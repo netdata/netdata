@@ -54,9 +54,19 @@ func (e *IncompleteInventoryError) Error() string {
 
 func (e *InventoryLimitError) Error() string {
 	if e.Hard {
-		return fmt.Sprintf("Ceph %s inventory contains %d rows, exceeding the internal ceiling of %d", e.Resource, e.Total, e.Limit)
+		return fmt.Sprintf(
+			"Ceph %s inventory contains %d rows, exceeding the internal ceiling of %d",
+			e.Resource,
+			e.Total,
+			e.Limit,
+		)
 	}
-	return fmt.Sprintf("Ceph %s inventory contains %d rows, exceeding the selected limit of %d; choose a larger limit", e.Resource, e.Total, e.Limit)
+	return fmt.Sprintf(
+		"Ceph %s inventory contains %d rows, exceeding the selected limit of %d; choose a larger limit",
+		e.Resource,
+		e.Total,
+		e.Limit,
+	)
 }
 
 type HealthResult struct {

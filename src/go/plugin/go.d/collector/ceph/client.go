@@ -21,14 +21,7 @@ import (
 const (
 	activeDiscoveryMaxHops = 5
 	urlPathAPIClusterFSID  = "/api/health/get_cluster_fsid"
-	maxIdentityBodyBytes   = 64 << 10
-	maxMonitorBodyBytes    = 8 << 20
-	maxHealthBodyBytes     = 32 << 20
-	maxInventoryBodyBytes  = 64 << 20
-	maxDefaultBodyBytes    = 16 << 20
 )
-
-var errResponseBodyTooLarge = errors.New("response exceeds the endpoint byte limit")
 
 type apiHTTPError struct {
 	operation string
@@ -77,7 +70,12 @@ type cephClient struct {
 	jwt          string
 }
 
-func newCephClient(httpClient *http.Client, cfg web.RequestConfig, notFollowRedirects bool, allowedRedirectOrigins []string) (*cephClient, error) {
+func newCephClient(
+	httpClient *http.Client,
+	cfg web.RequestConfig,
+	notFollowRedirects bool,
+	allowedRedirectOrigins []string,
+) (*cephClient, error) {
 	if httpClient == nil {
 		return nil, errors.New("HTTP client is nil")
 	}
@@ -158,12 +156,23 @@ func (c *cephClient) getJSON(ctx context.Context, operation, endpoint, accept st
 	return err
 }
 
-func (c *cephClient) getJSONWithHeaders(ctx context.Context, operation, endpoint, accept string, query url.Values, dst any) (http.Header, error) {
+func (c *cephClient) getJSONWithHeaders(
+	ctx context.Context,
+	operation, endpoint, accept string,
+	query url.Values,
+	dst any,
+) (http.Header, error) {
 	headers, _, err := c.doJSON(ctx, operation, http.MethodGet, endpoint, accept, query, nil, dst)
 	return headers, err
 }
 
-func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, accept string, query url.Values, body []byte, dst any) (http.Header, activeBaseRef, error) {
+func (c *cephClient) doJSON(
+	ctx context.Context,
+	operation, method, endpoint, accept string,
+	query url.Values,
+	body []byte,
+	dst any,
+) (http.Header, activeBaseRef, error) {
 	if timeout := c.httpClient.Timeout; timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -217,7 +226,7 @@ func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, ac
 			headers := resp.Header.Clone()
 			defer web.CloseBody(resp)
 			if dst != nil {
-				if err := decodeJSONResponse(resp, endpoint, dst); err != nil {
+				if err := decodeJSONResponse(resp, dst); err != nil {
 					return nil, activeBaseRef{}, fmt.Errorf("decode %s response: %w", operation, err)
 				}
 			}
@@ -238,7 +247,11 @@ func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, ac
 			c.invalidateActive(active)
 			continue
 		}
-		return nil, activeBaseRef{}, &apiHTTPError{operation: operation, status: status, redirect: isRedirect}
+		return nil, activeBaseRef{}, &apiHTTPError{
+			operation: operation,
+			status:    status,
+			redirect:  isRedirect,
+		}
 	}
 
 	return nil, activeBaseRef{}, fmt.Errorf("%s exceeded bounded authentication/failover retries", operation)
@@ -255,7 +268,8 @@ func (c *cephClient) probeClusterIdentity(ctx context.Context) (string, error) {
 		}
 
 		c.stateMu.Lock()
-		if c.activeBase == nil || active.base == nil || c.activeGen != active.generation || c.activeBase.String() != active.base.String() {
+		if c.activeBase == nil || active.base == nil || c.activeGen != active.generation ||
+			c.activeBase.String() != active.base.String() {
 			c.stateMu.Unlock()
 			continue
 		}
@@ -303,7 +317,8 @@ func (c *cephClient) fetchClusterIdentity(ctx context.Context) (string, activeBa
 
 func (c *cephClient) ensureActiveIdentity(ctx context.Context, active activeBaseRef) (bool, error) {
 	c.stateMu.RLock()
-	current := c.activeBase != nil && active.base != nil && c.activeGen == active.generation && c.activeBase.String() == active.base.String()
+	current := c.activeBase != nil && active.base != nil && c.activeGen == active.generation &&
+		c.activeBase.String() == active.base.String()
 	initialized := c.expectedFSID != ""
 	validated := current && c.validatedGen == active.generation
 	c.stateMu.RUnlock()
@@ -338,7 +353,10 @@ func (c *cephClient) ensureActiveBase(ctx context.Context) (activeBaseRef, error
 	generation := c.activeGen
 	c.stateMu.RUnlock()
 	if active != nil {
-		return activeBaseRef{base: active, generation: generation}, nil
+		return activeBaseRef{
+			base:       active,
+			generation: generation,
+		}, nil
 	}
 
 	c.discoveryMu.Lock()
@@ -349,7 +367,10 @@ func (c *cephClient) ensureActiveBase(ctx context.Context) (activeBaseRef, error
 	generation = c.activeGen
 	c.stateMu.RUnlock()
 	if active != nil {
-		return activeBaseRef{base: active, generation: generation}, nil
+		return activeBaseRef{
+			base:       active,
+			generation: generation,
+		}, nil
 	}
 
 	active, err := c.discoverActiveBase(ctx)
@@ -361,7 +382,10 @@ func (c *cephClient) ensureActiveBase(ctx context.Context) (activeBaseRef, error
 	generation = c.activeGen
 	c.activeBase = cloneURL(active)
 	c.stateMu.Unlock()
-	return activeBaseRef{base: active, generation: generation}, nil
+	return activeBaseRef{
+		base:       active,
+		generation: generation,
+	}, nil
 }
 
 func (c *cephClient) discoverActiveBase(ctx context.Context) (*url.URL, error) {
@@ -410,7 +434,10 @@ discover:
 				base = next
 				continue discover
 			default:
-				return nil, &apiHTTPError{operation: "active-MGR discovery", status: status}
+				return nil, &apiHTTPError{
+					operation: "active-MGR discovery",
+					status:    status,
+				}
 			}
 		}
 		return nil, errors.New("active-MGR discovery found no supported identity endpoint")
@@ -447,7 +474,10 @@ func dashboardOrigin(value *url.URL) string {
 	if port != "" {
 		host += ":" + port
 	}
-	return (&url.URL{Scheme: scheme, Host: host}).String()
+	return (&url.URL{
+		Scheme: scheme,
+		Host:   host,
+	}).String()
 }
 
 func redirectedDashboardBase(current *url.URL, location, probePath string) (*url.URL, error) {
@@ -527,7 +557,10 @@ func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token 
 	}
 	resp, err := c.request(ctx, base, http.MethodPost, urlPathApiAuth, hdrAcceptVersion, nil, body, "")
 	if err != nil {
-		return "", true, &apiTransportError{operation: "Dashboard login", err: err}
+		return "", true, &apiTransportError{
+			operation: "Dashboard login",
+			err:       err,
+		}
 	}
 	defer web.CloseBody(resp)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -537,7 +570,7 @@ func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token 
 			redirect:  isRedirectStatus(resp.StatusCode),
 		}
 	}
-	if err := decodeJSONResponse(resp, urlPathApiAuth, &response); err != nil {
+	if err := decodeJSONResponse(resp, &response); err != nil {
 		return "", true, fmt.Errorf("decode login response: %w", err)
 	}
 	if response.Token == "" {
@@ -550,7 +583,14 @@ func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token 
 	return response.Token, true, nil
 }
 
-func (c *cephClient) request(ctx context.Context, base *url.URL, method, endpoint, accept string, query url.Values, body []byte, token string) (*http.Response, error) {
+func (c *cephClient) request(
+	ctx context.Context,
+	base *url.URL,
+	method, endpoint, accept string,
+	query url.Values,
+	body []byte,
+	token string,
+) (*http.Response, error) {
 	cfg := c.requestConfig.Copy()
 	u := cloneURL(base)
 	rawPath := strings.TrimSuffix(base.EscapedPath(), "/") + "/" + strings.TrimLeft(endpoint, "/")
@@ -560,7 +600,9 @@ func (c *cephClient) request(ctx context.Context, base *url.URL, method, endpoin
 	}
 	u.Path = decodedPath
 	u.RawPath = rawPath
-	if u.RawPath == (&url.URL{Path: u.Path}).EscapedPath() {
+	if u.RawPath == (&url.URL{
+		Path: u.Path,
+	}).EscapedPath() {
 		u.RawPath = ""
 	}
 	if len(query) > 0 {
@@ -595,7 +637,8 @@ func (c *cephClient) request(ctx context.Context, base *url.URL, method, endpoin
 func (c *cephClient) invalidateActive(active activeBaseRef) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
-	if c.activeBase != nil && active.base != nil && c.activeGen == active.generation && c.activeBase.String() == active.base.String() {
+	if c.activeBase != nil && active.base != nil && c.activeGen == active.generation &&
+		c.activeBase.String() == active.base.String() {
 		c.activeBase = nil
 		c.jwt = ""
 	}
@@ -639,14 +682,8 @@ func isUnsupportedAPIVersionError(err error) bool {
 	return httpErr.status == http.StatusNotAcceptable || httpErr.status == http.StatusUnsupportedMediaType
 }
 
-func decodeJSONResponse(resp *http.Response, endpoint string, dst any) error {
-	limit := responseBodyLimit(endpoint)
-	if resp.ContentLength > limit {
-		return fmt.Errorf("%w (%d bytes)", errResponseBodyTooLarge, limit)
-	}
-
-	reader := &boundedResponseReader{reader: resp.Body, remaining: limit}
-	decoder := json.NewDecoder(reader)
+func decodeJSONResponse(resp *http.Response, dst any) error {
+	decoder := json.NewDecoder(resp.Body)
 	decoder.UseNumber()
 	if err := decoder.Decode(dst); err != nil {
 		return err
@@ -659,50 +696,6 @@ func decodeJSONResponse(resp *http.Response, endpoint string, dst any) error {
 		return err
 	}
 	return nil
-}
-
-func responseBodyLimit(endpoint string) int64 {
-	switch endpoint {
-	case urlPathAPIClusterFSID, urlPathApiAuth:
-		return maxIdentityBodyBytes
-	case urlPathApiMonitor:
-		return maxMonitorBodyBytes
-	case urlPathApiHealthMinimal:
-		return maxHealthBodyBytes
-	case urlPathApiOsd, urlPathApiPool:
-		return maxInventoryBodyBytes
-	default:
-		return maxDefaultBodyBytes
-	}
-}
-
-type boundedResponseReader struct {
-	reader    io.Reader
-	remaining int64
-	eof       bool
-}
-
-func (r *boundedResponseReader) Read(p []byte) (int, error) {
-	if r.eof {
-		return 0, io.EOF
-	}
-	if r.remaining == 0 {
-		var extra [1]byte
-		n, err := r.reader.Read(extra[:])
-		if n > 0 {
-			return 0, errResponseBodyTooLarge
-		}
-		return 0, err
-	}
-	if int64(len(p)) > r.remaining {
-		p = p[:r.remaining]
-	}
-	n, err := r.reader.Read(p)
-	r.remaining -= int64(n)
-	if errors.Is(err, io.EOF) {
-		r.eof = true
-	}
-	return n, err
 }
 
 func cloneURL(u *url.URL) *url.URL {

@@ -39,7 +39,9 @@ func TestFuncDepsHealth(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 500)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Health(context.Background(), 500)
 	require.NoError(t, err)
 	require.Len(t, result.Rows, 2)
 	assert.Equal(t, 2, result.Total)
@@ -78,7 +80,9 @@ func TestFunctionRevalidatesPinnedClusterIdentity(t *testing.T) {
 	require.NoError(t, c.Check(context.Background()))
 	fsid.Store("cluster-b")
 
-	_, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 500)
+	_, err := (funcDepsAdapter{
+		collector: c,
+	}).Health(context.Background(), 500)
 	require.ErrorContains(t, err, "cluster identity changed")
 	assert.Zero(t, healthRequests.Load())
 }
@@ -107,7 +111,9 @@ func TestFuncDepsHealthBoundsNormalizedRows(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 1)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Health(context.Background(), 1)
 	require.NoError(t, err)
 	assert.Equal(t, 5, result.Total)
 	assert.Len(t, result.Rows, 2)
@@ -131,7 +137,9 @@ func TestFuncDepsHealthPrioritizesErrorsBeforeBound(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 1)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Health(context.Background(), 1)
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.Total)
 	require.Len(t, result.Rows, 2)
@@ -157,7 +165,9 @@ func TestFuncDepsHealthAcceptsKeyedCompatibilityForm(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 500)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Health(context.Background(), 500)
 	require.NoError(t, err)
 	require.Len(t, result.Rows, 1)
 	assert.Equal(t, "SLOW_OPS", result.Rows[0].Code)
@@ -180,7 +190,9 @@ func TestFuncDepsHealthRejectsMissingChecks(t *testing.T) {
 			c := newInitializedCollector(t, srv.URL, nil)
 			defer c.Cleanup(context.Background())
 
-			_, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 500)
+			_, err := (funcDepsAdapter{
+				collector: c,
+			}).Health(context.Background(), 500)
 			require.ErrorContains(t, err, "missing health checks")
 		})
 	}
@@ -208,7 +220,9 @@ func TestFuncDepsHealthRejectsAmbiguousOrInvalidRows(t *testing.T) {
 			c := newInitializedCollector(t, srv.URL, nil)
 			defer c.Cleanup(context.Background())
 
-			_, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 500)
+			_, err := (funcDepsAdapter{
+				collector: c,
+			}).Health(context.Background(), 500)
 			require.Error(t, err)
 		})
 	}
@@ -233,7 +247,9 @@ func TestFuncDepsOSDsRejectsInventoryAboveSelectedLimit(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).OSDs(context.Background(), 1)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).OSDs(context.Background(), 1)
 	require.ErrorContains(t, err, "selected limit")
 	assert.Equal(t, "1", requestedLimit)
 	assert.Empty(t, result.Rows)
@@ -243,7 +259,8 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case urlPathApiPool:
-			if r.URL.Query().Get("stats") != "false" || !strings.Contains(r.URL.Query().Get("attrs"), "pg_autoscale_mode") {
+			if r.URL.Query().Get("stats") != "false" ||
+				!strings.Contains(r.URL.Query().Get("attrs"), "pg_autoscale_mode") {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -264,7 +281,10 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 			}
 			writeJSON(w, http.StatusOK, []map[string]any{{
 				"rule_name": "ssd-rule",
-				"steps":     []map[string]any{{"op": "take", "item_name": "default~ssd"}, {"op": "chooseleaf_firstn", "type": "host"}},
+				"steps": []map[string]any{
+					{"op": "take", "item_name": "default~ssd"},
+					{"op": "chooseleaf_firstn", "type": "host"},
+				},
 			}})
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -274,11 +294,15 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).Pools(context.Background(), 1)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Pools(context.Background(), 1)
 	require.ErrorContains(t, err, "selected limit")
 	assert.Empty(t, result.Rows)
 
-	result, err = (funcDepsAdapter{collector: c}).Pools(context.Background(), 3)
+	result, err = (funcDepsAdapter{
+		collector: c,
+	}).Pools(context.Background(), 3)
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.Total)
 	require.Len(t, result.Rows, 3)
@@ -309,11 +333,15 @@ func TestFuncDepsDaemonsRejectsPartialAndSortsCompleteInventory(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).Daemons(context.Background(), 1)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Daemons(context.Background(), 1)
 	require.ErrorContains(t, err, "selected limit")
 	assert.Empty(t, result.Rows)
 
-	result, err = (funcDepsAdapter{collector: c}).Daemons(context.Background(), 3)
+	result, err = (funcDepsAdapter{
+		collector: c,
+	}).Daemons(context.Background(), 3)
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.Total)
 	require.Len(t, result.Rows, 3)
@@ -335,7 +363,9 @@ func TestFuncDepsDaemonsKeepsMissingActiveStateUnknown(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{collector: c}).Daemons(context.Background(), 10)
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Daemons(context.Background(), 10)
 	require.NoError(t, err)
 	require.Len(t, result.Rows, 1)
 	assert.Nil(t, result.Rows[0].Active)

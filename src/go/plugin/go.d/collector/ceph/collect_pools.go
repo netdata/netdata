@@ -28,7 +28,9 @@ type poolMetricSample struct {
 func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error {
 	var pools []apiPoolResponse
 	if err := c.apiClient.getJSON(ctx, "list pool statistics", urlPathApiPool, hdrAcceptVersion,
-		url.Values{"stats": {"true"}}, &pools); err != nil {
+		url.Values{
+			"stats": {"true"},
+		}, &pools); err != nil {
 		return err
 	}
 	if len(pools) > maxPoolInventoryRecords {
@@ -124,8 +126,15 @@ func poolSample(pool apiPoolResponse) (poolMetricSample, error) {
 		return poolMetricSample{}, fmt.Errorf("list pool statistics returned utilization outside the 0-1 range")
 	}
 	return poolMetricSample{
-		key: pool.PoolName, objects: parsed[0], available: parsed[1], used: parsed[2], utilization: utilization,
-		readOps: parsed[3], writeOps: parsed[4], readBytes: parsed[5], writtenBytes: parsed[6],
+		key:          pool.PoolName,
+		objects:      parsed[0],
+		available:    parsed[1],
+		used:         parsed[2],
+		utilization:  utilization,
+		readOps:      parsed[3],
+		writeOps:     parsed[4],
+		readBytes:    parsed[5],
+		writtenBytes: parsed[6],
 	}, nil
 }
 

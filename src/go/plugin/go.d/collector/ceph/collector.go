@@ -70,16 +70,16 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode                  string   `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery            int      `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry     int      `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	FunctionOnly           bool     `yaml:"function_only,omitempty" json:"function_only"`
+	Vnode                  string   `yaml:"vnode,omitempty"                    json:"vnode"`
+	UpdateEvery            int      `yaml:"update_every,omitempty"             json:"update_every"`
+	AutoDetectionRetry     int      `yaml:"autodetection_retry,omitempty"      json:"autodetection_retry"`
+	FunctionOnly           bool     `yaml:"function_only,omitempty"            json:"function_only"`
 	AllowedRedirectOrigins []string `yaml:"allowed_redirect_origins,omitempty" json:"allowed_redirect_origins"`
-	OSDSelector            string   `yaml:"osd_selector,omitempty" json:"osd_selector"`
-	MaxOSDs                int      `yaml:"max_osds,omitempty" json:"max_osds"`
-	PoolSelector           string   `yaml:"pool_selector,omitempty" json:"pool_selector"`
-	MaxPools               int      `yaml:"max_pools,omitempty" json:"max_pools"`
-	web.HTTPConfig         `yaml:",inline" json:""`
+	OSDSelector            string   `yaml:"osd_selector,omitempty"             json:"osd_selector"`
+	MaxOSDs                int      `yaml:"max_osds,omitempty"                 json:"max_osds"`
+	PoolSelector           string   `yaml:"pool_selector,omitempty"            json:"pool_selector"`
+	MaxPools               int      `yaml:"max_pools,omitempty"                json:"max_pools"`
+	web.HTTPConfig         `         yaml:",inline"                            json:""`
 }
 
 type entityState struct {
@@ -139,7 +139,9 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("create Ceph client: %v", err)
 	}
 	c.apiClient = apiClient
-	c.funcRouter = cephfunc.NewRouter(funcDepsAdapter{collector: c})
+	c.funcRouter = cephfunc.NewRouter(funcDepsAdapter{
+		collector: c,
+	})
 
 	return nil
 }

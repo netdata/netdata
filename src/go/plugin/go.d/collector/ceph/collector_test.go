@@ -267,7 +267,9 @@ func TestCollector_PeriodicCollectionRevalidatesIdentity(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case urlPathApiAuth:
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-token"})
+			writeJSON(w, http.StatusCreated, authLoginResp{
+				Token: "test-token",
+			})
 		case urlPathAPIClusterFSID:
 			if r.Header.Get("Authorization") == "" {
 				w.WriteHeader(http.StatusUnauthorized)
@@ -612,7 +614,9 @@ func TestCollector_CapSuppressionImmediatelyObsoletesEntityCharts(t *testing.T) 
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
 	c.addOsdCharts("uuid-1", "ssd", "osd.1")
-	c.seenOsds["uuid-1"] = &entityState{lastSeen: time.Now()}
+	c.seenOsds["uuid-1"] = &entityState{
+		lastSeen: time.Now(),
+	}
 
 	c.suppressEntityMetrics("osd", c.seenOsds)
 	assert.Empty(t, c.seenOsds)
@@ -750,7 +754,12 @@ func TestCollector_OSDWholeListRejectsInconsistentAdvertisedTotal(t *testing.T) 
 }
 
 func TestValidateOSDsRejectsUnsafeDynamicIdentitiesAndCapacity(t *testing.T) {
-	valid := apiOsdResponse{ID: 1, UUID: "uuid-1", Up: 1, In: 1}
+	valid := apiOsdResponse{
+		ID:   1,
+		UUID: "uuid-1",
+		Up:   1,
+		In:   1,
+	}
 	valid.OsdStats.Statfs.Total = 100
 	valid.OsdStats.Statfs.Available = 50
 	require.NoError(t, validateOSDs([]apiOsdResponse{valid}))
@@ -869,7 +878,9 @@ func TestCollector_DynamicEntityAbsenceGrace(t *testing.T) {
 	c.identityMu.Unlock()
 	c.addPoolCharts("pool-a")
 	base := time.Unix(100, 0)
-	c.seenPools["pool-a"] = &entityState{lastSeen: base}
+	c.seenPools["pool-a"] = &entityState{
+		lastSeen: base,
+	}
 
 	c.expireMissingEntities("pool", c.seenPools, map[string]bool{}, base.Add(59*time.Second))
 	assert.Contains(t, c.seenPools, "pool-a")
@@ -899,8 +910,12 @@ func TestCollector_DynamicEntityLifecycleUsesExactChartIDs(t *testing.T) {
 	c.addPoolCharts("foo")
 	c.addPoolCharts("foo_bar")
 	base := time.Unix(100, 0)
-	c.seenPools["foo"] = &entityState{lastSeen: base}
-	c.seenPools["foo_bar"] = &entityState{lastSeen: base}
+	c.seenPools["foo"] = &entityState{
+		lastSeen: base,
+	}
+	c.seenPools["foo_bar"] = &entityState{
+		lastSeen: base,
+	}
 
 	c.expireMissingEntities("pool", c.seenPools, map[string]bool{"foo_bar": true}, base.Add(61*time.Second))
 	for _, id := range entityChartIDs("pool", "foo") {
@@ -1105,7 +1120,13 @@ func TestCollector_PublicChartIdentityContract(t *testing.T) {
 			for _, dim := range chart.Dims {
 				dims = append(dims, dim.ID+"="+dim.Name)
 			}
-			got[chart.ID] = fmt.Sprintf("%s|%s|%s|%s", chart.Ctx, chart.Units, chart.Type.String(), strings.Join(dims, ","))
+			got[chart.ID] = fmt.Sprintf(
+				"%s|%s|%s|%s",
+				chart.Ctx,
+				chart.Units,
+				chart.Type.String(),
+				strings.Join(dims, ","),
+			)
 		}
 	}
 	assert.Equal(t, want, got)
@@ -1153,7 +1174,9 @@ func newFakeDashboard(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case urlPathApiAuth:
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-token"})
+			writeJSON(w, http.StatusCreated, authLoginResp{
+				Token: "test-token",
+			})
 			return
 		case urlPathAPIClusterFSID:
 			if r.Header.Get("Authorization") == "" {
@@ -1196,6 +1219,10 @@ func requireClusterIdentity(t *testing.T, c *Collector) {
 
 func TestCollector_RequestConfigRemainsCompatibleWithProxyAndTLSFields(t *testing.T) {
 	c := New()
-	c.Config.HTTPConfig = web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://ceph.example"}}
+	c.Config.HTTPConfig = web.HTTPConfig{
+		RequestConfig: web.RequestConfig{
+			URL: "https://ceph.example",
+		},
+	}
 	assert.Equal(t, "https://ceph.example", c.URL)
 }

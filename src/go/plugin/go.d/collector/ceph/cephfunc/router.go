@@ -31,15 +31,35 @@ type router struct {
 var _ funcapi.MethodHandler = (*router)(nil)
 
 func NewRouter(deps Deps) funcapi.MethodHandler {
-	return &router{deps: deps}
+	return &router{
+		deps: deps,
+	}
 }
 
 func Methods() []funcapi.FunctionConfig {
 	return []funcapi.FunctionConfig{
 		{ID: MethodHealth, Name: "Ceph Health", UpdateEvery: 10, Help: "Detailed Ceph health checks and RCA messages."},
-		{ID: MethodOSDs, Name: "Ceph OSDs", UpdateEvery: 30, Help: "Current Ceph OSD state, capacity, throughput, and latency.", RequiredParams: inventoryParams()},
-		{ID: MethodPools, Name: "Ceph Pools", UpdateEvery: 30, Help: "Ceph pool policy, placement, applications, and quotas.", RequiredParams: inventoryParams()},
-		{ID: MethodDaemons, Name: "Ceph Daemons", UpdateEvery: 30, Help: "Ceph daemon inventory reported by Dashboard.", RequiredParams: inventoryParams()},
+		{
+			ID:             MethodOSDs,
+			Name:           "Ceph OSDs",
+			UpdateEvery:    30,
+			Help:           "Current Ceph OSD state, capacity, throughput, and latency.",
+			RequiredParams: inventoryParams(),
+		},
+		{
+			ID:             MethodPools,
+			Name:           "Ceph Pools",
+			UpdateEvery:    30,
+			Help:           "Ceph pool policy, placement, applications, and quotas.",
+			RequiredParams: inventoryParams(),
+		},
+		{
+			ID:             MethodDaemons,
+			Name:           "Ceph Daemons",
+			UpdateEvery:    30,
+			Help:           "Ceph daemon inventory reported by Dashboard.",
+			RequiredParams: inventoryParams(),
+		},
 	}
 }
 
@@ -152,7 +172,14 @@ func (r *router) health(ctx context.Context, limit int) *funcapi.FunctionRespons
 			detail, summaryTruncated || textTruncated, truncated,
 		})
 	}
-	return tableResponse(healthColumns(), data, "severity", "Detailed Ceph health checks and RCA messages.", total, truncated)
+	return tableResponse(
+		healthColumns(),
+		data,
+		"severity",
+		"Detailed Ceph health checks and RCA messages.",
+		total,
+		truncated,
+	)
 }
 
 func (r *router) osds(ctx context.Context, limit int) *funcapi.FunctionResponse {
@@ -173,7 +200,14 @@ func (r *router) osds(ctx context.Context, limit int) *funcapi.FunctionResponse 
 			row.CommitLatencyMS, row.ApplyLatencyMS,
 		})
 	}
-	return tableResponse(osdColumns(), data, "id", "Current Ceph OSD state, capacity, throughput, and latency.", result.Total, false)
+	return tableResponse(
+		osdColumns(),
+		data,
+		"id",
+		"Current Ceph OSD state, capacity, throughput, and latency.",
+		result.Total,
+		false,
+	)
 }
 
 func (r *router) pools(ctx context.Context, limit int) *funcapi.FunctionResponse {
@@ -193,7 +227,14 @@ func (r *router) pools(ctx context.Context, limit int) *funcapi.FunctionResponse
 			row.ErasureProfile, row.QuotaMaxBytes, row.QuotaMaxObjects, row.Flags,
 		})
 	}
-	return tableResponse(poolColumns(), data, "name", "Ceph pool policy, placement, applications, and quotas.", result.Total, false)
+	return tableResponse(
+		poolColumns(),
+		data,
+		"name",
+		"Ceph pool policy, placement, applications, and quotas.",
+		result.Total,
+		false,
+	)
 }
 
 func (r *router) daemons(ctx context.Context, limit int) *funcapi.FunctionResponse {
@@ -212,7 +253,14 @@ func (r *router) daemons(ctx context.Context, limit int) *funcapi.FunctionRespon
 			row.Image, row.LastRefresh, row.Placement,
 		})
 	}
-	return tableResponse(daemonColumns(), data, "type", "Ceph daemon inventory reported by Dashboard.", result.Total, false)
+	return tableResponse(
+		daemonColumns(),
+		data,
+		"type",
+		"Ceph daemon inventory reported by Dashboard.",
+		result.Total,
+		false,
+	)
 }
 
 func functionError(err error) *funcapi.FunctionResponse {
@@ -243,16 +291,29 @@ func functionError(err error) *funcapi.FunctionResponse {
 
 func validateCompleteInventory(resource string, rows, total, limit int) error {
 	if total > MaxInventoryLimit {
-		return &InventoryLimitError{Resource: resource, Total: total, Limit: MaxInventoryLimit, Hard: true}
+		return &InventoryLimitError{
+			Resource: resource,
+			Total:    total,
+			Limit:    MaxInventoryLimit,
+			Hard:     true,
+		}
 	}
 	if total > limit {
-		return &InventoryLimitError{Resource: resource, Total: total, Limit: limit}
+		return &InventoryLimitError{
+			Resource: resource,
+			Total:    total,
+			Limit:    limit,
+		}
 	}
 	if total < 0 {
 		return fmt.Errorf("Ceph %s inventory returned a negative total", resource)
 	}
 	if rows != total {
-		return &IncompleteInventoryError{Resource: resource, Rows: rows, Total: total}
+		return &IncompleteInventoryError{
+			Resource: resource,
+			Rows:     rows,
+			Total:    total,
+		}
 	}
 	return nil
 }
@@ -267,7 +328,13 @@ func capRows[T any](rows []T, total, limit int) ([]T, int, bool) {
 	return rows, total, total > len(rows)
 }
 
-func tableResponse(columns map[string]any, data [][]any, defaultSort, help string, total int, truncated bool) *funcapi.FunctionResponse {
+func tableResponse(
+	columns map[string]any,
+	data [][]any,
+	defaultSort, help string,
+	total int,
+	truncated bool,
+) *funcapi.FunctionResponse {
 	if truncated {
 		help = fmt.Sprintf("%s Showing the %d most severe of %d rows.", help, len(data), total)
 	}
@@ -311,9 +378,16 @@ func columns(defs []columnDef) map[string]any {
 
 func textCol(name, tooltip string, visible, unique bool) columnDef {
 	return columnDef{funcapi.ColumnMeta{
-		Name: name, Tooltip: tooltip, Type: funcapi.FieldTypeString, Visible: visible, UniqueKey: unique,
-		Sortable: true, Filter: funcapi.FieldFilterMultiselect, Summary: funcapi.FieldSummaryCount,
-		Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformText,
+		Name:          name,
+		Tooltip:       tooltip,
+		Type:          funcapi.FieldTypeString,
+		Visible:       visible,
+		UniqueKey:     unique,
+		Sortable:      true,
+		Filter:        funcapi.FieldFilterMultiselect,
+		Summary:       funcapi.FieldSummaryCount,
+		Visualization: funcapi.FieldVisualValue,
+		Transform:     funcapi.FieldTransformText,
 	}}
 }
 
@@ -326,25 +400,46 @@ func wrappedTextCol(name, tooltip string, visible bool) columnDef {
 
 func intCol(name, tooltip, units string, visible bool) columnDef {
 	return columnDef{funcapi.ColumnMeta{
-		Name: name, Tooltip: tooltip, Type: funcapi.FieldTypeInteger, Units: units, Visible: visible,
-		Sortable: true, Filter: funcapi.FieldFilterRange, Summary: funcapi.FieldSummarySum,
-		Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNumber,
+		Name:          name,
+		Tooltip:       tooltip,
+		Type:          funcapi.FieldTypeInteger,
+		Units:         units,
+		Visible:       visible,
+		Sortable:      true,
+		Filter:        funcapi.FieldFilterRange,
+		Summary:       funcapi.FieldSummarySum,
+		Visualization: funcapi.FieldVisualValue,
+		Transform:     funcapi.FieldTransformNumber,
 	}}
 }
 
 func floatCol(name, tooltip, units string, visible bool, decimals int) columnDef {
 	return columnDef{funcapi.ColumnMeta{
-		Name: name, Tooltip: tooltip, Type: funcapi.FieldTypeFloat, Units: units, Visible: visible,
-		Sortable: true, Filter: funcapi.FieldFilterRange, Summary: funcapi.FieldSummaryMean,
-		Visualization: funcapi.FieldVisualValue, Transform: funcapi.FieldTransformNumber, DecimalPoints: decimals,
+		Name:          name,
+		Tooltip:       tooltip,
+		Type:          funcapi.FieldTypeFloat,
+		Units:         units,
+		Visible:       visible,
+		Sortable:      true,
+		Filter:        funcapi.FieldFilterRange,
+		Summary:       funcapi.FieldSummaryMean,
+		Visualization: funcapi.FieldVisualValue,
+		Transform:     funcapi.FieldTransformNumber,
+		DecimalPoints: decimals,
 	}}
 }
 
 func boolCol(name, tooltip string, visible bool) columnDef {
 	return columnDef{funcapi.ColumnMeta{
-		Name: name, Tooltip: tooltip, Type: funcapi.FieldTypeBoolean, Visible: visible,
-		Sortable: true, Filter: funcapi.FieldFilterMultiselect, Summary: funcapi.FieldSummaryCount,
-		Visualization: funcapi.FieldVisualPill, Transform: funcapi.FieldTransformNone,
+		Name:          name,
+		Tooltip:       tooltip,
+		Type:          funcapi.FieldTypeBoolean,
+		Visible:       visible,
+		Sortable:      true,
+		Filter:        funcapi.FieldFilterMultiselect,
+		Summary:       funcapi.FieldSummaryCount,
+		Visualization: funcapi.FieldVisualPill,
+		Transform:     funcapi.FieldTransformNone,
 	}}
 }
 
@@ -368,24 +463,87 @@ func osdColumns() map[string]any {
 		textCol("name", "OSD name", true, false), textCol("host", "OSD host", true, false),
 		textCol("device_class", "CRUSH device class", true, false), boolCol("up", "OSD is up", true),
 		boolCol("in", "OSD is in", true), textCol("operational_status", "Orchestrator operational status", true, false),
-		intCol("total_bytes", "Total OSD capacity", "bytes", false), intCol("used_bytes", "Used OSD capacity", "bytes", true),
-		intCol("available_bytes", "Available OSD capacity", "bytes", true), floatCol("utilization", "OSD utilization", "%", true, 2),
-		floatCol("read_bytes_per_sec", "Read throughput", "bytes/s", false, 2), floatCol("write_bytes_per_sec", "Write throughput", "bytes/s", false, 2),
-		floatCol("read_ops_per_sec", "Read operations", "ops/s", false, 2), floatCol("write_ops_per_sec", "Write operations", "ops/s", false, 2),
-		floatCol("commit_latency_ms", "Commit latency", "milliseconds", false, 3), floatCol("apply_latency_ms", "Apply latency", "milliseconds", false, 3),
+		intCol(
+			"total_bytes",
+			"Total OSD capacity",
+			"bytes",
+			false,
+		), intCol("used_bytes", "Used OSD capacity", "bytes", true),
+		intCol(
+			"available_bytes",
+			"Available OSD capacity",
+			"bytes",
+			true,
+		), floatCol("utilization", "OSD utilization", "%", true, 2),
+		floatCol(
+			"read_bytes_per_sec",
+			"Read throughput",
+			"bytes/s",
+			false,
+			2,
+		), floatCol("write_bytes_per_sec", "Write throughput", "bytes/s", false, 2),
+		floatCol(
+			"read_ops_per_sec",
+			"Read operations",
+			"ops/s",
+			false,
+			2,
+		), floatCol("write_ops_per_sec", "Write operations", "ops/s", false, 2),
+		floatCol(
+			"commit_latency_ms",
+			"Commit latency",
+			"milliseconds",
+			false,
+			3,
+		), floatCol("apply_latency_ms", "Apply latency", "milliseconds", false, 3),
 	})
 }
 
 func poolColumns() map[string]any {
 	return columns([]columnDef{
 		textCol("name", "Pool name", true, true), textCol("type", "Pool type", true, false),
-		intCol("size", "Replica or EC shard count", "copies", true), intCol("min_size", "Minimum available copies", "copies", true),
-		intCol("pg_num", "Placement groups", "PGs", true), intCol("pgp_num", "Placement groups for placement", "PGs", false),
-		textCol("pg_autoscale_mode", "PG autoscaler mode", true, false), textCol("crush_rule", "CRUSH rule", true, false),
-		textCol("crush_root", "CRUSH root", true, false), textCol("failure_domain", "CRUSH failure domain", true, false),
-		textCol("device_class", "CRUSH device class", true, false), textCol("applications", "Enabled pool applications", true, false),
-		textCol("erasure_profile", "Erasure-code profile", false, false), intCol("quota_max_bytes", "Pool byte quota", "bytes", false),
-		intCol("quota_max_objects", "Pool object quota", "objects", false), textCol("flags", "Pool flags", false, false),
+		intCol(
+			"size",
+			"Replica or EC shard count",
+			"copies",
+			true,
+		), intCol("min_size", "Minimum available copies", "copies", true),
+		intCol(
+			"pg_num",
+			"Placement groups",
+			"PGs",
+			true,
+		), intCol("pgp_num", "Placement groups for placement", "PGs", false),
+		textCol(
+			"pg_autoscale_mode",
+			"PG autoscaler mode",
+			true,
+			false,
+		), textCol("crush_rule", "CRUSH rule", true, false),
+		textCol(
+			"crush_root",
+			"CRUSH root",
+			true,
+			false,
+		), textCol("failure_domain", "CRUSH failure domain", true, false),
+		textCol(
+			"device_class",
+			"CRUSH device class",
+			true,
+			false,
+		), textCol("applications", "Enabled pool applications", true, false),
+		textCol(
+			"erasure_profile",
+			"Erasure-code profile",
+			false,
+			false,
+		), intCol("quota_max_bytes", "Pool byte quota", "bytes", false),
+		intCol(
+			"quota_max_objects",
+			"Pool object quota",
+			"objects",
+			false,
+		), textCol("flags", "Pool flags", false, false),
 	})
 }
 
@@ -393,8 +551,18 @@ func daemonColumns() map[string]any {
 	return columns([]columnDef{
 		textCol("id", "Daemon row identifier", false, true), textCol("type", "Daemon type", true, false),
 		textCol("name", "Daemon name", true, false), textCol("host", "Daemon host", true, false),
-		textCol("status", "Daemon status", true, false), boolCol("active", "Daemon active state when Dashboard reports it", true),
+		textCol(
+			"status",
+			"Daemon status",
+			true,
+			false,
+		), boolCol("active", "Daemon active state when Dashboard reports it", true),
 		textCol("version", "Ceph version", true, false), textCol("image", "Container image", false, false),
-		textCol("last_refresh", "Last inventory refresh", false, false), textCol("placement", "Orchestrator placement", false, false),
+		textCol(
+			"last_refresh",
+			"Last inventory refresh",
+			false,
+			false,
+		), textCol("placement", "Orchestrator placement", false, false),
 	})
 }

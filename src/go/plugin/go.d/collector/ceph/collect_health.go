@@ -23,7 +23,14 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 
 	var errs []error
 	missing := func(feature, section string) {
-		errs = append(errs, fmt.Errorf("%s: response section %q is unavailable (check Dashboard RBAC and feature support)", feature, section))
+		errs = append(
+			errs,
+			fmt.Errorf(
+				"%s: response section %q is unavailable (check Dashboard RBAC and feature support)",
+				feature,
+				section,
+			),
+		)
 	}
 
 	if resp.Health == nil {
@@ -223,7 +230,11 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 func validateHealthResponseRecordLimits(resp apiHealthMinimalResponse) error {
 	check := func(section string, count int) error {
 		if count > maxHealthSectionRecords {
-			return fmt.Errorf("minimal health response section %q exceeds the record limit of %d", section, maxHealthSectionRecords)
+			return fmt.Errorf(
+				"minimal health response section %q exceeds the record limit of %d",
+				section,
+				maxHealthSectionRecords,
+			)
 		}
 		return nil
 	}

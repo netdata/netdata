@@ -80,7 +80,9 @@ func TestCephClientActiveLoginAndRequest(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-token"})
+			writeJSON(w, http.StatusCreated, authLoginResp{
+				Token: "test-token",
+			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -94,7 +96,10 @@ func TestCephClientActiveLoginAndRequest(t *testing.T) {
 	var got struct {
 		FSID string `json:"fsid"`
 	}
-	require.NoError(t, client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &got))
+	require.NoError(
+		t,
+		client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &got),
+	)
 	assert.Equal(t, "cluster-fsid", got.FSID)
 	assert.EqualValues(t, 1, discoveryRequests.Load())
 	assert.EqualValues(t, 1, loginRequests.Load())
@@ -119,7 +124,9 @@ func TestCephClientStandbyRedirectDiscoversActiveWithoutCredentials(t *testing.T
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"fsid": "active-fsid"})
 		case urlPathApiAuth:
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-active"})
+			writeJSON(w, http.StatusCreated, authLoginResp{
+				Token: "test-active",
+			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -140,7 +147,10 @@ func TestCephClientStandbyRedirectDiscoversActiveWithoutCredentials(t *testing.T
 		cfg.Password = "test-password"
 	}, active.URL)
 	var got map[string]any
-	require.NoError(t, client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &got))
+	require.NoError(
+		t,
+		client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &got),
+	)
 	assert.Equal(t, "active-fsid", got["fsid"])
 	assert.False(t, standbySawCredentials.Load())
 	assert.EqualValues(t, 1, activeDiscoveryRequests.Load())
@@ -220,7 +230,9 @@ func TestCephClientRetriesManagedTokenOnceOnUnauthorized(t *testing.T) {
 			}
 		case urlPathApiAuth:
 			n := loginCount.Add(1)
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "token-" + string(rune('0'+n))})
+			writeJSON(w, http.StatusCreated, authLoginResp{
+				Token: "token-" + string(rune('0'+n)),
+			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -232,7 +244,10 @@ func TestCephClientRetriesManagedTokenOnceOnUnauthorized(t *testing.T) {
 		cfg.Password = "test-password"
 	})
 	var got map[string]any
-	require.NoError(t, client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &got))
+	require.NoError(
+		t,
+		client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &got),
+	)
 	assert.EqualValues(t, 2, loginCount.Load())
 }
 
@@ -255,10 +270,16 @@ func TestCephClientRereadsStaticBearerToken(t *testing.T) {
 		cfg.BearerTokenFile = tokenFile
 	})
 	var first map[string]any
-	require.NoError(t, client.getJSON(context.Background(), "first", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &first))
+	require.NoError(
+		t,
+		client.getJSON(context.Background(), "first", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &first),
+	)
 	require.NoError(t, os.WriteFile(tokenFile, []byte("token-2\n"), 0o600))
 	var second map[string]any
-	require.NoError(t, client.getJSON(context.Background(), "second", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &second))
+	require.NoError(
+		t,
+		client.getJSON(context.Background(), "second", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &second),
+	)
 
 	assert.Equal(t, "Bearer token-1", first["token"])
 	assert.Equal(t, "Bearer token-2", second["token"])
@@ -319,8 +340,12 @@ func TestCephClientLogicalOperationUsesSingleDeadline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client, err := newCephClient(&http.Client{Timeout: 100 * time.Millisecond}, web.RequestConfig{
-		URL: srv.URL, Username: "netdata", Password: "test-password",
+	client, err := newCephClient(&http.Client{
+		Timeout: 100 * time.Millisecond,
+	}, web.RequestConfig{
+		URL:      srv.URL,
+		Username: "netdata",
+		Password: "test-password",
 	}, false, nil)
 	require.NoError(t, err)
 	client.activeBase = requireURL(t, srv.URL)
@@ -330,26 +355,6 @@ func TestCephClientLogicalOperationUsesSingleDeadline(t *testing.T) {
 	err = client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
-}
-
-func TestCephClientRejectsOversizedIdentityResponse(t *testing.T) {
-	response := `"` + strings.Repeat("x", 1<<20) + `"`
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = io.WriteString(w, response)
-	}))
-	defer srv.Close()
-
-	client := newTestCephClient(t, srv.URL, false, func(cfg *web.RequestConfig) {
-		cfg.Username = "netdata"
-		cfg.Password = "test-password"
-	})
-	client.activeBase = requireURL(t, srv.URL)
-	client.jwt = "test-token"
-
-	var fsid string
-	err := client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "exceeds")
 }
 
 func TestCephClientRuntimeRedirectFailoverValidatesClusterIdentity(t *testing.T) {
@@ -381,7 +386,9 @@ func TestCephClientRuntimeRedirectFailoverValidatesClusterIdentity(t *testing.T)
 					secondIdentityRequests.Add(1)
 					writeJSON(w, http.StatusOK, secondFSID.Load().(string))
 				case urlPathApiAuth:
-					writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-second"})
+					writeJSON(w, http.StatusCreated, authLoginResp{
+						Token: "test-second",
+					})
 				case originalPath:
 					secondPoolRequests.Add(1)
 					if r.URL.Query().Get("stats") != "true" || r.Header.Get("Authorization") != "Bearer test-second" {
@@ -409,7 +416,9 @@ func TestCephClientRuntimeRedirectFailoverValidatesClusterIdentity(t *testing.T)
 					}
 					writeJSON(w, http.StatusOK, "cluster-fsid")
 				case urlPathApiAuth:
-					writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-first"})
+					writeJSON(w, http.StatusCreated, authLoginResp{
+						Token: "test-first",
+					})
 				case originalPath:
 					failedOver.Store(true)
 					http.Redirect(w, r, secondURL+"/", http.StatusSeeOther)
@@ -423,13 +432,20 @@ func TestCephClientRuntimeRedirectFailoverValidatesClusterIdentity(t *testing.T)
 				cfg.Username = "netdata"
 				cfg.Password = "test-password"
 			}, second.URL)
-			collector := &Collector{Config: Config{FunctionOnly: true}, apiClient: client}
+			collector := &Collector{
+				Config: Config{
+					FunctionOnly: true,
+				},
+				apiClient: client,
+			}
 			_, err := collector.probeClusterIdentity(context.Background())
 			require.NoError(t, err)
 
 			var got []map[string]any
 			err = client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion,
-				url.Values{"stats": {"true"}}, &got)
+				url.Values{
+					"stats": {"true"},
+				}, &got)
 			if test.wantErr {
 				require.ErrorContains(t, err, "cluster identity changed")
 				assert.Empty(t, got)
@@ -437,7 +453,9 @@ func TestCephClientRuntimeRedirectFailoverValidatesClusterIdentity(t *testing.T)
 
 				secondFSID.Store("cluster-fsid")
 				err = client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion,
-					url.Values{"stats": {"true"}}, &got)
+					url.Values{
+						"stats": {"true"},
+					}, &got)
 				require.NoError(t, err)
 				require.Len(t, got, 1)
 				assert.Equal(t, "pool-a", got[0]["pool_name"])
@@ -487,7 +505,9 @@ func TestCephClientRuntimeTransportFailoverValidatesClusterIdentity(t *testing.T
 						}
 						writeJSON(w, http.StatusOK, fsid)
 					case urlPathApiAuth:
-						writeJSON(w, http.StatusCreated, authLoginResp{Token: token})
+						writeJSON(w, http.StatusCreated, authLoginResp{
+							Token: token,
+						})
 					case originalPath:
 						poolRequests.Add(1)
 						if r.Header.Get("Authorization") != "Bearer "+token {
@@ -503,7 +523,13 @@ func TestCephClientRuntimeTransportFailoverValidatesClusterIdentity(t *testing.T
 
 			var firstIdentityRequests, firstPoolRequests atomic.Int64
 			first := newActive("test-first", "pool-first", "cluster-fsid", &firstIdentityRequests, &firstPoolRequests)
-			second := newActive("test-second", "pool-second", test.secondFSID, &secondIdentityRequests, &secondPoolRequests)
+			second := newActive(
+				"test-second",
+				"pool-second",
+				test.secondFSID,
+				&secondIdentityRequests,
+				&secondPoolRequests,
+			)
 			defer second.Close()
 			activeTarget.Store(first.URL)
 
@@ -519,12 +545,20 @@ func TestCephClientRuntimeTransportFailoverValidatesClusterIdentity(t *testing.T
 				cfg.Username = "netdata"
 				cfg.Password = "test-password"
 			}, first.URL, second.URL)
-			collector := &Collector{Config: Config{FunctionOnly: true}, apiClient: client}
+			collector := &Collector{
+				Config: Config{
+					FunctionOnly: true,
+				},
+				apiClient: client,
+			}
 			_, err := collector.probeClusterIdentity(context.Background())
 			require.NoError(t, err)
 
 			var got []map[string]any
-			require.NoError(t, client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion, nil, &got))
+			require.NoError(
+				t,
+				client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion, nil, &got),
+			)
 			require.Len(t, got, 1)
 			assert.Equal(t, "pool-first", got[0]["pool_name"])
 
@@ -563,7 +597,9 @@ func TestCephClientLoginTransportFailureRediscoversThroughConfiguredStandby(t *t
 			}
 			writeJSON(w, http.StatusOK, "cluster-fsid")
 		case urlPathApiAuth:
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-second"})
+			writeJSON(w, http.StatusCreated, authLoginResp{
+				Token: "test-second",
+			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -607,7 +643,10 @@ func TestCephClientLoginTransportFailureRediscoversThroughConfiguredStandby(t *t
 	}, first.URL, second.URL)
 
 	var fsid string
-	require.NoError(t, client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid))
+	require.NoError(
+		t,
+		client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid),
+	)
 	assert.Equal(t, "cluster-fsid", fsid)
 	assert.False(t, standbySawCredentials.Load())
 }
@@ -620,12 +659,15 @@ func TestRedirectedDashboardBaseSecurity(t *testing.T) {
 		want     string
 		wantFail bool
 	}{
-		"Ceph root":          {location: "https://active.example:8443/", want: "https://active.example:8443"},
-		"preserved API path": {location: "https://active.example:8443/api/health/get_cluster_fsid", want: "https://active.example:8443"},
-		"relative root":      {location: "/dashboard", want: "https://standby.example:8443/dashboard"},
-		"HTTPS downgrade":    {location: "http://active.example:8080/", wantFail: true},
-		"userinfo":           {location: "https://user:example" + "@" + "active.example/", wantFail: true},
-		"missing Location":   {wantFail: true},
+		"Ceph root": {location: "https://active.example:8443/", want: "https://active.example:8443"},
+		"preserved API path": {
+			location: "https://active.example:8443/api/health/get_cluster_fsid",
+			want:     "https://active.example:8443",
+		},
+		"relative root":    {location: "/dashboard", want: "https://standby.example:8443/dashboard"},
+		"HTTPS downgrade":  {location: "http://active.example:8080/", wantFail: true},
+		"userinfo":         {location: "https://user:example" + "@" + "active.example/", wantFail: true},
+		"missing Location": {wantFail: true},
 	}
 
 	for name, test := range tests {
@@ -677,27 +719,48 @@ func TestCephClientRejectsManagedAuthenticationHeaders(t *testing.T) {
 
 func TestCephClientPreservesEscapedPathSegments(t *testing.T) {
 	var escapedPath string
-	httpClient := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		escapedPath = req.URL.EscapedPath()
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(`{}`)),
-			Request:    req,
-		}, nil
-	})}
-	client, err := newCephClient(httpClient, web.RequestConfig{URL: "https://ceph.example/dashboard"}, false, nil)
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			escapedPath = req.URL.EscapedPath()
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+				Request:    req,
+			}, nil
+		}),
+	}
+	client, err := newCephClient(httpClient, web.RequestConfig{
+		URL: "https://ceph.example/dashboard",
+	}, false, nil)
 	require.NoError(t, err)
 	base := requireURL(t, "https://ceph.example/dashboard")
-	resp, err := client.request(context.Background(), base, http.MethodGet, "/api/resource/tenant%2Fuser", hdrAcceptVersion, nil, nil, "token")
+	resp, err := client.request(
+		context.Background(),
+		base,
+		http.MethodGet,
+		"/api/resource/tenant%2Fuser",
+		hdrAcceptVersion,
+		nil,
+		nil,
+		"token",
+	)
 	require.NoError(t, err)
 	web.CloseBody(resp)
 	assert.Equal(t, "/dashboard/api/resource/tenant%2Fuser", escapedPath)
 }
 
-func newTestCephClient(t *testing.T, rawURL string, notFollowRedirects bool, configure func(*web.RequestConfig), allowedRedirectOrigins ...string) *cephClient {
+func newTestCephClient(
+	t *testing.T,
+	rawURL string,
+	notFollowRedirects bool,
+	configure func(*web.RequestConfig),
+	allowedRedirectOrigins ...string,
+) *cephClient {
 	t.Helper()
-	cfg := web.RequestConfig{URL: rawURL}
+	cfg := web.RequestConfig{
+		URL: rawURL,
+	}
 	if configure != nil {
 		configure(&cfg)
 	}

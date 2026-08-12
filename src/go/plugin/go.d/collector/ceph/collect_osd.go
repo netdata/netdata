@@ -91,7 +91,11 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 }
 
 func (c *Collector) fetchAllOSDs(ctx context.Context) ([]apiOsdResponse, error) {
-	query := url.Values{"offset": {"0"}, "limit": {"-1"}, "sort": {"+id"}}
+	query := url.Values{
+		"offset": {"0"},
+		"limit":  {"-1"},
+		"sort":   {"+id"},
+	}
 	var osds []apiOsdResponse
 	headers, err := c.apiClient.getJSONWithHeaders(ctx, "list OSDs", urlPathApiOsd, hdrAcceptVersionV11, query, &osds)
 	if err != nil {

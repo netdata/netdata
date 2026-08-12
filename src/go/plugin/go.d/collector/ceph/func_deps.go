@@ -122,8 +122,12 @@ func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.Health
 			}
 			if len(result.Rows) < target {
 				result.Rows = append(result.Rows, cephfunc.HealthRow{
-					ID: code + "#00000000", Code: code, Severity: severity, Muted: check.Muted,
-					Summary: check.Summary.Message, Count: check.Summary.Count,
+					ID:       code + "#00000000",
+					Code:     code,
+					Severity: severity,
+					Muted:    check.Muted,
+					Summary:  check.Summary.Message,
+					Count:    check.Summary.Count,
 				})
 			}
 			continue
@@ -135,9 +139,13 @@ func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.Health
 			}
 			if len(result.Rows) < target {
 				result.Rows = append(result.Rows, cephfunc.HealthRow{
-					ID: fmt.Sprintf("%s#%08d", code, index), Code: code, Severity: severity,
-					Muted: check.Muted, Summary: check.Summary.Message, Count: check.Summary.Count,
-					Detail: detail.Message,
+					ID:       fmt.Sprintf("%s#%08d", code, index),
+					Code:     code,
+					Severity: severity,
+					Muted:    check.Muted,
+					Summary:  check.Summary.Message,
+					Count:    check.Summary.Count,
+					Detail:   detail.Message,
 				})
 			}
 		}
@@ -153,10 +161,19 @@ func (d funcDepsAdapter) OSDs(ctx context.Context, limit int) (cephfunc.OSDResul
 		return cephfunc.OSDResult{}, errors.New("OSD inventory received an invalid row limit")
 	}
 	query := url.Values{
-		"offset": {"0"}, "limit": {strconv.Itoa(limit)}, "sort": {"+id"},
+		"offset": {"0"},
+		"limit":  {strconv.Itoa(limit)},
+		"sort":   {"+id"},
 	}
 	var osds []apiOsdResponse
-	headers, err := d.collector.apiClient.getJSONWithHeaders(ctx, "list OSDs for Function", urlPathApiOsd, hdrAcceptVersionV11, query, &osds)
+	headers, err := d.collector.apiClient.getJSONWithHeaders(
+		ctx,
+		"list OSDs for Function",
+		urlPathApiOsd,
+		hdrAcceptVersionV11,
+		query,
+		&osds,
+	)
 	if err != nil {
 		return cephfunc.OSDResult{}, toFunctionSourceError(err, "OSD inventory")
 	}
@@ -166,11 +183,18 @@ func (d funcDepsAdapter) OSDs(ctx context.Context, limit int) (cephfunc.OSDResul
 	}
 	if total > cephfunc.MaxInventoryLimit {
 		return cephfunc.OSDResult{}, &cephfunc.InventoryLimitError{
-			Resource: "OSD", Total: total, Limit: cephfunc.MaxInventoryLimit, Hard: true,
+			Resource: "OSD",
+			Total:    total,
+			Limit:    cephfunc.MaxInventoryLimit,
+			Hard:     true,
 		}
 	}
 	if total > limit {
-		return cephfunc.OSDResult{}, &cephfunc.InventoryLimitError{Resource: "OSD", Total: total, Limit: limit}
+		return cephfunc.OSDResult{}, &cephfunc.InventoryLimitError{
+			Resource: "OSD",
+			Total:    total,
+			Limit:    limit,
+		}
 	}
 	if len(osds) != total {
 		return cephfunc.OSDResult{}, fmt.Errorf("OSD inventory is incomplete: received %d of %d rows", len(osds), total)
@@ -193,17 +217,30 @@ func (d funcDepsAdapter) OSDs(ctx context.Context, limit int) (cephfunc.OSDResul
 			name = fmt.Sprintf("osd.%d", osd.ID)
 		}
 		rows = append(rows, cephfunc.OSDRow{
-			ID: osd.ID, Name: name, UUID: osd.UUID, Host: osd.Host.Name,
-			DeviceClass: osd.Tree.DeviceClass, Up: osd.Up == 1, In: osd.In == 1,
-			OperationalStatus: osd.OperationalStatus, TotalBytes: totalBytes, UsedBytes: usedBytes,
-			AvailableBytes: availableBytes, Utilization: utilization,
-			ReadBytesPerSec: osd.Stats.OpOutBytes, WriteBytesPerSec: osd.Stats.OpInBytes,
-			ReadOpsPerSec: osd.Stats.OpR, WriteOpsPerSec: osd.Stats.OpW,
-			CommitLatencyMS: osd.OsdStats.PerfStat.CommitLatencyMs,
-			ApplyLatencyMS:  osd.OsdStats.PerfStat.ApplyLatencyMs,
+			ID:                osd.ID,
+			Name:              name,
+			UUID:              osd.UUID,
+			Host:              osd.Host.Name,
+			DeviceClass:       osd.Tree.DeviceClass,
+			Up:                osd.Up == 1,
+			In:                osd.In == 1,
+			OperationalStatus: osd.OperationalStatus,
+			TotalBytes:        totalBytes,
+			UsedBytes:         usedBytes,
+			AvailableBytes:    availableBytes,
+			Utilization:       utilization,
+			ReadBytesPerSec:   osd.Stats.OpOutBytes,
+			WriteBytesPerSec:  osd.Stats.OpInBytes,
+			ReadOpsPerSec:     osd.Stats.OpR,
+			WriteOpsPerSec:    osd.Stats.OpW,
+			CommitLatencyMS:   osd.OsdStats.PerfStat.CommitLatencyMs,
+			ApplyLatencyMS:    osd.OsdStats.PerfStat.ApplyLatencyMs,
 		})
 	}
-	return cephfunc.OSDResult{Rows: rows, Total: total}, nil
+	return cephfunc.OSDResult{
+		Rows:  rows,
+		Total: total,
+	}, nil
 }
 
 func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolResult, error) {
@@ -220,16 +257,26 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 	}, ",")
 	var pools []map[string]any
 	if err := d.collector.apiClient.getJSON(ctx, "list pool policy", urlPathApiPool, hdrAcceptVersion,
-		url.Values{"stats": {"false"}, "attrs": {attrs}}, &pools); err != nil {
+		url.Values{
+			"stats": {"false"},
+			"attrs": {attrs},
+		}, &pools); err != nil {
 		return cephfunc.PoolResult{}, toFunctionSourceError(err, "pool inventory")
 	}
 	if len(pools) > cephfunc.MaxInventoryLimit {
 		return cephfunc.PoolResult{}, &cephfunc.InventoryLimitError{
-			Resource: "pool", Total: len(pools), Limit: cephfunc.MaxInventoryLimit, Hard: true,
+			Resource: "pool",
+			Total:    len(pools),
+			Limit:    cephfunc.MaxInventoryLimit,
+			Hard:     true,
 		}
 	}
 	if len(pools) > limit {
-		return cephfunc.PoolResult{}, &cephfunc.InventoryLimitError{Resource: "pool", Total: len(pools), Limit: limit}
+		return cephfunc.PoolResult{}, &cephfunc.InventoryLimitError{
+			Resource: "pool",
+			Total:    len(pools),
+			Limit:    limit,
+		}
 	}
 	seenPools := make(map[string]bool, len(pools))
 	for _, pool := range pools {
@@ -251,7 +298,10 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 	}
 	if len(rules) > cephfunc.MaxInventoryLimit {
 		return cephfunc.PoolResult{}, &cephfunc.InventoryLimitError{
-			Resource: "CRUSH rule", Total: len(rules), Limit: cephfunc.MaxInventoryLimit, Hard: true,
+			Resource: "CRUSH rule",
+			Total:    len(rules),
+			Limit:    cephfunc.MaxInventoryLimit,
+			Hard:     true,
 		}
 	}
 	ruleInfo := make(map[string]crushRuleInfo, len(rules))
@@ -294,18 +344,28 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 		ruleName := anyString(pool["crush_rule"])
 		placement := ruleInfo[ruleName]
 		rows = append(rows, cephfunc.PoolRow{
-			Name: anyString(pool["pool_name"]), Type: anyString(pool["type"]),
-			Size: size, MinSize: minSize,
-			PGNum: pgNum, PGPNum: pgpNum,
-			PGAutoscaleMode: anyString(pool["pg_autoscale_mode"]), CrushRule: ruleName,
-			CrushRoot: placement.root, FailureDomain: placement.failureDomain, DeviceClass: placement.deviceClass,
-			Applications:   strings.Join(anyStringSlice(pool["application_metadata"]), ","),
-			ErasureProfile: anyString(pool["erasure_code_profile"]),
-			QuotaMaxBytes:  quotaMaxBytes, QuotaMaxObjects: quotaMaxObjects,
-			Flags: strings.Join(anyStringSlice(pool["flags_names"]), ","),
+			Name:            anyString(pool["pool_name"]),
+			Type:            anyString(pool["type"]),
+			Size:            size,
+			MinSize:         minSize,
+			PGNum:           pgNum,
+			PGPNum:          pgpNum,
+			PGAutoscaleMode: anyString(pool["pg_autoscale_mode"]),
+			CrushRule:       ruleName,
+			CrushRoot:       placement.root,
+			FailureDomain:   placement.failureDomain,
+			DeviceClass:     placement.deviceClass,
+			Applications:    strings.Join(anyStringSlice(pool["application_metadata"]), ","),
+			ErasureProfile:  anyString(pool["erasure_code_profile"]),
+			QuotaMaxBytes:   quotaMaxBytes,
+			QuotaMaxObjects: quotaMaxObjects,
+			Flags:           strings.Join(anyStringSlice(pool["flags_names"]), ","),
 		})
 	}
-	return cephfunc.PoolResult{Rows: rows, Total: len(pools)}, nil
+	return cephfunc.PoolResult{
+		Rows:  rows,
+		Total: len(pools),
+	}, nil
 }
 
 func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.DaemonResult, error) {
@@ -321,11 +381,18 @@ func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.Daemo
 	}
 	if len(daemons) > cephfunc.MaxInventoryLimit {
 		return cephfunc.DaemonResult{}, &cephfunc.InventoryLimitError{
-			Resource: "daemon", Total: len(daemons), Limit: cephfunc.MaxInventoryLimit, Hard: true,
+			Resource: "daemon",
+			Total:    len(daemons),
+			Limit:    cephfunc.MaxInventoryLimit,
+			Hard:     true,
 		}
 	}
 	if len(daemons) > limit {
-		return cephfunc.DaemonResult{}, &cephfunc.InventoryLimitError{Resource: "daemon", Total: len(daemons), Limit: limit}
+		return cephfunc.DaemonResult{}, &cephfunc.InventoryLimitError{
+			Resource: "daemon",
+			Total:    len(daemons),
+			Limit:    limit,
+		}
 	}
 	sort.SliceStable(daemons, func(i, j int) bool {
 		leftID, leftName := daemonIdentity(daemons[i])
@@ -359,13 +426,27 @@ func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.Daemo
 			active = new(value)
 		}
 		rows = append(rows, cephfunc.DaemonRow{
-			ID: id, Type: typ, Name: name, Host: anyString(daemon["hostname"]),
-			Status: anyString(daemon["status_desc"]), Active: active,
-			Version: anyString(daemon["version"]), Image: firstNonEmpty(anyString(daemon["container_image_name"]), anyString(daemon["container_image_id"])),
-			LastRefresh: anyString(daemon["last_refresh"]), Placement: anyString(daemon["service_name"]),
+			ID:     id,
+			Type:   typ,
+			Name:   name,
+			Host:   anyString(daemon["hostname"]),
+			Status: anyString(daemon["status_desc"]),
+			Active: active,
+			Version: anyString(
+				daemon["version"],
+			),
+			Image: firstNonEmpty(
+				anyString(daemon["container_image_name"]),
+				anyString(daemon["container_image_id"]),
+			),
+			LastRefresh: anyString(daemon["last_refresh"]),
+			Placement:   anyString(daemon["service_name"]),
 		})
 	}
-	return cephfunc.DaemonResult{Rows: rows, Total: len(daemons)}, nil
+	return cephfunc.DaemonResult{
+		Rows:  rows,
+		Total: len(daemons),
+	}, nil
 }
 
 type crushRuleInfo struct{ root, failureDomain, deviceClass string }
@@ -430,7 +511,10 @@ func toFunctionSourceError(err error, capability string) error {
 		case http.StatusServiceUnavailable:
 			message = capability + " is unavailable; check its Ceph service prerequisite"
 		}
-		return &cephfunc.SourceError{Status: apiErr.status, Message: message}
+		return &cephfunc.SourceError{
+			Status:  apiErr.status,
+			Message: message,
+		}
 	}
 	return err
 }

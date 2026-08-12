@@ -56,8 +56,11 @@ func (r *wireRecorder) observe(req *http.Request) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.requests = append(r.requests, wireRequest{
-		Method: req.Method, Path: req.URL.Path, Accept: req.Header.Get("Accept"),
-		ContentType: req.Header.Get("Content-Type"), Query: req.URL.Query().Encode(),
+		Method:        req.Method,
+		Path:          req.URL.Path,
+		Accept:        req.Header.Get("Accept"),
+		ContentType:   req.Header.Get("Content-Type"),
+		Query:         req.URL.Query().Encode(),
 		Authenticated: req.Header.Get("Authorization") != "",
 	})
 }
@@ -335,13 +338,20 @@ func expectedPacificRequests() []wireRequest {
 
 func getWire(path, accept, query string, authenticated bool) wireRequest {
 	return wireRequest{
-		Method: http.MethodGet, Path: path, Accept: accept, Query: query, Authenticated: authenticated,
+		Method:        http.MethodGet,
+		Path:          path,
+		Accept:        accept,
+		Query:         query,
+		Authenticated: authenticated,
 	}
 }
 
 func postWire(path string) wireRequest {
 	return wireRequest{
-		Method: http.MethodPost, Path: path, Accept: wireAcceptV1,
-		ContentType: "application/json", Authenticated: false,
+		Method:        http.MethodPost,
+		Path:          path,
+		Accept:        wireAcceptV1,
+		ContentType:   "application/json",
+		Authenticated: false,
 	}
 }

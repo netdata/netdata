@@ -547,7 +547,12 @@ func (c *Collector) addClusterCharts() {
 	}
 }
 
-func (c *Collector) expireMissingEntities(kind string, states map[string]*entityState, seen map[string]bool, now time.Time) {
+func (c *Collector) expireMissingEntities(
+	kind string,
+	states map[string]*entityState,
+	seen map[string]bool,
+	now time.Time,
+) {
 	for key, state := range states {
 		if seen[key] || now.Sub(state.lastSeen) < entityAbsenceGrace {
 			continue

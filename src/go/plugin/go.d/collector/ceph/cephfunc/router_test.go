@@ -38,12 +38,24 @@ func TestRouterTableResponses(t *testing.T) {
 	size := int64(3)
 	enabled := true
 	deps := fakeDeps{
-		health: HealthResult{Rows: []HealthRow{{
-			ID: "CHECK#0000", Code: "CHECK", Severity: "HEALTH_WARN", Summary: "summary", Count: 1, Detail: "detail",
-		}}, Total: 1},
-		osds:    OSDResult{Rows: []OSDRow{{ID: 1, UUID: "uuid-1", Name: "osd.1", Up: true, In: true}}, Total: 1},
-		pools:   PoolResult{Rows: []PoolRow{{Name: "pool-a", Type: "replicated", Size: &size}}, Total: 1},
-		daemons: DaemonResult{Rows: []DaemonRow{{ID: "mon.a", Type: "mon", Name: "a", Active: &enabled}}, Total: 1},
+		health: HealthResult{
+			Rows: []HealthRow{{
+				ID: "CHECK#0000", Code: "CHECK", Severity: "HEALTH_WARN", Summary: "summary", Count: 1, Detail: "detail",
+			}},
+			Total: 1,
+		},
+		osds: OSDResult{
+			Rows:  []OSDRow{{ID: 1, UUID: "uuid-1", Name: "osd.1", Up: true, In: true}},
+			Total: 1,
+		},
+		pools: PoolResult{
+			Rows:  []PoolRow{{Name: "pool-a", Type: "replicated", Size: &size}},
+			Total: 1,
+		},
+		daemons: DaemonResult{
+			Rows:  []DaemonRow{{ID: "mon.a", Type: "mon", Name: "a", Active: &enabled}},
+			Total: 1,
+		},
 	}
 	router := NewRouter(deps)
 
@@ -73,10 +85,22 @@ func TestRouterResponsesMatchFunctionUISchema(t *testing.T) {
 	size := int64(3)
 	enabled := true
 	deps := fakeDeps{
-		health:  HealthResult{Rows: []HealthRow{{ID: "CHECK#0000", Code: "CHECK", Severity: "HEALTH_WARN"}}, Total: 1},
-		osds:    OSDResult{Rows: []OSDRow{{ID: 1, UUID: "uuid-1", Name: "osd.1", Up: true, In: true}}, Total: 1},
-		pools:   PoolResult{Rows: []PoolRow{{Name: "pool-a", Type: "replicated", Size: &size}}, Total: 1},
-		daemons: DaemonResult{Rows: []DaemonRow{{ID: "mon.a", Type: "mon", Name: "a", Active: &enabled}}, Total: 1},
+		health: HealthResult{
+			Rows:  []HealthRow{{ID: "CHECK#0000", Code: "CHECK", Severity: "HEALTH_WARN"}},
+			Total: 1,
+		},
+		osds: OSDResult{
+			Rows:  []OSDRow{{ID: 1, UUID: "uuid-1", Name: "osd.1", Up: true, In: true}},
+			Total: 1,
+		},
+		pools: PoolResult{
+			Rows:  []PoolRow{{Name: "pool-a", Type: "replicated", Size: &size}},
+			Total: 1,
+		},
+		daemons: DaemonResult{
+			Rows:  []DaemonRow{{ID: "mon.a", Type: "mon", Name: "a", Active: &enabled}},
+			Total: 1,
+		},
 	}
 	router := NewRouter(deps)
 	methods := Methods()
@@ -109,14 +133,24 @@ func TestRouterResponsesMatchFunctionUISchema(t *testing.T) {
 }
 
 func TestRouterHealthTruncationIsExplicit(t *testing.T) {
-	deps := fakeDeps{health: HealthResult{
-		Rows: []HealthRow{
-			{ID: "A#0000", Code: "A", Severity: "HEALTH_ERR", Summary: strings.Repeat("é", maxFunctionTextLength), Detail: strings.Repeat("x", maxFunctionTextLength+1)},
-			{ID: "B#0000", Code: "B", Severity: "HEALTH_WARN"},
+	deps := fakeDeps{
+		health: HealthResult{
+			Rows: []HealthRow{
+				{
+					ID:       "A#0000",
+					Code:     "A",
+					Severity: "HEALTH_ERR",
+					Summary:  strings.Repeat("é", maxFunctionTextLength),
+					Detail:   strings.Repeat("x", maxFunctionTextLength+1),
+				},
+				{ID: "B#0000", Code: "B", Severity: "HEALTH_WARN"},
+			},
+			Total: 3,
 		},
-		Total: 3,
-	}}
-	response := (&router{deps: deps}).health(context.Background(), 1)
+	}
+	response := (&router{
+		deps: deps,
+	}).health(context.Background(), 1)
 	require.Equal(t, 200, response.Status)
 	data := response.Data.([][]any)
 	require.Len(t, data, 1)
@@ -134,7 +168,12 @@ func TestRouterHealthTruncationIsExplicit(t *testing.T) {
 }
 
 func TestRouterSourceErrors(t *testing.T) {
-	response := NewRouter(fakeDeps{healthErr: &SourceError{Status: 403, Message: "read permission required"}}).
+	response := NewRouter(fakeDeps{
+		healthErr: &SourceError{
+			Status:  403,
+			Message: "read permission required",
+		},
+	}).
 		Handle(context.Background(), MethodHealth, nil)
 	assert.Equal(t, 403, response.Status)
 }
@@ -150,11 +189,13 @@ func TestRouterMethodParams(t *testing.T) {
 
 func TestRouterPassesSelectedInventoryLimit(t *testing.T) {
 	captured := 0
-	deps := fakeDeps{onCall: func(method string, _ context.Context, limit int) {
-		if method == MethodOSDs {
-			captured = limit
-		}
-	}}
+	deps := fakeDeps{
+		onCall: func(method string, _ context.Context, limit int) {
+			if method == MethodOSDs {
+				captured = limit
+			}
+		},
+	}
 	params := funcapi.ResolveParams(inventoryParams(), map[string][]string{ParamLimit: {"2500"}})
 	response := NewRouter(deps).Handle(context.Background(), MethodOSDs, params)
 	require.Equal(t, 200, response.Status)
@@ -177,7 +218,9 @@ func TestRouterInventoryDoesNotReturnPartialRows(t *testing.T) {
 		"above hard limit":     {Total: MaxInventoryLimit + 1},
 	} {
 		t.Run(name, func(t *testing.T) {
-			response := NewRouter(fakeDeps{osds: result}).Handle(context.Background(), MethodOSDs, nil)
+			response := NewRouter(fakeDeps{
+				osds: result,
+			}).Handle(context.Background(), MethodOSDs, nil)
 			assert.Equal(t, 422, response.Status)
 			assert.Nil(t, response.Data)
 		})
@@ -186,11 +229,13 @@ func TestRouterInventoryDoesNotReturnPartialRows(t *testing.T) {
 
 func TestRouterAppliesInternalDeadlines(t *testing.T) {
 	deadlines := make(map[string]time.Duration)
-	deps := fakeDeps{onCall: func(method string, ctx context.Context, _ int) {
-		deadline, ok := ctx.Deadline()
-		require.True(t, ok)
-		deadlines[method] = time.Until(deadline)
-	}}
+	deps := fakeDeps{
+		onCall: func(method string, ctx context.Context, _ int) {
+			deadline, ok := ctx.Deadline()
+			require.True(t, ok)
+			deadlines[method] = time.Until(deadline)
+		},
+	}
 	router := NewRouter(deps)
 	for _, method := range []string{MethodHealth, MethodOSDs, MethodPools, MethodDaemons} {
 		response := router.Handle(context.Background(), method, nil)
@@ -207,7 +252,12 @@ func TestMaximumOSDInventoryResponseEnvelope(t *testing.T) {
 	params := funcapi.ResolveParams(inventoryParams(), map[string][]string{
 		ParamLimit: {fmt.Sprint(MaxInventoryLimit)},
 	})
-	response := NewRouter(fakeDeps{osds: OSDResult{Rows: rows, Total: len(rows)}}).
+	response := NewRouter(fakeDeps{
+		osds: OSDResult{
+			Rows:  rows,
+			Total: len(rows),
+		},
+	}).
 		Handle(context.Background(), MethodOSDs, params)
 	require.Equal(t, 200, response.Status)
 	encoded, err := json.Marshal(response)
@@ -223,7 +273,12 @@ func BenchmarkMaximumOSDInventoryResponse(b *testing.B) {
 	params := funcapi.ResolveParams(inventoryParams(), map[string][]string{
 		ParamLimit: {fmt.Sprint(MaxInventoryLimit)},
 	})
-	router := NewRouter(fakeDeps{osds: OSDResult{Rows: rows, Total: len(rows)}})
+	router := NewRouter(fakeDeps{
+		osds: OSDResult{
+			Rows:  rows,
+			Total: len(rows),
+		},
+	})
 	b.ReportAllocs()
 	for b.Loop() {
 		response := router.Handle(context.Background(), MethodOSDs, params)
@@ -239,12 +294,24 @@ func maximumOSDRows() []OSDRow {
 	rows := make([]OSDRow, MaxInventoryLimit)
 	for i := range rows {
 		rows[i] = OSDRow{
-			ID: int64(i), UUID: fmt.Sprintf("00000000-0000-0000-0000-%012d", i),
-			Name: fmt.Sprintf("osd.%d", i), Host: fmt.Sprintf("storage-host-%04d.example.net", i),
-			DeviceClass: "nvme", Up: true, In: true, OperationalStatus: "working",
-			TotalBytes: 8 << 40, UsedBytes: 4 << 40, AvailableBytes: 4 << 40, Utilization: 50,
-			ReadBytesPerSec: 1 << 30, WriteBytesPerSec: 1 << 30, ReadOpsPerSec: 100000,
-			WriteOpsPerSec: 100000, CommitLatencyMS: 1.25, ApplyLatencyMS: 1.5,
+			ID:                int64(i),
+			UUID:              fmt.Sprintf("00000000-0000-0000-0000-%012d", i),
+			Name:              fmt.Sprintf("osd.%d", i),
+			Host:              fmt.Sprintf("storage-host-%04d.example.net", i),
+			DeviceClass:       "nvme",
+			Up:                true,
+			In:                true,
+			OperationalStatus: "working",
+			TotalBytes:        8 << 40,
+			UsedBytes:         4 << 40,
+			AvailableBytes:    4 << 40,
+			Utilization:       50,
+			ReadBytesPerSec:   1 << 30,
+			WriteBytesPerSec:  1 << 30,
+			ReadOpsPerSec:     100000,
+			WriteOpsPerSec:    100000,
+			CommitLatencyMS:   1.25,
+			ApplyLatencyMS:    1.5,
 		}
 	}
 	return rows
