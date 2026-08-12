@@ -1,32 +1,12 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
 func TestLoadDCStatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
-	userRoot := t.TempDir()
-	stockRoot := t.TempDir()
-
-	t.Setenv("NETDATA_USER_CONFIG_DIR", userRoot)
-	t.Setenv("NETDATA_STOCK_CONFIG_DIR", stockRoot)
-
-	for _, root := range []string{userRoot, stockRoot} {
-		if err := os.MkdirAll(filepath.Join(root, "ebpf.d"), 0o755); err != nil {
-			t.Fatalf("mkdir %s/ebpf.d: %v", root, err)
-		}
-	}
-
-	write := func(root, rel, content string) {
-		path := filepath.Join(root, rel)
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	write(stockRoot, "ebpf.d.conf", `
+	writeCollectorConfigFixture(t, "dcstat.conf",
+		`
 [global]
     update every = 11
     pid table size = 2048
@@ -36,19 +16,19 @@ func TestLoadDCStatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 
 [ebpf programs]
     dcstat = no
-`)
-	write(stockRoot, filepath.Join("ebpf.d", "dcstat.conf"), `
+`,
+		`
 [global]
     pid table size = 4096
-`)
-	write(userRoot, "ebpf.d.conf", `
+`,
+		`
 [global]
     update every = 23
 
 [ebpf programs]
     dcstat = yes
-`)
-	write(userRoot, filepath.Join("ebpf.d", "dcstat.conf"), `
+`,
+		`
 [global]
     maps per core = no
     ebpf object flavor = buffer
@@ -87,8 +67,7 @@ func TestLoadDCStatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 }
 
 func TestLoadDCStatConfigFilesMissingReturnsNotFound(t *testing.T) {
-	t.Setenv("NETDATA_USER_CONFIG_DIR", t.TempDir())
-	t.Setenv("NETDATA_STOCK_CONFIG_DIR", t.TempDir())
+	useEmptyConfigRoots(t)
 
 	cfg, found, err := loadDCStatConfigFiles()
 	if err != nil {

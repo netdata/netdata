@@ -88,45 +88,6 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
     }
 }
 
-static void cgroup_ebpfgo_dcstat_update_single_chart(
-    struct cgroup *cg,
-    RRDSET **chart_ptr,
-    const char *chart_id,
-    const char *title,
-    const char *context,
-    const char *dimension,
-    const char *units,
-    int priority,
-    collected_number divisor,
-    collected_number value)
-{
-    RRDSET *chart = *chart_ptr;
-    collected_number scale = divisor ? divisor : 1;
-
-    if (unlikely(!chart)) {
-        char buff[RRD_ID_LENGTH_MAX + 1];
-        chart = *chart_ptr = rrdset_create_localhost(
-            cgroup_chart_type(buff, cg),
-            chart_id,
-            NULL,
-            "directory_cache",
-            context,
-            title,
-            units,
-            PLUGIN_CGROUPS_NAME,
-            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
-            priority,
-            cgroup_update_every,
-            RRDSET_TYPE_LINE);
-
-        rrdset_update_rrdlabels(chart, cg->chart_labels);
-        rrddim_add(chart, dimension, NULL, 1, scale, RRD_ALGORITHM_ABSOLUTE);
-    }
-
-    rrddim_set(chart, dimension, value);
-    rrdset_done(chart);
-}
-
 void cgroup_ebpfgo_dcstat_update_locked(void)
 {
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
@@ -162,11 +123,12 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
     const char *not_found_context = is_service ? "systemd.service.dc_not_found" : "cgroup.dc_not_found";
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5700;
 
-    cgroup_ebpfgo_dcstat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_dcstat_ratio,
         "dc_hit_ratio",
         "Percentage of files inside directory cache",
+        "directory_cache",
         ratio_context,
         "ratio",
         "%",
@@ -174,11 +136,12 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
         1,
         (collected_number)cg->dcstat.ratio);
 
-    cgroup_ebpfgo_dcstat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_dcstat_reference,
         "dc_reference",
         "Count file access",
+        "directory_cache",
         reference_context,
         "reference",
         "files/s",
@@ -186,11 +149,12 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
         cgroup_update_every,
         (collected_number)cg->dcstat.reference);
 
-    cgroup_ebpfgo_dcstat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_dcstat_not_cache,
         "dc_not_cache",
         "Files not present inside directory cache",
+        "directory_cache",
         not_cache_context,
         "slow",
         "files/s",
@@ -198,11 +162,12 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
         cgroup_update_every,
         (collected_number)cg->dcstat.slow);
 
-    cgroup_ebpfgo_dcstat_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_dcstat_not_found,
         "dc_not_found",
         "Files not found",
+        "directory_cache",
         not_found_context,
         "miss",
         "files/s",

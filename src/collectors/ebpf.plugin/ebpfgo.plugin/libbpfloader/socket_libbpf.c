@@ -14,35 +14,8 @@
 #include <bpf/libbpf.h>
 
 #include "../nd_alloc_shim.h"
+#include "nd_ebpf_runtime_common.h"
 
-/*
- * libbpf 0.0.9 (CentOS 7) compatibility shims — identical to those in
- * cachestat_libbpf.c so both files compile cleanly on old and new libbpf.
- */
-#ifndef LIBBPF_MAJOR_VERSION
-static inline int bpf_program__set_autoload(struct bpf_program *prog, bool autoload)
-{
-    (void)prog;
-    (void)autoload;
-    return 0;
-}
-
-static inline enum bpf_map_type bpf_map__type(const struct bpf_map *map)
-{
-    return bpf_map__def(map)->type;
-}
-
-static inline int bpf_map__set_type(struct bpf_map *map, enum bpf_map_type type)
-{
-    ((struct bpf_map_def *)bpf_map__def(map))->type = type;
-    return 0;
-}
-
-static inline int bpf_map__set_max_entries(struct bpf_map *map, __u32 max_entries)
-{
-    return bpf_map__resize(map, max_entries);
-}
-#endif /* !LIBBPF_MAJOR_VERSION */
 
 /* Passive connection value stored in tbl_lports.
  * Key: {protocol:u16, port:u16}  Value: this struct. */

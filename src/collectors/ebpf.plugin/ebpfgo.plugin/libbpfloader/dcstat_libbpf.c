@@ -14,40 +14,8 @@
 #include <bpf/libbpf.h>
 
 #include "../nd_alloc_shim.h"
+#include "nd_ebpf_runtime_common.h"
 
-/*
- * libbpf 0.0.9 (CentOS 7) does not define LIBBPF_MAJOR_VERSION and lacks
- * several APIs added in later releases.  Provide inline shims so the rest
- * of this file compiles unchanged on both old and new libbpf.
- */
-#ifndef LIBBPF_MAJOR_VERSION
-static inline int bpf_program__set_autoload(struct bpf_program *prog, bool autoload)
-{
-    /* No autoload API in old libbpf; all programs load unconditionally.
-     * Legacy .bpf.o files for old kernels do not contain fentry/CO-RE
-     * programs, so missing this call is harmless. */
-    (void)prog;
-    (void)autoload;
-    return 0;
-}
-
-static inline enum bpf_map_type bpf_map__type(const struct bpf_map *map)
-{
-    return bpf_map__def(map)->type;
-}
-
-static inline int bpf_map__set_type(struct bpf_map *map, enum bpf_map_type type)
-{
-    /* bpf_map__def() is const-qualified but the map is mutable before load */
-    ((struct bpf_map_def *)bpf_map__def(map))->type = type;
-    return 0;
-}
-
-static inline int bpf_map__set_max_entries(struct bpf_map *map, __u32 max_entries)
-{
-    return bpf_map__resize(map, max_entries);
-}
-#endif /* !LIBBPF_MAJOR_VERSION */
 
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1) && defined(__has_include) && __has_include(<linux/btf.h>)
 /*
@@ -130,14 +98,7 @@ struct netdata_ebpf_dcstat_runtime {
     struct ring_buffer *rb;         /* non-NULL for buffer flavor */
     void              *arena_state; /* mmap'd arena pointer (arena flavor) */
     uint32_t           arena_tail;  /* last consumed head for arena flavor */
-    struct netdata_ebpf_dcstat_pid_entry *acc;
-    size_t acc_cap;
-    size_t acc_count;
-    /* Hash table for O(1) acc lookup: slot stores (acc_index + 1), 0 = empty.
-     * Rebuilt from scratch on every structural change (growth or eviction), so
-     * no tombstones are needed. */
-    uint32_t *acc_htable;
-    size_t    acc_htable_sz; /* power-of-2 capacity */
+    struct nd_ebpf_acc_table acc;
 #endif
 };
 
@@ -163,13 +124,6 @@ struct netdata_ebpf_dcstat_pid_snapshot_list {
 };
 
 int netdata_dcstat_runtime_supports_core(void);
-
-enum netdata_dcstat_controller {
-    NETDATA_DCSTAT_CONTROLLER_APPS_ENABLED = 0,
-    NETDATA_DCSTAT_CONTROLLER_APPS_LEVEL = 1,
-    NETDATA_DCSTAT_CONTROLLER_PID_TABLE_ADD = 2,
-    NETDATA_DCSTAT_CONTROLLER_END = 6,
-};
 
 /* Global map keys, mirroring enum directory_cache_counters in
  * src/collectors/ebpf.plugin/ebpf_dcstat.h. */
@@ -236,35 +190,9 @@ static void dcstat_prepare_autoload(struct bpf_object *obj, int flavor)
 
 static int dcstat_update_map_types(struct bpf_object *obj, int maps_per_core)
 {
-    struct bpf_map *map;
-    bpf_object__for_each_map(map, obj)
-    {
-        const char *name = bpf_map__name(map);
-        if (!strcmp(name, "dcstat_global") || !strcmp(name, "dcstat_pid") || !strcmp(name, "dcstat_ctrl")) {
-            enum bpf_map_type type = bpf_map__type(map);
-            int ret = 0;
-            if (maps_per_core) {
-                if (type == BPF_MAP_TYPE_HASH)
-                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_HASH);
-                else if (type == BPF_MAP_TYPE_ARRAY)
-                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_ARRAY);
-            } else {
-                if (type == BPF_MAP_TYPE_PERCPU_HASH)
-                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_HASH);
-                else if (type == BPF_MAP_TYPE_PERCPU_ARRAY)
-                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY);
-            }
-            if (ret != 0) {
-                /* A buffer sized for non-percpu maps would be too small for a
-                 * percpu kernel write — proceeding risks a heap overflow. */
-                fprintf(stderr,
-                        "ebpf-go.plugin: dcstat: bpf_map__set_type failed for map '%s': %d; refusing to load\n",
-                        name, ret);
-                return -1;
-            }
-        }
-    }
-    return 0;
+    static const char *const maps[] = {"dcstat_global", "dcstat_pid", "dcstat_ctrl"};
+
+    return nd_ebpf_update_map_types(obj, maps, sizeof(maps) / sizeof(maps[0]), maps_per_core, "dcstat");
 }
 
 static void dcstat_update_map_sizes(struct bpf_object *obj, unsigned int pid_table_size)
@@ -288,37 +216,6 @@ static struct bpf_link *dcstat_attach_program_by_name(
         return NULL;
 
     return bpf_program__attach_kprobe(prog, retprobe, target);
-}
-
-static uint64_t dcstat_sum_percpu_values(const uint64_t *values, int count)
-{
-    uint64_t total = 0;
-    for (int i = 0; i < count; i++)
-        total += values[i];
-    return total;
-}
-
-static int dcstat_pid_snapshot_cmp(const void *a, const void *b)
-{
-    const struct netdata_ebpf_dcstat_pid_snapshot *pa = a;
-    const struct netdata_ebpf_dcstat_pid_snapshot *pb = b;
-    if (pa->pid < pb->pid) return -1;
-    if (pa->pid > pb->pid) return 1;
-    return 0;
-}
-
-static void dcstat_destroy_links(struct netdata_ebpf_dcstat_runtime *rt)
-{
-    if (!rt || !rt->links)
-        return;
-
-    for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
-        if (rt->links[i])
-            bpf_link__destroy(rt->links[i]);
-    }
-
-    freez(rt->links);
-    rt->links = NULL;
 }
 
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
@@ -466,18 +363,9 @@ int netdata_dcstat_runtime_prepare(
         return -1;
     dcstat_update_map_sizes(obj, pid_table_size);
 
-    /* Always allocate for libbpf_num_possible_cpus() so the post-load type
-     * re-query in the snapshot path can safely use either ARRAY (count=1) or
-     * PERCPU_ARRAY (count=cap) without a buffer overflow. */
-    int ncpu = libbpf_num_possible_cpus();
-    if (ncpu < 1)
-        ncpu = 1;
-
-    rt->percpu_u64 = callocz((size_t)ncpu, sizeof(*rt->percpu_u64));
-    rt->percpu_u64_cap = ncpu;
-
-    rt->percpu_entries = callocz((size_t)ncpu, sizeof(*rt->percpu_entries));
-    rt->percpu_entries_cap = ncpu;
+    nd_ebpf_alloc_percpu_buffers(
+        &rt->percpu_u64, &rt->percpu_u64_cap,
+        (void **)&rt->percpu_entries, &rt->percpu_entries_cap, sizeof(*rt->percpu_entries));
 
     /* items_buf starts NULL; grows lazily in snapshot_apps */
     return 0;
@@ -485,146 +373,33 @@ int netdata_dcstat_runtime_prepare(
 
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
 
-/*
- * Ring buffer event layout — must match struct netdata_dc_event_t in
- * ebpf-co-re/kernel-collector/includes/netdata_dc_buffer.h.  Byte-identical to
- * the cachestat event (48 bytes), verified against the arena skeleton's
- * _Static_assert (49160 = 4 + 4 padding + 1024 × 48) and the field offsets in
- * the compiled objects.
- */
-struct dcstat_rb_event {
-    uint64_t ct;
-    uint32_t pid;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char     name[16]; /* TASK_COMM_LEN */
-    uint8_t  action;
-    uint8_t  pad[3];
-};
-
-/* Action values emitted by the BPF programs.  SLOW_MISS is a single event that
- * means "slow path AND nothing found", so it increments both counters. */
+/* Action values emitted by the dcstat BPF programs.  SLOW_MISS is a single
+ * event meaning "slow path AND nothing found", so it bumps both counters.
+ * Recovered from the compiled objects; the event layout itself is shared (see
+ * struct nd_ebpf_pid_event). */
 enum {
     DCSTAT_RB_EVENT_REFERENCE = 0,
     DCSTAT_RB_EVENT_SLOW      = 1,
     DCSTAT_RB_EVENT_SLOW_MISS = 2,
 };
 
-/* Knuth multiplicative hash — good dispersion for sequential PID values. */
-static inline size_t dcstat_acc_htable_slot(uint32_t tgid, size_t sz)
-{
-    return (size_t)(((uint64_t)tgid * UINT64_C(2654435761)) >> 32) & (sz - 1);
-}
-
-/* Rebuild the hash table from the current acc[] contents.  Called after every
- * structural change (growth or eviction).  O(acc_count) — acceptable because
- * evictions are rare and growth is amortised. */
-static bool dcstat_acc_htable_rebuild(struct netdata_ebpf_dcstat_runtime *rt)
-{
-    /* capacity = next power-of-2 >= 4 × acc_count (load factor <= 0.25) */
-    size_t need = rt->acc_count < 16 ? 64 : rt->acc_count * 4;
-    size_t cap = 64;
-    while (cap < need) cap <<= 1;
-
-    if (cap != rt->acc_htable_sz) {
-        rt->acc_htable    = reallocz(rt->acc_htable, cap * sizeof(*rt->acc_htable));
-        rt->acc_htable_sz = cap;
-    }
-    memset(rt->acc_htable, 0, cap * sizeof(*rt->acc_htable));
-
-    for (size_t i = 0; i < rt->acc_count; i++) {
-        size_t h = dcstat_acc_htable_slot(rt->acc[i].tgid, cap);
-        while (rt->acc_htable[h])
-            h = (h + 1) & (cap - 1);
-        rt->acc_htable[h] = (uint32_t)(i + 1);
-    }
-    return true;
-}
-
-/* O(1) amortised: hash-table lookup, falls back to linear insert on new TGID. */
-static struct netdata_ebpf_dcstat_pid_entry *dcstat_acc_find_or_add(
-    struct netdata_ebpf_dcstat_runtime *rt, uint32_t tgid)
-{
-    /* Rebuild or initialise the table when load exceeds 0.5. */
-    if (!rt->acc_htable || rt->acc_count + 1 > rt->acc_htable_sz / 2) {
-        if (!dcstat_acc_htable_rebuild(rt))
-            return NULL;
-    }
-
-    size_t cap = rt->acc_htable_sz;
-    size_t h   = dcstat_acc_htable_slot(tgid, cap);
-
-    while (rt->acc_htable[h]) {
-        if (rt->acc[rt->acc_htable[h] - 1].tgid == tgid)
-            return &rt->acc[rt->acc_htable[h] - 1];
-        h = (h + 1) & (cap - 1);
-    }
-
-    /* New TGID — grow acc[] if needed then insert. */
-    if (rt->acc_count >= rt->acc_cap) {
-        size_t new_cap = rt->acc_cap ? rt->acc_cap * 2 : 64;
-        rt->acc     = reallocz(rt->acc, new_cap * sizeof(*rt->acc));
-        rt->acc_cap = new_cap;
-        /* acc[] base address may have changed — rebuild and re-probe. */
-        if (!dcstat_acc_htable_rebuild(rt)) return NULL;
-        cap = rt->acc_htable_sz;
-        h   = dcstat_acc_htable_slot(tgid, cap);
-        while (rt->acc_htable[h]) h = (h + 1) & (cap - 1);
-    }
-
-    struct netdata_ebpf_dcstat_pid_entry *entry = &rt->acc[rt->acc_count];
-    memset(entry, 0, sizeof(*entry));
-    entry->tgid = tgid;
-    rt->acc_htable[h] = (uint32_t)(rt->acc_count + 1);
-    rt->acc_count++;
-    return entry;
-}
-
-/* Remove a TGID from acc[] so dead processes don't inflate the accumulator.
- * Swap-with-last for O(1) removal, then rebuild the hash table. */
-static void dcstat_acc_evict_tgid(struct netdata_ebpf_dcstat_runtime *rt, uint32_t tgid)
-{
-    if (!rt->acc_htable || rt->acc_count == 0)
-        return;
-
-    size_t cap = rt->acc_htable_sz;
-    size_t h   = dcstat_acc_htable_slot(tgid, cap);
-
-    while (rt->acc_htable[h]) {
-        uint32_t idx = rt->acc_htable[h] - 1;
-        if (rt->acc[idx].tgid == tgid) {
-            size_t last = rt->acc_count - 1;
-            if (idx != last)
-                rt->acc[idx] = rt->acc[last];
-            rt->acc_count--;
-            /* Full rebuild: clears the deleted slot and fixes the moved entry. */
-            dcstat_acc_htable_rebuild(rt);
-            return;
-        }
-        h = (h + 1) & (cap - 1);
-    }
-}
-
 static int dcstat_rb_callback(void *ctx, void *data, size_t data_sz)
 {
-    if (data_sz < sizeof(struct dcstat_rb_event))
+    if (data_sz < sizeof(struct nd_ebpf_pid_event))
         return 0;
 
     struct netdata_ebpf_dcstat_runtime *rt = ctx;
-    const struct dcstat_rb_event *ev = data;
+    const struct nd_ebpf_pid_event *ev = data;
 
     uint32_t tgid = ev->tgid ? ev->tgid : ev->pid;
-    struct netdata_ebpf_dcstat_pid_entry *entry = dcstat_acc_find_or_add(rt, tgid);
+    struct netdata_ebpf_dcstat_pid_entry *entry = nd_ebpf_acc_find_or_add(&rt->acc, tgid);
     if (!entry)
         return 0;
 
     if (ev->ct > entry->ct)
         entry->ct = ev->ct;
-    if (!entry->name[0] && ev->name[0]) {
-        size_t nlen = strnlen(ev->name, sizeof(ev->name));
-        memcpy(entry->name, ev->name, nlen < sizeof(entry->name) - 1 ? nlen : sizeof(entry->name) - 1);
-    }
+    if (!entry->name[0] && ev->name[0])
+        nd_ebpf_copy_comm(entry->name, sizeof(entry->name), ev->name, sizeof(ev->name));
 
     switch (ev->action) {
     case DCSTAT_RB_EVENT_REFERENCE:
@@ -646,25 +421,8 @@ static int dcstat_rb_callback(void *ctx, void *data, size_t data_sz)
 
 static void dcstat_setup_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
 {
-    struct bpf_object *obj = dcstat_runtime_object(rt);
-    if (!obj)
-        return;
-
-    struct bpf_map *map = bpf_object__find_map_by_name(obj, "dc_events");
-    if (!map) {
-        fprintf(stderr, "ebpf-go: dcstat ring buffer map 'dc_events' not found\n");
-        return;
-    }
-
-    int fd = bpf_map__fd(map);
-    if (fd < 0) {
-        fprintf(stderr, "ebpf-go: dcstat ring buffer map fd invalid (%d)\n", fd);
-        return;
-    }
-
-    rt->rb = ring_buffer__new(fd, dcstat_rb_callback, rt, NULL);
-    if (!rt->rb)
-        fprintf(stderr, "ebpf-go: ring_buffer__new failed for dcstat (errno %d)\n", errno);
+    rt->rb = nd_ebpf_ring_buffer_open(
+        dcstat_runtime_object(rt), "dc_events", dcstat_rb_callback, rt, "dcstat");
 }
 
 static void dcstat_destroy_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
@@ -673,51 +431,29 @@ static void dcstat_destroy_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
         ring_buffer__free(rt->rb);
         rt->rb = NULL;
     }
-    freez(rt->acc);
-    freez(rt->acc_htable);
-    rt->acc           = NULL;
-    rt->acc_htable    = NULL;
-    rt->acc_cap       = 0;
-    rt->acc_count     = 0;
-    rt->acc_htable_sz = 0;
+    nd_ebpf_acc_free(&rt->acc);
 }
 
-/*
- * Arena flavor: the BPF programs write events into a shared-memory circular
- * slot buffer (BPF arena, mmap-able) instead of a ring buffer.
- *
- * Layout of struct netdata_dc_arena_state_t (NETDATA_ARENA_QUEUE_DECL in
- * netdata_arena_common.h):
- *   __u32 head          (4 bytes)
- *   [4 bytes padding to align events[] to 8 bytes]
- *   dcstat_rb_event events[1024]  (1024 × 48 = 49152 bytes)
- *   total = 49160 bytes  (verified by the skeleton's _Static_assert)
- */
-#define DCSTAT_ARENA_EVENT_SLOTS 1024
-
-struct dcstat_arena_state {
-    uint32_t head;
-    uint32_t _pad;
-    struct dcstat_rb_event events[DCSTAT_ARENA_EVENT_SLOTS];
-};
-
-_Static_assert(
-    sizeof(struct dcstat_arena_state) == 49160,
-    "dcstat_arena_state size does not match BPF-side layout");
-
-/* Capture the mmap'd arena state pointer once at load time.
+/* Arena flavor: the BPF programs publish events into an mmap-able BPF arena
+ * instead of a ring buffer.  The state layout and the drain loop are shared (see
+ * struct nd_ebpf_arena_state); only the companion BSS field name is per-module.
  *
  * bpf_map__initial_value() on a BPF_MAP_TYPE_ARENA map returns the arena region
  * start, but the data section sits at a page-aligned offset inside it, so using
- * the arena map pointer directly reads uninitialized memory.  The arena
- * skeleton wires a companion BSS map whose mmaped pointer libbpf resolves to
- * the correct offset after load — use that. */
+ * the arena map pointer directly reads uninitialized memory.  The arena skeleton
+ * wires a companion BSS map whose mmaped pointer libbpf resolves to the correct
+ * offset after load — use that. */
 static void dcstat_setup_arena(struct netdata_ebpf_dcstat_runtime *rt)
 {
     if (!rt->core.arena || !rt->core.arena->bss)
         return;
 
     rt->arena_state = (void *)&rt->core.arena->bss->dc_arena_state;
+}
+
+static void dcstat_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
+{
+    dcstat_rb_callback(ctx, (void *)ev, sizeof(*ev));
 }
 
 static int dcstat_snapshot_from_acc(
@@ -727,52 +463,36 @@ static int dcstat_snapshot_from_acc(
     out->items = NULL;
     out->count = 0;
 
-    if (!rt->acc || rt->acc_count == 0)
+    if (!rt->acc.items || rt->acc.count == 0)
         return 0;
 
-    if (rt->acc_count > rt->items_cap) {
-        rt->items_buf = reallocz(rt->items_buf, rt->acc_count * sizeof(*rt->items_buf));
-        rt->items_cap = rt->acc_count;
+    if (rt->acc.count > rt->items_cap) {
+        rt->items_buf = reallocz(rt->items_buf, rt->acc.count * sizeof(*rt->items_buf));
+        rt->items_cap = rt->acc.count;
     }
 
-    for (size_t i = 0; i < rt->acc_count; i++) {
-        const struct netdata_ebpf_dcstat_pid_entry *src = &rt->acc[i];
+    for (size_t i = 0; i < rt->acc.count; i++) {
+        const struct netdata_ebpf_dcstat_pid_entry *src = &((struct netdata_ebpf_dcstat_pid_entry *)rt->acc.items)[i];
         struct netdata_ebpf_dcstat_pid_snapshot *dst = &rt->items_buf[i];
         dst->pid  = src->tgid;
         dst->ppid = 0; /* acc path has no ppid; zero explicitly — buffer is reused */
         dst->ct   = src->ct;
-        memset(dst->comm, 0, sizeof(dst->comm));
-        size_t nlen = strnlen(src->name, sizeof(src->name));
-        memcpy(dst->comm, src->name, nlen < sizeof(dst->comm) - 1 ? nlen : sizeof(dst->comm) - 1);
+        nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), src->name, sizeof(src->name));
         dst->cache_access = src->cache_access;
         dst->file_system  = src->file_system;
         dst->not_found    = src->not_found;
     }
 
-    qsort(rt->items_buf, rt->acc_count, sizeof(*rt->items_buf), dcstat_pid_snapshot_cmp);
+    qsort(rt->items_buf, rt->acc.count, sizeof(*rt->items_buf), nd_ebpf_pid_first_u32_cmp);
 
     out->items = rt->items_buf;
-    out->count = rt->acc_count;
+    out->count = rt->acc.count;
     return 0;
 }
 
 static void dcstat_drain_arena(struct netdata_ebpf_dcstat_runtime *rt)
 {
-    if (!rt->arena_state)
-        return;
-
-    struct dcstat_arena_state *state = (struct dcstat_arena_state *)rt->arena_state;
-
-    uint32_t head = __atomic_load_n(&state->head, __ATOMIC_ACQUIRE);
-    uint32_t tail = rt->arena_tail;
-
-    while (tail != head) {
-        const struct dcstat_rb_event *ev = &state->events[tail % DCSTAT_ARENA_EVENT_SLOTS];
-        dcstat_rb_callback(rt, (void *)ev, sizeof(*ev));
-        tail++;
-    }
-
-    rt->arena_tail = head;
+    rt->arena_tail = nd_ebpf_arena_drain(rt->arena_state, rt->arena_tail, dcstat_rb_event, rt);
 }
 
 #endif /* NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED */
@@ -815,7 +535,7 @@ int netdata_dcstat_runtime_attach(
         d_lookup_target = NETDATA_DCSTAT_DEFAULT_D_LOOKUP_TARGET;
 
     if (rt->links)
-        dcstat_destroy_links(rt);
+        nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
 
     rt->links = callocz(NETDATA_DCSTAT_LINK_COUNT, sizeof(*rt->links));
     if (!rt->links)
@@ -830,7 +550,7 @@ int netdata_dcstat_runtime_attach(
 
     for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
         if (!rt->links[i] || libbpf_get_error(rt->links[i])) {
-            dcstat_destroy_links(rt);
+            nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
             return -1;
         }
     }
@@ -843,62 +563,12 @@ int netdata_dcstat_runtime_update_controller(
     int apps_enabled,
     int apps_level)
 {
-    struct bpf_object *obj = dcstat_runtime_object(rt);
-    if (!rt || !obj)
+    if (!rt)
         return -1;
 
-    struct bpf_map *map = bpf_object__find_map_by_name(obj, "dcstat_ctrl");
-    if (!map)
-        return -1;
-
-    int fd = bpf_map__fd(map);
-    if (fd < 0)
-        return -1;
-
-    /* dcstat_ctrl BPF map stores __u64 values; use uint64_t to match exactly */
-    const uint64_t values[NETDATA_DCSTAT_CONTROLLER_END] = {
-        apps_enabled ? 1ULL : 0ULL,
-        (uint64_t)apps_level,
-        0,
-        0,
-        0,
-        0,
-    };
-    const enum bpf_map_type type = bpf_map__type(map);
-    const bool is_percpu = (type == BPF_MAP_TYPE_PERCPU_ARRAY || type == BPF_MAP_TYPE_PERCPU_HASH);
-
-    for (uint32_t key = NETDATA_DCSTAT_CONTROLLER_APPS_ENABLED; key < NETDATA_DCSTAT_CONTROLLER_PID_TABLE_ADD; key++) {
-        if (!is_percpu) {
-            if (bpf_map_update_elem(fd, &key, &values[key], BPF_ANY))
-                return -1;
-            continue;
-        }
-
-        const int cpus = libbpf_num_possible_cpus();
-        if (cpus <= 0)
-            return -1;
-
-        uint64_t *percpu = callocz((size_t)cpus, sizeof(*percpu));
-        if (!percpu)
-            return -1;
-
-        for (int cpu = 0; cpu < cpus; cpu++)
-            percpu[cpu] = values[key];
-
-        const int rc = bpf_map_update_elem(fd, &key, percpu, BPF_ANY);
-        freez(percpu);
-
-        if (rc)
-            return -1;
-    }
-
-    return 0;
+    return nd_ebpf_update_controller(dcstat_runtime_object(rt), "dcstat_ctrl", apps_enabled, apps_level);
 }
 
-/* maps_per_core is accepted for signature parity with the sibling runtimes but
- * is deliberately not consulted: the post-load map type is authoritative.
- * bpf_map__set_type() can silently fail before load, so trusting the caller's
- * intent here would size the read buffer wrongly.  Same for snapshot_apps(). */
 int netdata_dcstat_runtime_snapshot(
     struct netdata_ebpf_dcstat_runtime *rt,
     int maps_per_core,
@@ -943,7 +613,7 @@ int netdata_dcstat_runtime_snapshot(
         *entries[i].dst = 0;
 
         if (bpf_map_lookup_elem(fd, &key, values) == 0)
-            *entries[i].dst = dcstat_sum_percpu_values(values, count);
+            *entries[i].dst = nd_ebpf_sum_percpu_u64(values, count);
     }
 
     return 0;
@@ -1067,7 +737,7 @@ int netdata_dcstat_runtime_snapshot_apps(
      * each shared-memory slot represents one process.
      */
     if (out_count > 1) {
-        qsort(rt->items_buf, out_count, sizeof(*rt->items_buf), dcstat_pid_snapshot_cmp);
+        qsort(rt->items_buf, out_count, sizeof(*rt->items_buf), nd_ebpf_pid_first_u32_cmp);
 
         size_t merged_count = 0;
         for (size_t i = 0; i < out_count; i++) {
@@ -1103,32 +773,22 @@ void netdata_dcstat_runtime_free_apps_snapshot(struct netdata_ebpf_dcstat_pid_sn
 
 int netdata_dcstat_runtime_delete_pid(struct netdata_ebpf_dcstat_runtime *rt, uint32_t pid)
 {
-    struct bpf_object *obj = dcstat_runtime_object(rt);
-    if (!rt || !obj)
+    if (!rt)
         return -1;
 
-    struct bpf_map *map = bpf_object__find_map_by_name(obj, "dcstat_pid");
-    if (!map) {
-        /* Buffer/arena flavor: no dcstat_pid map.  Evict from the userspace
-         * accumulator so dead TGIDs do not inflate it indefinitely. */
+    bool map_missing = false;
+    int rc = nd_ebpf_map_delete_pid(dcstat_runtime_object(rt), "dcstat_pid", pid, &map_missing);
+    if (!map_missing)
+        return rc;
+
+    /* Buffer/arena flavor: no dcstat_pid map.  Evict from the userspace
+     * accumulator so dead TGIDs do not inflate it indefinitely. */
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
-        dcstat_acc_evict_tgid(rt, pid);
+    nd_ebpf_acc_evict_tgid(&rt->acc, pid);
 #endif
-        return 0;
-    }
-
-    int fd = bpf_map__fd(map);
-    if (fd < 0)
-        return -1;
-
-    return bpf_map_delete_elem(fd, &pid);
+    return 0;
 }
 
-/*
- * Bulk delete: prefers bpf_map_delete_batch (kernel >= 5.6) when available;
- * otherwise falls back to a tight loop of bpf_map_delete_elem.  Behaviour is
- * equivalent to calling netdata_dcstat_runtime_delete_pid() per pid.
- */
 int netdata_dcstat_runtime_delete_pids(
     struct netdata_ebpf_dcstat_runtime *rt,
     uint32_t *pids,
@@ -1137,52 +797,20 @@ int netdata_dcstat_runtime_delete_pids(
     if (!rt || !pids || count == 0)
         return 0;
 
-    struct bpf_object *obj = dcstat_runtime_object(rt);
-    if (!obj)
-        return -1;
+    bool map_missing = false;
+    int rc = nd_ebpf_map_delete_pids(dcstat_runtime_object(rt), "dcstat_pid", pids, count, &map_missing);
+    if (!map_missing)
+        return rc;
 
-    struct bpf_map *map = bpf_object__find_map_by_name(obj, "dcstat_pid");
-    if (!map) {
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
-        /* dcstat_acc_evict_tgid() rebuilds the hash table after each removal.
-         * Eviction batches are typically small (<= 10), so the O(N*acc_count)
-         * cost is accepted rather than adding a deferred-rebuild path. */
-        for (size_t i = 0; i < count; i++) {
-            dcstat_acc_evict_tgid(rt, pids[i]);
-        }
-        if (rt->acc_count > 0)
-            dcstat_acc_htable_rebuild(rt);
+    /* nd_ebpf_acc_evict_tgid() rebuilds the hash table after each removal.
+     * Eviction batches are typically small (<= 10), so the O(N*count) cost is
+     * accepted rather than adding a deferred-rebuild path. */
+    for (size_t i = 0; i < count; i++)
+        nd_ebpf_acc_evict_tgid(&rt->acc, pids[i]);
+    if (rt->acc.count > 0)
+        nd_ebpf_acc_rebuild(&rt->acc);
 #endif
-        return 0;
-    }
-
-    int fd = bpf_map__fd(map);
-    if (fd < 0)
-        return -1;
-
-    /* Try the batch helper first; fall back to per-key delete on ENOSYS (older
-     * kernels) or EINVAL/EOPNOTSUPP (kernel rejected the batch shape).  ENOENT
-     * also falls through because htab_map_delete_batch stops at the first
-     * missing key — the remaining PIDs are still deletable individually.
-     *
-     * bpf_map_delete_batch takes __u32 count, not size_t; on overflow we skip
-     * the batch and go straight to the loop. */
-    if (count <= UINT32_MAX) {
-        uint32_t batch_count = (uint32_t)count;
-        int rc = bpf_map_delete_batch(fd, pids, &batch_count, NULL);
-        if (rc == 0)
-            return 0;
-        if (rc != -ENOSYS && rc != -EINVAL && rc != -EOPNOTSUPP && rc != -ENOENT)
-            return rc;
-    }
-
-    for (size_t i = 0; i < count; i++) {
-        int per = bpf_map_delete_elem(fd, &pids[i]);
-        /* Treat "not found" as success: the PID may have been removed by the
-         * BPF program between snapshot and delete. */
-        if (per != 0 && per != -ENOENT)
-            return per;
-    }
     return 0;
 }
 
@@ -1191,7 +819,7 @@ void netdata_dcstat_runtime_close(struct netdata_ebpf_dcstat_runtime *rt)
     if (!rt)
         return;
 
-    dcstat_destroy_links(rt);
+    nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
     freez(rt->percpu_u64);
     freez(rt->percpu_entries);
     freez(rt->items_buf);

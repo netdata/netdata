@@ -306,50 +306,84 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
 }
 
 #if defined(OS_LINUX)
-static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+/* One per-application eBPFGo chart definition.  cachestat and dcstat differ only
+ * in their tables and in which target fields they read, so both drive the same
+ * pair of emitters instead of carrying a copy of each loop. */
+struct apps_ebpf_chart {
+    const char *suffix;
+    const char *title;
+    const char *units;
+    const char *style;
+    int         priority;
+    const char *dim;
+    const char *algo;
+};
+
+static void send_ebpf_charts_to_netdata(
+    struct target *w,
+    const char *type,
+    const char *lbl_name,
+    const char *family,
+    const struct apps_ebpf_chart *charts,
+    size_t count)
+{
     if (strcmp(type, NETDATA_APP_FAMILY) != 0)
         return;
 
-    static const struct {
-        const char *suffix;
-        const char *title;
-        const char *units;
-        const char *style;
-        int         priority;
-        const char *dim;
-        const char *algo;
-    } charts[] = {
-        { "ebpf_cachestat_hit_ratio",   "Hit ratio",                "%",        "line",    20260, "ratio",  "absolute"    },
-        { "ebpf_cachestat_dirty_pages", "Number of dirty pages",    "page/s",   "stacked", 20261, "pages",  "incremental" },
-        { "ebpf_cachestat_access",      "Number of accessed files", "hits/s",   "stacked", 20262, "hits",   "incremental" },
-        { "ebpf_cachestat_misses",      "Files out of page cache",  "misses/s", "stacked", 20263, "misses", "incremental" },
-    };
-
-    const char *name  = string2str(w->clean_name);
+    const char *name = string2str(w->clean_name);
     const char *wname = string2str(w->name);
-    for (size_t i = 0; i < sizeof(charts) / sizeof(charts[0]); i++) {
-        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' page_cache %s.%s %s %d %d\n",
-                type, name, charts[i].suffix, charts[i].title, charts[i].units,
+    for (size_t i = 0; i < count; i++) {
+        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' %s %s.%s %s %d %d\n",
+                type, name, charts[i].suffix, charts[i].title, charts[i].units, family,
                 type, charts[i].suffix, charts[i].style, charts[i].priority, update_every);
         send_CLABEL_COMMIT(lbl_name, wname);
         fprintf(stdout, "DIMENSION %s '' %s 1 1\n", charts[i].dim, charts[i].algo);
     }
 }
 
-static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+/* values[] is parallel to charts[]: one value per chart, written to that chart's
+ * single dimension. */
+static void send_ebpf_data_to_netdata(
+    struct target *w,
+    const char *type,
+    usec_t dt,
+    const struct apps_ebpf_chart *charts,
+    const kernel_uint_t *values,
+    size_t count)
+{
     if (strcmp(type, NETDATA_APP_FAMILY) != 0)
         return;
 
-    static const struct {
-        const char *chart;
-        const char *dim;
-    } entries[] = {
-        { "ebpf_cachestat_hit_ratio",   "ratio"  },
-        { "ebpf_cachestat_dirty_pages", "pages"  },
-        { "ebpf_cachestat_access",      "hits"   },
-        { "ebpf_cachestat_misses",      "misses" },
-    };
+    const char *name = string2str(w->clean_name);
+    for (size_t i = 0; i < count; i++) {
+        send_BEGIN(type, name, charts[i].suffix, dt);
+        send_SET(charts[i].dim, values[i]);
+        send_END();
+    }
+}
 
+static const struct apps_ebpf_chart apps_cachestat_charts[] = {
+    { "ebpf_cachestat_hit_ratio",   "Hit ratio",                "%",        "line",    20260, "ratio",  "absolute"    },
+    { "ebpf_cachestat_dirty_pages", "Number of dirty pages",    "page/s",   "stacked", 20261, "pages",  "incremental" },
+    { "ebpf_cachestat_access",      "Number of accessed files", "hits/s",   "stacked", 20262, "hits",   "incremental" },
+    { "ebpf_cachestat_misses",      "Files out of page cache",  "misses/s", "stacked", 20263, "misses", "incremental" },
+};
+
+/* Chart ids, contexts, units, and priorities match the ones the C dcstat module
+ * published, so existing dashboards keep working after the port to ebpf-go. */
+static const struct apps_ebpf_chart apps_dcstat_charts[] = {
+    { "ebpf_dc_hit",       "Percentage of files inside directory cache.", "%",       "line",    20265, "ratio", "absolute"    },
+    { "ebpf_dc_reference", "Count file access.",                          "files/s", "stacked", 20266, "files", "incremental" },
+    { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files/s", "stacked", 20267, "files", "incremental" },
+    { "ebpf_dc_not_found", "Files not found.",                            "files/s", "stacked", 20268, "files", "incremental" },
+};
+
+static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+    send_ebpf_charts_to_netdata(w, type, lbl_name, "page_cache",
+                                apps_cachestat_charts, _countof(apps_cachestat_charts));
+}
+
+static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
     const kernel_uint_t values[] = {
         (kernel_uint_t)w->cachestat.ratio,
         (kernel_uint_t)w->cachestat.dirty,
@@ -357,60 +391,15 @@ static void send_cachestat_data_to_netdata(struct target *w, const char *type, u
         (kernel_uint_t)w->cachestat.miss,
     };
 
-    const char *name = string2str(w->clean_name);
-    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
-        send_BEGIN(type, name, entries[i].chart, dt);
-        send_SET(entries[i].dim, values[i]);
-        send_END();
-    }
+    send_ebpf_data_to_netdata(w, type, dt, apps_cachestat_charts, values, _countof(values));
 }
 
-/* Chart ids, contexts, units, and priorities match the ones the C dcstat module
- * published, so existing dashboards keep working after the port to ebpf-go. */
 static void send_dcstat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
-    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
-        return;
-
-    static const struct {
-        const char *suffix;
-        const char *title;
-        const char *units;
-        const char *style;
-        int         priority;
-        const char *dim;
-        const char *algo;
-    } charts[] = {
-        { "ebpf_dc_hit",       "Percentage of files inside directory cache.", "%",       "line",    20265, "ratio", "absolute"    },
-        { "ebpf_dc_reference", "Count file access.",                          "files/s", "stacked", 20266, "files", "incremental" },
-        { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files/s", "stacked", 20267, "files", "incremental" },
-        { "ebpf_dc_not_found", "Files not found.",                            "files/s", "stacked", 20268, "files", "incremental" },
-    };
-
-    const char *name  = string2str(w->clean_name);
-    const char *wname = string2str(w->name);
-    for (size_t i = 0; i < sizeof(charts) / sizeof(charts[0]); i++) {
-        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' directory_cache %s.%s %s %d %d\n",
-                type, name, charts[i].suffix, charts[i].title, charts[i].units,
-                type, charts[i].suffix, charts[i].style, charts[i].priority, update_every);
-        send_CLABEL_COMMIT(lbl_name, wname);
-        fprintf(stdout, "DIMENSION %s '' %s 1 1\n", charts[i].dim, charts[i].algo);
-    }
+    send_ebpf_charts_to_netdata(w, type, lbl_name, "directory_cache",
+                                apps_dcstat_charts, _countof(apps_dcstat_charts));
 }
 
 static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
-    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
-        return;
-
-    static const struct {
-        const char *chart;
-        const char *dim;
-    } entries[] = {
-        { "ebpf_dc_hit",       "ratio" },
-        { "ebpf_dc_reference", "files" },
-        { "ebpf_dc_not_cache", "files" },
-        { "ebpf_dc_not_found", "files" },
-    };
-
     const kernel_uint_t values[] = {
         (kernel_uint_t)w->dcstat_totals.ratio,
         (kernel_uint_t)w->dcstat_totals.reference,
@@ -418,12 +407,7 @@ static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec
         (kernel_uint_t)w->dcstat_totals.not_found,
     };
 
-    const char *name = string2str(w->clean_name);
-    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
-        send_BEGIN(type, name, entries[i].chart, dt);
-        send_SET(entries[i].dim, values[i]);
-        send_END();
-    }
+    send_ebpf_data_to_netdata(w, type, dt, apps_dcstat_charts, values, _countof(values));
 }
 #endif
 
