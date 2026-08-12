@@ -461,7 +461,13 @@ function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$
     # byte-exact path: keep the BOM bytes, keep every line's OWN terminator, and
     # never invent a final newline the source did not have
     $bytes = [System.IO.File]::ReadAllBytes($path)
-    $text = $script:BytePreserving.GetString($bytes, $facts.bomLen, $bytes.Length - $facts.bomLen)
+    # Valid UTF-8 is decoded AS UTF-8: it re-encodes to the same bytes, and the
+    # PII rules compare against real .NET strings, so a non-ASCII hostname or
+    # username must not be reduced to Latin-1 mojibake - the replacement would
+    # miss it and the real value would ship. ISO-8859-1 is only the fallback for
+    # sources that are not valid UTF-8, where it is the byte-preserving choice.
+    $enc = if ($facts.json.utf8_valid) { $script:Utf8NoBom } else { $script:BytePreserving }
+    $text = $enc.GetString($bytes, $facts.bomLen, $bytes.Length - $facts.bomLen)
     $sb = New-Object System.Text.StringBuilder
     $inPem = $false
     $pos = 0
@@ -490,7 +496,7 @@ function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$
         }
         [void]$sb.Append((Invoke-SanitizeLine $lineText $secretScan $ctx)).Append($term)
     }
-    $body = $script:BytePreserving.GetBytes($sb.ToString())
+    $body = $enc.GetBytes($sb.ToString())
     if ($facts.bomLen -gt 0) {
         $outBytes = New-Object byte[] ($facts.bomLen + $body.Length)
         [System.Array]::Copy($bytes, 0, $outBytes, 0, $facts.bomLen)

@@ -194,6 +194,9 @@ encoding_probe() {
   # records ending in CR are CRLF pairs (awk splits on LF); the rest are bare CRs
   _ecrlf=$(LC_ALL=C awk '/\r$/ { c++ } END { print c + 0 }' "$_ef" 2>/dev/null)
   [ -n "${_ecrlf:-}" ] || _ecrlf=0
+  # with no LF anywhere there are no CRLF pairs - awk saw the whole file as one
+  # record and counted its trailing CR as if it were one
+  [ "$_elf" -eq 0 ] && _ecrlf=0
   _ebarecr=$((_ecr - _ecrlf)); [ "$_ebarecr" -lt 0 ] && _ebarecr=0
   _ebarelf=$((_elf - _ecrlf)); [ "$_ebarelf" -lt 0 ] && _ebarelf=0
   # CR is a line terminator too: a CR-terminated file is NOT missing its final
@@ -252,9 +255,11 @@ sanitize_file() {
   # A BOM shifts every ^-anchored rule in the sanitizer: a BOM'd "[<API_KEY>]"
   # header did NOT match the section rule and shipped verbatim. Strip the BOM
   # for the redaction pass and restore the exact bytes afterwards.
-  _sanin="$_f"
+  _sanin="$_f"; _bomstripped=0
   if [ "$ENC_BOM_BYTES" -gt 0 ]; then
-    if tail -c "+$((ENC_BOM_BYTES + 1))" "$_f" > "$_f.nobom" 2>>"$ERRORS"; then _sanin="$_f.nobom"; fi
+    if tail -c "+$((ENC_BOM_BYTES + 1))" "$_f" > "$_f.nobom" 2>>"$ERRORS"; then
+      _sanin="$_f.nobom"; _bomstripped=1
+    fi
   fi
   # A CR-only file is a single record to awk, so every rule would see one giant
   # line and only its FIRST key would be examined - later secrets would ship
@@ -656,7 +661,7 @@ sanitize_file() {
     fi
     # restore the exact BOM bytes the source had, so an encoding fault in the
     # user's file is still visible in the bundle
-    if [ "$_sanin" = "$_f.nobom" ]; then
+    if [ "$_bomstripped" = "1" ]; then
       head -c "$ENC_BOM_BYTES" "$_f" > "$_f.out" 2>>"$ERRORS"
     else
       : > "$_f.out"
@@ -666,7 +671,8 @@ sanitize_file() {
     # had no final newline, so a truncated source file still looks truncated
     if [ "$ENC_FINAL" = "false" ]; then
       _osz=$(wc -c < "$_f.out" | tr -d ' ')
-      if [ "${_osz:-0}" -gt 0 ] && [ "$(tail -c 1 "$_f.out" | wc -l | tr -d ' ')" = "1" ]; then
+      _lastout=$(tail -c 1 "$_f.out" 2>/dev/null | od -An -tx1 | tr -d ' \n')
+      if [ "${_osz:-0}" -gt 0 ] && { [ "$_lastout" = "0a" ] || [ "$_lastout" = "0d" ]; }; then
         head -c "$((_osz - 1))" "$_f.out" > "$_f.out2" 2>>"$ERRORS" && mv "$_f.out2" "$_f.out"
       fi
     fi
@@ -997,6 +1003,28 @@ STREAMVEC
     { echo "FAIL: CR-only line endings were not reproduced" >&2; _fails=$((_fails + 1)); }
   [ "$(LC_ALL=C tr -dc '\n' < "$_cf" | wc -c | tr -d ' ')" = "0" ] || \
     { echo "FAIL: CR-only file gained LF terminators" >&2; _fails=$((_fails + 1)); }
+  # a CR-only file that does NOT end in a terminator must not gain one
+  _cf2="$_tf.cronly2"
+  printf 'a = 1\rpassword = SENTINEL-CRONLY2\rlast' > "$_cf2"
+  sanitize_file "$_cf2"
+  grep -q "SENTINEL-CRONLY2" "$_cf2" && \
+    { echo "FAIL (leak): secret in a terminator-less CR-only file survived" >&2; _fails=$((_fails + 1)); }
+  [ "$(tail -c 1 "$_cf2" | od -An -tx1 | tr -d ' \n')" = "0d" ] && \
+    { echo "FAIL: CR-only file without a final terminator gained one" >&2; _fails=$((_fails + 1)); }
+  # a BOM on a CR-only file must still survive (the CR translation must not
+  # bypass the BOM restore)
+  _cf3="$_tf.bomcr"
+  printf '\357\273\277a = 1\rpassword = SENTINEL-BOMCR\r' > "$_cf3"
+  sanitize_file "$_cf3"
+  [ "$(head -c 3 "$_cf3" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ] || \
+    { echo "FAIL: BOM lost on a CR-only file" >&2; _fails=$((_fails + 1)); }
+  grep -q "SENTINEL-BOMCR" "$_cf3" && \
+    { echo "FAIL (leak): secret in a BOM'd CR-only file survived" >&2; _fails=$((_fails + 1)); }
+  # a file with no LF has no CRLF pairs, however awk records it
+  case "$ENC_JSON" in
+    *'"crlf":0'*) : ;;
+    *) echo "FAIL: CR-only file reported CRLF pairs in source_encoding" >&2; _fails=$((_fails + 1)) ;;
+  esac
 
   if [ "$_fails" -eq 0 ]; then
     echo "netdata-support-bundle selftest: ALL PASS"
