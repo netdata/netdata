@@ -72,20 +72,19 @@ func (r *wireRecorder) snapshot() []wireRequest {
 }
 
 func TestTargetReleaseDashboardContracts(t *testing.T) {
-	tests := []struct {
-		release   string
+	tests := map[string]struct {
 		legacyOSD bool
 	}{
-		{release: "17.2.7", legacyOSD: true},
-		{release: "18.2.8"},
-		{release: "19.2.5"},
-		{release: "20.2.2"},
+		"17.2.7": {legacyOSD: true},
+		"18.2.8": {},
+		"19.2.5": {},
+		"20.2.2": {},
 	}
 
-	for _, test := range tests {
-		t.Run(test.release, func(t *testing.T) {
-			fixture := loadReleaseContract(t, test.release)
-			assert.Equal(t, test.release, fixture.Release)
+	for release, test := range tests {
+		t.Run(release, func(t *testing.T) {
+			fixture := loadReleaseContract(t, release)
+			assert.Equal(t, release, fixture.Release)
 
 			var health apiHealthMinimalResponse
 			require.NoError(t, json.Unmarshal(fixture.HealthMinimal, &health))
@@ -119,19 +118,17 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 			assert.EqualValues(t, 10000, mx["pool_pool-a_space_utilization"])
 			collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 
-			for _, method := range []string{
-				cephfunc.MethodHealth, cephfunc.MethodOSDs, cephfunc.MethodPools, cephfunc.MethodDaemons,
-			} {
-				response := c.funcRouter.Handle(context.Background(), method, nil)
+			for _, method := range cephfunc.Methods() {
+				response := c.funcRouter.Handle(context.Background(), method.ID, nil)
 				expectedStatus := http.StatusOK
-				if test.legacyOSD && method == cephfunc.MethodOSDs {
+				if test.legacyOSD && method.ID == cephfunc.MethodOSDs {
 					expectedStatus = http.StatusUnsupportedMediaType
 				}
-				require.Equal(t, expectedStatus, response.Status, method)
+				require.Equal(t, expectedStatus, response.Status, method.ID)
 				if expectedStatus == http.StatusOK {
-					assert.NotEmpty(t, response.Data, method)
+					assert.NotEmpty(t, response.Data, method.ID)
 				} else {
-					assert.Nil(t, response.Data, method)
+					assert.Nil(t, response.Data, method.ID)
 				}
 			}
 			if test.legacyOSD {
