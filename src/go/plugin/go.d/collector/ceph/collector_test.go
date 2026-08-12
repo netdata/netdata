@@ -320,6 +320,7 @@ func TestCollector_HealthMissingSection(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	mx := make(map[string]int64)
 	err := c.collectHealth(context.Background(), mx)
 	require.Error(t, err)
@@ -356,6 +357,7 @@ func TestCollector_HealthSemantics(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	mx := make(map[string]int64)
 	_ = c.collectHealth(context.Background(), mx)
 
@@ -416,6 +418,7 @@ func TestCollector_OSDWholeListCapIsAllOrNone(t *testing.T) {
 		c.MaxOSDs = 2
 	})
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	mx := make(map[string]int64)
 	err := c.collectOsds(context.Background(), mx)
 	require.NoError(t, err)
@@ -455,6 +458,7 @@ func TestCollector_PoolCapIsAllOrNone(t *testing.T) {
 		c.MaxPools = 2
 	})
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	mx := make(map[string]int64)
 	err := c.collectPools(context.Background(), mx)
 	require.NoError(t, err)
@@ -654,6 +658,7 @@ func TestCollector_ReefOSDUsesSingleWholeListRequest(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	osds, err := c.fetchAllOSDs(context.Background())
 	require.NoError(t, err)
 	require.Len(t, osds, 1)
@@ -686,6 +691,7 @@ func TestCollector_OSDFallsBackToLegacyWholeListProtocol(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	osds, err := c.fetchAllOSDs(context.Background())
 	require.NoError(t, err)
 	assert.NotEmpty(t, osds)
@@ -713,6 +719,7 @@ func TestCollector_OSDWholeListSupportsClustersLargerThanTenThousand(t *testing.
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	osds, err := c.fetchAllOSDs(context.Background())
 	require.NoError(t, err)
 	assert.Len(t, osds, total)
@@ -736,6 +743,7 @@ func TestCollector_OSDWholeListRejectsInconsistentAdvertisedTotal(t *testing.T) 
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	_, err := c.fetchAllOSDs(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "advertised 101")
@@ -806,6 +814,7 @@ func TestCollector_PoolAvailableIsNotReducedTwice(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	mx := make(map[string]int64)
 	err := c.collectPools(context.Background(), mx)
 	require.NoError(t, err)
@@ -829,6 +838,7 @@ func TestCollector_PoolInventoryRejectsExcessiveRecordCount(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	err := c.collectPools(context.Background(), make(map[string]int64))
 	require.ErrorContains(t, err, "record limit")
 }
@@ -847,6 +857,7 @@ func TestCollector_HealthRejectsExcessiveSectionRecordCount(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	err := c.collectHealth(context.Background(), make(map[string]int64))
 	require.ErrorContains(t, err, "record limit")
 }
@@ -957,6 +968,7 @@ func TestCollector_PoolsRejectDuplicateSelectedNames(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
 	err := c.collectPools(context.Background(), make(map[string]int64))
 	require.ErrorContains(t, err, "duplicate selected pool name")
 }
@@ -1019,6 +1031,7 @@ func TestCollector_HealthRejectsInvalidSectionValues(t *testing.T) {
 
 			c := newInitializedCollector(t, srv.URL, nil)
 			defer c.Cleanup(context.Background())
+			requireClusterIdentity(t, c)
 			mx := make(map[string]int64)
 			err := c.collectHealth(context.Background(), mx)
 			require.ErrorContains(t, err, test.want)
@@ -1173,6 +1186,12 @@ func newInitializedCollector(t *testing.T, rawURL string, configure func(*Collec
 	}
 	require.NoError(t, c.Init(context.Background()))
 	return c
+}
+
+func requireClusterIdentity(t *testing.T, c *Collector) {
+	t.Helper()
+	_, err := c.probeClusterIdentity(context.Background())
+	require.NoError(t, err)
 }
 
 func TestCollector_RequestConfigRemainsCompatibleWithProxyAndTLSFields(t *testing.T) {

@@ -24,6 +24,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if _, err := c.probeClusterIdentity(ctx); err != nil {
 		return nil, err
 	}
+	c.addClusterChartsOnce.Do(c.addClusterCharts)
 
 	healthErr := c.collectHealth(ctx, mx)
 
@@ -81,42 +82,14 @@ func boolInt64(value bool) int64 {
 }
 
 func (c *Collector) probeClusterIdentity(ctx context.Context) (string, error) {
-	var fsid string
-	if err := c.apiClient.getJSON(ctx, "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid); err != nil {
-		if !isUnsupportedEndpointError(err) {
-			return "", fmt.Errorf("get cluster identity: %w", err)
-		}
-
-		// TODO: Remove the Pacific 16 and Quincy 17 monitor fallback only when
-		// the collector intentionally raises its minimum release to Reef 18.
-		var monitor struct {
-			MonStatus struct {
-				MonMap struct {
-					FSID string `json:"fsid"`
-				} `json:"monmap"`
-			} `json:"mon_status"`
-		}
-		if err := c.apiClient.getJSON(ctx, "get legacy cluster FSID", urlPathApiMonitor, hdrAcceptVersion, nil, &monitor); err != nil {
-			return "", fmt.Errorf("get cluster identity: %w", err)
-		}
-		fsid = monitor.MonStatus.MonMap.FSID
-	}
-	if fsid == "" {
-		return "", errors.New("get cluster identity: empty FSID")
+	fsid, err := c.apiClient.probeClusterIdentity(ctx)
+	if err != nil {
+		return "", err
 	}
 
 	c.identityMu.Lock()
-	switch {
-	case c.fsid == "":
-		c.fsid = fsid
-	case c.fsid != fsid:
-		c.identityMu.Unlock()
-		return "", errors.New("cluster identity changed after active-MGR discovery")
-	}
+	c.fsid = fsid
 	c.identityMu.Unlock()
 
-	if !c.FunctionOnly {
-		c.addClusterChartsOnce.Do(c.addClusterCharts)
-	}
 	return fsid, nil
 }

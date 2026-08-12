@@ -352,126 +352,202 @@ func TestCephClientRejectsOversizedIdentityResponse(t *testing.T) {
 	assert.Contains(t, err.Error(), "exceeds")
 }
 
-func TestCephClientRuntimeFailoverReconstructsOriginalPath(t *testing.T) {
+func TestCephClientRuntimeRedirectFailoverValidatesClusterIdentity(t *testing.T) {
 	const originalPath = "/api/pool"
-	var secondURL string
-	var failedOver atomic.Bool
-	var secondSawCredentialsDuringDiscovery atomic.Bool
-
-	second := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case urlPathAPIClusterFSID:
-			if r.Header.Get("Authorization") != "" {
-				secondSawCredentialsDuringDiscovery.Store(true)
-			}
-			w.WriteHeader(http.StatusUnauthorized)
-		case urlPathApiAuth:
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-second"})
-		case originalPath:
-			if r.URL.Query().Get("stats") != "true" || r.Header.Get("Authorization") != "Bearer test-second" {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			writeJSON(w, http.StatusOK, []map[string]any{{"pool_name": "pool-a"}})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer second.Close()
-	secondURL = second.URL
-
-	first := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if failedOver.Load() {
-			http.Redirect(w, r, secondURL+"/", http.StatusSeeOther)
-			return
-		}
-		switch r.URL.Path {
-		case urlPathAPIClusterFSID:
-			w.WriteHeader(http.StatusUnauthorized)
-		case urlPathApiAuth:
-			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-first"})
-		case originalPath:
-			failedOver.Store(true)
-			http.Redirect(w, r, secondURL+"/", http.StatusSeeOther)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer first.Close()
-
-	client := newTestCephClient(t, first.URL, false, func(cfg *web.RequestConfig) {
-		cfg.Username = "netdata"
-		cfg.Password = "test-password"
-	}, second.URL)
-	var got []map[string]any
-	require.NoError(t, client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion, url.Values{"stats": {"true"}}, &got))
-	require.Len(t, got, 1)
-	assert.Equal(t, "pool-a", got[0]["pool_name"])
-	assert.False(t, secondSawCredentialsDuringDiscovery.Load())
-}
-
-func TestCephClientRuntimeTransportFailureRediscoversThroughConfiguredStandby(t *testing.T) {
-	const originalPath = "/api/pool"
-	var activeTarget atomic.Value
-	var standbySawCredentials atomic.Bool
-
-	newActive := func(token, pool string) *httptest.Server {
-		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.URL.Path {
-			case urlPathAPIClusterFSID:
-				if r.Header.Get("Authorization") == "" {
-					w.WriteHeader(http.StatusUnauthorized)
-					return
-				}
-				if r.Header.Get("Authorization") != "Bearer "+token {
-					w.WriteHeader(http.StatusForbidden)
-					return
-				}
-				writeJSON(w, http.StatusOK, map[string]any{"fsid": "cluster-fsid"})
-			case urlPathApiAuth:
-				writeJSON(w, http.StatusCreated, authLoginResp{Token: token})
-			case originalPath:
-				if r.Header.Get("Authorization") != "Bearer "+token {
-					w.WriteHeader(http.StatusForbidden)
-					return
-				}
-				writeJSON(w, http.StatusOK, []map[string]any{{"pool_name": pool}})
-			default:
-				w.WriteHeader(http.StatusNotFound)
-			}
-		}))
+	tests := map[string]struct {
+		secondFSID string
+		wantErr    bool
+	}{
+		"same cluster":      {secondFSID: "cluster-fsid"},
+		"different cluster": {secondFSID: "other-cluster", wantErr: true},
 	}
 
-	first := newActive("test-first", "pool-first")
-	second := newActive("test-second", "pool-second")
-	defer second.Close()
-	activeTarget.Store(first.URL)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var secondURL string
+			var failedOver atomic.Bool
+			var secondFSID atomic.Value
+			var secondDiscoveryRequests, secondIdentityRequests, secondPoolRequests atomic.Int64
+			secondFSID.Store(test.secondFSID)
 
-	standby := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
-			standbySawCredentials.Store(true)
-		}
-		http.Redirect(w, r, activeTarget.Load().(string)+"/", http.StatusSeeOther)
-	}))
-	defer standby.Close()
+			second := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case urlPathAPIClusterFSID:
+					if r.Header.Get("Authorization") == "" {
+						secondDiscoveryRequests.Add(1)
+						w.WriteHeader(http.StatusUnauthorized)
+						return
+					}
+					secondIdentityRequests.Add(1)
+					writeJSON(w, http.StatusOK, secondFSID.Load().(string))
+				case urlPathApiAuth:
+					writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-second"})
+				case originalPath:
+					secondPoolRequests.Add(1)
+					if r.URL.Query().Get("stats") != "true" || r.Header.Get("Authorization") != "Bearer test-second" {
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
+					writeJSON(w, http.StatusOK, []map[string]any{{"pool_name": "pool-a"}})
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer second.Close()
+			secondURL = second.URL
 
-	client := newTestCephClient(t, standby.URL, false, func(cfg *web.RequestConfig) {
-		cfg.Username = "netdata"
-		cfg.Password = "test-password"
-	}, first.URL, second.URL)
+			first := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if failedOver.Load() {
+					http.Redirect(w, r, secondURL+"/", http.StatusSeeOther)
+					return
+				}
+				switch r.URL.Path {
+				case urlPathAPIClusterFSID:
+					if r.Header.Get("Authorization") == "" {
+						w.WriteHeader(http.StatusUnauthorized)
+						return
+					}
+					writeJSON(w, http.StatusOK, "cluster-fsid")
+				case urlPathApiAuth:
+					writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-first"})
+				case originalPath:
+					failedOver.Store(true)
+					http.Redirect(w, r, secondURL+"/", http.StatusSeeOther)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer first.Close()
 
-	var got []map[string]any
-	require.NoError(t, client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion, nil, &got))
-	require.Len(t, got, 1)
-	assert.Equal(t, "pool-first", got[0]["pool_name"])
+			client := newTestCephClient(t, first.URL, false, func(cfg *web.RequestConfig) {
+				cfg.Username = "netdata"
+				cfg.Password = "test-password"
+			}, second.URL)
+			collector := &Collector{Config: Config{FunctionOnly: true}, apiClient: client}
+			_, err := collector.probeClusterIdentity(context.Background())
+			require.NoError(t, err)
 
-	activeTarget.Store(second.URL)
-	first.Close()
-	got = nil
-	require.NoError(t, client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion, nil, &got))
-	require.Len(t, got, 1)
-	assert.Equal(t, "pool-second", got[0]["pool_name"])
-	assert.False(t, standbySawCredentials.Load())
+			var got []map[string]any
+			err = client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion,
+				url.Values{"stats": {"true"}}, &got)
+			if test.wantErr {
+				require.ErrorContains(t, err, "cluster identity changed")
+				assert.Empty(t, got)
+				assert.Zero(t, secondPoolRequests.Load())
+
+				secondFSID.Store("cluster-fsid")
+				err = client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion,
+					url.Values{"stats": {"true"}}, &got)
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				assert.Equal(t, "pool-a", got[0]["pool_name"])
+				assert.EqualValues(t, 2, secondDiscoveryRequests.Load())
+				assert.EqualValues(t, 2, secondIdentityRequests.Load())
+				assert.EqualValues(t, 1, secondPoolRequests.Load())
+			} else {
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				assert.Equal(t, "pool-a", got[0]["pool_name"])
+				assert.EqualValues(t, 1, secondPoolRequests.Load())
+				assert.EqualValues(t, 1, secondDiscoveryRequests.Load())
+				assert.EqualValues(t, 1, secondIdentityRequests.Load())
+			}
+		})
+	}
+}
+
+func TestCephClientRuntimeTransportFailoverValidatesClusterIdentity(t *testing.T) {
+	const originalPath = "/api/pool"
+	tests := map[string]struct {
+		secondFSID string
+		wantErr    bool
+	}{
+		"same cluster":      {secondFSID: "cluster-fsid"},
+		"different cluster": {secondFSID: "other-cluster", wantErr: true},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var activeTarget atomic.Value
+			var standbySawCredentials atomic.Bool
+			var secondIdentityRequests, secondPoolRequests atomic.Int64
+
+			newActive := func(token, pool, fsid string, identityRequests, poolRequests *atomic.Int64) *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case urlPathAPIClusterFSID:
+						if r.Header.Get("Authorization") == "" {
+							w.WriteHeader(http.StatusUnauthorized)
+							return
+						}
+						identityRequests.Add(1)
+						if r.Header.Get("Authorization") != "Bearer "+token {
+							w.WriteHeader(http.StatusForbidden)
+							return
+						}
+						writeJSON(w, http.StatusOK, fsid)
+					case urlPathApiAuth:
+						writeJSON(w, http.StatusCreated, authLoginResp{Token: token})
+					case originalPath:
+						poolRequests.Add(1)
+						if r.Header.Get("Authorization") != "Bearer "+token {
+							w.WriteHeader(http.StatusForbidden)
+							return
+						}
+						writeJSON(w, http.StatusOK, []map[string]any{{"pool_name": pool}})
+					default:
+						w.WriteHeader(http.StatusNotFound)
+					}
+				}))
+			}
+
+			var firstIdentityRequests, firstPoolRequests atomic.Int64
+			first := newActive("test-first", "pool-first", "cluster-fsid", &firstIdentityRequests, &firstPoolRequests)
+			second := newActive("test-second", "pool-second", test.secondFSID, &secondIdentityRequests, &secondPoolRequests)
+			defer second.Close()
+			activeTarget.Store(first.URL)
+
+			standby := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
+					standbySawCredentials.Store(true)
+				}
+				http.Redirect(w, r, activeTarget.Load().(string)+"/", http.StatusSeeOther)
+			}))
+			defer standby.Close()
+
+			client := newTestCephClient(t, standby.URL, false, func(cfg *web.RequestConfig) {
+				cfg.Username = "netdata"
+				cfg.Password = "test-password"
+			}, first.URL, second.URL)
+			collector := &Collector{Config: Config{FunctionOnly: true}, apiClient: client}
+			_, err := collector.probeClusterIdentity(context.Background())
+			require.NoError(t, err)
+
+			var got []map[string]any
+			require.NoError(t, client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion, nil, &got))
+			require.Len(t, got, 1)
+			assert.Equal(t, "pool-first", got[0]["pool_name"])
+
+			activeTarget.Store(second.URL)
+			first.Close()
+			got = nil
+			err = client.getJSON(context.Background(), "list pools", originalPath, hdrAcceptVersion, nil, &got)
+			if test.wantErr {
+				require.ErrorContains(t, err, "cluster identity changed")
+				assert.Empty(t, got)
+				assert.Zero(t, secondPoolRequests.Load())
+			} else {
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				assert.Equal(t, "pool-second", got[0]["pool_name"])
+				assert.EqualValues(t, 1, secondPoolRequests.Load())
+			}
+			assert.EqualValues(t, 1, firstIdentityRequests.Load())
+			assert.EqualValues(t, 1, firstPoolRequests.Load())
+			assert.EqualValues(t, 1, secondIdentityRequests.Load())
+			assert.False(t, standbySawCredentials.Load())
+		})
+	}
 }
 
 func TestCephClientLoginTransportFailureRediscoversThroughConfiguredStandby(t *testing.T) {

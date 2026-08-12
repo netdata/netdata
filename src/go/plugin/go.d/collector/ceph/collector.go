@@ -146,6 +146,9 @@ func (c *Collector) Init(context.Context) error {
 
 func (c *Collector) Check(ctx context.Context) error {
 	_, err := c.probeClusterIdentity(ctx)
+	if err == nil && !c.FunctionOnly {
+		c.addClusterChartsOnce.Do(c.addClusterCharts)
+	}
 	return err
 }
 func (c *Collector) Charts() *collectorapi.Charts {

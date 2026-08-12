@@ -51,6 +51,11 @@ func (e *apiTransportError) Error() string {
 
 func (e *apiTransportError) Unwrap() error { return e.err }
 
+type activeBaseRef struct {
+	base       *url.URL
+	generation uint64
+}
+
 type cephClient struct {
 	httpClient             *http.Client
 	requestConfig          web.RequestConfig
@@ -62,11 +67,14 @@ type cephClient struct {
 	password        string
 	bearerTokenFile string
 
-	discoveryMu sync.Mutex
-	authMu      sync.Mutex
-	stateMu     sync.RWMutex
-	activeBase  *url.URL
-	jwt         string
+	discoveryMu  sync.Mutex
+	authMu       sync.Mutex
+	stateMu      sync.RWMutex
+	activeBase   *url.URL
+	activeGen    uint64
+	validatedGen uint64
+	expectedFSID string
+	jwt          string
 }
 
 func newCephClient(httpClient *http.Client, cfg web.RequestConfig, notFollowRedirects bool, allowedRedirectOrigins []string) (*cephClient, error) {
@@ -146,15 +154,16 @@ func parseDashboardBaseURL(rawURL string) (*url.URL, error) {
 }
 
 func (c *cephClient) getJSON(ctx context.Context, operation, endpoint, accept string, query url.Values, dst any) error {
-	_, err := c.doJSON(ctx, operation, http.MethodGet, endpoint, accept, query, nil, dst)
+	_, _, err := c.doJSON(ctx, operation, http.MethodGet, endpoint, accept, query, nil, dst)
 	return err
 }
 
 func (c *cephClient) getJSONWithHeaders(ctx context.Context, operation, endpoint, accept string, query url.Values, dst any) (http.Header, error) {
-	return c.doJSON(ctx, operation, http.MethodGet, endpoint, accept, query, nil, dst)
+	headers, _, err := c.doJSON(ctx, operation, http.MethodGet, endpoint, accept, query, nil, dst)
+	return headers, err
 }
 
-func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, accept string, query url.Values, body []byte, dst any) (http.Header, error) {
+func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, accept string, query url.Values, body []byte, dst any) (http.Header, activeBaseRef, error) {
 	if timeout := c.httpClient.Timeout; timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -164,46 +173,55 @@ func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, ac
 	var retriedAuth, retriedRedirect, retriedTransport bool
 
 	for range 4 {
-		base, err := c.ensureActiveBase(ctx)
+		active, err := c.ensureActiveBase(ctx)
 		if err != nil {
-			return nil, err
+			return nil, activeBaseRef{}, err
+		}
+		if !isClusterIdentityEndpoint(endpoint) {
+			valid, err := c.ensureActiveIdentity(ctx, active)
+			if err != nil {
+				return nil, activeBaseRef{}, err
+			}
+			if !valid {
+				continue
+			}
 		}
 
-		token, managed, err := c.tokenForRequest(ctx, base)
+		token, managed, err := c.tokenForRequest(ctx, active.base)
 		if err != nil {
 			var httpErr *apiHTTPError
 			if errors.As(err, &httpErr) && httpErr.redirect && !retriedRedirect && !c.notFollowRedirects {
 				retriedRedirect = true
-				c.invalidateActive(base)
+				c.invalidateActive(active)
 				continue
 			}
 			var transportErr *apiTransportError
 			if errors.As(err, &transportErr) && method == http.MethodGet && !retriedTransport && ctx.Err() == nil {
 				retriedTransport = true
-				c.invalidateActive(base)
+				c.invalidateActive(active)
 				continue
 			}
-			return nil, err
+			return nil, activeBaseRef{}, err
 		}
 
-		resp, err := c.request(ctx, base, method, endpoint, accept, query, body, token)
+		resp, err := c.request(ctx, active.base, method, endpoint, accept, query, body, token)
 		if err != nil {
 			if method == http.MethodGet && !retriedTransport && ctx.Err() == nil {
 				retriedTransport = true
-				c.invalidateActive(base)
+				c.invalidateActive(active)
 				continue
 			}
-			return nil, fmt.Errorf("%s request failed: %w", operation, err)
+			return nil, activeBaseRef{}, fmt.Errorf("%s request failed: %w", operation, err)
 		}
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			headers := resp.Header.Clone()
 			defer web.CloseBody(resp)
 			if dst != nil {
 				if err := decodeJSONResponse(resp, endpoint, dst); err != nil {
-					return nil, fmt.Errorf("decode %s response: %w", operation, err)
+					return nil, activeBaseRef{}, fmt.Errorf("decode %s response: %w", operation, err)
 				}
 			}
-			return headers, nil
+			return headers, active, nil
 		}
 
 		status := resp.StatusCode
@@ -217,21 +235,110 @@ func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, ac
 		}
 		if isRedirect && !retriedRedirect && !c.notFollowRedirects {
 			retriedRedirect = true
-			c.invalidateActive(base)
+			c.invalidateActive(active)
 			continue
 		}
-		return nil, &apiHTTPError{operation: operation, status: status, redirect: isRedirect}
+		return nil, activeBaseRef{}, &apiHTTPError{operation: operation, status: status, redirect: isRedirect}
 	}
 
-	return nil, fmt.Errorf("%s exceeded bounded authentication/failover retries", operation)
+	return nil, activeBaseRef{}, fmt.Errorf("%s exceeded bounded authentication/failover retries", operation)
 }
 
-func (c *cephClient) ensureActiveBase(ctx context.Context) (*url.URL, error) {
+func (c *cephClient) probeClusterIdentity(ctx context.Context) (string, error) {
+	for range 4 {
+		fsid, active, err := c.fetchClusterIdentity(ctx)
+		if err != nil {
+			return "", err
+		}
+		if fsid == "" {
+			return "", errors.New("get cluster identity: empty FSID")
+		}
+
+		c.stateMu.Lock()
+		if c.activeBase == nil || active.base == nil || c.activeGen != active.generation || c.activeBase.String() != active.base.String() {
+			c.stateMu.Unlock()
+			continue
+		}
+		if c.expectedFSID == "" {
+			c.expectedFSID = fsid
+		} else if c.expectedFSID != fsid {
+			c.stateMu.Unlock()
+			c.invalidateActive(active)
+			return "", errors.New("cluster identity changed after active-MGR discovery")
+		}
+		c.validatedGen = active.generation
+		c.stateMu.Unlock()
+		return fsid, nil
+	}
+	return "", errors.New("cluster identity changed repeatedly during validation")
+}
+
+func (c *cephClient) fetchClusterIdentity(ctx context.Context) (string, activeBaseRef, error) {
+	var fsid string
+	_, active, err := c.doJSON(ctx, "get cluster FSID", http.MethodGet, urlPathAPIClusterFSID,
+		hdrAcceptVersion, nil, nil, &fsid)
+	if err == nil {
+		return fsid, active, nil
+	}
+	if !isUnsupportedEndpointError(err) {
+		return "", activeBaseRef{}, fmt.Errorf("get cluster identity: %w", err)
+	}
+
+	// TODO: Remove the Pacific 16 and Quincy 17 monitor fallback only when
+	// the collector intentionally raises its minimum release to Reef 18.
+	var monitor struct {
+		MonStatus struct {
+			MonMap struct {
+				FSID string `json:"fsid"`
+			} `json:"monmap"`
+		} `json:"mon_status"`
+	}
+	_, active, err = c.doJSON(ctx, "get legacy cluster FSID", http.MethodGet, urlPathApiMonitor,
+		hdrAcceptVersion, nil, nil, &monitor)
+	if err != nil {
+		return "", activeBaseRef{}, fmt.Errorf("get cluster identity: %w", err)
+	}
+	return monitor.MonStatus.MonMap.FSID, active, nil
+}
+
+func (c *cephClient) ensureActiveIdentity(ctx context.Context, active activeBaseRef) (bool, error) {
+	c.stateMu.RLock()
+	current := c.activeBase != nil && active.base != nil && c.activeGen == active.generation && c.activeBase.String() == active.base.String()
+	initialized := c.expectedFSID != ""
+	validated := current && c.validatedGen == active.generation
+	c.stateMu.RUnlock()
+
+	if !current {
+		return false, nil
+	}
+	if !initialized {
+		return false, errors.New("cluster identity must be validated before requesting cluster data")
+	}
+	if validated {
+		return true, nil
+	}
+	if _, err := c.probeClusterIdentity(ctx); err != nil {
+		return false, err
+	}
+
+	c.stateMu.RLock()
+	validated = c.activeBase != nil && active.base != nil && c.activeGen == active.generation &&
+		c.validatedGen == active.generation && c.activeBase.String() == active.base.String()
+	c.stateMu.RUnlock()
+	return validated, nil
+}
+
+func isClusterIdentityEndpoint(endpoint string) bool {
+	return endpoint == urlPathAPIClusterFSID || endpoint == urlPathApiMonitor
+}
+
+func (c *cephClient) ensureActiveBase(ctx context.Context) (activeBaseRef, error) {
 	c.stateMu.RLock()
 	active := cloneURL(c.activeBase)
+	generation := c.activeGen
 	c.stateMu.RUnlock()
 	if active != nil {
-		return active, nil
+		return activeBaseRef{base: active, generation: generation}, nil
 	}
 
 	c.discoveryMu.Lock()
@@ -239,19 +346,22 @@ func (c *cephClient) ensureActiveBase(ctx context.Context) (*url.URL, error) {
 
 	c.stateMu.RLock()
 	active = cloneURL(c.activeBase)
+	generation = c.activeGen
 	c.stateMu.RUnlock()
 	if active != nil {
-		return active, nil
+		return activeBaseRef{base: active, generation: generation}, nil
 	}
 
 	active, err := c.discoverActiveBase(ctx)
 	if err != nil {
-		return nil, err
+		return activeBaseRef{}, err
 	}
 	c.stateMu.Lock()
+	c.activeGen++
+	generation = c.activeGen
 	c.activeBase = cloneURL(active)
 	c.stateMu.Unlock()
-	return active, nil
+	return activeBaseRef{base: active, generation: generation}, nil
 }
 
 func (c *cephClient) discoverActiveBase(ctx context.Context) (*url.URL, error) {
@@ -482,10 +592,10 @@ func (c *cephClient) request(ctx context.Context, base *url.URL, method, endpoin
 	return c.httpClient.Do(req)
 }
 
-func (c *cephClient) invalidateActive(active *url.URL) {
+func (c *cephClient) invalidateActive(active activeBaseRef) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
-	if c.activeBase != nil && active != nil && c.activeBase.String() == active.String() {
+	if c.activeBase != nil && active.base != nil && c.activeGen == active.generation && c.activeBase.String() == active.base.String() {
 		c.activeBase = nil
 		c.jwt = ""
 	}
