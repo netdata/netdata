@@ -119,22 +119,26 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 			assert.EqualValues(t, 10000, mx["pool_pool-a_space_utilization"])
 			collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 
-			if test.legacyOSD {
-				response := c.funcRouter.Handle(context.Background(), cephfunc.MethodOSDs, nil)
-				assert.Equal(t, http.StatusUnsupportedMediaType, response.Status)
-				assert.Nil(t, response.Data)
-				assert.Equal(t, expectedQuincyRequests(), recorder.snapshot())
-				return
-			}
-
 			for _, method := range []string{
 				cephfunc.MethodHealth, cephfunc.MethodOSDs, cephfunc.MethodPools, cephfunc.MethodDaemons,
 			} {
 				response := c.funcRouter.Handle(context.Background(), method, nil)
-				require.Equal(t, http.StatusOK, response.Status, method)
-				assert.NotEmpty(t, response.Data, method)
+				expectedStatus := http.StatusOK
+				if test.legacyOSD && method == cephfunc.MethodOSDs {
+					expectedStatus = http.StatusUnsupportedMediaType
+				}
+				require.Equal(t, expectedStatus, response.Status, method)
+				if expectedStatus == http.StatusOK {
+					assert.NotEmpty(t, response.Data, method)
+				} else {
+					assert.Nil(t, response.Data, method)
+				}
 			}
-			assert.Equal(t, expectedModernRequests(), recorder.snapshot())
+			if test.legacyOSD {
+				assert.Equal(t, expectedQuincyRequests(), recorder.snapshot())
+			} else {
+				assert.Equal(t, expectedModernRequests(), recorder.snapshot())
+			}
 		})
 	}
 }
@@ -316,7 +320,14 @@ func expectedQuincyRequests() []wireRequest {
 		getWire("/api/osd", wireAcceptV1, "", true),
 		getWire("/api/pool", wireAcceptV1, "stats=true", true),
 		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/health/minimal", wireAcceptV1, "", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
 		getWire("/api/osd", wireAcceptV11, wireOSDFunctionQuery, true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/pool", wireAcceptV1, wirePoolPolicyQuery, true),
+		getWire("/api/crush_rule", wireAcceptV2, "", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/daemon", wireAcceptV1, "", true),
 	}
 }
 
