@@ -336,12 +336,16 @@ WHERE object_name LIKE '%SQL Errors%'
 // querySystemHealthLatestDeadlockEventFile retrieves the latest xml_deadlock_report event
 // from the system_health Extended Events file target.
 const querySystemHealthLatestDeadlockEventFile = `
+WITH xevents AS (
+  SELECT CAST(event_data AS XML) AS event_xml
+  FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
+  WHERE object_name = 'xml_deadlock_report'
+)
 SELECT TOP (1)
-  timestamp_utc AS deadlock_time,
-  CONVERT(nvarchar(max), CAST(event_data AS XML).query('(event/data[@name="xml_report"]/value/deadlock)[1]')) AS deadlock_xml
-FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
-WHERE object_name = 'xml_deadlock_report'
-ORDER BY timestamp_utc DESC;
+  event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') AS deadlock_time,
+  CONVERT(nvarchar(max), event_xml.query('(/event/data[@name="xml_report"]/value/deadlock)[1]')) AS deadlock_xml
+FROM xevents
+ORDER BY deadlock_time DESC;
 `
 
 // querySystemHealthLatestDeadlockRingBuffer retrieves the latest xml_deadlock_report event

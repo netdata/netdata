@@ -137,6 +137,15 @@ func TestParseDeadlockGraph_Malformed(t *testing.T) {
 	assert.Error(t, res.parseErr)
 }
 
+func TestQuerySystemHealthLatestDeadlockEventFile_SQLServer2014Compatible(t *testing.T) {
+	query := strings.ToLower(querySystemHealthLatestDeadlockEventFile)
+
+	assert.NotContains(t, query, "timestamp_utc")
+	assert.Contains(t, query, "cast(event_data as xml) as event_xml")
+	assert.Contains(t, query, "event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') as deadlock_time")
+	assert.Contains(t, query, "order by deadlock_time desc")
+}
+
 func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
