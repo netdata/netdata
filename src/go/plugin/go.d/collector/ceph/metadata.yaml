@@ -13,7 +13,7 @@ modules:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: "Ceph Dashboard API availability, control-plane RCA, storage policy, daemon inventory, and opt-in RGW data."
+        description: "Ceph cluster metrics, control-plane RCA, storage policy, and daemon inventory."
       keywords:
         - ceph
         - storage
@@ -25,35 +25,31 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor Ceph Dashboard API availability and optionally collect legacy cluster, OSD, and pool metrics.
-          Use the on-demand Functions for detailed health checks, OSD and daemon inventory, pool policy, and explicitly
-          selected RGW quota or multisite diagnostics.
+          Monitor Ceph cluster, OSD, and pool metrics. Use the on-demand Functions for detailed health checks, OSD and
+          daemon inventory, and pool policy.
 
-          This collector is complementary to Ceph's Prometheus producers. The default configuration leaves every
-          overlapping or potentially expensive legacy metric feature disabled. Use the MGR Prometheus module for
-          continuous cluster telemetry and `ceph-exporter` on every Ceph node for daemon/admin-socket telemetry.
+          This collector can coexist with Ceph's Prometheus producers. Use the MGR Prometheus module for additional cluster
+          telemetry and `ceph-exporter` on every Ceph node for daemon/admin-socket telemetry.
         method_description: |
           The collector uses the authenticated Ceph Dashboard REST API. It does not read daemon admin sockets and does
           not scrape Prometheus.
 
-          The default periodic request is `GET /api/health/get_cluster_fsid`, used to verify Dashboard API,
-          authentication, and active-MGR reachability. A JWT obtained through Dashboard's JSON login is cached and
-          renewed after an authorization failure; an externally managed bearer-token file is also supported.
+          The collector verifies the cluster identity, then periodically queries cluster health, OSD, and pool endpoints.
+          A JWT obtained through Dashboard's JSON login is cached and renewed after an authorization failure; an externally
+          managed bearer-token file is also supported.
 
           If a standby MGR redirects to the active MGR, the collector discovers the active origin without credentials,
           validates the destination against `allowed_redirect_origins`, reconstructs the original API path, and then
           authenticates. The configured origin is trusted implicitly; cross-origin redirects require an explicit exact
           origin. It rejects redirect loops, URL credentials, unsupported schemes, and HTTPS-to-HTTP downgrade.
 
-          Optional periodic features issue only the requests their enabled charts need:
+          Periodic collection uses:
 
-          - `/api/health/minimal` for selected cluster features. Enabling one child still incurs the whole endpoint.
-          - Paginated `/api/osd` for selected, bounded per-OSD charts.
+          - `/api/health/minimal` for cluster health and summary metrics.
+          - `/api/osd` for selected, bounded per-OSD charts.
           - `/api/pool?stats=true` for selected, bounded per-pool charts.
 
-          Functions query the Dashboard only when opened. Result rows and long health/sync text are bounded. RGW quota
-          collection never enumerates all users, buckets, or accounts; it performs point lookups only for configured
-          identities.
+          Functions query the Dashboard only when opened. Result rows and long health text are bounded.
 
           Coverage ownership is deliberately split:
 
@@ -61,12 +57,7 @@ modules:
           - Per-node `ceph-exporter` owns continuous daemon/admin-socket telemetry.
           - The native Health Function supplies exact current health-check detail for slow operations, scrub/damage
             errors, quorum symptoms, and other RCA; the other Functions supply bounded policy and inventory gaps.
-          - Native RGW Functions supply explicit quota/usage point lookups and multisite topology/sync diagnostics, not
-            S3 request telemetry. Per-bucket/user/client request rates, GET/PUT/DELETE/LIST latency, endpoint HTTP 4xx/5xx,
-            and client-attributed throughput require RGW structured access logs or another request-level source.
-
-          Release contracts are tested against Ceph Reef 18.2.8, Squid 19.2.5, and Tentacle 20.2.2. RGW sync detail is
-          unavailable through the public Dashboard API on Reef and is reported as unsupported rather than fabricated.
+          Release contracts cover Pacific 16, Quincy 17, Reef 18, Squid 19, and Tentacle 20.
       supported_platforms:
         include: [Linux]
         exclude: []
@@ -74,8 +65,8 @@ modules:
       additional_permissions:
         description: |
           No host capabilities are required. The Dashboard account needs read access to the Ceph scopes queried by the
-          enabled metric features and Functions. The built-in Ceph Dashboard `read-only` role grants read access to all
-          Dashboard scopes. Prefer a dedicated account and the narrowest custom role that covers the selected features.
+          metric endpoints and Functions. The built-in Ceph Dashboard `read-only` role grants read access to all Dashboard
+          scopes. Prefer a dedicated account and the narrowest custom role that covers the selected endpoints.
       default_behavior:
         auto_detection:
           description: |
@@ -83,13 +74,9 @@ modules:
             cannot discover credentials. A discovered job remains unavailable until Dashboard credentials are supplied.
         limits:
           description: |
-            The default job performs one lightweight Dashboard identity probe every 10 seconds. All legacy metric
-            features are disabled. Health, OSD, pool, and daemon Functions are enabled with 500-row limits; RGW
-            Functions are disabled and limited to 100 rows when enabled. Per-OSD and per-pool charts are capped at 100
-            selected entities each. OSD overflow aggregates additive capacity and rates plus arithmetic-mean latency,
-            but omits binary per-OSD status. Pool overflow aggregates only object count; non-additive pool capacity and
-            cumulative pool I/O are omitted. Selectors and caps bound Netdata chart/storage cardinality, not the
-            complete Dashboard response or supported cluster size.
+            The default job collects the complete cluster metric set every 10 seconds. Health, OSD, pool, and daemon
+            Functions are available on demand. Per-OSD and per-pool charts are capped at 100 selected entities each; when a
+            selected set exceeds its cap, that entity metric set is skipped rather than truncated.
         performance_impact:
           description: |
             On all three supported releases, standalone `ceph-exporter` refreshes daemon/admin-socket metrics every 5
@@ -98,13 +85,9 @@ modules:
             producer periods to avoid duplicate or skipped cached samples. If the MGR Prometheus `cache` option is
             disabled, its metrics are instead collected in the scrape request path.
 
-            Dashboard endpoints execute inside the active MGR. `/api/health/minimal` aggregates several subsystems;
-            iSCSI status may synchronously contact gateways; OSD and pool detail grows with cluster size. These features
-            are therefore opt-in and request-gated. RGW multisite topology and sync endpoints invoke `radosgw-admin`
-            subprocesses on the active MGR; the Function is therefore opt-in, on-demand, and bounded.
-
-            Disabling `collect.dashboard_api_status` also disables its per-cycle identity probe. The collector obtains
-            the cluster identity once for chart labels and Functions, then reuses it for that job.
+            Dashboard endpoints execute inside the active MGR. `/api/health/minimal` aggregates several subsystems and
+            iSCSI status may synchronously contact gateways; OSD and pool detail grows with cluster size. Choose an
+            appropriate `update_every`, selectors, and entity caps for the deployment.
     setup:
       prerequisites:
         list:
@@ -141,7 +124,7 @@ modules:
         options:
           description: |
             Options apply per job. The collector uses Dashboard JSON/JWT authentication, not HTTP Basic authentication.
-            `timeout: 0` inside a Function inherits the job HTTP timeout.
+            Core Functions run on demand with internal execution and response limits.
           folding:
             title: Config options
             enabled: true
@@ -152,261 +135,73 @@ modules:
                 refresh or the MGR Prometheus module's 15-second default cache refresh.
               default_value: 10
               required: false
-              group: Collection
+              group: Base
             - name: autodetection_retry
               description: Retry interval in seconds for a failed auto-detected job; zero disables retries.
-              default_value: 0
+              default_value: 60
               required: false
-              group: Collection
+              group: Base
             - name: function_only
-              description: Run only on-demand Functions; every `collect.*` option must then be disabled.
+              description: Run only on-demand Functions, without charts or periodic metric requests.
               default_value: false
               required: false
-              group: Collection
-            - name: collect.dashboard_api_status
-              description: Chart Dashboard API, authentication, and active-MGR reachability.
-              default_value: true
-              required: false
-              group: Periodic metrics
-            - name: collect.health_status
-              description: Collect the high-level Ceph health status from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.hosts
-              description: Collect the Dashboard host count from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.monitors
-              description: Collect the monitor count from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.osds_summary
-              description: Collect cluster OSD count and up/down/in/out totals from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.managers
-              description: Collect active and standby MGR counts from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.object_gateways
-              description: Collect the RGW daemon count from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.iscsi_gateways
-              description: Collect iSCSI gateway status; Ceph may synchronously contact gateways.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.capacity
-              description: Collect raw cluster capacity from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.objects
-              description: Collect logical object count and the Dashboard-native object-copy health distribution.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.pools_summary
-              description: Collect the cluster pool count from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.pgs
-              description: Collect PG totals, per-OSD ratio, and compatibility status categories.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.client_io
-              description: Collect cluster client throughput and operations from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.recovery
-              description: Collect cluster recovery throughput from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.scrub_status
-              description: Collect the cluster scrub scheduler status from `/api/health/minimal`.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.osds
-              description: Collect paginated per-OSD status, capacity, rates, and latency.
-              default_value: false
-              required: false
-              group: Periodic metrics
-            - name: collect.pools
-              description: Collect per-pool capacity, object, I/O, and IOPS metrics.
-              default_value: false
-              required: false
-              group: Periodic metrics
+              group: Base
             - name: osd_selector
               description: Simple-pattern selector matched against `osd.<id>` or OSD UUID before the cap.
               default_value: "*"
               required: false
-              group: Cardinality
+              group: Metrics
             - name: max_osds
               description: >-
-                Maximum selected OSDs with individual charts. Overflow aggregates capacity and rates plus mean latency
-                as a stable `other` entity; binary per-OSD status is omitted. This is not a supported-cluster-size cap.
+                Maximum selected OSDs with individual charts. If the selected set exceeds this operator policy, no
+                per-OSD metrics are collected.
               default_value: 100
               required: false
-              group: Cardinality
+              group: Metrics
             - name: pool_selector
               description: Simple-pattern selector matched against pool names before the cap.
               default_value: "*"
               required: false
-              group: Cardinality
+              group: Metrics
             - name: max_pools
               description: >-
-                Maximum selected pools with individual charts. Overflow object counts are aggregated as `other`;
-                non-additive capacity and cumulative I/O are omitted.
+                Maximum selected pools with individual charts. If the selected set exceeds this operator policy, no
+                per-pool metrics are collected.
               default_value: 100
               required: false
-              group: Cardinality
-            - name: functions.health.disabled
-              description: Disable the detailed health/RCA Function.
-              default_value: false
-              required: false
-              group: Functions
-            - name: functions.health.timeout
-              description: Health Function timeout in seconds; zero inherits the job timeout.
-              default_value: 0
-              required: false
-              group: Functions
-            - name: functions.health.limit
-              description: Maximum health rows.
-              default_value: 500
-              required: false
-              group: Functions
-            - name: functions.osds.disabled
-              description: Disable the OSD inventory Function.
-              default_value: false
-              required: false
-              group: Functions
-            - name: functions.osds.timeout
-              description: OSD Function timeout in seconds; zero inherits the job timeout.
-              default_value: 0
-              required: false
-              group: Functions
-            - name: functions.osds.limit
-              description: Maximum OSD rows.
-              default_value: 500
-              required: false
-              group: Functions
-            - name: functions.pools.disabled
-              description: Disable the pool policy Function.
-              default_value: false
-              required: false
-              group: Functions
-            - name: functions.pools.timeout
-              description: Pool Function timeout in seconds; zero inherits the job timeout.
-              default_value: 0
-              required: false
-              group: Functions
-            - name: functions.pools.limit
-              description: Maximum pool rows.
-              default_value: 500
-              required: false
-              group: Functions
-            - name: functions.daemons.disabled
-              description: Disable the orchestrator-backed daemon inventory Function.
-              default_value: false
-              required: false
-              group: Functions
-            - name: functions.daemons.timeout
-              description: Daemon Function timeout in seconds; zero inherits the job timeout.
-              default_value: 0
-              required: false
-              group: Functions
-            - name: functions.daemons.limit
-              description: Maximum daemon rows.
-              default_value: 500
-              required: false
-              group: Functions
-            - name: functions.rgw_multisite.disabled
-              description: Disable opt-in RGW topology and best-effort sync diagnostics.
-              default_value: true
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_multisite.timeout
-              description: RGW multisite Function timeout in seconds; zero inherits the job timeout.
-              default_value: 0
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_multisite.limit
-              description: Maximum RGW multisite rows.
-              default_value: 100
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_quotas.disabled
-              description: Disable explicit RGW user, bucket, and account quota lookups.
-              default_value: true
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_quotas.timeout
-              description: RGW quota Function timeout in seconds; zero inherits the job timeout.
-              default_value: 0
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_quotas.limit
-              description: Maximum total configured quota identities and returned rows.
-              default_value: 100
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_quotas.users
-              description: Explicit RGW user IDs to query; the collector never lists all users.
-              default_value: "[]"
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_quotas.buckets
-              description: Explicit RGW bucket IDs to query; the collector never lists all buckets.
-              default_value: "[]"
-              required: false
-              group: RGW Functions
-            - name: functions.rgw_quotas.accounts
-              description: Explicit RGW account IDs to query; accounts require Tentacle.
-              default_value: "[]"
-              required: false
-              group: RGW Functions
+              group: Metrics
             - name: url
               description: Base URL of a Ceph Dashboard API endpoint.
               default_value: https://127.0.0.1:8443
               required: true
-              group: Target
+              group: Base
             - name: timeout
-              description: HTTP request timeout in seconds; must be at least 0.5 so every Dashboard call is bounded.
-              default_value: 15
+              description: >-
+                Deadline in seconds for one logical Dashboard operation, including discovery, authentication, retries, and
+                response decoding; must be at least 0.5.
+              default_value: 2
               required: false
-              group: Target
+              group: Base
             - name: username
               description: Username for Ceph Dashboard JSON login; required with `password` unless a bearer-token file is used.
               default_value: ""
               required: false
-              group: Authentication
+              group: Auth
             - name: password
               description: Password for Ceph Dashboard JSON login; required with `username` unless a bearer-token file is used.
               default_value: ""
               required: false
-              group: Authentication
+              group: Auth
             - name: bearer_token_file
               description: Externally managed bearer-token file; takes priority over username/password.
               default_value: ""
               required: false
-              group: Authentication
+              group: Auth
             - name: not_follow_redirects
               description: Reject redirects instead of performing secure active-MGR discovery.
               default_value: false
               required: false
-              group: Request
+              group: Base
             - name: allowed_redirect_origins
               description: Exact trusted active-MGR origins; the configured URL origin is always trusted.
               detailed_description: |
@@ -415,17 +210,17 @@ modules:
                 bearer token. List every possible MGR Dashboard origin and validate TLS with a cluster CA.
               default_value: "[]"
               required: false
-              group: Request
+              group: Base
             - name: headers
               description: Additional HTTP headers; Authorization, Cookie, and Host are rejected.
               default_value: ""
               required: false
-              group: Request
+              group: Headers
             - name: force_http2
               description: Force HTTP/2, including h2c over plain TCP.
               default_value: false
               required: false
-              group: Request
+              group: Base
             - name: tls_skip_verify
               description: Skip server certificate and hostname verification; insecure.
               default_value: true
@@ -465,14 +260,14 @@ modules:
               description: Associate charts with a Virtual Node; Functions stay on the physical Agent job.
               default_value: ""
               required: false
-              group: Virtual Node
+              group: Base
         examples:
           folding:
             title: Config examples
             enabled: true
           list:
-            - name: Complementary once-per-cluster job
-              description: Default periodic Dashboard status plus bounded non-RGW Functions.
+            - name: Once-per-cluster job
+              description: Collect the complete native Dashboard metric set and provide bounded core Functions.
               config: |
                 jobs:
                   - name: ceph-site-a
@@ -488,66 +283,31 @@ modules:
                     username: netdata
                     password: change-me
                     function_only: true
-                    collect:
-                      dashboard_api_status: false
-            - name: Opt-in bounded native metrics
-              description: Enable selected legacy native charts when the Prometheus equivalents are not collected.
+            - name: Bounded native entity metrics
+              description: Select entity charts and reject the complete selected set when it exceeds the configured cap.
               config: |
                 jobs:
                   - name: ceph-native-detail
                     url: https://ceph-mgr.example:8443
                     username: netdata
                     password: change-me
-                    collect:
-                      dashboard_api_status: true
-                      health_status: true
-                      capacity: true
-                      pgs: true
-                      osds: true
                     osd_selector: "osd.* !osd.0"
                     max_osds: 50
-            - name: Explicit RGW quota targets
-              description: Query only named RGW identities; no tenant-wide enumeration occurs.
-              config: |
-                jobs:
-                  - name: ceph-rgw
-                    url: https://ceph-mgr.example:8443
-                    username: netdata
-                    password: change-me
-                    functions:
-                      rgw_quotas:
-                        disabled: false
-                        limit: 20
-                        users: [tenant-a$user-a]
-                        buckets: [tenant-a/bucket-a]
-                        accounts: [account-a]
     troubleshooting:
       problems:
         list:
-          - name: Legacy Ceph charts disappeared after upgrade
-            description: |
-              This is the intentional migration to complementary defaults. Jobs created by earlier collector versions
-              had no `collect:` section and polled every legacy endpoint. They now keep only
-              `collect.dashboard_api_status: true`; every overlapping or potentially expensive legacy feature defaults
-              to false. Explicitly enable only the native features that are not already owned by the MGR Prometheus
-              module or per-node `ceph-exporter` jobs.
           - name: Dashboard job follows a redirect but returns HTML
             description: |
               Do not put a generic reverse-proxy login page in front of the job. Configure `url` to a Ceph Dashboard
               endpoint. Leave `not_follow_redirects: false`, list every possible active MGR under
               `allowed_redirect_origins`, and configure CA verification. The collector reconstructs the API request but
               rejects untrusted origins, HTTPS downgrade, URL credentials, and redirect loops.
-          - name: Optional charts or Functions are missing
+          - name: Charts or Functions are missing
             description: |
-              Confirm that the corresponding `collect.*` feature or Function is enabled and that the Dashboard user has
-              read permission for its scope. Permission-filtered sections are treated as unavailable; they are not
-              emitted as healthy-looking zero values. The daemon Function also requires a configured Ceph orchestrator.
-          - name: RGW data is incomplete
-            description: |
-              Quota usage is the cached/asynchronous value returned by Dashboard and may lag RGW activity. Configure
-              explicit identities. Account lookups require Tentacle. Public RGW sync detail is unavailable on Reef.
-              Request-level status codes, methods/endpoints, latency, and client attribution require RGW structured
-              access logs; the Dashboard Admin API does not provide a truthful substitute.
+              Confirm that the Dashboard user has read permission for the corresponding scope. Permission-filtered
+              sections are treated as unavailable; they are not emitted as healthy-looking zero values. The daemon
+              Function also requires a configured Ceph orchestrator. When an OSD or pool selection exceeds its configured
+              cap, the collector deliberately emits no metrics for that entity set.
           - name: Long retention or capacity planning is required
             description: |
               Retention is a Netdata storage/streaming policy, not a Ceph collector setting. Follow the
@@ -577,7 +337,7 @@ modules:
               streaming, and retention in a representative pilot before setting a capacity or SLA commitment.
           - name: More preconfigured Ceph alerts are expected
             description: |
-              This integration ships alerts only for Dashboard API unavailability and the opt-in native capacity chart.
+              This integration ships alerts for collection failures and native capacity utilization.
               Health Function rows are on-demand tables and do not create alerts. Keep Ceph mixin/Alertmanager rules for
               PG states, OSD down/out, MON quorum, slow operations, scrub errors, and RGW conditions unless equivalent
               Netdata alerts are explicitly implemented and tested. Slack, webhook, and PagerDuty are notification
@@ -596,8 +356,7 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        `ceph.dashboard_api_status` is enabled by default. Every other context is emitted only when its owning
-        `collect.*` feature is enabled. Prefer Ceph Prometheus producers for overlapping continuous telemetry.
+        The default job emits the complete metric set. Per-entity metrics additionally honor their selectors and caps.
       availability: []
       scopes:
         - name: cluster
@@ -912,77 +671,4 @@ modules:
               - title: Configure a Ceph orchestrator
                 description: The Dashboard daemon endpoint requires an active orchestrator with daemon-list support.
           availability: Requires the Function to be enabled, an active Ceph orchestrator, and Dashboard hosts-scope read permission.
-          require_cloud: false
-        - id: rgw-multisite
-          name: Ceph RGW Multisite
-          description: |
-            Opt-in realm, zonegroup, and zone inventory plus bounded best-effort daemon sync diagnostics. Sync diagnostics
-            are capability-detected; the public API is unavailable on Reef and `radosgw-admin` failures remain local rows.
-          parameters: []
-          returns:
-            description: Bounded RGW topology and sync rows ordered realm, zonegroup, zone, sync, then by name.
-            columns:
-              - {name: id, type: string, unit: "", visibility: hidden, description: Unique row identifier.}
-              - {name: kind, type: string, unit: "", description: "Realm, zonegroup, zone, or sync row."}
-              - {name: name, type: string, unit: "", description: RGW object or daemon name.}
-              - {name: default, type: boolean, unit: "", description: Whether Ceph identifies the object as default; null when not applicable or unavailable.}
-              - {name: realm, type: string, unit: "", description: Realm name.}
-              - {name: zonegroup, type: string, unit: "", description: Zonegroup name.}
-              - {name: master, type: boolean, unit: "", description: Zonegroup master flag or zone-to-master-zone relationship; null when not applicable or unavailable.}
-              - {name: endpoints, type: string, unit: "", visibility: hidden, description: Configured endpoints.}
-              - {name: sync_status, type: string, unit: "", description: Best-effort sync status.}
-              - {name: sync_detail, type: string, unit: "", visibility: hidden, description: Bounded best-effort sync detail.}
-              - {name: sync_detail_truncated, type: boolean, unit: "", visibility: hidden, description: Sync text was truncated.}
-              - {name: release_scope, type: string, unit: "", visibility: hidden, description: Release/API capability note.}
-              - {name: truncated, type: boolean, unit: "", visibility: hidden, description: Result exceeded its row limit.}
-          performance: >-
-            Each realm, zonegroup, and zone list/detail lookup invokes `radosgw-admin` on the active MGR. The Function
-            reads the full name lists and then performs bounded point-detail lookups. Sync diagnostics invoke another
-            `radosgw-admin` command and are capped at ten daemons selected deterministically. A daemon-inventory failure
-            is returned as one safe sync-status row.
-          security: Exposes multisite names and endpoints. Enable only when these identifiers may be viewed by operators.
-          prerequisites:
-            list:
-              - title: Enable the RGW multisite Function
-                description: >-
-                  Set `functions.rgw_multisite.disabled: false`, grant Dashboard RGW read permission, and configure RGW
-                  multisite when topology rows are expected.
-          availability: Disabled by default. Requires Dashboard RGW read permission; public sync detail requires Squid or Tentacle.
-          require_cloud: false
-        - id: rgw-quotas
-          name: Ceph RGW Quotas
-          description: |
-            Opt-in point lookups for explicitly configured RGW users, buckets, and accounts. Returns only whitelisted
-            identity, owner, cached usage, object count, quota, and freshness fields; access/secret keys are never emitted.
-          parameters: []
-          returns:
-            description: One row per configured RGW identity up to the configured limit.
-            columns:
-              - {name: key, type: string, unit: "", visibility: hidden, description: Kind-qualified unique row identifier.}
-              - {name: id, type: string, unit: "", description: Configured RGW identity.}
-              - {name: kind, type: string, unit: "", description: "User, bucket, or account."}
-              - {name: status, type: string, unit: "", description: Point-lookup status.}
-              - {name: tenant, type: string, unit: "", description: RGW tenant.}
-              - {name: account, type: string, unit: "", description: RGW account.}
-              - {name: owner, type: string, unit: "", description: Bucket or account owner.}
-              - {name: used_bytes, type: integer, unit: bytes, description: Cached quota usage; null when unavailable.}
-              - {name: objects, type: integer, unit: objects, description: Cached object count; null when unavailable.}
-              - {name: quota_enabled, type: boolean, unit: "", description: Whether the quota is enabled; null when unavailable.}
-              - {name: quota_max_bytes, type: integer, unit: bytes, description: Quota byte limit; null when unavailable.}
-              - {name: quota_max_objects, type: integer, unit: objects, description: Quota object limit; null when unavailable.}
-              - {name: utilization, type: float, unit: percent, description: Usage against an enabled byte quota; null when unavailable.}
-              - {name: stats_freshness, type: string, unit: "", visibility: hidden, description: Dashboard cache freshness semantics.}
-              - {name: truncated, type: boolean, unit: "", visibility: hidden, description: Result exceeded its row limit.}
-          performance: |
-            Performs only configured point lookups; it never lists all users, buckets, or accounts. A Dashboard bucket
-            detail lookup also gathers versioning, encryption, policy, ACL, locking, and release-dependent settings, so
-            each configured bucket is more expensive than a quota-only read. Keep the target list and limit small.
-          security: RGW tenant, user, bucket, account, owner, and quota values may be customer data. Restrict configuration and access.
-          prerequisites:
-            list:
-              - title: Enable the RGW quota Function and select identities
-                description: >-
-                  Set `functions.rgw_quotas.disabled: false` and configure at least one explicit `users`, `buckets`, or
-                  `accounts` entry. The combined deduplicated target count must not exceed the Function limit.
-          availability: Disabled by default and requires explicit targets plus Dashboard RGW read permission; accounts require Tentacle.
           require_cloud: false

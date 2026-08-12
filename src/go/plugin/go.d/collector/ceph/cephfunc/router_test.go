@@ -19,10 +19,10 @@ import (
 
 func TestMethods(t *testing.T) {
 	methods := Methods()
-	require.Len(t, methods, 6)
+	require.Len(t, methods, 4)
 	assert.Equal(t, []string{
-		MethodHealth, MethodOSDs, MethodPools, MethodDaemons, MethodRGWMultisite, MethodRGWQuotas,
-	}, []string{methods[0].ID, methods[1].ID, methods[2].ID, methods[3].ID, methods[4].ID, methods[5].ID})
+		MethodHealth, MethodOSDs, MethodPools, MethodDaemons,
+	}, []string{methods[0].ID, methods[1].ID, methods[2].ID, methods[3].ID})
 }
 
 func TestRouterTableResponses(t *testing.T) {
@@ -44,7 +44,7 @@ func TestRouterTableResponses(t *testing.T) {
 	}
 	router := NewRouter(deps, enabledConfig(10))
 
-	for _, method := range []string{MethodHealth, MethodOSDs, MethodPools, MethodDaemons, MethodRGWMultisite, MethodRGWQuotas} {
+	for _, method := range []string{MethodHealth, MethodOSDs, MethodPools, MethodDaemons} {
 		t.Run(method, func(t *testing.T) {
 			response := router.Handle(context.Background(), method, nil)
 			require.Equal(t, 200, response.Status)
@@ -81,7 +81,7 @@ func TestRouterResponsesMatchFunctionUISchema(t *testing.T) {
 		}}, Total: 1},
 	}
 	router := NewRouter(deps, enabledConfig(10))
-	for _, method := range []string{MethodHealth, MethodOSDs, MethodPools, MethodDaemons, MethodRGWMultisite, MethodRGWQuotas} {
+	for _, method := range []string{MethodHealth, MethodOSDs, MethodPools, MethodDaemons} {
 		t.Run(method, func(t *testing.T) {
 			response := router.Handle(context.Background(), method, nil)
 			payload := map[string]any{

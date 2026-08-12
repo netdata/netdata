@@ -16,11 +16,11 @@
         "description": "Recheck interval in seconds. Zero disables retries.",
         "type": "integer",
         "minimum": 0,
-        "default": 0
+        "default": 60
       },
       "function_only": {
         "title": "Function-only mode",
-        "description": "Run only on-demand Functions. Every collect toggle must be false.",
+        "description": "Run only on-demand Functions, without creating charts or making periodic metric requests.",
         "type": "boolean",
         "default": false
       },
@@ -34,10 +34,10 @@
       },
       "timeout": {
         "title": "HTTP timeout",
-        "description": "HTTP request timeout in seconds.",
+        "description": "Deadline in seconds for one logical Dashboard operation, including discovery, authentication, retries, and response decoding.",
         "type": "number",
         "minimum": 0.5,
-        "default": 15
+        "default": 2
       },
       "not_follow_redirects": {
         "title": "Reject redirects",
@@ -82,116 +82,6 @@
         "type": "string",
         "minLength": 1
       },
-      "collect": {
-        "title": "Periodic metric features",
-        "description": "All legacy overlapping or potentially heavy metric features default off. Enabling any /api/health/minimal child still incurs that complete Ceph endpoint.",
-        "type": "object",
-        "properties": {
-          "dashboard_api_status": {
-            "title": "Dashboard API status",
-            "description": "Probe the cheap cluster-FSID endpoint and chart Dashboard API/auth/active-MGR reachability.",
-            "type": "boolean",
-            "default": true
-          },
-          "health_status": {
-            "title": "Cluster health status",
-            "description": "Collect the high-level HEALTH_OK/WARN/ERR status from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "hosts": {
-            "title": "Host count",
-            "description": "Collect the Dashboard host count from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "monitors": {
-            "title": "Monitor count",
-            "description": "Collect the monitor count from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "osds_summary": {
-            "title": "OSD summary",
-            "description": "Collect cluster OSD count and up/down/in/out totals from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "managers": {
-            "title": "Manager count",
-            "description": "Collect active and standby MGR counts from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "object_gateways": {
-            "title": "RGW count",
-            "description": "Collect the object-gateway count from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "iscsi_gateways": {
-            "title": "iSCSI gateway status",
-            "description": "Collect iSCSI gateway counts and status from /api/health/minimal. This may trigger synchronous gateway checks in Ceph.",
-            "type": "boolean",
-            "default": false
-          },
-          "capacity": {
-            "title": "Cluster capacity",
-            "description": "Collect cluster physical capacity from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "objects": {
-            "title": "Object health",
-            "description": "Collect logical object totals and Ceph-native copy/unfound health ratios from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "pools_summary": {
-            "title": "Pool count",
-            "description": "Collect the cluster pool count from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "pgs": {
-            "title": "PG summary",
-            "description": "Collect placement-group totals, per-OSD ratio, and compatibility status categories from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "client_io": {
-            "title": "Client I/O",
-            "description": "Collect cluster client throughput and operation rates from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "recovery": {
-            "title": "Recovery throughput",
-            "description": "Collect cluster recovery throughput from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "scrub_status": {
-            "title": "Scrub status",
-            "description": "Collect the cluster scrub scheduler status from /api/health/minimal.",
-            "type": "boolean",
-            "default": false
-          },
-          "osds": {
-            "title": "Per-OSD metrics",
-            "description": "Collect paginated per-OSD status, capacity, I/O, IOPS, and latency from /api/osd. Selector and cap apply.",
-            "type": "boolean",
-            "default": false
-          },
-          "pools": {
-            "title": "Per-pool metrics",
-            "description": "Collect per-pool capacity, object, I/O, and IOPS metrics from /api/pool?stats=true. Selector and cap apply.",
-            "type": "boolean",
-            "default": false
-          }
-        },
-        "additionalProperties": false
-      },
       "osd_selector": {
         "title": "OSD selector",
         "description": "Simple-pattern selector matched against osd.<id> or OSD UUID before the cap.",
@@ -201,7 +91,7 @@
       },
       "max_osds": {
         "title": "Maximum OSDs",
-        "description": "Maximum selected OSDs with individual charts. Overflow is represented by one aggregate other entity with additive capacity and rates plus mean latency; binary per-OSD status is omitted. This bounds Netdata cardinality, not the complete Dashboard OSD response or supported cluster size.",
+        "description": "Maximum selected OSDs with individual charts. If the selected set exceeds this operator policy, no per-OSD metrics are collected.",
         "type": "integer",
         "minimum": 1,
         "default": 100
@@ -215,225 +105,10 @@
       },
       "max_pools": {
         "title": "Maximum pools",
-        "description": "Maximum selected pools with individual charts. Overflow object counts are represented by one aggregate other entity; non-additive capacity and cumulative I/O are omitted. This bounds Netdata cardinality, not the complete Dashboard pool response.",
+        "description": "Maximum selected pools with individual charts. If the selected set exceeds this operator policy, no per-pool metrics are collected.",
         "type": "integer",
         "minimum": 1,
         "default": 100
-      },
-      "functions": {
-        "title": "On-demand Functions",
-        "description": "Bounded live RCA and inventory tables. They issue Dashboard requests only while queried.",
-        "type": "object",
-        "properties": {
-          "health": {
-            "title": "Health details",
-          "description": "Detailed health checks, slow operations, scrub errors, and RCA messages from /api/health/minimal. Dashboard still builds every permission-dependent health section; iSCSI read scope can trigger gateway pings.",
-            "type": "object",
-            "properties": {
-              "disabled": {
-                "title": "Disabled",
-                "description": "Disable the Health details Function.",
-                "type": "boolean",
-                "default": false
-              },
-              "timeout": {
-                "title": "Timeout",
-                "description": "Function timeout in seconds. Zero inherits the job HTTP timeout.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0
-              },
-              "limit": {
-                "title": "Row limit",
-                "description": "Maximum rows returned by the Function.",
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10000,
-                "default": 500
-              }
-            },
-            "additionalProperties": false
-          },
-          "osds": {
-            "title": "OSD inventory",
-            "description": "Paginated OSD state, topology, capacity, rates, and latency.",
-            "type": "object",
-            "properties": {
-              "disabled": {
-                "title": "Disabled",
-                "description": "Disable the OSD inventory Function.",
-                "type": "boolean",
-                "default": false
-              },
-              "timeout": {
-                "title": "Timeout",
-                "description": "Function timeout in seconds. Zero inherits the job HTTP timeout.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0
-              },
-              "limit": {
-                "title": "Row limit",
-                "description": "Maximum rows returned by the Function.",
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10000,
-                "default": 500
-              }
-            },
-            "additionalProperties": false
-          },
-          "pools": {
-            "title": "Pool policy",
-            "description": "Pool replication/EC, PG, CRUSH, application, and quota policy.",
-            "type": "object",
-            "properties": {
-              "disabled": {
-                "title": "Disabled",
-                "description": "Disable the Pool policy Function.",
-                "type": "boolean",
-                "default": false
-              },
-              "timeout": {
-                "title": "Timeout",
-                "description": "Function timeout in seconds. Zero inherits the job HTTP timeout.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0
-              },
-              "limit": {
-                "title": "Row limit",
-                "description": "Maximum rows returned by the Function.",
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10000,
-                "default": 500
-              }
-            },
-            "additionalProperties": false
-          },
-          "daemons": {
-            "title": "Daemon inventory",
-            "description": "Orchestrator-backed daemon inventory. Returns a Function-local error when no orchestrator is available.",
-            "type": "object",
-            "properties": {
-              "disabled": {
-                "title": "Disabled",
-                "description": "Disable the Daemon inventory Function.",
-                "type": "boolean",
-                "default": false
-              },
-              "timeout": {
-                "title": "Timeout",
-                "description": "Function timeout in seconds. Zero inherits the job HTTP timeout.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0
-              },
-              "limit": {
-                "title": "Row limit",
-                "description": "Maximum rows returned by the Function.",
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10000,
-                "default": 500
-              }
-            },
-            "additionalProperties": false
-          },
-          "rgw_multisite": {
-            "title": "RGW multisite",
-            "description": "Opt-in realm/zonegroup/zone inventory and best-effort sync diagnostics. It invokes radosgw-admin on the active MGR.",
-            "type": "object",
-            "properties": {
-              "disabled": {
-                "title": "Disabled",
-                "description": "Disable the RGW multisite Function.",
-                "type": "boolean",
-                "default": true
-              },
-              "timeout": {
-                "title": "Timeout",
-                "description": "Function timeout in seconds. Zero inherits the job HTTP timeout.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0
-              },
-              "limit": {
-                "title": "Row limit",
-                "description": "Maximum rows returned by the Function.",
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10000,
-                "default": 100
-              }
-            },
-            "additionalProperties": false
-          },
-          "rgw_quotas": {
-            "title": "RGW quotas",
-            "description": "Opt-in cached/asynchronous usage and quota data for explicit identities only.",
-            "type": "object",
-            "properties": {
-              "disabled": {
-                "title": "Disabled",
-                "description": "Disable the RGW quotas Function.",
-                "type": "boolean",
-                "default": true
-              },
-              "timeout": {
-                "title": "Timeout",
-                "description": "Function timeout in seconds. Zero inherits the job HTTP timeout.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0
-              },
-              "limit": {
-                "title": "Row limit",
-                "description": "Maximum rows returned by the Function.",
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10000,
-                "default": 100
-              },
-              "users": {
-                "title": "RGW users",
-                "description": "Explicit rgw users to query. The collector never enumerates all identities.",
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true,
-                "default": []
-              },
-              "buckets": {
-                "title": "RGW buckets",
-                "description": "Explicit rgw buckets to query. The collector never enumerates all identities.",
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true,
-                "default": []
-              },
-              "accounts": {
-                "title": "RGW accounts",
-                "description": "Explicit rgw accounts to query. The collector never enumerates all identities.",
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true,
-                "default": []
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
       },
       "force_http2": {
         "title": "Force HTTP/2",
@@ -529,7 +204,7 @@
       "ui:placeholder": "Create a Virtual Node first, then reference its name here."
     },
     "timeout": {
-      "ui:help": "Accepts decimals, for example 15.5 seconds."
+      "ui:help": "Accepts decimals, for example 2.5 seconds."
     },
     "username": {
       "ui:widget": "password"
@@ -556,23 +231,17 @@
             "timeout",
             "not_follow_redirects",
             "allowed_redirect_origins",
-            "vnode"
+            "vnode",
+            "force_http2"
           ]
         },
         {
           "title": "Metrics",
           "fields": [
-            "collect",
             "osd_selector",
             "max_osds",
             "pool_selector",
             "max_pools"
-          ]
-        },
-        {
-          "title": "Functions",
-          "fields": [
-            "functions"
           ]
         },
         {

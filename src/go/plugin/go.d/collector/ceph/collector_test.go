@@ -4,7 +4,6 @@ package ceph
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ceph/cephfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -38,76 +38,34 @@ func TestCollector_Interfaces(t *testing.T) {
 	assert.Implements(t, (*collectorapi.FunctionAvailability)(nil), New())
 }
 
+func TestCollector_SharedFunctionSurface(t *testing.T) {
+	var ids []string
+	for _, method := range cephfunc.Methods() {
+		ids = append(ids, method.ID)
+	}
+	assert.Equal(t, []string{"health", "osds", "pools", "daemons"}, ids)
+}
+
 func TestCollector_Defaults(t *testing.T) {
 	c := New()
 	assert.Equal(t, "https://127.0.0.1:8443", c.URL)
-	assert.Equal(t, 15*time.Second, c.Timeout.Duration())
+	assert.Equal(t, 2*time.Second, c.Timeout.Duration())
 	assert.Empty(t, c.AllowedRedirectOrigins)
 	assert.Equal(t, 100, c.MaxOSDs)
 	assert.Equal(t, 100, c.MaxPools)
 	assert.Equal(t, "*", c.OSDSelector)
 	assert.Equal(t, "*", c.PoolSelector)
 	assert.True(t, c.Metrics.DashboardAPIStatus)
-	assert.False(t, c.Metrics.anyHealthEnabled())
-	assert.False(t, c.Metrics.OSDs)
-	assert.False(t, c.Metrics.Pools)
-	assert.True(t, c.Functions.RGWMultisite.Disabled)
-	assert.True(t, c.Functions.RGWQuotas.Disabled)
-	assert.Equal(t, 100, c.Functions.RGWMultisite.Limit)
-	assert.Equal(t, 100, c.Functions.RGWQuotas.Limit)
+	assert.True(t, c.Metrics.anyHealthEnabled())
+	assert.True(t, c.Metrics.OSDs)
+	assert.True(t, c.Metrics.Pools)
 }
 
-func TestCollector_ConfigSchemaDefaultsMatchRuntime(t *testing.T) {
-	var document struct {
-		JSONSchema struct {
-			Properties map[string]any `json:"properties"`
-		} `json:"jsonSchema"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(configSchema), &document))
-	properties := document.JSONSchema.Properties
-	require.NotEmpty(t, properties)
-	assert.EqualValues(t, 10, schemaDefault(t, properties, "update_every"))
-	assert.EqualValues(t, 15, schemaDefault(t, properties, "timeout"))
-	assert.Equal(t, "https://127.0.0.1:8443", schemaDefault(t, properties, "url"))
-	assert.Equal(t, "*", schemaDefault(t, properties, "osd_selector"))
-	assert.EqualValues(t, 100, schemaDefault(t, properties, "max_osds"))
-	assert.Equal(t, "*", schemaDefault(t, properties, "pool_selector"))
-	assert.EqualValues(t, 100, schemaDefault(t, properties, "max_pools"))
-
-	collect := schemaProperties(t, properties, "collect")
-	for name := range collect {
-		assert.Equal(t, name == "dashboard_api_status", schemaDefault(t, collect, name), name)
-	}
-
-	functions := schemaProperties(t, properties, "functions")
-	for _, name := range []string{"health", "osds", "pools", "daemons", "rgw_multisite", "rgw_quotas"} {
-		method := schemaProperties(t, functions, name)
-		assert.Equal(t, name == "rgw_multisite" || name == "rgw_quotas", schemaDefault(t, method, "disabled"), name)
-		assert.EqualValues(t, map[string]int{"health": 500, "osds": 500, "pools": 500, "daemons": 500, "rgw_multisite": 100, "rgw_quotas": 100}[name], schemaDefault(t, method, "limit"), name)
-	}
-	assert.NotContains(t, properties, "method")
-	assert.NotContains(t, properties, "body")
+func TestCollector_ConfigSchemaMatchesMetadata(t *testing.T) {
+	collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")
 }
 
-func schemaProperties(t *testing.T, properties map[string]any, name string) map[string]any {
-	t.Helper()
-	entry, ok := properties[name].(map[string]any)
-	require.True(t, ok, name)
-	children, ok := entry["properties"].(map[string]any)
-	require.True(t, ok, name)
-	return children
-}
-
-func schemaDefault(t *testing.T, properties map[string]any, name string) any {
-	t.Helper()
-	entry, ok := properties[name].(map[string]any)
-	require.True(t, ok, name)
-	value, ok := entry["default"]
-	require.True(t, ok, name)
-	return value
-}
-
-func TestCollector_LegacyConfigMigratesToComplementaryDefaults(t *testing.T) {
+func TestCollector_LegacyConfigPreservesFullCollectionContract(t *testing.T) {
 	c := New()
 	require.NoError(t, yaml.Unmarshal([]byte(`
 url: https://ceph.example:8443
@@ -115,10 +73,10 @@ username: netdata
 password: test-password
 `), c))
 
-	assert.True(t, c.Metrics.DashboardAPIStatus)
-	assert.False(t, c.Metrics.anyHealthEnabled())
-	assert.False(t, c.Metrics.OSDs)
-	assert.False(t, c.Metrics.Pools)
+	config, err := yaml.Marshal(c.Configuration())
+	require.NoError(t, err)
+	assert.NotContains(t, string(config), "collect:")
+	assert.NotContains(t, string(config), "functions:")
 }
 
 func TestCollector_InitValidation(t *testing.T) {
@@ -167,19 +125,8 @@ func TestCollector_InitValidation(t *testing.T) {
 			modify:   func(cfg *Config) { cfg.Method = http.MethodPost },
 			wantFail: true,
 		},
-		"function only with metric": {
-			modify:   func(cfg *Config) { cfg.FunctionOnly = true },
-			wantFail: true,
-		},
-		"explicit function only": {
-			modify: func(cfg *Config) {
-				cfg.FunctionOnly = true
-				cfg.Metrics.DashboardAPIStatus = false
-			},
-		},
-		"no metric without function only": {
-			modify:   func(cfg *Config) { cfg.Metrics.DashboardAPIStatus = false },
-			wantFail: true,
+		"function only is atomic": {
+			modify: func(cfg *Config) { cfg.FunctionOnly = true },
 		},
 		"non-positive OSD cap": {
 			modify:   func(cfg *Config) { cfg.MaxOSDs = 0 },
@@ -187,18 +134,6 @@ func TestCollector_InitValidation(t *testing.T) {
 		},
 		"unbounded job timeout": {
 			modify:   func(cfg *Config) { cfg.Timeout = 0 },
-			wantFail: true,
-		},
-		"negative Function timeout": {
-			modify:   func(cfg *Config) { cfg.Functions.Health.Timeout = -1 },
-			wantFail: true,
-		},
-		"function limit above hard maximum": {
-			modify:   func(cfg *Config) { cfg.Functions.Health.Limit = maxFunctionRows + 1 },
-			wantFail: true,
-		},
-		"enabled RGW quotas without targets": {
-			modify:   func(cfg *Config) { cfg.Functions.RGWQuotas.Disabled = false },
 			wantFail: true,
 		},
 	}
@@ -222,14 +157,24 @@ func TestCollector_InitValidation(t *testing.T) {
 	}
 }
 
-func TestCollector_DefaultCollectionOnlyProbesDashboardAPI(t *testing.T) {
+func TestCollector_DefaultCollectionRequestsFullMetricSet(t *testing.T) {
 	var pathsMu sync.Mutex
 	paths := make(map[string]int)
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		pathsMu.Lock()
 		paths[r.URL.Path]++
 		pathsMu.Unlock()
-		w.WriteHeader(http.StatusNotFound)
+		switch r.URL.Path {
+		case urlPathApiHealthMinimal:
+			writeJSON(t, w, http.StatusOK, map[string]any{})
+		case urlPathApiOsd:
+			w.Header().Set("X-Total-Count", "0")
+			writeJSON(t, w, http.StatusOK, []any{})
+		case urlPathApiPool:
+			writeJSON(t, w, http.StatusOK, []any{})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	})
 	defer srv.Close()
 
@@ -238,17 +183,12 @@ func TestCollector_DefaultCollectionOnlyProbesDashboardAPI(t *testing.T) {
 	require.NoError(t, c.Check(context.Background()))
 	mx := c.Collect(context.Background())
 
-	assert.Equal(t, map[string]int64{
-		"dashboard_api_reachable":   1,
-		"dashboard_api_unreachable": 0,
-	}, mx)
-	require.Len(t, *c.Charts(), 1)
-	assert.Equal(t, dashboardAPIStatusChart.ID, (*c.Charts())[0].ID)
+	assert.NotEmpty(t, mx)
 	pathsMu.Lock()
 	defer pathsMu.Unlock()
-	assert.Zero(t, paths[urlPathApiHealthMinimal])
-	assert.Zero(t, paths[urlPathApiOsd])
-	assert.Zero(t, paths[urlPathApiPool])
+	assert.Positive(t, paths[urlPathApiHealthMinimal])
+	assert.Positive(t, paths[urlPathApiOsd])
+	assert.Positive(t, paths[urlPathApiPool])
 }
 
 func TestCollector_FunctionOnlyChecksIdentityWithoutMetrics(t *testing.T) {
@@ -259,7 +199,6 @@ func TestCollector_FunctionOnlyChecksIdentityWithoutMetrics(t *testing.T) {
 
 	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
 		c.FunctionOnly = true
-		c.Metrics.DashboardAPIStatus = false
 	})
 	defer c.Cleanup(context.Background())
 	require.NoError(t, c.Check(context.Background()))
@@ -942,6 +881,7 @@ func newInitializedCollector(t *testing.T, rawURL string, configure func(*Collec
 	c.Username = "netdata"
 	c.Password = "test-password"
 	if configure != nil {
+		c.Metrics = CollectConfig{}
 		configure(c)
 	}
 	require.NoError(t, c.Init(context.Background()))

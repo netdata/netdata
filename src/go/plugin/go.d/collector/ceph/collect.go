@@ -87,6 +87,8 @@ func (c *Collector) probeClusterIdentity(ctx context.Context) (string, error) {
 	}
 	c.identityMu.Unlock()
 
-	c.addClusterChartsOnce.Do(c.addClusterCharts)
+	if !c.FunctionOnly {
+		c.addClusterChartsOnce.Do(c.addClusterCharts)
+	}
 	return fsid, nil
 }

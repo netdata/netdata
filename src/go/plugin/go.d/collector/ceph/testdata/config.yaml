@@ -21,56 +21,7 @@ tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: yes
 force_http2: yes
-collect:
-  dashboard_api_status: yes
-  health_status: yes
-  hosts: yes
-  monitors: yes
-  osds_summary: yes
-  managers: yes
-  object_gateways: yes
-  iscsi_gateways: yes
-  capacity: yes
-  objects: yes
-  pools_summary: yes
-  pgs: yes
-  client_io: yes
-  recovery: yes
-  scrub_status: yes
-  osds: yes
-  pools: yes
 osd_selector: "osd.* !osd.0"
 max_osds: 123
 pool_selector: "* !internal*"
 max_pools: 123
-functions:
-  health:
-    disabled: yes
-    timeout: 123.123
-    limit: 123
-  osds:
-    disabled: yes
-    timeout: 123.123
-    limit: 123
-  pools:
-    disabled: yes
-    timeout: 123.123
-    limit: 123
-  daemons:
-    disabled: yes
-    timeout: 123.123
-    limit: 123
-  rgw_multisite:
-    disabled: yes
-    timeout: 123.123
-    limit: 123
-  rgw_quotas:
-    disabled: yes
-    timeout: 123.123
-    limit: 123
-    users:
-      - "user-a"
-    buckets:
-      - "bucket-a"
-    accounts:
-      - "account-a"

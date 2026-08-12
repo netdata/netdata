@@ -26,62 +26,8 @@
   "tls_key": "ok",
   "tls_skip_verify": true,
   "force_http2": true,
-  "collect": {
-    "dashboard_api_status": true,
-    "health_status": true,
-    "hosts": true,
-    "monitors": true,
-    "osds_summary": true,
-    "managers": true,
-    "object_gateways": true,
-    "iscsi_gateways": true,
-    "capacity": true,
-    "objects": true,
-    "pools_summary": true,
-    "pgs": true,
-    "client_io": true,
-    "recovery": true,
-    "scrub_status": true,
-    "osds": true,
-    "pools": true
-  },
   "osd_selector": "osd.* !osd.0",
   "max_osds": 123,
   "pool_selector": "* !internal*",
-  "max_pools": 123,
-  "functions": {
-    "health": {
-      "disabled": true,
-      "timeout": 123.123,
-      "limit": 123
-    },
-    "osds": {
-      "disabled": true,
-      "timeout": 123.123,
-      "limit": 123
-    },
-    "pools": {
-      "disabled": true,
-      "timeout": 123.123,
-      "limit": 123
-    },
-    "daemons": {
-      "disabled": true,
-      "timeout": 123.123,
-      "limit": 123
-    },
-    "rgw_multisite": {
-      "disabled": true,
-      "timeout": 123.123,
-      "limit": 123
-    },
-    "rgw_quotas": {
-      "disabled": true,
-      "timeout": 123.123,
-      "limit": 123,
-      "users": ["user-a"],
-      "buckets": ["bucket-a"],
-      "accounts": ["account-a"]
-    }
-  }
+  "max_pools": 123
 }

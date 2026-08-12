@@ -5,7 +5,6 @@ package ceph
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -45,34 +44,33 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Metrics: CollectConfig{
-				DashboardAPIStatus: true,
-			},
 			OSDSelector:  "*",
 			PoolSelector: "*",
 			MaxOSDs:      100,
 			MaxPools:     100,
-			Functions: FunctionsConfig{
-				Health:       FunctionConfig{Limit: 500},
-				OSDs:         FunctionConfig{Limit: 500},
-				Pools:        FunctionConfig{Limit: 500},
-				Daemons:      FunctionConfig{Limit: 500},
-				RGWMultisite: FunctionConfig{Disabled: true, Limit: 100},
-				RGWQuotas: RGWQuotasFunctionConfig{
-					FunctionConfig: FunctionConfig{Disabled: true, Limit: 100},
-				},
-			},
 			HTTPConfig: web.HTTPConfig{
 				RequestConfig: web.RequestConfig{
 					URL: "https://127.0.0.1:8443",
 				},
 				ClientConfig: web.ClientConfig{
-					Timeout: confopt.Duration(time.Second * 15),
+					Timeout: confopt.Duration(time.Second * 2),
 					TLSConfig: tlscfg.TLSConfig{
 						InsecureSkipVerify: true,
 					},
 				},
 			},
+		},
+		Metrics: CollectConfig{
+			DashboardAPIStatus: true, HealthStatus: true, Hosts: true, Monitors: true,
+			OSDsSummary: true, Managers: true, ObjectGateways: true, ISCSIGateways: true,
+			Capacity: true, Objects: true, PoolsSummary: true, PGs: true,
+			ClientIO: true, Recovery: true, ScrubStatus: true, OSDs: true, Pools: true,
+		},
+		Functions: FunctionsConfig{
+			Health:  FunctionConfig{Limit: 500},
+			OSDs:    FunctionConfig{Limit: 500},
+			Pools:   FunctionConfig{Limit: 500},
+			Daemons: FunctionConfig{Limit: 500},
 		},
 		charts:      &collectorapi.Charts{},
 		osdMatcher:  matcher.TRUE(),
@@ -84,17 +82,15 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode                  string          `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery            int             `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry     int             `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	FunctionOnly           bool            `yaml:"function_only,omitempty" json:"function_only"`
-	AllowedRedirectOrigins []string        `yaml:"allowed_redirect_origins,omitempty" json:"allowed_redirect_origins"`
-	Metrics                CollectConfig   `yaml:"collect" json:"collect"`
-	OSDSelector            string          `yaml:"osd_selector,omitempty" json:"osd_selector"`
-	MaxOSDs                int             `yaml:"max_osds,omitempty" json:"max_osds"`
-	PoolSelector           string          `yaml:"pool_selector,omitempty" json:"pool_selector"`
-	MaxPools               int             `yaml:"max_pools,omitempty" json:"max_pools"`
-	Functions              FunctionsConfig `yaml:"functions" json:"functions"`
+	Vnode                  string   `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery            int      `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry     int      `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	FunctionOnly           bool     `yaml:"function_only,omitempty" json:"function_only"`
+	AllowedRedirectOrigins []string `yaml:"allowed_redirect_origins,omitempty" json:"allowed_redirect_origins"`
+	OSDSelector            string   `yaml:"osd_selector,omitempty" json:"osd_selector"`
+	MaxOSDs                int      `yaml:"max_osds,omitempty" json:"max_osds"`
+	PoolSelector           string   `yaml:"pool_selector,omitempty" json:"pool_selector"`
+	MaxPools               int      `yaml:"max_pools,omitempty" json:"max_pools"`
 	web.HTTPConfig         `yaml:",inline" json:""`
 }
 
@@ -157,6 +153,9 @@ type entityState struct {
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
+	// Staged internal gates are removed with the periodic-runtime rewrite.
+	Metrics   CollectConfig   `yaml:"-" json:"-"`
+	Functions FunctionsConfig `yaml:"-" json:"-"`
 
 	charts               *collectorapi.Charts
 	addClusterChartsOnce sync.Once
@@ -213,24 +212,8 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	if c.FunctionOnly {
-		_, err := c.ensureClusterIdentity(ctx)
-		return err
-	}
-
-	mx, err := c.collect(ctx)
-	if err != nil && len(mx) == 0 {
-		return err
-	}
-	if err != nil {
-		c.Warningf("collector initialized with unavailable optional features: %v", err)
-	}
-
-	if len(mx) == 0 {
-		return errors.New("no metrics collected")
-	}
-
-	return nil
+	_, err := c.probeClusterIdentity(ctx)
+	return err
 }
 
 func (c *Collector) Charts() *collectorapi.Charts {
@@ -281,18 +264,8 @@ func (c *Collector) clusterFSID() string {
 
 func (c *Collector) FunctionAvailable(functionID string) bool {
 	switch functionID {
-	case cephfunc.MethodHealth:
-		return !c.Functions.Health.Disabled
-	case cephfunc.MethodOSDs:
-		return !c.Functions.OSDs.Disabled
-	case cephfunc.MethodPools:
-		return !c.Functions.Pools.Disabled
-	case cephfunc.MethodDaemons:
-		return !c.Functions.Daemons.Disabled
-	case cephfunc.MethodRGWMultisite:
-		return !c.Functions.RGWMultisite.Disabled
-	case cephfunc.MethodRGWQuotas:
-		return !c.Functions.RGWQuotas.Disabled
+	case cephfunc.MethodHealth, cephfunc.MethodOSDs, cephfunc.MethodPools, cephfunc.MethodDaemons:
+		return true
 	default:
 		return false
 	}
@@ -308,11 +281,9 @@ func (c *Collector) functionRouterConfig() cephfunc.Config {
 		return cephfunc.MethodConfig{Disabled: cfg.Disabled, Timeout: timeout, Limit: cfg.Limit}
 	}
 	return cephfunc.Config{
-		Health:       method(c.Functions.Health),
-		OSDs:         method(c.Functions.OSDs),
-		Pools:        method(c.Functions.Pools),
-		Daemons:      method(c.Functions.Daemons),
-		RGWMultisite: method(c.Functions.RGWMultisite),
-		RGWQuotas:    method(c.Functions.RGWQuotas.FunctionConfig),
+		Health:  method(c.Functions.Health),
+		OSDs:    method(c.Functions.OSDs),
+		Pools:   method(c.Functions.Pools),
+		Daemons: method(c.Functions.Daemons),
 	}
 }

@@ -31,8 +31,6 @@ func Methods() []funcapi.FunctionConfig {
 		{ID: MethodOSDs, Name: "Ceph OSDs", UpdateEvery: 30, Help: "Current Ceph OSD state, capacity, throughput, and latency."},
 		{ID: MethodPools, Name: "Ceph Pools", UpdateEvery: 30, Help: "Ceph pool policy, placement, applications, and quotas."},
 		{ID: MethodDaemons, Name: "Ceph Daemons", UpdateEvery: 30, Help: "Ceph daemon inventory reported by Dashboard."},
-		{ID: MethodRGWMultisite, Name: "Ceph RGW Multisite", UpdateEvery: 60, Help: "Opt-in RGW realm, zonegroup, zone, and best-effort sync diagnostics."},
-		{ID: MethodRGWQuotas, Name: "Ceph RGW Quotas", UpdateEvery: 60, Help: "Opt-in quota and cached usage for explicitly configured RGW identities."},
 	}
 }
 
