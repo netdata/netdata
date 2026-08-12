@@ -81,7 +81,7 @@ Netdata automatically generates host labels when it starts, capturing:
 
 | Label Category | Information Captured                                                                        |
 |----------------|---------------------------------------------------------------------------------------------|
-| System Info    | Kernel version, OS name and version                                                         |
+| System Info    | Kernel version; OS family, name, version, release, codename, edition, and build when available |
 | Hardware       | CPU architecture, cores, frequency, RAM, disk space, product ID, product name, product type |
 | Environment    | Container details, Kubernetes node status                                                   |
 | Infrastructure | Virtualization layer, Parent-child streaming status                                         |

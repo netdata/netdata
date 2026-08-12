@@ -32,11 +32,22 @@
 #include "windows.h"
 #include "versionhelpers.h"
 
+typedef struct netdata_windows_os_labels {
+    char name[64];
+    char version[64];
+    char release[64];
+    char edition[256];
+    char build[64];
+} NETDATA_WINDOWS_OS_LABELS;
+
 void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
 
 const char *netdata_windows_normalize_virt_string(const char *raw);
 const char *netdata_windows_resolve_virt_detection(const char *wmi, const char *smbios, const char *registry);
 void netdata_windows_format_os_version(char *out, size_t length, const char *product_name, DWORD build, bool is_server);
+void netdata_windows_parse_os_labels(NETDATA_WINDOWS_OS_LABELS *labels, const char *product_name,
+                                     const char *display_version, const char *edition_id, DWORD build,
+                                     DWORD ubr, bool has_ubr, bool is_server);
 
 // Kubernetes env-var container probe: returns NETDATA_WIN_CONTAINER_KUBERNETES when both
 // values are set and non-empty, otherwise NULL (caller should fall back to WMI detection).

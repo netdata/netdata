@@ -65,26 +65,6 @@ void rrdhost_set_is_parent_label(void) {
     }
 }
 
-const char *rrdhost_os_label_value(RRDLABELS *labels, const char *host_os, char *value, size_t value_size) {
-#ifdef OS_WINDOWS
-    if (labels && value && value_size) {
-        char os_name[RRDLABELS_MAX_VALUE_LENGTH + 1];
-        rrdlabels_get_value_strcpyz(labels, os_name, sizeof(os_name), "_os_name");
-        if (!strcmp(os_name, "Microsoft Windows")) {
-            rrdlabels_get_value_strcpyz(labels, value, value_size, "_os_version");
-            if (*value)
-                return value;
-        }
-    }
-#else
-    (void)labels;
-    (void)value;
-    (void)value_size;
-#endif
-
-    return host_os;
-}
-
 // expand ${VAR} and ${VAR:-default} patterns in src, writing result to dst
 static void env_expand_labels_value(const char *src, char *dst, size_t dst_size) {
     if(!src || !dst || dst_size < 1) return;
@@ -244,9 +224,7 @@ static void rrdhost_load_auto_labels(void) {
     (void)rrdhost_update_is_parent_label(labels, stream_receivers_currently_connected, true);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
-    char os_value[RRDLABELS_MAX_VALUE_LENGTH + 1];
-    const char *os = rrdhost_os_label_value(labels, string2str(localhost->os), os_value, sizeof(os_value));
-    rrdlabels_add(labels, "_os", os, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
 
     if (localhost->stream.snd.destination)
         rrdlabels_add(labels, "_streams_to", string2str(localhost->stream.snd.destination), RRDLABEL_SRC_AUTO);
@@ -394,6 +372,41 @@ static int is_parent_label_unittest(void) {
     return errors;
 }
 
+static int os_metadata_labels_unittest(void) {
+    struct rrdhost_system_info *system_info = rrdhost_system_info_create();
+    RRDLABELS *labels = rrdlabels_create();
+    int errors = 0;
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_NAME", "Ubuntu");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_VERSION", "24.04");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_RELEASE", "24.04");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_CODENAME", "noble");
+    rrdhost_system_info_to_rrdlabels(system_info, labels);
+
+    const struct {
+        const char *name;
+        const char *expected;
+    } cases[] = {
+        { "_os_name", "Ubuntu" },
+        { "_os_version", "24.04" },
+        { "_os_release", "24.04" },
+        { "_os_codename", "noble" },
+    };
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        rrdlabels_get_value_strcpyz(labels, value, sizeof(value), cases[i].name);
+        int err = strcmp(value, cases[i].expected) != 0;
+        fprintf(stderr, "  os metadata %s: %s, expected '%s', got '%s'\n", cases[i].name,
+                err ? "FAILED" : "OK", cases[i].expected, value);
+        errors += err;
+    }
+
+    rrdlabels_destroy(labels);
+    rrdhost_system_info_free(system_info);
+    return errors;
+}
+
 int rrdhost_labels_unittest(void) {
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
     int errors = 0;
@@ -528,6 +541,7 @@ int rrdhost_labels_unittest(void) {
     unsetenv("ND_TEST_NESTED");
 
     errors += is_parent_label_unittest();
+    errors += os_metadata_labels_unittest();
 
     fprintf(stderr, "%s: %d errors\n", __FUNCTION__, errors);
     return errors;

@@ -2505,68 +2505,52 @@ int test_sqlite(void) {
 int unit_test_windows_os_version(void) {
     static const struct {
         const char *product_name;
+        const char *display_version;
+        const char *edition_id;
         DWORD build;
+        DWORD ubr;
+        bool has_ubr;
         bool is_server;
-        const char *expected;
+        const char *name;
+        const char *version;
+        const char *release;
+        const char *edition;
+        const char *exact_build;
     } cases[] = {
-        {"Windows Server 2019 Standard", 17763, true, "Microsoft Windows Server 2019 Standard"},
-        {"Windows 10 Home", 26200, false, "Microsoft Windows 11 Home"},
-        {"Windows 10 Home", 19045, false, "Microsoft Windows 10 Home"},
-        {"Windows 11 Pro", 26200, false, "Microsoft Windows 11 Pro"},
-        {"Microsoft Windows Server 2022 Datacenter", 20348, true, "Microsoft Windows Server 2022 Datacenter"},
-        {"Microsoft Windows 11 Home", 19045, false, "Microsoft Windows 10 Home"},
-        {"", 26200, false, "Microsoft Windows"},
-        {NULL, 26200, false, "Microsoft Windows"},
+        {"Windows Server 2022 Datacenter", "21H2", "ServerDatacenter", 20348, 2582, true, true,
+         "Windows Server", "2022", "21H2", "Datacenter", "20348.2582"},
+        {"Windows 10 Home", "24H2", "Core", 26100, 2605, true, false,
+         "Windows", "11", "24H2", "Home", "26100.2605"},
+        {"Windows 10 Home", "22H2", "Core", 19045, 0, true, false,
+         "Windows", "10", "22H2", "Home", "19045.0"},
+        {"Microsoft Windows Server 2022 Datacenter: Azure Edition", "23H2", "ServerDatacenter", 20348, 0, true, true,
+         "Windows Server", "2022", "23H2", "Datacenter: Azure Edition", "20348.0"},
+        {NULL, NULL, "Professional", 26100, 0, false, false,
+         "Windows", "11", "", "Professional", ""},
     };
 
     int failures = 0;
     for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        char os_version[256];
-        netdata_windows_format_os_version(
-            os_version, sizeof(os_version), cases[i].product_name, cases[i].build, cases[i].is_server);
-        if(strcmp(os_version, cases[i].expected) != 0) {
+        NETDATA_WINDOWS_OS_LABELS labels;
+        netdata_windows_parse_os_labels(&labels, cases[i].product_name, cases[i].display_version, cases[i].edition_id,
+                                        cases[i].build, cases[i].ubr, cases[i].has_ubr, cases[i].is_server);
+        if(strcmp(labels.name, cases[i].name) || strcmp(labels.version, cases[i].version) ||
+           strcmp(labels.release, cases[i].release) || strcmp(labels.edition, cases[i].edition) ||
+           strcmp(labels.build, cases[i].exact_build)) {
             fprintf(stderr,
-                    "unit_test_windows_os_version: case '%s' expected '%s' got '%s'\n",
+                    "unit_test_windows_os_version: case '%s' produced name='%s' version='%s' release='%s' edition='%s' build='%s'\n",
                     cases[i].product_name ? cases[i].product_name : "(NULL)",
-                    cases[i].expected,
-                    os_version);
+                    labels.name, labels.version, labels.release, labels.edition, labels.build);
             failures++;
         }
     }
-
-    RRDLABELS *labels = rrdlabels_create();
-    char os_value[RRDLABELS_MAX_VALUE_LENGTH + 1];
-    rrdlabels_add(labels, "_os_name", "Microsoft Windows", RRDLABEL_SRC_AUTO);
-    const char *os = rrdhost_os_label_value(labels, "windows", os_value, sizeof(os_value));
-    if(strcmp(os, "windows") != 0) {
-        fprintf(stderr, "unit_test_windows_os_version: missing version fallback expected 'windows' got '%s'\n", os);
-        failures++;
-    }
-
-    rrdlabels_add(labels, "_os_version", "Microsoft Windows 11 Home", RRDLABEL_SRC_AUTO);
-    os = rrdhost_os_label_value(labels, "windows", os_value, sizeof(os_value));
-    if(strcmp(os, "Microsoft Windows 11 Home") != 0) {
-        fprintf(stderr, "unit_test_windows_os_version: Windows version expected 'Microsoft Windows 11 Home' got '%s'\n", os);
-        failures++;
-    }
-    rrdlabels_destroy(labels);
-
-    labels = rrdlabels_create();
-    rrdlabels_add(labels, "_os_name", "Other OS", RRDLABEL_SRC_AUTO);
-    rrdlabels_add(labels, "_os_version", "Microsoft Windows 11 Home", RRDLABEL_SRC_AUTO);
-    os = rrdhost_os_label_value(labels, "Netdata Virtual Host 1.0", os_value, sizeof(os_value));
-    if(strcmp(os, "Netdata Virtual Host 1.0") != 0) {
-        fprintf(stderr, "unit_test_windows_os_version: non-Windows host expected fallback got '%s'\n", os);
-        failures++;
-    }
-    rrdlabels_destroy(labels);
 
     if(failures) {
         fprintf(stderr, "unit_test_windows_os_version: %d failure(s)\n", failures);
         return 1;
     }
 
-    fprintf(stderr, "unit_test_windows_os_version: OK (%zu formatter cases + label selection)\n",
+    fprintf(stderr, "unit_test_windows_os_version: OK (%zu label cases)\n",
             sizeof(cases) / sizeof(cases[0]));
     return 0;
 }

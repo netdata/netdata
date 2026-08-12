@@ -118,6 +118,9 @@ CONTAINER_VERSION="unknown"
 CONTAINER_VERSION_ID="unknown"
 CONTAINER_ID="unknown"
 CONTAINER_ID_LIKE="unknown"
+CONTAINER_VERSION_CODENAME=""
+CONTAINER_VARIANT=""
+CONTAINER_BUILD_ID=""
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
   CONTAINER_ID=$(sw_vers -productName)
@@ -134,8 +137,11 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
   KERNEL_VERSION=$(uname -K)
 else
   if [ -f "/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release | sed 's/^/CONTAINER_/')"
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </etc/os-release | sed 's/^/CONTAINER_/')"
     CONTAINER_OS_DETECTION="/etc/os-release"
+  elif [ -f "/usr/lib/os-release" ]; then
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </usr/lib/os-release | sed 's/^/CONTAINER_/')"
+    CONTAINER_OS_DETECTION="/usr/lib/os-release"
   fi
 
   # shellcheck disable=SC2153
@@ -174,17 +180,23 @@ HOST_VERSION="unknown"
 HOST_VERSION_ID="unknown"
 HOST_ID="unknown"
 HOST_ID_LIKE="unknown"
+HOST_VERSION_CODENAME=""
+HOST_VARIANT=""
+HOST_BUILD_ID=""
 
 # 'systemd-detect-virt' returns 'none' if there is no hardware/container virtualization.
 if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
-  for v in NAME ID ID_LIKE VERSION VERSION_ID OS_DETECTION; do
+  for v in NAME ID ID_LIKE VERSION VERSION_ID VERSION_CODENAME VARIANT BUILD_ID OS_DETECTION; do
     eval "HOST_$v=\$CONTAINER_$v; CONTAINER_$v=none"
   done
 else
   # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
   if [ -e "/host/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </host/etc/os-release | sed 's/^/HOST_/')"
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </host/etc/os-release | sed 's/^/HOST_/')"
     HOST_OS_DETECTION="/host/etc/os-release"
+  elif [ -e "/host/usr/lib/os-release" ]; then
+    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </host/usr/lib/os-release | sed 's/^/HOST_/')"
+    HOST_OS_DETECTION="/host/usr/lib/os-release"
   fi
   if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
     if [ -f "/host/etc/lsb-release" ]; then
@@ -214,6 +226,15 @@ if [ -d "/etc/pve" ] &&
   HOST_VERSION_ID="$(echo "${HOST_VERSION}" | cut -f 1 -d '.')"
   HOST_OS_DETECTION="pveversion"
 fi
+
+# Label-only OS metadata uses standard os-release keys. Do not infer an edition,
+# codename, or point release when the operating system does not provide one.
+HOST_OS_LABEL_NAME="${HOST_NAME}"
+HOST_OS_LABEL_VERSION="${HOST_VERSION_ID}"
+HOST_OS_LABEL_RELEASE="${HOST_VERSION_ID}"
+HOST_OS_LABEL_CODENAME="${HOST_VERSION_CODENAME}"
+HOST_OS_LABEL_EDITION="${HOST_VARIANT}"
+HOST_OS_LABEL_BUILD="${HOST_BUILD_ID}"
 
 # -------------------------------------------------------------------------------------------------
 # Detect information about the CPU
@@ -699,6 +720,12 @@ echo "NETDATA_HOST_OS_ID_LIKE=${HOST_ID_LIKE}"
 echo "NETDATA_HOST_OS_VERSION=${HOST_VERSION}"
 echo "NETDATA_HOST_OS_VERSION_ID=${HOST_VERSION_ID}"
 echo "NETDATA_HOST_OS_DETECTION=${HOST_OS_DETECTION}"
+for label_field in NAME VERSION RELEASE CODENAME EDITION BUILD; do
+  eval "label_value=\${HOST_OS_LABEL_${label_field}}"
+  if [ -n "${label_value}" ] && [ "${label_value}" != "unknown" ] && [ "${label_value}" != "none" ]; then
+    echo "NETDATA_HOST_OS_LABEL_${label_field}=${label_value}"
+  fi
+done
 echo "NETDATA_HOST_IS_K8S_NODE=${HOST_IS_K8S_NODE}"
 echo "NETDATA_SYSTEM_KERNEL_NAME=${KERNEL_NAME}"
 echo "NETDATA_SYSTEM_KERNEL_VERSION=${KERNEL_VERSION}"

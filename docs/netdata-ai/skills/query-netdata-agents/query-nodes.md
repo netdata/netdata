@@ -112,7 +112,7 @@ agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid
 
 | Field                                   | `.host_labels` key(s)                                                             |
 |-----------------------------------------|-------------------------------------------------------------------------------------|
-| Architecture, kernel, OS name/version   | `_architecture`, `_kernel_version`, `_os_name`, `_os_version`, `_os`                |
+| Architecture, kernel, OS metadata       | `_architecture`, `_kernel_version`, `_os`, `_os_name`, `_os_version`, `_os_release`, `_os_codename`, `_os_edition`, `_os_build` |
 | CPU count, RAM, disk space               | `_system_cores`, `_system_cpu_model`, `_system_ram_total`, `_system_disk_space`     |
 | Hardware vendor/product                 | `_hw_sys_vendor`, `_hw_product_name`, `_hw_product_type`                           |
 | Cloud provider / region / instance type | `_cloud_provider_type`, `_cloud_instance_region`, `_cloud_instance_type`            |

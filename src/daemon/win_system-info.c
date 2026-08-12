@@ -19,6 +19,7 @@ typedef struct netdata_windows_os_info {
     char version[4096];
     char version_id[4096];
     char detection[64];
+    NETDATA_WINDOWS_OS_LABELS labels;
 } NETDATA_WINDOWS_OS_INFO;
 
 static void netdata_windows_ip(struct rrdhost_system_info *systemInfo)
@@ -210,6 +211,109 @@ static DWORD netdata_windows_get_current_build()
         return 0;
 
     return version;
+}
+
+static bool netdata_windows_get_update_revision(DWORD *ubr)
+{
+    return netdata_registry_get_dword(ubr,
+                                      HKEY_LOCAL_MACHINE,
+                                      "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                      "UBR");
+}
+
+static const char *netdata_windows_server_version_from_build(DWORD build)
+{
+    if (build >= 26100)
+        return "2025";
+    if (build >= 20348)
+        return "2022";
+    if (build >= 17763)
+        return "2019";
+    if (build >= 14393)
+        return "2016";
+    return "";
+}
+
+static const char *netdata_windows_client_version_from_build(DWORD build)
+{
+    if (build >= 22000)
+        return "11";
+    if (build >= 10240)
+        return "10";
+    if (build >= 9600)
+        return "8.1";
+    if (build >= 9200)
+        return "8";
+    if (build >= 7601)
+        return "7";
+    return "";
+}
+
+static const char *netdata_windows_without_microsoft_prefix(const char *product_name)
+{
+    if (product_name && !strncasecmp(product_name, "Microsoft ", strlen("Microsoft ")))
+        return product_name + strlen("Microsoft ");
+
+    return product_name;
+}
+
+static void netdata_windows_product_edition(char *edition, size_t length, const char *product_name, bool is_server)
+{
+    if (!product_name || !*product_name || !length)
+        return;
+
+    const char *name = netdata_windows_without_microsoft_prefix(product_name);
+    const char *prefix = is_server ? "Windows Server" : "Windows";
+    size_t prefix_length = strlen(prefix);
+    if (strncasecmp(name, prefix, prefix_length) ||
+        (name[prefix_length] && name[prefix_length] != ' '))
+        return;
+
+    name += prefix_length;
+    while (*name == ' ')
+        name++;
+
+    while (*name >= '0' && *name <= '9')
+        name++;
+    while (*name == '.' || *name == ' ')
+        name++;
+
+    if (*name)
+        snprintf(edition, length, "%s", name);
+}
+
+void netdata_windows_parse_os_labels(NETDATA_WINDOWS_OS_LABELS *labels, const char *product_name,
+                                     const char *display_version, const char *edition_id, DWORD build,
+                                     DWORD ubr, bool has_ubr, bool is_server)
+{
+    memset(labels, 0, sizeof(*labels));
+
+    snprintf(labels->name, sizeof(labels->name), "%s", is_server ? "Windows Server" : "Windows");
+    if (is_server) {
+        const char *name = netdata_windows_without_microsoft_prefix(product_name);
+        const char *prefix = "Windows Server ";
+        if (name && !strncasecmp(name, prefix, strlen(prefix))) {
+            name += strlen(prefix);
+            size_t version_length = strspn(name, "0123456789");
+            if (version_length)
+                snprintf(labels->version, sizeof(labels->version), "%.*s", (int)version_length, name);
+        }
+
+        if (!labels->version[0])
+            snprintf(labels->version, sizeof(labels->version), "%s", netdata_windows_server_version_from_build(build));
+    }
+    else
+        snprintf(labels->version, sizeof(labels->version), "%s", netdata_windows_client_version_from_build(build));
+
+    if (display_version && *display_version)
+        snprintf(labels->release, sizeof(labels->release), "%s", display_version);
+
+    netdata_windows_product_edition(labels->edition, sizeof(labels->edition), product_name, is_server);
+    if (!labels->edition[0] && edition_id && *edition_id)
+        snprintf(labels->edition, sizeof(labels->edition), "%s", edition_id);
+
+    if (build && has_ubr)
+        snprintf(labels->build, sizeof(labels->build), "%u.%u", build, ubr);
 }
 
 void netdata_windows_format_os_version(char *out, size_t length, const char *product_name, DWORD build, bool is_server)
@@ -423,6 +527,20 @@ static void netdata_windows_get_local_os_info(NETDATA_WINDOWS_OS_INFO *info)
     snprintf(info->version_id, sizeof(info->version_id), "%s", info->id);
     snprintf(info->id_like, sizeof(info->id_like), "%s", netdata_windows_get_os_id_like(build));
     snprintf(info->detection, sizeof(info->detection), "%s", NETDATA_WIN_DETECTION_METHOD);
+
+    char product_name[256] = {0};
+    char display_version[64] = {0};
+    char edition_id[256] = {0};
+    DWORD ubr = 0;
+    bool has_ubr = netdata_windows_get_update_revision(&ubr);
+    (void)netdata_registry_get_string(product_name, sizeof(product_name) - 1, HKEY_LOCAL_MACHINE,
+                                      "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "ProductName");
+    (void)netdata_registry_get_string(display_version, sizeof(display_version) - 1, HKEY_LOCAL_MACHINE,
+                                      "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "DisplayVersion");
+    (void)netdata_registry_get_string(edition_id, sizeof(edition_id) - 1, HKEY_LOCAL_MACHINE,
+                                      "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "EditionID");
+    netdata_windows_parse_os_labels(&info->labels, product_name, display_version, edition_id,
+                                    build, ubr, has_ubr, IsWindowsServer());
 }
 
 static void netdata_windows_set_local_kernel_info(struct rrdhost_system_info *systemInfo)
@@ -445,6 +563,16 @@ static void netdata_windows_set_host_os_info(struct rrdhost_system_info *systemI
                                   info->version,
                                   info->version_id,
                                   info->detection);
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_NAME", info->labels.name);
+    if (info->labels.version[0])
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_VERSION", info->labels.version);
+    if (info->labels.release[0])
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_RELEASE", info->labels.release);
+    if (info->labels.edition[0])
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_EDITION", info->labels.edition);
+    if (info->labels.build[0])
+        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_BUILD", info->labels.build);
 }
 
 static void netdata_windows_set_host_os_unknown(struct rrdhost_system_info *systemInfo)
