@@ -280,7 +280,8 @@ Repo path: `integrations/gen_docs_integrations.py`.
 - `integrations/integrations.js` -- the script parses it by
   string-splitting on `export const categories = ` and
   `export const integrations = ` (`:129-140`). It does NOT
-  read `integrations.json`.
+  read `integrations.json`. The input is mandatory: missing, malformed,
+  or empty category/integration data fails both generation and `--check`.
 - `integrations/descriptions.py` -- the shared description resolver and validator used by both per-integration page
   generation and the Monitor Anything catalog.
 
@@ -297,7 +298,8 @@ python3 integrations/gen_docs_integrations.py --check
 ```
 
 The command prints deterministic counts by documentation mode plus the mechanical and explicit-override totals. With
-`--collector`, it validates only that selected collector, matching scoped-generation behavior.
+`--collector`, it validates only that selected collector, matching scoped-generation behavior. An unknown collector is an
+error in both write and check modes; it never succeeds with an empty selection.
 
 ### Outputs
 

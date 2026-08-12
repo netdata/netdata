@@ -164,13 +164,22 @@ def read_integrations_js(path_to_file: str):
     Parse integrations/integrations.js and return (categories, integrations).
     """
     try:
-        data = Path(path_to_file).read_text()
+        data = Path(path_to_file).read_text(encoding="utf-8")
         categories_str = data.split("export const categories = ")[1].split("export const integrations = ")[0]
         integrations_str = data.split("export const categories = ")[1].split("export const integrations = ")[1]
-        return json.loads(categories_str), json.loads(integrations_str)
-    except FileNotFoundError as e:
-        print("Exception", e)
-        return [], []
+        categories = json.loads(categories_str)
+        integrations = json.loads(integrations_str)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Missing generated integrations input: {path_to_file}") from error
+    except (IndexError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"Malformed generated integrations input: {path_to_file}") from error
+
+    if not isinstance(categories, list) or not categories:
+        raise RuntimeError(f"Generated integrations input has no categories: {path_to_file}")
+    if not isinstance(integrations, list) or not integrations:
+        raise RuntimeError(f"Generated integrations input has no integrations: {path_to_file}")
+
+    return categories, integrations
 
 
 def generate_category_from_name(category_fragment, category_array) -> str:
@@ -681,17 +690,25 @@ def main():
     )
     args = parser.parse_args()
 
-    categories, integrations = read_integrations_js("integrations/integrations.js")
+    try:
+        categories, integrations = read_integrations_js("integrations/integrations.js")
+    except RuntimeError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
     selected_integrations = _select_integrations(integrations, args.collector)
 
     if args.collector and not selected_integrations:
-        print(f"No matching collector found for: {args.collector}")
-        sys.exit(0)
+        print(f"Error: no matching collector found for: {args.collector}", file=sys.stderr)
+        return 1
+    if not selected_integrations:
+        print("Error: generated integrations input contains no documentation records", file=sys.stderr)
+        return 1
 
     report = description_report(selected_integrations)
     if args.check:
         print(json.dumps(report, indent=2, sort_keys=True))
-        return
+        return 0
 
     if args.collector:
         # compute targets and CLEAN ONLY those
@@ -810,7 +827,8 @@ def main():
     resolve_related_links()
 
     make_symlinks(symlink_dict)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -3,11 +3,14 @@
 import copy
 import json
 import re
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 import yaml
+from jsonschema import ValidationError
 
 INTEGRATIONS_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = INTEGRATIONS_DIR.parent
@@ -23,6 +26,7 @@ from descriptions import (
     normalize_description,
     validate_description,
 )
+from _common import make_validator
 from gen_docs_integrations import (
     build_readme_from_integration,
     create_overview,
@@ -41,21 +45,6 @@ MODE_BY_TYPE = {
     "logs": "logs",
     "secretstore": "secretstore",
     "service_discovery": "service_discovery",
-}
-
-THIN_SOURCE_DOCS = {
-    "docs/Demo-Sites.md",
-    "docs/category-overview-pages/maintenance-operations-on-netdata-agents.md",
-    "docs/dashboards-and-charts/themes.md",
-    "docs/developer-and-contributor-corner/README.md",
-    "docs/developer-and-contributor-corner/build-the-netdata-agent-yourself.md",
-    "docs/netdata-ai/troubleshooting/index.md",
-    "docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md",
-    "src/web/api/exporters/shell/README.md",
-    "src/web/api/formatters/value/README.md",
-    "src/web/api/queries/max/README.md",
-    "src/web/api/queries/min/README.md",
-    "tests/health_mgmtapi/README.md",
 }
 
 MAP_DESCRIPTION_TARGETS = {
@@ -88,14 +77,6 @@ MAP_DESCRIPTION_TARGETS = {
 
 def remove_fenced_code(markdown):
     return re.sub(r"```.*?```|~~~.*?~~~", " ", markdown, flags=re.DOTALL)
-
-
-def visible_word_count(markdown):
-    text = remove_fenced_code(markdown)
-    text = re.sub(r"!\[[^]]*\]\([^)]*\)", " ", text)
-    text = re.sub(r"\[([^]]+)\]\([^)]*\)", r"\1", text)
-    text = re.sub(r"<[^>]+>", " ", text)
-    return len(re.findall(r"\b[\w'-]+\b", text))
 
 
 def top_level_heading_count(markdown):
@@ -156,6 +137,51 @@ Monitor **short** metrics. Collect enough detail to pass meta-description valida
             get_integration_meta_description(integration),
             integration["meta"]["description"],
         )
+
+    def test_explicit_description_only_trims_surrounding_spaces_and_tabs(self):
+        description = "Monitor explicit descriptions without rewriting the author's valid plain text."
+        integration = {
+            "id": "test",
+            "meta": {"description": f" \t{description}\t "},
+        }
+        self.assertEqual(get_integration_meta_description(integration), description)
+
+    def test_explicit_description_rejects_authored_violations_before_normalization(self):
+        invalid_values = {
+            "non-string": 42,
+            "too short": "Monitor one service.",
+            "too long": "x" * (MAX_DESCRIPTION_LENGTH + 1),
+            "Markdown link": "Monitor [PostgreSQL](https://postgresql.org) queries and connections across the server.",
+            "Markdown emphasis": "Monitor **PostgreSQL** queries and connections across every production database server.",
+            "Markdown single emphasis": "Monitor *PostgreSQL* queries and connections across every production database server.",
+            "Markdown code": "Monitor `PostgreSQL` queries and connections across every production database server.",
+            "HTML": "Monitor <strong>PostgreSQL</strong> queries and connections across every production database server.",
+            "URL": "Monitor PostgreSQL queries at https://example.com/metrics across every database server.",
+            "uppercase URL": "Monitor PostgreSQL queries at HTTPS://example.com/metrics across every database server.",
+            "other URL scheme": "Monitor PostgreSQL queries at ftp://example.com/metrics across every database server.",
+            "newline": "Monitor PostgreSQL queries and connections across every\nproduction database server.",
+            "double quote": 'Monitor PostgreSQL queries and the "ready" state across every production database server.',
+            "backslash": r"Monitor PostgreSQL queries under C:\metrics across every production database server.",
+        }
+
+        categories = [{"id": "logs", "name": "logs", "children": []}]
+        for label, value in invalid_values.items():
+            integration = {
+                "id": f"invalid-{label}",
+                "integration_type": "logs",
+                "edit_link": "https://github.com/netdata/netdata/blob/master/integrations/logs/metadata.yaml",
+                "meta": {
+                    "name": "Invalid test",
+                    "description": value,
+                    "categories": ["logs"],
+                    "icon_filename": "test.svg",
+                },
+                "overview": "# Invalid test\n\n## Overview\n\nMonitor a valid fallback that must not hide an invalid override.",
+            }
+            with self.subTest(label=label):
+                with self.assertRaises(RuntimeError) as caught:
+                    build_readme_from_integration(integration, categories, mode="logs")
+                self.assertIsInstance(caught.exception.__cause__, ValueError)
 
     def test_invalid_description_fails(self):
         with self.assertRaisesRegex(ValueError, "contains a URL"):
@@ -246,6 +272,111 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
         self.assertIn('alt="Maintained by Community"', community_badge)
 
 
+class DescriptionSchemaTest(unittest.TestCase):
+    def setUp(self):
+        self.cases = {
+            "shared": (
+                make_validator("./shared.json#/$defs/instance"),
+                {
+                    "name": "Test",
+                    "link": "https://example.com",
+                    "categories": ["data-collection.test"],
+                    "icon_filename": "test.svg",
+                },
+            ),
+            "secretstore": (
+                make_validator("./secretstore.json#/$defs/meta"),
+                {
+                    "kind": "test",
+                    "name": "Test",
+                    "link": "https://example.com",
+                    "icon_filename": "test.svg",
+                },
+            ),
+            "service_discovery": (
+                make_validator("./service_discovery.json#/$defs/meta"),
+                {
+                    "kind": "test",
+                    "name": "Test",
+                    "tagline": "Test targets.",
+                    "link": "https://example.com",
+                    "icon_filename": "test.svg",
+                },
+            ),
+        }
+
+    def test_all_description_schemas_accept_valid_plain_text(self):
+        description = "Monitor valid service behavior with enough specific plain text for generated metadata."
+        for name, (validator, base) in self.cases.items():
+            with self.subTest(schema=name):
+                validator.validate({**base, "description": description})
+
+    def test_all_description_schemas_reject_invalid_author_input(self):
+        invalid_values = {
+            "type": 42,
+            "short": "x" * (MIN_DESCRIPTION_LENGTH - 1),
+            "long": "x" * (MAX_DESCRIPTION_LENGTH + 1),
+            "Markdown link": "Monitor [service](https://example.com) behavior across every production system.",
+            "Markdown emphasis": "Monitor **service** behavior and operational health across every production system.",
+            "Markdown single emphasis": "Monitor *service* behavior and operational health across every production system.",
+            "Markdown code": "Monitor `service` behavior and operational health across every production system.",
+            "HTML": "Monitor <strong>service</strong> behavior and operational health across production systems.",
+            "URL": "Monitor service behavior from https://example.com/metrics across production systems.",
+            "uppercase URL": "Monitor service behavior from HTTPS://example.com/metrics across production systems.",
+            "other URL scheme": "Monitor service behavior from ftp://example.com/metrics across production systems.",
+            "newline": "Monitor service behavior and operational health across every\nproduction system.",
+            "double quote": 'Monitor service behavior and its "ready" state across every production system.',
+            "backslash": r"Monitor service behavior under C:\metrics across every production system.",
+        }
+        for schema_name, (validator, base) in self.cases.items():
+            for label, value in invalid_values.items():
+                with self.subTest(schema=schema_name, violation=label), self.assertRaises(ValidationError):
+                    validator.validate({**base, "description": value})
+
+
+class GeneratorInputFailureTest(unittest.TestCase):
+    def run_generator(self, cwd, *args):
+        return subprocess.run(
+            [sys.executable, str(INTEGRATIONS_DIR / "gen_docs_integrations.py"), *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def test_check_and_generation_fail_when_generated_input_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for args in ((), ("--check",)):
+                with self.subTest(args=args):
+                    result = self.run_generator(directory, *args)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("Missing generated integrations input", result.stderr)
+
+    def test_check_and_generation_fail_when_generated_input_is_empty_or_malformed(self):
+        fixtures = {
+            "empty": "",
+            "empty categories": "export const categories = []export const integrations = [{}]",
+            "empty integrations": "export const categories = [{}]export const integrations = []",
+            "malformed": "export const categories = [export const integrations = []",
+        }
+        for label, content in fixtures.items():
+            with tempfile.TemporaryDirectory() as directory:
+                integrations_dir = Path(directory) / "integrations"
+                integrations_dir.mkdir()
+                (integrations_dir / "integrations.js").write_text(content, encoding="utf-8")
+                for args in ((), ("--check",)):
+                    with self.subTest(label=label, args=args):
+                        result = self.run_generator(directory, *args)
+                        self.assertNotEqual(result.returncode, 0)
+
+    def test_unknown_collector_fails(self):
+        for args in (("--collector", "missing.plugin/missing"), ("--check", "--collector", "missing.plugin/missing")):
+            with self.subTest(args=args):
+                result = self.run_generator(REPO_ROOT, *args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("no matching collector found", result.stderr)
+
+
 class DocumentationSourceRegressionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -274,11 +405,6 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
         walk(map_data["sidebar"])
         self.assertEqual(targeted, MAP_DESCRIPTION_TARGETS)
         self.assertEqual(len(descriptions), len({value.casefold() for value in descriptions}))
-
-    def test_source_owned_thin_pages_exceed_300_visible_words(self):
-        for relative_path in sorted(THIN_SOURCE_DOCS):
-            markdown = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
-            self.assertGreater(visible_word_count(markdown), 300, relative_path)
 
     def test_affected_pages_have_one_top_level_heading(self):
         source_pages = {

@@ -67,6 +67,8 @@ The generator resolves each description in this order:
 1. Use the explicit override when one exists:
    - `meta.monitored_instance.description` for collector, flows, and device records;
    - `meta.description` for every other mode.
+   - The generator ignores only surrounding spaces and tabs, then validates and emits the author's remaining text exactly.
+   - It never removes markup, collapses whitespace, truncates, or falls back to overview prose when an explicit value is invalid.
 2. Otherwise, derive it mechanically from the first useful prose in the rendered overview.
    - Markdown and HTML are reduced to plain text.
    - Sentences are included until the description reaches 50 characters.
@@ -79,6 +81,9 @@ An explicit description MUST:
 - be one line of plain text with no Markdown, HTML, URL, double quote, or backslash;
 - be unique across every generated integration page;
 - accurately describe the specific integration in active, user-facing language.
+
+Mechanical overview extraction and explicit author input are deliberately separate paths. Markdown stripping, whitespace
+normalization, sentence selection, and word-boundary truncation apply only to a mechanically derived description.
 
 Double quotes and backslashes are rejected because Learn's legacy frontmatter parser cannot preserve their escaping. Use unquoted wording
 or Unicode typographic quotation marks when quotation is essential.

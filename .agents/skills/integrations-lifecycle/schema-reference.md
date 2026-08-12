@@ -30,6 +30,12 @@ unknown keys pass through silently. See `gotchas.md`.
 
 Referenced by every other schema for common structures.
 
+### `$defs.page_description`
+
+The reusable optional explicit-page-description contract: a 50–160 character string with a parser-safe plain-text pattern.
+It rejects Markdown, HTML, URLs, newlines, double quotes, and backslashes. `shared.instance.description`,
+`secretstore.meta.description`, and `service_discovery.meta.description` all reference this definition.
+
 ### `$defs.id`
 
 Single string field used in many schemas as an identifier.
@@ -394,6 +400,7 @@ Per-backend entries.
 | `meta.name`                                         | string                        | yes                 | --          | learn / in-app                    | Display name.                                                                                      |
 | `meta.link`                                         | string                        | yes                 | URL         | learn / www                       |                                                                                                    |
 | `meta.icon_filename`                                | string                        | yes                 | --          | learn / www / in-app              |                                                                                                    |
+| `meta.description`                                  | $ref `shared.page_description` | no                  | 50–160 plain text | learn frontmatter             | Explicit override used only when mechanical overview extraction is unsuitable.                    |
 | `keywords`                                          | array<string>                 | yes                 | --          | learn frontmatter                 |                                                                                                    |
 | `overview.description`                              | string                        | yes                 | markdown    | learn (`overview/secretstore.md`) |                                                                                                    |
 | `overview.limitations`                              | string                        | no                  | markdown    | learn                             |                                                                                                    |
@@ -421,6 +428,7 @@ Per-backend entries.
 | `meta.tagline`                                   | string                        | yes                                       | --       | SD hub table                            | One-liner shown in the SERVICE-DISCOVERY.md table.                         |
 | `meta.link`                                      | string                        | yes                                       | URL      | learn / www                             |                                                                            |
 | `meta.icon_filename`                             | string                        | yes                                       | --       | learn / www / in-app                    |                                                                            |
+| `meta.description`                               | $ref `shared.page_description` | no                                       | 50–160 plain text | learn frontmatter                 | Explicit override used only when mechanical overview extraction is unsuitable.                   |
 | `keywords`                                       | array<string>                 | yes                                       | --       | learn frontmatter                       |                                                                            |
 | `overview.description`                           | string                        | yes                                       | markdown | learn (`overview/service_discovery.md`) |                                                                            |
 | `overview.how_it_works`                          | string                        | no                                        | markdown | learn                                   | h3 under Overview.                                                         |

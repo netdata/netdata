@@ -25,8 +25,12 @@ DOCUMENTATION_TYPES = {
     "service_discovery",
 }
 
-_BARE_URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
+_BARE_URL_RE = re.compile(r"(?:[a-z][a-z0-9+.-]*://|mailto:|www\.)\S+", re.IGNORECASE)
 _MARKDOWN_LINK_RE = re.compile(r"!?\[([^]]*)\]\([^)]*\)")
+_MARKDOWN_SYNTAX_RE = re.compile(
+    r"!?\[[^]]*\](?:\([^)]*\)|\[[^]]*\])|`|:::|\*\*|__|~~|"
+    r"(?<!\w)[*_][^*_\r\n]+[*_](?!\w)|(?:^|\s)#{1,6}\s|(?:^|\s)>\s|(?:^|\s)[-*+]\s"
+)
 _RELATED_RESOURCE_RE = re.compile(
     r'\{% relatedResource id="[^"]*" %\}(.*?)\{% /relatedResource %\}',
     re.DOTALL,
@@ -131,7 +135,7 @@ def _truncate(text: str) -> str:
 
 
 def normalize_description(text: str, *, summarize: bool) -> str:
-    """Normalize an explicit description or summarize rendered overview prose."""
+    """Normalize and optionally summarize mechanically derived overview prose."""
     plain = markdown_to_plain_text(text)
     if summarize:
         plain = _summarize(plain)
@@ -172,18 +176,29 @@ def extract_description_from_overview(overview: str, *, for_meta: bool = False) 
 
 
 def get_description_override(integration: Dict[str, Any]) -> Optional[str]:
-    """Return the explicit shared-schema description for an integration, if present."""
+    """Return the exact explicit metadata description, if present and valid."""
     meta = integration.get("meta", {})
     monitored_instance = meta.get("monitored_instance")
     owner = monitored_instance if isinstance(monitored_instance, dict) else meta
-    value = owner.get("description") if isinstance(owner, dict) else None
+    if not isinstance(owner, dict) or "description" not in owner:
+        return None
 
-    if isinstance(value, str) and value.strip():
-        return normalize_description(value, summarize=False)
-    return None
+    integration_id = integration.get("id", "<missing-id>")
+    value = owner["description"]
+    if not isinstance(value, str):
+        raise ValueError(f"Invalid description for {integration_id}: must be a string: {value!r}")
+
+    # Spaces and tabs around an explicit value are harmless authoring whitespace.
+    # Newlines are not stripped because the one-line contract must reject them.
+    description = value.strip(" \t")
+    validate_description(description, integration_id)
+    return description
 
 
 def validate_description(description: str, integration_id: str) -> None:
+    if not isinstance(description, str):
+        raise ValueError(f"Invalid description for {integration_id}: must be a string: {description!r}")
+
     errors = []
     length = len(description)
 
@@ -195,7 +210,7 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append("contains a newline")
     if _BARE_URL_RE.search(description):
         errors.append("contains a URL")
-    if _MARKDOWN_LINK_RE.search(description) or "`" in description or ":::" in description:
+    if _MARKDOWN_SYNTAX_RE.search(description):
         errors.append("contains Markdown syntax")
     if re.search(r"<[^>]+>", description):
         errors.append("contains HTML")

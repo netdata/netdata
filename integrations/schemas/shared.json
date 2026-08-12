@@ -7,6 +7,13 @@
       "minLength": 1,
       "description": "A unique ID for the item. Must be URL safe."
     },
+    "page_description": {
+      "description": "Optional explicit page description used when the overview cannot produce an accurate, unique 50-160 character summary. Surrounding spaces and tabs are ignored by the generator. Markdown, HTML, URLs, newlines, double quotes, and backslashes are not supported.",
+      "type": "string",
+      "minLength": 50,
+      "maxLength": 160,
+      "pattern": "^(?!.*(?:[A-Za-z][A-Za-z0-9+.-]*://|[Mm][Aa][Ii][Ll][Tt][Oo]:|[Ww][Ww][Ww]\\.))(?!.*(?:!?\\[[^\\]]*\\](?:\\([^)]*\\)|\\[[^\\]]*\\])|`|:::|\\*\\*|__|~~|(?:^|[^A-Za-z0-9_])[*_][^*_\\r\\n]+[*_](?:[^A-Za-z0-9_]|$)|(?:^|\\s)#{1,6}\\s|(?:^|\\s)>\\s|(?:^|\\s)[-*+]\\s|<[^>]+>))[^\\r\\n\"\\\\]+$"
+    },
     "instance": {
       "type": "object",
       "description": "Information about the integration instance.",
@@ -16,11 +23,7 @@
           "type": "string"
         },
         "description": {
-          "description": "Optional explicit page description used when the overview cannot produce an accurate, unique 50-160 character summary. Double quotes and backslashes are not supported by Learn's frontmatter parser.",
-          "type": "string",
-          "minLength": 50,
-          "maxLength": 160,
-          "pattern": "^[^\\r\\n\"\\\\]+$"
+          "$ref": "#/$defs/page_description"
         },
         "link": {
           "description": "Link to the instance official website if any.",
