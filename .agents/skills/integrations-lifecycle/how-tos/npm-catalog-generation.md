@@ -30,9 +30,9 @@ generated. Neither is hand-editable.
 ## The CI gap that matters
 
 `.github/workflows/generate-integrations.yml` runs `gen_integrations.py`,
-`gen_taxonomy.py`, `gen_taxonomy_seed.py`, `gen_docs_integrations.py`,
-`gen_doc_collector_page.py`, and `gen_doc_secrets_page.py`. It does **NOT** run
-`gen_npm_catalog.py`.
+`gen_taxonomy.py`, `gen_docs_integrations.py`, `gen_doc_collector_page.py`, and
+`gen_doc_secrets_page.py`. (`gen_taxonomy_seed.py` appears only in the workflow's
+`paths:` filter, not as a run step.) It does **NOT** run `gen_npm_catalog.py`.
 
 Consequence: a change to an SNMP device profile or trap profile does **not**
 propagate to the NPM catalog on its own. Whoever changes the profiles (or the
@@ -43,14 +43,23 @@ regenerate the metadata itself.
 ## Regenerating, end to end
 
 ```bash
-python3 integrations/gen_npm_catalog.py      # profiles      -> metadata.yaml
-python3 integrations/gen_integrations.py     # metadata.yaml -> integrations.js/.json
-python3 integrations/gen_docs_integrations.py # metadata.yaml -> per-entry .md pages
+python3 integrations/gen_npm_catalog.py       # profiles         -> metadata.yaml
+python3 integrations/gen_integrations.py      # metadata.yaml    -> integrations.js/.json
+python3 integrations/gen_docs_integrations.py # integrations.js  -> per-entry .md pages
 ```
 
-Stage the changed files explicitly; `gen_integrations.py` also touches the
-gitignored `integrations.js` / `integrations.json`, which must never be
-committed.
+**The order is mandatory.** `gen_docs_integrations.py` renders from
+`integrations/integrations.js`, not from `metadata.yaml`. Skipping
+`gen_integrations.py` leaves the `.md` pages silently stale — the command
+succeeds and nothing changes, which reads as "no diff needed".
+
+Stage the changed files explicitly. Two outputs must never be committed:
+
+- `integrations/integrations.js` and `integrations/integrations.json` — gitignored.
+- `src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` — a
+  side report `gen_npm_catalog.py` writes on every run (`write_gap_report`,
+  called from `main`). It is untracked and NOT gitignored, so it shows up as a
+  new untracked file after every regeneration. Delete it before staging.
 
 ## Catalog composition
 
@@ -68,27 +77,45 @@ committed.
 Capability (BGP / licensing) is detected by resolving each profile's transitive
 `extends:` chain, not by a flag in the profile.
 
-## The YAML-anchor trap
+## Shared objects, and the anchors that reveal them
 
-`ruamel.yaml` emits shared Python objects as YAML anchors and aliases. Because
-`make_entry()` reuses the same module-level dicts for `setup`, `troubleshooting`,
-and `metrics`, the generated `metadata.yaml` contains `setup: &id001 ...` on the
-first entry and `setup: *id001` on the other thousand.
-
-This is what made every non-SNMP producer render SNMP setup instructions: a
-single hardcoded `SETUP` dict was aliased onto entries produced by
+The root cause of a past defect here was `make_entry()` assigning the *same*
+module-level `SETUP` dict to every entry it built. Entries produced by
 `network-viewer.plugin`, the streaming graph, vSphere, Cato, and the
-OpenTelemetry syslog pipeline, none of which use SNMP.
+OpenTelemetry syslog pipeline — none of which use SNMP — therefore rendered SNMP
+prerequisites and `edit-config go.d/snmp.conf`.
+
+YAML anchors did not cause that; they made it visible. `ruamel.yaml` serializes a
+shared Python object as an anchor plus aliases, so the file shows
+`setup: &id001 ...` on the first entry and `setup: *id001` on the other thousand.
+The alias is the symptom you can grep for.
 
 Two practical consequences when editing the generator:
 
 - **Sharing an object is the default, not an optimization.** If a builder needs
   a different `setup` / `metrics` / `troubleshooting`, it must pass its own
-  object; there is no per-entry copy.
+  object; there is no per-entry copy. The same applies to values baked into
+  `overview()` — `supported_platforms` and `multi_instance` were once hardcoded
+  for every entry, which claimed all-platform support and side-by-side instances
+  for singleton, Linux-only producers.
 - **The anchor id numbering shifts.** Introducing a new shared object renumbers
   the anchors after it (`&id004` etc.), so a regeneration diff can look larger
   than the semantic change. Check the diff hunk ranges, not the line count:
   a setup-only change should be confined to the affected entries' line ranges.
+
+## Verify catalog entries against the collector's own metadata
+
+Several catalog entries describe collectors that already have an authoritative
+`metadata.yaml` elsewhere in the tree — for example
+`src/collectors/network-viewer.plugin/metadata.yaml`. That file is the source of
+truth for supported platforms, `multi_instance`, and configuration options. When
+a catalog entry covers such a collector, copy those facts rather than inventing
+them; a catalog entry that contradicts the collector's own metadata is a bug in
+the catalog.
+
+Producers with no `metadata.yaml` of their own (`snmp_topology` is one) have the
+catalog entry as their *only* public documentation, so its setup block must be
+checked directly against the collector source and `config_schema.json`.
 
 ## Verifying a generator change did not disturb the other 990 entries
 

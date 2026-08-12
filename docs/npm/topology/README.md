@@ -16,7 +16,7 @@ and where each part sits — built automatically from what you already monitor.
 Two maps, in the same view:
 
 - **The network fabric** — your switches and routers and the links between them, read over SNMP from the devices themselves.
-- **Your applications** — which process, container, and Kubernetes workload talks to which, read from each host's kernel.
+- **Your applications** — which process, container, and Kubernetes workload talks to which, read from the host's kernel.
 
 Neither needs setup. There is nothing to instrument, no topology to declare, and no diagram to maintain.
 
@@ -44,12 +44,14 @@ The result is a live Layer 2 and Layer 3 map, kept current as devices come and g
 
 ## Your applications, mapped the same way
 
-The device fabric tells you how the wires run. On every host you monitor, Netdata also reads the kernel's live socket
-table and maps the software: which process talks to which, attributed to the container, image, systemd unit, or
-Kubernetes pod, namespace, and workload that owns it — with no instrumentation of any kind (`topology:network-connections`).
+The device fabric tells you how the wires run. On a monitored host, Netdata also reads the kernel's live socket table
+and maps the software: which process talks to which, and on Linux which container, image, systemd unit, or Kubernetes
+pod, namespace, and workload owns it — with no instrumentation of any kind (`topology:network-connections`).
 
-You can regroup that map by node, container, process name, or PID, so you can look at your infrastructure at whichever
-level answers your question — how hosts depend on each other, or exactly which worker process opened a connection.
+You can regroup that map by process name, container, or PID, so you can look at the host at whichever level answers
+your question — the services it runs, or exactly which worker process opened a connection.
+
+The map is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only.
 
 ![Live network connections function](https://www.netdata.cloud/img/dashboard-screens/functions-network-connections.png)
 

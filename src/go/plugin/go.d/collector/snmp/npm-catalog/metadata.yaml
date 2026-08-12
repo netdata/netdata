@@ -9347,7 +9347,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9366,11 +9366,19 @@ modules:
         file:
           name: go.d/snmp_topology.conf
         options:
-          description: 'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. Use this file only to change the discovery interval.'
+          description: 'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. It runs as a single job, and the only settings are the two intervals below.'
           folding:
             title: Config options
             enabled: true
-          list: []
+          list:
+            - name: update_every
+              description: How often to check for new or stale devices, in seconds.
+              default_value: 60
+              required: false
+            - name: refresh_every
+              description: How often to refresh topology data for each device.
+              default_value: 30m
+              required: false
         examples:
           folding:
             title: Config
@@ -9407,7 +9415,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9450,7 +9458,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9492,7 +9500,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9534,7 +9542,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9577,7 +9585,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9620,7 +9628,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9660,12 +9668,15 @@ modules:
         description: ''
     overview:
       data_collection:
-        metrics_description: Map application dependencies on your hosts. The network-viewer plugin reads the kernel's live socket table and draws which process talks to which — attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it.
-        method_description: The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table — no SNMP, no instrumentation, and no configuration.
+        metrics_description: Map application dependencies on a host. The network-viewer plugin reads the kernel's live socket table and draws which local process talks to which, and which remote endpoints they reach. On Linux each process is also attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it.
+        method_description: The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only.
       supported_platforms:
-        include: []
+        include:
+          - Linux
+          - FreeBSD
+          - macOS
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:
@@ -9680,13 +9691,18 @@ modules:
         list: []
       configuration:
         file:
-          name: ''
+          name: netdata.conf
+          section_name: '[plugin:network-viewer]'
         options:
-          description: This integration has no configuration options.
+          description: The Function is always available and needs no setup. The only setting is the APPS_LOOKUP cache used to enrich connections with container and Kubernetes identity.
           folding:
             title: Config options
             enabled: true
-          list: []
+          list:
+            - name: apps lookup cache size
+              description: Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin.
+              default_value: 8192
+              required: false
         examples:
           folding:
             title: Config
@@ -9723,7 +9739,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: ''
       default_behavior:

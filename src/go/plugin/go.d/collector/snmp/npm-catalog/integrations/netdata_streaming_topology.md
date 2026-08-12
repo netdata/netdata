@@ -29,7 +29,7 @@ Netdata builds the `topology:streaming` view from the live streaming connections
 
 This integration is supported on all platforms.
 
-This integration supports multiple instances configured side-by-side.
+This integration runs as a single instance per Netdata Agent.
 
 
 ### Default Behavior

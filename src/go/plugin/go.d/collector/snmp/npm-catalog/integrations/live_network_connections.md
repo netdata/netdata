@@ -23,13 +23,17 @@ Module: network-viewer
 
 ## Overview
 
-Map application dependencies on your hosts. The network-viewer plugin reads the kernel's live socket table and draws which process talks to which — attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it.
+Map application dependencies on a host. The network-viewer plugin reads the kernel's live socket table and draws which local process talks to which, and which remote endpoints they reach. On Linux each process is also attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it.
 
-The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table — no SNMP, no instrumentation, and no configuration.
+The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only.
 
-This integration is supported on all platforms.
+This integration is only supported on the following platforms:
 
-This integration supports multiple instances configured side-by-side.
+- Linux
+- FreeBSD
+- macOS
+
+This integration runs as a single instance per Netdata Agent.
 
 
 ### Default Behavior
@@ -57,13 +61,43 @@ No action required.
 
 #### Options
 
-This integration has no configuration options.
+The Function is always available and needs no setup. The only setting is the APPS_LOOKUP cache used to enrich connections with container and Kubernetes identity.
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| apps lookup cache size | Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin. | 8192 | no |
+
+
+</details>
 
 
 
 #### via File
 
-There is no configuration file.
+The configuration file name for this integration is `netdata.conf`.
+Configuration for this specific integration is located in the `[plugin:network-viewer]` section within that file.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
 
 ##### Examples
 There are no configuration examples.

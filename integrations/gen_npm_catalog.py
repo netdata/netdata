@@ -211,11 +211,14 @@ def _plural(n, word):
     return f'{n} {word}' if n == 1 else f'{n} {word}s'
 
 
-def overview(metrics_description, method_description, auto_detection):
+def overview(metrics_description, method_description, auto_detection, platforms=(), multi_instance=True):
+    """`platforms` empty means every platform the Agent runs on; producers that are not
+    built everywhere must list theirs. `multi_instance` must be False for singleton
+    producers, otherwise the page claims side-by-side instances the collector rejects."""
     return {
         'data_collection': {'metrics_description': metrics_description, 'method_description': method_description},
-        'supported_platforms': {'include': [], 'exclude': []},
-        'multi_instance': True,
+        'supported_platforms': {'include': list(platforms), 'exclude': []},
+        'multi_instance': multi_instance,
         'additional_permissions': {'description': ''},
         'default_behavior': {
             'auto_detection': {'description': auto_detection},
@@ -225,23 +228,28 @@ def overview(metrics_description, method_description, auto_detection):
     }
 
 
-def setup_block(config_file, options_description, prerequisites=()):
+def setup_block(config_file, options_description, prerequisites=(), options=(), examples=(), section_name=None):
     """Build a `setup` block. Most catalog entries come from the SNMP collector and
     share SETUP below, but the topology, syslog, and vSphere/Cato producers are not
     SNMP-based and must not inherit SNMP prerequisites or `go.d/snmp.conf`.
 
     An empty `config_file` renders "There is no configuration file." and an empty
-    `prerequisites` renders "No action required." (integrations/templates/setup-generic.md)."""
+    `prerequisites` renders "No action required." (integrations/templates/setup-generic.md).
+    Pass `options` whenever the producer really does expose settings — an empty list
+    renders as if it had none."""
+    file_block = {'name': config_file}
+    if section_name:
+        file_block['section_name'] = section_name
     return {
         'prerequisites': {'list': [{'title': t, 'description': d} for t, d in prerequisites]},
         'configuration': {
-            'file': {'name': config_file},
+            'file': file_block,
             'options': {
                 'description': options_description,
                 'folding': {'title': 'Config options', 'enabled': True},
-                'list': [],
+                'list': list(options),
             },
-            'examples': {'folding': {'title': 'Config', 'enabled': True}, 'list': []},
+            'examples': {'folding': {'title': 'Config', 'enabled': True}, 'list': list(examples)},
         },
     }
 
@@ -255,18 +263,40 @@ SETUP = setup_block(
 )
 
 # The topology collector has its own job file; the devices it walks come from the
-# SNMP collector's jobs (src/go/plugin/go.d/config/go.d/snmp_topology.conf).
+# SNMP collector's jobs (src/go/plugin/go.d/config/go.d/snmp_topology.conf). It is a
+# single-instance collector (InstancePolicySingle), and its schema exposes exactly the
+# two options below (snmp_topology/config_schema.json).
 SNMP_TOPOLOGY_SETUP = setup_block(
     'go.d/snmp_topology.conf',
     'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector '
-    'jobs. Use this file only to change the discovery interval.',
+    'jobs. It runs as a single job, and the only settings are the two intervals below.',
     [('SNMP devices configured',
       'The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP access must be reachable from the '
       'Netdata Agent acting as the site\'s SNMP hub.')],
+    options=[
+        {'name': 'update_every', 'description': 'How often to check for new or stale devices, in seconds.',
+         'default_value': 60, 'required': False},
+        {'name': 'refresh_every', 'description': 'How often to refresh topology data for each device.',
+         'default_value': '30m', 'required': False},
+    ],
 )
 
-# network-viewer.plugin reads the host's own socket table. Nothing to reach, nothing to configure.
-NO_SETUP = setup_block('', 'This integration has no configuration options.')
+# network-viewer.plugin reads the host's own socket table: nothing to reach and no job to
+# create, but it is not option-free. Mirror the collector's own metadata
+# (src/collectors/network-viewer.plugin/metadata.yaml) rather than claiming "no configuration".
+NETWORK_VIEWER_SETUP = setup_block(
+    'netdata.conf',
+    'The Function is always available and needs no setup. The only setting is the APPS_LOOKUP cache used to enrich '
+    'connections with container and Kubernetes identity.',
+    section_name='[plugin:network-viewer]',
+    options=[
+        {'name': 'apps lookup cache size',
+         'description': 'Maximum number of per-PID APPS_LOOKUP cache entries kept by network-viewer.plugin.',
+         'default_value': 8192, 'required': False},
+    ],
+    # No example: the shared template fences every example as YAML, which would
+    # mislabel netdata.conf's INI syntax. The options table above is enough.
+)
 
 STREAMING_SETUP = setup_block(
     'stream.conf',
@@ -617,18 +647,24 @@ def build_topology_modules():
          'Discovered automatically on routers that expose the OSPF neighbor table.'),
     ]
 
+    # network-viewer.plugin builds topology:network-connections only where network-viewer.c
+    # is compiled — Linux, FreeBSD and macOS (CMakeLists.txt). Windows builds
+    # network-viewer-windows.c, which registers network-connections and network-protocols
+    # but NOT the topology Function. Container/Kubernetes/systemd enrichment needs the
+    # APPS_LOOKUP client, which is Linux-only (network-viewer-apps-lookup-client.h).
     other = [
         ('Live Network Connections', 'network-viewer.plugin', 'network-viewer', 'network.svg',
          ['network connections', 'sockets', 'processes', 'containers', 'kubernetes', 'dependencies', 'topology',
           'live', 'npm'],
-         'Map application dependencies on your hosts. The network-viewer plugin reads the kernel\'s live socket table '
-         'and draws which process talks to which — attributed to the container, image, systemd unit, or Kubernetes '
-         'pod, namespace, and workload that owns it.',
+         'Map application dependencies on a host. The network-viewer plugin reads the kernel\'s live socket table and '
+         'draws which local process talks to which, and which remote endpoints they reach. On Linux each process is '
+         'also attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns '
+         'it.',
          'The network-viewer plugin builds the `topology:network-connections` view directly from the host\'s live '
-         'socket '
-         'table — no SNMP, no instrumentation, and no configuration.',
+         'socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container '
+         'and Kubernetes attribution is Linux-only.',
          'Always on; observes the host\'s live network connections.',
-         NO_SETUP),
+         NETWORK_VIEWER_SETUP, ['Linux', 'FreeBSD', 'macOS'], False),
         ('Netdata Streaming Topology', 'netdata', 'streaming', 'netdata.png',
          ['streaming', 'parents', 'children', 'topology', 'agents', 'npm'],
          'See how your Netdata Agents connect. The streaming topology renders the parent-child hierarchy of a Netdata '
@@ -636,7 +672,7 @@ def build_topology_modules():
          '— which Agents stream to which Parents.',
          'Netdata builds the `topology:streaming` view from the live streaming connections between Agents and Parents.',
          'Always available; reflects the live streaming connections of the deployment.',
-         STREAMING_SETUP),
+         STREAMING_SETUP, (), False),
         ('vSphere Topology', 'go.d.plugin', 'vsphere', icon_for('vmware'),
          ['vsphere', 'vmware', 'vcenter', 'virtualization', 'topology', 'npm'],
          'Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with '
@@ -644,7 +680,7 @@ def build_topology_modules():
          'and network-attachment links, plus datastore-utilization overlays.',
          'The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.',
          'Built from the configured vCenter inventory.',
-         VSPHERE_SETUP),
+         VSPHERE_SETUP, (), True),
         ('Cato Networks Topology', 'go.d.plugin', 'cato_networks', FALLBACK_ICON,
          ['cato', 'sase', 'sd-wan', 'topology', 'npm'],
          'Map a Cato Networks SASE fabric. The Cato collector renders sites, sockets, and gateways with their tunnel '
@@ -654,19 +690,20 @@ def build_topology_modules():
          '`netdata.topology.v1` '
          'graph.',
          'Built from the configured Cato account.',
-         CATO_SETUP),
+         CATO_SETUP, (), True),
     ]
 
     modules = []
+    # snmp_topology is InstancePolicySingle: one job, never side-by-side instances.
     for name, keywords, metrics_desc, method_desc, auto in snmp_methods:
         modules.append(make_entry(
             name=name, link='', categories=[CAT_TOPOLOGY], icon=FALLBACK_ICON,
-            keywords=keywords, ov=overview(metrics_desc, method_desc, auto),
+            keywords=keywords, ov=overview(metrics_desc, method_desc, auto, multi_instance=False),
             plugin_name='go.d.plugin', module_name='snmp_topology', setup=SNMP_TOPOLOGY_SETUP))
-    for name, plugin, module, icon, keywords, metrics_desc, method_desc, auto, setup in other:
+    for name, plugin, module, icon, keywords, metrics_desc, method_desc, auto, setup, platforms, multi in other:
         modules.append(make_entry(
             name=name, link='', categories=[CAT_TOPOLOGY], icon=icon,
-            keywords=keywords, ov=overview(metrics_desc, method_desc, auto),
+            keywords=keywords, ov=overview(metrics_desc, method_desc, auto, platforms, multi),
             plugin_name=plugin, module_name=module, setup=setup))
     return modules
 

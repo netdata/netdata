@@ -10,9 +10,9 @@ endmeta-->
 
 # Application Dependency Mapping
 
-The same topology view that draws your switches also draws your software. On every host, Netdata reads the kernel's live
-socket table and turns it into a dependency map: which process talks to which, over which port — attributed to the
-container, image, systemd unit, or Kubernetes pod that owns it.
+The same topology view that draws your switches also draws your software. On a monitored host, Netdata reads the
+kernel's live socket table and turns it into a dependency map: which process talks to which, over which port —
+attributed, on Linux, to the container, image, systemd unit, or Kubernetes pod that owns it.
 
 There is nothing to instrument. No language agents, no sidecars, no code changes, no service mesh. These are the sockets
 your kernel already has, read continuously and drawn as a graph.
@@ -21,24 +21,31 @@ your kernel already has, read continuously and drawn as a graph.
 
 ## What it maps
 
-Every connection Netdata sees is attributed to the software on both ends of it, as far as the host can tell:
+For every socket on the host, Netdata identifies the local process behind it:
 
 - **The process** — the running program, its command line, the user it runs as, and its parent.
-- **The container** — the container name and the image it came from.
-- **The Kubernetes workload** — the pod, the namespace, and the workload it belongs to.
-- **The systemd unit** — for services that aren't containerized.
+- **The container** *(Linux)* — the container name and the image it came from.
+- **The Kubernetes workload** *(Linux)* — the pod, the namespace, and the workload it belongs to.
+- **The systemd unit** *(Linux)* — for services that aren't containerized.
 - **The host itself** — for connections that belong to no particular service.
+
+The other end depends on where it is. When both ends of a connection live on the same host, Netdata draws a direct
+process-to-process link. When the peer is elsewhere, it is drawn as an endpoint actor carrying its address, and the map
+records the matching keys needed to resolve it against the process serving it on another monitored host.
 
 The result is a graph of your applications rather than a list of sockets: this pod talks to that database, this service
 depends on that queue, this host reaches out to that external address.
+
+Identification is best-effort. A socket whose owning process Netdata cannot see — a permission-restricted process, or
+one that exited between reads — is still drawn, with `[unknown]` where the name or user would be.
 
 ## Group the map the way you think
 
 The map redraws around whichever level you want to reason about:
 
-- **By node** — how your hosts depend on each other.
-- **By container** — how your containers and pods depend on each other, with the processes inside them collapsed away.
-- **By process name** — all instances of a service treated as one, so a 12-replica deployment is one box, not twelve.
+- **By process name** (the default) — all instances of a service treated as one, so a 12-replica deployment is one box,
+  not twelve.
+- **By container** — how your containers and pods relate, with the processes inside them collapsed away.
 - **By PID** — every individual process, when you need to see which specific worker is responsible.
 
 Start grouped, then drill down. A dependency map that shows every process on a busy host is accurate and unreadable;
@@ -57,19 +64,27 @@ the value is in choosing the altitude that answers your question.
 
 ## Platform support
 
-| Platform | What you get |
-|:---|:---|
-| **Linux** | Full process, container, Kubernetes, and systemd attribution. |
-| **Windows** | Connection monitoring, including SMB. |
-| **FreeBSD** | Connection monitoring. |
+| Platform | Dependency map | Process identity | Container / Kubernetes / systemd |
+|:---|:---|:---|:---|
+| **Linux** | yes | yes | yes |
+| **FreeBSD** | yes | yes | no |
+| **macOS** | yes | yes | no |
+| **Windows** | no | — | — |
 
-On Linux, container and Kubernetes attribution comes from the cgroup each socket's process belongs to, so it works for
-Docker, containerd, CRI-O, LXC, and plain systemd services without any per-runtime configuration.
+On Linux, container and Kubernetes attribution comes from the cgroup each socket's process belongs to. Netdata
+recognizes Docker, Kubernetes, Podman, LXC, systemd-nspawn, KVM guests, and plain systemd units, with no per-runtime
+configuration. On FreeBSD and macOS
+the map is drawn from processes and endpoints only — the cgroup enrichment that supplies container and workload
+identity is Linux-specific.
+
+Windows does not have this map. Netdata monitors Windows network connections through the **Network Connections**
+table function (including SMB), but the `topology:network-connections` graph is not available there.
 
 ## How to open it
 
 The map is served by the **`topology:network-connections`** function — open it from the topology view. It comes up on
-its own: the plugin is enabled by default and has nothing to configure.
+its own: the plugin is enabled by default and needs no setup. Its one setting, the size of the cache used to enrich
+connections with container identity, lives in `netdata.conf` under `[plugin:network-viewer]` and rarely needs changing.
 
 Two levels of detail are available:
 

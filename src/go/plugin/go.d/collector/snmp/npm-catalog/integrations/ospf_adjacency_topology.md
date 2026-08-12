@@ -29,7 +29,7 @@ Netdata reads the OSPF-MIB neighbor table over SNMP and renders adjacencies in t
 
 This integration is supported on all platforms.
 
-This integration supports multiple instances configured side-by-side.
+This integration runs as a single instance per Netdata Agent.
 
 
 ### Default Behavior
@@ -74,7 +74,19 @@ The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP acc
 
 #### Options
 
-Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. Use this file only to change the discovery interval.
+Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. It runs as a single job, and the only settings are the two intervals below.
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update_every | How often to check for new or stale devices, in seconds. | 60 | no |
+| refresh_every | How often to refresh topology data for each device. | 30m | no |
+
+
+</details>
 
 
 #### via UI
