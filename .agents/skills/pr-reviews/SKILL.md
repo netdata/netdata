@@ -508,7 +508,7 @@ If a new AI reviewer appears in the project, classify it by adding to
   iteration and never reaches the bot. `trigger-coderabbit.sh` hardcodes the
   correct handle -- do not hand-write the mention. The same care applies to
   `@cubic-dev-ai`. Before posting any comment containing an `@`, check the
-  handle against the bot directory below.
+  handle against the bot directory above.
 
 - **`coderabbitai[bot]` posts line-level findings**, not just summaries. It was
   originally classified here as informational; it is an AI reviewer and its
