@@ -115,8 +115,6 @@ jobs:
             echo 'CRLF line endings were not preserved in stream.conf' >&2
             exit 1
           fi
-          jq -e '.files[] | select(.path == "04-config/stream.conf")
-                 | .source_encoding | .bom == "utf-8" and .final_newline == false' "$root/MANIFEST.json"
 
   macos-posix:
     name: macOS POSIX sanitization

@@ -90,7 +90,7 @@ The archive is organized into numbered directories so a person or an automated r
 
 - Secrets are removed. This covers API tokens, passwords, bearer and basic credentials, private key blocks, and credentials embedded in URLs.
 - One deliberate exception: the **streaming API key** is kept as-is in `04-config/stream.conf`, because support needs it to tell whether a child and its parent agree on the same key. Remove or mask that file before sending the bundle if you would rather not share it.
-- Collected files keep their original bytes, including a byte-order mark and CRLF line endings, so an encoding problem in your configuration is still visible. What was found is recorded per file in `MANIFEST.json`, and anything unusual is listed in `summary.txt`.
+- Collected files keep their original bytes, including a byte-order mark and CRLF line endings, so an encoding problem in your configuration is still visible.
 - IP addresses and hostnames are replaced with stable pseudonyms by default, so the same address reads as the same pseudonym across the whole bundle. Use `--no-obfuscate` to keep the real values.
 - When pseudonymization is on, the map from real values to pseudonyms is written next to the archive, not inside it. Keep that map private and do not attach it to a ticket.
 - Review the archive before you send it. The tool runs on your own host and you are in control of what leaves it.

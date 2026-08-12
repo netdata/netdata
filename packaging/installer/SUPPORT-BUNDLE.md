@@ -56,7 +56,7 @@ document.**
 | Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, via `timeout` or a portable watchdog — the watchdog kills the direct child only, a documented limitation); global deadline checked before each collector, so the hard runtime bound is deadline + one command timeout; size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only — writes only its private staging dir and the final artifacts, never restarts or reconfigures anything; artifacts are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
 | Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-WAS-DOWN.txt` marker is written instead of API captures |
 | Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below. **One documented exception:** the streaming API key in `stream.conf` is kept verbatim (see "The streaming API key exception") |
-| Source bytes preserved | collected files keep their byte-order mark, their per-line terminators (CRLF/CR/LF, including on redacted lines) and a missing final newline, so an encoding fault in the user's file is still visible in the bundle; what was observed is recorded per file under `source_encoding` in `MANIFEST.json`, and anomalies are listed in `summary.txt` |
+| Source bytes preserved | collected files keep their byte-order mark, their per-line terminators (CRLF/CR/LF, including on lines the sanitizer rewrote) and a missing final newline, so an encoding fault in the user's file is still visible in the bundle |
 | PII pseudonymized by default | IPs (v4+v6), MACs, emails, this host's names, the invoking user, child/mirrored node hostnames and stream destinations are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
 | Caps cannot expose secrets | all caps cut at LINE boundaries, so a secret can never straddle the cut and dodge the line-based sanitizer; a capped tail with no line break at all is withheld entirely; sanitizer failures withhold the file content (fail closed) |
 | Legible to humans AND AI agents | triage-ordered numbered directories; sanitized file copies have no injected provenance headers; provenance headers only on command captures; `MANIFEST.json` indexes every file with safe origin + sanitization state; `summary.txt` opens with a triage read-order |
@@ -272,23 +272,22 @@ Redaction must not silently rewrite the bytes of a collected file, because the
 encoding *is* sometimes the bug (a BOM in `stream.conf`, a config saved with
 CRLF, a truncated file with no final newline).
 
-Preserved through sanitization on both platforms: the byte-order mark (restored
-byte-for-byte); each line's own terminator — CRLF, bare CR or LF — **including
-on lines the sanitizer rewrote**, which previously lost the CR; and the absence
-of a final newline. UTF-16/32 bodies are still withheld whole, since they carry
-NUL bytes.
+Preserved through sanitization on both platforms: the byte-order mark; each
+line's own terminator — CRLF, bare CR or LF — **including on lines the sanitizer
+rewrote**, which previously lost the CR; and the absence of a final newline.
+UTF-16/32 bodies are still withheld whole, since they carry NUL bytes. On
+Windows a source that is not valid UTF-8 round-trips through ISO-8859-1, so a
+Latin-1 config is not corrupted into U+FFFD.
 
-Reported so a fault is legible without a hex dump: `MANIFEST.json` carries a
-`source_encoding` object per **copied file** (`bom`, `lf`, `crlf`, `cr`,
-`final_newline`, `non_ascii_bytes`, `utf8_valid`), and `summary.txt` lists only
-the files with something notable. Command and API captures get no record —
-those bytes are the tool's own, so they would describe this script, not a source
-file.
+Two encodings need special handling by the POSIX sanitizer, and both are
+covered by `--selftest` vectors:
 
-A BOM used to shift every `^`-anchored rule, so a BOM-prefixed `[<API_KEY>]`
-header did **not** match the section rule and shipped verbatim. The BOM is now
-stripped for the redaction pass and restored afterwards; both selftests carry
-the regression test.
+- a **BOM** used to shift every `^`-anchored rule, so a BOM-prefixed
+  `[<API_KEY>]` header did not match the section rule and shipped verbatim. The
+  BOM is stripped for the redaction pass and restored afterwards.
+- a **CR-only** file is a single record to awk, so only its first key was ever
+  examined and later secrets shipped unredacted. It is translated to LF for the
+  pass and translated back.
 
 ## Redaction philosophy
 
@@ -419,9 +418,9 @@ by these scripts.
    per-command timeout.
 4. If the item can contain credentials or PII of a NEW shape, extend the sanitizer
    in **both** scripts and add the pattern to the Sanitization section above.
-   If the item is a COPIED file, it must go through `collect_file` / `Save-File`
-   so its bytes and its `source_encoding` record are preserved; do not add a
-   collector that reads a user file and writes it out itself.
+   A COPIED file must go through `collect_file` / `Save-File` so its bytes are
+   preserved; do not add a collector that reads a user file and writes it out
+   itself.
 5. Mirror the change in the other script (`.sh` ↔ `.ps1`) or record explicitly
    in your PR why it is platform-specific.
 6. Test the redaction: add a vector to the built-in regression suite and run
@@ -437,9 +436,9 @@ by these scripts.
 
 - Schema id: `netdata-support-bundle/v1` (in `MANIFEST.json`). Bump the suffix on
   breaking layout changes; downstream ticket tooling may parse it. The
-  `09-permissions/` section, the per-file `source_encoding` object and the
-  top-level `streaming_api_key_redacted` flag were added in tool version 1.1.0
-  and are purely additive, so the schema id is unchanged.
+  `09-permissions/` section and the top-level `streaming_api_key_redacted` flag
+  were added in tool version 1.1.0 and are purely additive, so the schema id is
+  unchanged.
 - Command captures are `.txt` files starting with a
   `# netdata-support-bundle v<version> | command: ... | captured: <utc>` header; on POSIX
   they also end with an `# exit: N | duration: Ns` trailer. PowerShell command

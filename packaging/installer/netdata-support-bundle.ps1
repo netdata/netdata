@@ -63,11 +63,6 @@ $script:Ip6Count = 0
 $script:FqdnCount = 0
 $script:DomainCount = 0
 $script:SeededHosts = @() # child/mirrored hostnames pre-seeded from the local API
-# encoding facts of the file most recently sanitized; consumed by Add-Manifest.
-# EncNotes keeps only the ANOMALIES, which summary.txt surfaces.
-$script:EncJson = $null
-$script:EncNote = ''
-$script:EncNotes = New-Object System.Collections.ArrayList
 # byte-exact encoding preservation reads the whole file into one string; the
 # Windows perflib dump can be tens of MB, where fidelity is irrelevant (we
 # generated it) and the memory cost is not. Above this, use the line path.
@@ -150,6 +145,12 @@ function Test-DiagnosticKey([string]$key) {
         if ($k -eq $w -or $k.EndsWith(" $w")) { return $true }
     }
     return $false
+}
+
+function Test-KeyExempt([string]$key) {
+    # the two reasons a key that LOOKS secret is left alone: it names or
+    # describes a secret rather than holding one, or it is the streaming api key
+    return ((Test-DiagnosticKey $key) -or (Test-StreamingApiKey $key))
 }
 
 function Test-StreamingApiKey([string]$key) {
@@ -336,74 +337,40 @@ function Invoke-SanitizeLine([string]$line, [bool]$secretScan = $true, [string]$
 }
 
 function Get-FileEncodingFacts([string]$path) {
-    # Large GENERATED captures (the Windows perflib dump, tens of MB) have no
-    # source encoding worth reporting, and a per-byte scan over them would eat
-    # the global deadline. Probe a prefix for NUL only and let the caller take
-    # the line-based path.
+    # What the sanitizer must preserve: where the BOM ends, whether the body is
+    # valid UTF-8 (which decides the round-trip encoding), and whether it holds
+    # a NUL. The old ReadAllLines/WriteAllLines pair normalized the BOM and the
+    # line endings away silently - netdata/netdata#23448.
     $len = (Get-Item $path -Force).Length
     if ($len -gt $script:ByteExactMax) {
-        $probeLen = [Math]::Min($len, 1MB)
+        # a large GENERATED capture (the perflib dump): scanning tens of MB in a
+        # scalar loop would eat the global deadline, so probe a prefix for NUL
+        # only and let the caller take the line-based path
+        $probeLen = [int][Math]::Min($len, 1MB)
         $probe = New-Object byte[] $probeLen
         $fs = [System.IO.File]::OpenRead($path)
         try { [void]$fs.Read($probe, 0, $probeLen) } finally { $fs.Close() }
-        $hasNul = $false
-        for ($i = 0; $i -lt $probeLen; $i++) { if ($probe[$i] -eq 0) { $hasNul = $true; break } }
-        return [pscustomobject]@{ size = $len; bomLen = 0; nul = $hasNul; notes = @(); json = $null }
+        return [pscustomobject]@{
+            size = $len; bomLen = 0; utf8Valid = $true
+            nul = ([Array]::IndexOf($probe, [byte]0) -ge 0)
+        }
     }
-    # Record the encoding of a collected file BEFORE redaction touches it, so
-    # support can tell a genuine source-file encoding fault (a BOM, mixed line
-    # endings, a missing final newline) from an artifact of this tool. The old
-    # ReadAllLines/WriteAllLines pair normalized every one of these away
-    # silently - netdata/netdata#23448.
     $bytes = [System.IO.File]::ReadAllBytes($path)
-    $bom = 'none'; $bomLen = 0
-    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
-        $bom = 'utf-8'; $bomLen = 3
-    } elseif ($bytes.Length -ge 4 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and $bytes[2] -eq 0 -and $bytes[3] -eq 0) {
-        $bom = 'utf-32le'; $bomLen = 4
-    } elseif ($bytes.Length -ge 4 -and $bytes[0] -eq 0 -and $bytes[1] -eq 0 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) {
-        $bom = 'utf-32be'; $bomLen = 4
-    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
-        $bom = 'utf-16le'; $bomLen = 2
-    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
-        $bom = 'utf-16be'; $bomLen = 2
-    }
-    $lf = 0; $crlf = 0; $crAll = 0; $nonAscii = 0; $nul = $false
-    for ($i = $bomLen; $i -lt $bytes.Length; $i++) {
-        $b = $bytes[$i]
-        if ($b -eq 0) { $nul = $true }
-        elseif ($b -eq 10) { if ($i -gt $bomLen -and $bytes[$i - 1] -eq 13) { $crlf++ } else { $lf++ } }
-        elseif ($b -eq 13) { $crAll++ }
-        if ($b -gt 127) { $nonAscii++ }
-    }
-    $cr = $crAll - $crlf; if ($cr -lt 0) { $cr = 0 }
-    # CR is a line terminator too: a CR-terminated file is not missing its
-    # final newline
-    $finalNewline = ($bytes.Length -gt $bomLen -and
-                     ($bytes[$bytes.Length - 1] -eq 10 -or $bytes[$bytes.Length - 1] -eq 13))
+    $bomLen = 0
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { $bomLen = 3 }
+    elseif ($bytes.Length -ge 4 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and $bytes[2] -eq 0 -and $bytes[3] -eq 0) { $bomLen = 4 }
+    elseif ($bytes.Length -ge 4 -and $bytes[0] -eq 0 -and $bytes[1] -eq 0 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) { $bomLen = 4 }
+    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) { $bomLen = 2 }
+    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) { $bomLen = 2 }
     # a strict decoder is the cheapest UTF-8 validator available here
     $utf8Valid = $true
     try {
         $strict = New-Object System.Text.UTF8Encoding($false, $true)
         [void]$strict.GetString($bytes, $bomLen, $bytes.Length - $bomLen)
     } catch { $utf8Valid = $false }
-    $notes = @()
-    if ($bom -ne 'none') { $notes += "$bom-BOM" }
-    if ($cr -gt 0) { $notes += "CR-only-line-endings($cr)" }
-    if ($crlf -gt 0 -and $lf -gt 0) { $notes += "mixed-line-endings(lf=$lf,crlf=$crlf)" }
-    if (-not $finalNewline -and $bytes.Length -gt 0) { $notes += 'no-final-newline' }
-    if (-not $utf8Valid) { $notes += 'invalid-UTF-8' }
     return [pscustomobject]@{
-        size  = $bytes.Length
-        bomLen = $bomLen
-        nul   = $nul
-        notes = $notes
-        json  = [ordered]@{
-            bom = $bom; lf = $lf; crlf = $crlf; cr = $cr
-            final_newline = [bool]$finalNewline
-            # the scan starts past the BOM, so its bytes are already excluded
-            non_ascii_bytes = $nonAscii; utf8_valid = [bool]$utf8Valid
-        }
+        size = $bytes.Length; bomLen = $bomLen; utf8Valid = $utf8Valid
+        nul = ([Array]::IndexOf($bytes, [byte]0) -ge 0)
     }
 }
 
@@ -433,7 +400,6 @@ function Convert-SanitizedText([string[]]$lines, [bool]$secretScan = $true, [str
 
 function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$ctx = '') {
     if (-not (Test-Path $path)) { return }
-    $script:EncJson = $null
     $facts = Get-FileEncodingFacts $path
     if ($facts.nul) {
         # a NUL means binary/UTF-16: line-based redaction would be byte-unsafe
@@ -447,17 +413,6 @@ function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$
         [System.IO.File]::WriteAllLines($path, $out, $script:Utf8NoBom)
         return
     }
-    $script:EncJson = $facts.json
-    # Staged for Add-Manifest to commit, NOT recorded here: only COPIED files have
-    # a source encoding worth reporting. A command capture's line endings are this
-    # tool's own artifact (the provenance header is CRLF-joined), so recording
-    # them would fill the report with noise that looks like user-file faults.
-    $script:EncNote = ''
-    if ($facts.notes.Count -gt 0) {
-        $encRel = $path
-        if ($path.StartsWith($Work)) { $encRel = $path.Substring($Work.Length).TrimStart('\', '/').Replace('\', '/') }
-        $script:EncNote = "{0}`t{1}" -f $encRel, ($facts.notes -join ' ')
-    }
     # byte-exact path: keep the BOM bytes, keep every line's OWN terminator, and
     # never invent a final newline the source did not have
     $bytes = [System.IO.File]::ReadAllBytes($path)
@@ -466,7 +421,7 @@ function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$
     # username must not be reduced to Latin-1 mojibake - the replacement would
     # miss it and the real value would ship. ISO-8859-1 is only the fallback for
     # sources that are not valid UTF-8, where it is the byte-preserving choice.
-    $enc = if ($facts.json.utf8_valid) { $script:Utf8NoBom } else { $script:BytePreserving }
+    $enc = if ($facts.utf8Valid) { $script:Utf8NoBom } else { $script:BytePreserving }
     $text = $enc.GetString($bytes, $facts.bomLen, $bytes.Length - $facts.bomLen)
     $sb = New-Object System.Text.StringBuilder
     $inPem = $false
@@ -554,44 +509,27 @@ if ($SelfTest) {
         # 09-permissions ACL output: the machine's own AD domain is a corporate
         # identifier, built-in authorities are not
         @{ in = 'BUILTIN\Administrators and TESTDOM\svc_netdata have Modify';       mustNot = @('TESTDOM');             must = @('redacted-domain', 'BUILTIN\Administrators') }
-    )
-    $fails = 0
-    foreach ($v in $vectors) {
-        $result = Invoke-SanitizeLine $v.in
-        $ok = $true
-        foreach ($p in $v.mustNot) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $ok = $false } }
-        foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
-        if ($ok) { Write-Output "ok:   $result" } else { Write-Output "FAIL: '$($v.in)' -> '$result'"; $fails++ }
-    }
-    # --- stream.conf context (netdata/netdata#23448): the STREAMING api key is
-    # --- kept verbatim, while every other secret in the same file is redacted
-    $streamVectors = @(
-        @{ in = '    api key = 11111111-2222-3333-4444-555555555555';       mustNot = @('REDACTED'); must = @('api key = 11111111-2222-3333-4444-555555555555') }
-        @{ in = '    proxy api key = 99999999-8888-7777-6666-555555555555'; mustNot = @('REDACTED'); must = @('proxy api key = 99999999-8888-7777-6666-555555555555') }
-        @{ in = '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]';                   mustNot = @('REDACTED'); must = @('[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]') }
-        # a NON-api-key secret in the same file is still redacted
-        @{ in = '    password = SENTINEL-STREAM-PW';                        mustNot = @('SENTINEL'); must = @('[REDACTED]') }
+        # stream.conf context (netdata/netdata#23448): the STREAMING api key is
+        # kept verbatim, while every other secret in the same file is redacted
+        @{ ctx = 'stream'; in = '    api key = 11111111-2222-3333-4444-555555555555';       mustNot = @('REDACTED'); must = @('api key = 11111111-2222-3333-4444-555555555555') }
+        @{ ctx = 'stream'; in = '    proxy api key = 99999999-8888-7777-6666-555555555555'; mustNot = @('REDACTED'); must = @('proxy api key = 99999999-8888-7777-6666-555555555555') }
+        @{ ctx = 'stream'; in = '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]';                   mustNot = @('REDACTED'); must = @('[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]') }
+        @{ ctx = 'stream'; in = '    password = SENTINEL-STREAM-PW';                        mustNot = @('SENTINEL'); must = @('[REDACTED]') }
         # PII obfuscation is NOT disabled by the stream context
-        @{ in = '    destination = parent.example.internal:19999';          mustNot = @('parent.example'); must = @('private-host') }
-    )
-    foreach ($v in $streamVectors) {
-        $result = Invoke-SanitizeLine $v.in $true 'stream'
-        $ok = $true
-        foreach ($p in $v.mustNot) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $ok = $false } }
-        foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
-        if ($ok) { Write-Output "ok:   [stream] $result" } else { Write-Output "FAIL: [stream] '$($v.in)' -> '$result'"; $fails++ }
-    }
-    # the SAME lines WITHOUT the stream context must still be redacted
-    $noStreamVectors = @(
+        @{ ctx = 'stream'; in = '    destination = parent.example.internal:19999';          mustNot = @('parent.example'); must = @('private-host') }
+        # the SAME lines with NO context must still be redacted
         @{ in = '    api key = 11111111-2222-3333-4444-555555555555'; mustNot = @('11111111'); must = @('[REDACTED]') }
         @{ in = '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]';             mustNot = @('aaaaaaaa'); must = @('[REDACTED-KEY-SECTION]') }
     )
-    foreach ($v in $noStreamVectors) {
-        $result = Invoke-SanitizeLine $v.in
+    $fails = 0
+    foreach ($v in $vectors) {
+        $ctx = if ($v.ContainsKey('ctx')) { [string]$v.ctx } else { '' }
+        $label = if ($ctx) { "[$ctx] " } else { '' }
+        $result = Invoke-SanitizeLine $v.in $true $ctx
         $ok = $true
         foreach ($p in $v.mustNot) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $ok = $false } }
         foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
-        if ($ok) { Write-Output "ok:   [no-ctx] $result" } else { Write-Output "FAIL (leak): [no-ctx] '$($v.in)' -> '$result'"; $fails++ }
+        if ($ok) { Write-Output "ok:   $label$result" } else { Write-Output "FAIL: $label'$($v.in)' -> '$result'"; $fails++ }
     }
 
     # --- encoding fidelity (netdata/netdata#23448): a BOM, CRLF endings and a
@@ -613,7 +551,6 @@ if ($SelfTest) {
     if ($encStr.IndexOf('SENTINEL-ENC') -ge 0) { $encFails += 'a secret survived in the encoding vector' }
     if (@([regex]::Matches($encStr, "`r`n")).Count -lt 2) { $encFails += 'CRLF line endings were lost (including on the redacted line)' }
     if ($encOut[$encOut.Length - 1] -eq 10) { $encFails += 'a final newline was added to a source that had none' }
-    if ($null -eq $script:EncJson -or $script:EncJson['bom'] -ne 'utf-8') { $encFails += 'source_encoding did not record the BOM' }
     if ($encFails.Count -gt 0) { foreach ($e in $encFails) { Write-Output "FAIL: $e"; $fails++ } }
     else { Write-Output 'ok:   encoding preserved (BOM + CRLF + no trailing newline) and the BOM did not defeat redaction' }
 
@@ -642,23 +579,10 @@ function Add-Manifest([string]$rel, [string]$kind, [string]$origin, [string]$tit
     $full = Join-Path $Work $rel
     $bytes = 0
     if (Test-Path $full) { $bytes = (Get-Item $full).Length }
-    # source_encoding is recorded for COPIED files only: for command/API captures
-    # the bytes are ours, so the facts would describe this tool, not a source
-    # file. For a capped file it describes the retained tail (see origin).
-    $enc = $script:EncJson
-    $script:EncJson = $null
-    $encNote = $script:EncNote
-    $script:EncNote = ''
-    if ($kind -eq 'file') {
-        if ($encNote) { [void]$script:EncNotes.Add($encNote) }
-    } else {
-        $enc = $null
-    }
     $row = [ordered]@{
         path = $rel.Replace('\', '/'); kind = $kind; origin = $origin; title = $title
         bytes = [long]$bytes; pii_obfuscated = [bool]$Obfuscate
     }
-    if ($enc) { $row['source_encoding'] = $enc }
     [void]$script:ManifestRows.Add($row)
 }
 
@@ -717,7 +641,6 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     # raise the floor; without it the job is killed and its WHOLE output is
     # replaced by "TIMEOUT after Ns", losing everything it had already gathered
     $timeout = if ($timeoutFloor -gt 0) { [Math]::Max($TimeoutSeconds, $timeoutFloor) } else { $TimeoutSeconds }
-    $script:EncJson = $null
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
@@ -754,7 +677,6 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     # like Save-Cmd but with NO header/trailer, for commands whose output must
     # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
     # removed if the command produced nothing.
-    $script:EncJson = $null
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
@@ -786,7 +708,6 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
 }
 
 function Save-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
-    $script:EncJson = $null
     if (Test-Deadline) { return }
     if ($cap -eq 0) { $cap = $FileCap }
     if (-not (Test-Path $src -PathType Leaf)) { return }
@@ -837,7 +758,6 @@ function Save-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
 $NdPort = 19999
 $CloudHost = 'app.netdata.cloud'   # reachability probe target
 function Save-Api([string]$rel, [string]$title, [string]$urlPath) {
-    $script:EncJson = $null
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
@@ -1236,14 +1156,6 @@ $StreamNote = ''
 if (Test-Path (Join-Path $Work '04-config\stream.conf')) {
     $StreamNote = 'streaming key:    PRESENT VERBATIM in 04-config\stream.conf (by design - see README.md)'
 }
-$EncNote = ''
-if ($script:EncNotes.Count -gt 0) {
-    $EncNote = "SOURCE FILES WITH NOTABLE ENCODING (preserved as-is in this bundle):`r`n" + ((
-        $script:EncNotes | Sort-Object -Unique | Select-Object -First 40 | ForEach-Object {
-            $parts = $_ -split "`t"
-            '  {0}: {1}' -f $parts[0], $parts[1]
-        }) -join "`r`n")
-}
 
 $summary = @"
 NETDATA SUPPORT BUNDLE SUMMARY
@@ -1258,7 +1170,7 @@ service status:   $(if ($NetdataSvc) { $NetdataSvc.Status } else { 'NOT INSTALLE
 agent process:    $(if ($NetdataProc) { "yes (pid $($NetdataProc.Id))" } else { 'NOT RUNNING' })
 agent api:        $(if ($ApiOk) { 'reachable' } else { 'UNREACHABLE' })
 $(if ($CrashHint) { "last exit reason: $CrashHint   <-- check 06-state\status-file.json" })
-$EncNote
+
 READ ORDER FOR TRIAGE:
   crashes/won't start -> 06-state\status-file.json, 05-logs\eventlog-netdata.txt
   collector issues    -> 04-config\go.d*, 05-logs\, 09-permissions\plugins-d.txt
@@ -1287,9 +1199,8 @@ mask it before sending the bundle. The same key IS still redacted where it
 appears in the Access event-log channel.
 
 Collected files keep their original bytes: a byte-order mark, CRLF or CR line
-endings and a missing final newline all survive redaction, so encoding faults
-stay visible. What was observed is recorded per file under ``source_encoding`` in
-MANIFEST.json, and anything notable is listed in summary.txt.
+endings and a missing final newline all survive redaction, so an encoding fault
+in a config file is still visible here.
 
 Layout matches the POSIX bundle (see MANIFEST.json for every file):
 01-system, 02-install, 03-process, 04-config, 05-logs (Windows Event Log:
@@ -1315,8 +1226,7 @@ $manifest = [ordered]@{
     is_container = $false
     files = $script:ManifestRows
 }
-# depth 6: manifest -> files -> row -> source_encoding must all survive
-Write-Utf8 (Join-Path $Work 'MANIFEST.json') (($manifest | ConvertTo-Json -Depth 6) + "`n")
+Write-Utf8 (Join-Path $Work 'MANIFEST.json') (($manifest | ConvertTo-Json -Depth 4) + "`n")
 
 # ============================================================================
 # zip
