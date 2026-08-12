@@ -13,10 +13,8 @@ import (
 )
 
 const (
-	osdPageSize            = 100
-	maxOSDInventoryRecords = 100000
-	entityAbsenceGrace     = time.Minute
-	hdrAcceptVersionV11    = "application/vnd.ceph.api.v1.1+json"
+	entityAbsenceGrace  = time.Minute
+	hdrAcceptVersionV11 = "application/vnd.ceph.api.v1.1+json"
 )
 
 type osdMetricSample struct {
@@ -108,9 +106,6 @@ func (c *Collector) fetchAllOSDs(ctx context.Context) ([]apiOsdResponse, error) 
 		if err := c.apiClient.getJSON(ctx, "list legacy OSDs", urlPathApiOsd, hdrAcceptVersion, nil, &osds); err != nil {
 			return nil, err
 		}
-		if len(osds) > maxOSDInventoryRecords {
-			return nil, fmt.Errorf("list legacy OSDs exceeds the record limit of %d", maxOSDInventoryRecords)
-		}
 		return osds, nil
 	}
 
@@ -118,9 +113,6 @@ func (c *Collector) fetchAllOSDs(ctx context.Context) ([]apiOsdResponse, error) 
 	total, err := strconv.Atoi(rawTotal)
 	if err != nil || total < 0 {
 		return nil, fmt.Errorf("list OSDs returned invalid X-Total-Count")
-	}
-	if total > maxOSDInventoryRecords {
-		return nil, fmt.Errorf("list OSDs exceeds the record limit of %d", maxOSDInventoryRecords)
 	}
 	if len(osds) != total {
 		return nil, fmt.Errorf("list OSDs returned %d entries but advertised %d", len(osds), total)

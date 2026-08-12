@@ -10,17 +10,11 @@ import (
 	"strings"
 )
 
-const maxHealthSectionRecords = 100000
-
 func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) error {
 	var resp apiHealthMinimalResponse
 	if err := c.apiClient.getJSON(ctx, "get minimal health", urlPathApiHealthMinimal, hdrAcceptVersion, nil, &resp); err != nil {
 		return err
 	}
-	if err := validateHealthResponseRecordLimits(resp); err != nil {
-		return err
-	}
-
 	var errs []error
 	missing := func(feature, section string) {
 		errs = append(
@@ -225,46 +219,6 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 	}
 
 	return errors.Join(errs...)
-}
-
-func validateHealthResponseRecordLimits(resp apiHealthMinimalResponse) error {
-	check := func(section string, count int) error {
-		if count > maxHealthSectionRecords {
-			return fmt.Errorf(
-				"minimal health response section %q exceeds the record limit of %d",
-				section,
-				maxHealthSectionRecords,
-			)
-		}
-		return nil
-	}
-
-	if resp.MonStatus != nil {
-		if err := check("mon_status.monmap.mons", len(resp.MonStatus.MonMap.Mons)); err != nil {
-			return err
-		}
-	}
-	if resp.OsdMap != nil {
-		if err := check("osd_map.osds", len(resp.OsdMap.Osds)); err != nil {
-			return err
-		}
-	}
-	if resp.Pools != nil {
-		if err := check("pools", len(*resp.Pools)); err != nil {
-			return err
-		}
-	}
-	if resp.MgrMap != nil {
-		if err := check("mgr_map.standbys", len(resp.MgrMap.Standbys)); err != nil {
-			return err
-		}
-	}
-	if resp.PgInfo != nil {
-		if err := check("pg_info.statuses", len(resp.PgInfo.Statuses)); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func scaledNonnegativeValues(values ...float64) ([]int64, error) {

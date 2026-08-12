@@ -833,44 +833,6 @@ func TestCollector_PoolAvailableIsNotReducedTwice(t *testing.T) {
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
-func TestCollector_PoolInventoryRejectsExcessiveRecordCount(t *testing.T) {
-	const records = 100001
-	response := "[" + strings.Repeat("{},", records-1) + "{}]"
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiPool {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		_, _ = io.WriteString(w, response)
-	})
-	defer srv.Close()
-
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-	requireClusterIdentity(t, c)
-	err := c.collectPools(context.Background(), make(map[string]int64))
-	require.ErrorContains(t, err, "record limit")
-}
-
-func TestCollector_HealthRejectsExcessiveSectionRecordCount(t *testing.T) {
-	const records = 100001
-	response := `{"pools":[` + strings.Repeat("{},", records-1) + "{}]}"
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiHealthMinimal {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		_, _ = io.WriteString(w, response)
-	})
-	defer srv.Close()
-
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-	requireClusterIdentity(t, c)
-	err := c.collectHealth(context.Background(), make(map[string]int64))
-	require.ErrorContains(t, err, "record limit")
-}
-
 func TestCollector_DynamicEntityAbsenceGrace(t *testing.T) {
 	c := New()
 	c.identityMu.Lock()

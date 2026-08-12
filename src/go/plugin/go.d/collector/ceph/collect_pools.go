@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-const maxPoolInventoryRecords = 100000
-
 type poolMetricSample struct {
 	key          string
 	objects      int64
@@ -33,10 +31,6 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 		}, &pools); err != nil {
 		return err
 	}
-	if len(pools) > maxPoolInventoryRecords {
-		return fmt.Errorf("list pool statistics exceeds the record limit of %d", maxPoolInventoryRecords)
-	}
-
 	sort.SliceStable(pools, func(i, j int) bool { return pools[i].PoolName < pools[j].PoolName })
 	seenPoolNames := make(map[string]bool)
 	for _, pool := range pools {
