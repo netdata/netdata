@@ -231,7 +231,10 @@ For thread N:
    ```
    `<comment-id>` is the `databaseId` of the FIRST comment in the thread
    (from `review-threads.json` -> `.[].comments.nodes[0].databaseId`).
-6. **Resolve the thread immediately after the reply succeeds.**
+6. **Resolve the thread immediately after the reply succeeds.** "Succeeds"
+   means you saw `posted reply id=...`. Resolving a thread whose reply failed
+   hides it from the needs-attention view with nothing written in it, which
+   reads to a human as a silently dismissed review.
    ```
    bash .agents/skills/pr-reviews/scripts/resolve-thread.sh <thread-id>
    ```
@@ -519,6 +522,8 @@ If a new AI reviewer appears in the project, classify it by adding to
 | `fetch-all.sh` returns suspiciously round counts       | Pagination missed pages. Re-run; fetch-all auto-probes when count is a multiple of 100. |
 | A GraphQL helper script fails with `cursor_args[@]: unbound variable` | macOS Bash 3.2 plus `set -u` treats empty array expansion as unbound. Keep `gh api` argument arrays non-empty before expansion or branch the first-page GraphQL call. This affected both `fetch-all.sh` and `wait-for-activity.sh`. |
 | `reply-thread.sh` -> 404                               | Wrong comment id (use `databaseId` from `review-threads.json`, not the GraphQL node id). |
+| `reply-thread.sh` -> `line N: 2: usage`, yet the thread ends up resolved | The comment id expanded to empty AND the resolve ran anyway. Never chain reply and resolve so that resolve can run after reply fails: run `reply-thread.sh`, confirm it printed `posted reply id=...`, THEN resolve. See the bash-vs-zsh note below. |
+| An associative-array lookup (`${MAP[key]}`) is empty in a helper loop | The interactive shell here is zsh, not bash. `declare -A` plus `${MAP[key]}` does not behave the same, so ids silently expand to nothing. Pass literal ids, or drive the loop from `python3` output one line at a time, rather than building a shell map. |
 | `resolve-thread.sh` -> "thread not found"              | Used REST id instead of GraphQL node id.                              |
 | `trigger-copilot.sh` succeeds but no new review        | Expected. The org has no Copilot review credits, which is why it is not in the loop. Do not wait on it. |
 | `trigger-cubic.sh` succeeds but no new review          | cubic ignores comments without an explicit `@cubic-dev-ai` mention. The script always prepends it. |
