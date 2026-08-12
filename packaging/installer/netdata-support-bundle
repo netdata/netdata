@@ -94,7 +94,7 @@ ERRORS="$STAGING/errors.txt"; : > "$ERRORS"
 # encoding facts of the file most recently sanitized; consumed by manifest_add.
 # ENC_NOTES accumulates only the ANOMALIES, which summary.txt surfaces.
 ENC_NOTES="$STAGING/encoding.notes"; : > "$ENC_NOTES"
-ENC_JSON=""; ENC_NOTE=""; ENC_BOM=none; ENC_BOM_BYTES=0; ENC_FINAL=true
+ENC_JSON=""; ENC_NOTE=""; ENC_BOM=none; ENC_BOM_BYTES=0; ENC_FINAL=true; ENC_CRONLY=0
 
 cleanup() { [ "$KEEP_STAGING" = "1" ] || rm -rf "$STAGING"; }
 trap cleanup EXIT
@@ -178,7 +178,7 @@ case "$RUN_USER" in root|netdata|"") RUN_USER="" ;; *) : ;; esac
 # artifact of this tool. Redaction used to normalize these away silently.
 encoding_probe() {
   _ef="$1"; _erel="${_ef#"$WORK"/}"
-  ENC_BOM=none; ENC_BOM_BYTES=0; ENC_FINAL=true; ENC_JSON=""
+  ENC_BOM=none; ENC_BOM_BYTES=0; ENC_FINAL=true; ENC_CRONLY=0; ENC_JSON=""
   _esize=$(wc -c < "$_ef" 2>/dev/null | tr -d ' ')
   _ehex=$(head -c 4 "$_ef" 2>/dev/null | od -An -tx1 2>/dev/null | tr -d ' \n')
   case "$_ehex" in
@@ -196,7 +196,16 @@ encoding_probe() {
   [ -n "${_ecrlf:-}" ] || _ecrlf=0
   _ebarecr=$((_ecr - _ecrlf)); [ "$_ebarecr" -lt 0 ] && _ebarecr=0
   _ebarelf=$((_elf - _ecrlf)); [ "$_ebarelf" -lt 0 ] && _ebarelf=0
-  [ "$(tail -c 1 "$_ef" 2>/dev/null | wc -l | tr -d ' ')" = "1" ] || ENC_FINAL=false
+  # CR is a line terminator too: a CR-terminated file is NOT missing its final
+  # newline, and sanitize_file relies on this to avoid eating that last byte
+  case "$(tail -c 1 "$_ef" 2>/dev/null | od -An -tx1 | tr -d ' \n')" in
+    0a|0d) ENC_FINAL=true ;;
+    *) ENC_FINAL=false ;;
+  esac
+  # CR-only (classic Mac) endings make the whole file ONE awk record, so only its
+  # first key would ever be examined - sanitize_file translates for the pass
+  ENC_CRONLY=0
+  [ "$_ebarecr" -gt 0 ] && [ "$_elf" -eq 0 ] && ENC_CRONLY=1
   # exclude the BOM's own bytes: it is reported separately, and counting it here
   # would make a pure-ASCII file look like it carried non-ASCII content
   _enonascii=$(LC_ALL=C tr -d '\000-\177' < "$_ef" 2>/dev/null | wc -c | tr -d ' ')
@@ -246,6 +255,13 @@ sanitize_file() {
   _sanin="$_f"
   if [ "$ENC_BOM_BYTES" -gt 0 ]; then
     if tail -c "+$((ENC_BOM_BYTES + 1))" "$_f" > "$_f.nobom" 2>>"$ERRORS"; then _sanin="$_f.nobom"; fi
+  fi
+  # A CR-only file is a single record to awk, so every rule would see one giant
+  # line and only its FIRST key would be examined - later secrets would ship
+  # unredacted. Translate CR to LF for the pass and translate back after, which
+  # redacts correctly and still reproduces the original bytes.
+  if [ "$ENC_CRONLY" = "1" ]; then
+    if LC_ALL=C tr '\r' '\n' < "$_sanin" > "$_f.lf" 2>>"$ERRORS"; then _sanin="$_f.lf"; fi
   fi
   if awk -v ctx="$_ctx" -v obf="$OBFUSCATE" -v mapfile="$MAP_FILE" \
       -v host_short="$HOST_SHORT" -v host_fqdn="$HOST_FQDN" -v run_user="$RUN_USER" '
@@ -635,6 +651,9 @@ sanitize_file() {
     }
     print line cr;
   }' "$_sanin" > "$_f.san" 2>>"$ERRORS"; then
+    if [ "$ENC_CRONLY" = "1" ]; then
+      LC_ALL=C tr '\n' '\r' < "$_f.san" > "$_f.san2" 2>>"$ERRORS" && mv "$_f.san2" "$_f.san"
+    fi
     # restore the exact BOM bytes the source had, so an encoding fault in the
     # user's file is still visible in the bundle
     if [ "$_sanin" = "$_f.nobom" ]; then
@@ -652,10 +671,10 @@ sanitize_file() {
       fi
     fi
     mv "$_f.out" "$_f"
-    rm -f "$_f.san" "$_f.nobom" "$_f.out2"
+    rm -f "$_f.san" "$_f.nobom" "$_f.lf" "$_f.out2"
   else
     # fail CLOSED: never ship content the sanitizer could not process
-    rm -f "$_f.san" "$_f.nobom" "$_f.out" "$_f.out2"
+    rm -f "$_f.san" "$_f.san2" "$_f.nobom" "$_f.lf" "$_f.out" "$_f.out2"
     echo "[netdata-support-bundle] sanitization failed for this file - content withheld for safety" > "$_f"
     ENC_JSON=""
   fi
@@ -966,6 +985,18 @@ STREAMVEC
     *'"bom":"utf-8"'*) : ;;
     *) echo "FAIL: source_encoding did not record the BOM" >&2; _fails=$((_fails + 1)) ;;
   esac
+  # --- CR-only (classic Mac) endings: awk sees ONE record, so without the
+  # --- translation only the first key would be examined and later secrets
+  # --- would ship unredacted
+  _cf="$_tf.cronly"
+  printf '[stream]\r    enabled = yes\r    password = SENTINEL-CRONLY\r' > "$_cf"
+  sanitize_file "$_cf"
+  grep -q "SENTINEL-CRONLY" "$_cf" && \
+    { echo "FAIL (leak): secret in a CR-only file was not redacted" >&2; _fails=$((_fails + 1)); }
+  [ "$(LC_ALL=C tr -dc '\r' < "$_cf" | wc -c | tr -d ' ')" = "3" ] || \
+    { echo "FAIL: CR-only line endings were not reproduced" >&2; _fails=$((_fails + 1)); }
+  [ "$(LC_ALL=C tr -dc '\n' < "$_cf" | wc -c | tr -d ' ')" = "0" ] || \
+    { echo "FAIL: CR-only file gained LF terminators" >&2; _fails=$((_fails + 1)); }
 
   if [ "$_fails" -eq 0 ]; then
     echo "netdata-support-bundle selftest: ALL PASS"
@@ -1155,7 +1186,7 @@ if [ -n "$CONFDIR" ]; then
       /\.(pem|key)\$/ { next }
       { print }"'
   collect_file 04-config/netdata.conf "On-disk main config" "$CONFDIR/netdata.conf"
-  collect_file 04-config/stream.conf "Streaming config (parent/child; api key redacted)" "$CONFDIR/stream.conf"
+  collect_file 04-config/stream.conf "Streaming config (parent/child; the streaming api key is KEPT VERBATIM - see README.md)" "$CONFDIR/stream.conf"
   collect_file 04-config/exporting.conf "Exporting engine config (credentials redacted)" "$CONFDIR/exporting.conf"
   collect_file 04-config/go.d.conf "go.d orchestrator config (module enable/disable)" "$CONFDIR/go.d.conf"
   # every user-customized config, nested dirs included (go.d/sd/, go.d/ss/,
@@ -1373,10 +1404,14 @@ if [ -n "$CONFDIR" ] && [ -r "$CONFDIR/netdata.conf" ]; then
 fi
 PLUGINSD_DIRS="${PLUGINSD_DIRS# }"
 
-collect_cmd 09-permissions/plugins-d.txt "plugins.d: modes, ownership, setuid/setgid bits, file CAPABILITIES and the parent directory chain (lost capabilities are a top cause of a plugin collecting nothing)" sh -c '
-  dirs="'"$PLUGINSD_DIRS"'"
-  if [ -z "$dirs" ]; then echo "(no plugins.d directory found on this host)"; exit 0; fi
-  for d in $dirs; do
+# The directory list reaches the child as positional ARGUMENTS, never as text
+# spliced into the program: one of these paths can come from the [directories]
+# plugins value in netdata.conf, and a path containing a quote would otherwise
+# close the quoted program and run as shell code with the bundle's privileges.
+# shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
+collect_cmd 09-permissions/plugins-d.txt "plugins.d: modes, ownership, setuid/setgid bits and file CAPABILITIES (lost capabilities are a top cause of a plugin collecting nothing)" sh -c '
+  if [ "$#" -eq 0 ]; then echo "(no plugins.d directory found on this host)"; exit 0; fi
+  for d in "$@"; do
     echo "===== $d ====="
     ls -ld "$d" 2>/dev/null
     echo "-- contents --"
@@ -1395,7 +1430,7 @@ collect_cmd 09-permissions/plugins-d.txt "plugins.d: modes, ownership, setuid/se
     # on netdata installs is usually the security.capability xattr shown above,
     # NOT an ACL. ACLs for the directory itself are in netdata-paths.txt.
   done
-  true'
+  true' sh $PLUGINSD_DIRS
 
 # every netdata-owned path worth reporting permissions for; the cache dir stays
 # TOP-LEVEL only (recursing it would enumerate thousands of dbengine files)
@@ -1410,11 +1445,12 @@ for _p in "$CONFDIR" "$CONFDIR/netdata.conf" "$CONFDIR/stream.conf" "$CONFDIR/ss
 done
 _PERM_PATHS="${_PERM_PATHS# }"
 
+# paths reach the child as positional ARGUMENTS - see the note above
+# shellcheck disable=SC2086  # deliberate word-split of the discovered path list
 collect_cmd 09-permissions/netdata-paths.txt "Modes, ownership, extended attributes, security contexts (SELinux/AppArmor) and POSIX ACLs for netdata's directories, configs and binary" sh -c '
-  paths="'"$_PERM_PATHS"'"
-  if [ -z "$paths" ]; then echo "(no netdata paths found on this host)"; exit 0; fi
+  if [ "$#" -eq 0 ]; then echo "(no netdata paths found on this host)"; exit 0; fi
   has_selinux=0; [ -e /sys/fs/selinux ] && has_selinux=1
-  for p in $paths; do
+  for p in "$@"; do
     echo "===== $p ====="
     ls -ld "$p" 2>/dev/null
     stat -c "mode=%A(%a) owner=%U(%u) group=%G(%g) type=%F" "$p" 2>/dev/null \
@@ -1462,7 +1498,7 @@ collect_cmd 09-permissions/netdata-paths.txt "Modes, ownership, extended attribu
       echo "acl: (getfacl not available)"
     fi
   done
-  true'
+  true' sh $_PERM_PATHS
 
 # =============================================================================
 # summary + manifest + README

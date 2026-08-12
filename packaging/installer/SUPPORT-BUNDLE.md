@@ -214,8 +214,8 @@ Tools are feature-detected and a missing one is reported, not passed over.
 `getfattr` ships in the `attr` package, which is **not** installed by default on
 Debian/Ubuntu, so when it is absent the collector falls back to `getcap` (for
 `security.capability`) and `lsattr` (for ext file flags) — the attributes that
-actually break netdata — instead of reporting nothing. macOS uses
-`ls -l@`/`xattr`, FreeBSD uses `lsextattr`.
+actually break netdata — instead of reporting nothing. macOS uses `xattr -l`,
+FreeBSD uses `lsextattr`.
 
 ## What is NEVER collected
 

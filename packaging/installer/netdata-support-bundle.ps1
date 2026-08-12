@@ -77,6 +77,12 @@ function Show-Info([string]$msg) { Write-Host " [*] $msg" }
 
 # PS 5.1 Set-Content writes UTF-16LE by default; every bundle file must be UTF-8
 $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+# ISO-8859-1 maps bytes 0x00-0xFF one-to-one onto U+0000-U+00FF, so decoding and
+# re-encoding with it reproduces the ORIGINAL bytes exactly. The byte-exact
+# sanitize path uses it instead of UTF-8, whose replacement fallback would turn
+# every invalid sequence in a Latin-1 config into U+FFFD and corrupt the copy.
+# Every sanitizer pattern is ASCII, which this mapping leaves unchanged.
+$script:BytePreserving = [System.Text.Encoding]::GetEncoding(28591)
 function Write-Utf8([string]$path, [string]$text) {
     [System.IO.File]::WriteAllText($path, $text, $script:Utf8NoBom)
 }
@@ -330,6 +336,20 @@ function Invoke-SanitizeLine([string]$line, [bool]$secretScan = $true, [string]$
 }
 
 function Get-FileEncodingFacts([string]$path) {
+    # Large GENERATED captures (the Windows perflib dump, tens of MB) have no
+    # source encoding worth reporting, and a per-byte scan over them would eat
+    # the global deadline. Probe a prefix for NUL only and let the caller take
+    # the line-based path.
+    $len = (Get-Item $path -Force).Length
+    if ($len -gt $script:ByteExactMax) {
+        $probeLen = [Math]::Min($len, 1MB)
+        $probe = New-Object byte[] $probeLen
+        $fs = [System.IO.File]::OpenRead($path)
+        try { [void]$fs.Read($probe, 0, $probeLen) } finally { $fs.Close() }
+        $hasNul = $false
+        for ($i = 0; $i -lt $probeLen; $i++) { if ($probe[$i] -eq 0) { $hasNul = $true; break } }
+        return [pscustomobject]@{ size = $len; bomLen = 0; nul = $hasNul; notes = @(); json = $null }
+    }
     # Record the encoding of a collected file BEFORE redaction touches it, so
     # support can tell a genuine source-file encoding fault (a BOM, mixed line
     # endings, a missing final newline) from an artifact of this tool. The old
@@ -357,7 +377,10 @@ function Get-FileEncodingFacts([string]$path) {
         if ($b -gt 127) { $nonAscii++ }
     }
     $cr = $crAll - $crlf; if ($cr -lt 0) { $cr = 0 }
-    $finalNewline = ($bytes.Length -gt $bomLen -and $bytes[$bytes.Length - 1] -eq 10)
+    # CR is a line terminator too: a CR-terminated file is not missing its
+    # final newline
+    $finalNewline = ($bytes.Length -gt $bomLen -and
+                     ($bytes[$bytes.Length - 1] -eq 10 -or $bytes[$bytes.Length - 1] -eq 13))
     # a strict decoder is the cheapest UTF-8 validator available here
     $utf8Valid = $true
     try {
@@ -438,7 +461,7 @@ function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$
     # byte-exact path: keep the BOM bytes, keep every line's OWN terminator, and
     # never invent a final newline the source did not have
     $bytes = [System.IO.File]::ReadAllBytes($path)
-    $text = $script:Utf8NoBom.GetString($bytes, $facts.bomLen, $bytes.Length - $facts.bomLen)
+    $text = $script:BytePreserving.GetString($bytes, $facts.bomLen, $bytes.Length - $facts.bomLen)
     $sb = New-Object System.Text.StringBuilder
     $inPem = $false
     $pos = 0
@@ -467,7 +490,7 @@ function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true, [string]$
         }
         [void]$sb.Append((Invoke-SanitizeLine $lineText $secretScan $ctx)).Append($term)
     }
-    $body = $script:Utf8NoBom.GetBytes($sb.ToString())
+    $body = $script:BytePreserving.GetBytes($sb.ToString())
     if ($facts.bomLen -gt 0) {
         $outBytes = New-Object byte[] ($facts.bomLen + $body.Length)
         [System.Array]::Copy($bytes, 0, $outBytes, 0, $facts.bomLen)
@@ -680,10 +703,14 @@ function Invoke-NativeProcess([string]$exe, [string[]]$argList, [int]$timeoutSec
     return $r
 }
 
-function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @(), [long]$cap = 0) {
+function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @(), [long]$cap = 0, [int]$timeoutFloor = 0) {
     # $cap mirrors the POSIX "collect_cmd --cap": journal/event-log captures are
     # documented at 5 MiB while command output defaults to 2 MiB
     if ($cap -le 0) { $cap = 2MB }
+    # a capture that legitimately needs longer than the per-command default can
+    # raise the floor; without it the job is killed and its WHOLE output is
+    # replaced by "TIMEOUT after Ns", losing everything it had already gathered
+    $timeout = if ($timeoutFloor -gt 0) { [Math]::Max($TimeoutSeconds, $timeoutFloor) } else { $TimeoutSeconds }
     $script:EncJson = $null
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
@@ -692,16 +719,16 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     if ($nativeExe) {
         # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
         # Text file, so merge stdout+stderr like the old `2>&1`; never silent.
-        $np = Invoke-NativeProcess $nativeExe $nativeArgs $TimeoutSeconds
+        $np = Invoke-NativeProcess $nativeExe $nativeArgs $timeout
         if ($np.LaunchError) { $result = "ERROR: could not launch: $($np.LaunchError)" }
-        elseif ($np.TimedOut) { $result = "TIMEOUT after ${TimeoutSeconds}s" }
+        elseif ($np.TimedOut) { $result = "TIMEOUT after ${timeout}s" }
         elseif ($np.ExitCode -ne 0) { $result = "ERROR: exit $($np.ExitCode)`r`n$($np.StdErr)$($np.StdOut)" }
         else { $result = "$($np.StdOut)$($np.StdErr)" }
     } else {
         try {
             $job = Start-Job -ScriptBlock $cmd
-            $done = Wait-Job $job -Timeout $TimeoutSeconds
-            if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
+            $done = Wait-Job $job -Timeout $timeout
+            if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String } else { $result = "TIMEOUT after ${timeout}s" }
             Stop-Job $job -ErrorAction SilentlyContinue
             Remove-Job $job -Force
         } catch { $result = "ERROR: $_" }
@@ -917,7 +944,7 @@ if ($ApiOk) {
 if (Test-Path $ConfDir) {
     Save-Cmd '04-config\config-tree.txt' 'User config dir tree (files here = user-customized; ssl and key material excluded)' { Get-ChildItem $using:ConfDir -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '[\\/]ssl([\\/]|$)' -and $_.Extension -notin @('.pem', '.key') } | Select-Object -First 2000 | Format-Table Mode, LastWriteTime, Length, FullName -AutoSize } "Get-ChildItem $ConfDir -Recurse (ssl/key material excluded)"
     Save-File '04-config\netdata.conf' 'On-disk main config' (Join-Path $ConfDir 'netdata.conf')
-    Save-File '04-config\stream.conf' 'Streaming config (parent/child; api key redacted)' (Join-Path $ConfDir 'stream.conf')
+    Save-File '04-config\stream.conf' 'Streaming config (parent/child; the streaming api key is KEPT VERBATIM - see README.md)' (Join-Path $ConfDir 'stream.conf')
     Save-File '04-config\claim.conf' 'Cloud claim config (token redacted)' (Join-Path $ConfDir 'claim.conf')
     Save-File '04-config\go.d.conf' 'go.d orchestrator config' (Join-Path $ConfDir 'go.d.conf')
     # every user-customized collector/health config, keeping subdirectory
@@ -985,7 +1012,7 @@ Save-Cmd '05-logs\eventlog-netdata.txt' 'Netdata events from the Windows Event L
             '(no events in this window, or the channel does not exist on this system)'
         }
     }
-} "Get-WinEvent: Netdata/* ETW channels + NetdataWEL + Application (last ${SinceHours}h)" -cap $LogCap
+} "Get-WinEvent: Netdata/* ETW channels + NetdataWEL + Application (last ${SinceHours}h)" -cap $LogCap -timeoutFloor 30
 if (Test-Path $LogDir) {
     Get-ChildItem $LogDir -File -Filter '*.log' | ForEach-Object {
         Save-File "05-logs\$($_.Name)" "Agent log file: $($_.Name)" $_.FullName $LogCap
@@ -1128,7 +1155,7 @@ Save-Cmd '09-permissions\plugins-d.txt' 'plugins.d: ACLs, ownership, inheritance
     $d = $using:PluginsDir
     if (-not (Test-Path $d)) { "(plugins.d not found at $d)"; return }
     "===== $d ====="
-    Get-Acl $d | Format-List Owner, Group, Access, Sddl
+    Get-Acl $d | Format-List Owner, Group, Access
     '-- contents --'
     Get-ChildItem $d -Force -ErrorAction SilentlyContinue |
         Select-Object Mode, LastWriteTime, Length, Name | Format-Table -AutoSize
@@ -1171,7 +1198,6 @@ Save-Cmd '09-permissions\netdata-paths.txt' 'Ownership, ACLs, inheritance and in
             $acl.Access | ForEach-Object {
                 "    {0} {1} {2} (inherited={3})" -f $_.IdentityReference, $_.AccessControlType, $_.FileSystemRights, $_.IsInherited
             }
-            "sddl:  $($acl.Sddl)"
             if ($acl.AreAccessRulesProtected) { 'NOTE: ACL inheritance is DISABLED on this path' }
         } else {
             '(could not read the ACL - insufficient privilege?)'

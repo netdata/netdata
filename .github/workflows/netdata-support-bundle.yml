@@ -211,7 +211,7 @@ jobs:
               if (-not $elEntry) { throw 'the event log capture is missing' }
               $er = New-Object System.IO.StreamReader($elEntry.Open(), $utf8, $true)
               try { $eltext = $er.ReadToEnd() } finally { $er.Dispose() }
-              foreach ($ch in @('Netdata/Daemon', 'Netdata/Collectors', 'Netdata/Access', 'NetdataWEL')) {
+              foreach ($ch in @('Netdata/Daemon', 'Netdata/Collectors', 'Netdata/Health', 'Netdata/Aclk', 'Netdata/Access', 'NetdataWEL')) {
                   if ($eltext -notmatch [regex]::Escape($ch)) { throw "the event log capture never queried $ch" }
               }
               if (-not ($archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])09-permissions[\\/]plugins-d.txt$' })) {
