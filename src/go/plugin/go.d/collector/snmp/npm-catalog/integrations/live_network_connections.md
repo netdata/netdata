@@ -57,7 +57,7 @@ The default configuration for this integration is not expected to impose a signi
 
 #### Privileged access to the socket tables
 
-The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard installations grant these. In containers it also needs host networking and `SYS_ADMIN`; on macOS, a non-privileged or TCC-restricted run silently omits protected processes.
+The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard installations grant these. A container needs the host network namespace and the host `/proc` to see anything beyond its own sockets, `SYS_ADMIN` to reach sibling containers' connections, and `SYS_PTRACE` to attribute connections to processes — without `SYS_PTRACE` the connections are still listed but not tied to the processes that own them. On macOS, a non-privileged or TCC-restricted run silently omits protected processes.
 
 
 ### Configuration

@@ -22,7 +22,7 @@ not a stored history — the map shows what is connected at the moment you ask.
 
 ## What it maps
 
-For every socket on the host, Netdata identifies the local process behind it:
+For every TCP and UDP socket on the host, IPv4 and IPv6, Netdata identifies the local process behind it:
 
 - **The process** — the running program, its command line, the user it runs as, and its parent.
 - **The container** *(Linux)* — the container name and the image it came from.
@@ -40,7 +40,12 @@ depends on that queue, this host reaches out to that external address.
 Identification is best-effort. A socket whose owning process Netdata can see but cannot name — one that exited between
 reads, for example — is still drawn, with `[unknown]` where the name or user would be. Enumerating every process's
 sockets needs privileged access, which standard installations grant; where it is missing the map is quietly
-incomplete rather than wrong. In containers the plugin also needs host networking and `SYS_ADMIN`, and on macOS a
+incomplete rather than wrong.
+
+Running the Agent in a container needs more than the default: the host network namespace and the host `/proc` to see
+anything beyond the container's own sockets, `SYS_ADMIN` to reach sibling containers' connections, and `SYS_PTRACE` to
+attribute connections to processes — without `SYS_PTRACE` you get the connections but not the software behind them,
+which is the point of this map. Netdata's own container images and Helm chart request these already. On macOS, a
 non-privileged or TCC-restricted Agent omits protected processes altogether. The plugin logs a warning when it detects
 that its view was truncated.
 

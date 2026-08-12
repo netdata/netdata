@@ -69,6 +69,10 @@ UI configuration requires paid Netdata Cloud plan.
 
 The devices must be configured to send SNMP traps to the Netdata Agent acting as the site's trap receiver, and the trap port must be reachable from them.
 
+#### Permission to bind the trap port
+
+The default listener is UDP/162, a privileged port: binding it needs `CAP_NET_BIND_SERVICE` or root on Linux. Netdata packages grant this capability, so standard installations just work; hardened or custom deployments must grant it, or move the listener to an unprivileged port.
+
 
 ### Configuration
 

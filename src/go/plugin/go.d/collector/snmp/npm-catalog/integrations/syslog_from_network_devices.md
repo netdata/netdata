@@ -71,7 +71,7 @@ The routers, switches, and firewalls must be configured to send syslog to the co
 
 #### Options
 
-The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. The endpoint defaults to loopback, so a Collector running on another host needs it opened explicitly.
+The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not authenticate the sender. Prefer keeping the Collector on the same host as the Agent.
 
 
 

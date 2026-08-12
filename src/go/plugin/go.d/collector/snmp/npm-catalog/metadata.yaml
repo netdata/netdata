@@ -9366,7 +9366,7 @@ modules:
         file:
           name: go.d/snmp_topology.conf
         options:
-          description: 'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. It runs as a single job, and the only settings are the two intervals below.'
+          description: 'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. The only settings are the two intervals below. Note that this collector is single-instance: it takes one job, named `snmp_topology` — other job names are rejected — and `update_every` has a minimum of 10, so ignore the multi-job shape of the generic example below.'
           folding:
             title: Config options
             enabled: true
@@ -9690,7 +9690,7 @@ modules:
       prerequisites:
         list:
           - title: Privileged access to the socket tables
-            description: The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard installations grant these. In containers it also needs host networking and `SYS_ADMIN`; on macOS, a non-privileged or TCC-restricted run silently omits protected processes.
+            description: The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard installations grant these. A container needs the host network namespace and the host `/proc` to see anything beyond its own sockets, `SYS_ADMIN` to reach sibling containers' connections, and `SYS_PTRACE` to attribute connections to processes — without `SYS_PTRACE` the connections are still listed but not tied to the processes that own them. On macOS, a non-privileged or TCC-restricted run silently omits protected processes.
       configuration:
         file:
           name: netdata.conf
@@ -9946,7 +9946,7 @@ modules:
         file:
           name: otel.yaml
         options:
-          description: The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. The endpoint defaults to loopback, so a Collector running on another host needs it opened explicitly.
+          description: The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not authenticate the sender. Prefer keeping the Collector on the same host as the Agent.
           folding:
             title: Config options
             enabled: true
@@ -10003,6 +10003,8 @@ modules:
         list:
           - title: Devices configured to send traps
             description: The devices must be configured to send SNMP traps to the Netdata Agent acting as the site's trap receiver, and the trap port must be reachable from them.
+          - title: Permission to bind the trap port
+            description: 'The default listener is UDP/162, a privileged port: binding it needs `CAP_NET_BIND_SERVICE` or root on Linux. Netdata packages grant this capability, so standard installations just work; hardened or custom deployments must grant it, or move the listener to an unprivileged port.'
       configuration:
         file:
           name: go.d/snmp_traps.conf

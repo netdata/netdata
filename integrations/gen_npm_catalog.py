@@ -269,7 +269,9 @@ SETUP = setup_block(
 SNMP_TOPOLOGY_SETUP = setup_block(
     'go.d/snmp_topology.conf',
     'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector '
-    'jobs. It runs as a single job, and the only settings are the two intervals below.',
+    'jobs. The only settings are the two intervals below. Note that this collector is single-instance: it takes one '
+    'job, named `snmp_topology` — other job names are rejected — and `update_every` has a minimum of 10, so ignore '
+    'the multi-job shape of the generic example below.',
     [('SNMP devices configured',
       'The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP access must be reachable from the '
       'Netdata Agent acting as the site\'s SNMP hub.')],
@@ -290,8 +292,11 @@ NETWORK_VIEWER_SETUP = setup_block(
     'connections with container and Kubernetes identity.',
     [('Privileged access to the socket tables',
       'The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard '
-      'installations grant these. In containers it also needs host networking and `SYS_ADMIN`; on macOS, a '
-      'non-privileged or TCC-restricted run silently omits protected processes.')],
+      'installations grant these. A container needs the host network namespace and the host `/proc` to see anything '
+      'beyond its own sockets, `SYS_ADMIN` to reach sibling containers\' connections, and `SYS_PTRACE` to attribute '
+      'connections to processes — without `SYS_PTRACE` the connections are still listed but not tied to the '
+      'processes that own them. On macOS, a non-privileged or TCC-restricted run silently omits protected '
+      'processes.')],
     section_name='[plugin:network-viewer]',
     options=[
         {'name': 'apps lookup cache size',
@@ -333,8 +338,12 @@ CATO_SETUP = setup_block(
 SYSLOG_SETUP = setup_block(
     'otel.yaml',
     'The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only '
-    'to change the Agent\'s OTLP endpoint or retention. The endpoint defaults to loopback, so a Collector running on '
-    'another host needs it opened explicitly.',
+    'to change the Agent\'s OTLP endpoint or retention. The endpoint listens on loopback by default, which accepts '
+    'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
+    'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, '
+    '`endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise '
+    'anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not '
+    'authenticate the sender. Prefer keeping the Collector on the same host as the Agent.',
     [('The OpenTelemetry plugin',
       'The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the '
       'OpenTelemetry collector documentation for how it is enabled in each installation method.'),
@@ -353,7 +362,11 @@ SNMP_TRAPS_SETUP = setup_block(
     'the enrichment options. Trap decoding itself needs no configuration — the vendor profiles ship with Netdata.',
     [('Devices configured to send traps',
       'The devices must be configured to send SNMP traps to the Netdata Agent acting as the site\'s trap receiver, '
-      'and the trap port must be reachable from them.')],
+      'and the trap port must be reachable from them.'),
+     ('Permission to bind the trap port',
+      'The default listener is UDP/162, a privileged port: binding it needs `CAP_NET_BIND_SERVICE` or root on Linux. '
+      'Netdata packages grant this capability, so standard installations just work; hardened or custom deployments '
+      'must grant it, or move the listener to an unprivileged port.')],
 )
 
 TROUBLESHOOTING = {'problems': {'list': []}}

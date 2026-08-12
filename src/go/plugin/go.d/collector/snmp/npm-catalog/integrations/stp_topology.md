@@ -74,7 +74,7 @@ The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP acc
 
 #### Options
 
-Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. It runs as a single job, and the only settings are the two intervals below.
+Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. The only settings are the two intervals below. Note that this collector is single-instance: it takes one job, named `snmp_topology` — other job names are rejected — and `update_every` has a minimum of 10, so ignore the multi-job shape of the generic example below.
 
 <details open><summary>Config options</summary>
 
