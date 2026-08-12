@@ -30,6 +30,8 @@ This is the reverse of connecting an AI client *to* Netdata. Here, **Netdata rea
 
    For **OAuth** integrations, you'll be redirected to the provider to authorize Netdata. Once you approve, you're sent back and the connection is established automatically.
 
+   For **GitHub with OAuth**, authorizing is not enough on its own — the **Netdata MCP** GitHub App also has to be installed on the organization that owns your repositories. See [GitHub: OAuth or a personal access token](#github-oauth-or-a-personal-access-token).
+
    ![Authorize Netdata](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-authorize.png)
 
 5. On success, Netdata retrieves the tools the remote MCP server exposes. Select the tools you want to make available for this connection.
@@ -39,6 +41,34 @@ This is the reverse of connecting an AI client *to* Netdata. Here, **Netdata rea
    ![Select read-only tools](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-tools.png)
 
 6. Click **Save Changes** to complete the configuration. Enabled tools are not active until you save.
+
+## GitHub: OAuth or a personal access token
+
+GitHub offers both authentication methods — **OAuth 2.0** and **Personal Access Token** — and what limits Netdata AI is different in each.
+
+### OAuth: install the Netdata MCP app
+
+With OAuth, what Netdata AI can read is decided when the **Netdata MCP** GitHub App is installed, not when you connect. Authorizing the OAuth flow can succeed while the connection still returns nothing, because the app is not installed on the organization that owns the repositories.
+
+1. An **organization owner** installs [Netdata MCP](https://github.com/apps/netdata-mcp) on the organization, from <https://github.com/apps/netdata-mcp/installations/new>.
+2. During installation, choose which repositories the app can access — **All repositories**, or a specific list. **This selection bounds the non-public repositories** Netdata AI can read. Public repositories are readable either way: GitHub gives an app acting on behalf of a user implicit read access to public data.
+3. If you are not an owner, GitHub turns your installation into a **request**. An owner has to approve it before the connection returns any data.
+4. To reach repositories you own personally, install the app on your own GitHub account as well.
+5. If your organization enforces **SAML single sign-on**, start an SSO session for it — `https://github.com/orgs/YOUR-ORG/sso` — before you install or authorize. Without an active session the authorization does not cover that organization.
+
+Every permission the app asks for is **read-only**: repository metadata and contents, issues, pull requests, workflow runs and artifact metadata, deployments, discussions, commit statuses, security alerts, and Copilot agent task and variable metadata. GitHub shows the full list on the installation screen. The app cannot write to your repositories, and it subscribes to no webhook events.
+
+Each user still connects individually through OAuth, so a user sees only the repositories they can already access, within what the installation allows. An organization owner uninstalling the app revokes access for everyone at once; a user revoking it under **GitHub → Settings → Applications** revokes only their own connection.
+
+### Personal access token: the token is the boundary
+
+The **Personal Access Token** method needs no app installation — Netdata authenticates to GitHub with the token you paste in, so the token's own permissions decide what is reachable. Three things to plan for:
+
+- The token is **shared by the whole Space**. Everyone using Netdata AI reads GitHub as the token's owner, with that person's access. Prefer a fine-grained token limited to the repositories and read permissions you want exposed, rather than a classic token with broad scopes.
+- If your organization **requires approval for fine-grained personal access tokens**, an owner has to approve the token before it can read the organization's non-public repositories.
+- If your organization enforces **SAML single sign-on**, a **classic** token has to be authorized for that organization after you create it: click **Configure SSO** next to the token, then **Authorize**. The option only appears once you have signed in through your identity provider at least once. Fine-grained tokens are authorized when they are created.
+
+Revoking is done on the token itself, in **GitHub → Settings → Developer settings → Personal access tokens** — which disconnects the integration for the entire Space at once.
 
 ## Authentication methods
 
