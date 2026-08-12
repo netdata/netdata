@@ -5,12 +5,14 @@ package ceph
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -206,6 +208,64 @@ func TestCollector_FunctionOnlyChecksIdentityWithoutMetrics(t *testing.T) {
 	assert.Empty(t, *c.Charts())
 }
 
+func TestCollector_CheckFallsBackToLegacyMonitorIdentity(t *testing.T) {
+	monitor, err := os.ReadFile("testdata/v16.2.15/api_monitor.json")
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathAPIClusterFSID:
+			w.WriteHeader(http.StatusNotFound)
+		case "/api/monitor":
+			if r.Header.Get("Authorization") == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(monitor)
+		case urlPathApiAuth:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"token":"test-token"}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	require.NoError(t, c.Check(context.Background()))
+	assert.NotEmpty(t, c.clusterFSID())
+}
+
+func TestCollectorCleanupDoesNotLogout(t *testing.T) {
+	var logoutRequests atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathAPIClusterFSID:
+			if r.Header.Get("Authorization") == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_, _ = io.WriteString(w, `"synthetic-fsid"`)
+		case urlPathApiAuth:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"token":"test-token"}`)
+		case "/api/auth/logout":
+			logoutRequests.Add(1)
+			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	require.NoError(t, c.Check(context.Background()))
+	c.Cleanup(context.Background())
+	assert.Zero(t, logoutRequests.Load())
+}
+
 func TestCollector_DisabledStatusCachesIdentityInsteadOfPollingIt(t *testing.T) {
 	var authenticatedFSIDRequests int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -330,7 +390,7 @@ func TestCollector_HealthSemantics(t *testing.T) {
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
-func TestCollector_OSDPaginationCapAndAggregateOther(t *testing.T) {
+func TestCollector_OSDWholeListCapAndAggregateOther(t *testing.T) {
 	var offsets []int
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != urlPathApiOsd {
@@ -341,10 +401,7 @@ func TestCollector_OSDPaginationCapAndAggregateOther(t *testing.T) {
 		require.NoError(t, err)
 		offsets = append(offsets, offset)
 		w.Header().Set("X-Total-Count", "101")
-		count := 100
-		if offset == 100 {
-			count = 1
-		}
+		count := 101
 		page := make([]apiOsdResponse, 0, count)
 		for i := 0; i < count; i++ {
 			id := offset + i
@@ -375,7 +432,7 @@ func TestCollector_OSDPaginationCapAndAggregateOther(t *testing.T) {
 	mx, err := c.collect(context.Background())
 	require.NoError(t, err)
 
-	assert.Equal(t, []int{0, 100}, offsets)
+	assert.Equal(t, []int{0}, offsets)
 	assert.NotContains(t, mx, "osd_other_status_up")
 	assert.NotContains(t, mx, "osd_other_status_down")
 	assert.NotContains(t, mx, "osd_other_status_in")
@@ -387,20 +444,74 @@ func TestCollector_OSDPaginationCapAndAggregateOther(t *testing.T) {
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
-func TestCollector_OSDPaginationSupportsClustersLargerThanTenThousand(t *testing.T) {
+func TestCollector_ReefOSDUsesSingleWholeListRequest(t *testing.T) {
+	var requests atomic.Int64
+	var limit string
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != urlPathApiOsd {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		requests.Add(1)
+		limit = r.URL.Query().Get("limit")
+		w.Header().Set("X-Total-Count", "1")
+		_, _ = io.WriteString(w, `[{"id":1,"uuid":"uuid-1"}]`)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	osds, err := c.fetchAllOSDs(context.Background())
+	require.NoError(t, err)
+	require.Len(t, osds, 1)
+	assert.Equal(t, "-1", limit)
+	assert.EqualValues(t, 1, requests.Load())
+}
+
+func TestCollector_OSDFallsBackToLegacyWholeListProtocol(t *testing.T) {
+	legacy, err := os.ReadFile("testdata/v16.2.15/api_osd.json")
+	require.NoError(t, err)
+
+	var acceptsMu sync.Mutex
+	var accepts []string
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != urlPathApiOsd {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		acceptsMu.Lock()
+		accepts = append(accepts, r.Header.Get("Accept"))
+		acceptsMu.Unlock()
+		if r.Header.Get("Accept") == hdrAcceptVersionV11 {
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(legacy)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	osds, err := c.fetchAllOSDs(context.Background())
+	require.NoError(t, err)
+	assert.NotEmpty(t, osds)
+	acceptsMu.Lock()
+	defer acceptsMu.Unlock()
+	assert.Equal(t, []string{hdrAcceptVersionV11, hdrAcceptVersion}, accepts)
+}
+
+func TestCollector_OSDWholeListSupportsClustersLargerThanTenThousand(t *testing.T) {
 	const total = 10001
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != urlPathApiOsd {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
-		require.NoError(t, err)
-		count := min(osdPageSize, total-offset)
-		page := make([]apiOsdResponse, count)
+		page := make([]apiOsdResponse, total)
 		for i := range page {
-			page[i].ID = int64(offset + i)
-			page[i].UUID = fmt.Sprintf("uuid-%05d", offset+i)
+			page[i].ID = int64(i)
+			page[i].UUID = fmt.Sprintf("uuid-%05d", i)
 		}
 		w.Header().Set("X-Total-Count", strconv.Itoa(total))
 		writeJSON(t, w, http.StatusOK, page)
@@ -414,7 +525,7 @@ func TestCollector_OSDPaginationSupportsClustersLargerThanTenThousand(t *testing
 	assert.Len(t, osds, total)
 }
 
-func TestCollector_OSDPaginationRejectsShortPageBeforeAdvertisedTotal(t *testing.T) {
+func TestCollector_OSDWholeListRejectsInconsistentAdvertisedTotal(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != urlPathApiOsd {
 			w.WriteHeader(http.StatusNotFound)
@@ -437,7 +548,7 @@ func TestCollector_OSDPaginationRejectsShortPageBeforeAdvertisedTotal(t *testing
 	defer c.Cleanup(context.Background())
 	_, err := c.collect(context.Background())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "short page")
+	assert.Contains(t, err.Error(), "advertised 101")
 }
 
 func TestValidateOSDsRejectsUnsafeDynamicIdentitiesAndCapacity(t *testing.T) {
@@ -514,6 +625,46 @@ func TestCollector_PoolAvailableIsNotReducedTwice(t *testing.T) {
 	assert.EqualValues(t, 20, mx["pool_pool-a_space_used_bytes"])
 	assert.EqualValues(t, 20000, mx["pool_pool-a_space_utilization"])
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+}
+
+func TestCollector_PoolInventoryRejectsExcessiveRecordCount(t *testing.T) {
+	const records = 100001
+	response := "[" + strings.Repeat("{},", records-1) + "{}]"
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != urlPathApiPool {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, response)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
+		c.Metrics.Pools = true
+	})
+	defer c.Cleanup(context.Background())
+	_, err := c.collect(context.Background())
+	require.ErrorContains(t, err, "record limit")
+}
+
+func TestCollector_HealthRejectsExcessiveSectionRecordCount(t *testing.T) {
+	const records = 100001
+	response := `{"pools":[` + strings.Repeat("{},", records-1) + "{}]}"
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != urlPathApiHealthMinimal {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, response)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, func(c *Collector) {
+		c.Metrics.PoolsSummary = true
+	})
+	defer c.Cleanup(context.Background())
+	_, err := c.collect(context.Background())
+	require.ErrorContains(t, err, "record limit")
 }
 
 func TestCollector_DynamicEntityAbsenceGrace(t *testing.T) {
@@ -853,9 +1004,6 @@ func newFakeDashboard(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 		switch r.URL.Path {
 		case urlPathApiAuth:
 			writeJSON(t, w, http.StatusCreated, authLoginResp{Token: "test-token"})
-			return
-		case urlPathApiAuthLogout:
-			w.WriteHeader(http.StatusOK)
 			return
 		case urlPathAPIClusterFSID:
 			if r.Header.Get("Authorization") == "" {

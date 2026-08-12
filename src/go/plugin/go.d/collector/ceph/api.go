@@ -10,8 +10,8 @@ import (
 
 const (
 	urlPathApiAuth          = "/api/auth"
-	urlPathApiAuthLogout    = "/api/auth/logout"
 	urlPathApiHealthMinimal = "/api/health/minimal"
+	urlPathApiMonitor       = "/api/monitor"
 	urlPathApiOsd           = "/api/osd"
 	urlPathApiPool          = "/api/pool"
 )

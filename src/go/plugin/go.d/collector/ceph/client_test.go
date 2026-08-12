@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -249,6 +250,61 @@ func TestCephClientRereadsStaticBearerToken(t *testing.T) {
 	assert.Equal(t, "Bearer token-1", first["token"])
 	assert.Equal(t, "Bearer token-2", second["token"])
 	assert.EqualValues(t, 2, authenticatedRequests.Load())
+}
+
+func TestCephClientLogicalOperationUsesSingleDeadline(t *testing.T) {
+	const requestDelay = 70 * time.Millisecond
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathAPIClusterFSID:
+			if r.Header.Get("Authorization") == "Bearer token-1" {
+				time.Sleep(requestDelay)
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_, _ = io.WriteString(w, `"cluster-fsid"`)
+		case urlPathApiAuth:
+			time.Sleep(requestDelay)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"token":"token-2"}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	client, err := newCephClient(&http.Client{Timeout: 100 * time.Millisecond}, web.RequestConfig{
+		URL: srv.URL, Username: "netdata", Password: "test-password",
+	}, false, nil)
+	require.NoError(t, err)
+	client.activeBase = requireURL(t, srv.URL)
+	client.jwt = "token-1"
+
+	var fsid string
+	err = client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestCephClientRejectsOversizedIdentityResponse(t *testing.T) {
+	response := `"` + strings.Repeat("x", 1<<20) + `"`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, response)
+	}))
+	defer srv.Close()
+
+	client := newTestCephClient(t, srv.URL, false, func(cfg *web.RequestConfig) {
+		cfg.Username = "netdata"
+		cfg.Password = "test-password"
+	})
+	client.activeBase = requireURL(t, srv.URL)
+	client.jwt = "test-token"
+
+	var fsid string
+	err := client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds")
 }
 
 func TestCephClientRuntimeFailoverReconstructsOriginalPath(t *testing.T) {

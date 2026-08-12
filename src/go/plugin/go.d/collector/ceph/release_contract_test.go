@@ -5,6 +5,7 @@ package ceph
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -170,6 +171,63 @@ func TestLegacyPacificDashboardFixturesRemainParseable(t *testing.T) {
 		_, err := poolSample(pool)
 		require.NoError(t, err, pool.PoolName)
 	}
+}
+
+func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
+	read := func(name string) []byte {
+		t.Helper()
+		bs, err := os.ReadFile("testdata/v16.2.15/" + name)
+		require.NoError(t, err)
+		return bs
+	}
+	monitor := read("api_monitor.json")
+	health := read("api_health_minimal.json")
+	osds := read("api_osd.json")
+	pools := read("api_pool_stats.json")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var response []byte
+		switch r.URL.Path {
+		case urlPathAPIClusterFSID:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		case urlPathApiMonitor:
+			if r.Header.Get("Authorization") == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			response = monitor
+		case urlPathApiAuth:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"token":"test-token"}`)
+			return
+		case urlPathApiHealthMinimal:
+			response = health
+		case urlPathApiOsd:
+			if r.Header.Get("Accept") == hdrAcceptVersionV11 {
+				w.WriteHeader(http.StatusUnsupportedMediaType)
+				return
+			}
+			response = osds
+		case urlPathApiPool:
+			response = pools
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(response)
+	}))
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	require.NoError(t, c.Check(context.Background()))
+	mx, err := c.collect(context.Background())
+	require.NoError(t, err)
+	assert.NotEmpty(t, mx)
+	assert.NotEmpty(t, c.clusterFSID())
+	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
 func loadReleaseContract(t *testing.T, release string) releaseContractFixture {

@@ -5,9 +5,12 @@ package ceph
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,6 +47,41 @@ func TestFuncDepsHealth(t *testing.T) {
 	assert.Equal(t, "SLOW_OPS#00000000", result.Rows[0].ID)
 	assert.Equal(t, "osd.1 slow", result.Rows[0].Detail)
 	assert.EqualValues(t, 2, result.Rows[0].Count)
+}
+
+func TestFunctionRevalidatesPinnedClusterIdentity(t *testing.T) {
+	var fsid atomic.Value
+	fsid.Store("cluster-a")
+	var healthRequests atomic.Int64
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathAPIClusterFSID:
+			if r.Header.Get("Authorization") == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_, _ = fmt.Fprintf(w, "%q", fsid.Load().(string))
+		case urlPathApiAuth:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"token":"test-token"}`)
+		case urlPathApiHealthMinimal:
+			healthRequests.Add(1)
+			_, _ = io.WriteString(w, `{"health":{"checks":[]}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	require.NoError(t, c.Check(context.Background()))
+	fsid.Store("cluster-b")
+
+	_, err := (funcDepsAdapter{collector: c}).Health(context.Background(), 500)
+	require.ErrorContains(t, err, "cluster identity changed")
+	assert.Zero(t, healthRequests.Load())
 }
 
 func TestFuncDepsHealthBoundsNormalizedRows(t *testing.T) {

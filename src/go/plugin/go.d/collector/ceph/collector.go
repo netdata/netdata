@@ -238,16 +238,6 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
-	if timeout := c.Timeout.Duration(); timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	if c.apiClient != nil {
-		if err := c.apiClient.logout(ctx); err != nil {
-			c.Warningf("failed to logout: %v", err)
-		}
-	}
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
 	}

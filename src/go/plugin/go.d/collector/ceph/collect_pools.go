@@ -10,6 +10,8 @@ import (
 	"sort"
 )
 
+const maxPoolInventoryRecords = 100000
+
 type poolMetricSample struct {
 	key          string
 	objects      int64
@@ -28,6 +30,9 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 	if err := c.apiClient.getJSON(ctx, "list pool statistics", urlPathApiPool, hdrAcceptVersion,
 		url.Values{"stats": {"true"}}, &pools); err != nil {
 		return err
+	}
+	if len(pools) > maxPoolInventoryRecords {
+		return fmt.Errorf("list pool statistics exceeds the record limit of %d", maxPoolInventoryRecords)
 	}
 
 	sort.SliceStable(pools, func(i, j int) bool { return pools[i].PoolName < pools[j].PoolName })

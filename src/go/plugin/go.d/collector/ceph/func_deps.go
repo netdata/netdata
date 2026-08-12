@@ -38,6 +38,11 @@ type funcDepsAdapter struct {
 	collector *Collector
 }
 
+func (d funcDepsAdapter) revalidateClusterIdentity(ctx context.Context) error {
+	_, err := d.collector.probeClusterIdentity(ctx)
+	return err
+}
+
 type apiHealthCheck struct {
 	Type     string `json:"type"`
 	Severity string `json:"severity"`
@@ -78,6 +83,9 @@ func (c *apiHealthChecks) UnmarshalJSON(data []byte) error {
 }
 
 func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.HealthResult, error) {
+	if err := d.revalidateClusterIdentity(ctx); err != nil {
+		return cephfunc.HealthResult{}, err
+	}
 	var response struct {
 		Health *struct {
 			Checks *apiHealthChecks `json:"checks"`
@@ -142,6 +150,9 @@ func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.Health
 }
 
 func (d funcDepsAdapter) OSDs(ctx context.Context, limit int) (cephfunc.OSDResult, error) {
+	if err := d.revalidateClusterIdentity(ctx); err != nil {
+		return cephfunc.OSDResult{}, err
+	}
 	target := functionRowTarget(limit)
 	var osds []apiOsdResponse
 	total := 0
@@ -213,6 +224,9 @@ func (d funcDepsAdapter) OSDs(ctx context.Context, limit int) (cephfunc.OSDResul
 }
 
 func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolResult, error) {
+	if err := d.revalidateClusterIdentity(ctx); err != nil {
+		return cephfunc.PoolResult{}, err
+	}
 	attrs := strings.Join([]string{
 		"pool_name", "type", "size", "min_size", "pg_num", "pg_placement_num", "pg_autoscale_mode",
 		"crush_rule", "application_metadata", "erasure_code_profile", "quota_max_bytes",
@@ -300,6 +314,9 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 }
 
 func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.DaemonResult, error) {
+	if err := d.revalidateClusterIdentity(ctx); err != nil {
+		return cephfunc.DaemonResult{}, err
+	}
 	var daemons []map[string]any
 	if err := d.collector.apiClient.getJSON(ctx, "list daemons", urlPathAPIDaemon, hdrAcceptVersion, nil, &daemons); err != nil {
 		return cephfunc.DaemonResult{}, toFunctionSourceError(err, "daemon inventory")

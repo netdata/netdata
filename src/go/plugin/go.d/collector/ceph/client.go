@@ -21,7 +21,14 @@ import (
 const (
 	activeDiscoveryMaxHops = 5
 	urlPathAPIClusterFSID  = "/api/health/get_cluster_fsid"
+	maxIdentityBodyBytes   = 64 << 10
+	maxMonitorBodyBytes    = 8 << 20
+	maxHealthBodyBytes     = 32 << 20
+	maxInventoryBodyBytes  = 64 << 20
+	maxDefaultBodyBytes    = 16 << 20
 )
+
+var errResponseBodyTooLarge = errors.New("response exceeds the endpoint byte limit")
 
 type apiHTTPError struct {
 	operation string
@@ -148,6 +155,12 @@ func (c *cephClient) getJSONWithHeaders(ctx context.Context, operation, endpoint
 }
 
 func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, accept string, query url.Values, body []byte, dst any) (http.Header, error) {
+	if timeout := c.httpClient.Timeout; timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
 	var retriedAuth, retriedRedirect, retriedTransport bool
 
 	for attempts := 0; attempts < 4; attempts++ {
@@ -186,9 +199,7 @@ func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, ac
 			headers := resp.Header.Clone()
 			defer web.CloseBody(resp)
 			if dst != nil {
-				decoder := json.NewDecoder(resp.Body)
-				decoder.UseNumber()
-				if err := decoder.Decode(dst); err != nil {
+				if err := decodeJSONResponse(resp, endpoint, dst); err != nil {
 					return nil, fmt.Errorf("decode %s response: %w", operation, err)
 				}
 			}
@@ -247,6 +258,7 @@ func (c *cephClient) discoverActiveBase(ctx context.Context) (*url.URL, error) {
 	base := cloneURL(c.configuredBase)
 	visited := make(map[string]bool, activeDiscoveryMaxHops+1)
 
+discover:
 	for hop := 0; hop <= activeDiscoveryMaxHops; hop++ {
 		key := base.String()
 		if visited[key] {
@@ -254,37 +266,44 @@ func (c *cephClient) discoverActiveBase(ctx context.Context) (*url.URL, error) {
 		}
 		visited[key] = true
 
-		resp, err := c.request(ctx, base, http.MethodGet, urlPathAPIClusterFSID, hdrAcceptVersion, nil, nil, "")
-		if err != nil {
-			return nil, fmt.Errorf("active-MGR discovery failed: %w", err)
-		}
-		status := resp.StatusCode
-		location := resp.Header.Get("Location")
-		web.CloseBody(resp)
-
-		switch {
-		case status >= 200 && status < 300,
-			status == http.StatusUnauthorized,
-			status == http.StatusForbidden:
-			return base, nil
-		case isRedirectStatus(status):
-			if c.notFollowRedirects {
-				return nil, fmt.Errorf("active-MGR discovery redirect rejected by not_follow_redirects")
-			}
-			if hop == activeDiscoveryMaxHops {
-				return nil, fmt.Errorf("active-MGR discovery exceeded %d redirects", activeDiscoveryMaxHops)
-			}
-			next, err := redirectedDashboardBase(base, location, urlPathAPIClusterFSID)
+		for _, probePath := range []string{urlPathAPIClusterFSID, urlPathApiMonitor} {
+			resp, err := c.request(ctx, base, http.MethodGet, probePath, hdrAcceptVersion, nil, nil, "")
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("active-MGR discovery failed: %w", err)
 			}
-			if _, ok := c.allowedRedirectOrigins[dashboardOrigin(next)]; !ok {
-				return nil, errors.New("active-MGR redirect origin is not trusted; add it to allowed_redirect_origins")
+			status := resp.StatusCode
+			location := resp.Header.Get("Location")
+			web.CloseBody(resp)
+
+			if probePath == urlPathAPIClusterFSID && isUnsupportedEndpointStatus(status) {
+				continue
 			}
-			base = next
-		default:
-			return nil, &apiHTTPError{operation: "active-MGR discovery", status: status}
+			switch {
+			case status >= 200 && status < 300,
+				status == http.StatusUnauthorized,
+				status == http.StatusForbidden:
+				return base, nil
+			case isRedirectStatus(status):
+				if c.notFollowRedirects {
+					return nil, fmt.Errorf("active-MGR discovery redirect rejected by not_follow_redirects")
+				}
+				if hop == activeDiscoveryMaxHops {
+					return nil, fmt.Errorf("active-MGR discovery exceeded %d redirects", activeDiscoveryMaxHops)
+				}
+				next, err := redirectedDashboardBase(base, location, probePath)
+				if err != nil {
+					return nil, err
+				}
+				if _, ok := c.allowedRedirectOrigins[dashboardOrigin(next)]; !ok {
+					return nil, errors.New("active-MGR redirect origin is not trusted; add it to allowed_redirect_origins")
+				}
+				base = next
+				continue discover
+			default:
+				return nil, &apiHTTPError{operation: "active-MGR discovery", status: status}
+			}
 		}
+		return nil, errors.New("active-MGR discovery found no supported identity endpoint")
 	}
 
 	return nil, errors.New("active-MGR discovery failed")
@@ -408,9 +427,7 @@ func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token 
 			redirect:  isRedirectStatus(resp.StatusCode),
 		}
 	}
-	decoder := json.NewDecoder(resp.Body)
-	decoder.UseNumber()
-	if err := decoder.Decode(&response); err != nil {
+	if err := decodeJSONResponse(resp, urlPathApiAuth, &response); err != nil {
 		return "", true, fmt.Errorf("decode login response: %w", err)
 	}
 	if response.Token == "" {
@@ -482,30 +499,6 @@ func (c *cephClient) invalidateJWT(token string) {
 	}
 }
 
-func (c *cephClient) logout(ctx context.Context) error {
-	if c.bearerTokenFile != "" {
-		return nil
-	}
-	c.stateMu.RLock()
-	base := cloneURL(c.activeBase)
-	token := c.jwt
-	c.stateMu.RUnlock()
-	if base == nil || token == "" {
-		return nil
-	}
-
-	resp, err := c.request(ctx, base, http.MethodPost, urlPathApiAuthLogout, hdrAcceptVersion, nil, []byte("{}"), token)
-	c.invalidateJWT(token)
-	if err != nil {
-		return err
-	}
-	defer web.CloseBody(resp)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &apiHTTPError{operation: "Dashboard logout", status: resp.StatusCode}
-	}
-	return nil
-}
-
 func isRedirectStatus(status int) bool {
 	switch status {
 	case http.StatusMovedPermanently,
@@ -517,6 +510,89 @@ func isRedirectStatus(status int) bool {
 	default:
 		return false
 	}
+}
+
+func isUnsupportedEndpointStatus(status int) bool {
+	return status == http.StatusNotFound || status == http.StatusMethodNotAllowed
+}
+
+func isUnsupportedEndpointError(err error) bool {
+	var httpErr *apiHTTPError
+	return errors.As(err, &httpErr) && isUnsupportedEndpointStatus(httpErr.status)
+}
+
+func isUnsupportedAPIVersionError(err error) bool {
+	var httpErr *apiHTTPError
+	if !errors.As(err, &httpErr) {
+		return false
+	}
+	return httpErr.status == http.StatusNotAcceptable || httpErr.status == http.StatusUnsupportedMediaType
+}
+
+func decodeJSONResponse(resp *http.Response, endpoint string, dst any) error {
+	limit := responseBodyLimit(endpoint)
+	if resp.ContentLength > limit {
+		return fmt.Errorf("%w (%d bytes)", errResponseBodyTooLarge, limit)
+	}
+
+	reader := &boundedResponseReader{reader: resp.Body, remaining: limit}
+	decoder := json.NewDecoder(reader)
+	decoder.UseNumber()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("response contains more than one JSON value")
+		}
+		return err
+	}
+	return nil
+}
+
+func responseBodyLimit(endpoint string) int64 {
+	switch endpoint {
+	case urlPathAPIClusterFSID, urlPathApiAuth:
+		return maxIdentityBodyBytes
+	case urlPathApiMonitor:
+		return maxMonitorBodyBytes
+	case urlPathApiHealthMinimal:
+		return maxHealthBodyBytes
+	case urlPathApiOsd, urlPathApiPool:
+		return maxInventoryBodyBytes
+	default:
+		return maxDefaultBodyBytes
+	}
+}
+
+type boundedResponseReader struct {
+	reader    io.Reader
+	remaining int64
+	eof       bool
+}
+
+func (r *boundedResponseReader) Read(p []byte) (int, error) {
+	if r.eof {
+		return 0, io.EOF
+	}
+	if r.remaining == 0 {
+		var extra [1]byte
+		n, err := r.reader.Read(extra[:])
+		if n > 0 {
+			return 0, errResponseBodyTooLarge
+		}
+		return 0, err
+	}
+	if int64(len(p)) > r.remaining {
+		p = p[:r.remaining]
+	}
+	n, err := r.reader.Read(p)
+	r.remaining -= int64(n)
+	if errors.Is(err, io.EOF) {
+		r.eof = true
+	}
+	return n, err
 }
 
 func cloneURL(u *url.URL) *url.URL {

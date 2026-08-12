@@ -71,7 +71,23 @@ func (c *Collector) ensureClusterIdentity(ctx context.Context) (string, error) {
 func (c *Collector) probeClusterIdentity(ctx context.Context) (string, error) {
 	var fsid string
 	if err := c.apiClient.getJSON(ctx, "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid); err != nil {
-		return "", fmt.Errorf("get cluster identity: %w", err)
+		if !isUnsupportedEndpointError(err) {
+			return "", fmt.Errorf("get cluster identity: %w", err)
+		}
+
+		// TODO: Remove the Pacific 16 and Quincy 17 monitor fallback only when
+		// the collector intentionally raises its minimum release to Reef 18.
+		var monitor struct {
+			MonStatus struct {
+				MonMap struct {
+					FSID string `json:"fsid"`
+				} `json:"monmap"`
+			} `json:"mon_status"`
+		}
+		if err := c.apiClient.getJSON(ctx, "get legacy cluster FSID", urlPathApiMonitor, hdrAcceptVersion, nil, &monitor); err != nil {
+			return "", fmt.Errorf("get cluster identity: %w", err)
+		}
+		fsid = monitor.MonStatus.MonMap.FSID
 	}
 	if fsid == "" {
 		return "", errors.New("get cluster identity: empty FSID")

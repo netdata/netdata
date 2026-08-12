@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	osdPageSize         = 100
-	entityAbsenceGrace  = time.Minute
-	hdrAcceptVersionV11 = "application/vnd.ceph.api.v1.1+json"
+	osdPageSize            = 100
+	maxOSDInventoryRecords = 100000
+	entityAbsenceGrace     = time.Minute
+	hdrAcceptVersionV11    = "application/vnd.ceph.api.v1.1+json"
 )
 
 type osdMetricSample struct {
@@ -111,47 +112,37 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 }
 
 func (c *Collector) fetchAllOSDs(ctx context.Context) ([]apiOsdResponse, error) {
-	var all []apiOsdResponse
-	total := -1
-	for offset := 0; ; offset += osdPageSize {
-		query := url.Values{
-			"offset": {strconv.Itoa(offset)},
-			"limit":  {strconv.Itoa(osdPageSize)},
-			"sort":   {"+id"},
-		}
-		var page []apiOsdResponse
-		headers, err := c.apiClient.getJSONWithHeaders(ctx, "list OSDs", urlPathApiOsd, hdrAcceptVersionV11, query, &page)
-		if err != nil {
+	query := url.Values{"offset": {"0"}, "limit": {"-1"}, "sort": {"+id"}}
+	var osds []apiOsdResponse
+	headers, err := c.apiClient.getJSONWithHeaders(ctx, "list OSDs", urlPathApiOsd, hdrAcceptVersionV11, query, &osds)
+	if err != nil {
+		if !isUnsupportedAPIVersionError(err) {
 			return nil, err
 		}
-		if len(page) > osdPageSize {
-			return nil, fmt.Errorf("list OSDs returned a page larger than the requested limit")
+		// TODO: Remove the Pacific 16 and Quincy 17 whole-list fallback only
+		// when the collector intentionally raises its minimum release to Reef 18.
+		osds = nil
+		if err := c.apiClient.getJSON(ctx, "list legacy OSDs", urlPathApiOsd, hdrAcceptVersion, nil, &osds); err != nil {
+			return nil, err
 		}
-		if rawTotal := headers.Get("X-Total-Count"); rawTotal != "" {
-			parsedTotal, err := strconv.Atoi(rawTotal)
-			if err != nil || parsedTotal < 0 {
-				return nil, fmt.Errorf("list OSDs returned invalid X-Total-Count")
-			}
-			if total >= 0 && parsedTotal != total {
-				return nil, fmt.Errorf("list OSDs changed X-Total-Count between pages")
-			}
-			total = parsedTotal
+		if len(osds) > maxOSDInventoryRecords {
+			return nil, fmt.Errorf("list legacy OSDs exceeds the record limit of %d", maxOSDInventoryRecords)
 		}
-		if total >= 0 && len(all)+len(page) > total {
-			return nil, fmt.Errorf("list OSDs returned more entries than X-Total-Count")
-		}
-		all = append(all, page...)
-		if total >= 0 && len(all) == total {
-			break
-		}
-		if len(page) < osdPageSize {
-			if total >= 0 {
-				return nil, fmt.Errorf("list OSDs returned a short page before the advertised total")
-			}
-			break
-		}
+		return osds, nil
 	}
-	return all, nil
+
+	rawTotal := headers.Get("X-Total-Count")
+	total, err := strconv.Atoi(rawTotal)
+	if err != nil || total < 0 {
+		return nil, fmt.Errorf("list OSDs returned invalid X-Total-Count")
+	}
+	if total > maxOSDInventoryRecords {
+		return nil, fmt.Errorf("list OSDs exceeds the record limit of %d", maxOSDInventoryRecords)
+	}
+	if len(osds) != total {
+		return nil, fmt.Errorf("list OSDs returned %d entries but advertised %d", len(osds), total)
+	}
+	return osds, nil
 }
 
 func validateOSDs(osds []apiOsdResponse) error {
