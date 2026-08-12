@@ -23,7 +23,7 @@ Module: vsphere
 
 ## Overview
 
-Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with placement and network-attachment links, plus datastore-utilization overlays.
+Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with placement links and datastore-utilization overlays; enabling `collect_network_topology` adds the network and port-group attachments.
 
 The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.
 
@@ -54,7 +54,7 @@ You can configure the **vsphere** collector in two ways:
 | Method                | Best for                                                                                 | How to                                                                                                                                 |
 |-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **vsphere**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/snmp.conf` and add a job.                                                                        |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/vsphere.conf` and add a job.                                                                        |
 
 :::important
 
@@ -65,16 +65,16 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-#### SNMP access
+#### vCenter access
 
-SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site's SNMP hub.
+A vCenter Server reachable from the Netdata Agent, and a read-only account with permission to browse the inventory.
 
 
 ### Configuration
 
 #### Options
 
-Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for all options.
+Configure the vSphere collector with the vCenter URL and credentials. See the [vSphere collector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/vsphere/integrations/vmware_vcenter_server.md) page for all options, including `collect_network_topology`, which is off by default and is what adds the network and port-group actors to the map.
 
 
 #### via UI
@@ -93,7 +93,7 @@ Configure the **vsphere** collector from the Netdata web interface:
 
 #### via File
 
-The configuration file name for this integration is `go.d/snmp.conf`.
+The configuration file name for this integration is `go.d/vsphere.conf`.
 
 The file format is YAML. Generally, the structure is:
 
@@ -109,12 +109,24 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/snmp.conf
+sudo ./edit-config go.d/vsphere.conf
 ```
 
 ##### Examples
-There are no configuration examples.
 
+###### Minimal job with topology enabled
+
+The three required fields plus `collect_network_topology`, which is off by default and is what adds the network and port-group actors to the map.
+
+```yaml
+jobs:
+  - name: vcenter
+    url: https://vcenter.example.com
+    username: netdata@vsphere.local
+    password: SECRET
+    collect_network_topology: yes
+
+```
 
 
 ## Alerts
