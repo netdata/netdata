@@ -19,35 +19,128 @@ import (
 )
 
 func TestFuncDepsHealth(t *testing.T) {
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiHealthMinimal {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"health": map[string]any{"checks": []map[string]any{
-				{
-					"type":     "SLOW_OPS",
-					"severity": "HEALTH_WARN", "muted": false,
-					"summary": map[string]any{"message": "slow operations", "count": 2},
-					"detail":  []map[string]any{{"message": "osd.1 slow"}, {"message": "osd.2 slow"}},
-				},
-			}},
-		})
-	})
-	defer srv.Close()
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
+	details := make([]map[string]any, 5)
+	for i := range details {
+		details[i] = map[string]any{"message": "detail"}
+	}
+	warnDetails := make([]map[string]any, cephfunc.MaxInventoryLimit)
+	for i := range warnDetails {
+		warnDetails[i] = map[string]any{"message": "warning detail"}
+	}
 
-	result, err := (funcDepsAdapter{
-		collector: c,
-	}).Health(context.Background(), 500)
-	require.NoError(t, err)
-	require.Len(t, result.Rows, 2)
-	assert.Equal(t, 2, result.Total)
-	assert.Equal(t, "SLOW_OPS#00000000", result.Rows[0].ID)
-	assert.Equal(t, "osd.1 slow", result.Rows[0].Detail)
-	assert.EqualValues(t, 2, result.Rows[0].Count)
+	tests := map[string]struct {
+		response        map[string]any
+		limit           int
+		wantTotal       int
+		wantRows        int
+		wantFirstID     string
+		wantFirstCode   string
+		wantFirstDetail string
+		wantFirstCount  int
+	}{
+		"normalizes detail rows": {
+			response: healthChecksResponse([]map[string]any{{
+				"type":     "SLOW_OPS",
+				"severity": "HEALTH_WARN",
+				"muted":    false,
+				"summary":  map[string]any{"message": "slow operations", "count": 2},
+				"detail":   []map[string]any{{"message": "osd.1 slow"}, {"message": "osd.2 slow"}},
+			}}),
+			limit:           500,
+			wantTotal:       2,
+			wantRows:        2,
+			wantFirstID:     "SLOW_OPS#00000000",
+			wantFirstDetail: "osd.1 slow",
+			wantFirstCount:  2,
+		},
+		"retains limit lookahead": {
+			response: healthChecksResponse([]map[string]any{{
+				"type":     "SLOW_OPS",
+				"severity": "HEALTH_WARN",
+				"summary":  map[string]any{"message": "slow", "count": 5},
+				"detail":   details,
+			}}),
+			limit:     1,
+			wantTotal: 5,
+			wantRows:  2,
+		},
+		"returns severe bounded subset above inventory ceiling": {
+			response: healthChecksResponse([]map[string]any{
+				{
+					"type":     "A_WARN",
+					"severity": "HEALTH_WARN",
+					"summary":  map[string]any{"message": "warning", "count": len(warnDetails)},
+					"detail":   warnDetails,
+				},
+				{
+					"type":     "Z_ERR",
+					"severity": "HEALTH_ERR",
+					"summary":  map[string]any{"message": "error", "count": 1},
+					"detail":   []map[string]any{{"message": "error detail"}},
+				},
+			}),
+			limit:         cephfunc.DefaultInventoryLimit,
+			wantTotal:     cephfunc.MaxInventoryLimit + 1,
+			wantRows:      cephfunc.DefaultInventoryLimit + 1,
+			wantFirstCode: "Z_ERR",
+		},
+		"prioritizes errors before bound": {
+			response: healthChecksResponse([]map[string]any{
+				{"type": "A_WARN", "severity": "HEALTH_WARN", "summary": map[string]any{"message": "warn", "count": 1}},
+				{"type": "B_WARN", "severity": "HEALTH_WARN", "summary": map[string]any{"message": "warn", "count": 1}},
+				{"type": "Z_ERR", "severity": "HEALTH_ERR", "summary": map[string]any{"message": "error", "count": 1}},
+			}),
+			limit:         1,
+			wantTotal:     3,
+			wantRows:      2,
+			wantFirstCode: "Z_ERR",
+		},
+		"accepts keyed compatibility form": {
+			response: healthChecksResponse(map[string]any{
+				"SLOW_OPS": map[string]any{
+					"severity": "HEALTH_WARN",
+					"summary":  map[string]any{"message": "slow", "count": 1},
+				},
+			}),
+			limit:         500,
+			wantTotal:     1,
+			wantRows:      1,
+			wantFirstCode: "SLOW_OPS",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != urlPathApiHealthMinimal {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				writeJSON(w, http.StatusOK, test.response)
+			})
+			defer srv.Close()
+			c := newInitializedCollector(t, srv.URL, nil)
+			defer c.Cleanup(context.Background())
+
+			result, err := (funcDepsAdapter{
+				collector: c,
+			}).Health(context.Background(), test.limit)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantTotal, result.Total)
+			require.Len(t, result.Rows, test.wantRows)
+			if test.wantFirstID != "" {
+				assert.Equal(t, test.wantFirstID, result.Rows[0].ID)
+			}
+			if test.wantFirstCode != "" {
+				assert.Equal(t, test.wantFirstCode, result.Rows[0].Code)
+			}
+			if test.wantFirstDetail != "" {
+				assert.Equal(t, test.wantFirstDetail, result.Rows[0].Detail)
+			}
+			if test.wantFirstCount != 0 {
+				assert.EqualValues(t, test.wantFirstCount, result.Rows[0].Count)
+			}
+		})
+	}
 }
 
 func TestFunctionRevalidatesPinnedClusterIdentity(t *testing.T) {
@@ -87,144 +180,39 @@ func TestFunctionRevalidatesPinnedClusterIdentity(t *testing.T) {
 	assert.Zero(t, healthRequests.Load())
 }
 
-func TestFuncDepsHealthBoundsNormalizedRows(t *testing.T) {
-	details := make([]map[string]any, 5)
-	for i := range details {
-		details[i] = map[string]any{"message": "detail"}
+func TestFuncDepsHealthRejectsInvalidResponses(t *testing.T) {
+	tests := map[string]struct {
+		response map[string]any
+		want     string
+	}{
+		"missing health": {
+			response: map[string]any{},
+			want:     "missing health checks",
+		},
+		"missing checks": {
+			response: map[string]any{"health": map[string]any{}},
+			want:     "missing health checks",
+		},
+		"duplicate type": {
+			response: healthChecksResponse([]map[string]any{
+				{"type": "SLOW_OPS", "severity": "HEALTH_WARN"},
+				{"type": "SLOW_OPS", "severity": "HEALTH_WARN"},
+			}),
+		},
+		"negative count": {
+			response: healthChecksResponse([]map[string]any{
+				{"type": "SLOW_OPS", "severity": "HEALTH_WARN", "summary": map[string]any{"count": -1}},
+			}),
+		},
 	}
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiHealthMinimal {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"health": map[string]any{"checks": []map[string]any{
-				{
-					"type":     "SLOW_OPS",
-					"severity": "HEALTH_WARN", "summary": map[string]any{"message": "slow", "count": 5},
-					"detail": details,
-				},
-			}},
-		})
-	})
-	defer srv.Close()
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-
-	result, err := (funcDepsAdapter{
-		collector: c,
-	}).Health(context.Background(), 1)
-	require.NoError(t, err)
-	assert.Equal(t, 5, result.Total)
-	assert.Len(t, result.Rows, 2)
-}
-
-func TestFuncDepsHealthReturnsBoundedSubsetAboveInventoryCeiling(t *testing.T) {
-	warnDetails := make([]map[string]any, cephfunc.MaxInventoryLimit)
-	for i := range warnDetails {
-		warnDetails[i] = map[string]any{"message": "warning detail"}
-	}
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiHealthMinimal {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"health": map[string]any{"checks": []map[string]any{
-				{
-					"type":     "A_WARN",
-					"severity": "HEALTH_WARN",
-					"summary":  map[string]any{"message": "warning", "count": len(warnDetails)},
-					"detail":   warnDetails,
-				},
-				{
-					"type":     "Z_ERR",
-					"severity": "HEALTH_ERR",
-					"summary":  map[string]any{"message": "error", "count": 1},
-					"detail":   []map[string]any{{"message": "error detail"}},
-				},
-			}},
-		})
-	})
-	defer srv.Close()
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-
-	result, err := (funcDepsAdapter{
-		collector: c,
-	}).Health(context.Background(), cephfunc.DefaultInventoryLimit)
-	require.NoError(t, err)
-	assert.Equal(t, cephfunc.MaxInventoryLimit+1, result.Total)
-	require.Len(t, result.Rows, cephfunc.DefaultInventoryLimit+1)
-	assert.Equal(t, "Z_ERR", result.Rows[0].Code)
-}
-
-func TestFuncDepsHealthPrioritizesErrorsBeforeBound(t *testing.T) {
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiHealthMinimal {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"health": map[string]any{"checks": []map[string]any{
-				{"type": "A_WARN", "severity": "HEALTH_WARN", "summary": map[string]any{"message": "warn", "count": 1}},
-				{"type": "B_WARN", "severity": "HEALTH_WARN", "summary": map[string]any{"message": "warn", "count": 1}},
-				{"type": "Z_ERR", "severity": "HEALTH_ERR", "summary": map[string]any{"message": "error", "count": 1}},
-			}},
-		})
-	})
-	defer srv.Close()
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-
-	result, err := (funcDepsAdapter{
-		collector: c,
-	}).Health(context.Background(), 1)
-	require.NoError(t, err)
-	assert.Equal(t, 3, result.Total)
-	require.Len(t, result.Rows, 2)
-	assert.Equal(t, "Z_ERR", result.Rows[0].Code)
-}
-
-func TestFuncDepsHealthAcceptsKeyedCompatibilityForm(t *testing.T) {
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiHealthMinimal {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"health": map[string]any{"checks": map[string]any{
-				"SLOW_OPS": map[string]any{
-					"severity": "HEALTH_WARN",
-					"summary":  map[string]any{"message": "slow", "count": 1},
-				},
-			}},
-		})
-	})
-	defer srv.Close()
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-
-	result, err := (funcDepsAdapter{
-		collector: c,
-	}).Health(context.Background(), 500)
-	require.NoError(t, err)
-	require.Len(t, result.Rows, 1)
-	assert.Equal(t, "SLOW_OPS", result.Rows[0].Code)
-}
-
-func TestFuncDepsHealthRejectsMissingChecks(t *testing.T) {
-	for _, response := range []map[string]any{
-		{},
-		{"health": map[string]any{}},
-	} {
-		t.Run(fmt.Sprint(response), func(t *testing.T) {
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
 			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path != urlPathApiHealthMinimal {
 					w.WriteHeader(http.StatusNotFound)
 					return
 				}
-				writeJSON(w, http.StatusOK, response)
+				writeJSON(w, http.StatusOK, test.response)
 			})
 			defer srv.Close()
 			c := newInitializedCollector(t, srv.URL, nil)
@@ -233,39 +221,17 @@ func TestFuncDepsHealthRejectsMissingChecks(t *testing.T) {
 			_, err := (funcDepsAdapter{
 				collector: c,
 			}).Health(context.Background(), 500)
-			require.ErrorContains(t, err, "missing health checks")
+			if test.want != "" {
+				require.ErrorContains(t, err, test.want)
+			} else {
+				require.Error(t, err)
+			}
 		})
 	}
 }
 
-func TestFuncDepsHealthRejectsAmbiguousOrInvalidRows(t *testing.T) {
-	for name, checks := range map[string][]map[string]any{
-		"duplicate type": {
-			{"type": "SLOW_OPS", "severity": "HEALTH_WARN"},
-			{"type": "SLOW_OPS", "severity": "HEALTH_WARN"},
-		},
-		"negative count": {
-			{"type": "SLOW_OPS", "severity": "HEALTH_WARN", "summary": map[string]any{"count": -1}},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == urlPathApiHealthMinimal {
-					writeJSON(w, http.StatusOK, map[string]any{"health": map[string]any{"checks": checks}})
-					return
-				}
-				w.WriteHeader(http.StatusNotFound)
-			})
-			defer srv.Close()
-			c := newInitializedCollector(t, srv.URL, nil)
-			defer c.Cleanup(context.Background())
-
-			_, err := (funcDepsAdapter{
-				collector: c,
-			}).Health(context.Background(), 500)
-			require.Error(t, err)
-		})
-	}
+func healthChecksResponse(checks any) map[string]any {
+	return map[string]any{"health": map[string]any{"checks": checks}}
 }
 
 func TestFuncDepsOSDsRejectsInventoryAboveSelectedLimit(t *testing.T) {
@@ -354,32 +320,43 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{
-		collector: c,
-	}).Pools(context.Background(), 1)
-	require.ErrorContains(t, err, "selected limit")
-	assert.Empty(t, result.Rows)
-
-	result, err = (funcDepsAdapter{
-		collector: c,
-	}).Pools(context.Background(), 3)
-	require.NoError(t, err)
-	assert.Equal(t, 3, result.Total)
-	require.Len(t, result.Rows, 3)
-	rows := make(map[string]cephfunc.PoolRow, len(result.Rows))
-	for _, row := range result.Rows {
-		rows[row.Name] = row
+	tests := map[string]struct {
+		limit     int
+		wantError string
+		wantRows  int
+	}{
+		"rejects partial inventory":  {limit: 1, wantError: "selected limit"},
+		"returns complete inventory": {limit: 3, wantRows: 3},
 	}
-	require.Contains(t, rows, "pool-a")
-	row := rows["pool-a"]
-	assert.Equal(t, "pool-a", row.Name)
-	assert.EqualValues(t, 3, *row.Size)
-	assert.Equal(t, "default", row.CrushRoot)
-	assert.Equal(t, "ssd", row.DeviceClass)
-	assert.Equal(t, "host", row.FailureDomain)
-	assert.Equal(t, "rgw", row.Applications)
-	assert.Nil(t, rows["pool-b"].Size)
-	assert.Nil(t, rows["pool-b"].PGNum)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			result, err := (funcDepsAdapter{
+				collector: c,
+			}).Pools(context.Background(), test.limit)
+			if test.wantError != "" {
+				require.ErrorContains(t, err, test.wantError)
+				assert.Empty(t, result.Rows)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantRows, result.Total)
+			require.Len(t, result.Rows, test.wantRows)
+			rows := make(map[string]cephfunc.PoolRow, len(result.Rows))
+			for _, row := range result.Rows {
+				rows[row.Name] = row
+			}
+			require.Contains(t, rows, "pool-a")
+			row := rows["pool-a"]
+			assert.Equal(t, "pool-a", row.Name)
+			assert.EqualValues(t, 3, *row.Size)
+			assert.Equal(t, "default", row.CrushRoot)
+			assert.Equal(t, "ssd", row.DeviceClass)
+			assert.Equal(t, "host", row.FailureDomain)
+			assert.Equal(t, "rgw", row.Applications)
+			assert.Nil(t, rows["pool-b"].Size)
+			assert.Nil(t, rows["pool-b"].PGNum)
+		})
+	}
 }
 
 func TestFuncDepsDaemonsRejectsPartialAndReturnsCompleteInventory(t *testing.T) {
@@ -398,23 +375,34 @@ func TestFuncDepsDaemonsRejectsPartialAndReturnsCompleteInventory(t *testing.T) 
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 
-	result, err := (funcDepsAdapter{
-		collector: c,
-	}).Daemons(context.Background(), 1)
-	require.ErrorContains(t, err, "selected limit")
-	assert.Empty(t, result.Rows)
-
-	result, err = (funcDepsAdapter{
-		collector: c,
-	}).Daemons(context.Background(), 3)
-	require.NoError(t, err)
-	assert.Equal(t, 3, result.Total)
-	require.Len(t, result.Rows, 3)
-	ids := make([]string, 0, len(result.Rows))
-	for _, row := range result.Rows {
-		ids = append(ids, row.ID)
+	tests := map[string]struct {
+		limit     int
+		wantError string
+		wantRows  int
+	}{
+		"rejects partial inventory":  {limit: 1, wantError: "selected limit"},
+		"returns complete inventory": {limit: 3, wantRows: 3},
 	}
-	assert.ElementsMatch(t, []string{"mgr.a", "mon.a", "osd.9"}, ids)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			result, err := (funcDepsAdapter{
+				collector: c,
+			}).Daemons(context.Background(), test.limit)
+			if test.wantError != "" {
+				require.ErrorContains(t, err, test.wantError)
+				assert.Empty(t, result.Rows)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantRows, result.Total)
+			require.Len(t, result.Rows, test.wantRows)
+			ids := make([]string, 0, len(result.Rows))
+			for _, row := range result.Rows {
+				ids = append(ids, row.ID)
+			}
+			assert.ElementsMatch(t, []string{"mgr.a", "mon.a", "osd.9"}, ids)
+		})
+	}
 }
 
 func TestFuncDepsDaemonsKeepsMissingActiveStateUnknown(t *testing.T) {
@@ -441,9 +429,19 @@ func TestFuncDepsDaemonsKeepsMissingActiveStateUnknown(t *testing.T) {
 
 func TestCollectorFunctionAvailability(t *testing.T) {
 	c := New()
-	assert.True(t, c.FunctionAvailable(cephfunc.MethodHealth))
-	assert.True(t, c.FunctionAvailable(cephfunc.MethodOSDs))
-	assert.True(t, c.FunctionAvailable(cephfunc.MethodPools))
-	assert.True(t, c.FunctionAvailable(cephfunc.MethodDaemons))
-	assert.False(t, c.FunctionAvailable("unknown"))
+	tests := map[string]struct {
+		method string
+		want   bool
+	}{
+		"health":  {method: cephfunc.MethodHealth, want: true},
+		"OSDs":    {method: cephfunc.MethodOSDs, want: true},
+		"pools":   {method: cephfunc.MethodPools, want: true},
+		"daemons": {method: cephfunc.MethodDaemons, want: true},
+		"unknown": {method: "unknown"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, c.FunctionAvailable(test.method))
+		})
+	}
 }
