@@ -389,11 +389,48 @@ func TestCephClientIdentityFallbackUsesSingleDeadline(t *testing.T) {
 	client.activeGen = 1
 	client.jwt = "test-token"
 
-	_, _, err = client.fetchClusterIdentity(context.Background())
+	_, err = client.probeClusterIdentity(context.Background())
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.EqualValues(t, 1, modernRequests.Load())
 	assert.EqualValues(t, 1, legacyRequests.Load())
+}
+
+func TestCephClientIdentityGenerationRetryUsesSingleDeadline(t *testing.T) {
+	const requestDelay = 70 * time.Millisecond
+
+	var startedRequests, completedRequests atomic.Int64
+	var client *cephClient
+	httpClient := &http.Client{
+		Timeout: 100 * time.Millisecond,
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			startedRequests.Add(1)
+			response, err := delayedHTTPResponse(req, requestDelay, http.StatusOK, `"cluster-fsid"`)
+			if err != nil {
+				return nil, err
+			}
+			if completedRequests.Add(1) == 1 {
+				client.stateMu.Lock()
+				client.activeGen++
+				client.stateMu.Unlock()
+			}
+			return response, nil
+		}),
+	}
+	var err error
+	client, err = newCephClient(httpClient, web.RequestConfig{
+		URL: "https://ceph.example",
+	}, false, nil)
+	require.NoError(t, err)
+	client.activeBase = requireURL(t, "https://ceph.example")
+	client.activeGen = 1
+	client.jwt = "test-token"
+
+	_, err = client.probeClusterIdentity(context.Background())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.EqualValues(t, 2, startedRequests.Load())
+	assert.EqualValues(t, 1, completedRequests.Load())
 }
 
 func TestCephClientOSDFallbackUsesSingleDeadline(t *testing.T) {

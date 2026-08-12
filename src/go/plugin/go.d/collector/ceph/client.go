@@ -290,6 +290,9 @@ func (c *cephClient) withOperationTimeout(ctx context.Context) (context.Context,
 }
 
 func (c *cephClient) probeClusterIdentity(ctx context.Context) (string, error) {
+	ctx, cancel := c.withOperationTimeout(ctx)
+	defer cancel()
+
 	for range 4 {
 		fsid, active, err := c.fetchClusterIdentity(ctx)
 		if err != nil {
@@ -320,9 +323,6 @@ func (c *cephClient) probeClusterIdentity(ctx context.Context) (string, error) {
 }
 
 func (c *cephClient) fetchClusterIdentity(ctx context.Context) (string, activeBaseRef, error) {
-	ctx, cancel := c.withOperationTimeout(ctx)
-	defer cancel()
-
 	var fsid string
 	_, active, err := c.doJSON(ctx, "get cluster FSID", http.MethodGet, urlPathAPIClusterFSID,
 		hdrAcceptVersion, nil, nil, &fsid)
