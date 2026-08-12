@@ -121,7 +121,7 @@ impl ColumnSchema {
             sortable: false,
             sticky: false,
             summary: "count".to_string(),
-            filter: FilterType::Range,
+            filter: FilterType::None,
             full_width: false,
             wrap: true,
             default_expanded_filter: false,
@@ -217,7 +217,7 @@ impl ColumnSchema {
 /// Generate the complete column schema map for the logs table UI.
 ///
 /// This function creates the full schema including:
-/// 1. Special "timestamp" column (index 0) - with range filter
+/// 1. Special "timestamp" column (index 0) - with no filter
 /// 2. Special "rowOptions" column (index 1) - UI-only, no filter
 /// 3. All discovered fields from the histogram (index 2+) - with facet or no filter
 ///
@@ -292,4 +292,28 @@ pub fn columns_to_sorted_json(columns: &StdHashMap<String, ColumnSchema>) -> Val
     }
 
     Value::Object(map)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialized_columns_do_not_offer_timestamp_range_filter() {
+        let schema = generate_column_schema(&["PRIORITY".to_string()]);
+        let columns = columns_to_sorted_json(&schema);
+        let columns = columns.as_object().expect("columns should be an object");
+        let timestamp = columns
+            .get("timestamp")
+            .expect("timestamp column should be present");
+
+        assert_eq!(timestamp["filter"], "none");
+        for (key, column) in columns {
+            assert_ne!(
+                column.get("filter").and_then(Value::as_str),
+                Some("range"),
+                "column {key}"
+            );
+        }
+    }
 }
