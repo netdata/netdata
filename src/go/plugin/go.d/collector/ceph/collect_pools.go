@@ -12,15 +12,15 @@ import (
 )
 
 type poolMetricSample struct {
-	key          string
-	objects      int64
-	available    int64
-	used         int64
-	utilization  float64
-	readOps      int64
-	writeOps     int64
-	readBytes    int64
-	writtenBytes int64
+	key              string
+	objects          int64
+	available        int64
+	used             int64
+	utilizationRatio float64
+	readOps          int64
+	writeOps         int64
+	readBytes        int64
+	writtenBytes     int64
 }
 
 func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error {
@@ -126,20 +126,22 @@ func poolSample(pool apiPoolResponse) (poolMetricSample, error) {
 		}
 		parsed[i] = value
 	}
-	utilization, err := pool.Stats.PercentUsed.Latest.Float64()
-	if err != nil || math.IsNaN(utilization) || math.IsInf(utilization, 0) || utilization < 0 || utilization > 100 {
-		return poolMetricSample{}, fmt.Errorf("list pool statistics returned utilization outside the 0-100 range")
+	// Dashboard forwards Ceph's 0-1 df JSON ratio; only the ceph df text table converts it to percent.
+	utilizationRatio, err := pool.Stats.PercentUsed.Latest.Float64()
+	if err != nil || math.IsNaN(utilizationRatio) || math.IsInf(utilizationRatio, 0) || utilizationRatio < 0 ||
+		utilizationRatio > 1 {
+		return poolMetricSample{}, fmt.Errorf("list pool statistics returned utilization ratio outside the 0-1 range")
 	}
 	return poolMetricSample{
-		key:          pool.PoolName,
-		objects:      parsed[0],
-		available:    parsed[1],
-		used:         parsed[2],
-		utilization:  utilization,
-		readOps:      parsed[3],
-		writeOps:     parsed[4],
-		readBytes:    parsed[5],
-		writtenBytes: parsed[6],
+		key:              pool.PoolName,
+		objects:          parsed[0],
+		available:        parsed[1],
+		used:             parsed[2],
+		utilizationRatio: utilizationRatio,
+		readOps:          parsed[3],
+		writeOps:         parsed[4],
+		readBytes:        parsed[5],
+		writtenBytes:     parsed[6],
 	}, nil
 }
 
@@ -148,7 +150,7 @@ func emitPoolMetrics(mx map[string]int64, sample poolMetricSample) {
 	mx[px+"objects"] = sample.objects
 	mx[px+"space_used_bytes"] = sample.used
 	mx[px+"space_avail_bytes"] = sample.available
-	mx[px+"space_utilization"] = int64(sample.utilization * precision)
+	mx[px+"space_utilization"] = int64(sample.utilizationRatio * 100 * precision)
 	mx[px+"read_ops"] = sample.readOps
 	mx[px+"read_bytes"] = sample.readBytes
 	mx[px+"write_ops"] = sample.writeOps

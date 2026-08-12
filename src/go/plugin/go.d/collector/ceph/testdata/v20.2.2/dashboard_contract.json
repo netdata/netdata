@@ -213,7 +213,7 @@
           "latest": 10
         },
         "percent_used": {
-          "latest": 10
+          "latest": 0.1
         },
         "rd": {
           "latest": 5

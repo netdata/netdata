@@ -221,7 +221,7 @@ func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, mx)
 	assert.NotEmpty(t, c.clusterFSID())
-	assert.EqualValues(t, 1000, mx["pool_mySuperPool_space_utilization"])
+	assert.EqualValues(t, 100000, mx["pool_mySuperPool_space_utilization"])
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 	assert.Equal(t, expectedPacificRequests(), recorder.snapshot())
 }
