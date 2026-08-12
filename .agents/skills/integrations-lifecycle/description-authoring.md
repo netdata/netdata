@@ -67,7 +67,7 @@ The generator resolves each description in this order:
 1. Use the explicit override when one exists:
    - `meta.monitored_instance.description` for collector, flows, and device records;
    - `meta.description` for every other mode.
-   - The generator ignores only surrounding spaces and tabs, then validates and emits the author's remaining text exactly.
+   - The value must already be trimmed. The generator rejects leading or trailing whitespace and emits accepted text exactly.
    - It never removes markup, collapses whitespace, truncates, or falls back to overview prose when an explicit value is invalid.
 2. Otherwise, derive it mechanically from the first useful prose in the rendered overview.
    - Markdown and HTML are reduced to plain text.
@@ -78,7 +78,8 @@ The generator resolves each description in this order:
 An explicit description MUST:
 
 - be 50–160 characters;
-- be one line of plain text with no Markdown, HTML, URL, double quote, or backslash;
+- be already trimmed, with no leading or trailing whitespace;
+- be one line of plain text with no C0/C1 control character, including tabs, or any Markdown, HTML, URL, double quote, or backslash;
 - be unique across every generated integration page;
 - accurately describe the specific integration in active, user-facing language.
 

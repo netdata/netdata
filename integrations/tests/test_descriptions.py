@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ast
 import copy
 import json
 import re
@@ -47,6 +48,56 @@ MODE_BY_TYPE = {
     "service_discovery": "service_discovery",
 }
 
+SCHEMA_REF_BY_TYPE = {
+    "agent_notification": "./agent_notification.json#",
+    "authentication": "./authentication.json#",
+    "cloud_notification": "./cloud_notification.json#",
+    "collector": "./collector.json#",
+    "device": "./device.json#",
+    "exporter": "./exporter.json#",
+    "flows": "./flows.json#",
+    "logs": "./logs.json#",
+    "secretstore": "./secretstore.json#",
+    "service_discovery": "./service_discovery.json#",
+}
+
+VALID_EXPLICIT_DESCRIPTIONS = {
+    "exactly 50 characters": "x" * MIN_DESCRIPTION_LENGTH,
+    "exactly 160 characters": "x" * MAX_DESCRIPTION_LENGTH,
+    "parser-safe Unicode": "Monitor service behavior and operational health with Netdata’s real-time metrics.",
+}
+
+INVALID_EXPLICIT_DESCRIPTIONS = {
+    "non-string": 42,
+    "empty": "",
+    "49 characters": "x" * (MIN_DESCRIPTION_LENGTH - 1),
+    "161 characters": "x" * (MAX_DESCRIPTION_LENGTH + 1),
+    "50 spaces": " " * MIN_DESCRIPTION_LENGTH,
+    "one character plus 49 spaces": "x" + " " * (MIN_DESCRIPTION_LENGTH - 1),
+    "leading space": " " + "x" * MIN_DESCRIPTION_LENGTH,
+    "trailing space": "x" * MIN_DESCRIPTION_LENGTH + " ",
+    "leading tab": "\t" + "x" * MIN_DESCRIPTION_LENGTH,
+    "trailing tab": "x" * MIN_DESCRIPTION_LENGTH + "\t",
+    "internal tab": "x" * 25 + "\t" + "x" * 25,
+    "spaces around 160 characters": " " + "x" * MAX_DESCRIPTION_LENGTH + " ",
+    "Markdown link": "Monitor [PostgreSQL](https://postgresql.org) queries and connections across the server.",
+    "Markdown emphasis": "Monitor **PostgreSQL** queries and connections across every production database server.",
+    "Markdown single emphasis": "Monitor *PostgreSQL* queries and connections across every production database server.",
+    "Markdown code": "Monitor `PostgreSQL` queries and connections across every production database server.",
+    "HTML": "Monitor <strong>PostgreSQL</strong> queries and connections across every production database server.",
+    "URL": "Monitor PostgreSQL queries at https://example.com/metrics across every database server.",
+    "uppercase URL": "Monitor PostgreSQL queries at HTTPS://example.com/metrics across every database server.",
+    "other URL scheme": "Monitor PostgreSQL queries at ftp://example.com/metrics across every database server.",
+    "double quote": 'Monitor PostgreSQL queries and the "ready" state across every production database server.',
+    "backslash": r"Monitor PostgreSQL queries under C:\metrics across every production database server.",
+}
+INVALID_EXPLICIT_DESCRIPTIONS.update(
+    {
+        f"control U+{codepoint:04X}": "x" * 25 + chr(codepoint) + "x" * 25
+        for codepoint in (*range(0x20), *range(0x7F, 0xA0))
+    }
+)
+
 MAP_DESCRIPTION_TARGETS = {
     "docs/NIDL-Framework.md",
     "docs/developer-and-contributor-corner/dyncfg.md",
@@ -81,6 +132,17 @@ def remove_fenced_code(markdown):
 
 def top_level_heading_count(markdown):
     return len(re.findall(r"^# (?!#)", remove_fenced_code(markdown), flags=re.MULTILINE))
+
+
+def parse_description_with_learn_legacy_parser(description_line):
+    """Apply the description-relevant behavior of Learn ingest's read_metadata()."""
+    value = description_line.split(": ", 1)[1]
+    try:
+        if isinstance(ast.literal_eval(value), dict):
+            value = ast.literal_eval(value)
+    except (SyntaxError, ValueError):
+        pass
+    return value.strip('"')
 
 
 class DescriptionNormalizationTest(unittest.TestCase):
@@ -138,34 +200,17 @@ Monitor **short** metrics. Collect enough detail to pass meta-description valida
             integration["meta"]["description"],
         )
 
-    def test_explicit_description_only_trims_surrounding_spaces_and_tabs(self):
+    def test_explicit_description_is_emitted_without_rewriting(self):
         description = "Monitor explicit descriptions without rewriting the author's valid plain text."
         integration = {
             "id": "test",
-            "meta": {"description": f" \t{description}\t "},
+            "meta": {"description": description},
         }
         self.assertEqual(get_integration_meta_description(integration), description)
 
     def test_explicit_description_rejects_authored_violations_before_normalization(self):
-        invalid_values = {
-            "non-string": 42,
-            "too short": "Monitor one service.",
-            "too long": "x" * (MAX_DESCRIPTION_LENGTH + 1),
-            "Markdown link": "Monitor [PostgreSQL](https://postgresql.org) queries and connections across the server.",
-            "Markdown emphasis": "Monitor **PostgreSQL** queries and connections across every production database server.",
-            "Markdown single emphasis": "Monitor *PostgreSQL* queries and connections across every production database server.",
-            "Markdown code": "Monitor `PostgreSQL` queries and connections across every production database server.",
-            "HTML": "Monitor <strong>PostgreSQL</strong> queries and connections across every production database server.",
-            "URL": "Monitor PostgreSQL queries at https://example.com/metrics across every database server.",
-            "uppercase URL": "Monitor PostgreSQL queries at HTTPS://example.com/metrics across every database server.",
-            "other URL scheme": "Monitor PostgreSQL queries at ftp://example.com/metrics across every database server.",
-            "newline": "Monitor PostgreSQL queries and connections across every\nproduction database server.",
-            "double quote": 'Monitor PostgreSQL queries and the "ready" state across every production database server.',
-            "backslash": r"Monitor PostgreSQL queries under C:\metrics across every production database server.",
-        }
-
         categories = [{"id": "logs", "name": "logs", "children": []}]
-        for label, value in invalid_values.items():
+        for label, value in INVALID_EXPLICIT_DESCRIPTIONS.items():
             integration = {
                 "id": f"invalid-{label}",
                 "integration_type": "logs",
@@ -312,26 +357,125 @@ class DescriptionSchemaTest(unittest.TestCase):
                 validator.validate({**base, "description": description})
 
     def test_all_description_schemas_reject_invalid_author_input(self):
-        invalid_values = {
-            "type": 42,
-            "short": "x" * (MIN_DESCRIPTION_LENGTH - 1),
-            "long": "x" * (MAX_DESCRIPTION_LENGTH + 1),
-            "Markdown link": "Monitor [service](https://example.com) behavior across every production system.",
-            "Markdown emphasis": "Monitor **service** behavior and operational health across every production system.",
-            "Markdown single emphasis": "Monitor *service* behavior and operational health across every production system.",
-            "Markdown code": "Monitor `service` behavior and operational health across every production system.",
-            "HTML": "Monitor <strong>service</strong> behavior and operational health across production systems.",
-            "URL": "Monitor service behavior from https://example.com/metrics across production systems.",
-            "uppercase URL": "Monitor service behavior from HTTPS://example.com/metrics across production systems.",
-            "other URL scheme": "Monitor service behavior from ftp://example.com/metrics across production systems.",
-            "newline": "Monitor service behavior and operational health across every\nproduction system.",
-            "double quote": 'Monitor service behavior and its "ready" state across every production system.',
-            "backslash": r"Monitor service behavior under C:\metrics across every production system.",
-        }
         for schema_name, (validator, base) in self.cases.items():
-            for label, value in invalid_values.items():
+            for label, value in INVALID_EXPLICIT_DESCRIPTIONS.items():
                 with self.subTest(schema=schema_name, violation=label), self.assertRaises(ValidationError):
                     validator.validate({**base, "description": value})
+
+
+class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.categories, integrations = read_integrations_js("integrations/integrations.js")
+        cls.integrations = {
+            integration_type: copy.deepcopy(
+                next(item for item in integrations if item.get("integration_type") == integration_type)
+            )
+            for integration_type in MODE_BY_TYPE
+        }
+        cls.schema_fixtures = {
+            integration_type: cls._load_schema_fixture(integration)
+            for integration_type, integration in cls.integrations.items()
+        }
+
+    @staticmethod
+    def _description_owner(integration):
+        meta = integration["meta"]
+        monitored_instance = meta.get("monitored_instance")
+        return monitored_instance if isinstance(monitored_instance, dict) else meta
+
+    @classmethod
+    def _load_schema_fixture(cls, integration):
+        source_path = integration["edit_link"].split("/blob/master/", 1)[1]
+        source = yaml.safe_load((REPO_ROOT / source_path).read_text(encoding="utf-8"))
+        expected_name = cls._description_owner(integration)["name"]
+
+        if isinstance(source, dict) and "modules" in source:
+            candidates = source["modules"]
+        elif isinstance(source, list):
+            candidates = source
+        else:
+            candidates = [source]
+
+        matching = [
+            candidate
+            for candidate in candidates
+            if cls._description_owner(candidate).get("name") == expected_name
+        ]
+        if len(matching) != 1:
+            raise AssertionError(
+                f"Expected one source record for {integration['integration_type']} {expected_name!r}, got {len(matching)}"
+            )
+
+        if isinstance(source, dict) and "modules" in source:
+            source = {**source, "modules": [matching[0]]}
+        elif isinstance(source, list):
+            source = [matching[0]]
+        else:
+            source = matching[0]
+        return source
+
+    @classmethod
+    def _with_description(cls, value, integration, schema_fixture):
+        rendered = copy.deepcopy(integration)
+        cls._description_owner(rendered)["description"] = value
+
+        source = copy.deepcopy(schema_fixture)
+        if isinstance(source, dict) and "modules" in source:
+            source_entry = source["modules"][0]
+        elif isinstance(source, list):
+            source_entry = source[0]
+        else:
+            source_entry = source
+        cls._description_owner(source_entry)["description"] = value
+        return rendered, source
+
+    def _assert_contract(self, value, expected_valid, label):
+        for integration_type, integration in self.integrations.items():
+            rendered, source = self._with_description(
+                value,
+                integration,
+                self.schema_fixtures[integration_type],
+            )
+            validator = make_validator(SCHEMA_REF_BY_TYPE[integration_type])
+
+            try:
+                validator.validate(source)
+                schema_valid = True
+            except ValidationError:
+                schema_valid = False
+
+            try:
+                _, _, _, markdown, _ = build_readme_from_integration(
+                    rendered,
+                    self.categories,
+                    mode=MODE_BY_TYPE[integration_type],
+                )
+                generator_valid = True
+            except RuntimeError:
+                markdown = ""
+                generator_valid = False
+
+            with self.subTest(mode=integration_type, value=label):
+                self.assertEqual(schema_valid, expected_valid)
+                self.assertEqual(generator_valid, expected_valid)
+                self.assertEqual(schema_valid, generator_valid)
+
+                if expected_valid:
+                    description_line = next(
+                        line for line in markdown.splitlines() if line.startswith("description: ")
+                    )
+                    serialized = description_line.split(": ", 1)[1]
+                    self.assertEqual(json.loads(serialized), value)
+                    self.assertEqual(parse_description_with_learn_legacy_parser(description_line), value)
+
+    def test_all_ten_schema_and_generator_paths_accept_the_same_boundary_values(self):
+        for label, value in VALID_EXPLICIT_DESCRIPTIONS.items():
+            self._assert_contract(value, True, label)
+
+    def test_all_ten_schema_and_generator_paths_reject_the_same_adversarial_values(self):
+        for label, value in INVALID_EXPLICIT_DESCRIPTIONS.items():
+            self._assert_contract(value, False, label)
 
 
 class GeneratorInputFailureTest(unittest.TestCase):

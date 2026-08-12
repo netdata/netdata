@@ -86,8 +86,9 @@ endmeta-->
 
 `description:` is mandatory for every generated integration page. The generator prefers an explicit metadata override and
 otherwise derives it from overview prose; it validates length, plain-text form, and global uniqueness before cleanup or
-writing. Explicit input is validated and emitted as authored after trimming only surrounding spaces and tabs; normalization
-and truncation apply only to derived overview prose. See `description-authoring.md` for the source fields and authoring rules.
+writing. Explicit input must already be trimmed and contain no C0/C1 control characters; accepted input is emitted exactly as
+authored. Normalization and truncation apply only to derived overview prose. See `description-authoring.md` for the source fields
+and authoring rules.
 
 The exact wording of `message:` varies by type. From
 `gen_docs_integrations.py`:

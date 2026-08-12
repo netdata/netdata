@@ -36,6 +36,7 @@ _RELATED_RESOURCE_RE = re.compile(
     re.DOTALL,
 )
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])(?:\s+|$)")
+_CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 
 def _remove_fenced_blocks(markdown: str) -> str:
@@ -188,11 +189,8 @@ def get_description_override(integration: Dict[str, Any]) -> Optional[str]:
     if not isinstance(value, str):
         raise ValueError(f"Invalid description for {integration_id}: must be a string: {value!r}")
 
-    # Spaces and tabs around an explicit value are harmless authoring whitespace.
-    # Newlines are not stripped because the one-line contract must reject them.
-    description = value.strip(" \t")
-    validate_description(description, integration_id)
-    return description
+    validate_description(value, integration_id)
+    return value
 
 
 def validate_description(description: str, integration_id: str) -> None:
@@ -206,8 +204,10 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append(
             f"length {length} is outside {MIN_DESCRIPTION_LENGTH}-{MAX_DESCRIPTION_LENGTH} characters"
         )
-    if "\n" in description or "\r" in description:
-        errors.append("contains a newline")
+    if description != description.strip():
+        errors.append("contains leading or trailing whitespace")
+    if _CONTROL_CHARACTER_RE.search(description):
+        errors.append("contains a C0 or C1 control character")
     if _BARE_URL_RE.search(description):
         errors.append("contains a URL")
     if _MARKDOWN_SYNTAX_RE.search(description):
