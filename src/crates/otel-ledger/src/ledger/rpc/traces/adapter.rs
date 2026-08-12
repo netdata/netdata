@@ -643,7 +643,7 @@ pub(crate) fn resolve_window(
 /// cursor).
 pub(crate) fn to_search_result(
     data: SearchData,
-    last: usize,
+    limit: usize,
     incoming: Option<&SearchCursor>,
     frozen: (u32, u32),
     completion_coverage: CoverageWire,
@@ -652,13 +652,13 @@ pub(crate) fn to_search_result(
     if let Some(c) = incoming {
         traces.retain(|t| !is_served(c, t));
     }
-    traces.truncate(last);
+    traces.truncate(limit);
 
     let complete = data.status.is_complete();
     let served_before = incoming.map_or(0, |c| c.served);
-    let anchor = (traces.len() == last && last > 0 && complete)
+    let anchor = (traces.len() == limit && limit > 0 && complete)
         .then(|| {
-            let tail = traces.last().expect("page is full, last > 0");
+            let tail = traces.last().expect("page is full, limit > 0");
             let served = served_before + traces.len();
             // A walk past the cap can't over-fetch any further — end it
             // here (the client sees a full page with no continuation).
@@ -681,7 +681,7 @@ pub(crate) fn to_search_result(
         completion_coverage,
         items: SearchItems {
             returned: traces.len(),
-            max_to_return: last,
+            max_to_return: limit,
         },
         traces: traces.into_iter().map(summary_wire).collect(),
         field_kinds: field_kinds_wire(data.field_kinds),

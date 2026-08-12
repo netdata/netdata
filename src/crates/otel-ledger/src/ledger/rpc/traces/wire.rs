@@ -86,9 +86,10 @@ struct RawOtelTracesRequest {
 /// the optional call-scoping `tenant`. Implements `Deserialize`
 /// manually — top level must be a JSON object (arrays and scalars are
 /// client errors; the object streams through [`RawOtelTracesRequest`]'s
-/// derived visitor, preserving duplicate-key and unknown-key
-/// rejection) — and does NOT implement `Serialize` (tests build JSON
-/// bodies directly).
+/// derived visitor, preserving TOP-LEVEL duplicate-key and unknown-key
+/// rejection — inside a mode object, duplicates collapse last-wins at
+/// the `Value` capture, a known serde_json DOM property) — and does
+/// NOT implement `Serialize` (tests build JSON bodies directly).
 #[derive(Debug, Clone)]
 pub struct OtelTracesRequest {
     pub tenant: Option<String>,
@@ -751,7 +752,7 @@ pub struct FieldKindsWire {
 #[derive(Debug, Serialize)]
 pub struct InfoResponse {
     /// The response's self-description: always `"info"`.
-    mode: &'static str,
+    pub mode: &'static str,
     version: u32,
     status: u32,
     accepted_params: Vec<&'static str>,
