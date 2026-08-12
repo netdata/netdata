@@ -4,6 +4,7 @@ package ceph
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -77,15 +78,27 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 	seen := make(map[string]bool, len(selected))
 	for _, sample := range selected {
 		seen[sample.key] = true
-		if _, ok := c.seenOsds[sample.key]; !ok {
-			c.seenOsds[sample.key] = &entityState{}
-			c.addOsdCharts(sample.key, sample.deviceClass, sample.name)
+	}
+	deferred := c.retireCollidingEntityOwners("osd", c.seenOsds, seen)
+	var chartErrs []error
+	for _, sample := range selected {
+		if deferred[sample.key] {
+			continue
 		}
-		c.seenOsds[sample.key].lastSeen = now
+		state, ok := c.seenOsds[sample.key]
+		if !ok {
+			if err := c.addOsdCharts(sample.key, sample.deviceClass, sample.name); err != nil {
+				chartErrs = append(chartErrs, fmt.Errorf("add charts for OSD %q: %w", sample.key, err))
+				continue
+			}
+			state = &entityState{}
+			c.seenOsds[sample.key] = state
+		}
+		state.lastSeen = now
 		emitOSDMetrics(mx, sample)
 	}
 	c.expireMissingEntities("osd", c.seenOsds, seen, now)
-	return nil
+	return errors.Join(chartErrs...)
 }
 
 func (c *Collector) fetchAllOSDs(ctx context.Context) ([]apiOsdResponse, error) {
@@ -166,7 +179,7 @@ func validateOSDs(osds []apiOsdResponse) error {
 func validateOSDChartKeys(samples []osdMetricSample) error {
 	seen := make(map[string]bool, len(samples))
 	for _, sample := range samples {
-		key := cleanChartID("osd_" + sample.key + "_")
+		key := normalizedEntityChartKey("osd", sample.key)
 		if seen[key] {
 			return fmt.Errorf("selected OSD UUIDs collide after legacy chart-ID normalization")
 		}

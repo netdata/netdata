@@ -569,7 +569,36 @@ func (c *Collector) suppressEntityMetrics(kind string, states map[string]*entity
 	}
 }
 
-func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) {
+func (c *Collector) retireCollidingEntityOwners(
+	kind string,
+	states map[string]*entityState,
+	seen map[string]bool,
+) map[string]bool {
+	selectedOwners := make(map[string]string, len(seen))
+	for key := range seen {
+		selectedOwners[normalizedEntityChartKey(kind, key)] = key
+	}
+	var deferred map[string]bool
+	for oldKey := range states {
+		newKey, ok := selectedOwners[normalizedEntityChartKey(kind, oldKey)]
+		if !ok || newKey == oldKey {
+			continue
+		}
+		delete(states, oldKey)
+		c.removeEntityCharts(kind, oldKey)
+		if deferred == nil {
+			deferred = make(map[string]bool)
+		}
+		deferred[newKey] = true
+	}
+	return deferred
+}
+
+func normalizedEntityChartKey(kind, key string) string {
+	return cleanChartID(kind + "_" + key + "_")
+}
+
+func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) error {
 	c.pruneRemovedCharts(entityChartIDs("osd", osdUuid))
 	charts := osdChartsTmpl.Copy()
 
@@ -587,12 +616,10 @@ func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) {
 		}
 	}
 
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warning(err)
-	}
+	return c.addChartsTransactional(charts)
 }
 
-func (c *Collector) addPoolCharts(poolName string) {
+func (c *Collector) addPoolCharts(poolName string) error {
 	c.pruneRemovedCharts(entityChartIDs("pool", poolName))
 	charts := poolChartsTmpl.Copy()
 
@@ -608,9 +635,20 @@ func (c *Collector) addPoolCharts(poolName string) {
 		}
 	}
 
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warning(err)
+	return c.addChartsTransactional(charts)
+}
+
+func (c *Collector) addChartsTransactional(charts *collectorapi.Charts) error {
+	all := c.Charts()
+	before := len(*all)
+	if err := all.Add(*charts...); err != nil {
+		for i := before; i < len(*all); i++ {
+			(*all)[i] = nil
+		}
+		*all = (*all)[:before]
+		return err
 	}
+	return nil
 }
 
 func entityChartIDs(kind, key string) []string {

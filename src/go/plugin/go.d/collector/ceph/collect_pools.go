@@ -4,6 +4,7 @@ package ceph
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -68,21 +69,33 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 	seen := make(map[string]bool, len(selected))
 	for _, sample := range selected {
 		seen[sample.key] = true
-		if _, ok := c.seenPools[sample.key]; !ok {
-			c.seenPools[sample.key] = &entityState{}
-			c.addPoolCharts(sample.key)
+	}
+	deferred := c.retireCollidingEntityOwners("pool", c.seenPools, seen)
+	var chartErrs []error
+	for _, sample := range selected {
+		if deferred[sample.key] {
+			continue
 		}
-		c.seenPools[sample.key].lastSeen = now
+		state, ok := c.seenPools[sample.key]
+		if !ok {
+			if err := c.addPoolCharts(sample.key); err != nil {
+				chartErrs = append(chartErrs, fmt.Errorf("add charts for pool %q: %w", sample.key, err))
+				continue
+			}
+			state = &entityState{}
+			c.seenPools[sample.key] = state
+		}
+		state.lastSeen = now
 		emitPoolMetrics(mx, sample)
 	}
 	c.expireMissingEntities("pool", c.seenPools, seen, now)
-	return nil
+	return errors.Join(chartErrs...)
 }
 
 func validatePoolChartKeys(samples []poolMetricSample) error {
 	seen := make(map[string]bool, len(samples))
 	for _, sample := range samples {
-		key := cleanChartID("pool_" + sample.key + "_")
+		key := normalizedEntityChartKey("pool", sample.key)
 		if seen[key] {
 			return fmt.Errorf("selected pool names collide after legacy chart-ID normalization")
 		}

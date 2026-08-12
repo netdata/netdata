@@ -613,7 +613,7 @@ func TestCollector_CapSuppressionImmediatelyObsoletesEntityCharts(t *testing.T) 
 	c.identityMu.Lock()
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
-	c.addOsdCharts("uuid-1", "ssd", "osd.1")
+	require.NoError(t, c.addOsdCharts("uuid-1", "ssd", "osd.1"))
 	c.seenOsds["uuid-1"] = &entityState{
 		lastSeen: time.Now(),
 	}
@@ -838,7 +838,7 @@ func TestCollector_DynamicEntityAbsenceGrace(t *testing.T) {
 	c.identityMu.Lock()
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
-	c.addPoolCharts("pool-a")
+	require.NoError(t, c.addPoolCharts("pool-a"))
 	base := time.Unix(100, 0)
 	c.seenPools["pool-a"] = &entityState{
 		lastSeen: base,
@@ -856,7 +856,7 @@ func TestCollector_DynamicEntityAbsenceGrace(t *testing.T) {
 		assert.True(t, chart.Obsolete)
 	}
 
-	c.addPoolCharts("pool-a")
+	require.NoError(t, c.addPoolCharts("pool-a"))
 	require.Len(t, *c.Charts(), len(poolChartsTmpl))
 	for _, chart := range *c.Charts() {
 		assert.False(t, chart.IsRemoved())
@@ -869,8 +869,8 @@ func TestCollector_DynamicEntityLifecycleUsesExactChartIDs(t *testing.T) {
 	c.identityMu.Lock()
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
-	c.addPoolCharts("foo")
-	c.addPoolCharts("foo_bar")
+	require.NoError(t, c.addPoolCharts("foo"))
+	require.NoError(t, c.addPoolCharts("foo_bar"))
 	base := time.Unix(100, 0)
 	c.seenPools["foo"] = &entityState{
 		lastSeen: base,
@@ -889,11 +889,104 @@ func TestCollector_DynamicEntityLifecycleUsesExactChartIDs(t *testing.T) {
 		assert.False(t, c.Charts().Get(id).IsRemoved(), id)
 	}
 
-	c.addPoolCharts("foo")
+	require.NoError(t, c.addPoolCharts("foo"))
 	assert.Len(t, *c.Charts(), 2*len(poolChartsTmpl))
 	for _, id := range entityChartIDs("pool", "foo_bar") {
 		assert.False(t, c.Charts().Get(id).IsRemoved(), id)
 	}
+}
+
+func TestCollector_PoolNormalizedChartOwnerReplacement(t *testing.T) {
+	var current atomic.Value
+	current.Store(validPoolResponse("pool.a"))
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == urlPathApiPool && r.URL.Query().Get("stats") == "true" {
+			writeJSON(w, http.StatusOK, []apiPoolResponse{current.Load().(apiPoolResponse)})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
+	now := time.Unix(100, 0)
+	c.now = func() time.Time { return now }
+
+	mx := make(map[string]int64)
+	require.NoError(t, c.collectPools(context.Background(), mx))
+	assert.Contains(t, c.seenPools, "pool.a")
+	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+
+	current.Store(validPoolResponse("pool_a"))
+	now = now.Add(10 * time.Second)
+	mx = make(map[string]int64)
+	require.NoError(t, c.collectPools(context.Background(), mx))
+	assert.Empty(t, mx)
+	assert.NotContains(t, c.seenPools, "pool.a")
+	assert.NotContains(t, c.seenPools, "pool_a")
+	for _, id := range entityChartIDs("pool", "pool.a") {
+		require.NotNil(t, c.Charts().Get(id))
+		assert.True(t, c.Charts().Get(id).IsRemoved(), id)
+	}
+
+	now = now.Add(10 * time.Second)
+	mx = make(map[string]int64)
+	require.NoError(t, c.collectPools(context.Background(), mx))
+	assert.Contains(t, c.seenPools, "pool_a")
+	assert.NotContains(t, c.seenPools, "pool.a")
+	require.Len(t, *c.Charts(), len(poolChartsTmpl))
+	for _, chart := range *c.Charts() {
+		assert.False(t, chart.IsRemoved(), chart.ID)
+		assert.Equal(t, "pool_a", chart.Labels[1].Value, chart.ID)
+	}
+	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+}
+
+func TestCollector_PoolChartAdmissionIsTransactional(t *testing.T) {
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == urlPathApiPool && r.URL.Query().Get("stats") == "true" {
+			writeJSON(w, http.StatusOK, []apiPoolResponse{validPoolResponse("pool-a")})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
+	require.NoError(t, c.addPoolCharts("pool-a"))
+	ids := entityChartIDs("pool", "pool-a")
+	for _, id := range ids {
+		if id != ids[1] {
+			require.NoError(t, c.Charts().Remove(id))
+		}
+	}
+	require.Len(t, *c.Charts(), 1)
+
+	mx := make(map[string]int64)
+	err := c.collectPools(context.Background(), mx)
+	require.Error(t, err)
+	assert.Empty(t, mx)
+	assert.Empty(t, c.seenPools)
+	require.Len(t, *c.Charts(), 1)
+	assert.Nil(t, c.Charts().Get(ids[0]))
+}
+
+func validPoolResponse(name string) apiPoolResponse {
+	var value apiPoolResponse
+	value.PoolName = name
+	value.Stats.Objects.Latest = "5"
+	value.Stats.AvailRaw.Latest = "80"
+	value.Stats.BytesUsed.Latest = "20"
+	value.Stats.PercentUsed.Latest = "0.2"
+	value.Stats.Reads.Latest = "1"
+	value.Stats.ReadBytes.Latest = "2"
+	value.Stats.Writes.Latest = "3"
+	value.Stats.WrittenBytes.Latest = "4"
+	return value
 }
 
 func TestValidatePoolChartKeysRejectsLegacyNormalizationCollision(t *testing.T) {
@@ -1098,8 +1191,8 @@ func TestCollector_PublicChartIdentityContract(t *testing.T) {
 	c.fsid = "synthetic-fsid"
 	c.identityMu.Unlock()
 	c.addClusterCharts()
-	c.addOsdCharts("uuid-1", "ssd", "osd.1")
-	c.addPoolCharts("pool-a")
+	require.NoError(t, c.addOsdCharts("uuid-1", "ssd", "osd.1"))
+	require.NoError(t, c.addPoolCharts("pool-a"))
 	for _, chart := range *c.Charts() {
 		keys := make([]string, 0, len(chart.Labels))
 		for _, label := range chart.Labels {
