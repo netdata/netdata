@@ -18,20 +18,10 @@ import (
 )
 
 const (
-	urlPathAPICrushRule      = "/api/crush_rule"
-	urlPathAPIDaemon         = "/api/daemon"
-	urlPathAPIRGWDaemon      = "/api/rgw/daemon"
-	urlPathAPIRGWRealm       = "/api/rgw/realm"
-	urlPathAPIRGWZonegroup   = "/api/rgw/zonegroup"
-	urlPathAPIRGWZone        = "/api/rgw/zone"
-	urlPathAPIRGWSyncStatus  = "/api/rgw/multisite/sync_status"
-	urlPathAPIRGWUser        = "/api/rgw/user"
-	urlPathAPIRGWBucket      = "/api/rgw/bucket"
-	urlPathAPIRGWAccounts    = "/api/rgw/accounts"
-	hdrAcceptVersionV2       = "application/vnd.ceph.api.v2.0+json"
-	maxFunctionRows          = 10000
-	maxFunctionLookaheadRows = maxFunctionRows + 1
-	maxRGWSyncProbes         = 10
+	urlPathAPICrushRule   = "/api/crush_rule"
+	urlPathAPIDaemon      = "/api/daemon"
+	hdrAcceptVersionV2    = "application/vnd.ceph.api.v2.0+json"
+	maxHealthFunctionRows = cephfunc.MaxInventoryLimit
 )
 
 type funcDepsAdapter struct {
@@ -121,12 +111,15 @@ func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.Health
 		return checks[i].Type < checks[j].Type
 	})
 	result := cephfunc.HealthResult{}
-	target := functionRowTarget(limit)
+	target := min(limit+1, maxHealthFunctionRows)
 	for _, check := range checks {
 		code := check.Type
 		severity := strings.ToUpper(check.Severity)
 		if len(check.Detail) == 0 {
 			result.Total++
+			if result.Total > maxHealthFunctionRows {
+				return cephfunc.HealthResult{}, errors.New("health detail exceeds the internal row ceiling")
+			}
 			if len(result.Rows) < target {
 				result.Rows = append(result.Rows, cephfunc.HealthRow{
 					ID: code + "#00000000", Code: code, Severity: severity, Muted: check.Muted,
@@ -137,6 +130,9 @@ func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.Health
 		}
 		for index, detail := range check.Detail {
 			result.Total++
+			if result.Total > maxHealthFunctionRows {
+				return cephfunc.HealthResult{}, errors.New("health detail exceeds the internal row ceiling")
+			}
 			if len(result.Rows) < target {
 				result.Rows = append(result.Rows, cephfunc.HealthRow{
 					ID: fmt.Sprintf("%s#%08d", code, index), Code: code, Severity: severity,
@@ -153,44 +149,31 @@ func (d funcDepsAdapter) OSDs(ctx context.Context, limit int) (cephfunc.OSDResul
 	if err := d.revalidateClusterIdentity(ctx); err != nil {
 		return cephfunc.OSDResult{}, err
 	}
-	target := functionRowTarget(limit)
+	if limit <= 0 || limit > cephfunc.MaxInventoryLimit {
+		return cephfunc.OSDResult{}, errors.New("OSD inventory received an invalid row limit")
+	}
+	query := url.Values{
+		"offset": {"0"}, "limit": {strconv.Itoa(limit)}, "sort": {"+id"},
+	}
 	var osds []apiOsdResponse
-	total := 0
-	for offset := 0; len(osds) < target; {
-		pageLimit := min(osdPageSize, target-len(osds))
-		query := url.Values{
-			"offset": {strconv.Itoa(offset)}, "limit": {strconv.Itoa(pageLimit)}, "sort": {"+id"},
-		}
-		var page []apiOsdResponse
-		headers, err := d.collector.apiClient.getJSONWithHeaders(ctx, "list OSDs for Function", urlPathApiOsd, hdrAcceptVersionV11, query, &page)
-		if err != nil {
-			return cephfunc.OSDResult{}, toFunctionSourceError(err, "OSD inventory")
-		}
-		if raw := headers.Get("X-Total-Count"); raw != "" {
-			parsed, err := strconv.Atoi(raw)
-			if err != nil || parsed < 0 {
-				return cephfunc.OSDResult{}, errors.New("OSD inventory returned an invalid X-Total-Count")
-			}
-			total = parsed
-		}
-		pageLength := len(page)
-		if total < offset+pageLength {
-			total = offset + pageLength
-		}
-		if remaining := target - len(osds); len(page) > remaining {
-			page = page[:remaining]
-		}
-		osds = append(osds, page...)
-		offset += pageLength
-		if pageLength < pageLimit {
-			if total > offset {
-				return cephfunc.OSDResult{}, errors.New("OSD inventory returned a short page before the advertised total")
-			}
-			break
+	headers, err := d.collector.apiClient.getJSONWithHeaders(ctx, "list OSDs for Function", urlPathApiOsd, hdrAcceptVersionV11, query, &osds)
+	if err != nil {
+		return cephfunc.OSDResult{}, toFunctionSourceError(err, "OSD inventory")
+	}
+	total, err := strconv.Atoi(headers.Get("X-Total-Count"))
+	if err != nil || total < 0 {
+		return cephfunc.OSDResult{}, errors.New("OSD inventory returned an invalid X-Total-Count")
+	}
+	if total > cephfunc.MaxInventoryLimit {
+		return cephfunc.OSDResult{}, &cephfunc.InventoryLimitError{
+			Resource: "OSD", Total: total, Limit: cephfunc.MaxInventoryLimit, Hard: true,
 		}
 	}
-	if total < len(osds) {
-		total = len(osds)
+	if total > limit {
+		return cephfunc.OSDResult{}, &cephfunc.InventoryLimitError{Resource: "OSD", Total: total, Limit: limit}
+	}
+	if len(osds) != total {
+		return cephfunc.OSDResult{}, fmt.Errorf("OSD inventory is incomplete: received %d of %d rows", len(osds), total)
 	}
 	if err := validateOSDs(osds); err != nil {
 		return cephfunc.OSDResult{}, err
@@ -227,6 +210,9 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 	if err := d.revalidateClusterIdentity(ctx); err != nil {
 		return cephfunc.PoolResult{}, err
 	}
+	if limit <= 0 || limit > cephfunc.MaxInventoryLimit {
+		return cephfunc.PoolResult{}, errors.New("pool inventory received an invalid row limit")
+	}
 	attrs := strings.Join([]string{
 		"pool_name", "type", "size", "min_size", "pg_num", "pg_placement_num", "pg_autoscale_mode",
 		"crush_rule", "application_metadata", "erasure_code_profile", "quota_max_bytes",
@@ -236,6 +222,14 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 	if err := d.collector.apiClient.getJSON(ctx, "list pool policy", urlPathApiPool, hdrAcceptVersion,
 		url.Values{"stats": {"false"}, "attrs": {attrs}}, &pools); err != nil {
 		return cephfunc.PoolResult{}, toFunctionSourceError(err, "pool inventory")
+	}
+	if len(pools) > cephfunc.MaxInventoryLimit {
+		return cephfunc.PoolResult{}, &cephfunc.InventoryLimitError{
+			Resource: "pool", Total: len(pools), Limit: cephfunc.MaxInventoryLimit, Hard: true,
+		}
+	}
+	if len(pools) > limit {
+		return cephfunc.PoolResult{}, &cephfunc.InventoryLimitError{Resource: "pool", Total: len(pools), Limit: limit}
 	}
 	seenPools := make(map[string]bool, len(pools))
 	for _, pool := range pools {
@@ -255,6 +249,11 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 	if err := d.collector.apiClient.getJSON(ctx, "list CRUSH rules", urlPathAPICrushRule, hdrAcceptVersionV2, nil, &rules); err != nil {
 		return cephfunc.PoolResult{}, toFunctionSourceError(err, "CRUSH rule inventory")
 	}
+	if len(rules) > cephfunc.MaxInventoryLimit {
+		return cephfunc.PoolResult{}, &cephfunc.InventoryLimitError{
+			Resource: "CRUSH rule", Total: len(rules), Limit: cephfunc.MaxInventoryLimit, Hard: true,
+		}
+	}
 	ruleInfo := make(map[string]crushRuleInfo, len(rules))
 	for _, rule := range rules {
 		name := anyString(rule["rule_name"])
@@ -266,12 +265,8 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 		}
 	}
 
-	target := functionRowTarget(limit)
-	rows := make([]cephfunc.PoolRow, 0, min(len(pools), target))
+	rows := make([]cephfunc.PoolRow, 0, len(pools))
 	for _, pool := range pools {
-		if len(rows) == target {
-			break
-		}
 		size, err := nonnegativeInt64Field(pool, "size")
 		if err != nil {
 			return cephfunc.PoolResult{}, err
@@ -317,9 +312,20 @@ func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.Daemo
 	if err := d.revalidateClusterIdentity(ctx); err != nil {
 		return cephfunc.DaemonResult{}, err
 	}
+	if limit <= 0 || limit > cephfunc.MaxInventoryLimit {
+		return cephfunc.DaemonResult{}, errors.New("daemon inventory received an invalid row limit")
+	}
 	var daemons []map[string]any
 	if err := d.collector.apiClient.getJSON(ctx, "list daemons", urlPathAPIDaemon, hdrAcceptVersion, nil, &daemons); err != nil {
 		return cephfunc.DaemonResult{}, toFunctionSourceError(err, "daemon inventory")
+	}
+	if len(daemons) > cephfunc.MaxInventoryLimit {
+		return cephfunc.DaemonResult{}, &cephfunc.InventoryLimitError{
+			Resource: "daemon", Total: len(daemons), Limit: cephfunc.MaxInventoryLimit, Hard: true,
+		}
+	}
+	if len(daemons) > limit {
+		return cephfunc.DaemonResult{}, &cephfunc.InventoryLimitError{Resource: "daemon", Total: len(daemons), Limit: limit}
 	}
 	sort.SliceStable(daemons, func(i, j int) bool {
 		leftID, leftName := daemonIdentity(daemons[i])
@@ -340,12 +346,8 @@ func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.Daemo
 		}
 		seenDaemons[id] = true
 	}
-	target := functionRowTarget(limit)
-	rows := make([]cephfunc.DaemonRow, 0, min(len(daemons), target))
+	rows := make([]cephfunc.DaemonRow, 0, len(daemons))
 	for _, daemon := range daemons {
-		if len(rows) == target {
-			break
-		}
 		typ := anyString(daemon["daemon_type"])
 		id, name := daemonIdentity(daemon)
 		var active *bool
@@ -364,311 +366,6 @@ func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.Daemo
 		})
 	}
 	return cephfunc.DaemonResult{Rows: rows, Total: len(daemons)}, nil
-}
-
-func (d funcDepsAdapter) RGWMultisite(ctx context.Context, limit int) (cephfunc.RGWMultisiteResult, error) {
-	type objectList struct {
-		kind       string
-		path       string
-		key        string
-		defaultKey string
-	}
-	lists := []objectList{
-		{kind: "realm", path: urlPathAPIRGWRealm, key: "realms", defaultKey: "default_info"},
-		{kind: "zonegroup", path: urlPathAPIRGWZonegroup, key: "zonegroups", defaultKey: "default_info"},
-		{kind: "zone", path: urlPathAPIRGWZone, key: "zones", defaultKey: "default_info"},
-	}
-	type candidate struct {
-		kind, path, name, defaultInfo string
-		hasDefault                    bool
-	}
-	var candidates []candidate
-	seenCandidates := make(map[string]bool)
-	for _, list := range lists {
-		var response map[string]any
-		if err := d.collector.apiClient.getJSON(ctx, "list RGW "+list.kind, list.path, hdrAcceptVersion, nil, &response); err != nil {
-			return cephfunc.RGWMultisiteResult{}, toFunctionSourceError(err, "RGW multisite inventory")
-		}
-		defaultInfo, hasDefault, err := rgwDefaultInfo(response, list.defaultKey)
-		if err != nil {
-			return cephfunc.RGWMultisiteResult{}, err
-		}
-		for _, name := range anyStringSlice(response[list.key]) {
-			candidateKey := list.kind + "\x00" + name
-			if seenCandidates[candidateKey] {
-				return cephfunc.RGWMultisiteResult{}, errors.New("RGW multisite inventory returned duplicate object names")
-			}
-			seenCandidates[candidateKey] = true
-			candidates = append(candidates, candidate{
-				kind: list.kind, path: list.path, name: name, defaultInfo: defaultInfo,
-				hasDefault: hasDefault,
-			})
-		}
-	}
-	sort.SliceStable(candidates, func(i, j int) bool {
-		leftRank, rightRank := rgwObjectKindRank(candidates[i].kind), rgwObjectKindRank(candidates[j].kind)
-		if leftRank != rightRank {
-			return leftRank < rightRank
-		}
-		return candidates[i].name < candidates[j].name
-	})
-
-	result := cephfunc.RGWMultisiteResult{Total: len(candidates)}
-	masterZones := make(map[string]string)
-	seenRowIDs := make(map[string]bool)
-	for _, object := range candidates {
-		if len(result.Rows) >= limit || len(result.Rows) >= maxFunctionRows {
-			break
-		}
-		var detail map[string]any
-		endpoint := endpointWithSegment(object.path, object.name)
-		if err := d.collector.apiClient.getJSON(ctx, "get RGW "+object.kind, endpoint, hdrAcceptVersion, nil, &detail); err != nil {
-			return cephfunc.RGWMultisiteResult{}, toFunctionSourceError(err, "RGW multisite detail")
-		}
-		id := firstNonEmpty(anyString(detail["id"]), object.name)
-		name := firstNonEmpty(anyString(detail["name"]), object.name)
-		row := cephfunc.RGWMultisiteRow{
-			ID: object.kind + ":" + id, Kind: object.kind, Name: name,
-			Realm:     firstNonEmpty(anyString(detail["realm_name"]), anyString(detail["realm_id"])),
-			Zonegroup: firstNonEmpty(anyString(detail["zonegroup_name"]), anyString(detail["zonegroup_id"])),
-			Endpoints: strings.Join(anyStringSlice(detail["endpoints"]), ","),
-		}
-		if seenRowIDs[row.ID] {
-			return cephfunc.RGWMultisiteResult{}, errors.New("RGW multisite detail returned duplicate object identities")
-		}
-		seenRowIDs[row.ID] = true
-		if object.hasDefault {
-			row.Default = boolPtr(object.defaultInfo == id || object.defaultInfo == name)
-		}
-		switch object.kind {
-		case "zonegroup":
-			if master, ok := anyBoolKnown(detail["is_master"]); ok {
-				row.Master = boolPtr(master)
-			}
-			if rawMasterZone, exists := detail["master_zone"]; exists && rawMasterZone != nil {
-				masterZone, ok := rawMasterZone.(string)
-				if !ok {
-					return cephfunc.RGWMultisiteResult{}, errors.New("RGW zonegroup detail returned an invalid master-zone identity")
-				}
-				masterZones[id] = masterZone
-				masterZones[name] = masterZone
-			}
-		case "zone":
-			if masterZone, ok := masterZones[row.Zonegroup]; ok {
-				row.Master = boolPtr(masterZone == id || masterZone == name)
-			}
-		}
-		result.Rows = append(result.Rows, row)
-	}
-
-	var daemons []map[string]any
-	if err := d.collector.apiClient.getJSON(ctx, "list RGW daemons", urlPathAPIRGWDaemon, hdrAcceptVersion, nil, &daemons); err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return cephfunc.RGWMultisiteResult{}, err
-		}
-		result.Total++
-		if len(result.Rows) < limit {
-			status, note := rgwSyncInventoryError(err)
-			result.Rows = append(result.Rows, cephfunc.RGWMultisiteRow{
-				ID: "sync:inventory", Kind: "sync", Name: "sync diagnostics",
-				SyncStatus: status, ReleaseScope: note,
-			})
-		}
-		return result, nil
-	}
-
-	sort.SliceStable(daemons, func(i, j int) bool {
-		return rgwDaemonIdentity(daemons[i]) < rgwDaemonIdentity(daemons[j])
-	})
-	seenRGWDaemons := make(map[string]bool, len(daemons))
-	for _, daemon := range daemons {
-		name := rgwDaemonIdentity(daemon)
-		if name == "" {
-			return cephfunc.RGWMultisiteResult{}, errors.New("RGW daemon inventory returned an empty daemon identity")
-		}
-		if seenRGWDaemons[name] {
-			return cephfunc.RGWMultisiteResult{}, errors.New("RGW daemon inventory returned duplicate daemon identities")
-		}
-		seenRGWDaemons[name] = true
-	}
-	probeCount := min(maxRGWSyncProbes, len(daemons))
-	result.Total += probeCount
-	unsupported := false
-	for i := 0; i < probeCount && len(result.Rows) < limit; i++ {
-		name := rgwDaemonIdentity(daemons[i])
-		row := cephfunc.RGWMultisiteRow{ID: "sync:" + name, Kind: "sync", Name: name}
-		if unsupported {
-			row.SyncStatus = "unsupported_public_api"
-			row.ReleaseScope = "Public sync API is available on Squid and Tentacle, not Reef."
-			result.Rows = append(result.Rows, row)
-			continue
-		}
-		var syncResponse map[string]any
-		err := d.collector.apiClient.getJSON(ctx, "get RGW sync status", urlPathAPIRGWSyncStatus, hdrAcceptVersion,
-			url.Values{"daemon_name": {name}}, &syncResponse)
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return cephfunc.RGWMultisiteResult{}, err
-			}
-			var apiErr *apiHTTPError
-			if errors.As(err, &apiErr) && apiErr.status == http.StatusNotFound {
-				unsupported = true
-				row.SyncStatus = "unsupported_public_api"
-				row.ReleaseScope = "Public sync API is available on Squid and Tentacle, not Reef."
-				result.Rows = append(result.Rows, row)
-				continue
-			}
-			row.SyncStatus = "error"
-			row.ReleaseScope = "The bounded Dashboard sync probe failed; no raw error detail is exposed."
-			result.Rows = append(result.Rows, row)
-			continue
-		}
-		row.SyncStatus = "available"
-		if metadata, ok := syncResponse["metadataSyncInfo"].(map[string]any); ok {
-			row.SyncStatus = firstNonEmpty(anyString(metadata["syncstatus"]), row.SyncStatus)
-		}
-		if bs, err := json.Marshal(syncResponse); err == nil {
-			row.SyncDetail = string(bs)
-		}
-		row.ReleaseScope = "Best-effort Dashboard parsing of radosgw-admin output."
-		result.Rows = append(result.Rows, row)
-	}
-
-	return result, nil
-}
-
-func (d funcDepsAdapter) RGWQuotas(ctx context.Context, limit int) (cephfunc.RGWQuotaResult, error) {
-	targets := quotaTargets(d.collector.Functions.RGWQuotas)
-	result := cephfunc.RGWQuotaResult{Total: len(targets)}
-	for _, target := range targets {
-		if len(result.Rows) >= limit {
-			break
-		}
-		row, err := d.lookupRGWQuota(ctx, target.kind, target.id)
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return cephfunc.RGWQuotaResult{}, err
-			}
-			var apiErr *apiHTTPError
-			switch {
-			case errors.As(err, &apiErr) && apiErr.status == http.StatusNotFound:
-				status := "not_found"
-				if target.kind == "account" {
-					status = "unsupported_or_not_found"
-				}
-				result.Rows = append(result.Rows, cephfunc.RGWQuotaRow{
-					Key: quotaRowKey(target.kind, target.id), ID: target.id, Kind: target.kind, Status: status,
-				})
-				continue
-			case errors.As(err, &apiErr) && apiErr.status == http.StatusForbidden:
-				return cephfunc.RGWQuotaResult{}, &cephfunc.SourceError{Status: http.StatusForbidden, Message: "Dashboard RGW read permission is required"}
-			default:
-				result.Rows = append(result.Rows, cephfunc.RGWQuotaRow{
-					Key: quotaRowKey(target.kind, target.id), ID: target.id, Kind: target.kind, Status: "error",
-				})
-				continue
-			}
-		}
-		result.Rows = append(result.Rows, row)
-	}
-	return result, nil
-}
-
-type quotaTarget struct{ kind, id string }
-
-func quotaTargets(cfg RGWQuotasFunctionConfig) []quotaTarget {
-	seen := make(map[string]bool)
-	var targets []quotaTarget
-	add := func(kind string, values []string) {
-		for _, value := range values {
-			value = strings.TrimSpace(value)
-			key := kind + "\x00" + value
-			if value == "" || seen[key] {
-				continue
-			}
-			seen[key] = true
-			targets = append(targets, quotaTarget{kind: kind, id: value})
-		}
-	}
-	add("user", cfg.Users)
-	add("bucket", cfg.Buckets)
-	add("account", cfg.Accounts)
-	sort.SliceStable(targets, func(i, j int) bool {
-		if targets[i].kind != targets[j].kind {
-			return targets[i].kind < targets[j].kind
-		}
-		return targets[i].id < targets[j].id
-	})
-	return targets
-}
-
-func (d funcDepsAdapter) lookupRGWQuota(ctx context.Context, kind, id string) (cephfunc.RGWQuotaRow, error) {
-	path := map[string]string{"user": urlPathAPIRGWUser, "bucket": urlPathAPIRGWBucket, "account": urlPathAPIRGWAccounts}[kind]
-	query := url.Values(nil)
-	if kind == "user" {
-		query = url.Values{"stats": {"true"}}
-	}
-	var response map[string]any
-	if err := d.collector.apiClient.getJSON(ctx, "get RGW "+kind+" quota", endpointWithSegment(path, id), hdrAcceptVersion, query, &response); err != nil {
-		return cephfunc.RGWQuotaRow{}, err
-	}
-	row := cephfunc.RGWQuotaRow{
-		Key: quotaRowKey(kind, id), ID: id, Kind: kind, Status: "ok", Tenant: anyString(response["tenant"]),
-		Account: firstNonEmpty(anyString(response["account_id"]), anyString(response["account"])),
-		Owner:   firstNonEmpty(anyString(response["owner"]), anyString(response["name"])),
-	}
-
-	var usage map[string]any
-	aggregateUsage := false
-	var quota map[string]any
-	switch kind {
-	case "user":
-		usage = anyMap(response["stats"])
-		quota = anyMap(response["user_quota"])
-		row.StatsFreshness = "Ceph RGW cached/asynchronous quota statistics; no forced sync."
-	case "bucket":
-		usage = anyMap(response["usage"])
-		aggregateUsage = true
-		quota = anyMap(response["bucket_quota"])
-		row.StatsFreshness = "Ceph RGW cached/asynchronous bucket statistics; no forced sync."
-	case "account":
-		usage = anyMap(response["stats"])
-		quota = firstNonEmptyMap(anyMap(response["account_quota"]), anyMap(response["quota"]))
-		row.StatsFreshness = "Account usage availability depends on Tentacle Dashboard/RGW capabilities."
-	}
-
-	if usage != nil {
-		used, objects, err := extractRGWUsage(usage, aggregateUsage)
-		if err != nil {
-			return cephfunc.RGWQuotaRow{}, err
-		}
-		row.UsedBytes = used
-		row.Objects = objects
-	}
-	if quota != nil {
-		if rawEnabled, ok := quota["enabled"]; ok && rawEnabled != nil {
-			enabled, valid := anyBoolKnown(rawEnabled)
-			if !valid {
-				return cephfunc.RGWQuotaRow{}, errors.New("RGW quota returned an invalid enabled state")
-			}
-			row.QuotaEnabled = boolPtr(enabled)
-		}
-		maxBytes, err := exactInt64Field(quota, "max_size", "max_size_bytes")
-		if err != nil || maxBytes != nil && *maxBytes < -1 {
-			return cephfunc.RGWQuotaRow{}, errors.New("RGW quota returned an invalid byte limit")
-		}
-		maxObjects, err := exactInt64Field(quota, "max_objects")
-		if err != nil || maxObjects != nil && *maxObjects < -1 {
-			return cephfunc.RGWQuotaRow{}, errors.New("RGW quota returned an invalid object limit")
-		}
-		row.QuotaMaxBytes = maxBytes
-		row.QuotaMaxObjects = maxObjects
-		if row.QuotaEnabled != nil && *row.QuotaEnabled && maxBytes != nil && *maxBytes > 0 && row.UsedBytes != nil {
-			utilization := float64(*row.UsedBytes) / float64(*maxBytes) * 100
-			row.Utilization = &utilization
-		}
-	}
-	return row, nil
 }
 
 type crushRuleInfo struct{ root, failureDomain, deviceClass string }
@@ -699,25 +396,6 @@ func daemonIdentity(daemon map[string]any) (id, name string) {
 	return id, name
 }
 
-func rgwDaemonIdentity(daemon map[string]any) string {
-	return firstNonEmpty(anyString(daemon["id"]), anyString(daemon["daemon_name"]))
-}
-
-func rgwSyncInventoryError(err error) (status, note string) {
-	var apiErr *apiHTTPError
-	if errors.As(err, &apiErr) {
-		switch apiErr.status {
-		case http.StatusForbidden:
-			return "permission_denied", "Dashboard RGW read permission is required for sync diagnostics."
-		case http.StatusNotFound:
-			return "unsupported_or_unavailable", "RGW daemon inventory is unsupported or unavailable in this Dashboard configuration."
-		case http.StatusServiceUnavailable:
-			return "unavailable", "RGW daemon inventory is unavailable; check the Ceph RGW service prerequisite."
-		}
-	}
-	return "error", "RGW daemon inventory failed; no raw error detail is exposed."
-}
-
 func parseCrushRule(rule map[string]any) crushRuleInfo {
 	var result crushRuleInfo
 	steps, _ := rule["steps"].([]any)
@@ -738,21 +416,6 @@ func parseCrushRule(rule map[string]any) crushRuleInfo {
 		}
 	}
 	return result
-}
-
-func endpointWithSegment(basePath, segment string) string {
-	escaped := strings.ReplaceAll(url.PathEscape(segment), ".", "%2E")
-	return strings.TrimSuffix(basePath, "/") + "/" + escaped
-}
-
-func functionRowTarget(limit int) int {
-	if limit <= 0 {
-		return 1
-	}
-	if limit >= maxFunctionRows {
-		return maxFunctionLookaheadRows
-	}
-	return limit + 1
 }
 
 func toFunctionSourceError(err error, capability string) error {
@@ -805,38 +468,6 @@ func anyBoolKnown(value any) (bool, bool) {
 	}
 }
 
-func rgwObjectKindRank(kind string) int {
-	switch kind {
-	case "realm":
-		return 0
-	case "zonegroup":
-		return 1
-	case "zone":
-		return 2
-	default:
-		return 3
-	}
-}
-
-func rgwDefaultInfo(response map[string]any, key string) (value string, known bool, err error) {
-	raw, exists := response[key]
-	if !exists || raw == nil {
-		return "", false, nil
-	}
-	switch raw := raw.(type) {
-	case string:
-		return raw, true, nil
-	case map[string]any:
-		value = firstNonEmpty(anyString(raw["id"]), anyString(raw["name"]))
-		if value == "" && len(raw) > 0 {
-			return "", false, errors.New("RGW multisite inventory returned invalid default-object information")
-		}
-		return value, true, nil
-	default:
-		return "", false, errors.New("RGW multisite inventory returned invalid default-object information")
-	}
-}
-
 func anyStringSlice(value any) []string {
 	switch values := value.(type) {
 	case []string:
@@ -855,53 +486,6 @@ func anyStringSlice(value any) []string {
 		}
 	}
 	return nil
-}
-
-func extractRGWUsage(usage map[string]any, aggregateCategories bool) (usedBytes, objects *int64, err error) {
-	if !aggregateCategories || usage["size"] != nil || usage["size_utilized"] != nil ||
-		usage["size_actual"] != nil || usage["num_objects"] != nil {
-		usedBytes, err = exactInt64Field(usage, "size", "size_utilized", "size_actual")
-		if err != nil || usedBytes != nil && *usedBytes < 0 {
-			return nil, nil, errors.New("RGW usage returned an invalid byte count")
-		}
-		objects, err = exactInt64Field(usage, "num_objects")
-		if err != nil || objects != nil && *objects < 0 {
-			return nil, nil, errors.New("RGW usage returned an invalid object count")
-		}
-		return usedBytes, objects, nil
-	}
-
-	var usedTotal, objectTotal int64
-	var haveUsed, haveObjects bool
-	for _, raw := range usage {
-		category := anyMap(raw)
-		if category == nil {
-			return nil, nil, errors.New("RGW bucket usage returned an invalid category")
-		}
-		used, err := exactInt64Field(category, "size", "size_actual")
-		if err != nil || used != nil && (*used < 0 || *used > math.MaxInt64-usedTotal) {
-			return nil, nil, errors.New("RGW bucket usage returned an invalid byte count")
-		}
-		if used != nil {
-			usedTotal += *used
-			haveUsed = true
-		}
-		count, err := exactInt64Field(category, "num_objects")
-		if err != nil || count != nil && (*count < 0 || *count > math.MaxInt64-objectTotal) {
-			return nil, nil, errors.New("RGW bucket usage returned an invalid object count")
-		}
-		if count != nil {
-			objectTotal += *count
-			haveObjects = true
-		}
-	}
-	if haveUsed {
-		usedBytes = int64Ptr(usedTotal)
-	}
-	if haveObjects {
-		objects = int64Ptr(objectTotal)
-	}
-	return usedBytes, objects, nil
 }
 
 func exactInt64Field(values map[string]any, keys ...string) (*int64, error) {
@@ -926,8 +510,6 @@ func nonnegativeInt64Field(values map[string]any, key string) (*int64, error) {
 	}
 	return value, nil
 }
-
-func quotaRowKey(kind, id string) string { return kind + ":" + id }
 
 func exactInt64(value any) (int64, error) {
 	switch value := value.(type) {
@@ -964,15 +546,6 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func firstNonEmptyMap(values ...map[string]any) map[string]any {
-	for _, value := range values {
-		if len(value) > 0 {
-			return value
-		}
-	}
-	return nil
 }
 
 func int64Ptr(value int64) *int64 { return &value }

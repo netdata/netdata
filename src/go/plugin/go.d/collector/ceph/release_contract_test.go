@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ceph/cephfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -26,39 +25,13 @@ type releaseContractFixture struct {
 	PoolsPolicy   json.RawMessage `json:"pools_policy"`
 	CrushRules    json.RawMessage `json:"crush_rules"`
 	Daemons       json.RawMessage `json:"daemons"`
-	RGW           struct {
-		RealmList       json.RawMessage `json:"realm_list"`
-		RealmDetail     json.RawMessage `json:"realm_detail"`
-		ZonegroupList   json.RawMessage `json:"zonegroup_list"`
-		ZonegroupDetail json.RawMessage `json:"zonegroup_detail"`
-		ZoneList        json.RawMessage `json:"zone_list"`
-		ZoneDetail      json.RawMessage `json:"zone_detail"`
-		Daemons         json.RawMessage `json:"daemons"`
-		SyncStatus      json.RawMessage `json:"sync_status"`
-		User            json.RawMessage `json:"user"`
-		Bucket          json.RawMessage `json:"bucket"`
-		Account         json.RawMessage `json:"account"`
-		PublicSyncAPI   bool            `json:"public_sync_api"`
-		AccountsAPI     bool            `json:"accounts_api"`
-	} `json:"rgw"`
 }
 
 func TestTargetReleaseDashboardContracts(t *testing.T) {
-	tests := map[string]struct {
-		publicSync bool
-		accounts   bool
-	}{
-		"18.2.8": {publicSync: false, accounts: false},
-		"19.2.5": {publicSync: true, accounts: false},
-		"20.2.2": {publicSync: true, accounts: true},
-	}
-
-	for release, expected := range tests {
+	for _, release := range []string{"18.2.8", "19.2.5", "20.2.2"} {
 		t.Run(release, func(t *testing.T) {
 			fixture := loadReleaseContract(t, release)
 			assert.Equal(t, release, fixture.Release)
-			assert.Equal(t, expected.publicSync, fixture.RGW.PublicSyncAPI)
-			assert.Equal(t, expected.accounts, fixture.RGW.AccountsAPI)
 
 			var health apiHealthMinimalResponse
 			require.NoError(t, json.Unmarshal(fixture.HealthMinimal, &health))
@@ -78,13 +51,7 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 
 			srv := newReleaseContractServer(t, fixture)
 			defer srv.Close()
-			c := newInitializedCollector(t, srv.URL, func(c *Collector) {
-				c.Functions.RGWQuotas.Users = []string{"tenant$user-a"}
-				c.Functions.RGWQuotas.Buckets = []string{"bucket-a"}
-				if fixture.RGW.AccountsAPI {
-					c.Functions.RGWQuotas.Accounts = []string{"RGW00000000000000001"}
-				}
-			})
+			c := newInitializedCollector(t, srv.URL, nil)
 			defer c.Cleanup(context.Background())
 
 			mx, err := c.collect(context.Background())
@@ -110,28 +77,6 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 			daemonResult, err := deps.Daemons(context.Background(), 500)
 			require.NoError(t, err)
 			assert.NotEmpty(t, daemonResult.Rows)
-			multisiteResult, err := deps.RGWMultisite(context.Background(), 100)
-			require.NoError(t, err)
-			assert.NotEmpty(t, multisiteResult.Rows)
-			multisiteRows := make(map[string]cephfunc.RGWMultisiteRow)
-			for _, row := range multisiteResult.Rows {
-				if row.Kind != "sync" {
-					multisiteRows[row.Kind] = row
-				}
-			}
-			require.Contains(t, multisiteRows, "realm")
-			require.Contains(t, multisiteRows, "zonegroup")
-			require.Contains(t, multisiteRows, "zone")
-			assert.Equal(t, boolPtr(true), multisiteRows["realm"].Default)
-			assert.Nil(t, multisiteRows["realm"].Master)
-			assert.Equal(t, boolPtr(true), multisiteRows["zonegroup"].Master)
-			assert.Equal(t, boolPtr(true), multisiteRows["zone"].Master)
-			if !fixture.RGW.PublicSyncAPI {
-				assert.Contains(t, multisiteResult.Rows[len(multisiteResult.Rows)-1].SyncStatus, "unsupported")
-			}
-			quotaResult, err := deps.RGWQuotas(context.Background(), 100)
-			require.NoError(t, err)
-			assert.Equal(t, 2+btoi(fixture.RGW.AccountsAPI), quotaResult.Total)
 		})
 	}
 }
@@ -262,37 +207,6 @@ func newReleaseContractServer(t *testing.T, fixture releaseContractFixture) *htt
 			response = fixture.CrushRules
 		case urlPathAPIDaemon:
 			response = fixture.Daemons
-		case urlPathAPIRGWRealm:
-			response = fixture.RGW.RealmList
-		case urlPathAPIRGWRealm + "/realm-a":
-			response = fixture.RGW.RealmDetail
-		case urlPathAPIRGWZonegroup:
-			response = fixture.RGW.ZonegroupList
-		case urlPathAPIRGWZonegroup + "/zonegroup-a":
-			response = fixture.RGW.ZonegroupDetail
-		case urlPathAPIRGWZone:
-			response = fixture.RGW.ZoneList
-		case urlPathAPIRGWZone + "/zone-a":
-			response = fixture.RGW.ZoneDetail
-		case urlPathAPIRGWDaemon:
-			response = fixture.RGW.Daemons
-		case urlPathAPIRGWSyncStatus:
-			if !fixture.RGW.PublicSyncAPI {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			response = fixture.RGW.SyncStatus
-		case urlPathAPIRGWUser + "/tenant$user-a":
-			assert.Equal(t, "true", r.URL.Query().Get("stats"))
-			response = fixture.RGW.User
-		case urlPathAPIRGWBucket + "/bucket-a":
-			response = fixture.RGW.Bucket
-		case urlPathAPIRGWAccounts + "/RGW00000000000000001":
-			if !fixture.RGW.AccountsAPI {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			response = fixture.RGW.Account
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -302,11 +216,4 @@ func newReleaseContractServer(t *testing.T, fixture releaseContractFixture) *htt
 		_, err := w.Write(response)
 		require.NoError(t, err)
 	})
-}
-
-func btoi(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
 }

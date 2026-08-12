@@ -7,67 +7,80 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
+	"time"
 	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
 
-const maxFunctionTextLength = funcapi.DefaultMaxQueryLength
+const (
+	ParamLimit            = "limit"
+	healthResultLimit     = 500
+	functionHealthTimeout = 5 * time.Second
+	functionOSDTimeout    = 5 * time.Second
+	functionPoolTimeout   = 8 * time.Second
+	functionDaemonTimeout = 5 * time.Second
+	maxFunctionTextLength = funcapi.DefaultMaxQueryLength
+)
 
 type router struct {
-	deps   Deps
-	config Config
+	deps Deps
 }
 
 var _ funcapi.MethodHandler = (*router)(nil)
 
-func NewRouter(deps Deps, config Config) funcapi.MethodHandler {
-	return &router{deps: deps, config: config}
+func NewRouter(deps Deps) funcapi.MethodHandler {
+	return &router{deps: deps}
 }
 
 func Methods() []funcapi.FunctionConfig {
 	return []funcapi.FunctionConfig{
 		{ID: MethodHealth, Name: "Ceph Health", UpdateEvery: 10, Help: "Detailed Ceph health checks and RCA messages."},
-		{ID: MethodOSDs, Name: "Ceph OSDs", UpdateEvery: 30, Help: "Current Ceph OSD state, capacity, throughput, and latency."},
-		{ID: MethodPools, Name: "Ceph Pools", UpdateEvery: 30, Help: "Ceph pool policy, placement, applications, and quotas."},
-		{ID: MethodDaemons, Name: "Ceph Daemons", UpdateEvery: 30, Help: "Ceph daemon inventory reported by Dashboard."},
+		{ID: MethodOSDs, Name: "Ceph OSDs", UpdateEvery: 30, Help: "Current Ceph OSD state, capacity, throughput, and latency.", RequiredParams: inventoryParams()},
+		{ID: MethodPools, Name: "Ceph Pools", UpdateEvery: 30, Help: "Ceph pool policy, placement, applications, and quotas.", RequiredParams: inventoryParams()},
+		{ID: MethodDaemons, Name: "Ceph Daemons", UpdateEvery: 30, Help: "Ceph daemon inventory reported by Dashboard.", RequiredParams: inventoryParams()},
 	}
 }
 
 func (r *router) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if _, ok := r.methodConfig(method); !ok {
+	switch method {
+	case MethodHealth, MethodOSDs, MethodPools, MethodDaemons:
+		return nil, nil
+	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
-	return nil, nil
 }
 
-func (r *router) Handle(ctx context.Context, method string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	cfg, ok := r.methodConfig(method)
+func (r *router) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	timeout, ok := methodTimeout(method)
 	if !ok {
 		return funcapi.NotFoundResponse(method)
 	}
-	if cfg.Disabled {
-		return funcapi.NotFoundResponse(method)
-	}
-	if cfg.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, cfg.Timeout)
-		defer cancel()
-	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	switch method {
 	case MethodHealth:
-		return r.health(ctx, cfg.Limit)
+		return r.health(ctx, healthResultLimit)
 	case MethodOSDs:
-		return r.osds(ctx, cfg.Limit)
+		limit, err := inventoryLimit(params)
+		if err != nil {
+			return funcapi.ErrorResponse(400, "%v", err)
+		}
+		return r.osds(ctx, limit)
 	case MethodPools:
-		return r.pools(ctx, cfg.Limit)
+		limit, err := inventoryLimit(params)
+		if err != nil {
+			return funcapi.ErrorResponse(400, "%v", err)
+		}
+		return r.pools(ctx, limit)
 	case MethodDaemons:
-		return r.daemons(ctx, cfg.Limit)
-	case MethodRGWMultisite:
-		return r.rgwMultisite(ctx, cfg.Limit)
-	case MethodRGWQuotas:
-		return r.rgwQuotas(ctx, cfg.Limit)
+		limit, err := inventoryLimit(params)
+		if err != nil {
+			return funcapi.ErrorResponse(400, "%v", err)
+		}
+		return r.daemons(ctx, limit)
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
@@ -75,23 +88,47 @@ func (r *router) Handle(ctx context.Context, method string, _ funcapi.ResolvedPa
 
 func (r *router) Cleanup(context.Context) {}
 
-func (r *router) methodConfig(method string) (MethodConfig, bool) {
+func methodTimeout(method string) (time.Duration, bool) {
 	switch method {
 	case MethodHealth:
-		return r.config.Health, true
+		return functionHealthTimeout, true
 	case MethodOSDs:
-		return r.config.OSDs, true
+		return functionOSDTimeout, true
 	case MethodPools:
-		return r.config.Pools, true
+		return functionPoolTimeout, true
 	case MethodDaemons:
-		return r.config.Daemons, true
-	case MethodRGWMultisite:
-		return r.config.RGWMultisite, true
-	case MethodRGWQuotas:
-		return r.config.RGWQuotas, true
+		return functionDaemonTimeout, true
 	default:
-		return MethodConfig{}, false
+		return 0, false
 	}
+}
+
+func inventoryParams() []funcapi.ParamConfig {
+	return []funcapi.ParamConfig{{
+		ID: ParamLimit, Name: "Maximum rows", Help: "Return the complete inventory only when it fits within this limit.",
+		Selection: funcapi.ParamSelect,
+		Options: []funcapi.ParamOption{
+			{ID: "100", Name: "100 rows"},
+			{ID: strconv.Itoa(DefaultInventoryLimit), Name: "500 rows", Default: true},
+			{ID: "1000", Name: "1,000 rows"},
+			{ID: "2500", Name: "2,500 rows"},
+			{ID: strconv.Itoa(MaxInventoryLimit), Name: "5,000 rows"},
+		},
+	}}
+}
+
+func inventoryLimit(params funcapi.ResolvedParams) (int, error) {
+	value := params.GetOne(ParamLimit)
+	if value == "" {
+		return DefaultInventoryLimit, nil
+	}
+	for _, option := range inventoryParams()[0].Options {
+		if value == option.ID {
+			limit, _ := strconv.Atoi(value)
+			return limit, nil
+		}
+	}
+	return 0, fmt.Errorf("unsupported inventory limit %q", value)
 }
 
 func (r *router) health(ctx context.Context, limit int) *funcapi.FunctionResponse {
@@ -112,7 +149,7 @@ func (r *router) health(ctx context.Context, limit int) *funcapi.FunctionRespons
 		detail, textTruncated := truncateText(row.Detail, maxFunctionTextLength)
 		data = append(data, []any{
 			row.ID, row.Code, row.Severity, row.Muted, summary, row.Count,
-			detail, row.DetailTruncated || summaryTruncated || textTruncated, truncated,
+			detail, summaryTruncated || textTruncated, truncated,
 		})
 	}
 	return tableResponse(healthColumns(), data, "severity", "Detailed Ceph health checks and RCA messages.", total, truncated)
@@ -123,18 +160,20 @@ func (r *router) osds(ctx context.Context, limit int) *funcapi.FunctionResponse 
 	if err != nil {
 		return functionError(err)
 	}
+	if err := validateCompleteInventory("OSD", len(result.Rows), result.Total, limit); err != nil {
+		return functionError(err)
+	}
 	sort.SliceStable(result.Rows, func(i, j int) bool { return result.Rows[i].ID < result.Rows[j].ID })
-	rows, total, truncated := capRows(result.Rows, result.Total, limit)
-	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
+	data := make([][]any, 0, len(result.Rows))
+	for _, row := range result.Rows {
 		data = append(data, []any{
 			row.UUID, row.ID, row.Name, row.Host, row.DeviceClass, row.Up, row.In, row.OperationalStatus,
 			row.TotalBytes, row.UsedBytes, row.AvailableBytes, row.Utilization,
 			row.ReadBytesPerSec, row.WriteBytesPerSec, row.ReadOpsPerSec, row.WriteOpsPerSec,
-			row.CommitLatencyMS, row.ApplyLatencyMS, truncated,
+			row.CommitLatencyMS, row.ApplyLatencyMS,
 		})
 	}
-	return tableResponse(osdColumns(), data, "id", "Current Ceph OSD state, capacity, throughput, and latency.", total, truncated)
+	return tableResponse(osdColumns(), data, "id", "Current Ceph OSD state, capacity, throughput, and latency.", result.Total, false)
 }
 
 func (r *router) pools(ctx context.Context, limit int) *funcapi.FunctionResponse {
@@ -142,17 +181,19 @@ func (r *router) pools(ctx context.Context, limit int) *funcapi.FunctionResponse
 	if err != nil {
 		return functionError(err)
 	}
+	if err := validateCompleteInventory("pool", len(result.Rows), result.Total, limit); err != nil {
+		return functionError(err)
+	}
 	sort.SliceStable(result.Rows, func(i, j int) bool { return result.Rows[i].Name < result.Rows[j].Name })
-	rows, total, truncated := capRows(result.Rows, result.Total, limit)
-	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
+	data := make([][]any, 0, len(result.Rows))
+	for _, row := range result.Rows {
 		data = append(data, []any{
 			row.Name, row.Type, row.Size, row.MinSize, row.PGNum, row.PGPNum, row.PGAutoscaleMode,
 			row.CrushRule, row.CrushRoot, row.FailureDomain, row.DeviceClass, row.Applications,
-			row.ErasureProfile, row.QuotaMaxBytes, row.QuotaMaxObjects, row.Flags, truncated,
+			row.ErasureProfile, row.QuotaMaxBytes, row.QuotaMaxObjects, row.Flags,
 		})
 	}
-	return tableResponse(poolColumns(), data, "name", "Ceph pool policy, placement, applications, and quotas.", total, truncated)
+	return tableResponse(poolColumns(), data, "name", "Ceph pool policy, placement, applications, and quotas.", result.Total, false)
 }
 
 func (r *router) daemons(ctx context.Context, limit int) *funcapi.FunctionResponse {
@@ -160,81 +201,18 @@ func (r *router) daemons(ctx context.Context, limit int) *funcapi.FunctionRespon
 	if err != nil {
 		return functionError(err)
 	}
+	if err := validateCompleteInventory("daemon", len(result.Rows), result.Total, limit); err != nil {
+		return functionError(err)
+	}
 	sort.SliceStable(result.Rows, func(i, j int) bool { return result.Rows[i].ID < result.Rows[j].ID })
-	rows, total, truncated := capRows(result.Rows, result.Total, limit)
-	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
+	data := make([][]any, 0, len(result.Rows))
+	for _, row := range result.Rows {
 		data = append(data, []any{
 			row.ID, row.Type, row.Name, row.Host, row.Status, row.Active, row.Version,
-			row.Image, row.LastRefresh, row.Placement, truncated,
+			row.Image, row.LastRefresh, row.Placement,
 		})
 	}
-	return tableResponse(daemonColumns(), data, "type", "Ceph daemon inventory reported by Dashboard.", total, truncated)
-}
-
-func (r *router) rgwMultisite(ctx context.Context, limit int) *funcapi.FunctionResponse {
-	result, err := r.deps.RGWMultisite(ctx, limit)
-	if err != nil {
-		return functionError(err)
-	}
-	sort.SliceStable(result.Rows, func(i, j int) bool {
-		leftRank, rightRank := rgwKindRank(result.Rows[i].Kind), rgwKindRank(result.Rows[j].Kind)
-		if leftRank != rightRank {
-			return leftRank < rightRank
-		}
-		if result.Rows[i].Name != result.Rows[j].Name {
-			return result.Rows[i].Name < result.Rows[j].Name
-		}
-		return result.Rows[i].ID < result.Rows[j].ID
-	})
-	rows, total, truncated := capRows(result.Rows, result.Total, limit)
-	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
-		detail, detailTruncated := truncateText(row.SyncDetail, maxFunctionTextLength)
-		data = append(data, []any{
-			row.ID, row.Kind, row.Name, row.Default, row.Realm, row.Zonegroup, row.Master,
-			row.Endpoints, row.SyncStatus, detail, detailTruncated, row.ReleaseScope, truncated,
-		})
-	}
-	return tableResponse(rgwMultisiteColumns(), data, "kind", "Opt-in RGW realm, zonegroup, zone, and best-effort sync diagnostics.", total, truncated)
-}
-
-func rgwKindRank(kind string) int {
-	switch kind {
-	case "realm":
-		return 0
-	case "zonegroup":
-		return 1
-	case "zone":
-		return 2
-	case "sync":
-		return 3
-	default:
-		return 4
-	}
-}
-
-func (r *router) rgwQuotas(ctx context.Context, limit int) *funcapi.FunctionResponse {
-	result, err := r.deps.RGWQuotas(ctx, limit)
-	if err != nil {
-		return functionError(err)
-	}
-	sort.SliceStable(result.Rows, func(i, j int) bool {
-		if result.Rows[i].Kind != result.Rows[j].Kind {
-			return result.Rows[i].Kind < result.Rows[j].Kind
-		}
-		return result.Rows[i].ID < result.Rows[j].ID
-	})
-	rows, total, truncated := capRows(result.Rows, result.Total, limit)
-	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
-		data = append(data, []any{
-			row.Key, row.ID, row.Kind, row.Status, row.Tenant, row.Account, row.Owner, row.UsedBytes, row.Objects,
-			row.QuotaEnabled, row.QuotaMaxBytes, row.QuotaMaxObjects, row.Utilization,
-			row.StatsFreshness, truncated,
-		})
-	}
-	return tableResponse(rgwQuotaColumns(), data, "kind", "Opt-in quota and cached usage for explicitly configured RGW identities.", total, truncated)
+	return tableResponse(daemonColumns(), data, "type", "Ceph daemon inventory reported by Dashboard.", result.Total, false)
 }
 
 func functionError(err error) *funcapi.FunctionResponse {
@@ -243,6 +221,14 @@ func functionError(err error) *funcapi.FunctionResponse {
 	}
 	if errors.Is(err, context.Canceled) {
 		return funcapi.ErrorResponse(499, "Ceph Dashboard query was canceled")
+	}
+	var limitErr *InventoryLimitError
+	if errors.As(err, &limitErr) {
+		return funcapi.ErrorResponse(422, "%s", limitErr.Error())
+	}
+	var incompleteErr *IncompleteInventoryError
+	if errors.As(err, &incompleteErr) {
+		return funcapi.ErrorResponse(422, "%s", incompleteErr.Error())
 	}
 	var sourceErr *SourceError
 	if errors.As(err, &sourceErr) {
@@ -253,6 +239,22 @@ func functionError(err error) *funcapi.FunctionResponse {
 		return funcapi.ErrorResponse(status, "%s", sourceErr.Error())
 	}
 	return funcapi.ErrorResponse(500, "Ceph Dashboard query failed")
+}
+
+func validateCompleteInventory(resource string, rows, total, limit int) error {
+	if total > MaxInventoryLimit {
+		return &InventoryLimitError{Resource: resource, Total: total, Limit: MaxInventoryLimit, Hard: true}
+	}
+	if total > limit {
+		return &InventoryLimitError{Resource: resource, Total: total, Limit: limit}
+	}
+	if total < 0 {
+		return fmt.Errorf("Ceph %s inventory returned a negative total", resource)
+	}
+	if rows != total {
+		return &IncompleteInventoryError{Resource: resource, Rows: rows, Total: total}
+	}
+	return nil
 }
 
 func capRows[T any](rows []T, total, limit int) ([]T, int, bool) {
@@ -267,7 +269,7 @@ func capRows[T any](rows []T, total, limit int) ([]T, int, bool) {
 
 func tableResponse(columns map[string]any, data [][]any, defaultSort, help string, total int, truncated bool) *funcapi.FunctionResponse {
 	if truncated {
-		help = fmt.Sprintf("%s Showing %d of %d rows; use collector configuration to change the bounded limit.", help, len(data), total)
+		help = fmt.Sprintf("%s Showing the %d most severe of %d rows.", help, len(data), total)
 	}
 	return &funcapi.FunctionResponse{
 		Status:            200,
@@ -356,7 +358,7 @@ func healthColumns() map[string]any {
 		intCol("count", "Affected item count", "items", true),
 		wrappedTextCol("detail", "Detailed health-check message", true),
 		boolCol("detail_truncated", "Summary or detailed message was truncated", false),
-		boolCol("truncated", "Result was truncated by the configured row limit", false),
+		boolCol("truncated", "Result contains only the most severe rows allowed by the internal health limit", false),
 	})
 }
 
@@ -371,7 +373,6 @@ func osdColumns() map[string]any {
 		floatCol("read_bytes_per_sec", "Read throughput", "bytes/s", false, 2), floatCol("write_bytes_per_sec", "Write throughput", "bytes/s", false, 2),
 		floatCol("read_ops_per_sec", "Read operations", "ops/s", false, 2), floatCol("write_ops_per_sec", "Write operations", "ops/s", false, 2),
 		floatCol("commit_latency_ms", "Commit latency", "milliseconds", false, 3), floatCol("apply_latency_ms", "Apply latency", "milliseconds", false, 3),
-		boolCol("truncated", "Result was truncated by the configured row limit", false),
 	})
 }
 
@@ -385,7 +386,6 @@ func poolColumns() map[string]any {
 		textCol("device_class", "CRUSH device class", true, false), textCol("applications", "Enabled pool applications", true, false),
 		textCol("erasure_profile", "Erasure-code profile", false, false), intCol("quota_max_bytes", "Pool byte quota", "bytes", false),
 		intCol("quota_max_objects", "Pool object quota", "objects", false), textCol("flags", "Pool flags", false, false),
-		boolCol("truncated", "Result was truncated by the configured row limit", false),
 	})
 }
 
@@ -396,31 +396,5 @@ func daemonColumns() map[string]any {
 		textCol("status", "Daemon status", true, false), boolCol("active", "Daemon active state when Dashboard reports it", true),
 		textCol("version", "Ceph version", true, false), textCol("image", "Container image", false, false),
 		textCol("last_refresh", "Last inventory refresh", false, false), textCol("placement", "Orchestrator placement", false, false),
-		boolCol("truncated", "Result was truncated by the configured row limit", false),
-	})
-}
-
-func rgwMultisiteColumns() map[string]any {
-	return columns([]columnDef{
-		textCol("id", "RGW multisite row identifier", false, true), textCol("kind", "Realm, zonegroup, zone, or sync row", true, false),
-		textCol("name", "Object name", true, false), boolCol("default", "Default object when Ceph reports the relationship", true),
-		textCol("realm", "Realm", true, false), textCol("zonegroup", "Zonegroup", true, false),
-		boolCol("master", "Zonegroup or zone master relationship when Ceph reports it", true), wrappedTextCol("endpoints", "Configured endpoints", false),
-		textCol("sync_status", "Best-effort sync status", true, false), wrappedTextCol("sync_detail", "Best-effort sync detail", false),
-		boolCol("sync_detail_truncated", "Sync detail was truncated", false), textCol("release_scope", "Release/API capability note", false, false),
-		boolCol("truncated", "Result was truncated by the configured row limit", false),
-	})
-}
-
-func rgwQuotaColumns() map[string]any {
-	return columns([]columnDef{
-		textCol("key", "Kind-qualified RGW row identifier", false, true), textCol("id", "Configured RGW identity", true, false),
-		textCol("kind", "User, bucket, or account", true, false),
-		textCol("status", "Lookup status", true, false), textCol("tenant", "RGW tenant", true, false), textCol("account", "RGW account", true, false),
-		textCol("owner", "Bucket or account owner", true, false), intCol("used_bytes", "Cached quota usage", "bytes", true),
-		intCol("objects", "Cached object count", "objects", true), boolCol("quota_enabled", "Quota is enabled", true),
-		intCol("quota_max_bytes", "Quota byte limit", "bytes", true), intCol("quota_max_objects", "Quota object limit", "objects", true),
-		floatCol("utilization", "Usage against enabled byte quota", "%", true, 2), textCol("stats_freshness", "Quota usage freshness semantics", false, false),
-		boolCol("truncated", "Result was truncated by the configured row limit", false),
 	})
 }

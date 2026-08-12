@@ -5,40 +5,22 @@ package cephfunc
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 const (
-	MethodHealth       = "health"
-	MethodOSDs         = "osds"
-	MethodPools        = "pools"
-	MethodDaemons      = "daemons"
-	MethodRGWMultisite = "rgw-multisite"
-	MethodRGWQuotas    = "rgw-quotas"
+	MethodHealth          = "health"
+	MethodOSDs            = "osds"
+	MethodPools           = "pools"
+	MethodDaemons         = "daemons"
+	DefaultInventoryLimit = 500
+	MaxInventoryLimit     = 5000
 )
-
-type MethodConfig struct {
-	Disabled bool
-	Timeout  time.Duration
-	Limit    int
-}
-
-type Config struct {
-	Health       MethodConfig
-	OSDs         MethodConfig
-	Pools        MethodConfig
-	Daemons      MethodConfig
-	RGWMultisite MethodConfig
-	RGWQuotas    MethodConfig
-}
 
 type Deps interface {
 	Health(context.Context, int) (HealthResult, error)
 	OSDs(context.Context, int) (OSDResult, error)
 	Pools(context.Context, int) (PoolResult, error)
 	Daemons(context.Context, int) (DaemonResult, error)
-	RGWMultisite(context.Context, int) (RGWMultisiteResult, error)
-	RGWQuotas(context.Context, int) (RGWQuotaResult, error)
 }
 
 type SourceError struct {
@@ -53,20 +35,43 @@ func (e *SourceError) Error() string {
 	return fmt.Sprintf("Ceph Dashboard request failed with status %d", e.Status)
 }
 
+type InventoryLimitError struct {
+	Resource string
+	Total    int
+	Limit    int
+	Hard     bool
+}
+
+type IncompleteInventoryError struct {
+	Resource string
+	Rows     int
+	Total    int
+}
+
+func (e *IncompleteInventoryError) Error() string {
+	return fmt.Sprintf("Ceph %s inventory is incomplete: received %d of %d rows", e.Resource, e.Rows, e.Total)
+}
+
+func (e *InventoryLimitError) Error() string {
+	if e.Hard {
+		return fmt.Sprintf("Ceph %s inventory contains %d rows, exceeding the internal ceiling of %d", e.Resource, e.Total, e.Limit)
+	}
+	return fmt.Sprintf("Ceph %s inventory contains %d rows, exceeding the selected limit of %d; choose a larger limit", e.Resource, e.Total, e.Limit)
+}
+
 type HealthResult struct {
 	Rows  []HealthRow
 	Total int
 }
 
 type HealthRow struct {
-	ID              string
-	Code            string
-	Severity        string
-	Muted           bool
-	Summary         string
-	Count           int64
-	Detail          string
-	DetailTruncated bool
+	ID       string
+	Code     string
+	Severity string
+	Muted    bool
+	Summary  string
+	Count    int64
+	Detail   string
 }
 
 type OSDResult struct {
@@ -135,45 +140,4 @@ type DaemonRow struct {
 	Image       string
 	LastRefresh string
 	Placement   string
-}
-
-type RGWMultisiteResult struct {
-	Rows  []RGWMultisiteRow
-	Total int
-}
-
-type RGWMultisiteRow struct {
-	ID           string
-	Kind         string
-	Name         string
-	Default      *bool
-	Realm        string
-	Zonegroup    string
-	Master       *bool
-	Endpoints    string
-	SyncStatus   string
-	SyncDetail   string
-	ReleaseScope string
-}
-
-type RGWQuotaResult struct {
-	Rows  []RGWQuotaRow
-	Total int
-}
-
-type RGWQuotaRow struct {
-	Key             string
-	ID              string
-	Kind            string
-	Status          string
-	Tenant          string
-	Account         string
-	Owner           string
-	UsedBytes       *int64
-	Objects         *int64
-	QuotaEnabled    *bool
-	QuotaMaxBytes   *int64
-	QuotaMaxObjects *int64
-	Utilization     *float64
-	StatsFreshness  string
 }

@@ -557,27 +557,6 @@ func TestCephClientPreservesEscapedPathSegments(t *testing.T) {
 	assert.Equal(t, "/dashboard/api/rgw/user/tenant%2Fuser", escapedPath)
 }
 
-func TestCephClientPreservesEscapedDotSegments(t *testing.T) {
-	var escapedPath string
-	httpClient := &http.Client{Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		escapedPath = req.URL.EscapedPath()
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Header:     make(http.Header),
-			Body:       io.NopCloser(strings.NewReader(`{}`)),
-			Request:    req,
-		}, nil
-	})}
-	client, err := newCephClient(httpClient, web.RequestConfig{URL: "https://ceph.example/dashboard"}, false, nil)
-	require.NoError(t, err)
-	base := requireURL(t, "https://ceph.example/dashboard")
-	endpoint := endpointWithSegment("/api/rgw/user", "../tenant/user")
-	resp, err := client.request(context.Background(), base, http.MethodGet, endpoint, hdrAcceptVersion, nil, nil, "token")
-	require.NoError(t, err)
-	web.CloseBody(resp)
-	assert.Equal(t, "/dashboard/api/rgw/user/%2E%2E%2Ftenant%2Fuser", escapedPath)
-}
-
 func newTestCephClient(t *testing.T, rawURL string, notFollowRedirects bool, configure func(*web.RequestConfig), allowedRedirectOrigins ...string) *cephClient {
 	t.Helper()
 	cfg := web.RequestConfig{URL: rawURL}

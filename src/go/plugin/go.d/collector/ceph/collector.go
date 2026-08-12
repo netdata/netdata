@@ -60,12 +60,6 @@ func New() *Collector {
 				},
 			},
 		},
-		Functions: FunctionsConfig{
-			Health:  FunctionConfig{Limit: 500},
-			OSDs:    FunctionConfig{Limit: 500},
-			Pools:   FunctionConfig{Limit: 500},
-			Daemons: FunctionConfig{Limit: 500},
-		},
 		charts:      &collectorapi.Charts{},
 		osdMatcher:  matcher.TRUE(),
 		poolMatcher: matcher.TRUE(),
@@ -88,36 +82,13 @@ type Config struct {
 	web.HTTPConfig         `yaml:",inline" json:""`
 }
 
-type FunctionsConfig struct {
-	Health       FunctionConfig          `yaml:"health" json:"health"`
-	OSDs         FunctionConfig          `yaml:"osds" json:"osds"`
-	Pools        FunctionConfig          `yaml:"pools" json:"pools"`
-	Daemons      FunctionConfig          `yaml:"daemons" json:"daemons"`
-	RGWMultisite FunctionConfig          `yaml:"rgw_multisite" json:"rgw_multisite"`
-	RGWQuotas    RGWQuotasFunctionConfig `yaml:"rgw_quotas" json:"rgw_quotas"`
-}
-
-type FunctionConfig struct {
-	Disabled bool             `yaml:"disabled" json:"disabled"`
-	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Limit    int              `yaml:"limit,omitempty" json:"limit"`
-}
-
-type RGWQuotasFunctionConfig struct {
-	FunctionConfig `yaml:",inline" json:""`
-	Users          []string `yaml:"users,omitempty" json:"users"`
-	Buckets        []string `yaml:"buckets,omitempty" json:"buckets"`
-	Accounts       []string `yaml:"accounts,omitempty" json:"accounts"`
-}
-
 type entityState struct {
 	lastSeen time.Time
 }
 
 type Collector struct {
 	collectorapi.Base
-	Config    `yaml:",inline" json:""`
-	Functions FunctionsConfig `yaml:"-" json:"-"`
+	Config `yaml:",inline" json:""`
 
 	charts               *collectorapi.Charts
 	addClusterChartsOnce sync.Once
@@ -168,7 +139,7 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("create Ceph client: %v", err)
 	}
 	c.apiClient = apiClient
-	c.funcRouter = cephfunc.NewRouter(funcDepsAdapter{collector: c}, c.functionRouterConfig())
+	c.funcRouter = cephfunc.NewRouter(funcDepsAdapter{collector: c})
 
 	return nil
 }
@@ -177,7 +148,6 @@ func (c *Collector) Check(ctx context.Context) error {
 	_, err := c.probeClusterIdentity(ctx)
 	return err
 }
-
 func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
@@ -220,22 +190,5 @@ func (c *Collector) FunctionAvailable(functionID string) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func (c *Collector) functionRouterConfig() cephfunc.Config {
-	inheritedTimeout := c.Timeout.Duration()
-	method := func(cfg FunctionConfig) cephfunc.MethodConfig {
-		timeout := cfg.Timeout.Duration()
-		if timeout <= 0 {
-			timeout = inheritedTimeout
-		}
-		return cephfunc.MethodConfig{Disabled: cfg.Disabled, Timeout: timeout, Limit: cfg.Limit}
-	}
-	return cephfunc.Config{
-		Health:  method(c.Functions.Health),
-		OSDs:    method(c.Functions.OSDs),
-		Pools:   method(c.Functions.Pools),
-		Daemons: method(c.Functions.Daemons),
 	}
 }
