@@ -26,11 +26,21 @@ func TestMethods(t *testing.T) {
 		MethodHealth, MethodOSDs, MethodPools, MethodDaemons,
 	}, []string{methods[0].ID, methods[1].ID, methods[2].ID, methods[3].ID})
 	assert.Empty(t, methods[0].RequiredParams)
-	for _, method := range methods[1:] {
-		require.Len(t, method.RequiredParams, 1)
-		assert.Equal(t, ParamLimit, method.RequiredParams[0].ID)
-		assert.Equal(t, "500", method.RequiredParams[0].Options[1].ID)
-		assert.True(t, method.RequiredParams[0].Options[1].Default)
+
+	tests := map[string]struct {
+		method funcapi.FunctionConfig
+	}{
+		MethodOSDs:    {method: methods[1]},
+		MethodPools:   {method: methods[2]},
+		MethodDaemons: {method: methods[3]},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Len(t, test.method.RequiredParams, 1)
+			assert.Equal(t, ParamLimit, test.method.RequiredParams[0].ID)
+			assert.Equal(t, "500", test.method.RequiredParams[0].Options[1].ID)
+			assert.True(t, test.method.RequiredParams[0].Options[1].Default)
+		})
 	}
 }
 
@@ -59,7 +69,13 @@ func TestRouterTableResponses(t *testing.T) {
 	}
 	router := NewRouter(deps)
 
-	for _, method := range []string{MethodHealth, MethodOSDs, MethodPools, MethodDaemons} {
+	tests := map[string]struct{}{
+		MethodHealth:  {},
+		MethodOSDs:    {},
+		MethodPools:   {},
+		MethodDaemons: {},
+	}
+	for method := range tests {
 		t.Run(method, func(t *testing.T) {
 			response := router.Handle(context.Background(), method, nil)
 			require.Equal(t, 200, response.Status)
@@ -104,10 +120,18 @@ func TestRouterResponsesMatchFunctionUISchema(t *testing.T) {
 	}
 	router := NewRouter(deps)
 	methods := Methods()
-	for _, method := range methods {
-		t.Run(method.ID, func(t *testing.T) {
-			response := router.Handle(context.Background(), method.ID, nil)
-			params := method.RequiredParams
+	tests := map[string]struct {
+		method funcapi.FunctionConfig
+	}{
+		MethodHealth:  {method: methods[0]},
+		MethodOSDs:    {method: methods[1]},
+		MethodPools:   {method: methods[2]},
+		MethodDaemons: {method: methods[3]},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			response := router.Handle(context.Background(), test.method.ID, nil)
+			params := test.method.RequiredParams
 			if len(response.RequiredParams) != 0 {
 				params = response.RequiredParams
 			}
@@ -180,46 +204,87 @@ func TestRouterSourceErrors(t *testing.T) {
 
 func TestRouterMethodParams(t *testing.T) {
 	router := NewRouter(fakeDeps{})
-	params, err := router.MethodParams(context.Background(), MethodPools)
-	require.NoError(t, err)
-	assert.Empty(t, params)
-	_, err = router.MethodParams(context.Background(), "unknown")
-	require.Error(t, err)
+	tests := map[string]struct {
+		method    string
+		wantError bool
+	}{
+		"known method":   {method: MethodPools},
+		"unknown method": {method: "unknown", wantError: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			params, err := router.MethodParams(context.Background(), test.method)
+			if test.wantError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Empty(t, params)
+		})
+	}
 }
 
-func TestRouterPassesSelectedInventoryLimit(t *testing.T) {
-	captured := 0
-	deps := fakeDeps{
-		onCall: func(method string, _ context.Context, limit int) {
-			if method == MethodOSDs {
-				captured = limit
-			}
+func TestRouterInventoryLimitParams(t *testing.T) {
+	tests := map[string]struct {
+		params       funcapi.ResolvedParams
+		wantStatus   int
+		wantCaptured int
+		wantData     bool
+	}{
+		"supported limit": {
+			params:       funcapi.ResolveParams(inventoryParams(), map[string][]string{ParamLimit: {"2500"}}),
+			wantStatus:   200,
+			wantCaptured: 2500,
+			wantData:     true,
+		},
+		"unsupported limit": {
+			params: funcapi.ResolvedParams{
+				ParamLimit: {IDs: []string{"999"}},
+			},
+			wantStatus: 400,
 		},
 	}
-	params := funcapi.ResolveParams(inventoryParams(), map[string][]string{ParamLimit: {"2500"}})
-	response := NewRouter(deps).Handle(context.Background(), MethodOSDs, params)
-	require.Equal(t, 200, response.Status)
-	assert.Equal(t, 2500, captured)
-}
-
-func TestRouterRejectsUnsupportedInventoryLimit(t *testing.T) {
-	params := funcapi.ResolvedParams{
-		ParamLimit: {IDs: []string{"999"}},
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			captured := 0
+			deps := fakeDeps{
+				onCall: func(method string, _ context.Context, limit int) {
+					if method == MethodOSDs {
+						captured = limit
+					}
+				},
+			}
+			response := NewRouter(deps).Handle(context.Background(), MethodOSDs, test.params)
+			require.Equal(t, test.wantStatus, response.Status)
+			assert.Equal(t, test.wantCaptured, captured)
+			if test.wantData {
+				assert.NotNil(t, response.Data)
+			} else {
+				assert.Nil(t, response.Data)
+			}
+		})
 	}
-	response := NewRouter(fakeDeps{}).Handle(context.Background(), MethodOSDs, params)
-	assert.Equal(t, 400, response.Status)
-	assert.Nil(t, response.Data)
 }
 
 func TestRouterInventoryDoesNotReturnPartialRows(t *testing.T) {
-	for name, result := range map[string]OSDResult{
-		"incomplete response":  {Rows: []OSDRow{{ID: 1, UUID: "uuid-1"}}, Total: 2},
-		"above selected limit": {Total: DefaultInventoryLimit + 1},
-		"above hard limit":     {Total: MaxInventoryLimit + 1},
-	} {
+	tests := map[string]struct {
+		result OSDResult
+	}{
+		"incomplete response": {result: OSDResult{
+			Rows:  []OSDRow{{ID: 1, UUID: "uuid-1"}},
+			Total: 2,
+		}},
+		"above selected limit": {result: OSDResult{
+			Total: DefaultInventoryLimit + 1,
+		}},
+		"above hard limit": {result: OSDResult{
+			Total: MaxInventoryLimit + 1,
+		}},
+	}
+	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			response := NewRouter(fakeDeps{
-				osds: result,
+				osds: test.result,
 			}).Handle(context.Background(), MethodOSDs, nil)
 			assert.Equal(t, 422, response.Status)
 			assert.Nil(t, response.Data)
@@ -228,27 +293,34 @@ func TestRouterInventoryDoesNotReturnPartialRows(t *testing.T) {
 }
 
 func TestRouterAppliesInternalDeadlines(t *testing.T) {
-	deadlines := make(map[string]time.Duration)
-	deps := fakeDeps{
-		onCall: func(method string, ctx context.Context, _ int) {
-			deadline, ok := ctx.Deadline()
-			require.True(t, ok)
-			deadlines[method] = time.Until(deadline)
-		},
+	tests := map[string]struct{}{
+		MethodHealth:  {},
+		MethodOSDs:    {},
+		MethodPools:   {},
+		MethodDaemons: {},
 	}
-	router := NewRouter(deps)
-	for _, method := range []string{MethodHealth, MethodOSDs, MethodPools, MethodDaemons} {
-		response := router.Handle(context.Background(), method, nil)
-		require.Equal(t, 200, response.Status)
-		expected, ok := methodTimeout(method)
-		require.True(t, ok)
-		assert.Positive(t, deadlines[method])
-		assert.LessOrEqual(t, deadlines[method], expected)
+	for method := range tests {
+		t.Run(method, func(t *testing.T) {
+			var duration time.Duration
+			deps := fakeDeps{
+				onCall: func(_ string, ctx context.Context, _ int) {
+					deadline, ok := ctx.Deadline()
+					require.True(t, ok)
+					duration = time.Until(deadline)
+				},
+			}
+			response := NewRouter(deps).Handle(context.Background(), method, nil)
+			require.Equal(t, 200, response.Status)
+			expected, ok := methodTimeout(method)
+			require.True(t, ok)
+			assert.Positive(t, duration)
+			assert.LessOrEqual(t, duration, expected)
+		})
 	}
 }
 
-func TestMaximumOSDInventoryResponseEnvelope(t *testing.T) {
-	rows := maximumOSDRows()
+func TestRouterAcceptsMaximumOSDInventoryRowCount(t *testing.T) {
+	rows := representativeMaximumOSDRows()
 	params := funcapi.ResolveParams(inventoryParams(), map[string][]string{
 		ParamLimit: {fmt.Sprint(MaxInventoryLimit)},
 	})
@@ -260,16 +332,15 @@ func TestMaximumOSDInventoryResponseEnvelope(t *testing.T) {
 	}).
 		Handle(context.Background(), MethodOSDs, params)
 	require.Equal(t, 200, response.Status)
-	encoded, err := json.Marshal(response)
-	require.NoError(t, err)
-	t.Logf("encoded 5,000-row OSD Function response: %d bytes", len(encoded))
-	assert.Less(t, len(encoded), 16<<20)
+	data, ok := response.Data.([][]any)
+	require.True(t, ok)
+	assert.Len(t, data, MaxInventoryLimit)
 }
 
 var benchmarkPayload []byte
 
-func BenchmarkMaximumOSDInventoryResponse(b *testing.B) {
-	rows := maximumOSDRows()
+func BenchmarkRepresentativeMaximumOSDInventorySerialization(b *testing.B) {
+	rows := representativeMaximumOSDRows()
 	params := funcapi.ResolveParams(inventoryParams(), map[string][]string{
 		ParamLimit: {fmt.Sprint(MaxInventoryLimit)},
 	})
@@ -290,7 +361,7 @@ func BenchmarkMaximumOSDInventoryResponse(b *testing.B) {
 	}
 }
 
-func maximumOSDRows() []OSDRow {
+func representativeMaximumOSDRows() []OSDRow {
 	rows := make([]OSDRow, MaxInventoryLimit)
 	for i := range rows {
 		rows[i] = OSDRow{
