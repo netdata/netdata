@@ -17,6 +17,7 @@ const (
 	topQueriesMethodID      = "top-queries"
 	topQueriesMaxTextLength = 4096
 	topQueriesParamSort     = "__sort"
+	queryStoreUnavailable   = "top-queries requires Query Store, available in SQL Server 2016 (13.x) and later; this server version does not support it"
 )
 
 func topQueriesFunctionConfig() funcapi.FunctionConfig {
@@ -221,6 +222,13 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 	if f.router.collector.Functions.TopQueries.Disabled {
 		return nil, fmt.Errorf("top-queries function disabled in configuration")
 	}
+	unsupported, err := f.queryStoreUnsupported(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if unsupported {
+		return nil, fmt.Errorf("%s", queryStoreUnavailable)
+	}
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
 	if err != nil {
@@ -239,6 +247,13 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	if f.router.collector.Functions.TopQueries.Disabled {
 		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+	}
+	unsupported, err := f.queryStoreUnsupported(ctx)
+	if err != nil {
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to determine SQL Server version: %v", err)}
+	}
+	if unsupported {
+		return funcapi.UnavailableResponse(queryStoreUnavailable)
 	}
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
@@ -396,6 +411,18 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 		RequiredParams:    []funcapi.ParamConfig{sortParam},
 		ChartingConfig:    cs.BuildCharting(),
 	}
+}
+
+func (f *funcTopQueries) queryStoreUnsupported(ctx context.Context) (bool, error) {
+	majorVersion := f.router.collector.majorVersion
+	if majorVersion == 0 {
+		var version string
+		if err := f.router.collector.db.QueryRowContext(ctx, queryVersion).Scan(&version); err != nil {
+			return false, err
+		}
+		majorVersion = parseMajorVersion(version)
+	}
+	return majorVersion > 0 && majorVersion < 13, nil
 }
 
 func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {

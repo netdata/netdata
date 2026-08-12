@@ -71,6 +71,26 @@ func TestTopQueriesColumns_HasRequiredColumns(t *testing.T) {
 	}
 }
 
+func TestTopQueries_SQLServer2014IsUnavailable(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	c := New()
+	c.db = db
+	c.majorVersion = 12
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
+	assert.Nil(t, params)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SQL Server 2016")
+
+	response := handler.collectData(context.Background(), "")
+	assert.Equal(t, 503, response.Status)
+	assert.Contains(t, response.Message, "SQL Server 2016")
+}
+
 func TestTopQueriesScanDynamicRows(t *testing.T) {
 	makeCols := func() []topQueriesColumn {
 		return []topQueriesColumn{
