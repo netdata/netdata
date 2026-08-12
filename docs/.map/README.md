@@ -37,7 +37,7 @@ Each node is either:
 | **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
 | **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
 | **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
-| **description** | Page description used by Learn metadata, search, and social previews.          | Use unique plain text of 50–160 characters. Do not include Markdown, HTML, URLs, or newlines.                                                                                               |
+| **description** | Page description used by Learn metadata, search, and social previews.          | Use unique plain text of 50–160 characters. Uniqueness is case-insensitive and NFC-normalized. Do not include Markdown, HTML, URLs, or newlines.                                             |
 
 #### Path Reconstruction
 

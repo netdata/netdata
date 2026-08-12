@@ -289,8 +289,9 @@ Repo path: `integrations/gen_docs_integrations.py`.
 
 Before cleanup or any file write, a full run resolves and validates descriptions for every generated page across all ten
 documentation modes. Generation fails if any description is missing, duplicated, outside 50–160 characters, or contains
-leading or trailing whitespace, a C0/C1 control character, Markdown, HTML, a URL, a double quote, or a backslash. This ordering
-prevents a description defect from deleting the previous generated tree.
+leading or trailing whitespace, a C0/C1 control, a surrogate code point, a Unicode line or paragraph separator, Markdown, HTML,
+a URL, a double quote, or a backslash. Duplicate identity is NFC-normalized and case-folded without rewriting emitted text. This
+ordering prevents a description defect from deleting the previous generated tree.
 
 Run the same preflight without changing files:
 

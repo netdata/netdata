@@ -3,10 +3,12 @@
 import ast
 import copy
 import json
+import random
 import re
 import subprocess
 import sys
 import tempfile
+import unicodedata
 import unittest
 from pathlib import Path
 
@@ -65,6 +67,9 @@ VALID_EXPLICIT_DESCRIPTIONS = {
     "exactly 50 characters": "x" * MIN_DESCRIPTION_LENGTH,
     "exactly 160 characters": "x" * MAX_DESCRIPTION_LENGTH,
     "parser-safe Unicode": "Monitor service behavior and operational health with Netdata’s real-time metrics.",
+    "Unicode prose": "Monitor Κατάσταση, 数据, and café service health across reliable production systems.",
+    "Unicode joiners": "Monitor Persian می‌شود text and 👩‍💻 operator workflows across reliable production systems.",
+    "non-ASCII URL lookalike": "Monitor K://example identifiers as plain Unicode text across reliable production systems.",
 }
 
 INVALID_EXPLICIT_DESCRIPTIONS = {
@@ -90,6 +95,11 @@ INVALID_EXPLICIT_DESCRIPTIONS = {
     "other URL scheme": "Monitor PostgreSQL queries at ftp://example.com/metrics across every database server.",
     "double quote": 'Monitor PostgreSQL queries and the "ready" state across every production database server.',
     "backslash": r"Monitor PostgreSQL queries under C:\metrics across every production database server.",
+    "Unicode emphasis boundary": "Monitor service behavior around é*word*é boundaries with reliable production health metrics.",
+    "Unicode line separator": "Monitor service behavior and health across production systems.\u2028Track reliable operations.",
+    "Unicode paragraph separator": "Monitor service behavior and health across production systems.\u2029Track reliable operations.",
+    "high surrogate": "Monitor service behavior and health across production \ud800 systems reliably.",
+    "low surrogate": "Monitor service behavior and health across production \udfff systems reliably.",
 }
 INVALID_EXPLICIT_DESCRIPTIONS.update(
     {
@@ -250,6 +260,21 @@ Monitor **short** metrics. Collect enough detail to pass meta-description valida
         with self.assertRaisesRegex(ValueError, "Duplicate generated descriptions"):
             build_description_index(integrations)
 
+    def test_duplicate_identity_uses_nfc_and_casefold_without_rewriting_output(self):
+        composed = "Monitor Café service behavior and health across reliable production systems."
+        decomposed = unicodedata.normalize("NFD", composed.upper())
+        integrations = [
+            {"id": "one", "integration_type": "logs", "meta": {"description": composed}},
+            {"id": "two", "integration_type": "logs", "meta": {"description": decomposed}},
+        ]
+
+        with self.assertRaisesRegex(ValueError, "Duplicate generated descriptions"):
+            build_description_index(integrations)
+
+        only_decomposed = build_description_index(integrations[1:])
+        self.assertEqual(only_decomposed["two"], decomposed)
+        self.assertNotEqual(only_decomposed["two"], unicodedata.normalize("NFC", decomposed))
+
 
 class GeneratedDocumentationDescriptionTest(unittest.TestCase):
     @classmethod
@@ -279,7 +304,7 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             description = json.loads(matches[0])
             validate_description(description, integration["id"])
             self.assertEqual(description, get_integration_meta_description(integration))
-            descriptions.append(description.casefold())
+            descriptions.append(unicodedata.normalize("NFC", description.casefold()))
 
         self.assertEqual(seen_modes, DOCUMENTATION_TYPES)
         self.assertEqual(len(descriptions), len(set(descriptions)))
@@ -477,6 +502,69 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
         for label, value in INVALID_EXPLICIT_DESCRIPTIONS.items():
             self._assert_contract(value, False, label)
 
+    def test_seeded_unicode_regex_properties_match_shared_schema(self):
+        validator = make_validator("./shared.json#/$defs/instance")
+        base = {
+            "name": "Test",
+            "link": "https://example.com",
+            "categories": ["data-collection.test"],
+            "icon_filename": "test.svg",
+        }
+        rng = random.Random(0x4E455444415441)
+        ascii_word = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
+        non_ascii = "éΩЖ中Kİıſ"
+        punctuation = ".,:;!?-+"
+
+        def accepts(value):
+            try:
+                validate_description(value, "fuzz")
+                python_valid = True
+            except ValueError:
+                python_valid = False
+            try:
+                validator.validate({**base, "description": value})
+                schema_valid = True
+            except ValidationError:
+                schema_valid = False
+            self.assertEqual(schema_valid, python_valid, value)
+            return python_valid
+
+        for iteration in range(256):
+            scheme_start = rng.choice(ascii_word.replace("0123456789_", "") + non_ascii)
+            scheme_tail = "".join(rng.choice(ascii_word + "+.-" + non_ascii) for _ in range(4))
+            value = (
+                f"Monitor {scheme_start}{scheme_tail}://example identifiers as plain text across reliable production systems."
+            )
+            scheme = scheme_start + scheme_tail
+            scheme_allowed = ascii_word.replace("_", "") + "+.-"
+            has_ascii_scheme_suffix = any(
+                char in ascii_word[:52]
+                and all(tail_char in scheme_allowed for tail_char in scheme[index:])
+                for index, char in enumerate(scheme)
+            )
+            expected = not has_ascii_scheme_suffix
+            self.assertEqual(accepts(value), expected, value)
+            if iteration < 16:
+                self._assert_contract(value, expected, f"seeded URL syntax {iteration}")
+
+            boundary_chars = ascii_word.replace("_", "") + non_ascii + punctuation
+            left = rng.choice(boundary_chars)
+            right = rng.choice(boundary_chars)
+            marker = rng.choice("*_")
+            value = (
+                f"Monitor service behavior around {left}{marker}word{marker}{right} boundaries with reliable production health metrics."
+            )
+            expected = left in ascii_word or right in ascii_word
+            self.assertEqual(accepts(value), expected, value)
+            if iteration < 16:
+                self._assert_contract(value, expected, f"seeded Markdown boundary {iteration}")
+
+            separator = rng.choice(("\u2028", "\u2029"))
+            value = f"Monitor service behavior across production systems.{separator}Track reliable health and performance."
+            self.assertFalse(accepts(value), repr(value))
+            if iteration < 16:
+                self._assert_contract(value, False, f"seeded Unicode separator {iteration}")
+
 
 class GeneratorInputFailureTest(unittest.TestCase):
     def run_generator(self, cwd, *args):
@@ -548,7 +636,8 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
 
         walk(map_data["sidebar"])
         self.assertEqual(targeted, MAP_DESCRIPTION_TARGETS)
-        self.assertEqual(len(descriptions), len({value.casefold() for value in descriptions}))
+        identities = {unicodedata.normalize("NFC", value.casefold()) for value in descriptions}
+        self.assertEqual(len(descriptions), len(identities))
 
     def test_affected_pages_have_one_top_level_heading(self):
         source_pages = {

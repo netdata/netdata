@@ -8,11 +8,11 @@
       "description": "A unique ID for the item. Must be URL safe."
     },
     "page_description": {
-      "description": "Optional explicit page description used when the overview cannot produce an accurate, unique 50-160 character summary. Values must already be trimmed. Leading or trailing whitespace, C0/C1 control characters, Markdown, HTML, URLs, double quotes, and backslashes are not supported.",
+      "description": "Optional explicit page description used when the overview cannot produce an accurate, unique 50-160 character summary. Values must already be trimmed. Leading or trailing whitespace, C0/C1 controls, surrogate code points, Unicode line or paragraph separators, Markdown, HTML, URLs, double quotes, and backslashes are not supported.",
       "type": "string",
       "minLength": 50,
       "maxLength": 160,
-      "pattern": "^(?!\\s)(?!.*\\s$)(?!.*[\\u0000-\\u001F\\u007F-\\u009F])(?!.*(?:[A-Za-z][A-Za-z0-9+.-]*://|[Mm][Aa][Ii][Ll][Tt][Oo]:|[Ww][Ww][Ww]\\.))(?!.*(?:!?\\[[^\\]]*\\](?:\\([^)]*\\)|\\[[^\\]]*\\])|`|:::|\\*\\*|__|~~|(?:^|[^A-Za-z0-9_])[*_][^*_\\r\\n]+[*_](?:[^A-Za-z0-9_]|$)|(?:^|\\s)#{1,6}\\s|(?:^|\\s)>\\s|(?:^|\\s)[-*+]\\s|<[^>]+>))[^\"\\\\]+$"
+      "pattern": "^(?!\\s)(?!.*\\s$)(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029\\uD800-\\uDFFF])(?!.*(?:[A-Za-z][A-Za-z0-9+.-]*://|[Mm][Aa][Ii][Ll][Tt][Oo]:|[Ww][Ww][Ww]\\.))(?!.*(?:!?\\[[^\\]]*\\](?:\\([^)]*\\)|\\[[^\\]]*\\])|`|:::|\\*\\*|__|~~|(?:^|[^A-Za-z0-9_])[*_][^*_\\r\\n]+[*_](?:[^A-Za-z0-9_]|$)|(?:^|[ \\t])#{1,6}[ \\t]|(?:^|[ \\t])>[ \\t]|(?:^|[ \\t])[-*+][ \\t]|<[^>]+>))[^\"\\\\]+$"
     },
     "instance": {
       "type": "object",

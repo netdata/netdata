@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import re
+import unicodedata
 from collections import Counter
 from typing import Any, Dict, Iterable, Optional
 
@@ -25,18 +26,25 @@ DOCUMENTATION_TYPES = {
     "service_discovery",
 }
 
-_BARE_URL_RE = re.compile(r"(?:[a-z][a-z0-9+.-]*://|mailto:|www\.)\S+", re.IGNORECASE)
+_ASCII_URL_PREFIX_PATTERN = (
+    r"(?:[A-Za-z][A-Za-z0-9+.-]*://|"
+    r"[Mm][Aa][Ii][Ll][Tt][Oo]:|"
+    r"[Ww][Ww][Ww]\.)"
+)
+_BARE_URL_RE = re.compile(_ASCII_URL_PREFIX_PATTERN + r"\S*")
+_URL_SYNTAX_RE = re.compile(_ASCII_URL_PREFIX_PATTERN)
 _MARKDOWN_LINK_RE = re.compile(r"!?\[([^]]*)\]\([^)]*\)")
 _MARKDOWN_SYNTAX_RE = re.compile(
-    r"!?\[[^]]*\](?:\([^)]*\)|\[[^]]*\])|`|:::|\*\*|__|~~|"
-    r"(?<!\w)[*_][^*_\r\n]+[*_](?!\w)|(?:^|\s)#{1,6}\s|(?:^|\s)>\s|(?:^|\s)[-*+]\s"
+    r"!?\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])|`|:::|\*\*|__|~~|"
+    r"(?:^|[^A-Za-z0-9_])[*_][^*_\r\n]+[*_](?:[^A-Za-z0-9_]|$)|"
+    r"(?:^|[ \t])#{1,6}[ \t]|(?:^|[ \t])>[ \t]|(?:^|[ \t])[-*+][ \t]"
 )
 _RELATED_RESOURCE_RE = re.compile(
     r'\{% relatedResource id="[^"]*" %\}(.*?)\{% /relatedResource %\}',
     re.DOTALL,
 )
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])(?:\s+|$)")
-_CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+_CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]")
 
 
 def _remove_fenced_blocks(markdown: str) -> str:
@@ -207,8 +215,8 @@ def validate_description(description: str, integration_id: str) -> None:
     if description != description.strip():
         errors.append("contains leading or trailing whitespace")
     if _CONTROL_CHARACTER_RE.search(description):
-        errors.append("contains a C0 or C1 control character")
-    if _BARE_URL_RE.search(description):
+        errors.append("contains a control, surrogate, or Unicode line/paragraph separator")
+    if _URL_SYNTAX_RE.search(description):
         errors.append("contains a URL")
     if _MARKDOWN_SYNTAX_RE.search(description):
         errors.append("contains Markdown syntax")
@@ -246,7 +254,8 @@ def build_description_index(integrations: Iterable[Dict[str, Any]]) -> Dict[str,
         integration_id = integration.get("id", "<missing-id>")
         description = get_integration_meta_description(integration)
         descriptions[integration_id] = description
-        normalized_to_ids.setdefault(description.casefold(), []).append(integration_id)
+        identity = unicodedata.normalize("NFC", description.casefold())
+        normalized_to_ids.setdefault(identity, []).append(integration_id)
 
     duplicates = [ids for ids in normalized_to_ids.values() if len(ids) > 1]
     if duplicates:
