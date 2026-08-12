@@ -1,7 +1,7 @@
 package main
 
 import (
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
@@ -127,7 +127,7 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 	// The native snapshot path already sorts by pid; only a test or fallback
 	// caller supplying unordered input pays for the sort.
 	if !ordered {
-		sort.Slice(pids, func(i, j int) bool { return pids[i] < pids[j] })
+		slices.Sort(pids)
 	}
 
 	s.dcstatPIDs = pids
