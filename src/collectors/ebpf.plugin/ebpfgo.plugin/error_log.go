@@ -39,3 +39,21 @@ func rateLimitedStderr(site, msg string) {
 func logPluginErr(site, module, what string, err error) {
 	rateLimitedStderr(site, fmt.Sprintf("ebpf-go.plugin: %s %s failed: %v\n", module, what, err))
 }
+
+// warnIntegrationDisabled explains, once per module, why an enabled collector is
+// only producing its host-wide charts.
+//
+// The per-application and per-cgroup charts come from apps.plugin and
+// cgroups.plugin reading this plugin's shared-memory segment, and the plugin
+// only collects and publishes per-PID rows when `apps` and/or `cgroups` are on.
+// Both ship as `no` in the stock ebpf.d.conf, so enabling a module alone is not
+// enough — which is easy to miss because the global charts do appear.
+//
+// Only opt-in modules should call this: a module that is enabled by default
+// would print on every stock install.
+func warnIntegrationDisabled(module string) {
+	fmt.Fprintf(os.Stderr,
+		"ebpf-go.plugin: %s: global charts only — per-application and per-cgroup charts need "+
+			"'apps = yes' and/or 'cgroups = yes' in the [global] section of ebpf.d.conf\n",
+		module)
+}

@@ -137,6 +137,10 @@ func main() {
 			if handle.AppsEnabled || handle.CgroupsEnabled {
 				dcstatStore = store
 				dcstatWillPublish = !cachestatWillPublish
+			} else {
+				// dcstat is opt-in, so reaching here means an operator enabled it
+				// and will otherwise wonder why only the global charts appeared.
+				warnIntegrationDisabled("dcstat")
 			}
 			shouldPublish := dcstatWillPublish
 			anyStarted = true

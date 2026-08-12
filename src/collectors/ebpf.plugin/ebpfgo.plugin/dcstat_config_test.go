@@ -104,3 +104,56 @@ func TestDCStatDefaultsMatchStockConfig(t *testing.T) {
 		t.Fatalf("dcstatMaxBaseSelector = %d, want 7 (5.14 is the newest base dc object)", dcstatMaxBaseSelector)
 	}
 }
+
+// TestDCStatAppsCgroupsGate pins the contract an operator hits when enabling
+// dcstat: the per-application and per-cgroup charts require `apps`/`cgroups` in
+// the [global] section on top of `dcstat = yes`, exactly as the C module did
+// (ebpf_library.c read the same two keys, and both ship as `no`).
+func TestDCStatAppsCgroupsGate(t *testing.T) {
+	const stockGlobal = "[global]\n    apps = no\n    cgroups = no\n\n[ebpf programs]\n    dcstat = no\n"
+
+	tests := map[string]struct {
+		userGlobal  string
+		wantApps    bool
+		wantCgroups bool
+		wantPerPID  bool
+	}{
+		"dcstat alone yields global charts only": {
+			userGlobal: "[ebpf programs]\n    dcstat = yes\n",
+		},
+		"apps = yes enables per-PID collection": {
+			userGlobal: "[global]\n    apps = yes\n\n[ebpf programs]\n    dcstat = yes\n",
+			wantApps:   true,
+			wantPerPID: true,
+		},
+		"cgroups = yes enables per-PID collection": {
+			userGlobal:  "[global]\n    cgroups = yes\n\n[ebpf programs]\n    dcstat = yes\n",
+			wantCgroups: true,
+			wantPerPID:  true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			writeCollectorConfigFixture(t, "dcstat.conf", stockGlobal, "", tc.userGlobal, "")
+
+			cfg, err := resolveDCStatLegacyConfig()
+			if err != nil {
+				t.Fatalf("resolve: %v", err)
+			}
+			if !cfg.Enabled {
+				t.Fatal("dcstat must be enabled")
+			}
+			if cfg.AppsEnabled != tc.wantApps {
+				t.Fatalf("AppsEnabled = %v, want %v", cfg.AppsEnabled, tc.wantApps)
+			}
+			if cfg.CgroupsEnabled != tc.wantCgroups {
+				t.Fatalf("CgroupsEnabled = %v, want %v", cfg.CgroupsEnabled, tc.wantCgroups)
+			}
+			// This is what main.go tests before wiring the shared-memory store.
+			if got := cfg.AppsEnabled || cfg.CgroupsEnabled; got != tc.wantPerPID {
+				t.Fatalf("per-PID collection = %v, want %v", got, tc.wantPerPID)
+			}
+		})
+	}
+}

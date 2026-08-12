@@ -109,11 +109,14 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
     if (unlikely(!cgroup_ebpfgo_dcstat_snapshot_ready))
         return;
 
-    // Don't create charts until the cgroup has actual directory-cache activity.
-    // Once st_dcstat_ratio exists the guard is skipped — charts persist on idle.
-    if (!cg->st_dcstat_ratio &&
-        !cg->dcstat.ratio && !cg->dcstat.reference &&
-        !cg->dcstat.slow && !cg->dcstat.not_found)
+    /* Don't create charts until this cgroup actually has directory-cache data.
+     *
+     * The test is on ct (set whenever any PID in the cgroup carries a dcstat SHM
+     * row), NOT on the published values: dcstat's idle ratio is 0 by design,
+     * unlike cachestat's 100, so a values-based guard would keep the charts
+     * hidden on any cgroup whose lookups happen to be quiet in the first cycles.
+     * Once st_dcstat_ratio exists the guard is skipped and the charts persist. */
+    if (!cg->st_dcstat_ratio && !cg->dcstat.ct)
         return;
 
     const bool is_service = is_cgroup_systemd_service(cg);
