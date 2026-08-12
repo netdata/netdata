@@ -44,11 +44,11 @@ Always on; observes the host's live network connections.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits.
+A single response is capped at 64 MiB. On a host with enough connections to exceed that, the request is aborted rather than truncated — group the map (by process name or container) to bring it back under the cap.
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+Sockets are enumerated when the Function is called, not continuously in the background, so the cost is paid per request and scales with the number of open sockets and processes.
 
 ## Setup
 

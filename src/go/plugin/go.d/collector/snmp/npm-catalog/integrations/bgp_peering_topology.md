@@ -49,18 +49,9 @@ The default configuration for this integration is not expected to impose a signi
 ## Setup
 
 
-You can configure the **snmp_topology** collector in two ways:
-
-| Method                | Best for                                                                                 | How to                                                                                                                                 |
-|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **snmp_topology**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/snmp_topology.conf` and add a job.                                                                        |
-
-:::important
-
-UI configuration requires paid Netdata Cloud plan.
-
-:::
+The **snmp_topology** collector runs as a single instance: it does not take user-defined jobs, and the
+Netdata web interface offers no **+** to add one. Adjust its settings in
+`go.d/snmp_topology.conf`.
 
 
 ### Prerequisites
@@ -74,7 +65,7 @@ The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP acc
 
 #### Options
 
-Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. The only settings are the two intervals below. Note that this collector is single-instance: it takes one job, named `snmp_topology` — other job names are rejected — and `update_every` has a minimum of 10, so ignore the multi-job shape of the generic example below.
+Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. The only settings are the two intervals below, and `update_every` has a minimum of 10.
 
 <details open><summary>Config options</summary>
 
@@ -89,33 +80,19 @@ Topology discovery needs no per-device configuration: it walks the devices alrea
 </details>
 
 
-#### via UI
-
-Configure the **snmp_topology** collector from the Netdata web interface:
-
-1. Go to **Nodes**.
-2. Select the node **where you want the snmp_topology data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
-3. The **Collectors → Jobs** view opens by default.
-4. In the Search box, type _snmp_topology_ (or scroll the list) to locate the **snmp_topology** collector.
-5. Click the **+** next to the **snmp_topology** collector to add a new job.
-6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
-    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
-
 
 #### via File
 
 The configuration file name for this integration is `go.d/snmp_topology.conf`.
 
-The file format is YAML. Generally, the structure is:
+The file format is YAML. A single-instance collector takes exactly one job, whose name is fixed:
 
 ```yaml
-update_every: 1
-autodetection_retry: 0
 jobs:
-  - name: some_name1
-  - name: some_name2
+  - name: snmp_topology
 ```
+
+Any other job name is rejected. Set the collector's own options alongside `name`.
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
 

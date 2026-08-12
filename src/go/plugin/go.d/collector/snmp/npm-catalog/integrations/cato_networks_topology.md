@@ -74,7 +74,7 @@ A Cato Management Application API key with read access to the account you want t
 
 #### Options
 
-Configure the Cato Networks collector with your account ID and API key. See the Cato Networks collector reference for all options.
+Configure the Cato Networks collector with your account ID and API key. See the [Cato Networks collector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page for all options.
 
 
 #### via UI

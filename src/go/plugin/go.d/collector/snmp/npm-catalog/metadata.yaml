@@ -9366,7 +9366,7 @@ modules:
         file:
           name: go.d/snmp_topology.conf
         options:
-          description: 'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. The only settings are the two intervals below. Note that this collector is single-instance: it takes one job, named `snmp_topology` — other job names are rejected — and `update_every` has a minimum of 10, so ignore the multi-job shape of the generic example below.'
+          description: 'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. The only settings are the two intervals below, and `update_every` has a minimum of 10.'
           folding:
             title: Config options
             enabled: true
@@ -9384,6 +9384,7 @@ modules:
             title: Config
             enabled: true
           list: []
+      single_job: true
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9683,9 +9684,9 @@ modules:
         auto_detection:
           description: Always on; observes the host's live network connections.
         limits:
-          description: ''
+          description: A single response is capped at 64 MiB. On a host with enough connections to exceed that, the request is aborted rather than truncated — group the map (by process name or container) to bring it back under the cap.
         performance_impact:
-          description: ''
+          description: Sockets are enumerated when the Function is called, not continuously in the background, so the cost is paid per request and scales with the number of open sockets and processes.
     setup:
       prerequisites:
         list:
@@ -9796,7 +9797,7 @@ modules:
         description: ''
     overview:
       data_collection:
-        metrics_description: Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with placement and network-attachment links, plus datastore-utilization overlays.
+        metrics_description: Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with placement links and datastore-utilization overlays; enabling `collect_network_topology` adds the network and port-group attachments.
         method_description: The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.
       supported_platforms:
         include: []
@@ -9820,7 +9821,7 @@ modules:
         file:
           name: go.d/vsphere.conf
         options:
-          description: Configure the vSphere collector with the vCenter URL and credentials. See the vSphere collector reference for all options.
+          description: Configure the vSphere collector with the vCenter URL and credentials. See the [vSphere collector](/src/go/plugin/go.d/collector/vsphere/integrations/vmware_vcenter_server.md) page for all options, including `collect_network_topology`, which is off by default and is what adds the network and port-group actors to the map.
           folding:
             title: Config options
             enabled: true
@@ -9879,7 +9880,7 @@ modules:
         file:
           name: go.d/cato_networks.conf
         options:
-          description: Configure the Cato Networks collector with your account ID and API key. See the Cato Networks collector reference for all options.
+          description: Configure the Cato Networks collector with your account ID and API key. See the [Cato Networks collector](/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page for all options.
           folding:
             title: Config options
             enabled: true

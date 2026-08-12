@@ -23,7 +23,7 @@ Module: vsphere
 
 ## Overview
 
-Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with placement and network-attachment links, plus datastore-utilization overlays.
+Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with placement links and datastore-utilization overlays; enabling `collect_network_topology` adds the network and port-group attachments.
 
 The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.
 
@@ -74,7 +74,7 @@ A vCenter Server reachable from the Netdata Agent, and a read-only account with 
 
 #### Options
 
-Configure the vSphere collector with the vCenter URL and credentials. See the vSphere collector reference for all options.
+Configure the vSphere collector with the vCenter URL and credentials. See the [vSphere collector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/vsphere/integrations/vmware_vcenter_server.md) page for all options, including `collect_network_topology`, which is off by default and is what adds the network and port-group actors to the map.
 
 
 #### via UI

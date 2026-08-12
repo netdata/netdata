@@ -211,10 +211,14 @@ def _plural(n, word):
     return f'{n} {word}' if n == 1 else f'{n} {word}s'
 
 
-def overview(metrics_description, method_description, auto_detection, platforms=(), multi_instance=True):
+def overview(metrics_description, method_description, auto_detection, platforms=(), multi_instance=True,
+             limits='', performance_impact=''):
     """`platforms` empty means every platform the Agent runs on; producers that are not
     built everywhere must list theirs. `multi_instance` must be False for singleton
-    producers, otherwise the page claims side-by-side instances the collector rejects."""
+    producers, otherwise the page claims side-by-side instances the collector rejects.
+
+    An empty `limits` renders "does not impose any limits", so pass the real limit
+    whenever the producer has one."""
     return {
         'data_collection': {'metrics_description': metrics_description, 'method_description': method_description},
         'supported_platforms': {'include': list(platforms), 'exclude': []},
@@ -222,13 +226,14 @@ def overview(metrics_description, method_description, auto_detection, platforms=
         'additional_permissions': {'description': ''},
         'default_behavior': {
             'auto_detection': {'description': auto_detection},
-            'limits': {'description': ''},
-            'performance_impact': {'description': ''},
+            'limits': {'description': limits},
+            'performance_impact': {'description': performance_impact},
         },
     }
 
 
-def setup_block(config_file, options_description, prerequisites=(), options=(), examples=(), section_name=None):
+def setup_block(config_file, options_description, prerequisites=(), options=(), examples=(), section_name=None,
+                single_job=False):
     """Build a `setup` block. Most catalog entries come from the SNMP collector and
     share SETUP below, but the topology, syslog, and vSphere/Cato producers are not
     SNMP-based and must not inherit SNMP prerequisites or `go.d/snmp.conf`.
@@ -236,14 +241,17 @@ def setup_block(config_file, options_description, prerequisites=(), options=(), 
     An empty `config_file` renders "There is no configuration file." and an empty
     `prerequisites` renders "No action required." (integrations/templates/setup-generic.md).
     Pass `options` whenever the producer really does expose settings — an empty list
-    renders as if it had none."""
-    file_block = {'name': config_file}
-    if section_name:
-        file_block['section_name'] = section_name
-    return {
+    renders as if it had none.
+
+    `single_job` marks a collector that rejects user-defined jobs (go.d
+    `InstancePolicySingle`). The generic go.d rendering otherwise tells the reader to
+    add a job from the UI and shows a multi-job sample, neither of which works. This is
+    NOT the same as `multi_instance: false`, which many collectors set while still
+    accepting jobs."""
+    block = {
         'prerequisites': {'list': [{'title': t, 'description': d} for t, d in prerequisites]},
         'configuration': {
-            'file': file_block,
+            'file': {'name': config_file},
             'options': {
                 'description': options_description,
                 'folding': {'title': 'Config options', 'enabled': True},
@@ -252,6 +260,11 @@ def setup_block(config_file, options_description, prerequisites=(), options=(), 
             'examples': {'folding': {'title': 'Config', 'enabled': True}, 'list': list(examples)},
         },
     }
+    if section_name:
+        block['configuration']['file']['section_name'] = section_name
+    if single_job:
+        block['single_job'] = True
+    return block
 
 
 SETUP = setup_block(
@@ -269,9 +282,7 @@ SETUP = setup_block(
 SNMP_TOPOLOGY_SETUP = setup_block(
     'go.d/snmp_topology.conf',
     'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector '
-    'jobs. The only settings are the two intervals below. Note that this collector is single-instance: it takes one '
-    'job, named `snmp_topology` — other job names are rejected — and `update_every` has a minimum of 10, so ignore '
-    'the multi-job shape of the generic example below.',
+    'jobs. The only settings are the two intervals below, and `update_every` has a minimum of 10.',
     [('SNMP devices configured',
       'The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP access must be reachable from the '
       'Netdata Agent acting as the site\'s SNMP hub.')],
@@ -281,6 +292,7 @@ SNMP_TOPOLOGY_SETUP = setup_block(
         {'name': 'refresh_every', 'description': 'How often to refresh topology data for each device.',
          'default_value': '30m', 'required': False},
     ],
+    single_job=True,
 )
 
 # network-viewer.plugin reads the host's own socket table: nothing to reach and no job to
@@ -317,8 +329,10 @@ STREAMING_SETUP = setup_block(
 
 VSPHERE_SETUP = setup_block(
     'go.d/vsphere.conf',
-    'Configure the vSphere collector with the vCenter URL and credentials. See the vSphere collector reference for all '
-    'options.',
+    'Configure the vSphere collector with the vCenter URL and credentials. See the '
+    '[vSphere collector](/src/go/plugin/go.d/collector/vsphere/integrations/vmware_vcenter_server.md) page for '
+    'all options, including `collect_network_topology`, which is off by default and is what adds the network '
+    'and port-group actors to the map.',
     [('vCenter access',
       'A vCenter Server reachable from the Netdata Agent, and a read-only account with permission to browse the '
       'inventory.')],
@@ -326,7 +340,8 @@ VSPHERE_SETUP = setup_block(
 
 CATO_SETUP = setup_block(
     'go.d/cato_networks.conf',
-    'Configure the Cato Networks collector with your account ID and API key. See the Cato Networks collector reference '
+    'Configure the Cato Networks collector with your account ID and API key. See the '
+    '[Cato Networks collector](/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page '
     'for all options.',
     [('Cato API access',
       'A Cato Management Application API key with read access to the account you want to map.')],
@@ -697,7 +712,11 @@ def build_topology_modules():
          'socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container '
          'and Kubernetes attribution is Linux-only.',
          'Always on; observes the host\'s live network connections.',
-         NETWORK_VIEWER_SETUP, ['Linux', 'FreeBSD', 'macOS'], False),
+         NETWORK_VIEWER_SETUP, ['Linux', 'FreeBSD', 'macOS'], False,
+         'A single response is capped at 64 MiB. On a host with enough connections to exceed that, the request is '
+         'aborted rather than truncated — group the map (by process name or container) to bring it back under the cap.',
+         'Sockets are enumerated when the Function is called, not continuously in the background, so the cost is paid '
+         'per request and scales with the number of open sockets and processes.'),
         ('Netdata Streaming Topology', 'netdata', 'streaming', 'netdata.png',
          ['streaming', 'parents', 'children', 'topology', 'agents', 'npm'],
          'See how your Netdata Agents connect. The streaming topology renders the parent-child hierarchy of a Netdata '
@@ -705,15 +724,15 @@ def build_topology_modules():
          '— which Agents stream to which Parents.',
          'Netdata builds the `topology:streaming` view from the live streaming connections between Agents and Parents.',
          'Always available; reflects the live streaming connections of the deployment.',
-         STREAMING_SETUP, (), False),
+         STREAMING_SETUP, (), False, '', ''),
         ('vSphere Topology', 'go.d.plugin', 'vsphere', icon_for('vmware'),
          ['vsphere', 'vmware', 'vcenter', 'virtualization', 'topology', 'npm'],
          'Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with '
-         'placement '
-         'and network-attachment links, plus datastore-utilization overlays.',
+         'placement links and datastore-utilization overlays; enabling `collect_network_topology` adds the '
+         'network and port-group attachments.',
          'The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.',
          'Built from the configured vCenter inventory.',
-         VSPHERE_SETUP, (), True),
+         VSPHERE_SETUP, (), True, '', ''),
         ('Cato Networks Topology', 'go.d.plugin', 'cato_networks', FALLBACK_ICON,
          ['cato', 'sase', 'sd-wan', 'topology', 'npm'],
          'Map a Cato Networks SASE fabric. The Cato collector renders sites, sockets, and gateways with their tunnel '
@@ -723,7 +742,7 @@ def build_topology_modules():
          '`netdata.topology.v1` '
          'graph.',
          'Built from the configured Cato account.',
-         CATO_SETUP, (), True),
+         CATO_SETUP, (), True, '', ''),
     ]
 
     modules = []
@@ -733,10 +752,11 @@ def build_topology_modules():
             name=name, link='', categories=[CAT_TOPOLOGY], icon=FALLBACK_ICON,
             keywords=keywords, ov=overview(metrics_desc, method_desc, auto, multi_instance=False),
             plugin_name='go.d.plugin', module_name='snmp_topology', setup=SNMP_TOPOLOGY_SETUP))
-    for name, plugin, module, icon, keywords, metrics_desc, method_desc, auto, setup, platforms, multi in other:
+    for (name, plugin, module, icon, keywords, metrics_desc, method_desc, auto, setup, platforms, multi,
+         limits, perf) in other:
         modules.append(make_entry(
             name=name, link='', categories=[CAT_TOPOLOGY], icon=icon,
-            keywords=keywords, ov=overview(metrics_desc, method_desc, auto, platforms, multi),
+            keywords=keywords, ov=overview(metrics_desc, method_desc, auto, platforms, multi, limits, perf),
             plugin_name=plugin, module_name=module, setup=setup))
     return modules
 

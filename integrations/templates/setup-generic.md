@@ -1,6 +1,6 @@
 ## Setup
 
-[% if entry.meta.plugin_name == 'go.d.plugin' %]
+[% if entry.meta.plugin_name == 'go.d.plugin' and not entry.setup.single_job %]
 
 You can configure the **[[ entry.meta.module_name ]]** collector in two ways:
 
@@ -14,6 +14,13 @@ You can configure the **[[ entry.meta.module_name ]]** collector in two ways:
 UI configuration requires paid Netdata Cloud plan.
 
 :::
+
+[% endif %]
+[% if entry.meta.plugin_name == 'go.d.plugin' and entry.setup.single_job %]
+
+The **[[ entry.meta.module_name ]]** collector runs as a single instance: it does not take user-defined jobs, and the
+Netdata web interface offers no **+** to add one. Adjust its settings in
+`[[ entry.setup.configuration.file.name ]]`.
 
 [% endif %]
 
@@ -87,7 +94,7 @@ There are no configuration options.
 
 [% endif %]
 
-[% if entry.meta.plugin_name == 'go.d.plugin' %]
+[% if entry.meta.plugin_name == 'go.d.plugin' and not entry.setup.single_job %]
 #### via UI
 
 Configure the **[[ entry.meta.module_name ]]** collector from the Netdata web interface:
@@ -111,7 +118,9 @@ The configuration file name for this integration is `[[ entry.setup.configuratio
 Configuration for this specific integration is located in the `[[ entry.setup.configuration.file.section_name ]]` section within that file.
 [% endif %]
 
-[% if entry.meta.plugin_name == 'go.d.plugin' %]
+[% if entry.meta.plugin_name == 'go.d.plugin' and entry.setup.single_job %]
+[% include 'setup/sample-go-config-single-job.md' %]
+[% elif entry.meta.plugin_name == 'go.d.plugin' %]
 [% include 'setup/sample-go-config.md' %]
 [% elif entry.meta.plugin_name == 'python.d.plugin' %]
 [% include 'setup/sample-python-config.md' %]
