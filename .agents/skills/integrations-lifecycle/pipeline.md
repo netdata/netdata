@@ -264,7 +264,7 @@ python3 integrations/check_collector_taxonomy.py --pr-diff origin/master...HEAD
 
 ```bash
 cd <repo>
-./integrations/pip.sh         # installs jsonschema referencing jinja2 ruamel.yaml
+./integrations/pip.sh         # installs jsonschema referencing jinja2 ruamel.yaml markdown-it-py
 python3 integrations/gen_integrations.py
 ```
 
@@ -291,6 +291,8 @@ Before cleanup or any file write, a full run resolves and validates descriptions
 documentation modes. Generation fails if any description is missing, duplicated, outside 50–160 characters, or contains
 leading or trailing whitespace, a C0/C1 control, a surrogate code point, a Unicode line or paragraph separator, a
 Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), a URL, a double quote, or a backslash.
+It also rejects descriptions beginning with a CommonMark unordered-list or one-to-nine-digit ordered-list marker, plus descriptions
+that consist only of a hyphen thematic break. Ordinary internal hyphens, plus signs, and digits remain valid.
 Duplicate identity is NFC-normalized and case-folded without rewriting emitted text. This ordering prevents a description defect
 from deleting the previous generated tree.
 

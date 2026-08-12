@@ -12,8 +12,9 @@ import unicodedata
 import unittest
 from pathlib import Path
 
-import yaml
 from jsonschema import ValidationError
+from markdown_it import MarkdownIt
+from ruamel.yaml import YAML
 
 INTEGRATIONS_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = INTEGRATIONS_DIR.parent
@@ -51,17 +52,104 @@ MODE_BY_TYPE = {
 }
 
 MARKDOWN_SPECIAL_CHARACTERS = "*_[]<>#`~"
+yaml = YAML(typ="safe")
 
+# This covers every CommonMark block form that can exist on one line. Setext
+# headings require a newline, while blank lines cannot satisfy the length and
+# trimming contract.
 COMMONMARK_ADVERSARIAL_DESCRIPTIONS = {
     "intraword asterisk emphasis": (
-        "Monitor service a*critical latency*event behavior across reliable production systems safely."
+        "Monitor service a*critical latency*event behavior across reliable production systems safely.",
+        r"<em\b",
     ),
     "Unicode-adjacent asterisk emphasis": (
-        "Monitor service é*critical latency*é behavior across reliable production systems safely."
+        "Monitor service é*critical latency*é behavior across reliable production systems safely.",
+        r"<em\b",
     ),
-    "strong emphasis": "Monitor **critical latency** behavior across reliable production systems and services safely.",
-    "inline code": "Monitor `critical latency` behavior across reliable production systems and services safely.",
-    "inline link": "Monitor [critical latency](latency) behavior across reliable production systems safely.",
+    "strong emphasis": (
+        "Monitor **critical latency** behavior across reliable production systems and services safely.",
+        r"<strong\b",
+    ),
+    "inline code": (
+        "Monitor `critical latency` behavior across reliable production systems and services safely.",
+        r"<code\b",
+    ),
+    "inline link": (
+        "Monitor [critical latency](latency) behavior across reliable production systems safely.",
+        r"<a\b",
+    ),
+    "unordered list with hyphen": (
+        "- Monitor service latency and availability across production systems safely.",
+        r"<ul\b",
+    ),
+    "unordered list with plus": (
+        "+ Monitor service latency and availability across production systems safely.",
+        r"<ul\b",
+    ),
+    "unordered list with asterisk": (
+        "* Monitor service latency and availability across production systems safely.",
+        r"<ul\b",
+    ),
+    "blockquote": (
+        "> Monitor service latency and availability across production systems safely.",
+        r"<blockquote\b",
+    ),
+    "ATX heading": (
+        "# Monitor service latency and availability across production systems safely.",
+        r"<h1\b",
+    ),
+    "indented code": (
+        "    Monitor service latency and availability across production systems safely.",
+        r"<pre\b",
+    ),
+    "fenced code": (
+        "``` Monitor service latency and availability across production systems safely.",
+        r"<pre\b",
+    ),
+    "HTML block": (
+        "<div>Monitor service latency and availability across production systems safely.</div>",
+        r"<div\b",
+    ),
+    "link reference definition": (
+        "[latency]: /metrics 'Monitor service latency and availability across production systems safely.'",
+        r"^$",
+    ),
+    "compact thematic break": (
+        "-" * MIN_DESCRIPTION_LENGTH,
+        r"<hr\b",
+    ),
+    "spaced thematic break": (
+        "- " * 24 + "--",
+        r"<hr\b",
+    ),
+}
+COMMONMARK_ADVERSARIAL_DESCRIPTIONS.update(
+    {
+        f"ordered list with {width} digits and {delimiter!r}": (
+            f"{'1' * width}{delimiter} Monitor service latency and availability across production systems safely.",
+            r"<ol\b",
+        )
+        for width in range(1, 10)
+        for delimiter in (".", ")")
+    }
+)
+
+COMMONMARK_PLAIN_TEXT_DESCRIPTIONS = {
+    "ordinary internal hyphens, pluses, and digits": (
+        "Monitor end-to-end C++ service health for 3 production tiers with reliable metrics."
+    ),
+    "leading hyphen without list space": (
+        "-Monitor service latency and availability across production systems safely."
+    ),
+    "leading plus without list space": (
+        "+Monitor service latency and availability across production systems safely."
+    ),
+    "ten-digit non-list prefix": (
+        "1234567890. Monitor service latency and availability across production systems safely."
+    ),
+    "hyphen prose that is not a thematic break": (
+        "--- Monitor service latency and availability across production systems safely."
+    ),
 }
 
 SCHEMA_REF_BY_TYPE = {
@@ -85,6 +173,7 @@ VALID_EXPLICIT_DESCRIPTIONS = {
     "Unicode joiners": "Monitor Persian می‌شود text and 👩‍💻 operator workflows across reliable production systems.",
     "non-ASCII URL lookalike": "Monitor K://example identifiers as plain Unicode text across reliable production systems.",
 }
+VALID_EXPLICIT_DESCRIPTIONS.update(COMMONMARK_PLAIN_TEXT_DESCRIPTIONS)
 
 INVALID_EXPLICIT_DESCRIPTIONS = {
     "non-string": 42,
@@ -121,7 +210,9 @@ INVALID_EXPLICIT_DESCRIPTIONS.update(
         for codepoint in (*range(0x20), *range(0x7F, 0xA0))
     }
 )
-INVALID_EXPLICIT_DESCRIPTIONS.update(COMMONMARK_ADVERSARIAL_DESCRIPTIONS)
+INVALID_EXPLICIT_DESCRIPTIONS.update(
+    {label: value for label, (value, _) in COMMONMARK_ADVERSARIAL_DESCRIPTIONS.items()}
+)
 INVALID_EXPLICIT_DESCRIPTIONS.update(
     {
         f"Markdown special {character!r}": (
@@ -435,7 +526,7 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
     @classmethod
     def _load_schema_fixture(cls, integration):
         source_path = integration["edit_link"].split("/blob/master/", 1)[1]
-        source = yaml.safe_load((REPO_ROOT / source_path).read_text(encoding="utf-8"))
+        source = yaml.load((REPO_ROOT / source_path).read_text(encoding="utf-8"))
         expected_name = cls._description_owner(integration)["name"]
 
         if isinstance(source, dict) and "modules" in source:
@@ -525,23 +616,22 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
         for label, value in INVALID_EXPLICIT_DESCRIPTIONS.items():
             self._assert_contract(value, False, label)
 
-    def test_commonmark_adversarial_values_render_as_markup_when_parser_is_available(self):
-        try:
-            from markdown_it import MarkdownIt
+    def test_commonmark_adversarial_values_render_as_markup(self):
+        render = MarkdownIt("commonmark").render
 
-            render = MarkdownIt("commonmark").render
-        except ImportError:
-            try:
-                import markdown
-
-                render = markdown.markdown
-            except ImportError:
-                self.skipTest("No CommonMark-compatible parser is installed")
-
-        for label, value in COMMONMARK_ADVERSARIAL_DESCRIPTIONS.items():
+        for label, (value, expected_markup) in COMMONMARK_ADVERSARIAL_DESCRIPTIONS.items():
             with self.subTest(value=label):
                 rendered = render(value)
-                self.assertRegex(rendered, r"<(?:a|code|em|strong)\b")
+                self.assertRegex(rendered, expected_markup)
+
+    def test_commonmark_plain_text_lookalikes_remain_paragraphs(self):
+        render = MarkdownIt("commonmark").render
+
+        for label, value in COMMONMARK_PLAIN_TEXT_DESCRIPTIONS.items():
+            with self.subTest(value=label):
+                rendered = render(value)
+                self.assertRegex(rendered, r"^<p>")
+                self.assertNotRegex(rendered, r"<(?:blockquote|h[1-6]|hr|ol|pre|ul)\b")
 
     def test_seeded_unicode_regex_properties_match_shared_schema(self):
         validator = make_validator("./shared.json#/$defs/instance")
@@ -655,7 +745,7 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
         cls.categories, cls.integrations = read_integrations_js("integrations/integrations.js")
 
     def test_map_descriptions_are_present_valid_and_unique(self):
-        map_data = yaml.safe_load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))
+        map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))
         descriptions = []
         targeted = set()
 

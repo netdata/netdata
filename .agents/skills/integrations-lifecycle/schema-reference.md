@@ -35,7 +35,8 @@ Referenced by every other schema for common structures.
 The reusable optional explicit-page-description contract: an already-trimmed 50–160 character string with a parser-safe
 plain-text pattern. It rejects leading or trailing whitespace, all C0/C1 controls, surrogate code points, Unicode line and paragraph
 separators, Markdown-special characters (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, and `~`), URLs, double quotes, and
-backslashes. `shared.instance.description`,
+backslashes. It also rejects a leading CommonMark unordered-list or one-to-nine-digit ordered-list marker and a value consisting only
+of a hyphen thematic break; ordinary internal hyphens, plus signs, and digits remain valid. `shared.instance.description`,
 `secretstore.meta.description`, and `service_discovery.meta.description` all reference this definition.
 
 ### `$defs.id`
@@ -56,7 +57,7 @@ The "what is this thing" descriptor used by every per-integration entry.
 | `instance.link`          | string        | yes | URL                                    | learn / www          | Official upstream site.                                                                                                                                            |
 | `instance.categories`    | array<string> | yes | each must match a `categories.yaml` id | learn / www / in-app | Validated; bogus removed (`gen_integrations.py:899-912`). If none survive, falls back to `categories.yaml` entries flagged `collector_default: true` (`:906-908`). |
 | `instance.icon_filename` | string        | yes | --                                     | learn / www / in-app | Path under `${NETDATA_REPOS_DIR}/website/themes/tailwind/static/img/` (icon repo).                                                                                 |
-| `instance.description`   | string        | no  | 50–160 trimmed plain-text characters   | learn frontmatter    | Explicit generated-page meta description. Must be unique under NFC-normalized case-folded identity and contain no leading/trailing whitespace, C0/C1 controls, surrogate code points, Unicode line/paragraph separators, Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), URL, double quote, or backslash. Accepted text is emitted without Unicode normalization. Use only when the mechanical overview result is unsuitable. |
+| `instance.description`   | string        | no  | 50–160 trimmed plain-text characters   | learn frontmatter    | Explicit generated-page meta description. Must be unique under NFC-normalized case-folded identity and contain no leading/trailing whitespace, C0/C1 controls, surrogate code points, Unicode line/paragraph separators, Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), CommonMark list/thematic-break block start, URL, double quote, or backslash. Accepted text is emitted without Unicode normalization. Use only when the mechanical overview result is unsuitable. |
 | `instance.variables`     | object        | no  | values: string / int / bool / number   | all rendered text    | Triggers two-pass Jinja templating; see `pipeline.md`.                                                                                                             |
 
 Do not use `instance.variables` or option/default text to build the

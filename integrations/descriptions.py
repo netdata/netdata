@@ -35,6 +35,9 @@ _BARE_URL_RE = re.compile(_ASCII_URL_PREFIX_PATTERN + r"\S*")
 _URL_SYNTAX_RE = re.compile(_ASCII_URL_PREFIX_PATTERN)
 _MARKDOWN_LINK_RE = re.compile(r"!?\[([^]]*)\]\([^)]*\)")
 _MARKDOWN_SPECIAL_CHARACTER_RE = re.compile(r"[*_\[\]<>#`~]")
+_COMMONMARK_BLOCK_START_RE = re.compile(
+    r"^(?:[-+*] |[0-9]{1,9}[.)] |-(?: *-){2,}$)"
+)
 _RELATED_RESOURCE_RE = re.compile(
     r'\{% relatedResource id="[^"]*" %\}(.*?)\{% /relatedResource %\}',
     re.DOTALL,
@@ -216,6 +219,8 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append("contains a URL")
     if _MARKDOWN_SPECIAL_CHARACTER_RE.search(description):
         errors.append("contains a Markdown-special character")
+    if _COMMONMARK_BLOCK_START_RE.search(description):
+        errors.append("starts a CommonMark block")
     if '"' in description or "\\" in description:
         errors.append("contains characters that Learn's frontmatter parser cannot preserve")
 

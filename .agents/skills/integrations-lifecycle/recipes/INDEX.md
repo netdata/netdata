@@ -22,9 +22,9 @@ the Python deps once per machine:
 ./integrations/pip.sh
 ```
 
-That installs `jsonschema`, `referencing`, `jinja2`,
-`ruamel.yaml` -- the four packages `gen_integrations.py`
-needs.
+That installs the four packages `gen_integrations.py` needs --
+`jsonschema`, `referencing`, `jinja2`, and `ruamel.yaml` -- plus
+`markdown-it-py` for the generated-description contract tests.
 
 For fast iteration during development, prefer `-c plugin/module`
 scoping on `gen_docs_integrations.py` to skip cleaning/

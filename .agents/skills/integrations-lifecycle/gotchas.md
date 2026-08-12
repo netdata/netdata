@@ -423,8 +423,8 @@ the right depth.
 ## `pip.sh` and the cmake module must stay in sync
 
 `integrations/pip.sh` is a 2-line script:
-`pip install jsonschema referencing jinja2 ruamel.yaml`. The
-same four packages are listed at
+`pip install jsonschema referencing jinja2 ruamel.yaml markdown-it-py`. The
+same five packages are listed at
 `packaging/cmake/Modules/NetdataRenderDocs.cmake:21`. Both
 must be updated together if the dep set changes (commented
 inline in `pip.sh`).
