@@ -589,21 +589,24 @@ func (c *Collector) mssqlErrorSessionAvailable(ctx context.Context, sessionName 
 	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
+	sessionQuery := queryMSSQLErrorConfiguredSessionHasEventFile
+	if c.Functions.ErrorInfo.UseRingBuffer {
+		sessionQuery = queryMSSQLErrorActiveSessionExists
+	}
+
 	var count int
-	err := c.db.QueryRowContext(qctx, queryMSSQLErrorSessionExists, sql.Named("sessionName", sessionName)).Scan(&count)
+	err := c.db.QueryRowContext(qctx, sessionQuery, sql.Named("sessionName", sessionName)).Scan(&count)
 	if err != nil {
 		return false, err
+	}
+	if !c.Functions.ErrorInfo.UseRingBuffer {
+		return count > 0, nil
 	}
 	if count == 0 {
 		return false, nil
 	}
 
-	targetQuery := queryMSSQLErrorSessionHasEventFile
-	if c.Functions.ErrorInfo.UseRingBuffer {
-		targetQuery = queryMSSQLErrorSessionHasRingBuffer
-	}
-
-	err = c.db.QueryRowContext(qctx, targetQuery, sql.Named("sessionName", sessionName)).Scan(&count)
+	err = c.db.QueryRowContext(qctx, queryMSSQLErrorSessionHasRingBuffer, sql.Named("sessionName", sessionName)).Scan(&count)
 	if err != nil {
 		return false, err
 	}

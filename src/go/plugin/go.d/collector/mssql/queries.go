@@ -379,20 +379,20 @@ SELECT database_id, name
 FROM sys.databases;
 `
 
-// queryMSSQLErrorSessionExists checks for the configured Extended Events session.
-const queryMSSQLErrorSessionExists = `
+// queryMSSQLErrorActiveSessionExists checks for a running configured Extended Events session.
+const queryMSSQLErrorActiveSessionExists = `
 SELECT COUNT(*)
 FROM sys.dm_xe_sessions
 WHERE name = @sessionName;
 `
 
-// queryMSSQLErrorSessionHasEventFile verifies that the session has an event_file target.
-const queryMSSQLErrorSessionHasEventFile = `
+// queryMSSQLErrorConfiguredSessionHasEventFile verifies that the configured session has an event_file target.
+const queryMSSQLErrorConfiguredSessionHasEventFile = `
 SELECT COUNT(*)
-FROM sys.dm_xe_session_targets AS xet
-JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
-WHERE xs.name = @sessionName
-  AND xet.target_name = 'event_file';
+FROM sys.server_event_sessions AS ses
+JOIN sys.server_event_session_targets AS setgt ON setgt.event_session_id = ses.event_session_id
+WHERE ses.name = @sessionName
+  AND setgt.name = 'event_file';
 `
 
 // queryMSSQLErrorSessionHasRingBuffer verifies that the session has a ring_buffer target.
@@ -406,15 +406,19 @@ WHERE xs.name = @sessionName
 
 // queryMSSQLErrorInfoEventFile reads recent error_reported events from the event_file target.
 const queryMSSQLErrorInfoEventFile = `
+WITH xevents AS (
+  SELECT CAST(event_data AS XML) AS event_xml
+  FROM sys.fn_xe_file_target_read_file(@sessionName + N'*.xel', NULL, NULL, NULL)
+  WHERE object_name = 'error_reported'
+)
 SELECT TOP (@limit)
-  timestamp_utc AS event_time,
-  CAST(event_data AS XML).value('(event/data[@name="error_number"]/value)[1]', 'int') AS error_number,
-  CAST(event_data AS XML).value('(event/data[@name="state"]/value)[1]', 'int') AS error_state,
-  CAST(event_data AS XML).value('(event/data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
-  CAST(event_data AS XML).value('(event/action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
-  CONVERT(VARCHAR(64), CAST(event_data AS XML).value('(event/action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash
-FROM sys.fn_xe_file_target_read_file(@sessionName + N'*.xel', NULL, NULL, NULL)
-WHERE object_name = 'error_reported'
+  event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') AS event_time,
+  event_xml.value('(/event/data[@name="error_number"]/value)[1]', 'int') AS error_number,
+  event_xml.value('(/event/data[@name="state"]/value)[1]', 'int') AS error_state,
+  event_xml.value('(/event/data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
+  event_xml.value('(/event/action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
+  CONVERT(VARCHAR(64), event_xml.value('(/event/action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash
+FROM xevents
 ORDER BY event_time DESC;
 `
 

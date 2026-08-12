@@ -146,6 +146,49 @@ func TestQuerySystemHealthLatestDeadlockEventFile_SQLServer2014Compatible(t *tes
 	assert.Contains(t, query, "order by deadlock_time desc")
 }
 
+func TestMSSQLErrorSessionAvailable_ConfiguredEventFileSession(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	c := New()
+	c.db = db
+
+	available, err := c.mssqlErrorSessionAvailable(context.Background(), "netdata_errors")
+	require.NoError(t, err)
+	assert.True(t, available)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestMSSQLErrorSessionAvailable_RingBufferRequiresRunningSession(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("dm_xe_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	c := New()
+	c.db = db
+	c.Config.Functions.ErrorInfo.UseRingBuffer = true
+
+	available, err := c.mssqlErrorSessionAvailable(context.Background(), "netdata_errors")
+	require.NoError(t, err)
+	assert.True(t, available)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestQueryMSSQLErrorInfoEventFile_SQLServer2014Compatible(t *testing.T) {
+	query := strings.ToLower(queryMSSQLErrorInfoEventFile)
+
+	assert.NotContains(t, query, "timestamp_utc")
+	assert.Contains(t, query, "cast(event_data as xml) as event_xml")
+	assert.Contains(t, query, "event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') as event_time")
+	assert.Contains(t, query, "order by event_time desc")
+}
+
 func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
