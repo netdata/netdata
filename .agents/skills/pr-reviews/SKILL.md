@@ -117,11 +117,12 @@ These are non-negotiable. Skipping any of them will cost the user time.
 
 ## Author classes -- different handling per class
 
-- **AI bots** (`cubic-dev-ai[bot]`, `copilot[bot]` and variants): handle
+- **AI bots** (`cubic-dev-ai[bot]`, `coderabbitai[bot]`, `copilot[bot]` and
+  variants): handle
   autonomously. Verify the finding, fix or push back with reasoning, reply
   in-thread, resolve thread.
 - **Informational bots** (`sonarqubecloud[bot]`, `github-actions[bot]`,
-  `netdata-bot[bot]`, `coderabbitai[bot]`): read for signal (e.g. quality
+  `netdata-bot[bot]`): read for signal (e.g. quality
   gate status). They don't usually require a reply.
 - **Humans** (developers, maintainers, community): consult the user.
   Maintainer comments matter most -- in this project, we are usually
@@ -474,6 +475,7 @@ behalf without explicit direction.
 | Bot                          | Role                                       | Re-trigger                                       |
 |------------------------------|--------------------------------------------|--------------------------------------------------|
 | `cubic-dev-ai[bot]`          | Line-level code review                     | New PR comment mentioning `@cubic-dev-ai`        |
+| `coderabbitai[bot]`          | Line-level code review                     | New PR comment mentioning `@coderabbitai review` |
 | `copilot[bot]`               | Line-level code review                     | Re-add as requested reviewer (`gh pr edit`)      |
 | `sonarqubecloud[bot]`        | Quality-gate status                        | Auto, on each scan run -- read its issue comment |
 | `github-actions[bot]`        | CI status / labels                         | Auto, on each workflow run                        |
@@ -481,6 +483,21 @@ behalf without explicit direction.
 
 If a new AI reviewer appears in the project, classify it by adding to
 `PR_AI_BOT_RE` in `_lib.sh` so the skill recognizes it.
+
+## Reviewer-specific notes
+
+- **`coderabbitai[bot]` posts line-level findings**, not just summaries. It was
+  originally classified here as informational; it is an AI reviewer and its
+  threads need the same verify-reply-resolve treatment as cubic's.
+- coderabbit cites external URLs (learn.netdata.cloud, upstream GitHub) as
+  evidence. Those citations are often *directionally* right but not
+  authoritative for the branch under review -- verify against the source in the
+  checkout before acting. Example: it correctly flagged that a Function needs a
+  signed-in identity, but the proof is the `HTTP_ACCESS_*` flags in the
+  producer, not the doc page it linked.
+- Both reviewers will flag a generated page's *content* when the real defect is
+  in the generator or the shared template. Fix the producer, regenerate, and say
+  so in the reply -- otherwise the same finding returns on the next vendor page.
 
 ## Failure modes -- quick diagnosis
 
