@@ -925,32 +925,58 @@ func TestRedirectedDashboardBaseSecurity(t *testing.T) {
 }
 
 func TestParseAllowedRedirectOrigins(t *testing.T) {
-	configured := requireURL(t, "https://mgr-a.example:8443/dashboard")
-	origins, err := parseAllowedRedirectOrigins(configured, []string{
-		"https://mgr-b.example:8443", "https://MGR-B.EXAMPLE:8443/",
-	})
-	require.NoError(t, err)
-	assert.Contains(t, origins, "https://mgr-a.example:8443")
-	assert.Contains(t, origins, "https://mgr-b.example:8443")
-	assert.Len(t, origins, 2)
-
-	defaultPortOrigins, err := parseAllowedRedirectOrigins(requireURL(t, "https://mgr-a.example"), []string{
-		"https://MGR-A.EXAMPLE:443",
-	})
-	require.NoError(t, err)
-	assert.Len(t, defaultPortOrigins, 1)
-	assert.Contains(t, defaultPortOrigins, "https://mgr-a.example")
-
-	_, err = parseAllowedRedirectOrigins(configured, []string{"https://mgr-b.example:8443/dashboard"})
-	require.Error(t, err)
+	tests := map[string]struct {
+		configured string
+		allowed    []string
+		want       []string
+		wantFail   bool
+	}{
+		"deduplicates normalized origins": {
+			configured: "https://mgr-a.example:8443/dashboard",
+			allowed:    []string{"https://mgr-b.example:8443", "https://MGR-B.EXAMPLE:8443/"},
+			want:       []string{"https://mgr-a.example:8443", "https://mgr-b.example:8443"},
+		},
+		"normalizes default HTTPS port": {
+			configured: "https://mgr-a.example",
+			allowed:    []string{"https://MGR-A.EXAMPLE:443"},
+			want:       []string{"https://mgr-a.example"},
+		},
+		"rejects path": {
+			configured: "https://mgr-a.example:8443/dashboard",
+			allowed:    []string{"https://mgr-b.example:8443/dashboard"},
+			wantFail:   true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			origins, err := parseAllowedRedirectOrigins(requireURL(t, test.configured), test.allowed)
+			if test.wantFail {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Len(t, origins, len(test.want))
+			for _, want := range test.want {
+				assert.Contains(t, origins, want)
+			}
+		})
+	}
 }
 
 func TestCephClientRejectsManagedAuthenticationHeaders(t *testing.T) {
-	for _, header := range []string{"Authorization", "authorization", "Cookie", "Host"} {
-		t.Run(header, func(t *testing.T) {
+	tests := map[string]struct {
+		header string
+	}{
+		"Authorization":             {header: "Authorization"},
+		"case-folded Authorization": {header: "authorization"},
+		"Cookie":                    {header: "Cookie"},
+		"Host":                      {header: "Host"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
 			_, err := newCephClient(&http.Client{}, web.RequestConfig{
 				URL:     "https://ceph.example",
-				Headers: map[string]string{header: "secret"},
+				Headers: map[string]string{test.header: "secret"},
 			}, false, nil)
 			require.Error(t, err)
 			assert.NotContains(t, err.Error(), "secret")
