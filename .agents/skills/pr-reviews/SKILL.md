@@ -78,10 +78,11 @@ These are non-negotiable. Skipping any of them will cost the user time.
      re-check `ci-status.sh`. If checks are still running, that's normal,
      surface to the user. If there are failures, fix and iterate.
 8. **Re-trigger AI reviewers explicitly.** They do NOT react to thread
-   replies or pushed commits the way humans do. Re-trigger EVERY AI reviewer
-   in `PR_AI_BOT_RE`, not just the ones you remember -- a reviewer you never
-   re-trigger can never post its "no new findings" pass, so the loop's exit
-   condition is unreachable for it.
+   replies or pushed commits the way humans do. Re-trigger every reviewer the
+   exit condition waits on -- if such a reviewer is never re-triggered it can
+   never post its "no new findings" pass, so the loop cannot end. A reviewer
+   that is deliberately excluded from the loop (see Copilot below) must also
+   be excluded from the exit condition, so the two lists always match.
    - cubic-dev-ai: post a new top-level comment mentioning it
      (`trigger-cubic.sh`).
    - coderabbitai: post a new top-level comment with a command
@@ -491,7 +492,7 @@ behalf without explicit direction.
 | Bot                          | Role                                       | Re-trigger                                       |
 |------------------------------|--------------------------------------------|--------------------------------------------------|
 | `cubic-dev-ai[bot]`          | Line-level code review                     | New PR comment mentioning `@cubic-dev-ai`        |
-| `coderabbitai[bot]`          | Line-level code review                     | `trigger-coderabbit.sh` (`@coderabbitai review`) |
+| `coderabbitai[bot]`          | Line-level code review                     | `trigger-coderabbit.sh` (`@coderabbitai review`) -- NEVER `@coderabbit`, that is a different, unrelated GitHub user |
 | `copilot[bot]`               | Line-level code review                     | Not re-triggered -- no credits (see rule 8)      |
 | `sonarqubecloud[bot]`        | Quality-gate status                        | Auto, on each scan run -- read its issue comment |
 | `github-actions[bot]`        | CI status / labels                         | Auto, on each workflow run                        |
@@ -501,6 +502,13 @@ If a new AI reviewer appears in the project, classify it by adding to
 `PR_AI_BOT_RE` in `_lib.sh` so the skill recognizes it.
 
 ## Reviewer-specific notes
+
+- **The mention is `@coderabbitai`, never `@coderabbit`.** `@coderabbit` is a
+  real, unrelated GitHub user; mentioning it pings a stranger on every
+  iteration and never reaches the bot. `trigger-coderabbit.sh` hardcodes the
+  correct handle -- do not hand-write the mention. The same care applies to
+  `@cubic-dev-ai`. Before posting any comment containing an `@`, check the
+  handle against the bot directory below.
 
 - **`coderabbitai[bot]` posts line-level findings**, not just summaries. It was
   originally classified here as informational; it is an AI reviewer and its

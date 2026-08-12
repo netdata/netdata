@@ -38,6 +38,8 @@ case "${CMD}" in
 esac
 
 SLUG="$(pr_require_slug)"
+# The handle is @coderabbitai. @coderabbit is a different, unrelated GitHub
+# user -- mentioning it pings a stranger and never reaches the bot.
 BODY="@coderabbitai ${CMD}"
 
 echo -e "${PR_GRAY}[trigger-coderabbit] PR ${SLUG}#${PR}: ${BODY}${PR_NC}" >&2
