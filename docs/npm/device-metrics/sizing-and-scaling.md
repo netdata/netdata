@@ -25,7 +25,7 @@ You can grow a hub two ways, and mix them freely:
 
 One rule makes the difference: **keep a slice's SNMP, traps, and topology on the same Agent.** That co-location is what lets traps arrive already enriched with device and topology context, automatically, with no correlation rules to maintain. (NetFlow has no such tie — you can run it on the same Agent or a separate one, as you prefer.)
 
-No matter how you split the network — up, out, or both — **[Netdata Cloud](https://app.netdata.cloud) presents one unified view** across every hub. Topology maps are currently drawn per hub, so you pick the hub whose slice you want to look at; everything else is already unified. The deployment shape is your operational choice.
+No matter how you split the network — up, out, or both — **[Netdata Cloud](https://app.netdata.cloud) presents one unified view**: dashboards and a single topology across every hub. The deployment shape is your operational choice; it never changes what operators see.
 
 For centralized retention and high availability, hubs stream to [Parents](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md) (a Parent handles on the order of 500 Agents); cluster Parents for HA.
 
