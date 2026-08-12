@@ -11,10 +11,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -379,7 +379,7 @@ func redirectedDashboardBase(current *url.URL, location, probePath string) (*url
 
 func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token string, managed bool, err error) {
 	if c.bearerTokenFile != "" {
-		bs, err := os.ReadFile(c.bearerTokenFile)
+		bs, err := safefile.Read(c.bearerTokenFile)
 		if err != nil {
 			return "", false, fmt.Errorf("read bearer token file: %w", err)
 		}

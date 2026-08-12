@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -262,6 +263,38 @@ func TestCephClientRereadsStaticBearerToken(t *testing.T) {
 	assert.Equal(t, "Bearer token-1", first["token"])
 	assert.Equal(t, "Bearer token-2", second["token"])
 	assert.EqualValues(t, 2, authenticatedRequests.Load())
+}
+
+func TestCephClientRejectsUnsafeStaticBearerTokenFile(t *testing.T) {
+	tests := map[string]struct {
+		prepare func(*testing.T) string
+		wantErr error
+	}{
+		"oversized regular file": {
+			prepare: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "token")
+				require.NoError(t, os.WriteFile(path, nil, 0o600))
+				require.NoError(t, os.Truncate(path, safefile.MaxSize+1))
+				return path
+			},
+			wantErr: safefile.ErrTooLarge,
+		},
+		"non-regular file": {
+			prepare: func(t *testing.T) string { return t.TempDir() },
+			wantErr: safefile.ErrNotRegular,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := newTestCephClient(t, "https://ceph.example", false, func(cfg *web.RequestConfig) {
+				cfg.BearerTokenFile = test.prepare(t)
+			})
+
+			_, _, err := client.tokenForRequest(context.Background(), requireURL(t, "https://ceph.example"))
+			require.ErrorIs(t, err, test.wantErr)
+		})
+	}
 }
 
 func TestCephClientLogicalOperationUsesSingleDeadline(t *testing.T) {
