@@ -1,6 +1,6 @@
 ---
 name: pr-reviews
-description: Address pull-request comments and reviews iteratively until the PR is clean — fetch all comments with paranoid pagination, classify by author (AI bot vs human), verify each finding, address it, find similar patterns, reply per-thread, resolve threads, check CI before pushing, retrigger AI reviewers (cubic-dev-ai, coderabbitai), and wait for new feedback. Use when the user says "address PR comments", "look at the reviews on PR N", "deal with the bot comments", "iterate on PR N until clean", or anything mentioning PR comments / reviews / cubic / copilot.
+description: Address pull-request comments and reviews iteratively until the PR is clean — fetch all comments with paranoid pagination, classify by author (AI bot vs human), verify each finding, address it, find similar patterns, reply per-thread, resolve threads, pull SonarCloud findings, check CI before pushing, retrigger AI reviewers (cubic-dev-ai, coderabbitai), and wait for new feedback. Use when the user says "address PR comments", "look at the reviews on PR N", "deal with the bot comments", "there is a coderabbit review", "another review", "iterate on PR N until clean", or anything mentioning PR comments / reviews / cubic / cubic-dev-ai / coderabbit / coderabbitai / copilot / sonar findings on a PR.
 ---
 
 # PR review handler skill
