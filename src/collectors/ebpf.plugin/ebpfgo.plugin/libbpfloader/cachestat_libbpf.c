@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -111,6 +112,8 @@ struct netdata_ebpf_cachestat_pid_snapshot_list {
     struct netdata_ebpf_cachestat_pid_snapshot *items;
     size_t count;
 };
+
+ND_EBPF_ASSERT_PID_FIRST(struct netdata_ebpf_cachestat_pid_snapshot);
 
 int netdata_cachestat_runtime_supports_core(void);
 
@@ -335,6 +338,12 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
     if (!rt) {
         return NULL;
     }
+
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+    /* The buffer/arena flavors accumulate per-TGID counters in userspace; the
+     * table has to know the entry layout before the first event arrives. */
+    nd_ebpf_acc_init(&rt->acc, sizeof(struct netdata_ebpf_cachestat_pid_entry), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid));
+#endif
 
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (use_core) {

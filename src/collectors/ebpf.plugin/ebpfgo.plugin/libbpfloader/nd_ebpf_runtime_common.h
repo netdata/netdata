@@ -226,6 +226,14 @@ static inline void nd_ebpf_acc_rebuild(struct nd_ebpf_acc_table *t)
 /* O(1) amortised: hash lookup, appending a zeroed item on a new TGID. */
 static inline void *nd_ebpf_acc_find_or_add(struct nd_ebpf_acc_table *t, uint32_t tgid)
 {
+    /* nd_ebpf_acc_init() must run before the first event: with item_size 0 the
+     * growth path would allocate nothing and the tgid write would corrupt the
+     * heap.  Refuse instead — callers treat NULL as "drop this event". */
+    if (!t->item_size) {
+        fprintf(stderr, "ebpf-go: accumulator used before nd_ebpf_acc_init()\n");
+        return NULL;
+    }
+
     /* Rebuild or initialise the table when load would exceed 0.5. */
     if (!t->htable || t->count + 1 > t->htable_sz / 2)
         nd_ebpf_acc_rebuild(t);
