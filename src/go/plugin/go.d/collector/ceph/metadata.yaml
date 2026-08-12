@@ -13,196 +13,322 @@ modules:
         integrations:
           list: []
       info_provided_to_referring_integrations:
-        description: ""
+        description: "Ceph cluster metrics, control-plane RCA, storage policy, and daemon inventory."
       keywords:
         - ceph
         - storage
+        - osd
+        - pool
+        - rgw
+        - s3
+        - prometheus
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors the overall health status and performance of your Ceph clusters.
-          It gathers key metrics for the entire cluster, individual Pools, and OSDs.
-        method_description: |
-          It collects metrics by periodically issuing HTTP GET requests to the Ceph Manager [REST API](https://docs.ceph.com/en/reef/mgr/ceph_api/#):
+          Monitor Ceph cluster, OSD, and pool metrics. Use the on-demand Functions for detailed health checks, OSD and
+          daemon inventory, and pool policy.
 
-          - [/api/monitor](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-monitor) (only once to get the Ceph cluster id (fsid))          
-          - [/api/health/minimal](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-health-minimal)
-          - [/api/osd](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-osd)
-          - [/api/pool?stats=true](https://docs.ceph.com/en/reef/mgr/ceph_api/#get--api-pool)
+          This collector can coexist with Ceph's Prometheus producers. Use the MGR Prometheus module for additional cluster
+          telemetry and, on Reef 18 and later, `ceph-exporter` on Ceph hosts for daemon/admin-socket telemetry.
+        method_description: |
+          The collector uses the authenticated Ceph Dashboard REST API. It does not read daemon admin sockets and does
+          not scrape Prometheus.
+
+          The collector verifies the cluster identity, then periodically queries cluster health, OSD, and pool endpoints.
+          A JWT obtained through Dashboard's JSON login is cached and renewed after an authorization failure. Alternatively,
+          the collector rereads an externally managed bearer-token file for every request; the file owner must replace the
+          token before it expires.
+
+          If a standby MGR redirects to the active MGR, the collector discovers the active origin without credentials,
+          validates the destination against `allowed_redirect_origins`, reconstructs the original API path, and then
+          authenticates. The configured origin is trusted implicitly; cross-origin redirects require an explicit exact
+          origin. It rejects redirect loops, URL credentials, unsupported schemes, and HTTPS-to-HTTP downgrade.
+
+          Periodic collection uses:
+
+          - `/api/health/minimal` for cluster health and summary metrics.
+          - `/api/osd` for selected, bounded per-OSD charts.
+          - `/api/pool?stats=true` for selected, bounded per-pool charts.
+
+          Functions query the Dashboard only when opened. Result rows and long health text are bounded.
+
+          Coverage ownership is deliberately split:
+
+          - MGR Prometheus owns continuous cluster telemetry such as PG states, OSD up/in, MON quorum, and capacity.
+          - On Reef 18 and later, per-host `ceph-exporter` owns continuous daemon/admin-socket telemetry.
+          - The native Health Function supplies exact current health-check detail for slow operations, scrub/damage
+            errors, quorum symptoms, and other RCA; the other Functions supply bounded policy and inventory gaps.
+          Release contracts cover Pacific 16, Quincy 17, Reef 18, Squid 19, and Tentacle 20.
       supported_platforms:
         include: [Linux]
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: |
+          No host capabilities are required. The Dashboard account needs read access to the Ceph scopes queried by the
+          metric endpoints and Functions. The built-in Ceph Dashboard `read-only` role grants read access to all Dashboard
+          scopes. Prefer a dedicated account and the narrowest custom role that covers the selected endpoints.
       default_behavior:
         auto_detection:
           description: |
-            The collector can automatically detect Ceph Manager instances running on:
-
-            - localhost that are listening on port 8443
-            - within Docker containers
-            
-            > **Note that the Ceph REST API requires a username and password**. 
-            > While Netdata can automatically detect Ceph Manager instances and create data collection jobs, these jobs will fail unless you provide the necessary credentials.
+            Listener discovery can find Ceph Dashboard endpoints on port 8443, including container listeners, but it
+            cannot discover credentials. A discovered job remains unavailable until Dashboard credentials are supplied.
         limits:
-          description: ""
+          description: |
+            The default job collects the complete cluster metric set every 10 seconds. Health, OSD, pool, and daemon
+            Functions are available on demand. Per-OSD and per-pool charts are capped at 100 selected entities each; when a
+            selected set exceeds its cap, that entity metric set is skipped rather than truncated.
         performance_impact:
-          description: ""
+          description: |
+            On Reef 18 and later, standalone `ceph-exporter` refreshes daemon/admin-socket metrics every 5 seconds by
+            default. The MGR Prometheus module refreshes its enabled cache every 15 seconds by default. Scrapes read these
+            caches and do not schedule refresh work, so match scraper intervals to the configured producer periods to avoid
+            duplicate or skipped cached samples. If the MGR Prometheus `cache` option is disabled, its metrics are instead
+            collected in the scrape request path.
+
+            Dashboard endpoints execute inside the active MGR. `/api/health/minimal` aggregates several subsystems and
+            iSCSI status may synchronously contact gateways; OSD and pool detail grows with cluster size. Choose an
+            appropriate `update_every`, selectors, and entity caps for the deployment.
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Enable and secure the Ceph Dashboard module
+            description: |
+              Enable Ceph Dashboard on the MGRs, configure TLS, and make the active/standby Dashboard addresses
+              reachable from the Netdata node that will run this once-per-cluster job.
+          - title: Create a read-only Dashboard account
+            description: |
+              Create a dedicated Ceph Dashboard user. Assign the built-in `read-only` role or a custom role with read
+              permissions for only the scopes needed by the enabled features. Store its password in a protected Netdata
+              configuration file or provide an externally managed bearer token through `bearer_token_file`. When using a
+              token file, its owner must replace the token before it expires; file updates take effect without restarting
+              the collector.
+          - title: Place the Dashboard job and optional Prometheus collectors
+            description: |
+              Run one native Dashboard job per Ceph cluster. If using Ceph's Prometheus telemetry, use one MGR Prometheus
+              scrape per cluster and, on Reef 18 and later, `ceph-exporter` on Ceph hosts for daemon/admin-socket telemetry.
+              Place the Dashboard job on a Netdata node with stable network access to the configured Dashboard and every
+              allowed active-MGR origin; its Functions execute on that node.
       configuration:
         file:
           name: go.d/ceph.conf
         options:
           description: |
-            The following options can be defined globally: update_every.
+            Options apply per job. The collector uses Dashboard JSON/JWT authentication, not HTTP Basic authentication.
+            Core Functions run on demand with internal execution and response limits.
           folding:
             title: Config options
             enabled: true
           list:
             - name: update_every
-              description: Data collection interval (seconds).
-              default_value: 1
+              description: >-
+                Periodic metric interval in seconds; it does not change the 5-second ceph-exporter default on Reef 18 and
+                later or the MGR Prometheus module's 15-second default cache refresh.
+              default_value: 10
               required: false
-              group: Collection
+              group: Base
             - name: autodetection_retry
-              description: Autodetection retry interval (seconds). Set 0 to disable.
-              default_value: 0
+              description: Retry interval in seconds for a failed auto-detected job; zero disables retries.
+              default_value: 60
               required: false
-              group: Collection
-
+              group: Base
+            - name: function_only
+              description: Run only on-demand Functions, without charts or periodic metric requests.
+              default_value: false
+              required: false
+              group: Base
+            - name: osd_selector
+              description: Simple-pattern selector matched against `osd.<id>` or OSD UUID before the cap.
+              default_value: "*"
+              required: false
+              group: Metrics
+            - name: max_osds
+              description: >-
+                Maximum selected OSDs with individual charts. If the selected set exceeds this operator policy, no
+                per-OSD metrics are collected.
+              default_value: 100
+              required: false
+              group: Metrics
+            - name: pool_selector
+              description: Simple-pattern selector matched against pool names before the cap.
+              default_value: "*"
+              required: false
+              group: Metrics
+            - name: max_pools
+              description: >-
+                Maximum selected pools with individual charts. If the selected set exceeds this operator policy, no
+                per-pool metrics are collected.
+              default_value: 100
+              required: false
+              group: Metrics
             - name: url
-              description: The URL of the [Ceph Manager API](https://docs.ceph.com/en/reef/mgr/ceph_api/).
+              description: Base URL of a Ceph Dashboard API endpoint.
               default_value: https://127.0.0.1:8443
               required: true
-              group: Target
+              group: Base
             - name: timeout
-              description: HTTP request timeout (seconds).
+              description: >-
+                Deadline in seconds for one logical Dashboard operation, including discovery, authentication, retries, and
+                response decoding; must be at least 0.5.
               default_value: 2
               required: false
-              group: Target
-
+              group: Base
             - name: username
-              description: Username for Basic HTTP authentication.
-              default_value: ""
-              required: true
-              group: HTTP Auth
-            - name: password
-              description: Password for Basic HTTP authentication.
-              default_value: ""
-              required: true
-              group: HTTP Auth
-            - name: bearer_token_file
-              description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
+              description: Username for Ceph Dashboard JSON login; required with `password` unless a bearer-token file is used.
               default_value: ""
               required: false
-              group: HTTP Auth
-
+              group: Auth
+            - name: password
+              description: Password for Ceph Dashboard JSON login; required with `username` unless a bearer-token file is used.
+              default_value: ""
+              required: false
+              group: Auth
+            - name: bearer_token_file
+              description: >-
+                Externally managed bearer-token file; takes priority over username/password. Its owner must replace the token
+                before it expires. The collector rereads the file for every request, so replacements take effect without a
+                restart.
+              default_value: ""
+              required: false
+              group: Auth
+            - name: not_follow_redirects
+              description: Reject redirects instead of performing secure active-MGR discovery.
+              default_value: false
+              required: false
+              group: Base
+            - name: allowed_redirect_origins
+              description: Exact trusted active-MGR origins; the configured URL origin is always trusted.
+              detailed_description: |
+                Cross-origin redirects are rejected unless the destination is listed as `scheme://host:port`. After a
+                credentialless discovery request, only a trusted origin may receive Dashboard login credentials or a
+                bearer token. List every possible MGR Dashboard origin and validate TLS with a cluster CA.
+              default_value: "[]"
+              required: false
+              group: Base
+            - name: headers
+              description: Additional HTTP headers; Authorization, Cookie, and Host are rejected.
+              default_value: ""
+              required: false
+              group: Headers
+            - name: force_http2
+              description: Force HTTP/2, including h2c over plain TCP.
+              default_value: false
+              required: false
+              group: Base
             - name: tls_skip_verify
-              description: Skip TLS certificate and hostname verification (insecure).
-              default_value: yes
+              description: Skip server certificate and hostname verification; insecure.
+              default_value: true
               required: false
               group: TLS
             - name: tls_ca
-              description: Path to CA bundle used to validate the server certificate.
+              description: Absolute path to a CA bundle used to validate the Dashboard certificate.
               default_value: ""
               required: false
               group: TLS
             - name: tls_cert
-              description: Path to client TLS certificate (for mTLS).
+              description: Absolute path to a client certificate for mTLS.
               default_value: ""
               required: false
               group: TLS
             - name: tls_key
-              description: Path to client TLS private key (for mTLS).
+              description: Absolute path to the client private key for mTLS.
               default_value: ""
               required: false
               group: TLS
-
             - name: proxy_url
-              description: HTTP proxy URL.
+              description: HTTP proxy URL; empty uses standard proxy environment variables.
               default_value: ""
               required: false
               group: Proxy
             - name: proxy_username
-              description: Username for proxy Basic HTTP authentication.
+              description: Proxy authentication username.
               default_value: ""
               required: false
               group: Proxy
             - name: proxy_password
-              description: Password for proxy Basic HTTP authentication.
+              description: Proxy authentication password.
               default_value: ""
               required: false
               group: Proxy
-
-            - name: method
-              description: HTTP method to use.
-              default_value: GET
-              required: false
-              group: Request
-            - name: body
-              description: Request body (e.g., for POST/PUT).
-              default_value: ""
-              required: false
-              group: Request
-            - name: headers
-              description: "Additional HTTP headers (one per line as key: value)."
-              default_value: ""
-              required: false
-              group: Request
-            - name: not_follow_redirects
-              description: Do not follow HTTP redirects.
-              default_value: no
-              required: false
-              group: Request
-            - name: force_http2
-              description: Force HTTP/2 (including h2c over TCP).
-              default_value: no
-              required: false
-              group: Request
-
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: Associate charts with a Virtual Node; Functions stay on the physical Agent job.
               default_value: ""
               required: false
-              group: Virtual Node
+              group: Base
         examples:
           folding:
-            title: ""
-            enabled: false
+            title: Config examples
+            enabled: true
           list:
-            - name: Basic
-              description: A basic example configuration.
-              folding:
-                enabled: false
+            - name: Once-per-cluster job
+              description: Collect the complete native Dashboard metric set and provide bounded core Functions.
               config: |
                 jobs:
-                  - name: local
-                    url: https://127.0.0.1:8443
-                    username: user
-                    password: pass
-            - name: Multi-instance
-              description: |
-                > **Note**: When you define multiple jobs, their names must be unique.
-                
-                Collecting metrics from local and remote instances.
+                  - name: ceph-site-a
+                    url: https://ceph-mgr.example:8443
+                    username: netdata
+                    password: change-me
+            - name: Function-only control-plane job
+              description: No periodic Dashboard charts; query RCA and inventory on demand.
               config: |
                 jobs:
-                  - name: local
-                    url: https://127.0.0.1:8443
-                    username: user
-                    password: pass
-                
-                  - name: remote
-                    url: https://192.0.2.1:8443
-                    username: user
-                    password: pass
+                  - name: ceph-control-plane
+                    url: https://ceph-mgr.example:8443
+                    username: netdata
+                    password: change-me
+                    function_only: true
+            - name: Bounded native entity metrics
+              description: Select entity charts and reject the complete selected set when it exceeds the configured cap.
+              config: |
+                jobs:
+                  - name: ceph-native-detail
+                    url: https://ceph-mgr.example:8443
+                    username: netdata
+                    password: change-me
+                    osd_selector: "osd.* !osd.0"
+                    max_osds: 50
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Dashboard job follows a redirect but returns HTML
+            description: |
+              Do not put a generic reverse-proxy login page in front of the job. Configure `url` to a Ceph Dashboard
+              endpoint. Leave `not_follow_redirects: false`, list every possible active MGR under
+              `allowed_redirect_origins`, and configure CA verification. The collector reconstructs the API request but
+              rejects untrusted origins, HTTPS downgrade, URL credentials, and redirect loops.
+          - name: Charts or Functions are missing
+            description: |
+              Confirm that the Dashboard user has read permission for the corresponding scope. Permission-filtered
+              sections are treated as unavailable; they are not emitted as healthy-looking zero values. The daemon
+              Function also requires a configured Ceph orchestrator. When an OSD or pool selection exceeds its configured
+              cap, the collector deliberately emits no metrics for that entity set.
+          - name: Long retention or capacity planning is required
+            description: |
+              Retention and Agent capacity are Netdata deployment concerns, not Ceph collector settings. Use the
+              [Agent sizing guide](/docs/netdata-agent/sizing-netdata-agents/README.md) and the
+              [disk and retention sizing guide](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md)
+              to size the intended Child/Parent topology from measured Ceph chart cardinality and retention requirements.
+
+              The collector reports current capacity; it does not emit a pool-fill forecast. Use retained history and
+              the presentation/query layer for projections, and validate the model against planned growth and rebalance.
+          - name: Existing Prometheus or Grafana monitoring must remain
+            description: |
+              Keep Ceph Prometheus exporters and existing dashboards until equivalent coverage is verified. This native
+              collector adds Dashboard metrics, Functions, and alerts; it does not replace every Ceph Prometheus series.
+              Netdata metric names are context-based, so Grafana dashboards that expect original `ceph_*` series are not
+              automatically compatible. On-demand Function tables are not Prometheus time series.
+          - name: More preconfigured Ceph alerts are expected
+            description: |
+              This integration ships alerts for collection failures and native capacity utilization.
+              Health Function rows are on-demand tables and do not create alerts. Keep Ceph mixin/Alertmanager rules for
+              PG states, OSD down/out, MON quorum, slow operations, scrub errors, and RGW conditions unless equivalent
+              Netdata alerts are explicitly implemented and tested. Slack, webhook, and PagerDuty are notification
+              transports, not Ceph threshold definitions.
     alerts:
+      - name: ceph_component_collection_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: ceph.component_collection_status
+        info: 'One or more Ceph metric components for cluster ${label:fsid} are failing'
       - name: ceph_cluster_physical_capacity_utilization
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.cluster_physical_capacity_utilization
@@ -211,185 +337,177 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ""
+      description: |
+        The default job emits the complete metric set. Per-entity metrics additionally honor their selectors and caps.
       availability: []
       scopes:
         - name: cluster
-          description: "These metrics refer to the entire Ceph cluster."
+          description: These metrics refer to the entire Ceph cluster.
           labels:
             - name: fsid
-              description: A unique identifier of the cluster.
+              description: Unique Ceph cluster identifier.
           metrics:
+            - name: ceph.component_collection_status
+              description: Ceph Component Collection Status
+              unit: status
+              chart_type: line
+              dimensions: [{name: health}, {name: osds}, {name: pools}]
             - name: ceph.cluster_status
               description: Ceph Cluster Status
               unit: status
               chart_type: line
-              dimensions:
-                - name: ok
-                - name: err
-                - name: warn
+              dimensions: [{name: ok}, {name: err}, {name: warn}]
             - name: ceph.cluster_hosts_count
               description: Ceph Cluster Hosts
               unit: hosts
               chart_type: line
-              dimensions:
-                - name: hosts
+              dimensions: [{name: hosts}]
             - name: ceph.cluster_monitors_count
               description: Ceph Cluster Monitors
               unit: monitors
               chart_type: line
-              dimensions:
-                - name: monitors
+              dimensions: [{name: monitors}]
             - name: ceph.cluster_osds_count
               description: Ceph Cluster OSDs
               unit: osds
               chart_type: line
-              dimensions:
-                - name: osds
+              dimensions: [{name: osds}]
             - name: ceph.cluster_osds_by_status_count
               description: Ceph Cluster OSDs by Status
-              unit: status
+              unit: osds
               chart_type: line
-              dimensions:
-                - name: up
-                - name: down
-                - name: in
-                - name: out
+              dimensions: [{name: up}, {name: down}, {name: in}, {name: out}]
             - name: ceph.cluster_managers_count
               description: Ceph Cluster Managers
               unit: managers
               chart_type: line
-              dimensions:
-                - name: active
-                - name: standby
+              dimensions: [{name: active}, {name: standby}]
             - name: ceph.cluster_object_gateways_count
-              description: Ceph Cluster Object Gateways (RGW)
+              description: Ceph Cluster Object Gateways
               unit: gateways
               chart_type: line
-              dimensions:
-                - name: object
+              dimensions: [{name: object}]
             - name: ceph.cluster_iscsi_gateways_count
               description: Ceph Cluster iSCSI Gateways
               unit: gateways
               chart_type: line
-              dimensions:
-                - name: iscsi
+              dimensions: [{name: iscsi}]
             - name: ceph.cluster_iscsi_gateways_by_status_count
               description: Ceph Cluster iSCSI Gateways by Status
               unit: gateways
               chart_type: line
-              dimensions:
-                - name: up
-                - name: down
+              dimensions: [{name: up}, {name: down}]
             - name: ceph.cluster_physical_capacity_utilization
               description: Ceph Cluster Physical Capacity Utilization
               unit: percent
               chart_type: area
-              dimensions:
-                - name: utilization
+              dimensions: [{name: utilization}]
             - name: ceph.cluster_physical_capacity_usage
               description: Ceph Cluster Physical Capacity Usage
               unit: bytes
               chart_type: stacked
-              dimensions:
-                - name: avail
-                - name: used
+              dimensions: [{name: avail}, {name: used}]
             - name: ceph.cluster_objects_count
-              description: Ceph Cluster Objects
+              description: Ceph Cluster Logical Objects
               unit: objects
               chart_type: line
-              dimensions:
-                - name: objects
-            - name: ceph.cluster_objects_by_status_distribution
-              description: Ceph Cluster Objects by Status
+              dimensions: [{name: objects}]
+            - name: ceph.cluster_object_copies_health
+              description: Ceph Cluster Object Copy Health
               unit: percent
-              chart_type: stacked
-              dimensions:
-                - name: healthy
-                - name: misplaced
-                - name: degraded
-                - name: unfound
+              chart_type: line
+              dimensions: [{name: degraded}, {name: misplaced}]
+            - name: ceph.cluster_objects_unfound
+              description: Ceph Cluster Unfound Objects
+              unit: percent
+              chart_type: line
+              dimensions: [{name: unfound}]
             - name: ceph.cluster_pools_count
               description: Ceph Cluster Pools
               unit: pools
               chart_type: line
-              dimensions:
-                - name: pools
+              dimensions: [{name: pools}]
             - name: ceph.cluster_pgs_count
               description: Ceph Cluster Placement Groups
               unit: pgs
               chart_type: line
-              dimensions:
-                - name: pgs
+              dimensions: [{name: pgs}]
             - name: ceph.cluster_pgs_by_status_count
-              description: Ceph Cluster Placement Groups by Status
+              description: Ceph Cluster Placement Groups by Compatibility Category
               unit: pgs
               chart_type: stacked
-              dimensions:
-                - name: clean
-                - name: working
-                - name: warning
-                - name: unknown
+              dimensions: [{name: clean}, {name: working}, {name: warning}, {name: unknown}]
             - name: ceph.cluster_pgs_per_osd_count
               description: Ceph Cluster Placement Groups per OSD
               unit: pgs
               chart_type: line
-              dimensions:
-                - name: per_osd
+              dimensions: [{name: per_osd}]
+            - name: ceph.cluster_client_io
+              description: Ceph Cluster Client I/O
+              unit: bytes/s
+              chart_type: area
+              dimensions: [{name: read}, {name: written}]
+            - name: ceph.cluster_client_iops
+              description: Ceph Cluster Client Operations
+              unit: ops/s
+              chart_type: line
+              dimensions: [{name: read}, {name: write}]
+            - name: ceph.cluster_recovery_throughput
+              description: Ceph Cluster Recovery Throughput
+              unit: bytes/s
+              chart_type: line
+              dimensions: [{name: recovery}]
+            - name: ceph.cluster_scrub_status
+              description: Ceph Cluster Scrubbing Status
+              unit: status
+              chart_type: line
+              dimensions: [{name: disabled}, {name: active}, {name: inactive}]
         - name: osd
-          description: These metrics refer to the Object Storage Daemon (OSD).
+          description: >-
+            These optional metrics refer to a selected OSD. When the selected inventory exceeds `max_osds`, the collector
+            emits no per-OSD metrics rather than returning a partial set.
           labels:
             - name: fsid
-              description: A unique identifier of the cluster.
+              description: Unique Ceph cluster identifier.
             - name: osd_uuid
               description: OSD UUID.
             - name: osd_name
               description: OSD name.
             - name: device_class
-              description: OSD device class.
+              description: OSD CRUSH device class.
           metrics:
             - name: ceph.osd_status
               description: Ceph OSD Status
               unit: status
               chart_type: line
-              dimensions:
-                - name: up
-                - name: down
-                - name: in
-                - name: out
+              dimensions: [{name: up}, {name: down}, {name: in}, {name: out}]
             - name: ceph.osd_space_usage
               description: Ceph OSD Space Usage
               unit: bytes
               chart_type: stacked
-              dimensions:
-                - name: avail
-                - name: used
+              dimensions: [{name: avail}, {name: used}]
             - name: ceph.osd_io
-              description: Ceph OSD IO
+              description: Ceph OSD I/O Rate
               unit: bytes/s
               chart_type: area
-              dimensions:
-                - name: read
-                - name: written
+              dimensions: [{name: read}, {name: written}]
             - name: ceph.osd_iops
-              description: Ceph OSD IOPS
+              description: Ceph OSD Operation Rate
               unit: ops/s
-              chart_type: area
-              dimensions:
-                - name: read
-                - name: write
+              chart_type: line
+              dimensions: [{name: read}, {name: write}]
             - name: ceph.osd_latency
               description: Ceph OSD Latency
               unit: milliseconds
               chart_type: line
-              dimensions:
-                - name: commit
-                - name: apply
+              dimensions: [{name: commit}, {name: apply}]
         - name: pool
-          description: These metrics refer to the Pool.
+          description: >-
+            These optional metrics refer to a selected pool. When the selected inventory exceeds `max_pools`, the
+            collector emits no per-pool metrics rather than returning a partial set.
           labels:
             - name: fsid
-              description: A unique identifier of the cluster.
+              description: Unique Ceph cluster identifier.
             - name: pool_name
               description: Pool name.
           metrics:
@@ -397,32 +515,193 @@ modules:
               description: Ceph Pool Space Utilization
               unit: percent
               chart_type: area
-              dimensions:
-                - name: utilization
+              dimensions: [{name: utilization}]
             - name: ceph.pool_space_usage
               description: Ceph Pool Space Usage
               unit: bytes
               chart_type: stacked
-              dimensions:
-                - name: avail
-                - name: used
+              dimensions: [{name: avail}, {name: used}]
             - name: ceph.pool_objects_count
               description: Ceph Pool Objects
               unit: objects
               chart_type: line
-              dimensions:
-                - name: object
+              dimensions: [{name: objects}]
             - name: ceph.pool_io
-              description: Ceph Pool IO
+              description: Ceph Pool I/O Rate
               unit: bytes/s
               chart_type: area
-              dimensions:
-                - name: read
-                - name: written
+              dimensions: [{name: read}, {name: written}]
             - name: ceph.pool_iops
-              description: Ceph Pool IOPS
+              description: Ceph Pool Operation Rate
               unit: ops/s
-              chart_type: area
-              dimensions:
-                - name: read
-                - name: write
+              chart_type: line
+              dimensions: [{name: read}, {name: write}]
+    functions:
+      description: |
+        Bounded on-demand tables for Ceph control-plane troubleshooting. They run on the physical Agent hosting the job,
+        work without Netdata Cloud, and query Ceph only while requested. Public method names are namespaced by the
+        framework, for example `ceph:health`; the IDs below are the collector method IDs.
+      list:
+        - id: health
+          name: Ceph Health
+          description: |
+            Returns exact Ceph health-check codes, severity, mute state, affected counts, summaries, and bounded detail.
+            Use it for MON quorum symptoms, slow operations, scrub/damage errors, PG warnings, and other current RCA data.
+          parameters: []
+          returns:
+            description: >-
+              At most 500 rows, ordered by severity and code. Each detailed health message becomes a row; a check with no
+              detail becomes one summary row. The `truncated` field identifies a bounded subset.
+            columns:
+              - {name: id, type: string, unit: "", visibility: hidden, description: Unique row identifier.}
+              - {name: code, type: string, unit: "", description: Ceph health-check code.}
+              - {name: severity, type: string, unit: "", description: "Ceph HEALTH_OK, HEALTH_WARN, or HEALTH_ERR severity."}
+              - {name: muted, type: boolean, unit: "", description: Whether Ceph muted the health check.}
+              - {name: summary, type: string, unit: "", description: Health-check summary.}
+              - {name: count, type: integer, unit: items, description: Affected item count.}
+              - {name: detail, type: string, unit: "", description: Bounded detailed health-check message.}
+              - {name: detail_truncated, type: boolean, unit: "", visibility: hidden, description: Summary or detail text was truncated.}
+              - {name: truncated, type: boolean, unit: "", visibility: hidden, description: Result exceeded its row limit.}
+          performance: >-
+            Dashboard builds every permission-dependent `/api/health/minimal` section per invocation; it cannot return
+            only health checks, and iSCSI read scope can trigger synchronous gateway pings. The minimal route carries the
+            same detailed checks as the full route without its larger payload. The collector retains 500 most-severe rows
+            plus one look-ahead row from the decoded checks and truncates long summary/detail cells. Use a narrow Dashboard
+            role to avoid unrelated sections when appropriate.
+          security: Health detail can expose daemon, host, pool, and client identifiers. Restrict Function access to operators.
+          availability: Requires Dashboard read permission for health-related scopes.
+          require_cloud: false
+        - id: osds
+          name: Ceph OSDs
+          description: Returns complete bounded OSD state, topology, capacity, current rates, and latency for RCA.
+          parameters:
+            - id: limit
+              name: Maximum rows
+              description: Return the complete OSD inventory only when it fits within this limit.
+              type: select
+              required: true
+              default: "500"
+              options:
+                - {id: "100", name: 100 rows}
+                - {id: "500", name: 500 rows, default: true}
+                - {id: "1000", name: "1,000 rows"}
+                - {id: "2500", name: "2,500 rows"}
+                - {id: "5000", name: "5,000 rows"}
+          returns:
+            description: >-
+              One row per OSD, ordered by numeric OSD ID. If the complete inventory exceeds the selected limit or the
+              internal ceiling, the Function returns an error and no rows.
+            columns:
+              - {name: uuid, type: string, unit: "", visibility: hidden, description: OSD UUID.}
+              - {name: id, type: integer, unit: "", description: Numeric OSD ID.}
+              - {name: name, type: string, unit: "", description: OSD name.}
+              - {name: host, type: string, unit: "", description: OSD host.}
+              - {name: device_class, type: string, unit: "", description: CRUSH device class.}
+              - {name: up, type: boolean, unit: "", description: Whether the OSD is up.}
+              - {name: in, type: boolean, unit: "", description: Whether the OSD is in.}
+              - {name: operational_status, type: string, unit: "", description: Orchestrator operational status.}
+              - {name: total_bytes, type: integer, unit: bytes, visibility: hidden, description: Total OSD capacity.}
+              - {name: used_bytes, type: integer, unit: bytes, description: Used OSD capacity.}
+              - {name: available_bytes, type: integer, unit: bytes, description: Available OSD capacity.}
+              - {name: utilization, type: float, unit: percent, description: OSD utilization.}
+              - {name: read_bytes_per_sec, type: float, unit: bytes/s, visibility: hidden, description: Current read rate.}
+              - {name: write_bytes_per_sec, type: float, unit: bytes/s, visibility: hidden, description: Current write rate.}
+              - {name: read_ops_per_sec, type: float, unit: ops/s, visibility: hidden, description: Current read operation rate.}
+              - {name: write_ops_per_sec, type: float, unit: ops/s, visibility: hidden, description: Current write operation rate.}
+              - {name: commit_latency_ms, type: float, unit: milliseconds, visibility: hidden, description: Commit latency.}
+              - {name: apply_latency_ms, type: float, unit: milliseconds, visibility: hidden, description: Apply latency.}
+          performance: >-
+            Makes one target-sized Dashboard v1.1 request, validates `X-Total-Count`, and returns rows only when that
+            response proves the complete inventory fits within the selected limit and internal response budgets. The
+            Function has a five-second internal deadline.
+          security: Exposes OSD UUIDs, host names, device classes, and storage usage. Restrict access to operators.
+          availability: >-
+            Requires Dashboard read permission for the OSD scope and the v1.1 OSD API available in Reef 18 and newer.
+            Pacific 16 and Quincy 17 periodic OSD metrics use a legacy compatibility path; this Function does not.
+          require_cloud: false
+        - id: pools
+          name: Ceph Pools
+          description: Returns pool replication/EC policy, PG settings, CRUSH placement, applications, flags, and quotas.
+          parameters:
+            - id: limit
+              name: Maximum rows
+              description: Return the complete pool inventory only when it fits within this limit.
+              type: select
+              required: true
+              default: "500"
+              options:
+                - {id: "100", name: 100 rows}
+                - {id: "500", name: 500 rows, default: true}
+                - {id: "1000", name: "1,000 rows"}
+                - {id: "2500", name: "2,500 rows"}
+                - {id: "5000", name: "5,000 rows"}
+          returns:
+            description: >-
+              One row per pool, ordered by pool name. If the complete inventory exceeds the selected limit or the
+              internal ceiling, the Function returns an error and no rows.
+            columns:
+              - {name: name, type: string, unit: "", description: Pool name.}
+              - {name: type, type: string, unit: "", description: Replicated or erasure-coded pool type.}
+              - {name: size, type: integer, unit: copies, description: Replica or EC shard count; null when unavailable.}
+              - {name: min_size, type: integer, unit: copies, description: Minimum available copies; null when unavailable.}
+              - {name: pg_num, type: integer, unit: PGs, description: Placement-group count; null when unavailable.}
+              - {name: pgp_num, type: integer, unit: PGs, visibility: hidden, description: Placement-group count used for placement; null when unavailable.}
+              - {name: pg_autoscale_mode, type: string, unit: "", description: PG autoscaler mode.}
+              - {name: crush_rule, type: string, unit: "", description: CRUSH rule.}
+              - {name: crush_root, type: string, unit: "", description: CRUSH root.}
+              - {name: failure_domain, type: string, unit: "", description: CRUSH failure domain.}
+              - {name: device_class, type: string, unit: "", description: CRUSH device class.}
+              - {name: applications, type: string, unit: "", description: Enabled pool applications.}
+              - {name: erasure_profile, type: string, unit: "", visibility: hidden, description: Erasure-code profile.}
+              - {name: quota_max_bytes, type: integer, unit: bytes, visibility: hidden, description: Pool byte quota; null when unavailable.}
+              - {name: quota_max_objects, type: integer, unit: objects, visibility: hidden, description: Pool object quota; null when unavailable.}
+              - {name: flags, type: string, unit: "", visibility: hidden, description: Pool flags.}
+          performance: >-
+            Dashboard returns the full pool and CRUSH-rule lists per invocation. The collector validates and sorts
+            those lists, rejects oversized or incomplete results before returning rows, and enforces internal response
+            budgets and an eight-second deadline. It does not request pool statistics or histories.
+          security: Pool names, applications, placement policy, and quotas may reveal tenant or workload organization.
+          availability: Requires Dashboard read permission for pool and OSD/CRUSH data.
+          require_cloud: false
+        - id: daemons
+          name: Ceph Daemons
+          description: Returns orchestrator-reported daemon type, placement, status, version, and image inventory.
+          parameters:
+            - id: limit
+              name: Maximum rows
+              description: Return the complete daemon inventory only when it fits within this limit.
+              type: select
+              required: true
+              default: "500"
+              options:
+                - {id: "100", name: 100 rows}
+                - {id: "500", name: 500 rows, default: true}
+                - {id: "1000", name: "1,000 rows"}
+                - {id: "2500", name: "2,500 rows"}
+                - {id: "5000", name: "5,000 rows"}
+          returns:
+            description: >-
+              One row per orchestrator daemon. If the complete inventory exceeds the selected limit or the internal
+              ceiling, the Function returns an error and no rows.
+            columns:
+              - {name: id, type: string, unit: "", visibility: hidden, description: Unique daemon row identifier.}
+              - {name: type, type: string, unit: "", description: Daemon type.}
+              - {name: name, type: string, unit: "", description: Daemon name.}
+              - {name: host, type: string, unit: "", description: Daemon host.}
+              - {name: status, type: string, unit: "", description: Daemon status.}
+              - {name: active, type: boolean, unit: "", description: Whether the daemon is active; null when Dashboard does not report it.}
+              - {name: version, type: string, unit: "", description: Ceph version.}
+              - {name: image, type: string, unit: "", visibility: hidden, description: Container image.}
+              - {name: last_refresh, type: string, unit: "", visibility: hidden, description: Inventory refresh timestamp.}
+              - {name: placement, type: string, unit: "", visibility: hidden, description: Orchestrator placement.}
+          performance: >-
+            Dashboard may return the full orchestrator daemon list per invocation. The collector validates and sorts
+            that list, rejects oversized or incomplete results before returning rows, and enforces internal response
+            budgets and a five-second deadline.
+          security: Exposes host names, daemon placement, versions, and container images.
+          prerequisites:
+            list:
+              - title: Configure a Ceph orchestrator
+                description: The Dashboard daemon endpoint requires an active orchestrator with daemon-list support.
+          availability: Requires an active Ceph orchestrator and Dashboard hosts-scope read permission.
+          require_cloud: false

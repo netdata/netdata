@@ -3,107 +3,93 @@
 package ceph
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"slices"
-
-	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"math"
+	"strings"
+	"time"
 )
 
 const precision = 1000
 
-func (c *Collector) collect() (map[string]int64, error) {
+var (
+	maxInt64Float       = math.Nextafter(float64(math.MaxInt64), 0)
+	maxScaledInt64Float = math.Nextafter(float64(math.MaxInt64)/precision, 0)
+)
+
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.auth(); err != nil {
+	if _, err := c.probeClusterIdentity(ctx); err != nil {
+		return nil, err
+	}
+	c.addClusterChartsOnce.Do(c.addClusterCharts)
+
+	healthErr := c.collectHealth(ctx, mx)
+
+	var osdErr error
+	if c.shouldSkipEntityCollection("osd", c.OSDSelector, mx["osds_num"], c.MaxOSDs) {
+		c.suppressEntityMetrics("osd", c.seenOsds)
+	} else {
+		osdErr = c.collectOsds(ctx, mx)
+	}
+
+	var poolErr error
+	if c.shouldSkipEntityCollection("pool", c.PoolSelector, mx["pools_num"], c.MaxPools) {
+		c.suppressEntityMetrics("pool", c.seenPools)
+	} else {
+		poolErr = c.collectPools(ctx, mx)
+	}
+
+	err := errors.Join(
+		wrapCollectionError("health", healthErr),
+		wrapCollectionError("OSD", osdErr),
+		wrapCollectionError("pool", poolErr),
+	)
+	if len(mx) == 0 {
 		return nil, err
 	}
 
-	if c.fsid == "" {
-		fsid, err := c.getFsid()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get fsid: %v", err)
-		}
-		c.fsid = fsid
-		c.addClusterChartsOnce.Do(c.addClusterCharts)
-	}
-
-	if err := c.collectHealth(mx); err != nil {
-		return nil, fmt.Errorf("failed to collect health: %v", err)
-	}
-	if err := c.collectOsds(mx); err != nil {
-		return nil, fmt.Errorf("failed to collect osds: %v", err)
-	}
-	if err := c.collectPools(mx); err != nil {
-		return nil, fmt.Errorf("failed to collect pools: %v", err)
-	}
-
-	return mx, nil
+	mx["health_collection_failed"] = boolInt64(healthErr != nil)
+	mx["osd_collection_failed"] = boolInt64(osdErr != nil)
+	mx["pool_collection_failed"] = boolInt64(poolErr != nil)
+	return mx, err
 }
 
-func (c *Collector) auth() error {
-	if c.token != "" {
-		ok, err := c.authCheck()
-		if err != nil {
-			return err
-		}
-		if ok {
-			return nil
-		}
-		c.token = ""
+func (c *Collector) shouldSkipEntityCollection(kind, selector string, count int64, limit int) bool {
+	if strings.TrimSpace(selector) != "*" || count <= int64(limit) {
+		return false
 	}
-
-	tok, err := c.authLogin()
-	if err != nil {
-		return err
-	}
-	c.token = tok
-
-	return nil
+	c.Limit(kind+"-cardinality", 1, time.Hour).Warningf(
+		"cluster reports %d %ss, exceeding max_%ss=%d; no per-%s metrics will be collected; narrow %s_selector or raise max_%ss",
+		count, kind, kind, limit, kind, kind, kind)
+	return true
 }
 
-func (c *Collector) getFsid() (string, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiMonitor)
+func wrapCollectionError(component string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("collect %s features: %w", component, err)
+}
+
+func boolInt64(value bool) int64 {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func (c *Collector) probeClusterIdentity(ctx context.Context) (string, error) {
+	fsid, err := c.apiClient.probeClusterIdentity(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	req.Header.Set("Accept", hdrAcceptVersion)
-	req.Header.Set("Content-Type", hdrContentTypeJson)
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	c.identityMu.Lock()
+	c.fsid = fsid
+	c.identityMu.Unlock()
 
-	var resp struct {
-		MonStatus struct {
-			MonMap struct {
-				FSID string `json:"fsid"`
-			} `json:"monmap"`
-		} `json:"mon_status"`
-	}
-
-	if err := c.webClient().RequestJSON(req, &resp); err != nil {
-		return "", err
-	}
-
-	if resp.MonStatus.MonMap.FSID == "" {
-		return "", errors.New("no fsid")
-	}
-
-	return resp.MonStatus.MonMap.FSID, nil
-}
-
-func (c *Collector) webClient(statusCodes ...int) *web.Client {
-	return web.DoHTTP(c.httpClient).OnNokCode(func(resp *http.Response) (bool, error) {
-		if slices.Contains(statusCodes, resp.StatusCode) {
-			return true, nil
-		}
-		var msg struct {
-			Detail string `json:"detail"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&msg); err == nil && msg.Detail != "" {
-			return false, errors.New(msg.Detail)
-		}
-		return false, nil
-	})
+	return fsid, nil
 }

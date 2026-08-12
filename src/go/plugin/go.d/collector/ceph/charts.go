@@ -5,12 +5,14 @@ package ceph
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioClusterStatus = collectorapi.Priority + iota
+	prioComponentCollectionStatus = collectorapi.Priority + iota
+	prioClusterStatus
 	prioClusterHostsCount
 	prioClusterMonitorsCount
 	prioClusterOSDsCount
@@ -23,7 +25,8 @@ const (
 	prioClusterPhysCapacityUtilization
 	prioClusterPhysCapacityUsage
 	prioClusterObjectsCount
-	prioClusterObjectsByStatusPercent
+	prioClusterObjectCopiesHealth
+	prioClusterObjectsUnfound
 	prioClusterPoolsCount
 	prioClusterPGsCount
 	prioClusterPGsByStatusCount
@@ -48,6 +51,7 @@ const (
 )
 
 var clusterCharts = collectorapi.Charts{
+	componentCollectionStatusChart.Copy(),
 	clusterStatusChart.Copy(),
 	clusterHostsCountChart.Copy(),
 	clusterMonitorsCountChart.Copy(),
@@ -61,7 +65,8 @@ var clusterCharts = collectorapi.Charts{
 	clusterPhysCapacityUtilizationChart.Copy(),
 	clusterPhysCapacityUsageChart.Copy(),
 	clusterObjectsCountChart.Copy(),
-	clusterObjectsByStatusPercentChart.Copy(),
+	clusterObjectCopiesHealthChart.Copy(),
+	clusterObjectsUnfoundChart.Copy(),
 	clusterPoolsCountChart.Copy(),
 	clusterPGsCountChart.Copy(),
 	clusterPGsByStatusCountChart.Copy(),
@@ -90,6 +95,20 @@ var poolChartsTmpl = collectorapi.Charts{
 }
 
 var (
+	componentCollectionStatusChart = collectorapi.Chart{
+		ID:       "component_collection_status",
+		Title:    "Ceph Component Collection Status",
+		Fam:      "status",
+		Units:    "status",
+		Ctx:      "ceph.component_collection_status",
+		Type:     collectorapi.Line,
+		Priority: prioComponentCollectionStatus,
+		Dims: collectorapi.Dims{
+			{ID: "health_collection_failed", Name: "health"},
+			{ID: "osd_collection_failed", Name: "osds"},
+			{ID: "pool_collection_failed", Name: "pools"},
+		},
+	}
 	clusterStatusChart = collectorapi.Chart{
 		ID:       "cluster_status",
 		Title:    "Ceph Cluster Status",
@@ -245,19 +264,29 @@ var (
 			{ID: "objects_num", Name: "objects"},
 		},
 	}
-	clusterObjectsByStatusPercentChart = collectorapi.Chart{
-		ID:       "cluster_objects_by_status",
-		Title:    "Ceph Cluster Objects by Status",
+	clusterObjectCopiesHealthChart = collectorapi.Chart{
+		ID:       "cluster_object_copies_health",
+		Title:    "Ceph Cluster Object Copy Health",
 		Fam:      "capacity",
 		Units:    "percent",
-		Ctx:      "ceph.cluster_objects_by_status_distribution",
-		Type:     collectorapi.Stacked,
-		Priority: prioClusterObjectsByStatusPercent,
+		Ctx:      "ceph.cluster_object_copies_health",
+		Type:     collectorapi.Line,
+		Priority: prioClusterObjectCopiesHealth,
 		Dims: collectorapi.Dims{
-			{ID: "objects_healthy_num", Name: "healthy", Algo: collectorapi.PercentOfAbsolute},
-			{ID: "objects_misplaced_num", Name: "misplaced", Algo: collectorapi.PercentOfAbsolute},
-			{ID: "objects_degraded_num", Name: "degraded", Algo: collectorapi.PercentOfAbsolute},
-			{ID: "objects_unfound_num", Name: "unfound", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "objects_degraded_ratio", Name: "degraded", Div: precision},
+			{ID: "objects_misplaced_ratio", Name: "misplaced", Div: precision},
+		},
+	}
+	clusterObjectsUnfoundChart = collectorapi.Chart{
+		ID:       "cluster_objects_unfound",
+		Title:    "Ceph Cluster Unfound Objects",
+		Fam:      "capacity",
+		Units:    "percent",
+		Ctx:      "ceph.cluster_objects_unfound",
+		Type:     collectorapi.Line,
+		Priority: prioClusterObjectsUnfound,
+		Dims: collectorapi.Dims{
+			{ID: "objects_unfound_ratio", Name: "unfound", Div: precision},
 		},
 	}
 	clusterPoolsCountChart = collectorapi.Chart{
@@ -308,7 +337,7 @@ var (
 		Type:     collectorapi.Line,
 		Priority: prioClusterPGsPerOsdCount,
 		Dims: collectorapi.Dims{
-			{ID: "pgs_per_osd", Name: "per_osd"},
+			{ID: "pgs_per_osd", Name: "per_osd", Div: precision},
 		},
 	}
 )
@@ -323,8 +352,8 @@ var (
 		Type:     collectorapi.Area,
 		Priority: prioClusterClientIO,
 		Dims: collectorapi.Dims{
-			{ID: "client_perf_read_bytes_sec", Name: "read"},
-			{ID: "client_perf_write_bytes_sec", Name: "written", Mul: -1},
+			{ID: "client_perf_read_bytes_sec", Name: "read", Div: precision},
+			{ID: "client_perf_write_bytes_sec", Name: "written", Mul: -1, Div: precision},
 		},
 	}
 	clusterClientIOPSChart = collectorapi.Chart{
@@ -336,8 +365,8 @@ var (
 		Type:     collectorapi.Line,
 		Priority: prioClusterClientIOPS,
 		Dims: collectorapi.Dims{
-			{ID: "client_perf_read_op_per_sec", Name: "read"},
-			{ID: "client_perf_write_op_per_sec", Name: "write", Mul: -1},
+			{ID: "client_perf_read_op_per_sec", Name: "read", Div: precision},
+			{ID: "client_perf_write_op_per_sec", Name: "write", Mul: -1, Div: precision},
 		},
 	}
 	clusterRecoveryThroughputChart = collectorapi.Chart{
@@ -349,7 +378,7 @@ var (
 		Type:     collectorapi.Line,
 		Priority: prioClusterClientRecoveryThroughput,
 		Dims: collectorapi.Dims{
-			{ID: "client_perf_recovering_bytes_per_sec", Name: "recovery"},
+			{ID: "client_perf_recovering_bytes_per_sec", Name: "recovery", Div: precision},
 		},
 	}
 	clusterScrubStatusChart = collectorapi.Chart{
@@ -406,8 +435,8 @@ var (
 		Type:     collectorapi.Area,
 		Priority: prioOsdIO,
 		Dims: collectorapi.Dims{
-			{ID: "osd_%s_read_bytes", Name: "read", Algo: collectorapi.Incremental},
-			{ID: "osd_%s_written_bytes", Name: "written", Algo: collectorapi.Incremental, Mul: -1},
+			{ID: "osd_%s_read_bytes", Name: "read", Div: precision},
+			{ID: "osd_%s_written_bytes", Name: "written", Mul: -1, Div: precision},
 		},
 	}
 	osdIOPSChartTmpl = collectorapi.Chart{
@@ -419,8 +448,8 @@ var (
 		Type:     collectorapi.Line,
 		Priority: prioOsdIOPS,
 		Dims: collectorapi.Dims{
-			{ID: "osd_%s_read_ops", Name: "read", Algo: collectorapi.Incremental},
-			{ID: "osd_%s_write_ops", Name: "write", Algo: collectorapi.Incremental},
+			{ID: "osd_%s_read_ops", Name: "read", Div: precision},
+			{ID: "osd_%s_write_ops", Name: "write", Div: precision},
 		},
 	}
 	osdLatencyChartTmpl = collectorapi.Chart{
@@ -432,8 +461,8 @@ var (
 		Type:     collectorapi.Line,
 		Priority: prioOsdLatency,
 		Dims: collectorapi.Dims{
-			{ID: "osd_%s_commit_latency_ms", Name: "commit"},
-			{ID: "osd_%s_apply_latency_ms", Name: "apply"},
+			{ID: "osd_%s_commit_latency_ms", Name: "commit", Div: precision},
+			{ID: "osd_%s_apply_latency_ms", Name: "apply", Div: precision},
 		},
 	}
 )
@@ -509,7 +538,7 @@ func (c *Collector) addClusterCharts() {
 
 	for _, chart := range *charts {
 		chart.Labels = []collectorapi.Label{
-			{Key: "fsid", Value: c.fsid},
+			{Key: "fsid", Value: c.clusterFSID()},
 		}
 	}
 
@@ -518,14 +547,66 @@ func (c *Collector) addClusterCharts() {
 	}
 }
 
-func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) {
+func (c *Collector) expireMissingEntities(
+	kind string,
+	states map[string]*entityState,
+	seen map[string]bool,
+	now time.Time,
+) {
+	for key, state := range states {
+		if seen[key] || now.Sub(state.lastSeen) < entityAbsenceGrace {
+			continue
+		}
+		delete(states, key)
+		c.removeEntityCharts(kind, key)
+	}
+}
+
+func (c *Collector) suppressEntityMetrics(kind string, states map[string]*entityState) {
+	for key := range states {
+		delete(states, key)
+		c.removeEntityCharts(kind, key)
+	}
+}
+
+func (c *Collector) retireCollidingEntityOwners(
+	kind string,
+	states map[string]*entityState,
+	seen map[string]bool,
+) map[string]bool {
+	selectedOwners := make(map[string]string, len(seen))
+	for key := range seen {
+		selectedOwners[normalizedEntityChartKey(kind, key)] = key
+	}
+	var deferred map[string]bool
+	for oldKey := range states {
+		newKey, ok := selectedOwners[normalizedEntityChartKey(kind, oldKey)]
+		if !ok || newKey == oldKey {
+			continue
+		}
+		delete(states, oldKey)
+		c.removeEntityCharts(kind, oldKey)
+		if deferred == nil {
+			deferred = make(map[string]bool)
+		}
+		deferred[newKey] = true
+	}
+	return deferred
+}
+
+func normalizedEntityChartKey(kind, key string) string {
+	return cleanChartID(kind + "_" + key + "_")
+}
+
+func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) error {
+	c.pruneRemovedCharts(entityChartIDs("osd", osdUuid))
 	charts := osdChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, osdUuid)
 		chart.ID = cleanChartID(chart.ID)
 		chart.Labels = []collectorapi.Label{
-			{Key: "fsid", Value: c.fsid},
+			{Key: "fsid", Value: c.clusterFSID()},
 			{Key: "osd_uuid", Value: osdUuid},
 			{Key: "osd_name", Value: osdName},
 			{Key: "device_class", Value: devClass},
@@ -535,19 +616,18 @@ func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) {
 		}
 	}
 
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warning(err)
-	}
+	return c.addChartsTransactional(charts)
 }
 
-func (c *Collector) addPoolCharts(poolName string) {
+func (c *Collector) addPoolCharts(poolName string) error {
+	c.pruneRemovedCharts(entityChartIDs("pool", poolName))
 	charts := poolChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, poolName)
 		chart.ID = cleanChartID(chart.ID)
 		chart.Labels = []collectorapi.Label{
-			{Key: "fsid", Value: c.fsid},
+			{Key: "fsid", Value: c.clusterFSID()},
 			{Key: "pool_name", Value: poolName},
 		}
 		for _, dim := range chart.Dims {
@@ -555,15 +635,65 @@ func (c *Collector) addPoolCharts(poolName string) {
 		}
 	}
 
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warning(err)
+	return c.addChartsTransactional(charts)
+}
+
+func (c *Collector) addChartsTransactional(charts *collectorapi.Charts) error {
+	all := c.Charts()
+	before := len(*all)
+	if err := all.Add(*charts...); err != nil {
+		for i := before; i < len(*all); i++ {
+			(*all)[i] = nil
+		}
+		*all = (*all)[:before]
+		return err
+	}
+	return nil
+}
+
+func entityChartIDs(kind, key string) []string {
+	var templates *collectorapi.Charts
+	switch kind {
+	case "osd":
+		templates = &osdChartsTmpl
+	case "pool":
+		templates = &poolChartsTmpl
+	default:
+		return nil
+	}
+
+	ids := make([]string, 0, len(*templates))
+	for _, chart := range *templates {
+		ids = append(ids, cleanChartID(fmt.Sprintf(chart.ID, key)))
+	}
+	return ids
+}
+
+func (c *Collector) pruneRemovedCharts(chartIDs []string) {
+	ids := make(map[string]bool, len(chartIDs))
+	for _, id := range chartIDs {
+		ids[id] = true
+	}
+	var removed []string
+	for _, chart := range *c.Charts() {
+		if ids[chart.ID] && chart.IsRemoved() {
+			removed = append(removed, chart.ID)
+		}
+	}
+	for _, id := range removed {
+		if err := c.Charts().Remove(id); err != nil {
+			c.Warningf("remove obsolete chart '%s': %v", id, err)
+		}
 	}
 }
 
-func (c *Collector) removeCharts(prefix string) {
-	prefix = cleanChartID(prefix)
+func (c *Collector) removeEntityCharts(kind, key string) {
+	ids := make(map[string]bool)
+	for _, id := range entityChartIDs(kind, key) {
+		ids[id] = true
+	}
 	for _, chart := range *c.Charts() {
-		if strings.HasPrefix(chart.ID, prefix) {
+		if ids[chart.ID] {
 			chart.MarkRemove()
 			chart.MarkNotCreated()
 		}
