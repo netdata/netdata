@@ -16,7 +16,7 @@ and where each part sits — built automatically from what you already monitor.
 Two maps, in the same view:
 
 - **The network fabric** — your switches and routers and the links between them, read over SNMP from the devices themselves.
-- **Your applications** — which process, container, and Kubernetes workload talks to which, read from the host's kernel.
+- **Your applications** — what each process is talking to, read from the host's kernel, and on Linux which container and Kubernetes workload owns it.
 
 Neither needs topology-specific setup: once you are monitoring the devices and running Agents on the hosts, the maps
 build themselves. There is nothing to instrument, no topology to declare, and no diagram to maintain.

@@ -78,10 +78,16 @@ These are non-negotiable. Skipping any of them will cost the user time.
      re-check `ci-status.sh`. If checks are still running, that's normal,
      surface to the user. If there are failures, fix and iterate.
 8. **Re-trigger AI reviewers explicitly.** They do NOT react to thread
-   replies or pushed commits the way humans do.
+   replies or pushed commits the way humans do. Re-trigger EVERY AI reviewer
+   in `PR_AI_BOT_RE`, not just the ones you remember -- a reviewer you never
+   re-trigger can never post its "no new findings" pass, so the loop's exit
+   condition is unreachable for it.
    - Copilot: re-add as a requested reviewer (`trigger-copilot.sh`).
    - cubic-dev-ai: post a new top-level comment mentioning it
      (`trigger-cubic.sh`).
+   - coderabbitai: post a new top-level comment with a command
+     (`trigger-coderabbit.sh`; `@coderabbitai review` is incremental,
+     `full review` re-reads the whole PR).
 9. **Don't loop forever on silent bots.** Some assistants stop responding.
    That's fine. Use `wait-for-activity.sh` with the 30-min timeout and
    move on if nothing changes.
@@ -378,12 +384,15 @@ user, move on. Do not make drive-by fixes here.
 After pushing the fix commit(s):
 
 ```
-bash .agents/skills/pr-reviews/scripts/trigger-copilot.sh <PR_NUMBER>
-bash .agents/skills/pr-reviews/scripts/trigger-cubic.sh   <PR_NUMBER>
+bash .agents/skills/pr-reviews/scripts/trigger-copilot.sh    <PR_NUMBER>
+bash .agents/skills/pr-reviews/scripts/trigger-cubic.sh      <PR_NUMBER>
+bash .agents/skills/pr-reviews/scripts/trigger-coderabbit.sh <PR_NUMBER>
 ```
 
-Copilot re-runs when re-requested as a reviewer. cubic re-reviews when
-mentioned in a new top-level PR comment.
+Copilot re-runs when re-requested as a reviewer. cubic and coderabbit
+re-review when mentioned in a new top-level PR comment. If you add a reviewer
+to `PR_AI_BOT_RE`, add its re-trigger here in the same change -- a classified
+reviewer with no re-trigger is silently skipped every iteration.
 
 ### 6. Wait for new activity
 
@@ -475,7 +484,7 @@ behalf without explicit direction.
 | Bot                          | Role                                       | Re-trigger                                       |
 |------------------------------|--------------------------------------------|--------------------------------------------------|
 | `cubic-dev-ai[bot]`          | Line-level code review                     | New PR comment mentioning `@cubic-dev-ai`        |
-| `coderabbitai[bot]`          | Line-level code review                     | New PR comment mentioning `@coderabbitai review` |
+| `coderabbitai[bot]`          | Line-level code review                     | `trigger-coderabbit.sh` (`@coderabbitai review`) |
 | `copilot[bot]`               | Line-level code review                     | Re-add as requested reviewer (`gh pr edit`)      |
 | `sonarqubecloud[bot]`        | Quality-gate status                        | Auto, on each scan run -- read its issue comment |
 | `github-actions[bot]`        | CI status / labels                         | Auto, on each workflow run                        |

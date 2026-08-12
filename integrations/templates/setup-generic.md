@@ -20,8 +20,12 @@ UI configuration requires paid Netdata Cloud plan.
 [% if god_single %]
 
 The **[[ entry.meta.module_name ]]** collector runs as a single instance: it does not take user-defined jobs, and the
-Netdata web interface offers no **+** to add one. Adjust its settings in
-`[[ entry.setup.configuration.file.name ]]`.
+Netdata web interface offers no **+** to add one.
+[% if entry.setup.configuration.file.name %]
+Adjust its settings in `[[ entry.setup.configuration.file.name ]]`.
+[% else %]
+It has no configuration file.
+[% endif %]
 
 [% endif %]
 
