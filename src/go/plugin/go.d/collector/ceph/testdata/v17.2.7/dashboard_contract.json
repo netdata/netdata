@@ -131,8 +131,7 @@
       "pgs_per_osd": 16.5,
       "statuses": {
         "active+clean": 31,
-        "active+degraded": 1,
-        "active+premerge": 1
+        "active+degraded": 1
       }
     },
     "pools": [
@@ -150,7 +149,6 @@
       },
       "id": 0,
       "in": 1,
-      "operational_status": "working",
       "osd": 0,
       "osd_stats": {
         "perf_stat": {
@@ -232,5 +230,5 @@
       }
     }
   ],
-  "release": "19.2.5"
+  "release": "17.2.7"
 }

@@ -5,16 +5,27 @@ package ceph
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ceph/cephfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+)
+
+const (
+	wireAcceptV1  = "application/vnd.ceph.api.v1.0+json"
+	wireAcceptV11 = "application/vnd.ceph.api.v1.1+json"
+	wireAcceptV2  = "application/vnd.ceph.api.v2.0+json"
+
+	wireOSDWholeListQuery = "limit=-1&offset=0&sort=%2Bid"
+	wireOSDFunctionQuery  = "limit=500&offset=0&sort=%2Bid"
+	wirePoolPolicyQuery   = "attrs=pool_name%2Ctype%2Csize%2Cmin_size%2Cpg_num%2Cpg_placement_num%2Cpg_autoscale_mode%2Ccrush_rule%2Capplication_metadata%2Cerasure_code_profile%2Cquota_max_bytes%2Cquota_max_objects%2Cflags_names&stats=false"
 )
 
 type releaseContractFixture struct {
@@ -27,11 +38,51 @@ type releaseContractFixture struct {
 	Daemons       json.RawMessage `json:"daemons"`
 }
 
+type wireRequest struct {
+	Method        string
+	Path          string
+	Accept        string
+	ContentType   string
+	Query         string
+	Authenticated bool
+}
+
+type wireRecorder struct {
+	mu       sync.Mutex
+	requests []wireRequest
+}
+
+func (r *wireRecorder) observe(req *http.Request) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.requests = append(r.requests, wireRequest{
+		Method: req.Method, Path: req.URL.Path, Accept: req.Header.Get("Accept"),
+		ContentType: req.Header.Get("Content-Type"), Query: req.URL.Query().Encode(),
+		Authenticated: req.Header.Get("Authorization") != "",
+	})
+}
+
+func (r *wireRecorder) snapshot() []wireRequest {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]wireRequest(nil), r.requests...)
+}
+
 func TestTargetReleaseDashboardContracts(t *testing.T) {
-	for _, release := range []string{"18.2.8", "19.2.5", "20.2.2"} {
-		t.Run(release, func(t *testing.T) {
-			fixture := loadReleaseContract(t, release)
-			assert.Equal(t, release, fixture.Release)
+	tests := []struct {
+		release   string
+		legacyOSD bool
+	}{
+		{release: "17.2.7", legacyOSD: true},
+		{release: "18.2.8"},
+		{release: "19.2.5"},
+		{release: "20.2.2"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.release, func(t *testing.T) {
+			fixture := loadReleaseContract(t, test.release)
+			assert.Equal(t, test.release, fixture.Release)
 
 			var health apiHealthMinimalResponse
 			require.NoError(t, json.Unmarshal(fixture.HealthMinimal, &health))
@@ -49,11 +100,12 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 			require.Len(t, pools, 1)
 			assert.Equal(t, "pool-a", pools[0].PoolName)
 
-			srv := newReleaseContractServer(t, fixture)
+			srv, recorder := newReleaseContractServer(fixture, test.legacyOSD)
 			defer srv.Close()
 			c := newInitializedCollector(t, srv.URL, nil)
 			defer c.Cleanup(context.Background())
 
+			require.NoError(t, c.Check(context.Background()))
 			mx, err := c.collect(context.Background())
 			require.NoError(t, err)
 			assert.EqualValues(t, 0, mx["health_collection_failed"])
@@ -64,19 +116,22 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 			assert.EqualValues(t, 10000, mx["pool_pool-a_space_utilization"])
 			collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 
-			deps := funcDepsAdapter{collector: c}
-			healthResult, err := deps.Health(context.Background(), 500)
-			require.NoError(t, err)
-			assert.NotEmpty(t, healthResult.Rows)
-			osdResult, err := deps.OSDs(context.Background(), 500)
-			require.NoError(t, err)
-			assert.NotEmpty(t, osdResult.Rows)
-			poolResult, err := deps.Pools(context.Background(), 500)
-			require.NoError(t, err)
-			assert.NotEmpty(t, poolResult.Rows)
-			daemonResult, err := deps.Daemons(context.Background(), 500)
-			require.NoError(t, err)
-			assert.NotEmpty(t, daemonResult.Rows)
+			if test.legacyOSD {
+				response := c.funcRouter.Handle(context.Background(), cephfunc.MethodOSDs, nil)
+				assert.Equal(t, http.StatusUnsupportedMediaType, response.Status)
+				assert.Nil(t, response.Data)
+				assert.Equal(t, expectedQuincyRequests(), recorder.snapshot())
+				return
+			}
+
+			for _, method := range []string{
+				cephfunc.MethodHealth, cephfunc.MethodOSDs, cephfunc.MethodPools, cephfunc.MethodDaemons,
+			} {
+				response := c.funcRouter.Handle(context.Background(), method, nil)
+				require.Equal(t, http.StatusOK, response.Status, method)
+				assert.NotEmpty(t, response.Data, method)
+			}
+			assert.Equal(t, expectedModernRequests(), recorder.snapshot())
 		})
 	}
 }
@@ -123,39 +178,35 @@ func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
 	health := read("api_health_minimal.json")
 	osds := read("api_osd.json")
 	pools := read("api_pool_stats.json")
+	recorder := &wireRecorder{}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var response []byte
+		recorder.observe(r)
 		switch r.URL.Path {
-		case urlPathAPIClusterFSID:
+		case "/api/health/get_cluster_fsid":
 			w.WriteHeader(http.StatusNotFound)
 			return
-		case urlPathApiMonitor:
+		case "/api/monitor":
 			if r.Header.Get("Authorization") == "" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			response = monitor
-		case urlPathApiAuth:
-			w.WriteHeader(http.StatusCreated)
-			_, _ = io.WriteString(w, `{"token":"test-token"}`)
-			return
-		case urlPathApiHealthMinimal:
-			response = health
-		case urlPathApiOsd:
-			if r.Header.Get("Accept") == hdrAcceptVersionV11 {
+			writeFixtureJSON(w, monitor)
+		case "/api/auth":
+			writeJSON(w, http.StatusCreated, map[string]any{"token": "test-token"})
+		case "/api/health/minimal":
+			writeFixtureJSON(w, health)
+		case "/api/osd":
+			if r.Header.Get("Accept") == wireAcceptV11 {
 				w.WriteHeader(http.StatusUnsupportedMediaType)
 				return
 			}
-			response = osds
-		case urlPathApiPool:
-			response = pools
+			writeFixtureJSON(w, osds)
+		case "/api/pool":
+			writeFixtureJSON(w, pools)
 		default:
 			w.WriteHeader(http.StatusNotFound)
-			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(response)
 	}))
 	defer srv.Close()
 
@@ -167,6 +218,7 @@ func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
 	assert.NotEmpty(t, mx)
 	assert.NotEmpty(t, c.clusterFSID())
 	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+	assert.Equal(t, expectedPacificRequests(), recorder.snapshot())
 }
 
 func loadReleaseContract(t *testing.T, release string) releaseContractFixture {
@@ -178,42 +230,118 @@ func loadReleaseContract(t *testing.T, release string) releaseContractFixture {
 	return fixture
 }
 
-func newReleaseContractServer(t *testing.T, fixture releaseContractFixture) *httptest.Server {
-	t.Helper()
-	return newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		var response json.RawMessage
+func newReleaseContractServer(fixture releaseContractFixture, legacyOSD bool) (*httptest.Server, *wireRecorder) {
+	recorder := &wireRecorder{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recorder.observe(r)
 		switch r.URL.Path {
-		case urlPathApiHealthMinimal:
-			assert.Equal(t, hdrAcceptVersion, r.Header.Get("Accept"))
-			response = fixture.HealthMinimal
-		case urlPathApiOsd:
-			assert.Equal(t, hdrAcceptVersionV11, r.Header.Get("Accept"))
-			assert.Equal(t, "0", r.URL.Query().Get("offset"))
-			assert.Equal(t, "+id", r.URL.Query().Get("sort"))
-			assert.NotEmpty(t, r.URL.Query().Get("limit"))
-			w.Header().Set("X-Total-Count", "1")
-			response = fixture.OSDs
-		case urlPathApiPool:
-			if r.URL.Query().Get("stats") == "true" {
-				assert.Equal(t, hdrAcceptVersion, r.Header.Get("Accept"))
-				response = fixture.PoolsStats
-			} else {
-				assert.Equal(t, "false", r.URL.Query().Get("stats"))
-				assert.Contains(t, r.URL.Query().Get("attrs"), "pg_autoscale_mode")
-				response = fixture.PoolsPolicy
+		case "/api/health/get_cluster_fsid":
+			if r.Header.Get("Authorization") == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
 			}
-		case urlPathAPICrushRule:
-			assert.Equal(t, hdrAcceptVersionV2, r.Header.Get("Accept"))
-			response = fixture.CrushRules
-		case urlPathAPIDaemon:
-			response = fixture.Daemons
+			writeJSON(w, http.StatusOK, "synthetic-fsid")
+		case "/api/auth":
+			writeJSON(w, http.StatusCreated, map[string]any{"token": "test-token"})
+		case "/api/health/minimal":
+			writeFixtureJSON(w, fixture.HealthMinimal)
+		case "/api/osd":
+			if legacyOSD && r.Header.Get("Accept") == wireAcceptV11 {
+				w.WriteHeader(http.StatusUnsupportedMediaType)
+				return
+			}
+			if !legacyOSD {
+				w.Header().Set("X-Total-Count", "1")
+			}
+			writeFixtureJSON(w, fixture.OSDs)
+		case "/api/pool":
+			if r.URL.Query().Get("stats") == "false" {
+				writeFixtureJSON(w, fixture.PoolsPolicy)
+			} else {
+				writeFixtureJSON(w, fixture.PoolsStats)
+			}
+		case "/api/crush_rule":
+			writeFixtureJSON(w, fixture.CrushRules)
+		case "/api/daemon":
+			writeFixtureJSON(w, fixture.Daemons)
 		default:
 			w.WriteHeader(http.StatusNotFound)
-			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write(response)
-		require.NoError(t, err)
-	})
+	}))
+	return server, recorder
+}
+
+func writeFixtureJSON(w http.ResponseWriter, payload []byte) {
+	if len(payload) == 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(payload)
+}
+
+func expectedModernRequests() []wireRequest {
+	return []wireRequest{
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", false),
+		postWire("/api/auth"),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/health/minimal", wireAcceptV1, "", true),
+		getWire("/api/osd", wireAcceptV11, wireOSDWholeListQuery, true),
+		getWire("/api/pool", wireAcceptV1, "stats=true", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/health/minimal", wireAcceptV1, "", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/osd", wireAcceptV11, wireOSDFunctionQuery, true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/pool", wireAcceptV1, wirePoolPolicyQuery, true),
+		getWire("/api/crush_rule", wireAcceptV2, "", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/daemon", wireAcceptV1, "", true),
+	}
+}
+
+func expectedQuincyRequests() []wireRequest {
+	return []wireRequest{
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", false),
+		postWire("/api/auth"),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/health/minimal", wireAcceptV1, "", true),
+		getWire("/api/osd", wireAcceptV11, wireOSDWholeListQuery, true),
+		getWire("/api/osd", wireAcceptV1, "", true),
+		getWire("/api/pool", wireAcceptV1, "stats=true", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/osd", wireAcceptV11, wireOSDFunctionQuery, true),
+	}
+}
+
+func expectedPacificRequests() []wireRequest {
+	return []wireRequest{
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", false),
+		getWire("/api/monitor", wireAcceptV1, "", false),
+		postWire("/api/auth"),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/monitor", wireAcceptV1, "", true),
+		getWire("/api/health/get_cluster_fsid", wireAcceptV1, "", true),
+		getWire("/api/monitor", wireAcceptV1, "", true),
+		getWire("/api/health/minimal", wireAcceptV1, "", true),
+		getWire("/api/osd", wireAcceptV11, wireOSDWholeListQuery, true),
+		getWire("/api/osd", wireAcceptV1, "", true),
+		getWire("/api/pool", wireAcceptV1, "stats=true", true),
+	}
+}
+
+func getWire(path, accept, query string, authenticated bool) wireRequest {
+	return wireRequest{
+		Method: http.MethodGet, Path: path, Accept: accept, Query: query, Authenticated: authenticated,
+	}
+}
+
+func postWire(path string) wireRequest {
+	return wireRequest{
+		Method: http.MethodPost, Path: path, Accept: wireAcceptV1,
+		ContentType: "application/json", Authenticated: false,
+	}
 }

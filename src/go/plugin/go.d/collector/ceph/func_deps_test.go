@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -23,7 +24,7 @@ func TestFuncDepsHealth(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		writeJSON(t, w, http.StatusOK, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"health": map[string]any{"checks": []map[string]any{
 				{
 					"type":     "SLOW_OPS",
@@ -92,7 +93,7 @@ func TestFuncDepsHealthBoundsNormalizedRows(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		writeJSON(t, w, http.StatusOK, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"health": map[string]any{"checks": []map[string]any{
 				{
 					"type":     "SLOW_OPS",
@@ -118,7 +119,7 @@ func TestFuncDepsHealthPrioritizesErrorsBeforeBound(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		writeJSON(t, w, http.StatusOK, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"health": map[string]any{"checks": []map[string]any{
 				{"type": "A_WARN", "severity": "HEALTH_WARN", "summary": map[string]any{"message": "warn", "count": 1}},
 				{"type": "B_WARN", "severity": "HEALTH_WARN", "summary": map[string]any{"message": "warn", "count": 1}},
@@ -143,7 +144,7 @@ func TestFuncDepsHealthAcceptsKeyedCompatibilityForm(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		writeJSON(t, w, http.StatusOK, map[string]any{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"health": map[string]any{"checks": map[string]any{
 				"SLOW_OPS": map[string]any{
 					"severity": "HEALTH_WARN",
@@ -173,7 +174,7 @@ func TestFuncDepsHealthRejectsMissingChecks(t *testing.T) {
 					w.WriteHeader(http.StatusNotFound)
 					return
 				}
-				writeJSON(t, w, http.StatusOK, response)
+				writeJSON(w, http.StatusOK, response)
 			})
 			defer srv.Close()
 			c := newInitializedCollector(t, srv.URL, nil)
@@ -198,7 +199,7 @@ func TestFuncDepsHealthRejectsAmbiguousOrInvalidRows(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == urlPathApiHealthMinimal {
-					writeJSON(t, w, http.StatusOK, map[string]any{"health": map[string]any{"checks": checks}})
+					writeJSON(w, http.StatusOK, map[string]any{"health": map[string]any{"checks": checks}})
 					return
 				}
 				w.WriteHeader(http.StatusNotFound)
@@ -226,7 +227,7 @@ func TestFuncDepsOSDsRejectsInventoryAboveSelectedLimit(t *testing.T) {
 		for i := range rows {
 			rows[i] = map[string]any{"id": i, "uuid": fmt.Sprintf("uuid-%d", i)}
 		}
-		writeJSON(t, w, http.StatusOK, rows)
+		writeJSON(w, http.StatusOK, rows)
 	})
 	defer srv.Close()
 	c := newInitializedCollector(t, srv.URL, nil)
@@ -242,9 +243,11 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case urlPathApiPool:
-			assert.Equal(t, "false", r.URL.Query().Get("stats"))
-			assert.Contains(t, r.URL.Query().Get("attrs"), "pg_autoscale_mode")
-			writeJSON(t, w, http.StatusOK, []map[string]any{
+			if r.URL.Query().Get("stats") != "false" || !strings.Contains(r.URL.Query().Get("attrs"), "pg_autoscale_mode") {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			writeJSON(w, http.StatusOK, []map[string]any{
 				{"pool_name": "pool-c"},
 				{
 					"pool_name": "pool-a", "type": "replicated", "size": 3, "min_size": 2,
@@ -255,8 +258,11 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 				{"pool_name": "pool-b"},
 			})
 		case urlPathAPICrushRule:
-			assert.Equal(t, hdrAcceptVersionV2, r.Header.Get("Accept"))
-			writeJSON(t, w, http.StatusOK, []map[string]any{{
+			if r.Header.Get("Accept") != hdrAcceptVersionV2 {
+				w.WriteHeader(http.StatusNotAcceptable)
+				return
+			}
+			writeJSON(w, http.StatusOK, []map[string]any{{
 				"rule_name": "ssd-rule",
 				"steps":     []map[string]any{{"op": "take", "item_name": "default~ssd"}, {"op": "chooseleaf_firstn", "type": "host"}},
 			}})
@@ -287,13 +293,13 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 	assert.Nil(t, result.Rows[1].PGNum)
 }
 
-func TestFuncDepsDaemonsSelectsDeterministicallyBeforeBound(t *testing.T) {
+func TestFuncDepsDaemonsRejectsPartialAndSortsCompleteInventory(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != urlPathAPIDaemon {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		writeJSON(t, w, http.StatusOK, []map[string]any{
+		writeJSON(w, http.StatusOK, []map[string]any{
 			{"daemon_name": "osd.9", "daemon_id": "9", "daemon_type": "osd", "is_active": true},
 			{"daemon_name": "mon.a", "daemon_id": "a", "daemon_type": "mon", "is_active": true},
 			{"daemon_name": "mgr.a", "daemon_id": "a", "daemon_type": "mgr", "is_active": true},
@@ -318,7 +324,7 @@ func TestFuncDepsDaemonsSelectsDeterministicallyBeforeBound(t *testing.T) {
 func TestFuncDepsDaemonsKeepsMissingActiveStateUnknown(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == urlPathAPIDaemon {
-			writeJSON(t, w, http.StatusOK, []map[string]any{{
+			writeJSON(w, http.StatusOK, []map[string]any{{
 				"daemon_name": "mon.a", "daemon_id": "a", "daemon_type": "mon",
 			}})
 			return

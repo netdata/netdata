@@ -343,10 +343,10 @@ modules:
               Netdata alerts are explicitly implemented and tested. Slack, webhook, and PagerDuty are notification
               transports, not Ceph threshold definitions.
     alerts:
-      - name: ceph_dashboard_api_unavailable
+      - name: ceph_component_collection_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: ceph.dashboard_api_status
-        info: 'Ceph Dashboard API for cluster ${label:fsid} is unavailable'
+        metric: ceph.component_collection_status
+        info: 'One or more Ceph metric components for cluster ${label:fsid} are failing'
       - name: ceph_cluster_physical_capacity_utilization
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.cluster_physical_capacity_utilization
@@ -365,11 +365,11 @@ modules:
             - name: fsid
               description: Unique Ceph cluster identifier.
           metrics:
-            - name: ceph.dashboard_api_status
-              description: Ceph Dashboard API Status
+            - name: ceph.component_collection_status
+              description: Ceph Component Collection Status
               unit: status
               chart_type: line
-              dimensions: [{name: reachable}, {name: unreachable}]
+              dimensions: [{name: health}, {name: osds}, {name: pools}]
             - name: ceph.cluster_status
               description: Ceph Cluster Status
               unit: status
@@ -430,11 +430,16 @@ modules:
               unit: objects
               chart_type: line
               dimensions: [{name: objects}]
-            - name: ceph.cluster_objects_by_status_distribution
-              description: Ceph Cluster Object Health Ratios
+            - name: ceph.cluster_object_copies_health
+              description: Ceph Cluster Object Copy Health
               unit: percent
-              chart_type: stacked
-              dimensions: [{name: healthy}, {name: misplaced}, {name: degraded}, {name: unfound}]
+              chart_type: line
+              dimensions: [{name: degraded}, {name: misplaced}]
+            - name: ceph.cluster_objects_unfound
+              description: Ceph Cluster Unfound Objects
+              unit: percent
+              chart_type: line
+              dimensions: [{name: unfound}]
             - name: ceph.cluster_pools_count
               description: Ceph Cluster Pools
               unit: pools
@@ -561,8 +566,8 @@ modules:
           parameters: []
           returns:
             description: >-
-              One row per detailed health message, or one summary row when a check has no detail, ordered by severity
-              and code.
+              At most 500 rows, ordered by severity and code. Each detailed health message becomes a row; a check with no
+              detail becomes one summary row. The `truncated` field identifies a bounded subset.
             columns:
               - {name: id, type: string, unit: "", visibility: hidden, description: Unique row identifier.}
               - {name: code, type: string, unit: "", description: Ceph health-check code.}
@@ -576,18 +581,32 @@ modules:
           performance: >-
             Dashboard builds every permission-dependent `/api/health/minimal` section per invocation; it cannot return
             only health checks, and iSCSI read scope can trigger synchronous gateway pings. The minimal route carries the
-            same detailed checks as the full route without its larger payload. The collector retains only the configured
-            row limit plus one look-ahead row and truncates long summary/detail cells. Use a narrow Dashboard role to
-            avoid unrelated sections when appropriate.
+            same detailed checks as the full route without its larger payload. The collector validates an internal hard
+            ceiling, retains 500 most-severe rows plus one look-ahead row, and truncates long summary/detail cells. Use a
+            narrow Dashboard role to avoid unrelated sections when appropriate.
           security: Health detail can expose daemon, host, pool, and client identifiers. Restrict Function access to operators.
-          availability: Requires the Function to be enabled and Dashboard read permission for health-related scopes.
+          availability: Requires Dashboard read permission for health-related scopes.
           require_cloud: false
         - id: osds
           name: Ceph OSDs
-          description: Returns bounded, paginated OSD state, topology, capacity, current rates, and latency for RCA.
-          parameters: []
+          description: Returns complete bounded OSD state, topology, capacity, current rates, and latency for RCA.
+          parameters:
+            - id: limit
+              name: Maximum rows
+              description: Return the complete OSD inventory only when it fits within this limit.
+              type: select
+              required: true
+              default: "500"
+              options:
+                - {id: "100", name: 100 rows}
+                - {id: "500", name: 500 rows, default: true}
+                - {id: "1000", name: "1,000 rows"}
+                - {id: "2500", name: "2,500 rows"}
+                - {id: "5000", name: "5,000 rows"}
           returns:
-            description: One row per OSD up to the configured limit, ordered by numeric OSD ID.
+            description: >-
+              One row per OSD, ordered by numeric OSD ID. If the complete inventory exceeds the selected limit or the
+              internal ceiling, the Function returns an error and no rows.
             columns:
               - {name: uuid, type: string, unit: "", visibility: hidden, description: OSD UUID.}
               - {name: id, type: integer, unit: "", description: Numeric OSD ID.}
@@ -607,17 +626,35 @@ modules:
               - {name: write_ops_per_sec, type: float, unit: ops/s, visibility: hidden, description: Current write operation rate.}
               - {name: commit_latency_ms, type: float, unit: milliseconds, visibility: hidden, description: Commit latency.}
               - {name: apply_latency_ms, type: float, unit: milliseconds, visibility: hidden, description: Apply latency.}
-              - {name: truncated, type: boolean, unit: "", visibility: hidden, description: Result exceeded its row limit.}
-          performance: Paginates `/api/osd` only until the configured row bound can be determined.
+          performance: >-
+            Makes one target-sized Dashboard v1.1 request, validates `X-Total-Count`, and returns rows only when that
+            response proves the complete inventory fits within the selected limit and internal response budgets. The
+            Function has a five-second internal deadline.
           security: Exposes OSD UUIDs, host names, device classes, and storage usage. Restrict access to operators.
-          availability: Requires the Function to be enabled and Dashboard read permission for the OSD scope.
+          availability: >-
+            Requires Dashboard read permission for the OSD scope and the v1.1 OSD API available in Reef 18 and newer.
+            Pacific 16 and Quincy 17 periodic OSD metrics use a legacy compatibility path; this Function does not.
           require_cloud: false
         - id: pools
           name: Ceph Pools
           description: Returns pool replication/EC policy, PG settings, CRUSH placement, applications, flags, and quotas.
-          parameters: []
+          parameters:
+            - id: limit
+              name: Maximum rows
+              description: Return the complete pool inventory only when it fits within this limit.
+              type: select
+              required: true
+              default: "500"
+              options:
+                - {id: "100", name: 100 rows}
+                - {id: "500", name: 500 rows, default: true}
+                - {id: "1000", name: "1,000 rows"}
+                - {id: "2500", name: "2,500 rows"}
+                - {id: "5000", name: "5,000 rows"}
           returns:
-            description: One row per pool up to the configured limit, ordered by pool name.
+            description: >-
+              One row per pool, ordered by pool name. If the complete inventory exceeds the selected limit or the
+              internal ceiling, the Function returns an error and no rows.
             columns:
               - {name: name, type: string, unit: "", description: Pool name.}
               - {name: type, type: string, unit: "", description: Replicated or erasure-coded pool type.}
@@ -635,20 +672,33 @@ modules:
               - {name: quota_max_bytes, type: integer, unit: bytes, visibility: hidden, description: Pool byte quota; null when unavailable.}
               - {name: quota_max_objects, type: integer, unit: objects, visibility: hidden, description: Pool object quota; null when unavailable.}
               - {name: flags, type: string, unit: "", visibility: hidden, description: Pool flags.}
-              - {name: truncated, type: boolean, unit: "", visibility: hidden, description: Result exceeded its row limit.}
           performance: >-
             Dashboard returns the full pool and CRUSH-rule lists per invocation. The collector validates and sorts
-            those lists for deterministic selection, then bounds detailed row construction and output to the configured
-            limit plus one look-ahead row. It does not request pool statistics or histories.
+            those lists, rejects oversized or incomplete results before returning rows, and enforces internal response
+            budgets and an eight-second deadline. It does not request pool statistics or histories.
           security: Pool names, applications, placement policy, and quotas may reveal tenant or workload organization.
-          availability: Requires the Function to be enabled and Dashboard read permission for pool and OSD/CRUSH data.
+          availability: Requires Dashboard read permission for pool and OSD/CRUSH data.
           require_cloud: false
         - id: daemons
           name: Ceph Daemons
           description: Returns orchestrator-reported daemon type, placement, status, version, and image inventory.
-          parameters: []
+          parameters:
+            - id: limit
+              name: Maximum rows
+              description: Return the complete daemon inventory only when it fits within this limit.
+              type: select
+              required: true
+              default: "500"
+              options:
+                - {id: "100", name: 100 rows}
+                - {id: "500", name: 500 rows, default: true}
+                - {id: "1000", name: "1,000 rows"}
+                - {id: "2500", name: "2,500 rows"}
+                - {id: "5000", name: "5,000 rows"}
           returns:
-            description: One row per orchestrator daemon up to the configured limit.
+            description: >-
+              One row per orchestrator daemon. If the complete inventory exceeds the selected limit or the internal
+              ceiling, the Function returns an error and no rows.
             columns:
               - {name: id, type: string, unit: "", visibility: hidden, description: Unique daemon row identifier.}
               - {name: type, type: string, unit: "", description: Daemon type.}
@@ -660,15 +710,14 @@ modules:
               - {name: image, type: string, unit: "", visibility: hidden, description: Container image.}
               - {name: last_refresh, type: string, unit: "", visibility: hidden, description: Inventory refresh timestamp.}
               - {name: placement, type: string, unit: "", visibility: hidden, description: Orchestrator placement.}
-              - {name: truncated, type: boolean, unit: "", visibility: hidden, description: Result exceeded its row limit.}
           performance: >-
             Dashboard may return the full orchestrator daemon list per invocation. The collector validates and sorts
-            that list for deterministic selection, then bounds row construction and output to the configured limit plus
-            one look-ahead row.
+            that list, rejects oversized or incomplete results before returning rows, and enforces internal response
+            budgets and a five-second deadline.
           security: Exposes host names, daemon placement, versions, and container images.
           prerequisites:
             list:
               - title: Configure a Ceph orchestrator
                 description: The Dashboard daemon endpoint requires an active orchestrator with daemon-list support.
-          availability: Requires the Function to be enabled, an active Ceph orchestrator, and Dashboard hosts-scope read permission.
+          availability: Requires an active Ceph orchestrator and Dashboard hosts-scope read permission.
           require_cloud: false

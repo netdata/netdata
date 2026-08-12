@@ -164,12 +164,12 @@ func TestCollector_DefaultCollectionRequestsFullMetricSet(t *testing.T) {
 		pathsMu.Unlock()
 		switch r.URL.Path {
 		case urlPathApiHealthMinimal:
-			writeJSON(t, w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
+			writeJSON(w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
 		case urlPathApiOsd:
 			w.Header().Set("X-Total-Count", "0")
-			writeJSON(t, w, http.StatusOK, []any{})
+			writeJSON(w, http.StatusOK, []any{})
 		case urlPathApiPool:
-			writeJSON(t, w, http.StatusOK, []any{})
+			writeJSON(w, http.StatusOK, []any{})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -267,16 +267,16 @@ func TestCollector_PeriodicCollectionRevalidatesIdentity(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case urlPathApiAuth:
-			writeJSON(t, w, http.StatusCreated, authLoginResp{Token: "test-token"})
+			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-token"})
 		case urlPathAPIClusterFSID:
 			if r.Header.Get("Authorization") == "" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
 			authenticatedFSIDRequests++
-			writeJSON(t, w, http.StatusOK, "synthetic-fsid")
+			writeJSON(w, http.StatusOK, "synthetic-fsid")
 		case urlPathApiHealthMinimal:
-			writeJSON(t, w, http.StatusOK, map[string]any{"hosts": 3})
+			writeJSON(w, http.StatusOK, map[string]any{"hosts": 3})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -293,7 +293,7 @@ func TestCollector_PeriodicCollectionRevalidatesIdentity(t *testing.T) {
 func TestCollector_CheckAllowsUnavailableOptionalFeatureWhenStatusWorks(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == urlPathApiHealthMinimal {
-			writeJSON(t, w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
+			writeJSON(w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -311,7 +311,7 @@ func TestCollector_HealthMissingSection(t *testing.T) {
 		switch r.URL.Path {
 		case urlPathApiHealthMinimal:
 			healthRequests++
-			writeJSON(t, w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
+			writeJSON(w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -347,7 +347,7 @@ func TestCollector_HealthSemantics(t *testing.T) {
 	}
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == urlPathApiHealthMinimal {
-			writeJSON(t, w, http.StatusOK, health)
+			writeJSON(w, http.StatusOK, health)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -384,7 +384,10 @@ func TestCollector_OSDWholeListCapIsAllOrNone(t *testing.T) {
 			return
 		}
 		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
-		require.NoError(t, err)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		offsets = append(offsets, offset)
 		w.Header().Set("X-Total-Count", "101")
 		count := 101
@@ -405,7 +408,7 @@ func TestCollector_OSDWholeListCapIsAllOrNone(t *testing.T) {
 			osd.OsdStats.PerfStat.ApplyLatencyMs = 2.5
 			page = append(page, osd)
 		}
-		writeJSON(t, w, http.StatusOK, page)
+		writeJSON(w, http.StatusOK, page)
 	})
 	defer srv.Close()
 
@@ -441,7 +444,7 @@ func TestCollector_PoolCapIsAllOrNone(t *testing.T) {
 	}
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == urlPathApiPool {
-			writeJSON(t, w, http.StatusOK, []apiPoolResponse{pool("a"), pool("b"), pool("c")})
+			writeJSON(w, http.StatusOK, []apiPoolResponse{pool("a"), pool("b"), pool("c")})
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -530,7 +533,7 @@ func TestCollector_HealthCountsSkipUnboundedEntityRequests(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case urlPathApiHealthMinimal:
-			writeJSON(t, w, http.StatusOK, map[string]any{
+			writeJSON(w, http.StatusOK, map[string]any{
 				"health":  map[string]any{"status": "HEALTH_OK"},
 				"osd_map": map[string]any{"osds": osds},
 				"pools":   pools,
@@ -568,7 +571,7 @@ func TestCollector_CustomSelectorFetchesInventoryDespiteHealthCount(t *testing.T
 			for i := range osds {
 				osds[i] = map[string]any{"up": 1, "in": 1}
 			}
-			writeJSON(t, w, http.StatusOK, map[string]any{
+			writeJSON(w, http.StatusOK, map[string]any{
 				"health":  map[string]any{"status": "HEALTH_OK"},
 				"osd_map": map[string]any{"osds": osds},
 				"pools":   []any{},
@@ -576,7 +579,7 @@ func TestCollector_CustomSelectorFetchesInventoryDespiteHealthCount(t *testing.T
 		case urlPathApiOsd:
 			osdRequests.Add(1)
 			w.Header().Set("X-Total-Count", "1")
-			writeJSON(t, w, http.StatusOK, []map[string]any{{
+			writeJSON(w, http.StatusOK, []map[string]any{{
 				"id": 1, "uuid": "uuid-1", "up": 1, "in": 1,
 				"tree": map[string]any{"name": "osd.1", "device_class": "ssd"},
 			}})
@@ -704,7 +707,7 @@ func TestCollector_OSDWholeListSupportsClustersLargerThanTenThousand(t *testing.
 			page[i].UUID = fmt.Sprintf("uuid-%05d", i)
 		}
 		w.Header().Set("X-Total-Count", strconv.Itoa(total))
-		writeJSON(t, w, http.StatusOK, page)
+		writeJSON(w, http.StatusOK, page)
 	})
 	defer srv.Close()
 
@@ -727,7 +730,7 @@ func TestCollector_OSDWholeListRejectsInconsistentAdvertisedTotal(t *testing.T) 
 			page[i].ID = int64(i)
 			page[i].UUID = fmt.Sprintf("uuid-%03d", i)
 		}
-		writeJSON(t, w, http.StatusOK, page)
+		writeJSON(w, http.StatusOK, page)
 	})
 	defer srv.Close()
 
@@ -794,7 +797,7 @@ func TestCollector_PoolAvailableIsNotReducedTwice(t *testing.T) {
 
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == urlPathApiPool && r.URL.Query().Get("stats") == "true" {
-			writeJSON(t, w, http.StatusOK, []apiPoolResponse{pool})
+			writeJSON(w, http.StatusOK, []apiPoolResponse{pool})
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -945,7 +948,7 @@ func TestCollector_PoolsRejectDuplicateSelectedNames(t *testing.T) {
 	pool.PoolName = "pool-a"
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == urlPathApiPool {
-			writeJSON(t, w, http.StatusOK, []apiPoolResponse{pool, pool})
+			writeJSON(w, http.StatusOK, []apiPoolResponse{pool, pool})
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -1007,7 +1010,7 @@ func TestCollector_HealthRejectsInvalidSectionValues(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == urlPathApiHealthMinimal {
-					writeJSON(t, w, http.StatusOK, test.response)
+					writeJSON(w, http.StatusOK, test.response)
 					return
 				}
 				w.WriteHeader(http.StatusNotFound)
@@ -1137,15 +1140,18 @@ func newFakeDashboard(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case urlPathApiAuth:
-			writeJSON(t, w, http.StatusCreated, authLoginResp{Token: "test-token"})
+			writeJSON(w, http.StatusCreated, authLoginResp{Token: "test-token"})
 			return
 		case urlPathAPIClusterFSID:
 			if r.Header.Get("Authorization") == "" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
-			writeJSON(t, w, http.StatusOK, "synthetic-fsid")
+			if r.Header.Get("Authorization") != "Bearer test-token" {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			writeJSON(w, http.StatusOK, "synthetic-fsid")
 			return
 		}
 		if r.Header.Get("Authorization") != "Bearer test-token" {

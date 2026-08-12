@@ -13,7 +13,7 @@ placements:
         id: availability-health
         title: Availability and Health
         items:
-          - ceph.dashboard_api_status
+          - ceph.component_collection_status
           - ceph.cluster_status
           - ceph.cluster_scrub_status
           - ceph.cluster_pgs_count
@@ -39,7 +39,8 @@ placements:
           - ceph.cluster_physical_capacity_utilization
           - ceph.cluster_physical_capacity_usage
           - ceph.cluster_objects_count
-          - ceph.cluster_objects_by_status_distribution
+          - ceph.cluster_object_copies_health
+          - ceph.cluster_objects_unfound
       - type: group
         id: cluster-performance
         title: Cluster Performance
