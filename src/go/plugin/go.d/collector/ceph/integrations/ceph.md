@@ -25,7 +25,7 @@ Monitor Ceph cluster, OSD, and pool metrics. Use the on-demand Functions for det
 daemon inventory, and pool policy.
 
 This collector can coexist with Ceph's Prometheus producers. Use the MGR Prometheus module for additional cluster
-telemetry and `ceph-exporter` on every Ceph node for daemon/admin-socket telemetry.
+telemetry and, on Reef 18 and later, `ceph-exporter` on Ceph hosts for daemon/admin-socket telemetry.
 
 
 The collector uses the authenticated Ceph Dashboard REST API. It does not read daemon admin sockets and does
@@ -51,7 +51,7 @@ Functions query the Dashboard only when opened. Result rows and long health text
 Coverage ownership is deliberately split:
 
 - MGR Prometheus owns continuous cluster telemetry such as PG states, OSD up/in, MON quorum, and capacity.
-- Per-node `ceph-exporter` owns continuous daemon/admin-socket telemetry.
+- On Reef 18 and later, per-host `ceph-exporter` owns continuous daemon/admin-socket telemetry.
 - The native Health Function supplies exact current health-check detail for slow operations, scrub/damage
   errors, quorum symptoms, and other RCA; the other Functions supply bounded policy and inventory gaps.
 Release contracts cover Pacific 16, Quincy 17, Reef 18, Squid 19, and Tentacle 20.
@@ -85,11 +85,11 @@ selected set exceeds its cap, that entity metric set is skipped rather than trun
 
 #### Performance Impact
 
-On all three supported releases, standalone `ceph-exporter` refreshes daemon/admin-socket metrics every 5
-seconds by default. The MGR Prometheus module refreshes its enabled cache every 15 seconds by default.
-Scrapes read these caches and do not schedule refresh work, so match scraper intervals to the configured
-producer periods to avoid duplicate or skipped cached samples. If the MGR Prometheus `cache` option is
-disabled, its metrics are instead collected in the scrape request path.
+On Reef 18 and later, standalone `ceph-exporter` refreshes daemon/admin-socket metrics every 5 seconds by
+default. The MGR Prometheus module refreshes its enabled cache every 15 seconds by default. Scrapes read these
+caches and do not schedule refresh work, so match scraper intervals to the configured producer periods to avoid
+duplicate or skipped cached samples. If the MGR Prometheus `cache` option is disabled, its metrics are instead
+collected in the scrape request path.
 
 Dashboard endpoints execute inside the active MGR. `/api/health/minimal` aggregates several subsystems and
 iSCSI status may synchronously contact gateways; OSD and pool detail grows with cluster size. Choose an
@@ -128,24 +128,12 @@ permissions for only the scopes needed by the enabled features. Store its passwo
 configuration file or provide an externally managed bearer token through `bearer_token_file`.
 
 
-#### Place collectors according to the Ceph topology
+#### Place the Dashboard job and optional Prometheus collectors
 
-Run a Netdata Child on each Ceph host when host-local system and `ceph-exporter` telemetry is wanted. Run
-one native Dashboard job and one MGR Prometheus scrape per Ceph cluster. Stream children to on-prem
-Parents for consolidated retention while preserving node, site, cluster, and job labels. Children and
-Parents have independent retention; collection continues locally during a Parent outage and history is
-replicated after reconnect.
-
-Netdata Cloud Rooms are access and presentation views; they do not move the physical collection job or
-its Function execution. For two sites, one Space can contain a Room per site plus a consolidated Room;
-one node can belong to multiple Rooms but only one Space. A single job placement does not automatically
-fail over if its Netdata node fails, so use a stable endpoint and design active/passive collection when
-that availability is required.
-
-Raw metric samples remain on Agents/Parents, but Cloud stores infrastructure metadata and alert
-configuration, and user-driven metric queries and Function results transit Cloud. For strict
-zero-offshore or LGPD contractual requirements, use on-prem storage and local access; confirm any Cloud
-region/residency commitment contractually rather than inferring it from Rooms or Spaces.
+Run one native Dashboard job per Ceph cluster. If using Ceph's Prometheus telemetry, use one MGR Prometheus
+scrape per cluster and, on Reef 18 and later, `ceph-exporter` on Ceph hosts for daemon/admin-socket telemetry.
+Place the Dashboard job on a Netdata node with stable network access to the configured Dashboard and every
+allowed active-MGR origin; its Functions execute on that node.
 
 
 
@@ -163,7 +151,7 @@ Core Functions run on demand with internal execution and response limits.
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Base** | update_every | Periodic metric interval in seconds; it does not change standalone ceph-exporter's 5-second default refresh or the MGR Prometheus module's 15-second default cache refresh. | 10 | no |
+| **Base** | update_every | Periodic metric interval in seconds; it does not change the 5-second ceph-exporter default on Reef 18 and later or the MGR Prometheus module's 15-second default cache refresh. | 10 | no |
 |  | autodetection_retry | Retry interval in seconds for a failed auto-detected job; zero disables retries. | 60 | no |
 |  | function_only | Run only on-demand Functions, without charts or periodic metric requests. | no | no |
 | **Metrics** | osd_selector | Simple-pattern selector matched against `osd.<id>` or OSD UUID before the cap. | * | no |
@@ -664,35 +652,21 @@ cap, the collector deliberately emits no metrics for that entity set.
 
 ### Long retention or capacity planning is required
 
-Retention is a Netdata storage/streaming policy, not a Ceph collector setting. Follow the
+Retention and Agent capacity are Netdata deployment concerns, not Ceph collector settings. Use the
+[Agent sizing guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md) and the
 [disk and retention sizing guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md)
-and size dbengine tiers on the on-prem Parents for the required audit window. Stream the per-node and
-once-per-cluster jobs there. The default tier time caps are 14 days, 3 months, and 2 years with a 1 GiB
-quota per tier; actual retention is the earlier of the configured size or time limit, and all streamed
-children share each Parent tier quota. Re-size these tiers from measured Ceph cardinality before relying
-on them for an ISO 20000-1 trail.
+to size the intended Child/Parent topology from measured Ceph chart cardinality and retention requirements.
 
 The collector reports current capacity; it does not emit a pool-fill forecast. Use retained history and
 the presentation/query layer for projections, and validate the model against planned growth and rebalance.
 
 
-### Existing Prometheus, Grafana, or Zabbix monitoring must remain
+### Existing Prometheus or Grafana monitoring must remain
 
-Coexist rather than replace by default. Keep Ceph Prometheus exporters and existing Grafana/Zabbix
-workflows while adding Netdata's high-resolution collection, streaming, Functions, and alerts. Prometheus
-can scrape Netdata, including child data hosted by a Parent, or Netdata can remote-write through a
-supported connector. Exported names are Netdata context-based and sanitized, so existing Grafana boards
-that expect original Ceph `ceph_*` series are not automatically compatible. On-demand Function tables are
-not Prometheus time series. Assign one paging owner per condition to avoid duplicate Netdata,
-Alertmanager, and Zabbix notifications.
-
-
-### A Ceph-specific Agent footprint estimate is required
-
-The [Agent sizing guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md) reports roughly 100-200 MiB
-and 1-5% of one core for an empty Agent, and about 250-350 MiB and 5-20% of one core in typical production
-use. These are not Ceph-specific guarantees. Measure the intended Child/Parent topology, enabled charts,
-streaming, and retention in a representative pilot before setting a capacity or SLA commitment.
+Keep Ceph Prometheus exporters and existing dashboards until equivalent coverage is verified. This native
+collector adds Dashboard metrics, Functions, and alerts; it does not replace every Ceph Prometheus series.
+Netdata metric names are context-based, so Grafana dashboards that expect original `ceph_*` series are not
+automatically compatible. On-demand Function tables are not Prometheus time series.
 
 
 ### More preconfigured Ceph alerts are expected
