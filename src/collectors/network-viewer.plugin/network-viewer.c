@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Function registration ownership split:
-//   - network-connections         : all OSes, served by this plugin
-//   - topology:network-connections: all OSes, served by this plugin
+// Function registration ownership split. NOTE: this file is compiled for Linux,
+// FreeBSD and macOS only; Windows builds network-viewer-windows.c instead (see
+// NETWORK_VIEWER_FILES in CMakeLists.txt), so "all OSes" below means "every OS
+// that builds this file", plus Windows only where that file registers its own.
+//   - network-connections         : all OSes -- here, and separately in
+//                                   network-viewer-windows.c for Windows
+//   - topology:network-connections: Linux, FreeBSD and macOS only; Windows has
+//                                   no topology Function
 //   - dns-queries                 : Linux only, served by this plugin
 //   - network-protocols           : FreeBSD only, served by this plugin
 //                                   (on Linux, network-protocols is served by
