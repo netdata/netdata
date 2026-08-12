@@ -9357,7 +9357,25 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup: &id004
+      prerequisites:
+        list:
+          - title: SNMP devices configured
+            description: The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP access must be reachable from the Netdata Agent acting as the site's SNMP hub.
+      configuration:
+        file:
+          name: go.d/snmp_topology.conf
+        options:
+          description: 'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector jobs. Use this file only to change the discovery interval.'
+          folding:
+            title: Config options
+            enabled: true
+          list: []
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9399,7 +9417,7 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup: *id004
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9442,7 +9460,7 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup: *id004
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9484,7 +9502,7 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup: *id004
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9526,7 +9544,7 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup: *id004
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9569,7 +9587,7 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup: *id004
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9612,7 +9630,7 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup: *id004
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9624,11 +9642,14 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.topologies
-        icon_filename: SNMP.png
+        icon_filename: network.svg
       keywords:
         - network connections
         - sockets
         - processes
+        - containers
+        - kubernetes
+        - dependencies
         - topology
         - live
         - npm
@@ -9639,8 +9660,8 @@ modules:
         description: ''
     overview:
       data_collection:
-        metrics_description: Visualize live host network connections. The network-viewer plugin maps local processes and services to the sockets and remote endpoints they are talking to, in real time.
-        method_description: The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table — no SNMP and no configuration.
+        metrics_description: Map application dependencies on your hosts. The network-viewer plugin reads the kernel's live socket table and draws which process talks to which — attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it.
+        method_description: The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table — no SNMP, no instrumentation, and no configuration.
       supported_platforms:
         include: []
         exclude: []
@@ -9654,7 +9675,23 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ''
+        options:
+          description: This integration has no configuration options.
+          folding:
+            title: Config options
+            enabled: true
+          list: []
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9666,7 +9703,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.topologies
-        icon_filename: SNMP.png
+        icon_filename: netdata.png
       keywords:
         - streaming
         - parents
@@ -9696,7 +9733,25 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup:
+      prerequisites:
+        list:
+          - title: Streaming configured
+            description: At least two Netdata Agents connected through streaming. A standalone Agent renders a single node.
+      configuration:
+        file:
+          name: stream.conf
+        options:
+          description: The streaming topology reflects whatever streaming is already configured. Use this file to change how this Agent streams to, or accepts streams from, other Agents.
+          folding:
+            title: Config options
+            enabled: true
+          list: []
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9738,7 +9793,25 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup:
+      prerequisites:
+        list:
+          - title: vCenter access
+            description: A vCenter Server reachable from the Netdata Agent, and a read-only account with permission to browse the inventory.
+      configuration:
+        file:
+          name: go.d/vsphere.conf
+        options:
+          description: Configure the vSphere collector with the vCenter URL and credentials. See the vSphere collector reference for all options.
+          folding:
+            title: Config options
+            enabled: true
+          list: []
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9779,7 +9852,25 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup:
+      prerequisites:
+        list:
+          - title: Cato API access
+            description: A Cato Management Application API key with read access to the account you want to map.
+      configuration:
+        file:
+          name: go.d/cato_networks.conf
+        options:
+          description: Configure the Cato Networks collector with your account ID and API key. See the Cato Networks collector reference for all options.
+          folding:
+            title: Config options
+            enabled: true
+          list: []
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
     troubleshooting: *id002
     alerts: []
     metrics: *id003
@@ -9791,7 +9882,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.syslog
-        icon_filename: SNMP.png
+        icon_filename: syslog.png
       keywords:
         - syslog
         - opentelemetry
@@ -9822,7 +9913,27 @@ modules:
           description: ''
         performance_impact:
           description: ''
-    setup: *id001
+    setup:
+      prerequisites:
+        list:
+          - title: An OpenTelemetry Collector
+            description: An OpenTelemetry Collector with a `syslog` receiver, reachable by your network devices, exporting over OTLP to the Netdata Agent.
+          - title: Devices pointed at it
+            description: The routers, switches, and firewalls must be configured to send syslog to the collector's listener.
+      configuration:
+        file:
+          name: ''
+        options:
+          description: Configuration happens on the OpenTelemetry Collector, not in the Agent. See the OpenTelemetry Collector entry in this section for a ready-to-use syslog pipeline.
+          folding:
+            title: Config options
+            enabled: true
+          list: []
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
     troubleshooting: *id002
     alerts: []
     metrics: *id003

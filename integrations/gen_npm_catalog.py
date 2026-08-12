@@ -225,30 +225,93 @@ def overview(metrics_description, method_description, auto_detection):
     }
 
 
-SETUP = {
-    'prerequisites': {'list': [{
-        'title': 'SNMP access',
-        'description': 'SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site\'s '
-        'SNMP '
-        'hub.',
-    }]},
-    'configuration': {
-        'file': {'name': 'go.d/snmp.conf'},
-        'options': {
-            'description': 'Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP '
-            'collector '
-            'reference for all options.',
-            'folding': {'title': 'Config options', 'enabled': True},
-            'list': [],
+def setup_block(config_file, options_description, prerequisites=()):
+    """Build a `setup` block. Most catalog entries come from the SNMP collector and
+    share SETUP below, but the topology, syslog, and vSphere/Cato producers are not
+    SNMP-based and must not inherit SNMP prerequisites or `go.d/snmp.conf`.
+
+    An empty `config_file` renders "There is no configuration file." and an empty
+    `prerequisites` renders "No action required." (integrations/templates/setup-generic.md)."""
+    return {
+        'prerequisites': {'list': [{'title': t, 'description': d} for t, d in prerequisites]},
+        'configuration': {
+            'file': {'name': config_file},
+            'options': {
+                'description': options_description,
+                'folding': {'title': 'Config options', 'enabled': True},
+                'list': [],
+            },
+            'examples': {'folding': {'title': 'Config', 'enabled': True}, 'list': []},
         },
-        'examples': {'folding': {'title': 'Config', 'enabled': True}, 'list': []},
-    },
-}
+    }
+
+
+SETUP = setup_block(
+    'go.d/snmp.conf',
+    'Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for '
+    'all options.',
+    [('SNMP access',
+      'SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site\'s SNMP hub.')],
+)
+
+# The topology collector has its own job file; the devices it walks come from the
+# SNMP collector's jobs (src/go/plugin/go.d/config/go.d/snmp_topology.conf).
+SNMP_TOPOLOGY_SETUP = setup_block(
+    'go.d/snmp_topology.conf',
+    'Topology discovery needs no per-device configuration: it walks the devices already configured as SNMP collector '
+    'jobs. Use this file only to change the discovery interval.',
+    [('SNMP devices configured',
+      'The devices must already be collected over SNMP (`go.d/snmp.conf`), and SNMP access must be reachable from the '
+      'Netdata Agent acting as the site\'s SNMP hub.')],
+)
+
+# network-viewer.plugin reads the host's own socket table. Nothing to reach, nothing to configure.
+NO_SETUP = setup_block('', 'This integration has no configuration options.')
+
+STREAMING_SETUP = setup_block(
+    'stream.conf',
+    'The streaming topology reflects whatever streaming is already configured. Use this file to change how this Agent '
+    'streams to, or accepts streams from, other Agents.',
+    [('Streaming configured',
+      'At least two Netdata Agents connected through streaming. A standalone Agent renders a single node.')],
+)
+
+VSPHERE_SETUP = setup_block(
+    'go.d/vsphere.conf',
+    'Configure the vSphere collector with the vCenter URL and credentials. See the vSphere collector reference for all '
+    'options.',
+    [('vCenter access',
+      'A vCenter Server reachable from the Netdata Agent, and a read-only account with permission to browse the '
+      'inventory.')],
+)
+
+CATO_SETUP = setup_block(
+    'go.d/cato_networks.conf',
+    'Configure the Cato Networks collector with your account ID and API key. See the Cato Networks collector reference '
+    'for all options.',
+    [('Cato API access',
+      'A Cato Management Application API key with read access to the account you want to map.')],
+)
+
+# Netdata has no syslog listener: an OpenTelemetry Collector receives syslog and
+# exports it over OTLP to the Agent (docs/npm/syslog/otel-collector.md).
+SYSLOG_SETUP = setup_block(
+    '',
+    'Configuration happens on the OpenTelemetry Collector, not in the Agent. See the OpenTelemetry Collector entry in '
+    'this section for a ready-to-use syslog pipeline.',
+    [('An OpenTelemetry Collector',
+      'An OpenTelemetry Collector with a `syslog` receiver, reachable by your network devices, exporting over OTLP to '
+      'the Netdata Agent.'),
+     ('Devices pointed at it',
+      'The routers, switches, and firewalls must be configured to send syslog to the collector\'s listener.')],
+)
+
 TROUBLESHOOTING = {'problems': {'list': []}}
 METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '', 'availability': [], 'scopes': []}
 
 
-def make_entry(name, link, categories, icon, keywords, ov, plugin_name='go.d.plugin', module_name='snmp', metrics=None):
+def make_entry(name, link, categories, icon, keywords, ov, plugin_name='go.d.plugin', module_name='snmp', metrics=None,
+               setup=None):
     return {
         'meta': {
             'plugin_name': plugin_name,
@@ -259,7 +322,7 @@ def make_entry(name, link, categories, icon, keywords, ov, plugin_name='go.d.plu
             'info_provided_to_referring_integrations': {'description': ''},
         },
         'overview': ov,
-        'setup': SETUP,
+        'setup': setup if setup is not None else SETUP,
         'troubleshooting': TROUBLESHOOTING,
         'alerts': [],
         'metrics': metrics if metrics is not None else METRICS,
@@ -555,29 +618,33 @@ def build_topology_modules():
     ]
 
     other = [
-        ('Live Network Connections', 'network-viewer.plugin', 'network-viewer', FALLBACK_ICON,
-         ['network connections', 'sockets', 'processes', 'topology', 'live', 'npm'],
-         'Visualize live host network connections. The network-viewer plugin maps local processes and services to the '
-         'sockets '
-         'and remote endpoints they are talking to, in real time.',
+        ('Live Network Connections', 'network-viewer.plugin', 'network-viewer', 'network.svg',
+         ['network connections', 'sockets', 'processes', 'containers', 'kubernetes', 'dependencies', 'topology',
+          'live', 'npm'],
+         'Map application dependencies on your hosts. The network-viewer plugin reads the kernel\'s live socket table '
+         'and draws which process talks to which — attributed to the container, image, systemd unit, or Kubernetes '
+         'pod, namespace, and workload that owns it.',
          'The network-viewer plugin builds the `topology:network-connections` view directly from the host\'s live '
          'socket '
-         'table — no SNMP and no configuration.',
-         'Always on; observes the host\'s live network connections.'),
-        ('Netdata Streaming Topology', 'netdata', 'streaming', FALLBACK_ICON,
+         'table — no SNMP, no instrumentation, and no configuration.',
+         'Always on; observes the host\'s live network connections.',
+         NO_SETUP),
+        ('Netdata Streaming Topology', 'netdata', 'streaming', 'netdata.png',
          ['streaming', 'parents', 'children', 'topology', 'agents', 'npm'],
          'See how your Netdata Agents connect. The streaming topology renders the parent-child hierarchy of a Netdata '
          'deployment '
          '— which Agents stream to which Parents.',
          'Netdata builds the `topology:streaming` view from the live streaming connections between Agents and Parents.',
-         'Always available; reflects the live streaming connections of the deployment.'),
+         'Always available; reflects the live streaming connections of the deployment.',
+         STREAMING_SETUP),
         ('vSphere Topology', 'go.d.plugin', 'vsphere', icon_for('vmware'),
          ['vsphere', 'vmware', 'vcenter', 'virtualization', 'topology', 'npm'],
          'Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with '
          'placement '
          'and network-attachment links, plus datastore-utilization overlays.',
          'The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.',
-         'Built from the configured vCenter inventory.'),
+         'Built from the configured vCenter inventory.',
+         VSPHERE_SETUP),
         ('Cato Networks Topology', 'go.d.plugin', 'cato_networks', FALLBACK_ICON,
          ['cato', 'sase', 'sd-wan', 'topology', 'npm'],
          'Map a Cato Networks SASE fabric. The Cato collector renders sites, sockets, and gateways with their tunnel '
@@ -586,7 +653,8 @@ def build_topology_modules():
          'The Cato collector reads the Cato Management Application over its API and renders the fabric as a '
          '`netdata.topology.v1` '
          'graph.',
-         'Built from the configured Cato account.'),
+         'Built from the configured Cato account.',
+         CATO_SETUP),
     ]
 
     modules = []
@@ -594,12 +662,12 @@ def build_topology_modules():
         modules.append(make_entry(
             name=name, link='', categories=[CAT_TOPOLOGY], icon=FALLBACK_ICON,
             keywords=keywords, ov=overview(metrics_desc, method_desc, auto),
-            plugin_name='go.d.plugin', module_name='snmp_topology'))
-    for name, plugin, module, icon, keywords, metrics_desc, method_desc, auto in other:
+            plugin_name='go.d.plugin', module_name='snmp_topology', setup=SNMP_TOPOLOGY_SETUP))
+    for name, plugin, module, icon, keywords, metrics_desc, method_desc, auto, setup in other:
         modules.append(make_entry(
             name=name, link='', categories=[CAT_TOPOLOGY], icon=icon,
             keywords=keywords, ov=overview(metrics_desc, method_desc, auto),
-            plugin_name=plugin, module_name=module))
+            plugin_name=plugin, module_name=module, setup=setup))
     return modules
 
 
@@ -611,7 +679,7 @@ def build_syslog_modules():
         name='Syslog from Network Devices',
         link='',
         categories=[CAT_SYSLOG],
-        icon=FALLBACK_ICON,
+        icon='syslog.png',
         keywords=['syslog', 'opentelemetry', 'otel', 'otlp', 'network devices', 'logs', 'npm'],
         ov=overview(
             'Ingest syslog from routers, switches, and firewalls into Netdata. An OpenTelemetry Collector with a '
@@ -629,6 +697,7 @@ def build_syslog_modules():
         ),
         plugin_name='otel.plugin',
         module_name='otel',
+        setup=SYSLOG_SETUP,
     )]
 
 

@@ -13,7 +13,7 @@ endmeta-->
 # Syslog from Network Devices
 
 
-<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
+<img src="https://netdata.cloud/img/syslog.png" width="150"/>
 
 
 Plugin: otel.plugin
@@ -51,31 +51,26 @@ The default configuration for this integration is not expected to impose a signi
 
 ### Prerequisites
 
-#### SNMP access
+#### An OpenTelemetry Collector
 
-SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site's SNMP hub.
+An OpenTelemetry Collector with a `syslog` receiver, reachable by your network devices, exporting over OTLP to the Netdata Agent.
+
+#### Devices pointed at it
+
+The routers, switches, and firewalls must be configured to send syslog to the collector's listener.
 
 
 ### Configuration
 
 #### Options
 
-Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for all options.
+Configuration happens on the OpenTelemetry Collector, not in the Agent. See the OpenTelemetry Collector entry in this section for a ready-to-use syslog pipeline.
 
 
 
 #### via File
 
-The configuration file name for this integration is `go.d/snmp.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/snmp.conf
-```
+There is no configuration file.
 
 ##### Examples
 There are no configuration examples.
