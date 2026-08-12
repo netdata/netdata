@@ -5,6 +5,7 @@ package ceph
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -355,6 +356,89 @@ func TestCephClientLogicalOperationUsesSingleDeadline(t *testing.T) {
 	err = client.getJSON(context.Background(), "get cluster FSID", urlPathAPIClusterFSID, hdrAcceptVersion, nil, &fsid)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestCephClientIdentityFallbackUsesSingleDeadline(t *testing.T) {
+	const requestDelay = 70 * time.Millisecond
+
+	var modernRequests, legacyRequests atomic.Int64
+	httpClient := &http.Client{
+		Timeout: 100 * time.Millisecond,
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			var status int
+			var body string
+			switch req.URL.Path {
+			case urlPathAPIClusterFSID:
+				modernRequests.Add(1)
+				status = http.StatusNotFound
+			case urlPathApiMonitor:
+				legacyRequests.Add(1)
+				status = http.StatusOK
+				body = `{"mon_status":{"monmap":{"fsid":"cluster-fsid"}}}`
+			default:
+				return nil, fmt.Errorf("unexpected request path %q", req.URL.Path)
+			}
+			return delayedHTTPResponse(req, requestDelay, status, body)
+		}),
+	}
+	client, err := newCephClient(httpClient, web.RequestConfig{
+		URL: "https://ceph.example",
+	}, false, nil)
+	require.NoError(t, err)
+	client.activeBase = requireURL(t, "https://ceph.example")
+	client.activeGen = 1
+	client.jwt = "test-token"
+
+	_, _, err = client.fetchClusterIdentity(context.Background())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.EqualValues(t, 1, modernRequests.Load())
+	assert.EqualValues(t, 1, legacyRequests.Load())
+}
+
+func TestCephClientOSDFallbackUsesSingleDeadline(t *testing.T) {
+	const requestDelay = 70 * time.Millisecond
+
+	var modernRequests, legacyRequests atomic.Int64
+	httpClient := &http.Client{
+		Timeout: 100 * time.Millisecond,
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Path != urlPathApiOsd {
+				return nil, fmt.Errorf("unexpected request path %q", req.URL.Path)
+			}
+			status := http.StatusOK
+			body := `[]`
+			switch req.Header.Get("Accept") {
+			case hdrAcceptVersionV11:
+				modernRequests.Add(1)
+				status = http.StatusUnsupportedMediaType
+				body = ""
+			case hdrAcceptVersion:
+				legacyRequests.Add(1)
+			default:
+				return nil, fmt.Errorf("unexpected Accept header %q", req.Header.Get("Accept"))
+			}
+			return delayedHTTPResponse(req, requestDelay, status, body)
+		}),
+	}
+	client, err := newCephClient(httpClient, web.RequestConfig{
+		URL: "https://ceph.example",
+	}, false, nil)
+	require.NoError(t, err)
+	client.activeBase = requireURL(t, "https://ceph.example")
+	client.activeGen = 1
+	client.validatedGen = 1
+	client.expectedFSID = "cluster-fsid"
+	client.jwt = "test-token"
+
+	c := &Collector{
+		apiClient: client,
+	}
+	_, err = c.fetchAllOSDs(context.Background())
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.EqualValues(t, 1, modernRequests.Load())
+	assert.EqualValues(t, 1, legacyRequests.Load())
 }
 
 func TestCephClientDiscoveryWaitHonorsContext(t *testing.T) {
@@ -902,6 +986,20 @@ func requireURL(t *testing.T, raw string) *url.URL {
 	u, err := url.Parse(raw)
 	require.NoError(t, err)
 	return u
+}
+
+func delayedHTTPResponse(req *http.Request, delay time.Duration, status int, body string) (*http.Response, error) {
+	select {
+	case <-time.After(delay):
+	case <-req.Context().Done():
+		return nil, req.Context().Err()
+	}
+	return &http.Response{
+		StatusCode: status,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Request:    req,
+	}, nil
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

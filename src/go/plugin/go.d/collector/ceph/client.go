@@ -201,11 +201,8 @@ func (c *cephClient) doJSON(
 	body []byte,
 	dst any,
 ) (http.Header, activeBaseRef, error) {
-	if timeout := c.httpClient.Timeout; timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
+	ctx, cancel := c.withOperationTimeout(ctx)
+	defer cancel()
 
 	var retriedAuth, retriedRedirect, retriedTransport bool
 
@@ -285,6 +282,13 @@ func (c *cephClient) doJSON(
 	return nil, activeBaseRef{}, fmt.Errorf("%s exceeded bounded authentication/failover retries", operation)
 }
 
+func (c *cephClient) withOperationTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if timeout := c.httpClient.Timeout; timeout > 0 {
+		return context.WithTimeout(ctx, timeout)
+	}
+	return ctx, func() {}
+}
+
 func (c *cephClient) probeClusterIdentity(ctx context.Context) (string, error) {
 	for range 4 {
 		fsid, active, err := c.fetchClusterIdentity(ctx)
@@ -316,6 +320,9 @@ func (c *cephClient) probeClusterIdentity(ctx context.Context) (string, error) {
 }
 
 func (c *cephClient) fetchClusterIdentity(ctx context.Context) (string, activeBaseRef, error) {
+	ctx, cancel := c.withOperationTimeout(ctx)
+	defer cancel()
+
 	var fsid string
 	_, active, err := c.doJSON(ctx, "get cluster FSID", http.MethodGet, urlPathAPIClusterFSID,
 		hdrAcceptVersion, nil, nil, &fsid)

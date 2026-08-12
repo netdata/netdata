@@ -89,6 +89,9 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 }
 
 func (c *Collector) fetchAllOSDs(ctx context.Context) ([]apiOsdResponse, error) {
+	ctx, cancel := c.apiClient.withOperationTimeout(ctx)
+	defer cancel()
+
 	query := url.Values{
 		"offset": {"0"},
 		"limit":  {"-1"},
