@@ -282,9 +282,6 @@ func (d funcDepsAdapter) Pools(ctx context.Context, limit int) (cephfunc.PoolRes
 		}
 		seenPools[name] = true
 	}
-	sort.SliceStable(pools, func(i, j int) bool {
-		return anyString(pools[i]["pool_name"]) < anyString(pools[j]["pool_name"])
-	})
 	var rules []map[string]any
 	if err := d.collector.apiClient.getJSON(ctx, "list CRUSH rules", urlPathAPICrushRule, hdrAcceptVersionV2, nil, &rules); err != nil {
 		return cephfunc.PoolResult{}, toFunctionSourceError(err, "CRUSH rule inventory")
@@ -387,14 +384,6 @@ func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.Daemo
 			Limit:    limit,
 		}
 	}
-	sort.SliceStable(daemons, func(i, j int) bool {
-		leftID, leftName := daemonIdentity(daemons[i])
-		rightID, rightName := daemonIdentity(daemons[j])
-		if leftID != rightID {
-			return leftID < rightID
-		}
-		return leftName < rightName
-	})
 	seenDaemons := make(map[string]bool, len(daemons))
 	for _, daemon := range daemons {
 		id, name := daemonIdentity(daemon)

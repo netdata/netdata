@@ -346,18 +346,23 @@ func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.Total)
 	require.Len(t, result.Rows, 3)
-	row := result.Rows[0]
+	rows := make(map[string]cephfunc.PoolRow, len(result.Rows))
+	for _, row := range result.Rows {
+		rows[row.Name] = row
+	}
+	require.Contains(t, rows, "pool-a")
+	row := rows["pool-a"]
 	assert.Equal(t, "pool-a", row.Name)
 	assert.EqualValues(t, 3, *row.Size)
 	assert.Equal(t, "default", row.CrushRoot)
 	assert.Equal(t, "ssd", row.DeviceClass)
 	assert.Equal(t, "host", row.FailureDomain)
 	assert.Equal(t, "rgw", row.Applications)
-	assert.Nil(t, result.Rows[1].Size)
-	assert.Nil(t, result.Rows[1].PGNum)
+	assert.Nil(t, rows["pool-b"].Size)
+	assert.Nil(t, rows["pool-b"].PGNum)
 }
 
-func TestFuncDepsDaemonsRejectsPartialAndSortsCompleteInventory(t *testing.T) {
+func TestFuncDepsDaemonsRejectsPartialAndReturnsCompleteInventory(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != urlPathAPIDaemon {
 			w.WriteHeader(http.StatusNotFound)
@@ -385,8 +390,11 @@ func TestFuncDepsDaemonsRejectsPartialAndSortsCompleteInventory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.Total)
 	require.Len(t, result.Rows, 3)
-	assert.Equal(t, "mgr.a", result.Rows[0].ID)
-	assert.Equal(t, "mon.a", result.Rows[1].ID)
+	ids := make([]string, 0, len(result.Rows))
+	for _, row := range result.Rows {
+		ids = append(ids, row.ID)
+	}
+	assert.ElementsMatch(t, []string{"mgr.a", "mon.a", "osd.9"}, ids)
 }
 
 func TestFuncDepsDaemonsKeepsMissingActiveStateUnknown(t *testing.T) {
