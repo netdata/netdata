@@ -88,7 +88,7 @@ Stage the changed files explicitly. Two outputs must never be committed:
 |---|---|---|
 | `build_device_modules` | one per SNMP device profile | Device Metrics |
 | `build_capability_modules` | BGP- and licensing-capable vendors | BGP / Licensing |
-| `build_topology_modules` | 7 SNMP discovery methods + 4 non-SNMP producers | Topologies |
+| `build_topology_modules` | 7 SNMP discovery methods + 4 non-SNMP producers (network-viewer, streaming, vSphere, Cato) | Topologies |
 | `build_syslog_modules` | 1 | Syslog |
 | `build_trap_modules` | one per trap-profile vendor | SNMP Traps |
 | `build_trap_enrichment_modules` | 3 | SNMP Traps |
@@ -99,10 +99,11 @@ Capability (BGP / licensing) is detected by resolving each profile's transitive
 ## Shared objects, and the anchors that reveal them
 
 The root cause of a past defect here was `make_entry()` assigning the *same*
-module-level `SETUP` dict to every entry it built. Entries produced by
-`network-viewer.plugin`, the streaming graph, vSphere, Cato, and the
-OpenTelemetry syslog pipeline — none of which use SNMP — therefore rendered SNMP
-prerequisites and `edit-config go.d/snmp.conf`.
+module-level `SETUP` dict to every entry it built. Five producers — the four
+non-SNMP entries of `build_topology_modules` (`network-viewer.plugin`, the
+streaming graph, vSphere, Cato) plus the OpenTelemetry syslog pipeline from
+`build_syslog_modules` — therefore rendered SNMP prerequisites and
+`edit-config go.d/snmp.conf` despite using no SNMP.
 
 YAML anchors did not cause that; they made it visible. `ruamel.yaml` serializes a
 shared Python object as an anchor plus aliases, so the file shows

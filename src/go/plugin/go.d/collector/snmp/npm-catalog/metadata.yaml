@@ -9669,7 +9669,7 @@ modules:
         description: ''
     overview:
       data_collection:
-        metrics_description: Map application dependencies on a host. The network-viewer plugin reads the kernel's live socket table and draws which local process talks to which, and which remote endpoints they reach. On Linux each process is also attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it.
+        metrics_description: Map application dependencies on a host. The network-viewer plugin reads the kernel's live socket table and draws which local process talks to which, and which remote endpoints they reach. On Linux it also attributes each process to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it, as far as the APPS_LOOKUP data allows — attribution is best effort, and a process it cannot resolve is still drawn.
         method_description: The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only.
       supported_platforms:
         include:
@@ -9679,7 +9679,7 @@ modules:
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: ''
+        description: The plugin needs privileged access to enumerate the sockets of every process; standard installations grant it. In a container it additionally needs the host network namespace, the host `/proc`, `SYS_ADMIN` for sibling containers, and `SYS_PTRACE` to attribute connections to processes. On macOS a non-privileged or TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. The Function itself requires a signed-in Netdata identity in the same Space with permission to view sensitive data — it is not available anonymously.
       default_behavior:
         auto_detection:
           description: Always on; observes the host's live network connections.
@@ -9697,7 +9697,7 @@ modules:
           name: netdata.conf
           section_name: '[plugin:network-viewer]'
         options:
-          description: The Function is always available and needs no setup. The only setting is the APPS_LOOKUP cache used to enrich connections with container and Kubernetes identity.
+          description: The Function is always available and needs no setup. The only setting is the size of the APPS_LOOKUP cache used to warm container and Kubernetes identity lookups; raising it does not guarantee attribution, it only keeps more resolved PIDs cached.
           folding:
             title: Config options
             enabled: true
@@ -9842,7 +9842,7 @@ modules:
         link: ''
         categories:
           - network-performance-monitoring.topologies
-        icon_filename: SNMP.png
+        icon_filename: network-wired.svg
       keywords:
         - cato
         - sase
@@ -9880,7 +9880,7 @@ modules:
         file:
           name: go.d/cato_networks.conf
         options:
-          description: Configure the Cato Networks collector with your account ID and API key. See the [Cato Networks collector](/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page for all options.
+          description: Configure the Cato Networks collector with your account ID and API key. See the [Cato Networks collector](/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page for all options. `update_every` must be at least 60; `url` defaults to the Cato public GraphQL endpoint and only needs setting for a different region or a proxy.
           folding:
             title: Config options
             enabled: true
@@ -9947,7 +9947,7 @@ modules:
         file:
           name: otel.yaml
         options:
-          description: The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not authenticate the sender. Prefer keeping the Collector on the same host as the Agent.
+          description: The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not authenticate the sender. Prefer keeping the Collector on the same host as the Agent.
           folding:
             title: Config options
             enabled: true
@@ -10003,14 +10003,16 @@ modules:
       prerequisites:
         list:
           - title: Devices configured to send traps
-            description: The devices must be configured to send SNMP traps to the Netdata Agent acting as the site's trap receiver, and the trap port must be reachable from them.
+            description: The devices must be configured to send SNMP traps or INFORMs to the Netdata Agent acting as the site's trap receiver, and the trap port must be reachable from them.
+          - title: A usable Netdata log directory
+            description: 'Jobs that write direct journals store them under `${NETDATA_LOG_DIR}/traps/` — `/var/log/netdata` on package installs, `/opt/netdata/var/log/netdata` on static ones. Job creation fails if that directory is missing or unwritable. A job that only exports over OTLP can set `journal.enabled: false` instead.'
           - title: Permission to bind the trap port
             description: 'The default listener is UDP/162, a privileged port: binding it needs `CAP_NET_BIND_SERVICE` or root on Linux. Netdata packages grant this capability, so standard installations just work; hardened or custom deployments must grant it, or move the listener to an unprivileged port.'
       configuration:
         file:
           name: go.d/snmp_traps.conf
         options:
-          description: 'Configure the trap listener: the address and port it binds, the SNMP versions and credentials it accepts, and the enrichment options. Trap decoding itself needs no configuration — the vendor profiles ship with Netdata.'
+          description: 'Configure the trap listener: the address and port it binds, the SNMP versions and credentials it accepts, and the enrichment options — see the [SNMP Trap Listener](/src/go/plugin/go.d/collector/snmp_traps/integrations/snmp_trap_listener.md) page for the full option reference. Trap decoding itself needs no configuration: the stock trap profiles ship with Netdata.'
           folding:
             title: Config options
             enabled: true
@@ -10019,7 +10021,12 @@ modules:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: Basic (SNMPv1/v2c)
+              folding:
+                enabled: false
+              description: 'A single listener on the standard trap port, accepting any SNMPv1/v2c community. `listen` is required: without an endpoint the job binds nothing. Restrict the allowlist for production.'
+              config: "jobs:\n  - name: local\n    listen:\n      endpoints:\n        - protocol: udp\n          address: 0.0.0.0\n          port: 162\n    versions:\n      - v1\n      - v2c\n"
     troubleshooting: *id002
     alerts: []
     metrics:

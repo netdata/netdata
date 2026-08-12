@@ -212,7 +212,7 @@ def _plural(n, word):
 
 
 def overview(metrics_description, method_description, auto_detection, platforms=(), multi_instance=True,
-             limits='', performance_impact=''):
+             limits='', performance_impact='', permissions=''):
     """`platforms` empty means every platform the Agent runs on; producers that are not
     built everywhere must list theirs. `multi_instance` must be False for singleton
     producers, otherwise the page claims side-by-side instances the collector rejects.
@@ -223,7 +223,7 @@ def overview(metrics_description, method_description, auto_detection, platforms=
         'data_collection': {'metrics_description': metrics_description, 'method_description': method_description},
         'supported_platforms': {'include': list(platforms), 'exclude': []},
         'multi_instance': multi_instance,
-        'additional_permissions': {'description': ''},
+        'additional_permissions': {'description': permissions},
         'default_behavior': {
             'auto_detection': {'description': auto_detection},
             'limits': {'description': limits},
@@ -300,8 +300,9 @@ SNMP_TOPOLOGY_SETUP = setup_block(
 # (src/collectors/network-viewer.plugin/metadata.yaml) rather than claiming "no configuration".
 NETWORK_VIEWER_SETUP = setup_block(
     'netdata.conf',
-    'The Function is always available and needs no setup. The only setting is the APPS_LOOKUP cache used to enrich '
-    'connections with container and Kubernetes identity.',
+    'The Function is always available and needs no setup. The only setting is the size of the APPS_LOOKUP cache used '
+    'to warm container and Kubernetes identity lookups; raising it does not guarantee attribution, it only keeps more '
+    'resolved PIDs cached.',
     [('Privileged access to the socket tables',
       'The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard '
       'installations grant these. A container needs the host network namespace and the host `/proc` to see anything '
@@ -342,7 +343,8 @@ CATO_SETUP = setup_block(
     'go.d/cato_networks.conf',
     'Configure the Cato Networks collector with your account ID and API key. See the '
     '[Cato Networks collector](/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page '
-    'for all options.',
+    'for all options. `update_every` must be at least 60; `url` defaults to the Cato public GraphQL endpoint and '
+    'only needs setting for a different region or a proxy.',
     [('Cato API access',
       'A Cato Management Application API key with read access to the account you want to map.')],
 )
@@ -353,7 +355,8 @@ CATO_SETUP = setup_block(
 SYSLOG_SETUP = setup_block(
     'otel.yaml',
     'The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only '
-    'to change the Agent\'s OTLP endpoint or retention. The endpoint listens on loopback by default, which accepts '
+    'to change the Agent\'s OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). '
+    'The endpoint listens on loopback by default, which accepts '
     'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
     'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, '
     '`endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise '
@@ -374,14 +377,37 @@ SYSLOG_SETUP = setup_block(
 SNMP_TRAPS_SETUP = setup_block(
     'go.d/snmp_traps.conf',
     'Configure the trap listener: the address and port it binds, the SNMP versions and credentials it accepts, and '
-    'the enrichment options. Trap decoding itself needs no configuration — the vendor profiles ship with Netdata.',
+    'the enrichment options — see the '
+    '[SNMP Trap Listener](/src/go/plugin/go.d/collector/snmp_traps/integrations/snmp_trap_listener.md) page for '
+    'the full option reference. Trap decoding itself needs no configuration: the stock trap profiles ship with '
+    'Netdata.',
     [('Devices configured to send traps',
-      'The devices must be configured to send SNMP traps to the Netdata Agent acting as the site\'s trap receiver, '
-      'and the trap port must be reachable from them.'),
+      'The devices must be configured to send SNMP traps or INFORMs to the Netdata Agent acting as the site\'s '
+      'trap receiver, and the trap port must be reachable from them.'),
+     ('A usable Netdata log directory',
+      'Jobs that write direct journals store them under `${NETDATA_LOG_DIR}/traps/` — `/var/log/netdata` on '
+      'package installs, `/opt/netdata/var/log/netdata` on static ones. Job creation fails if that directory is '
+      'missing or unwritable. A job that only exports over OTLP can set `journal.enabled: false` instead.'),
      ('Permission to bind the trap port',
       'The default listener is UDP/162, a privileged port: binding it needs `CAP_NET_BIND_SERVICE` or root on Linux. '
       'Netdata packages grant this capability, so standard installations just work; hardened or custom deployments '
       'must grant it, or move the listener to an unprivileged port.')],
+    examples=[{
+        'name': 'Basic (SNMPv1/v2c)',
+        'folding': {'enabled': False},
+        'description': 'A single listener on the standard trap port, accepting any SNMPv1/v2c community. `listen` is '
+                       'required: without an endpoint the job binds nothing. Restrict the allowlist for production.',
+        'config': 'jobs:\n'
+                  '  - name: local\n'
+                  '    listen:\n'
+                  '      endpoints:\n'
+                  '        - protocol: udp\n'
+                  '          address: 0.0.0.0\n'
+                  '          port: 162\n'
+                  '    versions:\n'
+                  '      - v1\n'
+                  '      - v2c\n',
+    }],
 )
 
 TROUBLESHOOTING = {'problems': {'list': []}}
@@ -705,9 +731,10 @@ def build_topology_modules():
          ['network connections', 'sockets', 'processes', 'containers', 'kubernetes', 'dependencies', 'topology',
           'live', 'npm'],
          'Map application dependencies on a host. The network-viewer plugin reads the kernel\'s live socket table and '
-         'draws which local process talks to which, and which remote endpoints they reach. On Linux each process is '
-         'also attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns '
-         'it.',
+         'draws which local process talks to which, and which remote endpoints they reach. On Linux it also attributes '
+         'each process to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it, '
+         'as far as the APPS_LOOKUP data allows — attribution is best effort, and a process it cannot resolve is still '
+         'drawn.',
          'The network-viewer plugin builds the `topology:network-connections` view directly from the host\'s live '
          'socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container '
          'and Kubernetes attribution is Linux-only.',
@@ -716,7 +743,13 @@ def build_topology_modules():
          'A single response is capped at 64 MiB. On a host with enough connections to exceed that, the request is '
          'aborted rather than truncated — group the map (by process name or container) to bring it back under the cap.',
          'Sockets are enumerated when the Function is called, not continuously in the background, so the cost is paid '
-         'per request and scales with the number of open sockets and processes.'),
+         'per request and scales with the number of open sockets and processes.',
+         'The plugin needs privileged access to enumerate the sockets of every process; standard installations grant '
+         'it. In a container it additionally needs the host network namespace, the host `/proc`, `SYS_ADMIN` for '
+         'sibling containers, and `SYS_PTRACE` to attribute connections to processes. On macOS a non-privileged or '
+         'TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. The '
+         'Function itself requires a signed-in Netdata identity in the same Space with permission to view sensitive '
+         'data — it is not available anonymously.'),
         ('Netdata Streaming Topology', 'netdata', 'streaming', 'netdata.png',
          ['streaming', 'parents', 'children', 'topology', 'agents', 'npm'],
          'See how your Netdata Agents connect. The streaming topology renders the parent-child hierarchy of a Netdata '
@@ -724,7 +757,7 @@ def build_topology_modules():
          '— which Agents stream to which Parents.',
          'Netdata builds the `topology:streaming` view from the live streaming connections between Agents and Parents.',
          'Always available; reflects the live streaming connections of the deployment.',
-         STREAMING_SETUP, (), False, '', ''),
+         STREAMING_SETUP, (), False, '', '', ''),
         ('vSphere Topology', 'go.d.plugin', 'vsphere', icon_for('vmware'),
          ['vsphere', 'vmware', 'vcenter', 'virtualization', 'topology', 'npm'],
          'Map VMware vSphere infrastructure. The vSphere collector renders clusters, hosts, VMs, and datastores with '
@@ -732,8 +765,8 @@ def build_topology_modules():
          'network and port-group attachments.',
          'The vSphere collector reads the vCenter inventory and renders it as a `netdata.topology.v1` graph.',
          'Built from the configured vCenter inventory.',
-         VSPHERE_SETUP, (), True, '', ''),
-        ('Cato Networks Topology', 'go.d.plugin', 'cato_networks', FALLBACK_ICON,
+         VSPHERE_SETUP, (), True, '', '', ''),
+        ('Cato Networks Topology', 'go.d.plugin', 'cato_networks', 'network-wired.svg',
          ['cato', 'sase', 'sd-wan', 'topology', 'npm'],
          'Map a Cato Networks SASE fabric. The Cato collector renders sites, sockets, and gateways with their tunnel '
          'and '
@@ -742,7 +775,7 @@ def build_topology_modules():
          '`netdata.topology.v1` '
          'graph.',
          'Built from the configured Cato account.',
-         CATO_SETUP, (), True, '', ''),
+         CATO_SETUP, (), True, '', '', ''),
     ]
 
     modules = []
@@ -753,10 +786,11 @@ def build_topology_modules():
             keywords=keywords, ov=overview(metrics_desc, method_desc, auto, multi_instance=False),
             plugin_name='go.d.plugin', module_name='snmp_topology', setup=SNMP_TOPOLOGY_SETUP))
     for (name, plugin, module, icon, keywords, metrics_desc, method_desc, auto, setup, platforms, multi,
-         limits, perf) in other:
+         limits, perf, perms) in other:
         modules.append(make_entry(
             name=name, link='', categories=[CAT_TOPOLOGY], icon=icon,
-            keywords=keywords, ov=overview(metrics_desc, method_desc, auto, platforms, multi, limits, perf),
+            keywords=keywords,
+            ov=overview(metrics_desc, method_desc, auto, platforms, multi, limits, perf, perms),
             plugin_name=plugin, module_name=module, setup=setup))
     return modules
 

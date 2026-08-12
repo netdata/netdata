@@ -13,7 +13,7 @@ endmeta-->
 # Cato Networks Topology
 
 
-<img src="https://netdata.cloud/img/SNMP.png" width="150"/>
+<img src="https://netdata.cloud/img/network-wired.svg" width="150"/>
 
 
 Plugin: go.d.plugin
@@ -74,7 +74,7 @@ A Cato Management Application API key with read access to the account you want t
 
 #### Options
 
-Configure the Cato Networks collector with your account ID and API key. See the [Cato Networks collector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page for all options.
+Configure the Cato Networks collector with your account ID and API key. See the [Cato Networks collector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) page for all options. `update_every` must be at least 60; `url` defaults to the Cato public GraphQL endpoint and only needs setting for a different region or a proxy.
 
 
 #### via UI

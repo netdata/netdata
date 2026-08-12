@@ -67,7 +67,11 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Devices configured to send traps
 
-The devices must be configured to send SNMP traps to the Netdata Agent acting as the site's trap receiver, and the trap port must be reachable from them.
+The devices must be configured to send SNMP traps or INFORMs to the Netdata Agent acting as the site's trap receiver, and the trap port must be reachable from them.
+
+#### A usable Netdata log directory
+
+Jobs that write direct journals store them under `${NETDATA_LOG_DIR}/traps/` — `/var/log/netdata` on package installs, `/opt/netdata/var/log/netdata` on static ones. Job creation fails if that directory is missing or unwritable. A job that only exports over OTLP can set `journal.enabled: false` instead.
 
 #### Permission to bind the trap port
 
@@ -78,7 +82,7 @@ The default listener is UDP/162, a privileged port: binding it needs `CAP_NET_BI
 
 #### Options
 
-Configure the trap listener: the address and port it binds, the SNMP versions and credentials it accepts, and the enrichment options. Trap decoding itself needs no configuration — the vendor profiles ship with Netdata.
+Configure the trap listener: the address and port it binds, the SNMP versions and credentials it accepts, and the enrichment options — see the [SNMP Trap Listener](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp_traps/integrations/snmp_trap_listener.md) page for the full option reference. Trap decoding itself needs no configuration: the stock trap profiles ship with Netdata.
 
 
 #### via UI
@@ -117,8 +121,24 @@ sudo ./edit-config go.d/snmp_traps.conf
 ```
 
 ##### Examples
-There are no configuration examples.
 
+###### Basic (SNMPv1/v2c)
+
+A single listener on the standard trap port, accepting any SNMPv1/v2c community. `listen` is required: without an endpoint the job binds nothing. Restrict the allowlist for production.
+
+```yaml
+jobs:
+  - name: local
+    listen:
+      endpoints:
+        - protocol: udp
+          address: 0.0.0.0
+          port: 162
+    versions:
+      - v1
+      - v2c
+
+```
 
 
 ## Alerts

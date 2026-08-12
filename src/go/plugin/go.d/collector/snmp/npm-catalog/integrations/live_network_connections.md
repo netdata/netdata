@@ -23,7 +23,7 @@ Module: network-viewer
 
 ## Overview
 
-Map application dependencies on a host. The network-viewer plugin reads the kernel's live socket table and draws which local process talks to which, and which remote endpoints they reach. On Linux each process is also attributed to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it.
+Map application dependencies on a host. The network-viewer plugin reads the kernel's live socket table and draws which local process talks to which, and which remote endpoints they reach. On Linux it also attributes each process to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it, as far as the APPS_LOOKUP data allows — attribution is best effort, and a process it cannot resolve is still drawn.
 
 The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only.
 
@@ -35,6 +35,7 @@ This integration is only supported on the following platforms:
 
 This integration runs as a single instance per Netdata Agent.
 
+The plugin needs privileged access to enumerate the sockets of every process; standard installations grant it. In a container it additionally needs the host network namespace, the host `/proc`, `SYS_ADMIN` for sibling containers, and `SYS_PTRACE` to attribute connections to processes. On macOS a non-privileged or TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. The Function itself requires a signed-in Netdata identity in the same Space with permission to view sensitive data — it is not available anonymously.
 
 ### Default Behavior
 
@@ -64,7 +65,7 @@ The plugin needs its normal privileged permissions to enumerate the sockets of e
 
 #### Options
 
-The Function is always available and needs no setup. The only setting is the APPS_LOOKUP cache used to enrich connections with container and Kubernetes identity.
+The Function is always available and needs no setup. The only setting is the size of the APPS_LOOKUP cache used to warm container and Kubernetes identity lookups; raising it does not guarantee attribution, it only keeps more resolved PIDs cached.
 
 <details open><summary>Config options</summary>
 

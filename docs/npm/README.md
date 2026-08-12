@@ -42,6 +42,7 @@ Netdata ships profiles for hundreds of device and trap vendors. Each capability 
 
 - **Monitor your devices** → [Device Metrics](/docs/npm/device-metrics/README.md)
 - **See how they connect** → [Topologies](/docs/npm/topology/README.md)
+- **See how your software connects** → [Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md)
 - **Watch routing and licensing** → [BGP Monitoring](/docs/npm/bgp/README.md) and [Licensing Monitoring](/docs/npm/licensing/README.md)
 - **Analyze their traffic** → [Network Flows](/docs/npm/network-flows/README.md)
 - **Catch their events and logs** → [SNMP Traps](/docs/npm/snmp-traps/README.md) and [Syslog from Network Devices](/docs/npm/syslog/README.md)

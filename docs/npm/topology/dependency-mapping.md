@@ -100,6 +100,10 @@ The map is served by the **`topology:network-connections`** function — open it
 its own: the plugin is enabled by default and needs no setup. Its one setting, the size of the cache used to enrich
 connections with container identity, lives in `netdata.conf` under `[plugin:network-viewer]` and rarely needs changing.
 
+The function is not anonymous. It exposes process names, command lines, users, and every address the host talks to, so
+it requires a signed-in Netdata identity, membership of the same Space as the node, and permission to view sensitive
+data. If the map is missing while the node is otherwise healthy, check your access before suspecting the collector.
+
 Two levels of detail are available:
 
 - **Aggregated** (the default) — the dependency graph.

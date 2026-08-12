@@ -18,7 +18,8 @@ Two maps, in the same view:
 - **The network fabric** — your switches and routers and the links between them, read over SNMP from the devices themselves.
 - **Your applications** — which process, container, and Kubernetes workload talks to which, read from the host's kernel.
 
-Neither needs setup. There is nothing to instrument, no topology to declare, and no diagram to maintain.
+Neither needs topology-specific setup: once you are monitoring the devices and running Agents on the hosts, the maps
+build themselves. There is nothing to instrument, no topology to declare, and no diagram to maintain.
 
 ![Network topology overview](https://www.netdata.cloud/img/network/snmp-topology-overview.png)
 
@@ -67,7 +68,7 @@ The topology view brings in the rest of your infrastructure in the same form, so
 - **VMware vSphere** — datacenters, clusters, resource pools, hosts, VMs, datastores, and networks (`topology:vsphere`).
 - **Cato Networks** — Cato SASE sites, devices, POPs, and BGP peers (`topology:cato_networks`).
 
-The device fabric (`topology:snmp`), application dependencies, and streaming come up automatically; vSphere and Cato come from their own collectors, configured separately.
+The device fabric (`topology:snmp`) and application dependencies come up on their own once the devices and hosts are monitored. The streaming map appears once Agents are streaming to a Parent (configured in `stream.conf`); vSphere and Cato come from their own collectors, configured separately.
 
 ## Where to start
 
