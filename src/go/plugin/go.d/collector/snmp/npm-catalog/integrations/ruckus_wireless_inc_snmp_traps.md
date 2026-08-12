@@ -54,7 +54,7 @@ You can configure the **snmp_traps** collector in two ways:
 | Method                | Best for                                                                                 | How to                                                                                                                                 |
 |-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **snmp_traps**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/snmp.conf` and add a job.                                                                        |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/snmp_traps.conf` and add a job.                                                                        |
 
 :::important
 
@@ -65,16 +65,24 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-#### SNMP access
+#### Devices configured to send traps
 
-SNMP must be enabled on the device and reachable from the Netdata Agent acting as the site's SNMP hub.
+The devices must be configured to send SNMP traps or INFORMs to the Netdata Agent acting as the site's trap receiver, and the trap port must be reachable from them.
+
+#### A usable Netdata log directory
+
+Jobs that write direct journals store them under `${NETDATA_LOG_DIR}/traps/` — `/var/log/netdata` on package installs, `/opt/netdata/var/log/netdata` on static ones. Job creation fails if that directory is missing or unwritable. A job that only exports over OTLP can set `journal.enabled: false` instead.
+
+#### Permission to bind the trap port
+
+The default listener is UDP/162, a privileged port: binding it needs `CAP_NET_BIND_SERVICE` or root on Linux. Netdata packages grant this capability, so standard installations just work; hardened or custom deployments must grant it, or move the listener to an unprivileged port.
 
 
 ### Configuration
 
 #### Options
 
-Configure the SNMP collector with the device hostname and SNMP credentials. See the SNMP collector reference for all options.
+Configure the trap listener: the address and port it binds, the SNMP versions and credentials it accepts, and the enrichment options — see the [SNMP Trap Listener](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp_traps/integrations/snmp_trap_listener.md) page for the full option reference. Trap decoding itself needs no configuration: the stock trap profiles ship with Netdata.
 
 
 #### via UI
@@ -93,7 +101,7 @@ Configure the **snmp_traps** collector from the Netdata web interface:
 
 #### via File
 
-The configuration file name for this integration is `go.d/snmp.conf`.
+The configuration file name for this integration is `go.d/snmp_traps.conf`.
 
 The file format is YAML. Generally, the structure is:
 
@@ -109,12 +117,28 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/snmp.conf
+sudo ./edit-config go.d/snmp_traps.conf
 ```
 
 ##### Examples
-There are no configuration examples.
 
+###### Basic (SNMPv1/v2c)
+
+A single listener on the standard trap port, accepting any SNMPv1/v2c community. `listen` is required: without an endpoint the job binds nothing. Restrict the allowlist for production.
+
+```yaml
+jobs:
+  - name: local
+    listen:
+      endpoints:
+        - protocol: udp
+          address: 0.0.0.0
+          port: 162
+    versions:
+      - v1
+      - v2c
+
+```
 
 
 ## Alerts
