@@ -1,6 +1,6 @@
 ---
 name: pr-reviews
-description: Address pull-request comments and reviews iteratively until the PR is clean — fetch all comments with paranoid pagination, classify by author (AI bot vs human), verify each finding, address it, find similar patterns, reply per-thread, resolve threads, check CI before pushing, retrigger AI reviewers (cubic-dev-ai, copilot), and wait for new feedback. Use when the user says "address PR comments", "look at the reviews on PR N", "deal with the bot comments", "iterate on PR N until clean", or anything mentioning PR comments / reviews / cubic / copilot.
+description: Address pull-request comments and reviews iteratively until the PR is clean — fetch all comments with paranoid pagination, classify by author (AI bot vs human), verify each finding, address it, find similar patterns, reply per-thread, resolve threads, check CI before pushing, retrigger AI reviewers (cubic-dev-ai, coderabbitai), and wait for new feedback. Use when the user says "address PR comments", "look at the reviews on PR N", "deal with the bot comments", "iterate on PR N until clean", or anything mentioning PR comments / reviews / cubic / copilot.
 ---
 
 # PR review handler skill
@@ -21,7 +21,7 @@ something to surface as a chat message.
 Sources of findings, in priority order:
 
 1. **Human review comments** -- maintainers / devs / community.
-2. **AI bot review comments** -- cubic-dev-ai, copilot, etc.
+2. **AI bot review comments** -- cubic-dev-ai, coderabbitai, etc.
 3. **SonarCloud PR findings** -- new code-smell / vulnerability /
    security-hotspot issues introduced by this PR. SonarCloud does NOT
    post these as inline GitHub review-comments; only a QualityGate
@@ -82,12 +82,16 @@ These are non-negotiable. Skipping any of them will cost the user time.
    in `PR_AI_BOT_RE`, not just the ones you remember -- a reviewer you never
    re-trigger can never post its "no new findings" pass, so the loop's exit
    condition is unreachable for it.
-   - Copilot: re-add as a requested reviewer (`trigger-copilot.sh`).
    - cubic-dev-ai: post a new top-level comment mentioning it
      (`trigger-cubic.sh`).
    - coderabbitai: post a new top-level comment with a command
      (`trigger-coderabbit.sh`; `@coderabbitai review` is incremental,
      `full review` re-reads the whole PR).
+   - Copilot: NOT re-triggered. Its billing model means the org normally has
+     no credits for it, so a re-request produces nothing and only adds
+     latency. `trigger-copilot.sh` is kept for the case where credits exist,
+     but it is not part of the loop and Copilot never blocks the exit
+     condition. Address any comments it does post like any other AI bot.
 9. **Don't loop forever on silent bots.** Some assistants stop responding.
    That's fine. Use `wait-for-activity.sh` with the 30-min timeout and
    move on if nothing changes.
@@ -321,7 +325,7 @@ context is what gives an honest second look.
 
 Why this is non-negotiable:
 
-- AI reviewers (cubic-dev-ai, copilot, sonarqube) only surface their
+- AI reviewers (cubic-dev-ai, coderabbitai, sonarqube) only surface their
   top 3-7 findings. The full set of similar issues remains hidden.
 - Each fix can introduce its own new problems (a printf format-string
   fix that breaks color rendering, a portability fix that drops a
@@ -384,14 +388,13 @@ user, move on. Do not make drive-by fixes here.
 After pushing the fix commit(s):
 
 ```
-bash .agents/skills/pr-reviews/scripts/trigger-copilot.sh    <PR_NUMBER>
 bash .agents/skills/pr-reviews/scripts/trigger-cubic.sh      <PR_NUMBER>
 bash .agents/skills/pr-reviews/scripts/trigger-coderabbit.sh <PR_NUMBER>
 ```
 
-Copilot re-runs when re-requested as a reviewer. cubic and coderabbit
-re-review when mentioned in a new top-level PR comment. If you add a reviewer
-to `PR_AI_BOT_RE`, add its re-trigger here in the same change -- a classified
+cubic and coderabbit re-review when mentioned in a new top-level PR comment.
+Copilot is deliberately absent: see rule 8. If you add a reviewer to
+`PR_AI_BOT_RE`, add its re-trigger here in the same change -- a classified
 reviewer with no re-trigger is silently skipped every iteration.
 
 ### 6. Wait for new activity
@@ -419,8 +422,9 @@ Go back to step 1. Continue until ALL of these are true:
 - `fetch-sonar-findings.sh` reports zero open issues / hotspots that
   this PR introduced (or the remaining ones are explicitly marked FP /
   WontFix).
-- The AI bots have posted a "no new findings" or equivalent comment
-  after their most recent re-trigger.
+- The re-triggered AI bots (cubic-dev-ai, coderabbitai) have posted a
+  "no new findings" or equivalent comment after their most recent
+  re-trigger. Copilot is not re-triggered and never gates this.
 - `ci-status.sh` reports no failures caused by this PR (failures
   unrelated to the PR are noted, surfaced to the user, but not fixed).
 
@@ -485,7 +489,7 @@ behalf without explicit direction.
 |------------------------------|--------------------------------------------|--------------------------------------------------|
 | `cubic-dev-ai[bot]`          | Line-level code review                     | New PR comment mentioning `@cubic-dev-ai`        |
 | `coderabbitai[bot]`          | Line-level code review                     | `trigger-coderabbit.sh` (`@coderabbitai review`) |
-| `copilot[bot]`               | Line-level code review                     | Re-add as requested reviewer (`gh pr edit`)      |
+| `copilot[bot]`               | Line-level code review                     | Not re-triggered -- no credits (see rule 8)      |
 | `sonarqubecloud[bot]`        | Quality-gate status                        | Auto, on each scan run -- read its issue comment |
 | `github-actions[bot]`        | CI status / labels                         | Auto, on each workflow run                        |
 | `netdata-bot[bot]`           | Repo automation (labels, etc.)             | Auto                                              |
@@ -516,7 +520,7 @@ If a new AI reviewer appears in the project, classify it by adding to
 | A GraphQL helper script fails with `cursor_args[@]: unbound variable` | macOS Bash 3.2 plus `set -u` treats empty array expansion as unbound. Keep `gh api` argument arrays non-empty before expansion or branch the first-page GraphQL call. This affected both `fetch-all.sh` and `wait-for-activity.sh`. |
 | `reply-thread.sh` -> 404                               | Wrong comment id (use `databaseId` from `review-threads.json`, not the GraphQL node id). |
 | `resolve-thread.sh` -> "thread not found"              | Used REST id instead of GraphQL node id.                              |
-| `trigger-copilot.sh` succeeds but no new review        | Reviewer was already requested -- script removes-then-adds to force a fresh run. If still nothing, copilot may be quota-limited; wait. |
+| `trigger-copilot.sh` succeeds but no new review        | Expected. The org has no Copilot review credits, which is why it is not in the loop. Do not wait on it. |
 | `trigger-cubic.sh` succeeds but no new review          | cubic ignores comments without an explicit `@cubic-dev-ai` mention. The script always prepends it. |
 | `ci-status.sh` exits 2 (running)                       | CI hasn't finished. Push anyway -- waiting on CI between iterations destroys throughput. The next push triggers a fresh CI run on the new code, which is what matters. (See Step 4b.) |
 | Bot keeps re-flagging the same line after a fix push   | The bot didn't see the new commit because it wasn't re-triggered.    |

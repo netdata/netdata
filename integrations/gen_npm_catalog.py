@@ -359,7 +359,8 @@ CATO_SETUP = setup_block(
 SYSLOG_SETUP = setup_block(
     'otel.yaml',
     'The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only '
-    'to change the Agent\'s OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). '
+    'to change the Agent\'s OTLP endpoint or retention. A ready-to-use syslog pipeline is in '
+    '[Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). '
     'The endpoint listens on loopback by default, which accepts '
     'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
     'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, '

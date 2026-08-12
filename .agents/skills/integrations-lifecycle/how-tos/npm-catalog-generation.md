@@ -64,8 +64,8 @@ this, exiting 0 the whole way:
    the rest.
 3. It iterates the empty list and writes nothing back.
 
-The result is every committed generated integration page in the repository
-deleted, with a zero exit status. Always run `gen_integrations.py` first, and
+The result is that every committed generated integration page in the repository
+is deleted, with a zero exit status. Always run `gen_integrations.py` first, and
 check `git status` before staging.
 
 If `integrations.js` is stale rather than missing, the failure is quieter: the
