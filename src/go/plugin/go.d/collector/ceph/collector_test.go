@@ -4,6 +4,7 @@ package ceph
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -470,36 +471,39 @@ func TestCollector_PoolCapIsAllOrNone(t *testing.T) {
 	assert.Empty(t, c.seenPools)
 }
 
-func TestCollector_FullyFailedCycleReturnsNoMetrics(t *testing.T) {
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
-	defer srv.Close()
+func TestCollector_CycleWithoutDataReturnsNoMetrics(t *testing.T) {
+	tests := map[string]struct {
+		failAll bool
+	}{
+		"all components fail":          {failAll: true},
+		"components return no metrics": {},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+				if test.failAll {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				switch r.URL.Path {
+				case urlPathApiHealthMinimal:
+					_, _ = io.WriteString(w, `{}`)
+				case urlPathApiOsd:
+					w.Header().Set("X-Total-Count", "0")
+					_, _ = io.WriteString(w, `[]`)
+				case urlPathApiPool:
+					_, _ = io.WriteString(w, `[]`)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			})
+			defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-	assert.Nil(t, c.Collect(context.Background()))
-}
-
-func TestCollector_EmptyCycleReturnsNoSyntheticMetrics(t *testing.T) {
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case urlPathApiHealthMinimal:
-			_, _ = io.WriteString(w, `{}`)
-		case urlPathApiOsd:
-			w.Header().Set("X-Total-Count", "0")
-			_, _ = io.WriteString(w, `[]`)
-		case urlPathApiPool:
-			_, _ = io.WriteString(w, `[]`)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	})
-	defer srv.Close()
-
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-	assert.Nil(t, c.Collect(context.Background()))
+			c := newInitializedCollector(t, srv.URL, nil)
+			defer c.Cleanup(context.Background())
+			assert.Nil(t, c.Collect(context.Background()))
+		})
+	}
 }
 
 func TestCollector_PartialFailureRetainsDataAndReportsComponentStatus(t *testing.T) {
@@ -704,53 +708,44 @@ func TestCollector_OSDFallsBackToLegacyWholeListProtocol(t *testing.T) {
 	assert.Equal(t, []string{hdrAcceptVersionV11, hdrAcceptVersion}, accepts)
 }
 
-func TestCollector_OSDWholeListSupportsClustersLargerThanTenThousand(t *testing.T) {
-	const total = 10001
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiOsd {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		page := make([]apiOsdResponse, total)
-		for i := range page {
-			page[i].ID = int64(i)
-			page[i].UUID = fmt.Sprintf("uuid-%05d", i)
-		}
-		w.Header().Set("X-Total-Count", strconv.Itoa(total))
-		writeJSON(w, http.StatusOK, page)
-	})
-	defer srv.Close()
+func TestCollector_OSDWholeListCompleteness(t *testing.T) {
+	tests := map[string]struct {
+		advertised int
+		rows       int
+		wantError  string
+	}{
+		"supports more than ten thousand rows":  {advertised: 10001, rows: 10001},
+		"rejects inconsistent advertised total": {advertised: 101, rows: 50, wantError: "advertised 101"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != urlPathApiOsd {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				page := make([]apiOsdResponse, test.rows)
+				for i := range page {
+					page[i].ID = int64(i)
+					page[i].UUID = fmt.Sprintf("uuid-%05d", i)
+				}
+				w.Header().Set("X-Total-Count", strconv.Itoa(test.advertised))
+				writeJSON(w, http.StatusOK, page)
+			})
+			defer srv.Close()
 
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-	requireClusterIdentity(t, c)
-	osds, err := c.fetchAllOSDs(context.Background())
-	require.NoError(t, err)
-	assert.Len(t, osds, total)
-}
-
-func TestCollector_OSDWholeListRejectsInconsistentAdvertisedTotal(t *testing.T) {
-	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != urlPathApiOsd {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		w.Header().Set("X-Total-Count", "101")
-		page := make([]apiOsdResponse, 50)
-		for i := range page {
-			page[i].ID = int64(i)
-			page[i].UUID = fmt.Sprintf("uuid-%03d", i)
-		}
-		writeJSON(w, http.StatusOK, page)
-	})
-	defer srv.Close()
-
-	c := newInitializedCollector(t, srv.URL, nil)
-	defer c.Cleanup(context.Background())
-	requireClusterIdentity(t, c)
-	_, err := c.fetchAllOSDs(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "advertised 101")
+			c := newInitializedCollector(t, srv.URL, nil)
+			defer c.Cleanup(context.Background())
+			requireClusterIdentity(t, c)
+			osds, err := c.fetchAllOSDs(context.Background())
+			if test.wantError != "" {
+				require.ErrorContains(t, err, test.wantError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Len(t, osds, test.rows)
+		})
+	}
 }
 
 func TestValidateOSDsRejectsUnsafeDynamicIdentitiesAndCapacity(t *testing.T) {
@@ -762,34 +757,34 @@ func TestValidateOSDsRejectsUnsafeDynamicIdentitiesAndCapacity(t *testing.T) {
 	}
 	valid.OsdStats.Statfs.Total = 100
 	valid.OsdStats.Statfs.Available = 50
-	require.NoError(t, validateOSDs([]apiOsdResponse{valid}))
+	duplicateID := valid
+	duplicateID.UUID = "uuid-2"
+	duplicateUUID := valid
+	duplicateUUID.ID = 2
+	invalidCapacity := valid
+	invalidCapacity.OsdStats.Statfs.Available = 101
+	negativeRate := valid
+	negativeRate.Stats.OpR = -1
 
-	tests := map[string][]apiOsdResponse{
-		"empty UUID": {{ID: 1}},
-		"duplicate ID": {valid, func() apiOsdResponse {
-			other := valid
-			other.UUID = "uuid-2"
-			return other
-		}()},
-		"duplicate UUID": {valid, func() apiOsdResponse {
-			other := valid
-			other.ID = 2
-			return other
-		}()},
-		"available exceeds total": {func() apiOsdResponse {
-			other := valid
-			other.OsdStats.Statfs.Available = 101
-			return other
-		}()},
-		"negative rate": {func() apiOsdResponse {
-			other := valid
-			other.Stats.OpR = -1
-			return other
-		}()},
+	tests := map[string]struct {
+		osds     []apiOsdResponse
+		wantFail bool
+	}{
+		"valid":                   {osds: []apiOsdResponse{valid}},
+		"empty UUID":              {osds: []apiOsdResponse{{ID: 1}}, wantFail: true},
+		"duplicate ID":            {osds: []apiOsdResponse{valid, duplicateID}, wantFail: true},
+		"duplicate UUID":          {osds: []apiOsdResponse{valid, duplicateUUID}, wantFail: true},
+		"available exceeds total": {osds: []apiOsdResponse{invalidCapacity}, wantFail: true},
+		"negative rate":           {osds: []apiOsdResponse{negativeRate}, wantFail: true},
 	}
-	for name, osds := range tests {
+	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Error(t, validateOSDs(osds))
+			err := validateOSDs(test.osds)
+			if test.wantFail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
@@ -996,32 +991,50 @@ func TestValidatePoolChartKeysRejectsLegacyNormalizationCollision(t *testing.T) 
 }
 
 func TestPoolSampleRejectsInvalidUpstreamValues(t *testing.T) {
-	var valid apiPoolResponse
-	valid.PoolName = "pool-a"
-	valid.Stats.Objects.Latest = "0"
-	valid.Stats.AvailRaw.Latest = "0"
-	valid.Stats.BytesUsed.Latest = "0"
-	valid.Stats.PercentUsed.Latest = "0.5"
-	valid.Stats.Reads.Latest = "0"
-	valid.Stats.ReadBytes.Latest = "0"
-	valid.Stats.Writes.Latest = "0"
-	valid.Stats.WrittenBytes.Latest = "0"
-	valid.Stats.Objects.Latest = "9007199254740993"
-	sample, err := poolSample(valid)
-	require.NoError(t, err)
-	assert.EqualValues(t, 9007199254740993, sample.objects)
+	tests := map[string]struct {
+		objects     string
+		percentUsed string
+		wantObjects int64
+		wantError   string
+	}{
+		"preserves integers above float precision": {
+			objects:     "9007199254740993",
+			percentUsed: "0.5",
+			wantObjects: 9007199254740993,
+		},
+		"rejects utilization above one": {
+			objects:     "0",
+			percentUsed: "1.1",
+			wantError:   "0-1",
+		},
+		"rejects fractional object count": {
+			objects:     "1.5",
+			percentUsed: "0.5",
+			wantError:   "objects",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var pool apiPoolResponse
+			pool.PoolName = "pool-a"
+			pool.Stats.Objects.Latest = json.Number(test.objects)
+			pool.Stats.AvailRaw.Latest = "0"
+			pool.Stats.BytesUsed.Latest = "0"
+			pool.Stats.PercentUsed.Latest = json.Number(test.percentUsed)
+			pool.Stats.Reads.Latest = "0"
+			pool.Stats.ReadBytes.Latest = "0"
+			pool.Stats.Writes.Latest = "0"
+			pool.Stats.WrittenBytes.Latest = "0"
 
-	invalid := valid
-	invalid.Stats.PercentUsed.Latest = "1.1"
-	_, err = poolSample(invalid)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "0-1")
-
-	invalid = valid
-	invalid.Stats.Objects.Latest = "1.5"
-	_, err = poolSample(invalid)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "objects")
+			sample, err := poolSample(pool)
+			if test.wantError != "" {
+				require.ErrorContains(t, err, test.wantError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantObjects, sample.objects)
+		})
+	}
 }
 
 func TestCollector_PoolsRejectDuplicateSelectedNames(t *testing.T) {
@@ -1210,17 +1223,22 @@ func TestCollector_PublicChartIdentityContract(t *testing.T) {
 }
 
 func TestPGStatusCategoryAllTargetReleaseStates(t *testing.T) {
-	tests := map[string]string{
-		"active+clean":         "clean",
-		"active+premerge":      "working",
-		"active+wait":          "working",
-		"active+failed_repair": "warning",
-		"active+laggy":         "warning",
-		"active+new_state":     "unknown",
-		"unknown":              "unknown",
+	tests := map[string]struct {
+		status string
+		want   string
+	}{
+		"clean":         {status: "active+clean", want: "clean"},
+		"premerge":      {status: "active+premerge", want: "working"},
+		"wait":          {status: "active+wait", want: "working"},
+		"failed repair": {status: "active+failed_repair", want: "warning"},
+		"laggy":         {status: "active+laggy", want: "warning"},
+		"new state":     {status: "active+new_state", want: "unknown"},
+		"unknown":       {status: "unknown", want: "unknown"},
 	}
-	for status, want := range tests {
-		assert.Equal(t, want, pgStatusCategory(status), status)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, pgStatusCategory(test.status))
+		})
 	}
 }
 
