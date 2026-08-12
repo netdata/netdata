@@ -353,14 +353,14 @@ Metrics:
 
 ### Per osd
 
-These optional metrics refer to a selected OSD or the aggregate overflow entity. The overflow entity has capacity, I/O, IOPS, and arithmetic-mean latency charts, but no binary OSD status chart.
+These optional metrics refer to a selected OSD. When the selected inventory exceeds `max_osds`, the collector emits no per-OSD metrics rather than returning a partial set.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
 | fsid | Unique Ceph cluster identifier. |
-| osd_uuid | OSD UUID or the stable aggregate overflow name (normally `other`). |
+| osd_uuid | OSD UUID. |
 | osd_name | OSD name. |
 | device_class | OSD CRUSH device class. |
 
@@ -377,14 +377,14 @@ Metrics:
 
 ### Per pool
 
-These optional metrics refer to a selected pool or the aggregate overflow entity.
+These optional metrics refer to a selected pool. When the selected inventory exceeds `max_pools`, the collector emits no per-pool metrics rather than returning a partial set.
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
 | fsid | Unique Ceph cluster identifier. |
-| pool_name | Pool name, or the stable aggregate overflow name on the object-count context. |
+| pool_name | Pool name. |
 
 Metrics:
 

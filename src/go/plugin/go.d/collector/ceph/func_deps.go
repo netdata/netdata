@@ -356,7 +356,7 @@ func (d funcDepsAdapter) Daemons(ctx context.Context, limit int) (cephfunc.Daemo
 			if !ok {
 				return cephfunc.DaemonResult{}, errors.New("daemon inventory returned an invalid active state")
 			}
-			active = boolPtr(value)
+			active = new(value)
 		}
 		rows = append(rows, cephfunc.DaemonRow{
 			ID: id, Type: typ, Name: name, Host: anyString(daemon["hostname"]),
@@ -498,7 +498,7 @@ func exactInt64Field(values map[string]any, keys ...string) (*int64, error) {
 		if err != nil {
 			return nil, err
 		}
-		return int64Ptr(result), nil
+		return new(result), nil
 	}
 	return nil, nil
 }
@@ -547,6 +547,3 @@ func firstNonEmpty(values ...string) string {
 	}
 	return ""
 }
-
-func int64Ptr(value int64) *int64 { return &value }
-func boolPtr(value bool) *bool    { return &value }

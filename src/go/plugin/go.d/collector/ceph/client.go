@@ -163,7 +163,7 @@ func (c *cephClient) doJSON(ctx context.Context, operation, method, endpoint, ac
 
 	var retriedAuth, retriedRedirect, retriedTransport bool
 
-	for attempts := 0; attempts < 4; attempts++ {
+	for range 4 {
 		base, err := c.ensureActiveBase(ctx)
 		if err != nil {
 			return nil, err
@@ -364,8 +364,8 @@ func redirectedDashboardBase(current *url.URL, location, probePath string) (*url
 
 	redirectPath := strings.TrimSuffix(next.Path, "/")
 	probe := strings.TrimSuffix(probePath, "/")
-	if strings.HasSuffix(redirectPath, probe) {
-		redirectPath = strings.TrimSuffix(strings.TrimSuffix(redirectPath, probe), "/")
+	if before, ok := strings.CutSuffix(redirectPath, probe); ok {
+		redirectPath = strings.TrimSuffix(before, "/")
 	}
 	if redirectPath == "." || redirectPath == "/" {
 		redirectPath = ""

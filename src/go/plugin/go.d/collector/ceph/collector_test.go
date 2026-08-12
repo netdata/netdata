@@ -392,7 +392,7 @@ func TestCollector_OSDWholeListCapIsAllOrNone(t *testing.T) {
 		w.Header().Set("X-Total-Count", "101")
 		count := 101
 		page := make([]apiOsdResponse, 0, count)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			id := offset + i
 			var osd apiOsdResponse
 			osd.ID = int64(id)
