@@ -1,5 +1,7 @@
 use super::*;
-use crate::ledger::rpc::traces::fixtures::{install_wal, make_registries, otlp_req, otlp_req_svc};
+use crate::ledger::rpc::traces::fixtures::{
+    install_sfst, install_wal, make_registries, otlp_req, otlp_req_svc,
+};
 use bridge::function::ProgressState;
 use file_lifecycle::registry::TenantRegistries;
 use serde_json::json;
@@ -118,6 +120,94 @@ async fn handler_with_fixture_wal() -> OtelTracesHandler {
 }
 
 #[tokio::test]
+async fn trace_coverage_declares_the_full_range_for_absent_bounds() {
+    let h = handler_with_fixture_wal().await;
+    let resp = call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+        .await
+        .unwrap();
+    let v = serde_json::to_value(&resp).unwrap();
+    assert_eq!(v["coverage"], json!({"after": 0, "before": 4_294_967_295_u32}));
+}
+
+#[tokio::test]
+async fn bounded_trace_fetch_echoes_coverage_and_assembles_identically() {
+    let h = handler_with_fixture_wal().await;
+    let unbounded = serde_json::to_value(
+        call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    let bounded = serde_json::to_value(
+        call_on(
+            &h,
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 100}}),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(bounded["coverage"], json!({"after": 0, "before": 100}));
+    assert_eq!(bounded["spans"], unbounded["spans"]);
+    assert_eq!(bounded["status"], json!({"complete": true}));
+}
+
+#[tokio::test]
+async fn bounded_trace_fetch_prunes_non_overlapping_sealed_files() {
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, 1_000_000_000)],
+    )
+    .await;
+    // Tracked but never written: probing it fails a source, so partial
+    // status is the observable for "this file was captured".
+    install_sfst(&registries, "default", 2, 500_000, 500_100).await;
+    let h = make_handler_over(registries);
+
+    // Bounds not overlapping the sealed summary: pruned at capture,
+    // never probed — the assembly stays complete.
+    let outside = serde_json::to_value(
+        call_on(
+            &h,
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 100}}),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(outside["status"], json!({"complete": true}));
+
+    // Absent bounds capture the full range: the unreadable sealed file
+    // is probed and surfaces as a source failure.
+    let full = serde_json::to_value(
+        call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(full["status"], json!({"partial": ["source_failure"]}));
+}
+
+#[tokio::test]
+async fn trace_bounds_width_at_the_cap_is_accepted() {
+    let h = handler_with_fixture_wal().await;
+    let v = serde_json::to_value(
+        call_on(
+            &h,
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 172_800}}),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["coverage"], json!({"after": 0, "before": 172_800}));
+    assert_eq!(v["items"]["returned"], 3);
+}
+
+#[tokio::test]
 async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
     let h = handler_with_fixture_wal().await;
     let resp = call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
@@ -126,6 +216,7 @@ async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
     let v = serde_json::to_value(&resp).unwrap();
 
     assert_eq!(v["trace_id"], FIXTURE_TRACE_ID);
+    assert_eq!(v["coverage"], json!({"after": 0, "before": 4_294_967_295_u32}));
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"]["returned"], 3);
     // Span 1 (unset parent) is the root; spans 2 and 3 parent to it.
@@ -209,6 +300,23 @@ async fn malformed_trace_selectors_are_clean_client_errors() {
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 0}}),
             "zero span cap",
+        ),
+        // Assembly bounds: both-or-neither, ordered, width-capped.
+        (
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100}}),
+            "both 'after' and 'before'",
+        ),
+        (
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 200, "before": 100}}),
+            "after 200 >= before 100",
+        ),
+        (
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100, "before": 100}}),
+            "after 100 >= before 100",
+        ),
+        (
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 172_901}}),
+            "exceeds the maximum 172800",
         ),
     ] {
         let err = call(body.clone()).await.expect_err("must be a client error");

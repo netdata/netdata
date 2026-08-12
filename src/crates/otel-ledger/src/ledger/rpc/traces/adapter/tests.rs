@@ -80,7 +80,7 @@ fn trace_result_shape_is_pinned() {
             link_attributes: vec![],
         },
     };
-    let v = serde_json::to_value(to_trace_result(&trace_id, data)).unwrap();
+    let v = serde_json::to_value(to_trace_result(&trace_id, data, CoverageWire { after: 0, before: u32::MAX })).unwrap();
 
     assert_eq!(v["version"], 1);
     assert_eq!(v["trace_id"], "11111111111111111111111111111111");
@@ -359,6 +359,10 @@ fn search_data(traces: Vec<sfsq::traces::TraceSummary>) -> SearchData {
 }
 
 const WIN: (u32, u32) = (9_000, 10_000);
+const WIN_COVERAGE: CoverageWire = CoverageWire {
+    after: 9_000,
+    before: 10_000,
+};
 
 #[test]
 fn full_page_emits_a_cursor_and_short_page_does_not() {
@@ -367,6 +371,7 @@ fn full_page_emits_a_cursor_and_short_page_does_not() {
         2,
         None,
         WIN,
+        WIN_COVERAGE,
     );
     assert_eq!(r.items.returned, 2);
     assert_eq!(
@@ -374,7 +379,7 @@ fn full_page_emits_a_cursor_and_short_page_does_not() {
         format!("t2:9000:10000:200:{}:2", "02".repeat(16))
     );
 
-    let r = to_search_result(search_data(vec![summary(1, 300)]), 2, None, WIN);
+    let r = to_search_result(search_data(vec![summary(1, 300)]), 2, None, WIN, WIN_COVERAGE);
     assert!(r.anchor.is_none(), "a short page ends the walk");
 }
 
@@ -389,7 +394,7 @@ fn anchor_page_drops_everything_at_or_above_the_after_key() {
         summary(3, 200),  // rank tie, id above the key → fresh
         summary(4, 100),
     ]);
-    let r = to_search_result(data, 2, Some(&c), WIN);
+    let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
     let ids: Vec<&str> = r.traces.iter().map(|t| t.trace_id.as_str()).collect();
     assert_eq!(ids, vec!["03".repeat(16).as_str(), "04".repeat(16).as_str()]);
     // served accumulates: 2 before + 2 this page.
@@ -412,7 +417,7 @@ fn straddling_trace_does_not_duplicate_below_the_boundary() {
         summary(0x1A, 50),            // U: the key
         summary(0x1B, 30),            // W: genuinely fresh
     ]);
-    let r = to_search_result(data, 2, Some(&c), WIN);
+    let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
     let ids: Vec<&str> = r.traces.iter().map(|t| t.trace_id.as_str()).collect();
     assert_eq!(ids, vec!["1b".repeat(16).as_str()], "only W is fresh");
 }
@@ -423,7 +428,7 @@ fn a_walk_at_the_served_cap_emits_no_further_cursor() {
     // is full but carries no continuation.
     let c = cursor(WIN.0, WIN.1, 500, 0x01, 9_999);
     let data = search_data(vec![summary(0x02, 400), summary(0x03, 300), summary(0x04, 200)]);
-    let r = to_search_result(data, 2, Some(&c), WIN);
+    let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
     assert_eq!(r.items.returned, 2, "the page itself still fills");
     assert!(
         r.anchor.is_none(),
@@ -443,7 +448,7 @@ fn partial_full_page_ends_the_walk_with_the_status_saying_why() {
         status: b.finish(),
         field_kinds: FieldKinds::default(),
     };
-    let r = to_search_result(data, 2, None, WIN);
+    let r = to_search_result(data, 2, None, WIN, WIN_COVERAGE);
     assert_eq!(r.items.returned, 2, "the page itself is full");
     assert!(r.anchor.is_none());
     assert_eq!(
@@ -461,7 +466,7 @@ fn work_ceiling_partial_reaches_the_wire() {
         status: b.finish(),
         field_kinds: FieldKinds::default(),
     };
-    let r = to_search_result(data, 20, None, WIN);
+    let r = to_search_result(data, 20, None, WIN, WIN_COVERAGE);
     assert_eq!(
         serde_json::to_value(&r.status).unwrap(),
         json!({"partial": ["work_ceiling"]})
@@ -480,7 +485,7 @@ fn empty_trace_maps_to_complete_zero_span_result() {
         status: QueryStatus::Complete,
         field_kinds: FieldKinds::default(),
     };
-    let v = serde_json::to_value(to_trace_result(&trace_id, data)).unwrap();
+    let v = serde_json::to_value(to_trace_result(&trace_id, data, CoverageWire { after: 0, before: u32::MAX })).unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"]["returned"], 0);
     assert_eq!(v["summary_root"], serde_json::Value::Null);

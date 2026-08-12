@@ -78,9 +78,10 @@ pub struct OtelTracesRequest {
     pub slowest: Option<serde_json::Value>,
     /// Query window, unix seconds. Consumed by the WINDOWED data modes
     /// (search, both enumeration modes, overview, slowest); the
-    /// `trace` mode deliberately ignores it — a trace is an exact
-    /// object whose spans straddle files, so by-id always looks at the
-    /// full range (see the handler).
+    /// `trace` mode ignores THESE envelope fields — its own optional
+    /// bounds live inside the `trace` sub-object
+    /// ([`TraceParams::after`]/[`TraceParams::before`]); absent there,
+    /// by-id looks at the full range (see the handler).
     #[serde(default)]
     pub after: u32,
     #[serde(default)]
@@ -314,8 +315,8 @@ pub struct AttributeValuesParams {
 }
 
 /// The `trace` mode's typed parameters. Unknown fields are rejected —
-/// a misspelled parameter on a two-field object is a client error, not
-/// a silent ignore.
+/// a misspelled parameter on a small object is a client error, not a
+/// silent ignore.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TraceParams {
@@ -325,6 +326,18 @@ pub struct TraceParams {
     /// Span cap override (engine default 65,536; zero rejected).
     #[serde(default)]
     pub span_cap: Option<usize>,
+    /// Optional assembly bounds, unix seconds: only files whose
+    /// summary range overlaps `[after, before)` are probed for the
+    /// trace's spans. Both-or-neither; `after < before`; width capped
+    /// at [`MAX_TRACE_BOUNDS_WIDTH_S`](super::adapter) — violations
+    /// are client errors (a clamp would ambiguously drop one end).
+    /// Absent = full retention, the only way to request it (an
+    /// explicit full range exceeds the cap). The response's `coverage`
+    /// declares the range actually used either way.
+    #[serde(default)]
+    pub after: Option<u32>,
+    #[serde(default)]
+    pub before: Option<u32>,
 }
 
 // ── Response ────────────────────────────────────────────────────────
@@ -513,6 +526,12 @@ pub struct SearchResult {
     /// Query-level completeness — a work-ceiling breach or a lost
     /// source shows up here, never silently.
     pub status: StatusWire,
+    /// The completion-assembly bounds, unix seconds: matched traces
+    /// assembled their spans from files overlapping this range (the
+    /// match window widened by a per-side slack). Spans beyond it are
+    /// UNKNOWN, not absent — per-row numbers are canonical WITHIN this
+    /// declared range.
+    pub completion_coverage: CoverageWire,
     pub items: SearchItems,
     pub traces: Vec<TraceSummaryWire>,
     /// Schema kinds for the fields the attached `matched_spans` expose.
@@ -522,6 +541,15 @@ pub struct SearchResult {
     /// the `anchor` param for the following page; treat it as opaque.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
+}
+
+/// A declared coverage range, unix seconds, always present — full
+/// retention is the literal `{after: 0, before: 4294967295}`, never a
+/// null a consumer must default-interpret.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct CoverageWire {
+    pub after: u32,
+    pub before: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -581,6 +609,14 @@ pub struct TraceResult {
     pub version: u32,
     /// The queried id, echoed in canonical lowercase hex.
     pub trace_id: String,
+    /// The assembly bounds actually used, unix seconds: only files
+    /// overlapping this range were probed for spans. Absent request
+    /// bounds declare the literal full range `{after: 0, before:
+    /// 4294967295}`. Spans beyond the declared range are UNKNOWN, not
+    /// absent — the honesty is the declaration (file granularity can
+    /// only extend real coverage past the declared range, never
+    /// shrink it).
+    pub coverage: CoverageWire,
     /// Query-level completeness. An absent id yields a COMPLETE empty
     /// trace (zero spans) — "nothing stored" is an answer, not an error.
     pub status: StatusWire,

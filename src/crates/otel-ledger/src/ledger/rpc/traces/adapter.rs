@@ -14,10 +14,10 @@ use sfsq::traces::{
 };
 
 use super::wire::{
-    AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, EventWire,
-    FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire, OverviewResult,
-    OverviewTotals, SearchItems, SearchResult, SlowestResult, SlowestTraceWire, SpanWire,
-    StatusWire, TraceItems, TraceResult, TraceSummaryWire,
+    AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
+    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire,
+    OverviewResult, OverviewTotals, SearchItems, SearchResult, SlowestResult, SlowestTraceWire,
+    SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -38,14 +38,60 @@ pub(crate) fn parse_trace_id(s: &str) -> Result<sfst::TraceId, String> {
     Ok(sfst::TraceId::from(bytes))
 }
 
+/// The by-id assembly-bounds width cap, seconds (48h): a backstop for
+/// callers not following the UI's `anchor ± clamp(W, 1h, 24h)` formula
+/// (whose total width maxes at exactly 48h). A wider request is a
+/// client error, never a clamp — the wire cannot know which end the
+/// caller values. Full retention is requested by OMITTING bounds.
+pub(crate) const MAX_TRACE_BOUNDS_WIDTH_S: u32 = 172_800;
+
+/// Validate the `trace` sub-object's optional assembly bounds into a
+/// capture range. Both-or-neither; `after < before`; width capped —
+/// all violations are client errors (the structural-error precedent of
+/// the envelope window and every other cap). `None` = full retention.
+pub(crate) fn validate_trace_bounds(
+    after: Option<u32>,
+    before: Option<u32>,
+) -> Result<Option<std::ops::Range<u32>>, String> {
+    let (after, before) = match (after, before) {
+        (None, None) => return Ok(None),
+        (Some(a), Some(b)) => (a, b),
+        _ => {
+            return Err(
+                "trace bounds require both 'after' and 'before' (or neither for full retention)"
+                    .to_string(),
+            );
+        }
+    };
+    if after >= before {
+        return Err(format!(
+            "invalid trace bounds: after {after} >= before {before}"
+        ));
+    }
+    if before - after > MAX_TRACE_BOUNDS_WIDTH_S {
+        return Err(format!(
+            "trace bounds width {} exceeds the maximum {MAX_TRACE_BOUNDS_WIDTH_S} seconds (48h); \
+             omit the bounds to request full retention",
+            before - after
+        ));
+    }
+    Ok(Some(after..before))
+}
+
 /// Shape one assembled trace into the wire result. `trace_id` is echoed
 /// back in canonical (lowercase) hex regardless of the request's casing.
-pub(crate) fn to_trace_result(trace_id: &sfst::TraceId, data: TraceData) -> TraceResult {
+/// `coverage` is the capture range assembly actually used.
+pub(crate) fn to_trace_result(
+    trace_id: &sfst::TraceId,
+    data: TraceData,
+    coverage: CoverageWire,
+) -> TraceResult {
     let t = data.trace;
     let summary_root = t.summary_root();
     TraceResult {
         version: 1,
         trace_id: trace_id.to_string(),
+        coverage,
         status: StatusWire::from(&data.status),
         items: TraceItems {
             returned: t.spans.len(),
@@ -576,6 +622,7 @@ pub(crate) fn to_search_result(
     last: usize,
     incoming: Option<&SearchCursor>,
     frozen: (u32, u32),
+    completion_coverage: CoverageWire,
 ) -> SearchResult {
     let mut traces = data.traces;
     if let Some(c) = incoming {
@@ -606,6 +653,7 @@ pub(crate) fn to_search_result(
     SearchResult {
         version: 1,
         status: StatusWire::from(&data.status),
+        completion_coverage,
         items: SearchItems {
             returned: traces.len(),
             max_to_return: last,

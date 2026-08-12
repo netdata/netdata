@@ -37,9 +37,12 @@ use super::adapter::{
     ResolvedWindow, build_predicate, parse_cursor, parse_enumeration_key, parse_owner_word,
     parse_trace_id, resolve_window, to_attribute_values_result, to_attributes_result,
     to_overview_result, to_search_result, to_slowest_result, to_trace_result,
+    validate_trace_bounds,
 };
 use super::sources::TracesSourceSupplier;
-use super::wire::{InfoResponse, OtelTracesRequest, OtelTracesResponse, RequestMode, SearchResult};
+use super::wire::{
+    CoverageWire, InfoResponse, OtelTracesRequest, OtelTracesResponse, RequestMode, SearchResult,
+};
 
 /// Shorthand for the handler-level error every failure path maps to.
 fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
@@ -65,12 +68,15 @@ impl OtelTracesHandler {
     /// The `trace` mode: exact single-trace fetch via the engine's
     /// cross-source `trace_by_id`.
     ///
-    /// Deliberately IGNORES the request window: a trace is an exact
-    /// object whose spans straddle files (WAL rotation is
-    /// content-agnostic), so by-id captures the FULL range —
-    /// window-pruning would silently drop spans, exactly the degradation
-    /// the traces engine forbids. An absent id is a Complete empty
-    /// trace, not an error.
+    /// Ignores the ENVELOPE window; assembly bounds live in the `trace`
+    /// sub-object. Absent bounds capture the FULL range — a trace is an
+    /// exact object whose spans straddle files (WAL rotation is
+    /// content-agnostic), and only the caller knows how much slack its
+    /// anchor deserves. Present bounds prune the capture file-granularly
+    /// (a file overlapping the bounds is probed whole). Either way the
+    /// response DECLARES the range used (`coverage`) — spans beyond it
+    /// are unknown, never silently dropped: the declaration is the
+    /// honesty. An absent id is a Complete empty trace, not an error.
     async fn trace(
         &self,
         ctx: &FunctionCallContext,
@@ -86,13 +92,21 @@ impl OtelTracesHandler {
             query = query.span_cap(cap);
         }
 
+        let bounds = validate_trace_bounds(params.after, params.before)
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let capture_range = bounds.unwrap_or(0..u32::MAX);
+        let coverage = CoverageWire {
+            after: capture_range.start,
+            before: capture_range.end,
+        };
+
         let tenant = TenantId::resolve_query(req.tenant.as_deref());
         // A cancelled capture returns NO copies; the empty default flows
         // into the engine, which polls the same token up front and
         // reports the Cancelled partial — one consistent cancel path.
         let sources = self
             .supplier
-            .capture(&tenant, 0..u32::MAX, 1, &ctx.cancellation)
+            .capture(&tenant, capture_range, 1, &ctx.cancellation)
             .await
             .pop()
             .unwrap_or_default();
@@ -129,7 +143,7 @@ impl OtelTracesHandler {
         };
 
         Ok(OtelTracesResponse::Trace(Box::new(to_trace_result(
-            &trace_id, data,
+            &trace_id, data, coverage,
         ))))
     }
 
@@ -232,6 +246,10 @@ impl OtelTracesHandler {
             req.last,
             cursor.as_ref(),
             (window.capture.start, window.capture.end),
+            CoverageWire {
+                after: window.capture.start,
+                before: window.capture.end,
+            },
         );
         Ok(OtelTracesResponse::Search(Box::new(result)))
     }
