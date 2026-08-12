@@ -119,6 +119,46 @@ func TestFuncDepsHealthBoundsNormalizedRows(t *testing.T) {
 	assert.Len(t, result.Rows, 2)
 }
 
+func TestFuncDepsHealthReturnsBoundedSubsetAboveInventoryCeiling(t *testing.T) {
+	warnDetails := make([]map[string]any, cephfunc.MaxInventoryLimit)
+	for i := range warnDetails {
+		warnDetails[i] = map[string]any{"message": "warning detail"}
+	}
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != urlPathApiHealthMinimal {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"health": map[string]any{"checks": []map[string]any{
+				{
+					"type":     "A_WARN",
+					"severity": "HEALTH_WARN",
+					"summary":  map[string]any{"message": "warning", "count": len(warnDetails)},
+					"detail":   warnDetails,
+				},
+				{
+					"type":     "Z_ERR",
+					"severity": "HEALTH_ERR",
+					"summary":  map[string]any{"message": "error", "count": 1},
+					"detail":   []map[string]any{{"message": "error detail"}},
+				},
+			}},
+		})
+	})
+	defer srv.Close()
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+
+	result, err := (funcDepsAdapter{
+		collector: c,
+	}).Health(context.Background(), cephfunc.DefaultInventoryLimit)
+	require.NoError(t, err)
+	assert.Equal(t, cephfunc.MaxInventoryLimit+1, result.Total)
+	require.Len(t, result.Rows, cephfunc.DefaultInventoryLimit+1)
+	assert.Equal(t, "Z_ERR", result.Rows[0].Code)
+}
+
 func TestFuncDepsHealthPrioritizesErrorsBeforeBound(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != urlPathApiHealthMinimal {

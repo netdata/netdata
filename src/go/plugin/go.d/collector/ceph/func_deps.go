@@ -18,10 +18,9 @@ import (
 )
 
 const (
-	urlPathAPICrushRule   = "/api/crush_rule"
-	urlPathAPIDaemon      = "/api/daemon"
-	hdrAcceptVersionV2    = "application/vnd.ceph.api.v2.0+json"
-	maxHealthFunctionRows = cephfunc.MaxInventoryLimit
+	urlPathAPICrushRule = "/api/crush_rule"
+	urlPathAPIDaemon    = "/api/daemon"
+	hdrAcceptVersionV2  = "application/vnd.ceph.api.v2.0+json"
 )
 
 type funcDepsAdapter struct {
@@ -111,15 +110,12 @@ func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.Health
 		return checks[i].Type < checks[j].Type
 	})
 	result := cephfunc.HealthResult{}
-	target := min(limit+1, maxHealthFunctionRows)
+	target := limit + 1
 	for _, check := range checks {
 		code := check.Type
 		severity := strings.ToUpper(check.Severity)
 		if len(check.Detail) == 0 {
 			result.Total++
-			if result.Total > maxHealthFunctionRows {
-				return cephfunc.HealthResult{}, errors.New("health detail exceeds the internal row ceiling")
-			}
 			if len(result.Rows) < target {
 				result.Rows = append(result.Rows, cephfunc.HealthRow{
 					ID:       code + "#00000000",
@@ -134,9 +130,6 @@ func (d funcDepsAdapter) Health(ctx context.Context, limit int) (cephfunc.Health
 		}
 		for index, detail := range check.Detail {
 			result.Total++
-			if result.Total > maxHealthFunctionRows {
-				return cephfunc.HealthResult{}, errors.New("health detail exceeds the internal row ceiling")
-			}
 			if len(result.Rows) < target {
 				result.Rows = append(result.Rows, cephfunc.HealthRow{
 					ID:       fmt.Sprintf("%s#%08d", code, index),

@@ -403,7 +403,7 @@ Use it for MON quorum symptoms, slow operations, scrub/damage errors, PG warning
 |:-------|:------------|
 | Name | `Ceph:health` |
 | Require Cloud | no |
-| Performance | Dashboard builds every permission-dependent `/api/health/minimal` section per invocation; it cannot return only health checks, and iSCSI read scope can trigger synchronous gateway pings. The minimal route carries the same detailed checks as the full route without its larger payload. The collector validates an internal hard ceiling, retains 500 most-severe rows plus one look-ahead row, and truncates long summary/detail cells. Use a narrow Dashboard role to avoid unrelated sections when appropriate. |
+| Performance | Dashboard builds every permission-dependent `/api/health/minimal` section per invocation; it cannot return only health checks, and iSCSI read scope can trigger synchronous gateway pings. The minimal route carries the same detailed checks as the full route without its larger payload. The collector retains 500 most-severe rows plus one look-ahead row from the decoded checks and truncates long summary/detail cells. Use a narrow Dashboard role to avoid unrelated sections when appropriate. |
 | Security | Health detail can expose daemon, host, pool, and client identifiers. Restrict Function access to operators. |
 | Availability | Requires Dashboard read permission for health-related scopes. |
 
