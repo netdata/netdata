@@ -50,6 +50,20 @@ MODE_BY_TYPE = {
     "service_discovery": "service_discovery",
 }
 
+MARKDOWN_SPECIAL_CHARACTERS = "*_[]<>#`~"
+
+COMMONMARK_ADVERSARIAL_DESCRIPTIONS = {
+    "intraword asterisk emphasis": (
+        "Monitor service a*critical latency*event behavior across reliable production systems safely."
+    ),
+    "Unicode-adjacent asterisk emphasis": (
+        "Monitor service é*critical latency*é behavior across reliable production systems safely."
+    ),
+    "strong emphasis": "Monitor **critical latency** behavior across reliable production systems and services safely.",
+    "inline code": "Monitor `critical latency` behavior across reliable production systems and services safely.",
+    "inline link": "Monitor [critical latency](latency) behavior across reliable production systems safely.",
+}
+
 SCHEMA_REF_BY_TYPE = {
     "agent_notification": "./agent_notification.json#",
     "authentication": "./authentication.json#",
@@ -105,6 +119,15 @@ INVALID_EXPLICIT_DESCRIPTIONS.update(
     {
         f"control U+{codepoint:04X}": "x" * 25 + chr(codepoint) + "x" * 25
         for codepoint in (*range(0x20), *range(0x7F, 0xA0))
+    }
+)
+INVALID_EXPLICIT_DESCRIPTIONS.update(COMMONMARK_ADVERSARIAL_DESCRIPTIONS)
+INVALID_EXPLICIT_DESCRIPTIONS.update(
+    {
+        f"Markdown special {character!r}": (
+            f"Monitor service health with literal {character} metadata across reliable production systems safely."
+        )
+        for character in MARKDOWN_SPECIAL_CHARACTERS
     }
 )
 
@@ -502,6 +525,24 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
         for label, value in INVALID_EXPLICIT_DESCRIPTIONS.items():
             self._assert_contract(value, False, label)
 
+    def test_commonmark_adversarial_values_render_as_markup_when_parser_is_available(self):
+        try:
+            from markdown_it import MarkdownIt
+
+            render = MarkdownIt("commonmark").render
+        except ImportError:
+            try:
+                import markdown
+
+                render = markdown.markdown
+            except ImportError:
+                self.skipTest("No CommonMark-compatible parser is installed")
+
+        for label, value in COMMONMARK_ADVERSARIAL_DESCRIPTIONS.items():
+            with self.subTest(value=label):
+                rendered = render(value)
+                self.assertRegex(rendered, r"<(?:a|code|em|strong)\b")
+
     def test_seeded_unicode_regex_properties_match_shared_schema(self):
         validator = make_validator("./shared.json#/$defs/instance")
         base = {
@@ -542,22 +583,21 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
                 and all(tail_char in scheme_allowed for tail_char in scheme[index:])
                 for index, char in enumerate(scheme)
             )
-            expected = not has_ascii_scheme_suffix
+            expected = not has_ascii_scheme_suffix and "_" not in scheme
             self.assertEqual(accepts(value), expected, value)
             if iteration < 16:
                 self._assert_contract(value, expected, f"seeded URL syntax {iteration}")
 
-            boundary_chars = ascii_word.replace("_", "") + non_ascii + punctuation
+            boundary_chars = ascii_word + non_ascii + punctuation
             left = rng.choice(boundary_chars)
             right = rng.choice(boundary_chars)
-            marker = rng.choice("*_")
+            marker = rng.choice(MARKDOWN_SPECIAL_CHARACTERS)
             value = (
-                f"Monitor service behavior around {left}{marker}word{marker}{right} boundaries with reliable production health metrics."
+                f"Monitor service behavior around {left}{marker}{right} metadata with reliable production health metrics."
             )
-            expected = left in ascii_word or right in ascii_word
-            self.assertEqual(accepts(value), expected, value)
+            self.assertFalse(accepts(value), value)
             if iteration < 16:
-                self._assert_contract(value, expected, f"seeded Markdown boundary {iteration}")
+                self._assert_contract(value, False, f"seeded Markdown special character {iteration}")
 
             separator = rng.choice(("\u2028", "\u2029"))
             value = f"Monitor service behavior across production systems.{separator}Track reliable health and performance."

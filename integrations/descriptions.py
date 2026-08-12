@@ -34,11 +34,7 @@ _ASCII_URL_PREFIX_PATTERN = (
 _BARE_URL_RE = re.compile(_ASCII_URL_PREFIX_PATTERN + r"\S*")
 _URL_SYNTAX_RE = re.compile(_ASCII_URL_PREFIX_PATTERN)
 _MARKDOWN_LINK_RE = re.compile(r"!?\[([^]]*)\]\([^)]*\)")
-_MARKDOWN_SYNTAX_RE = re.compile(
-    r"!?\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])|`|:::|\*\*|__|~~|"
-    r"(?:^|[^A-Za-z0-9_])[*_][^*_\r\n]+[*_](?:[^A-Za-z0-9_]|$)|"
-    r"(?:^|[ \t])#{1,6}[ \t]|(?:^|[ \t])>[ \t]|(?:^|[ \t])[-*+][ \t]"
-)
+_MARKDOWN_SPECIAL_CHARACTER_RE = re.compile(r"[*_\[\]<>#`~]")
 _RELATED_RESOURCE_RE = re.compile(
     r'\{% relatedResource id="[^"]*" %\}(.*?)\{% /relatedResource %\}',
     re.DOTALL,
@@ -218,10 +214,8 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append("contains a control, surrogate, or Unicode line/paragraph separator")
     if _URL_SYNTAX_RE.search(description):
         errors.append("contains a URL")
-    if _MARKDOWN_SYNTAX_RE.search(description):
-        errors.append("contains Markdown syntax")
-    if re.search(r"<[^>]+>", description):
-        errors.append("contains HTML")
+    if _MARKDOWN_SPECIAL_CHARACTER_RE.search(description):
+        errors.append("contains a Markdown-special character")
     if '"' in description or "\\" in description:
         errors.append("contains characters that Learn's frontmatter parser cannot preserve")
 

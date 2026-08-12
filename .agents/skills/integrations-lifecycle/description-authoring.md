@@ -80,7 +80,8 @@ An explicit description MUST:
 - be 50–160 characters;
 - be already trimmed, with no leading or trailing whitespace;
 - be one line of plain text with no C0/C1 control character, including tabs, no surrogate code point or Unicode line/paragraph
-  separator, and no Markdown, HTML, URL, double quote, or backslash;
+  separator, no Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), and no URL, double quote, or
+  backslash;
 - be unique across every generated integration page. Duplicate identity is case-insensitive and NFC-normalized, but accepted authored
   text is emitted exactly and is never silently normalized;
 - accurately describe the specific integration in active, user-facing language.
