@@ -22,7 +22,20 @@ pr_require_gh
 
 PR="${1:?usage: $0 <pr-number> [<command>]}"
 pr_require_numeric "${PR}"
-CMD="${2:-review}"
+shift
+
+# Join the remaining words so an unquoted `full review` is not silently
+# truncated to `full`, which posts a command coderabbit ignores while gh api
+# still reports success.
+CMD="${*:-review}"
+
+case "${CMD}" in
+    review | "full review") ;;
+    *)
+        echo "[trigger-coderabbit] unknown command '${CMD}' (expected 'review' or 'full review')" >&2
+        exit 1
+        ;;
+esac
 
 SLUG="$(pr_require_slug)"
 BODY="@coderabbitai ${CMD}"

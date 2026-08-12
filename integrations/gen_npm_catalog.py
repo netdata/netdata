@@ -304,9 +304,9 @@ SNMP_TOPOLOGY_SETUP = setup_block(
 # (src/collectors/network-viewer.plugin/metadata.yaml) rather than claiming "no configuration".
 NETWORK_VIEWER_SETUP = setup_block(
     'netdata.conf',
-    'The Function is always available and needs no setup. The only setting is the size of the APPS_LOOKUP cache used '
-    'to warm container and Kubernetes identity lookups; raising it does not guarantee attribution, it only keeps more '
-    'resolved PIDs cached.',
+    'The Function is always available and needs no setup. The only setting is the size of the per-PID APPS_LOOKUP '
+    'cache, which holds the cgroup identity already resolved for each process; raising it does not make more '
+    'processes resolvable, it only keeps more resolved ones cached.',
     [('Privileged access to the socket tables',
       'The plugin needs its normal privileged permissions to enumerate the sockets of every process. Standard '
       'installations grant these. A container needs the host network namespace and the host `/proc` to see anything '
@@ -341,6 +341,18 @@ VSPHERE_SETUP = setup_block(
     [('vCenter access',
       'A vCenter Server reachable from the Netdata Agent, and a read-only account with permission to browse the '
       'inventory.')],
+    examples=[{
+        'name': 'Minimal job with topology enabled',
+        'folding': {'enabled': False},
+        'description': 'The three required fields plus `collect_network_topology`, which is off by default and is what '
+                       'adds the network and port-group actors to the map.',
+        'config': 'jobs:\n'
+                  '  - name: vcenter\n'
+                  '    url: https://vcenter.example.com\n'
+                  '    username: netdata@vsphere.local\n'
+                  '    password: SECRET\n'
+                  '    collect_network_topology: yes\n',
+    }],
 )
 
 CATO_SETUP = setup_block(
@@ -351,6 +363,16 @@ CATO_SETUP = setup_block(
     'only needs setting for a different region or a proxy.',
     [('Cato API access',
       'A Cato Management Application API key with read access to the account you want to map.')],
+    examples=[{
+        'name': 'Minimal job',
+        'folding': {'enabled': False},
+        'description': 'The two required fields. `url` defaults to the Cato public GraphQL endpoint, and '
+                       '`update_every` must be at least 60.',
+        'config': 'jobs:\n'
+                  '  - name: cato\n'
+                  '    account_id: "12345"\n'
+                  '    api_key: SECRET\n',
+    }],
 )
 
 # Netdata has no syslog listener: an OpenTelemetry Collector receives syslog and
@@ -375,6 +397,33 @@ SYSLOG_SETUP = setup_block(
       'the Agent\'s endpoint (`127.0.0.1:4317` by default).'),
      ('Devices pointed at it',
       'The routers, switches, and firewalls must be configured to send syslog to the collector\'s listener.')],
+    options=[
+        {'name': 'endpoint.path', 'description': 'OTLP/gRPC endpoint the Agent listens on. The default accepts '
+                                                 'only local senders; bind a non-loopback address to accept a '
+                                                 'Collector on another host, and protect it when you do.',
+         'default_value': '127.0.0.1:4317', 'required': False},
+        {'name': 'endpoint.tls_cert_path', 'description': 'Server TLS certificate. Set together with '
+                                                          '`endpoint.tls_key_path`.',
+         'default_value': '', 'required': False},
+        {'name': 'endpoint.tls_key_path', 'description': 'Server TLS private key.',
+         'default_value': '', 'required': False},
+        {'name': 'endpoint.tls_ca_cert_path',
+         'description': 'CA certificate used to verify client certificates. Setting it enables mutual TLS and '
+                        'therefore also requires the server certificate and key.',
+         'default_value': '', 'required': False},
+    ],
+    examples=[{
+        'name': 'Accepting a Collector on another host',
+        'folding': {'enabled': False},
+        'description': 'Binds a routable address and requires client certificates, so only Collectors holding a '
+                       'certificate signed by your CA can send. Without the TLS keys this endpoint would accept '
+                       'telemetry from anyone who can reach it.',
+        'config': 'endpoint:\n'
+                  '  path: 0.0.0.0:4317\n'
+                  '  tls_cert_path: /etc/netdata/ssl/otel.crt\n'
+                  '  tls_key_path: /etc/netdata/ssl/otel.key\n'
+                  '  tls_ca_cert_path: /etc/netdata/ssl/ca.crt\n',
+    }],
 )
 
 # Traps arrive at the Agent's listener; they are not polled. Their configuration is

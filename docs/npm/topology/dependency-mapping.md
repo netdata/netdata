@@ -97,8 +97,10 @@ available there.
 ## How to open it
 
 The map is served by the **`topology:network-connections`** function — open it from the topology view. It comes up on
-its own: the plugin is enabled by default and needs no setup. Its one setting, the size of the cache used to enrich
-connections with container identity, lives in `netdata.conf` under `[plugin:network-viewer]` and rarely needs changing.
+its own: the plugin is enabled by default and needs no setup. Its one setting, `apps lookup cache size`, is the number
+of per-PID entries the APPS_LOOKUP cache keeps — the cgroup identity already resolved for each process. It lives in
+`netdata.conf` under `[plugin:network-viewer]` and rarely needs changing; raising it does not make more processes
+resolvable, it only keeps more of the resolved ones cached.
 
 The function is not anonymous. It exposes process names, command lines, users, and every address the host talks to, so
 it requires a signed-in Netdata identity, membership of the same Space as the node, and permission to view sensitive
