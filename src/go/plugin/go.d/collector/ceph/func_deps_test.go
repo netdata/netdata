@@ -295,6 +295,26 @@ func TestFuncDepsOSDsRejectsInventoryAboveSelectedLimit(t *testing.T) {
 	assert.Empty(t, result.Rows)
 }
 
+func TestOSDFunctionReportsIncompleteDashboardInventory(t *testing.T) {
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != urlPathApiOsd {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("X-Total-Count", "2")
+		writeJSON(w, http.StatusOK, []map[string]any{{"id": 1, "uuid": "uuid-1"}})
+	})
+	defer srv.Close()
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	requireClusterIdentity(t, c)
+
+	response := c.funcRouter.Handle(context.Background(), cephfunc.MethodOSDs, nil)
+	assert.Equal(t, http.StatusUnprocessableEntity, response.Status)
+	assert.Equal(t, "Ceph OSD inventory is incomplete: received 1 of 2 rows", response.Message)
+	assert.Nil(t, response.Data)
+}
+
 func TestFuncDepsPoolsAndCrushPlacement(t *testing.T) {
 	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

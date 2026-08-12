@@ -190,7 +190,11 @@ func (d funcDepsAdapter) OSDs(ctx context.Context, limit int) (cephfunc.OSDResul
 		}
 	}
 	if len(osds) != total {
-		return cephfunc.OSDResult{}, fmt.Errorf("OSD inventory is incomplete: received %d of %d rows", len(osds), total)
+		return cephfunc.OSDResult{}, &cephfunc.IncompleteInventoryError{
+			Resource: "OSD",
+			Rows:     len(osds),
+			Total:    total,
+		}
 	}
 	if err := validateOSDs(osds); err != nil {
 		return cephfunc.OSDResult{}, err
