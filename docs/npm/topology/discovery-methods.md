@@ -44,4 +44,5 @@ Start with the defaults; reach for the other map types and strategies when a lin
 ## What's next
 
 - [Overview](/docs/npm/topology/README.md) — what topology gives you and the other sources it brings in.
+- [Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md) — the same view, for your processes, containers, and Kubernetes workloads.
 - [Device Metrics](/docs/npm/device-metrics/README.md) — monitoring the devices the topology is built from.

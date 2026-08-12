@@ -20,7 +20,9 @@ The Network Monitor dashboard brings devices, topology, flows, and trap events t
 
 - **Device metrics (SNMP)** — poll routers, switches, firewalls, access points, UPSs, and PDUs. Netdata matches each device to a vendor profile by its `sysObjectID` and collects interfaces (traffic, errors, discards, operational state), system and host resources, and vendor-specific hardware, environmental, and protocol metrics. Every metric is a chart you can alert on, with interactive per-interface and per-device tables.
 
-- **Topology** — see how your network connects. Netdata builds Layer 2 maps (LLDP, CDP, MAC/FDB, STP) and Layer 3 maps (BGP, OSPF, ARP), plus live host connections, the Netdata streaming hierarchy, and virtual infrastructure (VMware vSphere, Cato).
+- **Topology** — see how your network connects. Netdata builds Layer 2 maps (LLDP, CDP, MAC/FDB, STP) and Layer 3 maps (BGP, OSPF, ARP), plus the Netdata streaming hierarchy and virtual infrastructure (VMware vSphere, Cato).
+
+- **Application dependencies** — see how your software connects. On every monitored host, Netdata reads the kernel's live socket table and maps which process talks to which, attributed to the container, image, systemd unit, or Kubernetes pod that owns it — with no instrumentation, no sidecars, and nothing to configure.
 
 - **BGP monitoring** — peer state, advertised and received prefixes, and session health on your routers, with an interactive peer table and alerts on session changes.
 
