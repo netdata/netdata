@@ -122,6 +122,42 @@ CONTAINER_VERSION_CODENAME=""
 CONTAINER_VARIANT=""
 CONTAINER_BUILD_ID=""
 
+load_os_release() {
+  os_release_scope="$1"
+  os_release_file="$2"
+
+  while IFS= read -r os_release_line || [ -n "${os_release_line}" ]; do
+    case "${os_release_line}" in
+      NAME=*|ID=*|ID_LIKE=*|VERSION=*|VERSION_ID=*|VERSION_CODENAME=*|VARIANT=*|BUILD_ID=*)
+        os_release_key="${os_release_line%%=*}"
+        os_release_value="${os_release_line#*=}"
+        case "${os_release_value}" in
+          \"*\") os_release_value="${os_release_value#\"}"; os_release_value="${os_release_value%\"}" ;;
+          \'*\') os_release_value="${os_release_value#\'}"; os_release_value="${os_release_value%\'}" ;;
+        esac
+        case "${os_release_scope}:${os_release_key}" in
+          CONTAINER:NAME) CONTAINER_NAME="${os_release_value}" ;;
+          CONTAINER:ID) CONTAINER_ID="${os_release_value}" ;;
+          CONTAINER:ID_LIKE) CONTAINER_ID_LIKE="${os_release_value}" ;;
+          CONTAINER:VERSION) CONTAINER_VERSION="${os_release_value}" ;;
+          CONTAINER:VERSION_ID) CONTAINER_VERSION_ID="${os_release_value}" ;;
+          CONTAINER:VERSION_CODENAME) CONTAINER_VERSION_CODENAME="${os_release_value}" ;;
+          CONTAINER:VARIANT) CONTAINER_VARIANT="${os_release_value}" ;;
+          CONTAINER:BUILD_ID) CONTAINER_BUILD_ID="${os_release_value}" ;;
+          HOST:NAME) HOST_NAME="${os_release_value}" ;;
+          HOST:ID) HOST_ID="${os_release_value}" ;;
+          HOST:ID_LIKE) HOST_ID_LIKE="${os_release_value}" ;;
+          HOST:VERSION) HOST_VERSION="${os_release_value}" ;;
+          HOST:VERSION_ID) HOST_VERSION_ID="${os_release_value}" ;;
+          HOST:VERSION_CODENAME) HOST_VERSION_CODENAME="${os_release_value}" ;;
+          HOST:VARIANT) HOST_VARIANT="${os_release_value}" ;;
+          HOST:BUILD_ID) HOST_BUILD_ID="${os_release_value}" ;;
+        esac
+        ;;
+    esac
+  done < "${os_release_file}"
+}
+
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
   CONTAINER_ID=$(sw_vers -productName)
   CONTAINER_ID_LIKE="macOS"
@@ -137,10 +173,10 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
   KERNEL_VERSION=$(uname -K)
 else
   if [ -f "/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </etc/os-release | sed 's/^/CONTAINER_/')"
+    load_os_release CONTAINER /etc/os-release
     CONTAINER_OS_DETECTION="/etc/os-release"
   elif [ -f "/usr/lib/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </usr/lib/os-release | sed 's/^/CONTAINER_/')"
+    load_os_release CONTAINER /usr/lib/os-release
     CONTAINER_OS_DETECTION="/usr/lib/os-release"
   fi
 
@@ -192,10 +228,10 @@ if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
 else
   # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
   if [ -e "/host/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </host/etc/os-release | sed 's/^/HOST_/')"
+    load_os_release HOST /host/etc/os-release
     HOST_OS_DETECTION="/host/etc/os-release"
   elif [ -e "/host/usr/lib/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID|VERSION_CODENAME|VARIANT|BUILD_ID)=" </host/usr/lib/os-release | sed 's/^/HOST_/')"
+    load_os_release HOST /host/usr/lib/os-release
     HOST_OS_DETECTION="/host/usr/lib/os-release"
   fi
   if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
