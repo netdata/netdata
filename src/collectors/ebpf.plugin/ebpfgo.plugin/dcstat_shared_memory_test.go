@@ -546,3 +546,55 @@ func TestCachestatStoreKeepsBaselineForIdlePID(t *testing.T) {
 			got.Hit, got.Miss, got.Ratio)
 	}
 }
+
+// TestDCStatTokensAreComparableAcrossPIDs pins that the published freshness token
+// is drawn from a store-wide sequence, not a per-PID counter.
+//
+// cgroup_ebpfgo_dcstat_sum_pids() keeps ONE watermark per cgroup and compares every
+// member PID's token against it. With per-PID counters a long-lived PID accumulates
+// a high count while a newly added PID starts near zero, so the new PID would sit
+// below the cgroup watermark and its activity would never be counted. This
+// simulates that consumer to prove a late joiner is admitted immediately.
+func TestDCStatTokensAreComparableAcrossPIDs(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	old := libbpfloader.DCStatAppSnapshot{Pid: 100, CacheAccess: 0}
+
+	// A long-lived PID is active on its own for many cycles.
+	for range 50 {
+		old.CacheAccess += 10
+		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old})
+	}
+
+	// The cgroup consumer's watermark after consuming those cycles.
+	watermark := uint64(0)
+	for _, row := range store.Snapshot() {
+		if row.dc.Ct > watermark {
+			watermark = row.dc.Ct
+		}
+	}
+	if watermark == 0 {
+		t.Fatal("the long-lived PID never published a token")
+	}
+
+	// A brand-new PID joins the same cgroup and is immediately active.
+	newcomer := libbpfloader.DCStatAppSnapshot{Pid: 200, CacheAccess: 7}
+	old.CacheAccess += 10
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old, newcomer})
+	newcomer.CacheAccess += 5
+	old.CacheAccess += 10
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old, newcomer})
+
+	var newRow netdataPublishDCStat
+	for _, row := range store.Snapshot() {
+		if row.pid == 200 {
+			newRow = row.dc
+		}
+	}
+	if newRow.Ct <= watermark {
+		t.Fatalf("newcomer token = %d, cgroup watermark = %d: the consumer's "+
+			"`ct > watermark` gate would skip this PID forever", newRow.Ct, watermark)
+	}
+	if newRow.CacheAccess != 5 {
+		t.Fatalf("newcomer delta = %d, want 5", newRow.CacheAccess)
+	}
+}

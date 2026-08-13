@@ -25,7 +25,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor Linux page cache events giving users a general vision about how the kernel is manipulating files."
+        metrics_description: "Monitor Linux page cache events giving users a general vision about how the kernel is manipulating files. Setting `cachestat = yes` enables collection and the host-wide charts only; the per-application and per-cgroup charts additionally require `apps = yes` and/or `cgroups = yes` in the `[global]` section."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include:
@@ -188,7 +188,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device. `reference`, `slow` and `miss` are independent kernel counters and are reported independently: an interval with no fast-path lookups can still report slow-path lookups or misses. The C implementation of this collector suppressed `slow` and `miss` whenever `reference` did not move in the same interval."
+        metrics_description: "Monitor directory cache events given an overall vision about files on memory or storage device. Setting `dcstat = yes` enables collection and the host-wide charts only; the per-application and per-cgroup charts additionally require `apps = yes` and/or `cgroups = yes` in the `[global]` section. `reference`, `slow` and `miss` are independent kernel counters and are reported independently: an interval with no fast-path lookups can still report slow-path lookups or misses. The C implementation of this collector suppressed `slow` and `miss` whenever `reference` did not move in the same interval."
         method_description: "Attach a kprobe to `lookup_fast` and a kretprobe to `d_lookup`, using the object flavor selected for the running kernel."
       supported_platforms:
         include:
@@ -303,7 +303,7 @@ modules:
           labels: []
           metrics:
             - name: filesystem.dc_hit_ratio
-              description: "Percentage of files inside directory cache. Computed from this interval's lookups, so it reflects current behaviour rather than a lifetime average; an interval with no lookups reports 0. The C implementation of this collector divided lifetime totals instead."
+              description: "Share of directory lookups this interval that the kernel resolved from the directory cache, as a percentage — `(reference - miss) / reference`. It measures lookup resolution, not how many files are held in the cache. Computed from this interval's counters, so it reflects current behaviour rather than a lifetime average; an interval with no lookups reports 0. The C implementation of this collector divided lifetime totals instead."
               unit: "%"
               chart_type: line
               dimensions:

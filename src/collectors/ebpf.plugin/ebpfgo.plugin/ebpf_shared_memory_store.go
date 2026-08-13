@@ -81,6 +81,12 @@ type ebpfSharedMemoryStore struct {
 	// the BPF value cannot be used.
 	dcstatPrevCt map[uint32]uint64
 	nextDcstatCt map[uint32]uint64
+	// dcstatPubSeq is a store-wide publication counter, bumped once per
+	// UpdateDCStatApps call.  Tokens are drawn from it so they stay comparable
+	// ACROSS PIDs: cgroups.plugin keeps one watermark per cgroup and compares every
+	// member PID's token against it, so a per-PID sequence would let a long-running
+	// PID's high token permanently mask a newly added one.
+	dcstatPubSeq uint64
 	dcstatMiss   map[uint32]int
 	nextDcstatMs map[uint32]int
 	dcstatStale  []uint32
