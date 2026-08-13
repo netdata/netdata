@@ -191,7 +191,12 @@ sorted ascending by trace id: `trace_ids` (16-byte arena), `root_span_ids`
 `min_start_ns` / `max_end_ns` (`Vec<i64>`, the stored envelope — end is
 `start ⊕ duration`, saturating), `span_counts` / `error_counts` (`Vec<u32>`),
 `root_kinds` (`Vec<i32>`, raw OTLP kind; 0 when no true root),
-`root_is_true_root` (`Vec<u8>`, 1/0), and `root_service_refs` /
+`root_is_true_root` (`Vec<u8>`, the tri-state claim flag: `0` = no
+unset-parent span of the trace is stored in this file — PROOF of local
+root absence; `1` = the root columns carry the file's claim; `2` = the
+claim was WITHHELD on an ambiguous tie — unset-parent spans exist but
+their pick is undecidable from recorded facets, so the root is unknown,
+neither absent nor any particular value), and `root_service_refs` /
 `root_name_refs` (`Vec<u32>`, file `KvId`s of the root's resource
 `service.name` / span `name` tokens, or the `u32::MAX` sentinel for absent).
 
@@ -203,8 +208,12 @@ Semantics are deliberate and part of the contract:
   label rollup-derived numbers accordingly.
 - The root columns are **honest-or-absent**: populated only from a span
   with a genuinely unset parent stored in THIS file (the earliest such span
-  wins — the `summary_root` convention). `root_is_true_root == 0` means the
-  other root columns are sentinels; a reader never synthesizes a root.
+  wins; equal starts tie-break by ascending span id — the `summary_root`
+  convention). A full `(start_ns, span_id)` tie between candidates with
+  DIFFERENT recorded facets (kind, service, name) records `2` (WITHHELD)
+  instead of guessing a storage-order-dependent pick. For flags `0` and
+  `2` the other root columns are sentinels; a reader never synthesizes a
+  root, and only flag `0` may be read as proof that no root exists here.
 - The all-zero "unset" trace id is excluded (the `TIDX` rule).
 
 It lives after the span structures (`LNKB`), requires the `TRCE` column its

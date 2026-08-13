@@ -73,6 +73,9 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
         /// (start_ns, span_id) of the current root pick — the tie-break key.
         root_key: Option<(i64, sfst::SpanId)>,
         root: Option<TraceRootInfo>,
+        /// The incumbent tied a candidate with different facets — the
+        /// seal accumulator's abstention, mirrored for parity.
+        root_ambiguous: bool,
     }
 
     let mut map: HashMap<sfst::TraceId, Acc> = HashMap::new();
@@ -88,6 +91,7 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
             error_count: 0,
             root_key: None,
             root: None,
+            root_ambiguous: false,
         });
         acc.min_start_ns = acc.min_start_ns.min(span.start_ns);
         acc.max_end_ns = acc.max_end_ns.max(end_ns);
@@ -98,16 +102,31 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
             acc.error_count = (acc.error_count + 1).min(u64::from(u32::MAX));
         }
         // The seal accumulator's exact rule: earliest unset-parent
-        // span wins; equal starts tie-break by ascending span id.
-        let key = (span.start_ns, span.span_id);
-        if span.parent_span_id.is_unset() && acc.root_key.is_none_or(|k| key < k) {
-            acc.root_key = Some(key);
-            acc.root = Some(TraceRootInfo {
+        // span wins; equal starts tie-break by ascending span id; a
+        // FULL-key tie with differing facets ABSTAINS (mirrors the
+        // seal's ambiguity state machine — the tail/seal parity
+        // contract covers the abstention too).
+        if span.parent_span_id.is_unset() {
+            let key = (span.start_ns, span.span_id);
+            let candidate = || TraceRootInfo {
                 span_id: span.span_id,
                 kind: span.kind,
                 service: span_field(span, &service_field).map(str::to_string),
                 name: span_field(span, name_field).map(str::to_string),
-            });
+            };
+            match acc.root_key {
+                Some(k) if key == k => {
+                    if acc.root.as_ref() != Some(&candidate()) {
+                        acc.root_ambiguous = true;
+                    }
+                }
+                Some(k) if key > k => {}
+                _ => {
+                    acc.root_key = Some(key);
+                    acc.root = Some(candidate());
+                    acc.root_ambiguous = false;
+                }
+            }
         }
     }
 
@@ -119,7 +138,7 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
             max_end_ns: acc.max_end_ns,
             span_count: acc.span_count,
             error_count: acc.error_count,
-            root: acc.root,
+            root: if acc.root_ambiguous { None } else { acc.root },
         })
         .collect();
     out.sort_unstable_by_key(|a| a.trace_id);

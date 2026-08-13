@@ -15,11 +15,14 @@ use sfsq::traces::{
 ///   RESENT copy of the child (stored-row counts) + an ERROR span;
 /// - trace B: NO unset-parent span (honest root absence);
 /// - trace C: two equal-start true roots (the span-id tie-break);
+/// - trace D: a FULL `(start, span_id)` tie with differing facets —
+///   the abstention (claim withheld on BOTH sides of the parity);
 /// - one UNSET-trace-id span (excluded everywhere).
 fn corpus() -> Vec<common::SpanSpec> {
     let a = [0xA1u8; 16];
     let b = [0xB2u8; 16];
     let c = [0xC3u8; 16];
+    let d = [0xD7u8; 16];
 
     let mut a_root = sp(1, 0, 1_000, "a-root");
     a_root.trace = a;
@@ -39,6 +42,14 @@ fn corpus() -> Vec<common::SpanSpec> {
     let mut c_root_lo = sp(5, 0, 3_000, "c-root-lo"); // same start, smaller id
     c_root_lo.trace = c;
 
+    // D: same (start, span_id), different kind — the ambiguous tie.
+    let mut d_tie_a = sp(8, 0, 4_000, "d-tie");
+    d_tie_a.trace = d;
+    d_tie_a.kind = 3; // CLIENT
+    let mut d_tie_b = sp(8, 0, 4_000, "d-tie");
+    d_tie_b.trace = d;
+    d_tie_b.kind = 2; // SERVER
+
     let mut unset = sp(6, 0, 100, "no-trace");
     unset.trace = [0; 16];
 
@@ -50,6 +61,8 @@ fn corpus() -> Vec<common::SpanSpec> {
         b_orphan,
         c_root_hi,
         c_root_lo,
+        d_tie_a,
+        d_tie_b,
         unset,
     ]
 }
@@ -91,8 +104,8 @@ fn the_fold_pins_every_rollup_semantic() {
     let aggs = tail_trace_aggregates(&scan);
 
     // The UNSET-trace-id span vanished; rows sort by trace id.
-    assert_eq!(aggs.len(), 3);
-    let (a, b, c) = (&aggs[0], &aggs[1], &aggs[2]);
+    assert_eq!(aggs.len(), 4);
+    let (a, b, c, d) = (&aggs[0], &aggs[1], &aggs[2], &aggs[3]);
     assert_eq!(a.trace_id, sfst::TraceId::from([0xA1; 16]));
 
     // A: stored-row counts (4 = root + child + resend + err), one error,
@@ -115,6 +128,11 @@ fn the_fold_pins_every_rollup_semantic() {
     let c_root = c.root.as_ref().expect("C has true roots");
     assert_eq!(c_root.span_id, sfst::SpanId::from([5; 8]));
     assert_eq!(c_root.name.as_deref(), Some("c-root-lo"));
+
+    // D: the ambiguous full-key tie abstains — roots exist, none is
+    // claimed (the seal marks the row WITHHELD; the fold reads None).
+    assert_eq!(d.span_count, 2);
+    assert!(d.root.is_none(), "ambiguous tie → claim withheld");
 }
 
 #[test]
