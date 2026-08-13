@@ -221,12 +221,21 @@ static int close_keeping_errno(int fd) {
     return -1;
 }
 
-// Opens filename for writing and returns a file descriptor whose mode is 0600,
-// or -1 with errno set. When the file exists, is accessible to group or other,
-// and cannot be chmod()-ed, *replace_it is set: the caller may then remove the
-// file and retry with O_EXCL.
-static int fopen_secret_open_fd(const char *filename, const char *mode, int extra_flags, bool *replace_it) {
-    *replace_it = false;
+typedef enum {
+    SECRET_OPEN_OK = 0,
+    SECRET_OPEN_FAILED,       // errno is set and there is nothing else to try
+    SECRET_OPEN_UNUSABLE,     // another uid owns it, or it has a second name
+    SECRET_OPEN_WIDE,         // ours with one name, but accessible to group/other
+} SECRET_OPEN;
+
+// Opens filename for writing and returns a file descriptor whose mode is 0600, or
+// -1 with *why explaining what to do next. repair_wide_in_place accepts a file
+// that is ours but group/other-accessible, tightening it with fchmod() instead of
+// reporting SECRET_OPEN_WIDE - the caller only asks for that once replacing the
+// file has proven impossible.
+static int fopen_secret_open_fd(const char *filename, const char *mode, int extra_flags,
+                                bool repair_wide_in_place, SECRET_OPEN *why) {
+    *why = SECRET_OPEN_FAILED;
 
     // O_CREAT's mode applies only when the file is created, and umask can still
     // clear bits from it, so fchmod() after the open is what actually pins 0600
@@ -314,56 +323,87 @@ static int fopen_secret_open_fd(const char *filename, const char *mode, int extr
     }
 #endif
 
-    if(fchmod(fd, 0600) != 0) {
-        int saved_errno = errno;
+    // A secret must never be written into an inode another uid owns or that has a
+    // second name: the owner can chmod it back and read it afterwards (and a
+    // privileged daemon can write to it even at 0600), while a hardlink exposes the
+    // same bytes under a name we do not control. Neither is repairable, so these
+    // are only ever replaced. A file this call just created cannot land here: it is
+    // ours with one name.
+    if(st.st_uid != geteuid() || st.st_nlink > 1) {
+        close(fd);
+        *why = SECRET_OPEN_UNUSABLE;
+        errno = EPERM;
+        return -1;
+    }
 
-        // fchmod() is gated on ownership, not on write access, so a secret left
-        // behind by an agent that ran as root is writable through the netdata
-        // group yet cannot be tightened. Some filesystems (CIFS, several FUSE and
-        // bind mounts) also refuse chmod outright.
+    // It is ours, but group or other can reach it. Replacing it is preferable to
+    // tightening it, because a reader may already hold this inode open - so report
+    // it and let the caller try that first.
+    if((st.st_mode & 0077) && !repair_wide_in_place) {
+        close(fd);
+        *why = SECRET_OPEN_WIDE;
+        errno = EPERM;
+        return -1;
+    }
+
+    // pin the mode: umask may have cleared owner bits when the file was created,
+    // and an existing owner-only file could be, say, 0400
+    if(fchmod(fd, 0600) != 0) {
         if(st.st_mode & 0077) {
-            // it is exposed and we cannot fix it in place - ask for a replacement
-            close(fd);
-            *replace_it = true;
-            errno = saved_errno;
+            // we were asked to tighten it and could not - refuse, the whole point
+            // of this call is that the secret does not become group-readable
+            close_keeping_errno(fd);
             return -1;
         }
 
-        // nothing is exposed, so keep going rather than failing the write
+        // it is ours and nothing is exposed - a filesystem that refuses chmod
+        // (CIFS, several FUSE and bind mounts) is not a reason to fail the write
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Cannot set mode 0600 on '%s' (%s), but it is already accessible only by its owner - continuing.",
-               filename, strerror(saved_errno));
+               "Cannot set mode 0600 on '%s' (%s), but it is owner-only and owned by this process - continuing.",
+               filename, strerror(errno));
     }
 
+    *why = SECRET_OPEN_OK;
     return fd;
 }
 
 FILE *fopen_secret_write(const char *filename, const char *mode) {
-    bool replace_it = false;
-    int fd = fopen_secret_open_fd(filename, mode, 0, &replace_it);
+    SECRET_OPEN why = SECRET_OPEN_FAILED;
+    int fd = fopen_secret_open_fd(filename, mode, 0, false, &why);
 
-    if(fd == -1 && replace_it) {
-        // The file is group or other accessible and un-chmod-able, so writing the
-        // secret into it would expose it. The secret directories are writable by
-        // the netdata group, so replace the file instead of failing permanently -
-        // this is a truncating open, so its old content is discarded either way.
-        int chmod_errno = errno;
+    if(fd == -1 && (why == SECRET_OPEN_UNUSABLE || why == SECRET_OPEN_WIDE)) {
+        // The file cannot receive a secret as it stands. The secret directories are
+        // writable by the netdata group, so replace it rather than fail
+        // permanently - this is a truncating open, so its old content is discarded
+        // either way, and a fresh inode is also what keeps a reader that already
+        // holds the old one from seeing what we are about to write.
+        if(unlink(filename) == 0)
+            // O_EXCL: if anything recreated the path in the meantime, fail instead
+            // of writing the secret into someone else's file
+            fd = fopen_secret_open_fd(filename, mode, O_EXCL, false, &why);
 
-        if(unlink(filename) != 0) {
-            // keep unlink()'s errno, it is the actionable one: EBUSY for a secret
-            // that is a single-file bind mount, EROFS for a read-only directory
+        else if(why == SECRET_OPEN_WIDE) {
+            // Replacing it is impossible - EBUSY when the secret is a single-file
+            // bind mount, EROFS on a read-only directory. It is ours and has no
+            // other name, so tightening it in place is still safe enough to keep
+            // working, which it did before this helper existed.
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "Cannot replace '%s' (%s) - tightening its permissions in place instead.",
+                   filename, strerror(errno));
+            fd = fopen_secret_open_fd(filename, mode, 0, true, &why);
+        }
+
+        else {
+            // owned by another uid or hardlinked, and we cannot remove it: writing
+            // the secret here would hand it to whoever controls the other name
             int unlink_errno = errno;
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "Cannot make '%s' private (%s) and cannot replace it (%s) - "
-                   "refusing to write a secret into a file readable by others.",
-                   filename, strerror(chmod_errno), strerror(unlink_errno));
+                   "Refusing to write a secret to '%s': it is not owned by this process or has another hardlink, "
+                   "and it cannot be replaced (%s).",
+                   filename, strerror(unlink_errno));
             errno = unlink_errno;
             return NULL;
         }
-
-        // O_EXCL: if anything recreated the path in the meantime, fail instead of
-        // writing the secret into someone else's file
-        fd = fopen_secret_open_fd(filename, mode, O_EXCL, &replace_it);
     }
 
     if(fd == -1)
@@ -498,6 +538,53 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     freez(sdir);
 }
 
+bool secret_file_harden(const char *filename) {
+    // Deliberately chmod-only. Files that reach here are generated once and then
+    // read for the lifetime of the installation - the claim keypair above all -
+    // so replacing one would destroy an identity that cannot be recovered from
+    // anything else on disk. Tightening in place is the only safe repair.
+    int flags = O_RDONLY | O_CLOEXEC;
+
+#ifdef O_NOFOLLOW
+    flags |= O_NOFOLLOW;
+#endif
+
+#ifdef O_NONBLOCK
+    flags |= O_NONBLOCK;
+#endif
+
+    int fd = open(filename, flags);
+    if(fd == -1)
+        return errno == ENOENT; // nothing to harden is not a failure
+
+    struct stat st;
+    if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        close(fd);
+        return false;
+    }
+
+    if(!(st.st_mode & 0077)) {
+        close(fd);
+        return true; // already unreachable for group and other
+    }
+
+    bool ok = fchmod(fd, st.st_mode & 0700) == 0;
+    if(ok) {
+        errno_clear(); // so the log line does not carry an unrelated errno
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Tightened permissions of '%s' from %04o to %04o - it was readable by others.",
+               filename, (unsigned)(st.st_mode & 07777), (unsigned)(st.st_mode & 0700));
+    }
+    else
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Cannot tighten permissions of '%s' (currently %04o): %s. "
+               "It stays readable by others until this is fixed manually.",
+               filename, (unsigned)(st.st_mode & 07777), strerror(errno));
+
+    close(fd);
+    return ok;
+}
+
 // Checks for fopen_secret_write(). Lives here, next to the implementation, so
 // `netdata -W unittest` runs it in CI - the standalone target only wraps it.
 //
@@ -529,12 +616,12 @@ int fopen_secret_write_unittest(void) {
     }
 
     char created[FILENAME_MAX + 1], control[FILENAME_MAX + 1], preexisting[FILENAME_MAX + 1];
-    char victim[FILENAME_MAX + 1], link[FILENAME_MAX + 1], fifo[FILENAME_MAX + 1], missing[FILENAME_MAX + 1];
+    char victim[FILENAME_MAX + 1], symlink_path[FILENAME_MAX + 1], fifo[FILENAME_MAX + 1], missing[FILENAME_MAX + 1];
     snprintfz(created, sizeof(created), "%s/created", dir);
     snprintfz(control, sizeof(control), "%s/control", dir);
     snprintfz(preexisting, sizeof(preexisting), "%s/preexisting", dir);
     snprintfz(victim, sizeof(victim), "%s/victim", dir);
-    snprintfz(link, sizeof(link), "%s/link", dir);
+    snprintfz(symlink_path, sizeof(symlink_path), "%s/symlink", dir);
     snprintfz(fifo, sizeof(fifo), "%s/fifo", dir);
     snprintfz(missing, sizeof(missing), "%s/no-such-directory/file", dir);
 
@@ -610,12 +697,12 @@ int fopen_secret_write_unittest(void) {
     // the secret directories are group-writable, so a symlink planted at the path
     // must be refused - neither the target's mode nor its content may change
     fp = fopen(victim, "w");
-    if(!fp || fprintf(fp, "victim") < 0 || fclose(fp) != 0 || symlink(victim, link) != 0) {
+    if(!fp || fprintf(fp, "victim") < 0 || fclose(fp) != 0 || symlink(victim, symlink_path) != 0) {
         fprintf(stderr, "  FAILED cannot set up the symlink case\n");
         errors++;
     }
     else {
-        fp = fopen_secret_write(link, "w");
+        fp = fopen_secret_write(symlink_path, "w");
         if(fp) {
             fprintf(stderr, "  FAILED a symlinked secret path was accepted\n");
             fclose(fp);
@@ -640,6 +727,117 @@ int fopen_secret_write_unittest(void) {
             fclose(fp);
             errors++;
         }
+    }
+
+    // a second hardlink exposes the secret under a name we do not control, so the
+    // file must be replaced - the write succeeds, but on a fresh inode, and the
+    // other name keeps the old content
+    char linked[FILENAME_MAX + 1], othername[FILENAME_MAX + 1];
+    snprintfz(linked, sizeof(linked), "%s/linked", dir);
+    snprintfz(othername, sizeof(othername), "%s/othername", dir);
+    fp = fopen(linked, "w");
+    if(!fp || fprintf(fp, "before") < 0 || fclose(fp) != 0 || chmod(linked, 0600) != 0 || link(linked, othername) != 0) {
+        fprintf(stderr, "  FAILED cannot set up the hardlink case\n");
+        errors++;
+    }
+    else {
+        fp = fopen_secret_write(linked, "w");
+        if(!fp) {
+            fprintf(stderr, "  FAILED a hardlinked secret path was not replaced: %s\n", strerror(errno));
+            errors++;
+        }
+        else {
+            fprintf(fp, "after");
+            fclose(fp);
+
+            char buf[128] = "";
+            // the inode number itself proves nothing: the filesystem is free to
+            // hand the same one back after unlink()
+            if(stat(linked, &st) != 0 || st.st_nlink != 1) {
+                fprintf(stderr, "  FAILED a hardlinked secret was written in place instead of being replaced\n");
+                errors++;
+            }
+            if((st.st_mode & 0777) != 0600) {
+                fprintf(stderr, "  FAILED the replacement of a hardlinked secret is not 0600\n");
+                errors++;
+            }
+            if(read_txt_file(othername, buf, sizeof(buf)) != 0 || strcmp(buf, "before") != 0) {
+                fprintf(stderr, "  FAILED the secret was written into the inode the other hardlink names\n");
+                errors++;
+            }
+        }
+    }
+
+    // An inode owned by someone else must never receive a secret, even at 0600:
+    // its owner can chmod it back and read what we wrote. Only a privileged
+    // process can reach this - an unprivileged one cannot open such a file at all,
+    // and cannot chown() to set the case up - so this runs only as root.
+    if(geteuid() == 0) {
+        char foreign[FILENAME_MAX + 1];
+        snprintfz(foreign, sizeof(foreign), "%s/foreign", dir);
+
+        fp = fopen(foreign, "w");
+        if(!fp || fprintf(fp, "attacker") < 0 || fclose(fp) != 0 ||
+           chown(foreign, 12345, 12345) != 0 || chmod(foreign, 0600) != 0 || stat(foreign, &st) != 0) {
+            fprintf(stderr, "  FAILED cannot set up the foreign-owner case\n");
+            errors++;
+        }
+        else {
+            fp = fopen_secret_write(foreign, "w");
+            if(!fp) {
+                fprintf(stderr, "  FAILED a foreign-owned secret path was not replaced: %s\n", strerror(errno));
+                errors++;
+            }
+            else {
+                fprintf(fp, "secret");
+                fclose(fp);
+
+                char buf[128] = "";
+                if(stat(foreign, &st) != 0 || st.st_uid != geteuid() || (st.st_mode & 0777) != 0600) {
+                    fprintf(stderr, "  FAILED the secret went to a file owned by %u with mode %o, "
+                                    "expected a replacement owned by %u at 600\n",
+                            (unsigned)st.st_uid, (unsigned)(st.st_mode & 0777), (unsigned)geteuid());
+                    errors++;
+                }
+                else if(read_txt_file(foreign, buf, sizeof(buf)) != 0 || strcmp(buf, "secret") != 0) {
+                    fprintf(stderr, "  FAILED the replacement does not hold the secret\n");
+                    errors++;
+                }
+            }
+        }
+    }
+
+    // secret_file_harden() must remove group and other access in place, keeping
+    // the same inode - the claim keypair cannot be replaced
+    char legacy[FILENAME_MAX + 1];
+    snprintfz(legacy, sizeof(legacy), "%s/legacy", dir);
+    fp = fopen(legacy, "w");
+    if(!fp || fprintf(fp, "old-secret") < 0 || fclose(fp) != 0 || chmod(legacy, 0660) != 0 || stat(legacy, &st) != 0) {
+        fprintf(stderr, "  FAILED cannot set up the harden case\n");
+        errors++;
+    }
+    else {
+        ino_t before_ino = st.st_ino;
+        char buf[128] = "";
+
+        if(!secret_file_harden(legacy)) {
+            fprintf(stderr, "  FAILED secret_file_harden() reported failure on a 0660 file we own\n");
+            errors++;
+        }
+        else if(stat(legacy, &st) != 0 || (st.st_mode & 0777) != 0600 || st.st_ino != before_ino) {
+            fprintf(stderr, "  FAILED secret_file_harden() did not tighten the file in place\n");
+            errors++;
+        }
+        else if(read_txt_file(legacy, buf, sizeof(buf)) != 0 || strcmp(buf, "old-secret") != 0) {
+            fprintf(stderr, "  FAILED secret_file_harden() did not preserve the content\n");
+            errors++;
+        }
+    }
+
+    // a missing file is nothing to harden, which is success, not failure
+    if(!secret_file_harden(missing)) {
+        fprintf(stderr, "  FAILED secret_file_harden() must accept a missing file\n");
+        errors++;
     }
 
     // failure must be reported as NULL with errno set

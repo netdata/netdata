@@ -28,6 +28,9 @@ static bool check_and_generate_certificates() {
     fp = fopen(public_key_file, "r");
     if (fp) {
         fclose(fp);
+        // an existing pair from a release that predates fopen_secret_write() is
+        // tightened by cloud_secrets_harden() at startup, which also covers the
+        // already-claimed agent that never reaches this function again
         return true;
     }
 
