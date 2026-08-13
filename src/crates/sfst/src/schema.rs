@@ -856,8 +856,10 @@ impl StreamBatch {
             self.row_offsets.push(acc);
         }
         // Every KvId is a fixed 4 bytes, so the buffer must hold exactly
-        // `total_ids * 4`.
-        self.kv_bytes.len() == acc as usize * 4
+        // `total_ids * 4` — compared in u64 so a 32-bit `usize` (the
+        // armv6/armv7 static builds) cannot wrap the multiply; a check
+        // that passes also proves every `row()` slice bound fits usize.
+        self.kv_bytes.len() as u64 == u64::from(acc) * 4
     }
 
     /// Number of log rows in this batch.

@@ -539,6 +539,12 @@ fn populate_trace_row_index(
                     // canonical materialization all take the first), so
                     // a crafted multi-valued frame cannot make the
                     // recorded facets diverge from the evaluated ones.
+                    // Precisely: `name` locks on the first entry, `kind`
+                    // on the first Int-valued entry, `status` on the
+                    // first entry of any type — the flattener emits
+                    // `_kind` only as Int and `status_code` only as Str
+                    // (ng-flatten common.rs), so the per-facet nuances
+                    // are unreachable from the ingest path.
                     // Honest OTLP spans carry each of these exactly once.
                     {
                         let base = resource_tokens.len() + scope_tokens.len();
