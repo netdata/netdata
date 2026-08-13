@@ -244,12 +244,15 @@ mqtt_wss_client mqtt_wss_new(
     }
 #elif defined(__APPLE__)
     if (pipe(client->write_notif_pipe)) {
-#else
-    if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
-#endif
         nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create pipe");
         goto fail_2;
     }
+#else
+    if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create pipe");
+        goto fail_2;
+    }
+#endif
 
     client->poll_fds[POLLFD_PIPE].fd = client->write_notif_pipe[PIPE_READ_END];
     client->poll_fds[POLLFD_PIPE].events = POLLIN;
