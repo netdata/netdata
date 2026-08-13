@@ -598,3 +598,75 @@ func TestDCStatTokensAreComparableAcrossPIDs(t *testing.T) {
 		t.Fatalf("newcomer delta = %d, want 5", newRow.CacheAccess)
 	}
 }
+
+// TestDCStatTokensSurviveProducerRestart pins that the freshness token comes from
+// a boot-relative clock rather than a counter starting at zero.
+//
+// cgroups.plugin is compiled into the netdata daemon, so its per-cgroup watermark
+// (cg->dcstat.ct) outlives an ebpf-go.plugin restart, and it only ever moves
+// forward. A restarted plugin whose tokens began at 1 would sit below that stored
+// watermark for as many cycles as the previous instance ran, freezing the cgroup
+// charts for hours. The replacement store's very first token must therefore exceed
+// every token the previous one issued.
+func TestDCStatTokensSurviveProducerRestart(t *testing.T) {
+	app := libbpfloader.DCStatAppSnapshot{Pid: 100, CacheAccess: 0}
+
+	before := NewEbpfSharedMemoryStore()
+	watermark := uint64(0)
+	for range 5 {
+		app.CacheAccess += 10
+		before.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+		for _, row := range before.Snapshot() {
+			if row.dc.Ct > watermark {
+				watermark = row.dc.Ct
+			}
+		}
+	}
+	if watermark == 0 {
+		t.Fatal("the first producer never published a token")
+	}
+
+	// ebpf-go.plugin restarts: a brand-new store, while the daemon still holds the
+	// watermark above. The BPF counters are unchanged because the kernel maps
+	// survived, so the first cycle re-baselines and the second one is the live test.
+	after := NewEbpfSharedMemoryStore()
+	after.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+	app.CacheAccess += 10
+	after.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+
+	snap := after.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if snap[0].dc.Ct <= watermark {
+		t.Fatalf("token after restart = %d, stale cgroup watermark = %d: the "+
+			"consumer would skip every PID until the token caught up",
+			snap[0].dc.Ct, watermark)
+	}
+	if snap[0].dc.CacheAccess != 10 {
+		t.Fatalf("delta after restart = %d, want 10", snap[0].dc.CacheAccess)
+	}
+}
+
+// TestBootNanosIsMonotonic pins the property the token generator depends on: the
+// clock is process-wide and never goes backwards, so a store created later always
+// sees values at least as large as one created earlier.
+//
+// The reference must be sampled once per process.  /proc/uptime has only
+// centisecond resolution, so a per-caller reference plus each caller's own
+// monotonic offset lets two readings taken milliseconds apart invert.
+func TestBootNanosIsMonotonic(t *testing.T) {
+	early := bootNanos()
+	if early == 0 {
+		t.Fatal("bootNanos reported 0; neither /proc/uptime nor the wall-clock fallback worked")
+	}
+
+	for i := range 100 {
+		got := bootNanos()
+		if got < early {
+			t.Fatalf("call %d reported %d, an earlier call reported %d: must never go backwards",
+				i, got, early)
+		}
+		early = got
+	}
+}

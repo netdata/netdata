@@ -81,15 +81,16 @@ type ebpfSharedMemoryStore struct {
 	// the BPF value cannot be used.
 	dcstatPrevCt map[uint32]uint64
 	nextDcstatCt map[uint32]uint64
-	// dcstatPubSeq is a store-wide publication counter, bumped once per
-	// UpdateDCStatApps call.  Tokens are drawn from it so they stay comparable
-	// ACROSS PIDs: cgroups.plugin keeps one watermark per cgroup and compares every
-	// member PID's token against it, so a per-PID sequence would let a long-running
-	// PID's high token permanently mask a newly added one.
-	dcstatPubSeq uint64
-	dcstatMiss   map[uint32]int
-	nextDcstatMs map[uint32]int
-	dcstatStale  []uint32
+	// dcstatLastToken is the last freshness token stamped on an active PID.  A
+	// single store-wide token keeps values comparable ACROSS PIDs: cgroups.plugin
+	// holds one watermark per cgroup and compares every member PID against it, so a
+	// per-PID sequence would let a long-running PID's high value permanently mask a
+	// newly added one.  The token comes from bootNanos() rather than a counter so
+	// it also survives a plugin restart — see bootNanos.
+	dcstatLastToken uint64
+	dcstatMiss      map[uint32]int
+	nextDcstatMs    map[uint32]int
+	dcstatStale     []uint32
 
 	// ---- socket ----
 	socketData         map[uint32]ebpfSocketPublishApps // per-interval deltas written to SHM this cycle
@@ -182,6 +183,19 @@ func (s *ebpfSharedMemoryStore) MarkSocketInactive() {
 	s.mu.Lock()
 	s.activeModules &^= ebpfgoSHMFlagSocket
 	s.mu.Unlock()
+}
+
+// nextDCStatTokenLocked returns the freshness token for this cycle.  The clock
+// reading is clamped to be strictly increasing so two cycles that land in the
+// same nanosecond still produce distinct tokens, which is what the consumers'
+// `ct > last_consumed_ct` gates require.
+func (s *ebpfSharedMemoryStore) nextDCStatTokenLocked() uint64 {
+	token := bootNanos()
+	if token <= s.dcstatLastToken {
+		token = s.dcstatLastToken + 1
+	}
+	s.dcstatLastToken = token
+	return token
 }
 
 // rebuildEntriesLocked recomputes s.entries from every module's current-cycle

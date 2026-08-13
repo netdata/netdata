@@ -78,12 +78,11 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 	stalePIDs := s.dcstatStale[:0]
 	ordered := true
 
-	// One tick of the store-wide publication counter per cycle.  Every PID that is
-	// active this cycle is stamped with the same value, so tokens issued later are
-	// always strictly greater than every token issued before — the property both
-	// consumers rely on, and the property the BPF `bpf_ktime_get_ns()` stamp used
-	// to provide.
-	s.dcstatPubSeq++
+	// One token per cycle, stamped on every PID that is active in it, so tokens
+	// issued later are always strictly greater than every token issued before —
+	// the property both consumers rely on and the one the BPF `bpf_ktime_get_ns()`
+	// stamp used to provide, including across a plugin restart.
+	publishToken := s.nextDCStatTokenLocked()
 
 	for _, app := range apps {
 		current := netdataPublishDCStatPid{
@@ -103,23 +102,21 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 		// counter moved" is an exact activity signal on every flavor.
 		advanced := !hasPrevious || current != previous
 
-		// The published token is synthetic: an active PID is stamped with the
-		// current publication sequence and an idle one holds its previous stamp,
-		// which is exactly the contract the C consumers' `ct > last_consumed_ct`
-		// gates expect.  The first stamp is >= 1, so those gates admit it.
+		// The published token is synthetic: an active PID is stamped with this
+		// cycle's token and an idle one holds its previous stamp, which is exactly
+		// the contract the C consumers' `ct > last_consumed_ct` gates expect.
 		//
-		// The stamp MUST come from the store-wide counter rather than from a
-		// per-PID increment.  apps.plugin keeps a watermark per PID
-		// (`p->ebpf_dcstat_ct`) and would not care, but
-		// cgroup_ebpfgo_dcstat_sum_pids() keeps ONE watermark per cgroup
-		// (`cg->dcstat.ct`) and compares every member PID against it.  With per-PID
-		// counters a long-lived PID's high count would sit above a freshly added
-		// PID's low count forever, so the new PID's activity would never be
-		// counted.
+		// The stamp MUST come from the store-wide clock rather than from a per-PID
+		// increment.  apps.plugin keeps a watermark per PID (`p->ebpf_dcstat_ct`)
+		// and would not care, but cgroup_ebpfgo_dcstat_sum_pids() keeps ONE
+		// watermark per cgroup (`cg->dcstat.ct`) and compares every member PID
+		// against it.  With per-PID counters a long-lived PID's high count would sit
+		// above a freshly added PID's low count forever, so the new PID's activity
+		// would never be counted.
 		lastCt, seen := s.dcstatPrevCt[app.Pid]
 		publishCt := lastCt
 		if advanced {
-			publishCt = s.dcstatPubSeq
+			publishCt = publishToken
 		}
 
 		stale := false
