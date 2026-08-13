@@ -38,6 +38,19 @@ bool filename_is_dir(const char *filename, bool create_it);
 // Returns NULL and leaves errno set on failure.
 FILE *fopen_secret_write(const char *filename, const char *mode);
 
+// Removes group and other access from an existing secret file, in place.
+//
+// For secrets that are generated once and then only read - the claim keypair,
+// claimed_id, cloud.conf, the management and MCP API keys - an agent that predates
+// fopen_secret_write() left them at 0660, and nothing rewrites them afterwards, so
+// they stay group-readable forever. Call this where such a file is loaded.
+//
+// Deliberately chmod-only: unlike fopen_secret_write() it never replaces the file,
+// because regenerating the claim keypair would break an identity that cannot be
+// recovered. Returns false only when the file exists and could not be tightened;
+// a missing file is success.
+bool secret_file_harden(const char *filename);
+
 bool path_entry_is_file(const char *path, const char *entry);
 bool path_entry_is_dir(const char *path, const char *entry, bool create_it);
 

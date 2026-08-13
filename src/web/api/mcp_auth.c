@@ -101,7 +101,15 @@ static bool mcp_api_key_load(void) {
 
 void mcp_api_key_initialize(void) {
     // Try to load existing key first
-    if (!mcp_api_key_load()) {
+    if (mcp_api_key_load()) {
+        // a loaded key is never rewritten, so one created before this file wrote
+        // 0600 would stay group-readable
+        char loaded_path[PATH_MAX];
+        snprintf(loaded_path, sizeof(loaded_path), "%s/%s",
+                 netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
+        secret_file_harden(loaded_path);
+    }
+    else {
         // If loading fails, generate a new one
         if (!mcp_api_key_generate_and_save()) {
             netdata_log_error("MCP: Failed to initialize API key system");
