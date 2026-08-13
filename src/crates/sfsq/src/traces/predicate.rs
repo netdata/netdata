@@ -1046,7 +1046,10 @@ fn eval_group_condition(c: &sfst::GroupCondition) -> EvalGroupCondition {
 /// name, root service, and envelope duration — the ENGINE owns the
 /// tri-state (an assembled trace whose values are unreliable — capped
 /// or degraded — is excluded as indeterminate before this evaluator is
-/// consulted). Absent root values never satisfy a condition, negated
+/// consulted). The root inputs are the TRUE root's values only
+/// (decision 1D — see [`search`](super::search)'s module docs): a
+/// rootless trace passes `None`s, never the display-side promoted
+/// root. Absent root values never satisfy a condition, negated
 /// forms included (the absent-never-satisfies rule; values are
 /// single-valued per trace, so no subgroup fork exists).
 pub(crate) struct TraceLevelEval {
@@ -1176,12 +1179,25 @@ impl TraceLevelEval {
         best
     }
 
+    /// Whether ANY root condition exists, either polarity. Under the
+    /// true-root filter semantics (decision 1D) a proven-rootless
+    /// candidate fails EVERY root condition — negated included
+    /// (absent-never-satisfies) — so any root condition supports the
+    /// gate's no-root prune even when it cannot support the
+    /// all-claims-fail rule.
+    pub(crate) fn has_root_conditions(&self) -> bool {
+        self.conditions.iter().any(|c| {
+            matches!(
+                c,
+                TraceLevelCondition::RootName { .. } | TraceLevelCondition::RootService { .. }
+            )
+        })
+    }
+
     /// Whether ANY condition gives the gate something to prune on —
-    /// the engagement check (a negated-only predicate must not pay for
-    /// gate state it can never use).
+    /// the engagement check.
     pub(crate) fn has_prunable_condition(&self) -> bool {
-        self.prunable_root_conditions().next().is_some()
-            || self.duration_lower_bound().is_some()
+        self.has_root_conditions() || self.duration_lower_bound().is_some()
     }
 
     /// Whether the assembled trace's values satisfy every condition.

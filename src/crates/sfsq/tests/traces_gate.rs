@@ -360,14 +360,15 @@ fn absent_chunks_block_pruning_without_a_partial() {
     }
 }
 
-/// No-true-root traces (the root span was never exported): the rollup
-/// records no claim, so the gate must not prune — the assembled trace's
-/// orphan-promoted graph root is real and matchable.
+/// True-root filter semantics (decision 1D): a trace whose root span
+/// was never exported matches NO root condition — either polarity —
+/// and the gate PROVES it from `ROOT_CLAIM_NONE` rows without
+/// assembling. The trace stays findable by span-level conditions.
 #[test]
-fn orphan_root_fallback_is_never_pruned() {
+fn rootless_traces_never_match_root_filters_and_prune_provably() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
-    // Parent 0xEE never exported: 0x11 orphan-promotes to graph root.
+    // Parent 0xEE never exported: no unset-parent span exists.
     let reqs = vec![req_with(svc, None, &[span_in(
         1,
         0x11,
@@ -377,17 +378,70 @@ fn orphan_root_fallback_is_never_pruned() {
     )])];
     let wal = write_wal(dir.path(), reqs, "orphan");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let q = || {
+    // Positive and NEGATED root conditions: both fail on a rootless
+    // trace (absent-never-satisfies), gate-on == gate-off.
+    for (op, value) in [
+        (CompareOp::Eq, "orphan-op"),
+        (CompareOp::NotEq, "something-else"),
+    ] {
+        let q = || {
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::RootName,
+                op,
+                vec![text(value)],
+            )]))
+        };
+        let on = run(sources(), q());
+        let off = run(sources(), q().trace_gate_for_tests(false));
+        assert!(on.traces.is_empty(), "rootless never matches ({op:?})");
+        assert_eq!(norm(&on), norm(&off));
+        assert_eq!(on.status, QueryStatus::Complete);
+    }
+    // Span-level conditions still find it.
+    let by_span = run(
+        sources(),
         SearchQuery::new(pred(vec![builtin(
-            BuiltinField::RootName,
+            BuiltinField::Name,
             CompareOp::Eq,
             vec![text("orphan-op")],
-        )]))
-    };
-    let on = run(sources(), q());
+        )])),
+    );
+    assert_eq!(ids(&by_span), vec![hex(1)]);
+}
+
+/// The 1D effectiveness win, pinned as the second incident shape: a
+/// root selection over a ROOTLESS-heavy corpus. Gate-off assembles
+/// every candidate just to exclude it (`Partial{WorkCeiling}`);
+/// gate-on proves each one rootless from its `ROOT_CLAIM_NONE` row and
+/// answers `Complete` — the no-root prune.
+#[test]
+fn rootless_heavy_corpus_completes_root_selections() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "flagd")];
+    // 70 two-span rootless traces (the parent was never exported).
+    let reqs: Vec<ExportTraceServiceRequest> = (0..70u8)
+        .map(|i| {
+            req_with(svc.clone(), None, &[
+                span_in(i + 1, 0x10, 0xEE, u64::from(i + 1) * NS, "eval"),
+                span_in(i + 1, 0x11, 0x10, u64::from(i + 1) * NS + 5, "resolve"),
+            ])
+        })
+        .collect();
+    let wal = write_wal(dir.path(), reqs, "rootless-heavy");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let q = || SearchQuery::new(pred(vec![root_service_eq("flagd")])).limit(1);
+
     let off = run(sources(), q().trace_gate_for_tests(false));
-    assert_eq!(ids(&on), vec![hex(1)], "graph-root fallback matches");
-    assert_eq!(norm(&on), norm(&off));
+    assert!(off.traces.is_empty());
+    assert!(
+        off.status.has(PartialReason::WorkCeiling),
+        "gate-off burns the ceiling excluding rootless candidates: {:?}",
+        off.status
+    );
+
+    let on = run(sources(), q());
+    assert!(on.traces.is_empty());
+    assert_eq!(on.status, QueryStatus::Complete, "the no-root prune proves it");
 }
 
 /// Negated conditions never prune: a `!=` root selection and a `!=`

@@ -29,10 +29,16 @@
 //!   rollup proves the trace absent from that file). A file with no
 //!   rollup chunk (pre-rollup retention) is Uncovered and blocks
 //!   pruning for every candidate it might contain.
-//! - Root rule (positive conditions only): at least one row claims a
-//!   true root AND every claiming row's resolved value fails the
-//!   condition. No cross-file root selection is ever attempted — the
-//!   rollup has no root start, so "the" root is not identifiable
+//! - No-root prune (any root condition, either polarity — decision
+//!   1D): when every covering row PROVES local root absence
+//!   (`ROOT_CLAIM_NONE`), the assembled trace has no unset-parent span
+//!   and no root condition can be satisfied (absent-never-satisfies).
+//!   A `ROOT_CLAIM_WITHHELD` row (ambiguous tie abstention) blocks
+//!   BOTH root rules — real roots exist there, values unknown.
+//! - All-claims-fail (positive conditions only): at least one row
+//!   claims a true root AND every claiming row's resolved value fails
+//!   the condition. No cross-file root selection is ever attempted —
+//!   the rollup has no root start, so "the" root is not identifiable
 //!   across files; all-claims-fail needs no ordering.
 //! - Duration rule: the MERGED cross-file envelope
 //!   (`max(max_end) - min(min_start)`, saturating) falls below the
@@ -105,6 +111,7 @@ pub(crate) enum GateDecision {
 pub(crate) struct GateStats {
     pub checks: u64,
     pub prunes: u64,
+    pub no_root_prunes: u64,
     pub tail_unprunable: u64,
     pub uncovered_unprunable: u64,
     pub bloom_probes: u64,
@@ -145,6 +152,8 @@ struct GateFile<'r, 'a> {
 struct RowEvidence {
     file: usize,
     row: usize,
+    /// The row's root-claim tri-state (`sfst::ROOT_CLAIM_*`).
+    claim: u8,
 }
 
 /// One claiming row's verdict against one root condition.
@@ -160,6 +169,9 @@ pub(crate) struct TraceGate<'r, 'a, 'e> {
     tail_ids: HashSet<sfst::TraceId>,
     /// Positive root conditions; matchers borrow the compiled eval.
     root_conditions: Vec<(GateRootField, &'e EvalMatcher)>,
+    /// ANY root condition exists (negated included) — the no-root
+    /// prune's trigger under true-root filter semantics (decision 1D).
+    has_root_conditions: bool,
     /// The resource `service.name` storage spelling, computed once.
     service_field: String,
     duration_lower_bound: Option<i64>,
@@ -190,6 +202,7 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
                 .collect(),
             tail_ids,
             root_conditions: eval.prunable_root_conditions().collect(),
+            has_root_conditions: eval.has_root_conditions(),
             service_field: resource_service_field(),
             duration_lower_bound: eval.duration_lower_bound(),
             new_failures: Vec::new(),
@@ -235,7 +248,11 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
                         unreachable!("probe said Ready")
                     };
                     if let Some(row) = rollup.find(trace_id) {
-                        rows.push(RowEvidence { file: idx, row });
+                        rows.push(RowEvidence {
+                            file: idx,
+                            row,
+                            claim: rollup.root_is_true_root[row],
+                        });
                     }
                     // A missing row in a valid rollup proves the trace
                     // absent from this file — nothing to collect.
@@ -244,21 +261,47 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         }
         // Coverage-complete now holds over the surviving files.
 
+        // ── Root claim census (decision 1D) ──────────────────────────
+        let mut any_claim = false;
+        let mut any_withheld = false;
+        for r in &rows {
+            if self.files[r.file].failed {
+                continue;
+            }
+            match r.claim {
+                sfst::ROOT_CLAIM_TRUE => any_claim = true,
+                sfst::ROOT_CLAIM_WITHHELD => any_withheld = true,
+                _ => {}
+            }
+        }
+        // No-root prune: every covering row proves LOCAL root absence,
+        // so the assembled trace (tails already excluded) has no
+        // unset-parent span — under true-root filter semantics no root
+        // condition, negated included, can be satisfied.
+        if self.has_root_conditions && !rows.is_empty() && !any_claim && !any_withheld {
+            self.stats.no_root_prunes += 1;
+            self.stats.prunes += 1;
+            return GateDecision::Prune;
+        }
+
         // ── Root rule: prune iff ≥1 true-root claim and ALL fail ─────
         // Index-iterated, copying each (Copy) pair out per round — the
         // matcher borrows the eval, not the gate, so per-row file state
-        // stays freely borrowable without cloning the list per pop.
-        'condition: for ci in 0..self.root_conditions.len() {
+        // stays freely borrowable without cloning the list per pop. A
+        // withheld claim hides real unset-parent spans with unknown
+        // values, so all-claims-fail cannot be proven — rule skipped.
+        let positive_conditions = if any_withheld { 0 } else { self.root_conditions.len() };
+        'condition: for ci in 0..positive_conditions {
             let (field, matcher) = self.root_conditions[ci];
             let mut claiming = 0usize;
-            for &RowEvidence { file, row } in &rows {
+            for &RowEvidence { file, row, claim } in &rows {
                 if self.files[file].failed {
                     continue; // failed mid-check while testing this candidate
                 }
                 let RollupState::Ready(rollup) = &self.files[file].rollup else {
                     unreachable!("evidence rows come from Ready rollups")
                 };
-                if rollup.root_is_true_root[row] != 1 {
+                if claim != sfst::ROOT_CLAIM_TRUE {
                     continue;
                 }
                 claiming += 1;
@@ -293,7 +336,7 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         // ── Duration rule: merged envelope below the lower bound ─────
         if let Some(bound) = self.duration_lower_bound {
             let mut envelope: Option<(i64, i64)> = None;
-            for &RowEvidence { file, row } in &rows {
+            for &RowEvidence { file, row, .. } in &rows {
                 if self.files[file].failed {
                     continue;
                 }

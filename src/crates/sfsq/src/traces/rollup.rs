@@ -176,7 +176,7 @@ pub fn sealed_trace_aggregates(
             max_end_ns: rollup.max_end_ns[i],
             span_count: u64::from(rollup.span_counts[i]),
             error_count: u64::from(rollup.error_counts[i]),
-            root: (rollup.root_is_true_root[i] == 1).then(|| TraceRootInfo {
+            root: (rollup.root_is_true_root[i] == sfst::ROOT_CLAIM_TRUE).then(|| TraceRootInfo {
                 span_id: rollup.root_span_ids.get(i),
                 kind: rollup.root_kinds[i],
                 service: value_of(rollup.root_service_refs[i]),

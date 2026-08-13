@@ -15,8 +15,11 @@
 //!   otherwise `root_is_true_root` is false and the root fields are
 //!   sentinels. A consumer NEVER synthesizes a root from them. A full
 //!   `(start_ns, span_id)` tie between candidates with DIFFERENT
-//!   recorded facets ABSTAINS (no claim) rather than guessing a pick
-//!   the combiner's deeper tie-break keys could contradict.
+//!   recorded facets ABSTAINS rather than guessing a pick the
+//!   combiner's deeper tie-break keys could contradict — flagged
+//!   [`ROOT_CLAIM_WITHHELD`], distinct from [`ROOT_CLAIM_NONE`]'s
+//!   proof of local root absence (the flag a pruning consumer may
+//!   act on under true-root filter semantics).
 //! - **UNSET trace ids are excluded** (the TIDX rule): the all-zero id
 //!   is the OTLP "unset" sentinel, not a trace.
 //!
@@ -38,6 +41,17 @@ use crate::{KvId, SpanId, SpanIds, TraceId, TraceIds};
 /// `u32::MAX` can never collide.
 pub const ROLLUP_NO_REF: u32 = u32::MAX;
 
+/// [`TraceRollup::root_is_true_root`] tri-state: NO unset-parent span
+/// of this trace is stored in this file — under true-root filter
+/// semantics this is PROOF the file contributes no root.
+pub const ROOT_CLAIM_NONE: u8 = 0;
+/// The root columns carry the file's true-root claim.
+pub const ROOT_CLAIM_TRUE: u8 = 1;
+/// Unset-parent spans exist in this file but the claim was WITHHELD
+/// (an ambiguous full-key tie): consumers must treat the root as
+/// unknown — neither absent nor any particular value.
+pub const ROOT_CLAIM_WITHHELD: u8 = 2;
+
 /// The sealed rollup: struct-of-arrays, index-parallel across every
 /// field, sorted ascending by trace id. Root fields are meaningful only
 /// where [`root_is_true_root`](Self::root_is_true_root) is `1`.
@@ -57,8 +71,11 @@ pub struct TraceRollup {
     pub error_counts: Vec<u32>,
     /// The true root's raw OTLP span kind; 0 when no true root.
     pub root_kinds: Vec<i32>,
-    /// 1 when a genuinely unset-parent span of this trace exists in this
-    /// file (its fields populate the root columns); else 0.
+    /// Root-claim tri-state per row: [`ROOT_CLAIM_NONE`] (no
+    /// unset-parent span stored here — proof of local root absence),
+    /// [`ROOT_CLAIM_TRUE`] (the root columns carry the claim), or
+    /// [`ROOT_CLAIM_WITHHELD`] (unset-parent spans exist, claim
+    /// withheld on an ambiguous tie — root unknown).
     pub root_is_true_root: Vec<u8>,
     /// File-interner [`KvId`] of the root's resource `service.name`
     /// entry, or [`ROLLUP_NO_REF`].
@@ -72,7 +89,7 @@ impl TraceRollup {
     /// Validate the decoded chunk's structural invariants (the reader
     /// calls this; unit-testable without a file, the `LinkIndex`
     /// precedent): index-parallel arrays, in-range root refs (`kv_total`
-    /// exclusive, [`ROLLUP_NO_REF`] allowed), 0/1 flags, and strictly
+    /// exclusive, [`ROLLUP_NO_REF`] allowed), tri-state claim flags, and strictly
     /// increasing trace ids (the seal sorts; a crafted duplicate would
     /// silently double-count in every cross-source merge).
     pub(crate) fn validate(&self, kv_total: u32) -> Result<(), crate::Error> {
@@ -94,7 +111,7 @@ impl TraceRollup {
         let ref_ok = |r: u32| r == ROLLUP_NO_REF || r < kv_total;
         if !self.root_service_refs.iter().all(|&r| ref_ok(r))
             || !self.root_name_refs.iter().all(|&r| ref_ok(r))
-            || !self.root_is_true_root.iter().all(|&f| f <= 1)
+            || !self.root_is_true_root.iter().all(|&f| f <= ROOT_CLAIM_WITHHELD)
         {
             return Err(crate::Error::CorruptIndex(
                 "trace rollup carries out-of-range root refs or flags".into(),
@@ -279,25 +296,27 @@ impl TraceRollupRows {
             out.span_counts.push(acc.span_count);
             out.error_counts.push(acc.error_count);
             match &acc.root {
-                // An ambiguous tie abstains — same row shape as no root.
+                // An ambiguous tie abstains — sentinel fields, but the
+                // WITHHELD flag keeps it distinct from proven absence
+                // (a pruning consumer may act on NONE, never on this).
                 Some(_) if acc.root_ambiguous => {
                     out.root_span_ids.push(SpanId::UNSET);
                     out.root_kinds.push(0);
-                    out.root_is_true_root.push(0);
+                    out.root_is_true_root.push(ROOT_CLAIM_WITHHELD);
                     out.root_service_refs.push(ROLLUP_NO_REF);
                     out.root_name_refs.push(ROLLUP_NO_REF);
                 }
                 Some(r) => {
                     out.root_span_ids.push(r.span_id);
                     out.root_kinds.push(r.kind);
-                    out.root_is_true_root.push(1);
+                    out.root_is_true_root.push(ROOT_CLAIM_TRUE);
                     out.root_service_refs.push(translate(&r.service));
                     out.root_name_refs.push(translate(&r.name));
                 }
                 None => {
                     out.root_span_ids.push(SpanId::UNSET);
                     out.root_kinds.push(0);
-                    out.root_is_true_root.push(0);
+                    out.root_is_true_root.push(ROOT_CLAIM_NONE);
                     out.root_service_refs.push(ROLLUP_NO_REF);
                     out.root_name_refs.push(ROLLUP_NO_REF);
                 }
@@ -423,7 +442,7 @@ mod tests {
             rows.record_span(tid(1), sid(7), true, 100, 5, first.0, first.1, None, None);
             rows.record_span(tid(1), sid(7), true, 100, 5, second.0, second.1, None, None);
             let sealed = rows.sealed(&[]);
-            assert_eq!(sealed.root_is_true_root, vec![0], "flip={flip}");
+            assert_eq!(sealed.root_is_true_root, vec![ROOT_CLAIM_WITHHELD], "flip={flip}");
             assert!(sealed.root_span_ids.get(0).is_unset());
             assert_eq!(sealed.root_service_refs[0], ROLLUP_NO_REF);
             // The abstention drops only the CLAIM, not the row stats.
@@ -508,8 +527,8 @@ mod tests {
         assert!(broken.validate(0).is_err(), "out-of-range ref");
 
         let mut broken = good.clone();
-        broken.root_is_true_root[0] = 2;
-        assert!(broken.validate(0).is_err(), "flag beyond 0/1");
+        broken.root_is_true_root[0] = 3;
+        assert!(broken.validate(0).is_err(), "flag beyond the tri-state");
 
         let mut broken = good.clone();
         let dup = broken.trace_ids.get(0);

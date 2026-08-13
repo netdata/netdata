@@ -43,18 +43,33 @@
 //! [`Cancelled`](PartialReason::Cancelled) (plus any reasons already
 //! observed).
 //!
+//! # Trace-level filter semantics: TRUE roots only (decision 1D)
+//!
+//! `trace:root_service_name` / `trace:root_name` conditions match the
+//! trace's TRUE root — the earliest span with a genuinely unset parent
+//! — and NOTHING else: a trace whose root span was never exported has
+//! no root as far as filters are concerned, either polarity
+//! (absent-never-satisfies). This is the ecosystem's semantics (Tempo
+//! TraceQL's `trace:rootService`, SigNoz's `parent_span_id = ''` root
+//! scope) and matches the aggregate panels, which fold true-root-only
+//! rollup rows. The ORPHAN-PROMOTED root (`Trace::summary_root`'s
+//! graph-root fallback) is a DISPLAY affordance on summaries — the
+//! jaeger-ui pattern — and never feeds a filter. Root-less traces stay
+//! findable by span-level conditions, by id, and in the panels.
+//!
 //! # Recorded-vs-canonical root divergence (the accepted ruling)
 //!
 //! The trace-level gate ([`gate`](super::gate)) prunes root-selection
-//! candidates on the sealed rollup's RECORDED per-file root, while the
-//! post-assembly truth evaluates the CANONICAL root
-//! (`Trace::summary_root`). The two picks diverge in exactly three
-//! mechanisms, all accepted by explicit project ruling as
-//! ignore-and-document (recall-miss only; seal-side tie-break hardening
-//! was rejected as unjustified recorder/combiner lockstep). Under any of
-//! them, a FILTERED search may omit a matching trace while reporting
-//! `Complete`; the trace stays findable unfiltered, by id (`trace:id`
-//! pins bypass the gate), and in the aggregate panels:
+//! candidates on the sealed rollup's RECORDED per-file root claims,
+//! while the post-assembly truth evaluates the assembled TRUE root
+//! (above). The recorded claims can diverge from the assembled pick in
+//! the mechanisms below, accepted by explicit project ruling as
+//! ignore-and-document (recall-miss only; seal-side hardening beyond
+//! the tie abstention was rejected as unjustified recorder/combiner
+//! lockstep). Under a residual mechanism, a FILTERED search may omit a
+//! matching trace while reporting `Complete`; the trace stays findable
+//! unfiltered, by id (`trace:id` pins bypass the gate), and in the
+//! panels:
 //!
 //! 1. **Tie-breaking — CLOSED by the recorder's abstention.** On a
 //!    full `(start_ns, span_id)` tie the canonical pick continues
@@ -70,10 +85,13 @@
 //! 2. **Stored-vs-retained.** The recorder folds STORED rows; the
 //!    combiner works on RETAINED canonical copies — a recorded root can
 //!    be a stored row whose canonical `(span_id, kind)` copy lives
-//!    elsewhere with a different parent/name (the "phantom root"); when
-//!    every true-root claim is a phantom, the canonical path falls back
-//!    to an orphan root no rollup row claims. Requires producers that
-//!    contradict themselves across resends.
+//!    elsewhere with a different parent/name (the "phantom root"). A
+//!    phantom claim can mask a real, later true root (all-claims-fail
+//!    prunes on the phantom's values while the assembled true root
+//!    matches), and under 1D a claim can also exist where the RETAINED
+//!    copies carry no unset parent at all (the gate then declines the
+//!    no-root prune it could have made — conservative, not wrong).
+//!    Requires producers that contradict themselves across resends.
 //! 3. **Multi-valued `name`.** The seal records the LAST `name` entry
 //!    of the root span; evaluation reads the FIRST. Divergent only for
 //!    a crafted frame; the single-valued OTLP assumption is explicit.
@@ -890,14 +908,19 @@ pub fn search(
                 // EXCLUDED as indeterminate (the underlying cause
                 // already marked the query Partial: SizeCap at the
                 // examined-truncated rule, SourceFailure at the
-                // failure sites), never guessed either way.
+                // failure sites), never guessed either way. Root
+                // conditions test the TRUE root only (decision 1D —
+                // see the module docs): a trace whose root span was
+                // never exported has NO root as far as filters are
+                // concerned; the summary's promoted root is display.
                 if let Some(tl) = &trace_level_eval {
                     if !summary.exact {
                         continue; // indeterminate → excluded
                     }
+                    let (true_root_name, true_root_service) = true_root_fields(&trace);
                     if !tl.matches(
-                        summary.root_name.as_deref(),
-                        summary.root_service.as_deref(),
+                        true_root_name.as_deref(),
+                        true_root_service.as_deref(),
                         summary.duration_ns,
                     ) {
                         continue; // decided no-match
@@ -1047,6 +1070,36 @@ fn discovery_state(
     }))
 }
 
+/// One span field's first value, by storage field name.
+fn span_field(span: &sfst::TraceSpan, field: &str) -> Option<String> {
+    span.fields
+        .iter()
+        .find(|(k, _)| k == field)
+        .map(|(_, v)| v.clone())
+}
+
+/// The TRUE root's `(name, resource service)` — both `None` when the
+/// assembled trace has no unset-parent span. Decision 1D: trace-level
+/// FILTERS consume only these (the ecosystem's `trace:rootService`
+/// semantics — a root-less trace matches no root condition, either
+/// polarity, via absent-never-satisfies); the summary's orphan-promoted
+/// root remains a DISPLAY affordance (the jaeger-ui pattern) and must
+/// never feed a filter.
+fn true_root_fields(trace: &sfst::Trace) -> (Option<String>, Option<String>) {
+    // Spans are in combiner total order, so the first unset-parent span
+    // IS the canonical true root (summary_root's first branch).
+    let Some(root) = trace.spans.iter().find(|s| s.parent_span_id.is_unset()) else {
+        return (None, None);
+    };
+    let name_field = BuiltinField::Name
+        .dictionary_field()
+        .expect("Name is dictionary-backed");
+    (
+        span_field(root, name_field),
+        span_field(root, &super::vocab::resource_service_field()),
+    )
+}
+
 /// Derive one exact summary from the assembled trace (pins R2-5):
 /// root fields from the combiner's summary root, envelope with
 /// saturating arithmetic, counts over the retained capped set, and the
@@ -1066,12 +1119,7 @@ fn summarize(
     let status_field = BuiltinField::Status
         .dictionary_field()
         .expect("Status is dictionary-backed");
-    let field_of = |span: &sfst::TraceSpan, field: &str| -> Option<String> {
-        span.fields
-            .iter()
-            .find(|(k, _)| k == field)
-            .map(|(_, v)| v.clone())
-    };
+    let field_of = span_field;
 
     let root = trace.summary_root().map(|i| &trace.spans[i]);
     let start_ns = trace.spans.iter().map(|s| s.start_ns).min().unwrap_or(0);
