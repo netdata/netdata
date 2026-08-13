@@ -225,7 +225,7 @@ static int close_keeping_errno(int fd) {
 // or -1 with errno set. When the file exists, is accessible to group or other,
 // and cannot be chmod()-ed, *replace_it is set: the caller may then remove the
 // file and retry with O_EXCL.
-static int fopen_secret_open_fd(const char *filename, int extra_flags, bool *replace_it) {
+static int fopen_secret_open_fd(const char *filename, const char *mode, int extra_flags, bool *replace_it) {
     *replace_it = false;
 
     // O_CREAT's mode applies only when the file is created, and umask can still
@@ -251,10 +251,14 @@ static int fopen_secret_open_fd(const char *filename, int extra_flags, bool *rep
     struct stat before;
     bool have_before = lstat(filename, &before) == 0;
     if(have_before) {
+#ifdef S_ISLNK
         if(S_ISLNK(before.st_mode)) {
             errno = ELOOP; // what O_NOFOLLOW would have returned
             return -1;
         }
+#endif
+        // a symlink also fails this check, so the refusal holds even where the
+        // platform has no S_ISLNK - only the reported errno differs
         if(!S_ISREG(before.st_mode)) {
             errno = EINVAL;
             return -1;
@@ -276,6 +280,13 @@ static int fopen_secret_open_fd(const char *filename, int extra_flags, bool *rep
     // appears. POSIX makes this a no-op for regular files, so the returned stream
     // behaves exactly as before for real secrets.
     flags |= O_NONBLOCK;
+#endif
+
+#ifdef O_BINARY
+    // where text/binary modes exist, the descriptor decides newline translation,
+    // so honour the caller's "b" the way the fopen() calls this replaced did
+    if(mode && strchr(mode, 'b'))
+        flags |= O_BINARY;
 #endif
 
     int fd = open(filename, flags, 0600);
@@ -329,37 +340,48 @@ static int fopen_secret_open_fd(const char *filename, int extra_flags, bool *rep
 
 FILE *fopen_secret_write(const char *filename, const char *mode) {
     bool replace_it = false;
-    int fd = fopen_secret_open_fd(filename, 0, &replace_it);
+    int fd = fopen_secret_open_fd(filename, mode, 0, &replace_it);
 
     if(fd == -1 && replace_it) {
         // The file is group or other accessible and un-chmod-able, so writing the
         // secret into it would expose it. The secret directories are writable by
         // the netdata group, so replace the file instead of failing permanently -
         // this is a truncating open, so its old content is discarded either way.
-        int saved_errno = errno;
+        int chmod_errno = errno;
 
         if(unlink(filename) != 0) {
-            errno = saved_errno;
+            // keep unlink()'s errno, it is the actionable one: EBUSY for a secret
+            // that is a single-file bind mount, EROFS for a read-only directory
+            int unlink_errno = errno;
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Cannot make '%s' private (%s) and cannot replace it (%s) - "
+                   "refusing to write a secret into a file readable by others.",
+                   filename, strerror(chmod_errno), strerror(unlink_errno));
+            errno = unlink_errno;
             return NULL;
         }
 
         // O_EXCL: if anything recreated the path in the meantime, fail instead of
         // writing the secret into someone else's file
-        fd = fopen_secret_open_fd(filename, O_EXCL, &replace_it);
+        fd = fopen_secret_open_fd(filename, mode, O_EXCL, &replace_it);
     }
 
     if(fd == -1)
         return NULL;
 
-    // now that the mode is pinned, make it behave like fopen(filename, "w")
-    if(ftruncate(fd, 0) != 0) {
+    // fdopen() before ftruncate(): a failure here must leave the previous content
+    // alone, the same way every refusal above does
+    FILE *fp = fdopen(fd, mode);
+    if(!fp) {
         close_keeping_errno(fd);
         return NULL;
     }
 
-    FILE *fp = fdopen(fd, mode);
-    if(!fp) {
-        close_keeping_errno(fd);
+    // now that the mode is pinned, make it behave like fopen(filename, "w")
+    if(ftruncate(fd, 0) != 0) {
+        int saved_errno = errno;
+        fclose(fp);
+        errno = saved_errno;
         return NULL;
     }
 

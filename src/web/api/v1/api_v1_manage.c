@@ -72,8 +72,9 @@ static char *get_mgmt_api_key(void) {
         // so a symlink planted at api_key_filename cannot redirect truncation to another file.
         //
         // Kept instead of fopen_secret_write() on this platform on purpose: the
-        // helper's lstat()/O_EXCL/inode-comparison fallback still leaves a narrow
-        // hardlink window that this atomic rename does not.
+        // helper's lstat()/O_EXCL/inode-comparison fallback closes the symlink
+        // redirect but not a hardlink planted before its lstat(), which this
+        // atomic rename does.
         char tmp_filename[FILENAME_MAX + 1];
         snprintfz(tmp_filename, FILENAME_MAX, "%s.tmp.XXXXXX", api_key_filename);
 

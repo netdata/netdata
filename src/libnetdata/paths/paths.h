@@ -12,18 +12,21 @@ bool filename_is_file(const char *filename);
 bool filename_is_dir(const char *filename, bool create_it);
 
 // Open a file for writing secrets (private keys, claim tokens, bearer tokens).
-// Truncates like fopen(filename, "w"), but the result is always mode 0600 -
-// both when the file is created and when it already exists with wider
-// permissions. fopen() would create it 0666 & ~umask, which with the daemon's
-// umask(0007) leaves secrets readable and writable by the whole netdata group.
+// Truncates like fopen(filename, "w"), but the result is never accessible to
+// group or other - it is set to 0600 both when the file is created and when it
+// already exists with wider permissions, and the only case where a different
+// mode survives is a filesystem that refuses chmod on a file that is already
+// owner-only (which may leave it tighter than 0600, never wider). fopen() would
+// create it 0666 & ~umask, which with the daemon's umask(0007) leaves secrets
+// readable and writable by the whole netdata group.
 //
 // The secret directories are group-writable, so symlinks and non-regular files
 // at the target path are refused instead of being followed or written into. Where
-// O_NOFOLLOW exists that is the open() itself; elsewhere (the Windows build) the
-// path is lstat()-ed first, creation is forced with O_EXCL, and the opened
-// inode is compared against what was inspected - which leaves only the narrow
-// case of a hardlink planted before the lstat() (normally blocked by
-// fs.protected_hardlinks).
+// O_NOFOLLOW exists that is the open() itself. Elsewhere the path is lstat()-ed
+// first, creation is forced with O_EXCL, and the opened inode is compared against
+// what was inspected; that closes the symlink redirect but not a hardlink planted
+// before the lstat(), so callers needing that guarantee too must write to a
+// unique temporary file and rename() it into place instead.
 //
 // An existing file that cannot be chmod()-ed - chmod needs ownership, not write
 // access, so a secret left behind by an agent that ran as root is writable
