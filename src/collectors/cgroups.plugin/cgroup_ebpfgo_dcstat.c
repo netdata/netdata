@@ -109,15 +109,21 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
     if (unlikely(!cgroup_ebpfgo_dcstat_snapshot_ready))
         return;
 
-    /* Don't create charts until this cgroup actually has directory-cache data.
+    /* Charts are created for every live cgroup while dcstat is publishing —
+     * deliberately NOT conditioned on this cgroup having directory-cache data.
      *
-     * The test is on ct (set whenever any PID in the cgroup carries a dcstat SHM
-     * row), NOT on the published values: dcstat's idle ratio is 0 by design,
-     * unlike cachestat's 100, so a values-based guard would keep the charts
-     * hidden on any cgroup whose lookups happen to be quiet in the first cycles.
-     * Once st_dcstat_ratio exists the guard is skipped and the charts persist. */
-    if (!cg->st_dcstat_ratio && !cg->dcstat.ct)
-        return;
+     * Two earlier attempts got this wrong:
+     *   - a values-based guard (copied from cachestat) never fires for dcstat,
+     *     because dcstat's idle ratio is 0 where cachestat's is 100;
+     *   - a presence-based guard (cg->dcstat.ct != 0) hides every cgroup whose
+     *     PIDs carry no dcstat row.  With the default `collect pid = real
+     *     parent`, a container's main process is attributed to its runtime
+     *     shim's TGID, which lives outside the container cgroup, so v1
+     *     containers never qualified while systemd services (whose parent
+     *     chains stay inside the cgroup) did.
+     *
+     * The removed C module created these charts for every updated cgroup, and
+     * cachestat effectively does the same today, so this matches both. */
 
     const bool is_service = is_cgroup_systemd_service(cg);
     const char *ratio_context = is_service ? "systemd.service.dc_ratio" : "cgroup.dc_ratio";
