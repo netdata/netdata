@@ -18,7 +18,12 @@ bool filename_is_dir(const char *filename, bool create_it);
 // umask(0007) leaves secrets readable and writable by the whole netdata group.
 //
 // The secret directories are group-writable, so symlinks and non-regular files
-// at the target path are refused instead of being followed or written into.
+// at the target path are refused instead of being followed or written into. Where
+// O_NOFOLLOW exists that is the open() itself; elsewhere (the Windows build) the
+// path is lstat()-ed first, creation is forced with O_EXCL, and the opened
+// inode is compared against what was inspected - which leaves only the narrow
+// case of a hardlink planted before the lstat() (normally blocked by
+// fs.protected_hardlinks).
 //
 // An existing file that cannot be chmod()-ed - chmod needs ownership, not write
 // access, so a secret left behind by an agent that ran as root is writable

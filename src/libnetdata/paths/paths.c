@@ -238,11 +238,37 @@ static int fopen_secret_open_fd(const char *filename, int extra_flags, bool *rep
     // replaced by an empty one.
     int flags = O_WRONLY | O_CREAT | O_CLOEXEC | extra_flags;
 
+    // The directory holding these secrets is group-writable (cloud.d is 0770), so
+    // the final path component is attacker-controllable: without protection we
+    // would chmod and truncate whatever a planted symlink points at.
 #ifdef O_NOFOLLOW
-    // the directory holding these secrets is group-writable (cloud.d is 0770), so
-    // the final path component is attacker-controllable: without this we would
-    // chmod and truncate whatever a planted symlink points at.
     flags |= O_NOFOLLOW;
+#else
+    // Platforms without O_NOFOLLOW (the Windows build) have to check the path
+    // themselves: refuse a symlink up front, and refuse anything that is no
+    // longer the object we inspected once the open() returns. Same approach as
+    // daemon/status-file-io.c.
+    struct stat before;
+    bool have_before = lstat(filename, &before) == 0;
+    if(have_before) {
+        if(S_ISLNK(before.st_mode)) {
+            errno = ELOOP; // what O_NOFOLLOW would have returned
+            return -1;
+        }
+        if(!S_ISREG(before.st_mode)) {
+            errno = EINVAL;
+            return -1;
+        }
+    }
+    else {
+        if(errno != ENOENT)
+            return -1;
+
+        // nothing is there, so require that we are the ones creating it: anything
+        // planted between the lstat() and the open() then fails with EEXIST
+        // instead of being followed
+        flags |= O_EXCL;
+    }
 #endif
 
 #ifdef O_NONBLOCK
@@ -267,6 +293,15 @@ static int fopen_secret_open_fd(const char *filename, int extra_flags, bool *rep
         errno = EINVAL;
         return -1;
     }
+
+#ifndef O_NOFOLLOW
+    // the path was swapped between the lstat() above and this open()
+    if(have_before && (before.st_dev != st.st_dev || before.st_ino != st.st_ino)) {
+        close(fd);
+        errno = ELOOP;
+        return -1;
+    }
+#endif
 
     if(fchmod(fd, 0600) != 0) {
         int saved_errno = errno;
