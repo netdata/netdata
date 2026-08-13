@@ -59,7 +59,7 @@ static bool check_and_generate_certificates() {
     EVP_PKEY_CTX_free(pctx);
 
     // Save private key
-    fp = fopen(private_key_file, "wb");
+    fp = fopen_secret_write(private_key_file, "wb");
     if (!fp || !PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL)) {
         claim_agent_failure_reason_set("Cannot write private key file: %s", private_key_file);
         if (fp) fclose(fp);
@@ -73,7 +73,7 @@ static bool check_and_generate_certificates() {
     }
 
     // Save public key
-    fp = fopen(public_key_file, "wb");
+    fp = fopen_secret_write(public_key_file, "wb");
     if (!fp || !PEM_write_PUBKEY(fp, pkey)) {
         claim_agent_failure_reason_set("Cannot write public key file: %s", public_key_file);
         if (fp) {

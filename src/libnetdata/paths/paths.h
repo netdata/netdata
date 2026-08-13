@@ -11,6 +11,14 @@ char *filename_from_path_entry_strdupz(const char *path, const char *entry);
 bool filename_is_file(const char *filename);
 bool filename_is_dir(const char *filename, bool create_it);
 
+// Open a file for writing secrets (private keys, claim tokens, bearer tokens).
+// Truncates like fopen(filename, "w"), but the result is always mode 0600 -
+// both when the file is created and when it already exists with wider
+// permissions. fopen() would create it 0666 & ~umask, which with the daemon's
+// umask(0007) leaves secrets readable and writable by the whole netdata group.
+// Returns NULL and leaves errno set on failure.
+FILE *fopen_secret_write(const char *filename, const char *mode);
+
 bool path_entry_is_file(const char *path, const char *entry);
 bool path_entry_is_dir(const char *path, const char *entry, bool create_it);
 

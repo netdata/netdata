@@ -214,6 +214,45 @@ bool path_entry_is_file(const char *path, const char *entry) {
     return filename_is_file(filename);
 }
 
+FILE *fopen_secret_write(const char *filename, const char *mode) {
+    // O_CREAT's mode applies only when the file is created, and umask can still
+    // clear bits from it, so fchmod() after the open is what actually pins 0600
+    // - it also fixes a file left behind with wider permissions by an older
+    // agent, or by fopen() before this helper existed.
+    //
+    // Deliberately no O_TRUNC: we truncate only after the mode is confirmed, so
+    // that a filesystem which rejects fchmod() (or an EPERM) leaves any existing
+    // secret intact instead of replacing it with an empty file.
+    int fd = open(filename, O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+    if(fd == -1)
+        return NULL;
+
+    if(fchmod(fd, 0600) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    // now that the mode is pinned, make it behave like fopen(filename, "w")
+    if(ftruncate(fd, 0) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    FILE *fp = fdopen(fd, mode);
+    if(!fp) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    return fp;
+}
+
 void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *entry, int (*callback)(const char *filename, void *data, bool stock_config), void *data, size_t depth) {
     if(depth > 3) {
         netdata_log_error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path,
