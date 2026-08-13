@@ -84,6 +84,7 @@ An explicit description MUST:
   hyphen thematic break at the beginning, and no URL, double quote, or backslash;
 - not begin with `- `, `+ `, `* `, or a one-to-nine-digit ordered-list marker such as `1. ` or `1) `, and not consist only of
   three or more hyphens separated by optional spaces. Internal hyphens, plus signs, and digits remain valid plain text;
+- be a complete statement: it must not end with `:` and every round parenthesis must be balanced. Nested balanced parentheses are valid;
 - be unique across every generated integration page. Duplicate identity is case-insensitive and NFC-normalized, but accepted authored
   text is emitted exactly and is never silently normalized;
 - accurately describe the specific integration in active, user-facing language.

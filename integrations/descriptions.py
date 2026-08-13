@@ -46,6 +46,19 @@ _SENTENCE_END_RE = re.compile(r"(?<=[.!?])(?:\s+|$)")
 _CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]")
 
 
+def parentheses_are_balanced(text: str) -> bool:
+    """Return whether round parentheses are balanced, including nested pairs."""
+    depth = 0
+    for character in text:
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
 def _remove_fenced_blocks(markdown: str) -> str:
     return re.sub(r"```.*?```|~~~.*?~~~", " ", markdown, flags=re.DOTALL)
 
@@ -221,6 +234,10 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append("contains a Markdown-special character")
     if _COMMONMARK_BLOCK_START_RE.search(description):
         errors.append("starts a CommonMark block")
+    if description.endswith(":"):
+        errors.append("ends with a colon")
+    if not parentheses_are_balanced(description):
+        errors.append("contains unbalanced parentheses")
     if '"' in description or "\\" in description:
         errors.append("contains characters that Learn's frontmatter parser cannot preserve")
 

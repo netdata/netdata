@@ -36,7 +36,10 @@ The reusable optional explicit-page-description contract: an already-trimmed 50â
 plain-text pattern. It rejects leading or trailing whitespace, all C0/C1 controls, surrogate code points, Unicode line and paragraph
 separators, Markdown-special characters (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, and `~`), URLs, double quotes, and
 backslashes. It also rejects a leading CommonMark unordered-list or one-to-nine-digit ordered-list marker and a value consisting only
-of a hyphen thematic break; ordinary internal hyphens, plus signs, and digits remain valid. `shared.instance.description`,
+of a hyphen thematic break, plus terminal colons and unbalanced round parentheses; ordinary internal hyphens, plus signs, digits, and
+nested balanced parentheses remain valid. The repository's `make_validator()` registers and enforces the
+`netdata-balanced-parentheses` format on this definition, so every generator-backed source-schema path applies the same balance check
+as the final Python description validator. `shared.instance.description`,
 `secretstore.meta.description`, and `service_discovery.meta.description` all reference this definition.
 
 ### `$defs.id`

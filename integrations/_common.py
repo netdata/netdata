@@ -2,10 +2,12 @@ import json
 import os
 from pathlib import Path
 
-from jsonschema import Draft7Validator, ValidationError
+from jsonschema import Draft7Validator, FormatChecker, ValidationError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT7
 from ruamel.yaml import YAML, YAMLError
+
+from descriptions import parentheses_are_balanced
 
 
 AGENT_REPO = 'netdata/netdata'
@@ -87,10 +89,19 @@ def retrieve_from_filesystem(uri):
 registry = Registry(retrieve=retrieve_from_filesystem)
 
 
+format_checker = FormatChecker()
+
+
+@format_checker.checks('netdata-balanced-parentheses')
+def _check_balanced_parentheses(instance):
+    return not isinstance(instance, str) or parentheses_are_balanced(instance)
+
+
 def make_validator(schema_ref):
     return Draft7Validator(
         {'$ref': schema_ref},
         registry=registry,
+        format_checker=format_checker,
     )
 
 

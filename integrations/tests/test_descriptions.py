@@ -25,9 +25,12 @@ from descriptions import (
     MAX_DESCRIPTION_LENGTH,
     MIN_DESCRIPTION_LENGTH,
     build_description_index,
+    description_report,
     extract_description_from_overview,
+    get_description_override,
     get_integration_meta_description,
     normalize_description,
+    parentheses_are_balanced,
     validate_description,
 )
 from _common import make_validator
@@ -172,6 +175,8 @@ VALID_EXPLICIT_DESCRIPTIONS = {
     "Unicode prose": "Monitor Κατάσταση, 数据, and café service health across reliable production systems.",
     "Unicode joiners": "Monitor Persian می‌شود text and 👩‍💻 operator workflows across reliable production systems.",
     "non-ASCII URL lookalike": "Monitor K://example identifiers as plain Unicode text across reliable production systems.",
+    "balanced nested parentheses": "Monitor service health (including nested (optional) detail) across reliable production systems.",
+    "internal colon": "Monitor service health by state: ready, degraded, and failed across reliable production systems.",
 }
 VALID_EXPLICIT_DESCRIPTIONS.update(COMMONMARK_PLAIN_TEXT_DESCRIPTIONS)
 
@@ -203,6 +208,10 @@ INVALID_EXPLICIT_DESCRIPTIONS = {
     "Unicode paragraph separator": "Monitor service behavior and health across production systems.\u2029Track reliable operations.",
     "high surrogate": "Monitor service behavior and health across production \ud800 systems reliably.",
     "low surrogate": "Monitor service behavior and health across production \udfff systems reliably.",
+    "terminal colon": "Monitor service health and behavior across reliable production systems safely:",
+    "missing closing parenthesis": "Monitor service health (including optional detail across reliable production systems safely.",
+    "unexpected closing parenthesis": "Monitor service health including optional detail) across reliable production systems safely.",
+    "misordered parentheses": "Monitor service health )(with optional detail across reliable production systems safely.",
 }
 INVALID_EXPLICIT_DESCRIPTIONS.update(
     {
@@ -268,6 +277,36 @@ LIBNETDATA_REFERENCE_LINKS = {
     },
 }
 
+ACCURACY_OVERRIDE_TARGETS = {
+    "go.d.plugin-azure_monitor-Azure_API_Management",
+    "go.d.plugin-azure_monitor-Azure_Application_Gateway",
+    "go.d.plugin-azure_monitor-Azure_Application_Insights",
+    "go.d.plugin-azure_monitor-Azure_Cache_for_Redis",
+    "go.d.plugin-azure_monitor-Azure_Cognitive_Services",
+    "go.d.plugin-azure_monitor-Azure_Container_Apps",
+    "go.d.plugin-azure_monitor-Azure_Container_Instances",
+    "go.d.plugin-azure_monitor-Azure_Container_Registry",
+    "go.d.plugin-azure_monitor-Azure_Data_Explorer_Cluster",
+    "go.d.plugin-azure_monitor-Azure_ExpressRoute_Circuit",
+    "go.d.plugin-azure_monitor-Azure_ExpressRoute_Gateway",
+    "go.d.plugin-azure_monitor-Azure_Kubernetes_Service_Cluster",
+    "go.d.plugin-azure_monitor-Azure_Load_Balancer",
+    "go.d.plugin-azure_monitor-Azure_Log_Analytics_Workspace",
+    "go.d.plugin-azure_monitor-Azure_Machine_Learning_Workspace",
+    "go.d.plugin-azure_monitor-Azure_MySQL_Flexible_Server",
+    "go.d.plugin-azure_monitor-Azure_PostgreSQL_Flexible_Server",
+    "go.d.plugin-azure_monitor-Azure_SQL_Elastic_Pool",
+    "go.d.plugin-azure_monitor-Azure_SQL_Managed_Instance",
+    "go.d.plugin-azure_monitor-Azure_Storage_Account",
+    "go.d.plugin-azure_monitor-Azure_Stream_Analytics_Job",
+    "go.d.plugin-azure_monitor-Azure_Synapse_Analytics_Workspace",
+    "go.d.plugin-azure_monitor-Azure_Virtual_Machine",
+    "go.d.plugin-azure_monitor-Azure_Virtual_Machine_Scale_Set",
+    "go.d.plugin-ntpd-NTPd",
+    "go.d.plugin-zookeeper-ZooKeeper",
+    "windows.plugin-PerflibHyperV-Hyper-V",
+}
+
 
 def remove_fenced_code(markdown):
     return re.sub(r"```.*?```|~~~.*?~~~", " ", markdown, flags=re.DOTALL)
@@ -324,6 +363,32 @@ Monitor **short** metrics. Collect enough detail to pass meta-description valida
         self.assertLessEqual(len(description), MAX_DESCRIPTION_LENGTH)
         self.assertTrue(description.endswith("…"))
         self.assertNotIn(" …", description)
+
+    def test_terminal_colon_extraction_fails_final_validation(self):
+        integration = {
+            "id": "terminal-colon",
+            "overview": "# Example\n\n## Overview\n\nMonitor service metrics covering:\n\n- latency\n- errors",
+        }
+        self.assertEqual(
+            extract_description_from_overview(integration["overview"], for_meta=True),
+            "Monitor service metrics covering:",
+        )
+        with self.assertRaisesRegex(ValueError, "ends with a colon"):
+            get_integration_meta_description(integration)
+
+    def test_truncation_inside_parentheses_fails_final_validation(self):
+        integration = {
+            "id": "unbalanced-truncation",
+            "overview": (
+                "# Example\n\n## Overview\n\nMonitor service health across production systems "
+                "with detailed resource statistics (including CPU utilization, memory pressure, "
+                "storage latency, network throughput, process state, and availability) for operators."
+            ),
+        }
+        extracted = extract_description_from_overview(integration["overview"], for_meta=True)
+        self.assertFalse(parentheses_are_balanced(extracted))
+        with self.assertRaisesRegex(ValueError, "contains unbalanced parentheses"):
+            get_integration_meta_description(integration)
 
     def test_wrapping_quotes_are_removed_for_learn_frontmatter(self):
         source = '"Monitor enterprise server sensors, event logs, and hardware health across the infrastructure."'
@@ -437,11 +502,26 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             description = json.loads(matches[0])
             validate_description(description, integration["id"])
             self.assertEqual(description, get_integration_meta_description(integration))
+            self.assertFalse(description.endswith(":"), integration["id"])
+            self.assertTrue(parentheses_are_balanced(description), integration["id"])
             descriptions.append(unicodedata.normalize("NFC", description.casefold()))
 
         self.assertEqual(seen_modes, DOCUMENTATION_TYPES)
         self.assertEqual(len(descriptions), len(set(descriptions)))
         self.assertTrue(all(MIN_DESCRIPTION_LENGTH <= len(value) <= MAX_DESCRIPTION_LENGTH for value in descriptions))
+
+    def test_complete_corpus_and_accuracy_override_inventory(self):
+        report = description_report(self.documented)
+        self.assertEqual(report["pages"], len(self.documented))
+        self.assertEqual(
+            report["explicit_overrides"] + report["mechanical_descriptions"],
+            report["pages"],
+        )
+
+        by_id = {integration["id"]: integration for integration in self.documented}
+        self.assertTrue(ACCURACY_OVERRIDE_TARGETS.issubset(by_id))
+        for integration_id in ACCURACY_OVERRIDE_TARGETS:
+            self.assertIsNotNone(get_description_override(by_id[integration_id]), integration_id)
 
     def test_logo_and_maintenance_badges_have_alt_text(self):
         integration = next(item for item in self.documented if item["integration_type"] == "collector")

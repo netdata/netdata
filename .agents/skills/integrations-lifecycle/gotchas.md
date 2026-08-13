@@ -387,6 +387,13 @@ Draft-7 JSON Schema `dependencies` keyword: when
 non-obvious -- nothing else in the schemas uses
 `dependencies`, and no commentary explains it.
 
+## Page-description balance uses a custom schema format
+
+Draft-7 regular expressions cannot express arbitrary balanced parentheses readably. The shared page-description definition therefore
+sets `format: netdata-balanced-parentheses`, and `integrations/_common.py` registers that format so it calls the same balance helper as
+final Python description validation. Always validate integration source schemas through `make_validator()`; a generic Draft-7
+validator without the repository format checker will legally ignore the custom format and provide incomplete evidence.
+
 ## `fail_on_warnings` makes ALL warnings fatal
 
 `gen_integrations.py:150-160`. Any single validation warning
