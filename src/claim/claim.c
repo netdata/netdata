@@ -35,7 +35,7 @@ const char *claim_agent_failure_reason_get(void) {
 bool claimed_id_save_to_file(const char *claimed_id_str) {
     bool ret;
     const char *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "claimed_id");
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen_secret_write(filename, "w");
     if(fp) {
         int written = fprintf(fp, "%s", claimed_id_str);
         int saved_errno = errno;
