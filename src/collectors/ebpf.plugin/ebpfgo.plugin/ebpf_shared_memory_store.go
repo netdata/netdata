@@ -146,9 +146,12 @@ func (s *ebpfSharedMemoryStore) Snapshot() []ebpfPidStat {
 //
 // selfFlag is the caller's own EBPFGO_SHM_FLAG_* bit.
 //
-// The lock is held for the duration of the C memcpy because the other modules'
-// goroutines write s.entries in place on the same backing array that the C side
-// reads; releasing the lock would expose a data race.
+// The lock is held for the duration of the C memcpy because of scratch-buffer
+// reuse, NOT because anything writes s.entries in place: rebuildEntriesLocked
+// builds a fresh slice and swaps it in, which hands the array the C side is
+// reading back to s.nextEntries.  The very next rebuild overwrites that array, so
+// releasing the lock around the memcpy would expose a data race.  Do not drop the
+// lock on the grounds that the swap makes it unnecessary.
 func (s *ebpfSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher, selfFlag uint32) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

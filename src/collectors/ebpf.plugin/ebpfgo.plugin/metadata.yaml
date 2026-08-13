@@ -96,7 +96,7 @@ modules:
               default_value: buffer
               required: false
             - name: ebpf type format
-              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              description: "Legacy key from the C ebpf.plugin, kept so migrated configurations still parse. It maps onto `ebpf object flavor`: `legacy` forces the kprobe-based tracing objects, while `co-re` and `auto` are accepted no-ops that leave the flavor to auto-detection. Prefer `ebpf object flavor` in new configurations."
               default_value: auto
               required: false
             - name: ebpf co-re tracing
@@ -259,7 +259,7 @@ modules:
               default_value: buffer
               required: false
             - name: ebpf type format
-              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
+              description: "Legacy key from the C ebpf.plugin, kept so migrated configurations still parse. It maps onto `ebpf object flavor`: `legacy` forces the kprobe-based tracing objects, while `co-re` and `auto` are accepted no-ops that leave the flavor to auto-detection. Prefer `ebpf object flavor` in new configurations."
               default_value: auto
               required: false
             - name: ebpf co-re tracing

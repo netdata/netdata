@@ -30,11 +30,10 @@ type cachestatGlobalPublish struct {
 }
 
 type cachestatGlobalState struct {
-	initialized bool
-	prev        cachestatGlobalCounters
-	cumDirty    int64
-	cumHits     int64
-	cumMisses   int64
+	prev      cachestatGlobalCounters
+	cumDirty  int64
+	cumHits   int64
+	cumMisses int64
 }
 
 type cachestatGlobalChart struct {
@@ -129,7 +128,6 @@ func (s *cachestatGlobalState) Update(current cachestatGlobalCounters) (cachesta
 	publish.Hit = s.cumHits
 	publish.Miss = s.cumMisses
 	s.prev = current
-	s.initialized = true
 
 	return publish, true
 }

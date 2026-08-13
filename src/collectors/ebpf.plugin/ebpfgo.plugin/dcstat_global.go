@@ -47,8 +47,14 @@ type dcstatGlobalChart struct {
 	dimensions []dcstatGlobalDimension
 }
 
-// Chart ids, contexts, units, and priorities are the ones the C dcstat module
-// published, so existing dashboards and alarms keep working after the port.
+// Chart ids, contexts, and priorities are the ones the C dcstat module published,
+// so existing dashboards and alarms keep resolving.  The units and algorithms of
+// dc_reference deliberately do NOT match C: it published pre-computed interval
+// totals as `files` with the `absolute` algorithm, while this collector publishes
+// the raw cumulative counters as `files/s` with `incremental` and lets the
+// database derive the rate.  At the stock update_every of 10s that renders values
+// roughly 10x smaller, because they are now a rate rather than a per-interval
+// total.  See the module metadata for the operator-facing note.
 var dcstatGlobalCharts = []dcstatGlobalChart{
 	{
 		id:      "dc_hit_ratio",
@@ -102,6 +108,12 @@ func dcstatHitRatio(reference, notFound int64) int64 {
 // per-interval value (the C collector divided lifetime totals, which barely
 // moves after a few hours of uptime and disagrees with the per-app and
 // per-cgroup ratios computed from interval deltas).
+//
+// The first sample has no previous reading, so it reports the idle ratio of 0
+// rather than a lifetime-derived figure — the same self-baselining rule
+// buildDCStatPublish applies per PID.  cachestat's global state deliberately
+// lacks this gate and derives its first ratio from lifetime totals; that code is
+// already shipped, so the two are not unified here.
 func (s *dcstatGlobalState) Update(current dcstatGlobalCounters) (dcstatGlobalPublish, bool) {
 	publish := dcstatGlobalPublish{
 		Reference: int64(current.Reference),
