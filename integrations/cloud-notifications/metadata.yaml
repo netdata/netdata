@@ -771,6 +771,7 @@
     categories:
       - notify.cloud
     icon_filename: "group_email.svg"
+    description: "Group Email sends Space-wide alert notifications to a shared group or mailing-list address, independently of each member's notification settings."
   keywords:
     - group email
     - mailing list
