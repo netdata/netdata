@@ -56,14 +56,17 @@
 //! `Complete`; the trace stays findable unfiltered, by id (`trace:id`
 //! pins bypass the gate), and in the aggregate panels:
 //!
-//! 1. **Tie-breaking.** The rollup recorder keeps the FIRST-STORED
-//!    unset-parent span on a full `(start_ns, span_id)` tie (its `<`
-//!    comparator is strict), while the canonical pick continues through
-//!    the combiner total order `(start_ns, span_id, kind, content)`.
-//!    A shared-span-id root pair (the Zipkin-bridge client/server
-//!    shape) with equal starts and per-kind values can therefore record
-//!    one root while the canonical root is the other. Equal-start ties
-//!    with DISTINCT span ids stay deterministic (ascending span id).
+//! 1. **Tie-breaking — CLOSED by the recorder's abstention.** On a
+//!    full `(start_ns, span_id)` tie the canonical pick continues
+//!    through the combiner total order `(kind, content)`, which the
+//!    recorder does not model; instead of guessing, the recorder drops
+//!    the claim when tie candidates differ in any recorded facet
+//!    (kind, service, name) — no claim, no prune, no divergence. A
+//!    facet-identical tie may still record either copy, but the gate
+//!    only ever tests those equal facets, so no observable divergence
+//!    remains from ties. (Equal-start ties with DISTINCT span ids were
+//!    always deterministic: ascending span id.) Aggregate panels lose
+//!    the root for ambiguous-tie traces — honest-or-absent.
 //! 2. **Stored-vs-retained.** The recorder folds STORED rows; the
 //!    combiner works on RETAINED canonical copies — a recorded root can
 //!    be a stored row whose canonical `(span_id, kind)` copy lives

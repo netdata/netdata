@@ -763,22 +763,19 @@ fn pruning_masks_assembly_only_corruption_by_design() {
     );
 }
 
-/// The ruled recorded-vs-canonical divergence, pinned AS accepted
-/// behavior (mechanism 1 in search's module docs): two unset-parent
+/// The recorder's tie ABSTENTION, pinned end to end: two unset-parent
 /// spans sharing `(start_ns, span_id)` with different kinds and
-/// per-kind services. The rollup records the first-stored span; the
-/// canonical root is the combiner-order winner — a filtered search may
-/// omit the trace under `Complete`, while the pinned by-id lookup
-/// (which bypasses the gate) still returns it. If this test ever fails,
-/// either the ruling was implemented away (seal-side hardening) or the
-/// gate started diverging somewhere new — both need a human.
+/// per-kind services. The recorder cannot model the combiner's deeper
+/// tie-break keys, so it records NO root claim — the gate treats the
+/// candidate as unprunable and gate-on answers byte-identically to the
+/// truth path for BOTH tie services. (Before the abstention this shape
+/// was the ruled kind-tie recall miss; the abstention closed it.)
 #[test]
-fn ruled_root_tie_divergence_is_recall_miss_only() {
+fn ambiguous_root_ties_abstain_and_never_diverge() {
     let dir = tempfile::tempdir().unwrap();
     // Same span id + start; CLIENT(3)/svc-first stored first,
     // SERVER(2)/svc-canon second — the combiner orders by kind, so the
-    // canonical root is the SERVER copy while the rollup records the
-    // first-stored CLIENT copy.
+    // canonical root is the SERVER copy whichever was stored first.
     let first = req_with(vec![kv_str("service.name", "svc-first")], None, &[SpanSpec {
         kind: 3,
         ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
@@ -790,21 +787,13 @@ fn ruled_root_tie_divergence_is_recall_miss_only() {
     let wal = write_wal(dir.path(), vec![first, second], "tie");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
-    let q = || SearchQuery::new(pred(vec![root_service_eq("svc-canon")]));
-    let off = run(sources(), q().trace_gate_for_tests(false));
-    let canonical_finds = ids(&off);
-    let on = run(sources(), q());
-    if canonical_finds == vec![hex(1)] {
-        // The divergent shape materialized: the gate-on filtered list
-        // omits the match, Complete — the accepted recall miss.
-        assert!(on.traces.is_empty(), "ruled divergence: filtered omit");
-        assert_eq!(on.status, QueryStatus::Complete);
-    } else {
-        // Storage order put the canonical winner in the rollup too —
-        // then there is no divergence to accept.
-        assert_eq!(norm(&on), norm(&off));
+    for service in ["svc-canon", "svc-first"] {
+        let q = || SearchQuery::new(pred(vec![root_service_eq(service)]));
+        let on = run(sources(), q());
+        let off = run(sources(), q().trace_gate_for_tests(false));
+        assert_eq!(norm(&on), norm(&off), "root={service}");
     }
-    // The trace stays findable by id regardless (pins bypass the gate).
+    // And the trace is findable by id (pins bypass the gate).
     let by_id = run(
         sources(),
         SearchQuery::new(pred(vec![builtin(

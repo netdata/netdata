@@ -13,7 +13,10 @@
 //!   span with a genuinely UNSET parent seen in THIS file (the earliest
 //!   such span wins, mirroring `Trace::summary_root`'s convention);
 //!   otherwise `root_is_true_root` is false and the root fields are
-//!   sentinels. A consumer NEVER synthesizes a root from them.
+//!   sentinels. A consumer NEVER synthesizes a root from them. A full
+//!   `(start_ns, span_id)` tie between candidates with DIFFERENT
+//!   recorded facets ABSTAINS (no claim) rather than guessing a pick
+//!   the combiner's deeper tie-break keys could contradict.
 //! - **UNSET trace ids are excluded** (the TIDX rule): the all-zero id
 //!   is the OTLP "unset" sentinel, not a trace.
 //!
@@ -144,6 +147,9 @@ struct Acc {
     error_count: u32,
     /// The earliest unset-parent span seen so far, when any.
     root: Option<Root>,
+    /// The incumbent tied another root candidate with different
+    /// recorded facets: the seal abstains from claiming a root.
+    root_ambiguous: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -200,6 +206,7 @@ impl TraceRollupRows {
             span_count: 0,
             error_count: 0,
             root: None,
+            root_ambiguous: false,
         });
         acc.min_start_ns = acc.min_start_ns.min(start_ns);
         acc.max_end_ns = acc.max_end_ns.max(end_ns);
@@ -209,25 +216,35 @@ impl TraceRollupRows {
         }
         // The earliest genuinely-unset-parent span wins the root
         // (the summary_root convention). Equal starts tie-break by
-        // ascending span id — the combiner total order's next key.
-        // On a FULL (start_ns, span_id) tie the strict `<` keeps the
-        // FIRST-STORED span, while the canonical pick continues through
-        // (kind, content): a ruled, documented divergence (recall-miss
-        // only — see sfsq's search module docs), NOT a determinism
-        // guarantee.
-        if parent_unset
-            && acc
-                .root
-                .as_ref()
-                .is_none_or(|r| (start_ns, span_id) < (r.start_ns, r.span_id))
-        {
-            acc.root = Some(Root {
-                start_ns,
-                span_id,
-                kind,
-                service,
-                name,
-            });
+        // ascending span id — the combiner total order's next key. On a
+        // FULL (start_ns, span_id) tie the canonical pick continues
+        // through keys (kind, content) the recorder does not model, so
+        // the recorder ABSTAINS instead of guessing: a tie challenger
+        // whose recorded facets (kind, service, name) differ from the
+        // incumbent's marks the claim AMBIGUOUS, and the seal emits no
+        // root for the trace — honest-or-absent, storage-order
+        // independent, and never a wrong claim a pruning consumer could
+        // act on. Identical-facet ties (plain resends) keep the claim; a
+        // strictly earlier span installs a fresh unambiguous incumbent.
+        if parent_unset {
+            match &acc.root {
+                Some(r) if (start_ns, span_id) == (r.start_ns, r.span_id) => {
+                    if kind != r.kind || service != r.service || name != r.name {
+                        acc.root_ambiguous = true;
+                    }
+                }
+                Some(r) if (start_ns, span_id) > (r.start_ns, r.span_id) => {}
+                _ => {
+                    acc.root = Some(Root {
+                        start_ns,
+                        span_id,
+                        kind,
+                        service,
+                        name,
+                    });
+                    acc.root_ambiguous = false;
+                }
+            }
         }
     }
 
@@ -262,6 +279,14 @@ impl TraceRollupRows {
             out.span_counts.push(acc.span_count);
             out.error_counts.push(acc.error_count);
             match &acc.root {
+                // An ambiguous tie abstains — same row shape as no root.
+                Some(_) if acc.root_ambiguous => {
+                    out.root_span_ids.push(SpanId::UNSET);
+                    out.root_kinds.push(0);
+                    out.root_is_true_root.push(0);
+                    out.root_service_refs.push(ROLLUP_NO_REF);
+                    out.root_name_refs.push(ROLLUP_NO_REF);
+                }
                 Some(r) => {
                     out.root_span_ids.push(r.span_id);
                     out.root_kinds.push(r.kind);
@@ -385,6 +410,49 @@ mod tests {
         assert_eq!(ids, vec![tid(2), tid(5), tid(9)]);
         assert_eq!(sealed.len(), 3);
         assert!(!sealed.is_empty());
+    }
+
+    #[test]
+    fn full_tie_with_differing_facets_abstains_in_both_orders() {
+        // Same (start, span_id), different kind: the recorder cannot
+        // know the combiner's deeper tie-break — no claim, either way.
+        for flip in [false, true] {
+            let mut rows = TraceRollupRows::new();
+            let (a, b) = ((2, false), (3, true));
+            let (first, second) = if flip { (b, a) } else { (a, b) };
+            rows.record_span(tid(1), sid(7), true, 100, 5, first.0, first.1, None, None);
+            rows.record_span(tid(1), sid(7), true, 100, 5, second.0, second.1, None, None);
+            let sealed = rows.sealed(&[]);
+            assert_eq!(sealed.root_is_true_root, vec![0], "flip={flip}");
+            assert!(sealed.root_span_ids.get(0).is_unset());
+            assert_eq!(sealed.root_service_refs[0], ROLLUP_NO_REF);
+            // The abstention drops only the CLAIM, not the row stats.
+            assert_eq!(sealed.span_counts, vec![2]);
+        }
+    }
+
+    #[test]
+    fn full_tie_with_identical_facets_keeps_the_claim() {
+        // A plain resend (same kind/service/name) is not ambiguous.
+        let mut rows = TraceRollupRows::new();
+        rows.record_span(tid(1), sid(7), true, 100, 5, 2, false, None, None);
+        rows.record_span(tid(1), sid(7), true, 100, 5, 2, false, None, None);
+        let sealed = rows.sealed(&[]);
+        assert_eq!(sealed.root_is_true_root, vec![1]);
+        assert_eq!(sealed.root_span_ids.get(0), sid(7));
+    }
+
+    #[test]
+    fn strictly_earlier_span_revives_an_ambiguous_claim() {
+        let mut rows = TraceRollupRows::new();
+        rows.record_span(tid(1), sid(7), true, 100, 5, 2, false, None, None);
+        rows.record_span(tid(1), sid(7), true, 100, 5, 3, false, None, None);
+        // A strictly earlier root candidate is unambiguous again.
+        rows.record_span(tid(1), sid(9), true, 50, 5, 4, false, None, None);
+        let sealed = rows.sealed(&[]);
+        assert_eq!(sealed.root_is_true_root, vec![1]);
+        assert_eq!(sealed.root_span_ids.get(0), sid(9));
+        assert_eq!(sealed.root_kinds[0], 4);
     }
 
     #[test]
