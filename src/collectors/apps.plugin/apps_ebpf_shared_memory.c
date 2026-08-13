@@ -102,6 +102,12 @@ bool apps_ebpf_shared_memory_refresh(void)
         &apps_ebpf_shared_memory_ctx,
         NETDATA_EBPFGO_INTEGRATION_NAME,
         NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
+    /* Publish the per-cycle result before the sticky availability flags: a reader
+     * that sampled between the two writes would otherwise see available = true
+     * with last_refresh_ok still false and skip a cycle.  Today every caller is
+     * on the same thread, so this is ordering hygiene rather than a live race. */
+    apps_ebpf_last_refresh_ok = ok;
+
     if (ok) {
         uint32_t flags = netdata_ebpfgo_shared_pid_memory_flags(&apps_ebpf_shared_memory_ctx);
         if (flags & EBPFGO_SHM_FLAG_CACHESTAT)
@@ -109,7 +115,6 @@ bool apps_ebpf_shared_memory_refresh(void)
         if (flags & EBPFGO_SHM_FLAG_DCSTAT)
             apps_ebpf_dcstat_available = true;
     }
-    apps_ebpf_last_refresh_ok = ok;
     return ok;
 }
 

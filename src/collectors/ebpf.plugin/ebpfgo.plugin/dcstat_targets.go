@@ -59,8 +59,8 @@ func resolveDCStatTargetsFrom(open kallsymsOpener) DCStatTargets {
 
 	warn := func(err error) {
 		rateLimitedStderr("dcstat.kallsyms",
-			fmt.Sprintf("ebpf-go.plugin: dcstat: cannot resolve %q from the kernel symbol table (%v); attaching to it as-is\n",
-				targets.LookupFast.Name, err))
+			"ebpf-go.plugin: dcstat: cannot resolve %q from the kernel symbol table (%v); attaching to it as-is\n",
+			targets.LookupFast.Name, err)
 	}
 
 	symbols, err := open()

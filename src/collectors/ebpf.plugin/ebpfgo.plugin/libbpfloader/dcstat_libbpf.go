@@ -71,6 +71,9 @@ type DCStatRuntime struct {
 	// appsBuf is a persistent output buffer reused across SnapshotApps calls so
 	// the per-cycle allocation pressure is zero in the steady state.  Owned by
 	// the runtime; cleared in Close().
+	//
+	// LIFETIME: the slice SnapshotApps returns aliases this buffer.  Consume it
+	// before the next SnapshotApps call; it must not be retained past that.
 	appsBuf []DCStatAppSnapshot
 }
 

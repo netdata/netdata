@@ -18,26 +18,40 @@ var (
 	errorLogLastLog = map[string]time.Time{}
 )
 
-// rateLimitedStderr writes msg to stderr the first time and at most once per
-// errorLogInterval.  The site key identifies the error site; use a short
+// rateLimitedStderr writes a message to stderr the first time and at most once
+// per errorLogInterval.  The site key identifies the error site; use a short
 // stable string per call site (e.g. "cachestat.snapshot").
-func rateLimitedStderr(site, msg string) {
+//
+// The message is formatted only when it will actually be written, so a site
+// that fails every collection cycle costs one map lookup rather than a
+// Sprintf.
+func rateLimitedStderr(site, format string, args ...any) {
+	if !claimErrorLogSlot(site) {
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, format, args...)
+}
+
+// claimErrorLogSlot reports whether this site may log now, recording the time
+// when it may.
+func claimErrorLogSlot(site string) bool {
 	errorLogMu.Lock()
 	defer errorLogMu.Unlock()
 
 	now := time.Now()
 	if last, ok := errorLogLastLog[site]; ok && now.Sub(last) < errorLogInterval {
-		return
+		return false
 	}
 	errorLogLastLog[site] = now
-	fmt.Fprint(os.Stderr, msg)
+	return true
 }
 
 // logPluginErr writes a "ebpf-go.plugin: <module> <what> failed: <err>\n"
 // message through rateLimitedStderr.  Used by the cachestat / socket / dns
 // collectors so each error site logs at most once per errorLogInterval.
 func logPluginErr(site, module, what string, err error) {
-	rateLimitedStderr(site, fmt.Sprintf("ebpf-go.plugin: %s %s failed: %v\n", module, what, err))
+	rateLimitedStderr(site, "ebpf-go.plugin: %s %s failed: %v\n", module, what, err)
 }
 
 // warnIntegrationDisabled explains, once per module, why an enabled collector is

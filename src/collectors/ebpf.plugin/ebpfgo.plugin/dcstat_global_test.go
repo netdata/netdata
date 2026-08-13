@@ -108,3 +108,34 @@ func formatDCStatGlobalChart(chart dcstatGlobalChart, updateEvery int) string {
 
 	return buf.String()
 }
+
+// TestDCStatGlobalStateUpdateIndependentRegression pins that diffCounters clamps
+// each counter independently: one field regressing (a map reset for that key)
+// must not suppress the deltas of the others.
+func TestDCStatGlobalStateUpdateIndependentRegression(t *testing.T) {
+	state := &dcstatGlobalState{}
+	state.Update(dcstatGlobalCounters{Reference: 1000, Slow: 200, Miss: 50})
+
+	// Reference regresses, Miss advances: the ratio must fall back to the idle
+	// convention (0) rather than deriving from a negative reference delta.
+	got, _ := state.Update(dcstatGlobalCounters{Reference: 500, Slow: 300, Miss: 60})
+	if got.Ratio != 0 {
+		t.Fatalf("ratio = %d, want 0 when the reference counter regressed", got.Ratio)
+	}
+	if got.Reference != 500 || got.Slow != 300 || got.Miss != 60 {
+		t.Fatalf("counters = %+v, want the raw values published verbatim", got)
+	}
+}
+
+// TestDCStatGlobalStateUpdateHugeCounters pins the clamp at the uint64->int64
+// boundary: diffCounters must not produce a negative delta that would invert the
+// ratio.
+func TestDCStatGlobalStateUpdateHugeCounters(t *testing.T) {
+	state := &dcstatGlobalState{}
+	state.Update(dcstatGlobalCounters{Reference: 0, Slow: 0, Miss: 0})
+
+	got, _ := state.Update(dcstatGlobalCounters{Reference: 1 << 62, Slow: 1 << 62, Miss: 0})
+	if got.Ratio != 100 {
+		t.Fatalf("ratio = %d, want 100 (no misses on a huge reference delta)", got.Ratio)
+	}
+}

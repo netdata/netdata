@@ -71,11 +71,14 @@ type ebpfSharedMemoryStore struct {
 	cachestatStale  []uint32
 
 	// ---- dcstat ----
-	dcstatData   map[uint32]netdataPublishDCStat
-	dcstatIdent  map[uint32]ebpfModuleIdentity
-	dcstatPIDs   []uint32 // ascending; drives the merge
-	dcstatPrev   map[uint32]netdataPublishDCStatPid
-	nextDcstat   map[uint32]netdataPublishDCStatPid
+	dcstatData  map[uint32]netdataPublishDCStat
+	dcstatIdent map[uint32]ebpfModuleIdentity
+	dcstatPIDs  []uint32 // ascending; drives the merge
+	dcstatPrev  map[uint32]netdataPublishDCStatPid
+	nextDcstat  map[uint32]netdataPublishDCStatPid
+	// dcstatPrevCt/nextDcstatCt hold the *synthetic* freshness token this store
+	// publishes for dcstat, not the BPF `ct` field.  See UpdateDCStatApps for why
+	// the BPF value cannot be used.
 	dcstatPrevCt map[uint32]uint64
 	nextDcstatCt map[uint32]uint64
 	dcstatMiss   map[uint32]int

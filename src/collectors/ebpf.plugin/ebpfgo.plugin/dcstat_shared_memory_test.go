@@ -125,17 +125,19 @@ func TestDCStatStoreFlagsStaleAfterStaleCycles(t *testing.T) {
 	}
 }
 
-func TestDCStatStoreNoFlagWhenCtAdvances(t *testing.T) {
+func TestDCStatStoreNoFlagWhenCountersAdvance(t *testing.T) {
 	store := NewEbpfSharedMemoryStore()
-	app := libbpfloader.DCStatAppSnapshot{Pid: 7, Ct: 100}
+	// The BPF ct is held fixed on purpose: it is not the freshness signal, so only
+	// counter movement may clear the stale flag.  See TestDCStatFreshnessIgnoresBPFCt.
+	app := libbpfloader.DCStatAppSnapshot{Pid: 7, Ct: 100, CacheAccess: 10}
 
 	for range ebpfStaleCycles {
 		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
 	}
 
-	app.Ct = 200
+	app.CacheAccess = 20
 	if stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}); len(stale) != 0 {
-		t.Fatalf("expected no stale flag after ct advance, got stale=%v", stale)
+		t.Fatalf("expected no stale flag after the counters advanced, got stale=%v", stale)
 	}
 }
 
@@ -249,7 +251,7 @@ func TestDCStatStoreKeepsBaselineForIdlePID(t *testing.T) {
 	}
 
 	// The process was only idle: it wakes up and does 100 more lookups, 10 missed.
-	app.Ct = 200
+	// The BPF ct stays where it was — the counters alone must revive the row.
 	app.CacheAccess = 1100
 	app.NotFound = 110
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
@@ -325,5 +327,167 @@ func TestClearDCStatAppsKeepsBaseline(t *testing.T) {
 	}
 	if snap[0].dc.Ratio != 90 {
 		t.Fatalf("ratio = %d, want 90", snap[0].dc.Ratio)
+	}
+}
+
+// TestDCStatStoreEmptySnapshotPreservesBaseline pins the fix for a real data
+// loss: SnapshotApps returns a nil slice for an empty BPF map/accumulator, and
+// rotating that empty map into the baseline discarded every PID's previous
+// counters, so the next active cycle re-baselined and silently dropped one
+// interval of activity.
+func TestDCStatStoreEmptySnapshotPreservesBaseline(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 10, Ct: 100, CacheAccess: 1000, NotFound: 100},
+	})
+	store.UpdateDCStatApps(nil) // empty cycle: nothing to publish, baseline must survive
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 10, Ct: 200, CacheAccess: 1100, NotFound: 110},
+	})
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if snap[0].dc.CacheAccess != 100 {
+		t.Fatalf("cache_access delta = %d, want 100 (baseline must survive an empty cycle)",
+			snap[0].dc.CacheAccess)
+	}
+	if snap[0].dc.Ratio != 90 {
+		t.Fatalf("ratio = %d, want 90", snap[0].dc.Ratio)
+	}
+}
+
+// TestCachestatStoreEmptySnapshotPreservesBaseline is the cachestat half of the
+// same defect — it rotated the empty baseline in exactly the same way.
+func TestCachestatStoreEmptySnapshotPreservesBaseline(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
+		{Pid: 10, Ct: 100, MarkPageAccessed: 1000, AddToPageCacheLru: 100},
+	})
+	store.UpdateApps(nil)
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
+		{Pid: 10, Ct: 200, MarkPageAccessed: 1100, AddToPageCacheLru: 110},
+	})
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	// interval: mark_page_accessed +100 (total), add_to_page_cache_lru +10 (misses)
+	if snap[0].cachestat.Hit != 90 || snap[0].cachestat.Miss != 10 {
+		t.Fatalf("hit/miss = %d/%d, want 90/10 (baseline must survive an empty cycle)",
+			snap[0].cachestat.Hit, snap[0].cachestat.Miss)
+	}
+}
+
+// TestSharedStoreModulesUpdateIndependently pins the merge asymmetry: a cycle in
+// which only one module updates must not drop the other module's rows.
+func TestSharedStoreModulesUpdateIndependently(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ppid: 1, Ct: 100, MarkPageAccessed: 50}})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 20, Ppid: 1, Ct: 100, CacheAccess: 9}})
+
+	// cachestat alone updates: PID 20's dcstat row must survive.
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ppid: 1, Ct: 200, MarkPageAccessed: 90}})
+	snap := store.Snapshot()
+	if len(snap) != 2 || snap[1].pid != 20 || snap[1].dc.Curr.CacheAccess != 9 {
+		t.Fatalf("dcstat row lost when only cachestat updated: %+v", snap)
+	}
+
+	// dcstat alone updates: PID 10's cachestat row must survive.
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 20, Ppid: 1, Ct: 200, CacheAccess: 19}})
+	snap = store.Snapshot()
+	if len(snap) != 2 || snap[0].pid != 10 || snap[0].cachestat.Current.MarkPageAccessed != 90 {
+		t.Fatalf("cachestat row lost when only dcstat updated: %+v", snap)
+	}
+}
+
+// TestDCStatFreshnessIgnoresBPFCt pins the fix for the dcstat `ct` contract: the
+// CO-RE base object never writes ct (it stays 0) and the legacy object writes it
+// once at map-entry creation.  A ct-based gate suppressed every delta on those two
+// flavors, so the store now derives freshness from the counters and publishes its
+// own monotonic token.
+func TestDCStatFreshnessIgnoresBPFCt(t *testing.T) {
+	cases := map[string]uint64{
+		"co-re base object never writes ct": 0,
+		"legacy object stamps ct once":      1234567890,
+	}
+
+	for name, bpfCt := range cases {
+		t.Run(name, func(t *testing.T) {
+			store := NewEbpfSharedMemoryStore()
+
+			// Cycle 1: first sample. Prev == Curr, so the delta is 0, but the token
+			// must already be non-zero or the consumers' `ct > 0` gate rejects it.
+			store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+				{Pid: 7, Ct: bpfCt, CacheAccess: 100, FileSystem: 10, NotFound: 5},
+			})
+			first := store.Snapshot()[0].dc
+			if first.Ct == 0 {
+				t.Fatalf("first sample published ct = 0; consumers gate on ct > 0")
+			}
+
+			// Cycles 2 and 3: the counters advance while the BPF ct stays put. Each
+			// cycle must publish a strictly greater token and the real delta.
+			prevCt := first.Ct
+			for cycle, access := range []uint64{160, 190} {
+				store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+					{Pid: 7, Ct: bpfCt, CacheAccess: access, FileSystem: 10, NotFound: 5},
+				})
+				got := store.Snapshot()[0].dc
+				if got.Ct <= prevCt {
+					t.Fatalf("cycle %d: ct = %d, want > %d (activity must advance the token)",
+						cycle+2, got.Ct, prevCt)
+				}
+				prevCt = got.Ct
+			}
+			if want := int64(30); prevCt != 0 && store.Snapshot()[0].dc.CacheAccess != want {
+				t.Fatalf("cache_access delta = %d, want %d",
+					store.Snapshot()[0].dc.CacheAccess, want)
+			}
+
+			// Idle cycle: counters unchanged, so the token must be held. A rising
+			// token here would make the consumers re-add the already-counted delta.
+			store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+				{Pid: 7, Ct: bpfCt, CacheAccess: 190, FileSystem: 10, NotFound: 5},
+			})
+			if got := store.Snapshot()[0].dc; got.Ct != prevCt {
+				t.Fatalf("idle cycle: ct = %d, want it held at %d", got.Ct, prevCt)
+			}
+		})
+	}
+}
+
+// TestDCStatStaleUsesCountersNotCt pins that the stale-PID debouncer follows the
+// same counters-derived signal: a PID whose BPF ct never moves but whose counters
+// do must never be flagged stale.
+func TestDCStatStaleUsesCountersNotCt(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+
+	for cycle := range ebpfStaleCycles + 2 {
+		stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+			// Ct pinned at 0, as the CO-RE base object leaves it.
+			{Pid: 7, Ct: 0, CacheAccess: uint64(100 + cycle*10)},
+		})
+		if len(stale) != 0 {
+			t.Fatalf("cycle %d: active PID flagged stale %v", cycle, stale)
+		}
+	}
+
+	// Now go idle with the counters frozen: the debouncer must fire on schedule.
+	var flagged []int
+	for cycle := range ebpfStaleCycles + 1 {
+		stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+			{Pid: 7, Ct: 0, CacheAccess: uint64(100 + (ebpfStaleCycles+1)*10)},
+		})
+		if len(stale) > 0 {
+			flagged = append(flagged, cycle)
+		}
+	}
+	if len(flagged) != 1 || flagged[0] != ebpfStaleCycles-1 {
+		t.Fatalf("stale flagged at cycles %v, want exactly [%d]", flagged, ebpfStaleCycles-1)
 	}
 }

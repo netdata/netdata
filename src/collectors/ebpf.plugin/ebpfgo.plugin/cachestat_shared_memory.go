@@ -119,9 +119,13 @@ func (s *ebpfSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnaps
 	}
 
 	s.cachestatPIDs = pids
-	s.cachestatPrev, s.nextCachestat = s.nextCachestat, s.cachestatPrev
-	s.cachestatPrevCt, s.nextCachestatCt = s.nextCachestatCt, s.cachestatPrevCt
-	s.cachestatMiss, s.nextCachestatMs = s.nextCachestatMs, s.cachestatMiss
+	// See UpdateDCStatApps: an empty snapshot must not rotate the empty baseline
+	// map in, or the next active cycle loses one interval of deltas.
+	if len(s.nextCachestat) > 0 {
+		s.cachestatPrev, s.nextCachestat = s.nextCachestat, s.cachestatPrev
+		s.cachestatPrevCt, s.nextCachestatCt = s.nextCachestatCt, s.cachestatPrevCt
+		s.cachestatMiss, s.nextCachestatMs = s.nextCachestatMs, s.cachestatMiss
+	}
 	s.cachestatStale = stalePIDs
 	s.activeModules |= ebpfgoSHMFlagCachestat // mark cachestat as an active producer
 	s.rebuildEntriesLocked()

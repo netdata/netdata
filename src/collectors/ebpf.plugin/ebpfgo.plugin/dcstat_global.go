@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -265,8 +264,8 @@ func runDCStatGlobalCollector(
 			if len(deadPIDs) > 0 {
 				if err := handle.Runtime.DeletePids(deadPIDs); err != nil {
 					rateLimitedStderr("dcstat.delete_pids",
-						fmt.Sprintf("ebpf-go.plugin: failed to delete %d stale PIDs from dcstat_pid: %v\n",
-							len(deadPIDs), err))
+						"ebpf-go.plugin: failed to delete %d stale PIDs from dcstat_pid: %v\n",
+						len(deadPIDs), err)
 				}
 			}
 		}

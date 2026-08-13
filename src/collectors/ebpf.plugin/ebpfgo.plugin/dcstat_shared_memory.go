@@ -79,9 +79,35 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 	ordered := true
 
 	for _, app := range apps {
+		current := netdataPublishDCStatPid{
+			CacheAccess: app.CacheAccess,
+			FileSystem:  app.FileSystem,
+			NotFound:    app.NotFound,
+		}
+		previous, hasPrevious := s.dcstatPrev[app.Pid]
+
+		// Freshness is derived from the counters, never from app.Ct.  Only the
+		// buffer and arena BPF objects stamp ct on every event; the CO-RE base
+		// object never writes it (so it stays 0 forever) and the legacy object
+		// writes it once when the map entry is created and never again.  Gating on
+		// ct would therefore suppress every delta on those two flavors, which are
+		// reachable as the last loader fallback and as the only path on hosts
+		// without BTF.  The three counters are monotonic per map entry, so "any
+		// counter moved" is an exact activity signal on every flavor.
+		advanced := !hasPrevious || current != previous
+
+		// The published token is synthetic: it advances by one whenever the PID was
+		// active and is otherwise held, which is exactly the contract the C
+		// consumers' `ct > last_consumed_ct` gates expect.  It starts at 1 for a
+		// new PID so those gates admit the first sample.
 		lastCt, seen := s.dcstatPrevCt[app.Pid]
+		publishCt := lastCt
+		if advanced {
+			publishCt++
+		}
+
 		stale := false
-		if seen && app.Ct == lastCt {
+		if seen && !advanced {
 			miss := s.dcstatMiss[app.Pid] + 1
 			if miss >= ebpfStaleCycles {
 				stale = true
@@ -90,18 +116,11 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 				s.nextDcstatMs[app.Pid] = miss
 			}
 		}
-		// New PID or ct advanced: miss count stays 0 (Go zero-value).  A stale
-		// candidate also resets it, so it is re-flagged every ebpfStaleCycles
-		// instead of forcing a kill() probe on every cycle.
+		// New PID or counters advanced: miss count stays 0 (Go zero-value).  A
+		// stale candidate also resets it, so it is re-flagged every
+		// ebpfStaleCycles instead of forcing a kill() probe on every cycle.
 
-		s.nextDcstatCt[app.Pid] = app.Ct
-
-		current := netdataPublishDCStatPid{
-			CacheAccess: app.CacheAccess,
-			FileSystem:  app.FileSystem,
-			NotFound:    app.NotFound,
-		}
-		previous, hasPrevious := s.dcstatPrev[app.Pid]
+		s.nextDcstatCt[app.Pid] = publishCt
 
 		// Carry the counter baseline forward even for a stale candidate.  The
 		// process may simply be idle-but-alive: dropping its previous counters
@@ -119,7 +138,7 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 		copy(ident.comm[:], app.Comm[:])
 		ident.ppid = app.Ppid
 
-		s.dcstatData[app.Pid] = buildDCStatPublish(current, previous, app.Ct, hasPrevious)
+		s.dcstatData[app.Pid] = buildDCStatPublish(current, previous, publishCt, hasPrevious)
 		s.dcstatIdent[app.Pid] = ident
 		pids, ordered = appendAscending(pids, app.Pid, ordered)
 	}
@@ -131,9 +150,16 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 	}
 
 	s.dcstatPIDs = pids
-	s.dcstatPrev, s.nextDcstat = s.nextDcstat, s.dcstatPrev
-	s.dcstatPrevCt, s.nextDcstatCt = s.nextDcstatCt, s.dcstatPrevCt
-	s.dcstatMiss, s.nextDcstatMs = s.nextDcstatMs, s.dcstatMiss
+	// Rotate the baselines only when this cycle actually recorded some.  An empty
+	// snapshot (SnapshotApps returns nil for an empty BPF map or accumulator) must
+	// not swap in the empty map: that would discard every PID's previous counters,
+	// so the next active cycle would look like a first sample and silently drop one
+	// interval of activity.  Socket's prevSocketData rotation is gated the same way.
+	if len(s.nextDcstat) > 0 {
+		s.dcstatPrev, s.nextDcstat = s.nextDcstat, s.dcstatPrev
+		s.dcstatPrevCt, s.nextDcstatCt = s.nextDcstatCt, s.dcstatPrevCt
+		s.dcstatMiss, s.nextDcstatMs = s.nextDcstatMs, s.dcstatMiss
+	}
 	s.dcstatStale = stalePIDs
 	s.activeModules |= ebpfgoSHMFlagDCStat // mark dcstat as an active producer
 	s.rebuildEntriesLocked()

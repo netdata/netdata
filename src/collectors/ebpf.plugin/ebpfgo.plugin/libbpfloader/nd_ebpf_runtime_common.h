@@ -223,7 +223,12 @@ static inline void nd_ebpf_acc_rebuild(struct nd_ebpf_acc_table *t)
     }
 }
 
-/* O(1) amortised: hash lookup, appending a zeroed item on a new TGID. */
+/* O(1) amortised: hash lookup, appending a zeroed item on a new TGID.
+ *
+ * LIFETIME: the returned pointer is valid only until the next call on this
+ * table.  Growth reallocs t->items, so a caller that stashes the pointer and
+ * writes through it after another find_or_add/evict writes into freed memory.
+ * Use it within the current event callback and re-look-up otherwise. */
 static inline void *nd_ebpf_acc_find_or_add(struct nd_ebpf_acc_table *t, uint32_t tgid)
 {
     /* nd_ebpf_acc_init() must run before the first event: with item_size 0 the
@@ -342,7 +347,11 @@ _Static_assert(sizeof(struct nd_ebpf_arena_state) == 49160, "nd_ebpf_arena_state
 
 typedef void (*nd_ebpf_event_fn)(void *ctx, const struct nd_ebpf_pid_event *ev);
 
-/* Consumes every slot published since tail and returns the new tail. */
+/* Consumes every slot published since tail and returns the new tail.
+ *
+ * NOT re-entrant: fn must not drain the same arena_state.  head is sampled once,
+ * so a nested drain would consume events this call still has to replay and the
+ * outer loop would process them twice. */
 static inline uint32_t nd_ebpf_arena_drain(const void *arena_state, uint32_t tail, nd_ebpf_event_fn fn, void *ctx)
 {
     if (!arena_state)
