@@ -47,7 +47,7 @@ ENUM_STR_MAP_DEFINE(https_client_resp_t) = {
     },
     {
         .id = HTTPS_CLIENT_RESP_NO_TLS_HOST_VERIFY,
-        .name = "cannot set TLS hostname verification",
+        .name = "cannot set TLS hostname/IP verification",
     },
     {
         .id = HTTPS_CLIENT_RESP_SSL_CONNECT_FAILED,
@@ -907,7 +907,7 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         if (!X509_VERIFY_PARAM_set1_ip_asc(param, request->host) &&
             !X509_VERIFY_PARAM_set1_host(param, request->host, 0)) {
             rc = HTTPS_CLIENT_RESP_NO_TLS_HOST_VERIFY;
-            netdata_log_error("ACLK: error setting TLS hostname verification host");
+            netdata_log_error("ACLK: error setting TLS hostname/IP verification for '%s'", request->host);
             goto exit_SSL;
         }
     }
