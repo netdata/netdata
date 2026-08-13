@@ -22,6 +22,7 @@
 //!   which deliberately never deduplicate.
 
 mod by_id;
+mod gate;
 mod overview;
 mod predicate;
 mod fold;

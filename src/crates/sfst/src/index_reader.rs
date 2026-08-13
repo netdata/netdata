@@ -13,9 +13,11 @@ use std::collections::HashMap;
 use crate::PrefixMap;
 use crate::reader::ChunkReader;
 
+mod rollup_resolver;
 mod session;
 mod trace_plan;
 
+pub use rollup_resolver::{RollupRefOutcome, RollupRootResolver};
 pub use session::TraceFileSession;
 pub use trace_plan::{
     CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm,

@@ -784,8 +784,11 @@ fn duration_bounds(op: CompareOp, v: i64) -> (Option<i64>, Option<i64>) {
     }
 }
 
-/// The compiled token/number matcher of one span-side term.
-enum EvalMatcher {
+/// The compiled token/number matcher of one span-side term. `pub(crate)`
+/// for ONE extra consumer: the trace-level gate applies the exact same
+/// compiled matcher to rollup-resolved root values (the one-lowering
+/// rule — the gate must never re-derive matching from raw conditions).
+pub(crate) enum EvalMatcher {
     Tokens {
         exact: Vec<String>,
         patterns: Vec<regex::bytes::Regex>,
@@ -801,7 +804,7 @@ impl EvalMatcher {
     /// equality / anchored regex, or the SAME numeric comparator the
     /// dictionary walks use ([`sfst::numeric_token_matches`]), so the
     /// two paths cannot diverge on parsing or comparison.
-    fn value_matches(&self, value: &str) -> bool {
+    pub(crate) fn value_matches(&self, value: &str) -> bool {
         match self {
             EvalMatcher::Tokens { exact, patterns } => {
                 exact.iter().any(|e| e == value)
@@ -1050,6 +1053,16 @@ pub(crate) struct TraceLevelEval {
     conditions: Vec<TraceLevelCondition>,
 }
 
+/// Which root field a gate-prunable condition targets. The gate maps
+/// this to the storage spelling (`name` /
+/// [`resource_service_field`](super::vocab::resource_service_field)) —
+/// the same spellings the rollup capture used.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GateRootField {
+    Service,
+    Name,
+}
+
 enum TraceLevelCondition {
     RootName { matcher: EvalMatcher, negated: bool },
     RootService { matcher: EvalMatcher, negated: bool },
@@ -1102,6 +1115,72 @@ impl TraceLevelEval {
             })
             .collect();
         Self { conditions }
+    }
+
+    /// The gate-prunable POSITIVE root conditions: `(field, matcher)`.
+    /// Negated (`!=`, `!~`) root conditions are deliberately absent —
+    /// the gate cannot PROVE an assembled root equals a specific value
+    /// (multiple candidate roots plus the documented divergence
+    /// mechanisms), so they never prune and the gate never sees them.
+    pub(crate) fn prunable_root_conditions(
+        &self,
+    ) -> impl Iterator<Item = (GateRootField, &EvalMatcher)> {
+        self.conditions.iter().filter_map(|c| match c {
+            TraceLevelCondition::RootName { matcher, negated: false } => {
+                Some((GateRootField::Name, matcher))
+            }
+            TraceLevelCondition::RootService { matcher, negated: false } => {
+                Some((GateRootField::Service, matcher))
+            }
+            _ => None,
+        })
+    }
+
+    /// The single duration lower bound the gate may prune on, if any:
+    /// per POSITIVE duration condition, the MIN over its compiled
+    /// intervals' `lo` values (an interval without a `lo` means the
+    /// condition has no lower bound at all); across conjunctive
+    /// conditions, the MAX. Negated conditions are skipped on the
+    /// NEGATED FLAG, never on interval shape — `!=` compiles to `Eq`
+    /// point-intervals whose `lo` would false-prune. The unsatisfiable
+    /// EMPTY interval keeps its `lo = i64::MAX`, which is sound (the
+    /// condition rejects everything; so does the gate) — do not "fix"
+    /// it. Upper bounds never contribute: the rollup envelope
+    /// over-estimates the canonical duration, so only a lower-bound
+    /// violation is provable.
+    pub(crate) fn duration_lower_bound(&self) -> Option<i64> {
+        let mut best: Option<i64> = None;
+        for c in &self.conditions {
+            let TraceLevelCondition::Duration { intervals, negated: false } = c else {
+                continue;
+            };
+            let mut cond_lo: Option<i64> = None;
+            let mut unbounded = false;
+            for &(lo, _) in intervals {
+                match lo {
+                    None => {
+                        unbounded = true;
+                        break;
+                    }
+                    Some(lo) => cond_lo = Some(cond_lo.map_or(lo, |a| a.min(lo))),
+                }
+            }
+            if unbounded {
+                continue;
+            }
+            if let Some(lo) = cond_lo {
+                best = Some(best.map_or(lo, |b| b.max(lo)));
+            }
+        }
+        best
+    }
+
+    /// Whether ANY condition gives the gate something to prune on —
+    /// the engagement check (a negated-only predicate must not pay for
+    /// gate state it can never use).
+    pub(crate) fn has_prunable_condition(&self) -> bool {
+        self.prunable_root_conditions().next().is_some()
+            || self.duration_lower_bound().is_some()
     }
 
     /// Whether the assembled trace's values satisfy every condition.

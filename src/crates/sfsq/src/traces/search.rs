@@ -52,6 +52,7 @@ use sfst::trace_combine::{SpanSource, combine};
 use sfst::{ScanWork, TraceId};
 
 use super::by_id::{DEFAULT_SPAN_CAP, FieldKinds};
+use super::gate::{GateDecision, TraceGate};
 use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
@@ -110,6 +111,7 @@ pub struct SearchQuery {
     spans_per_trace: usize,
     visited_ceiling: u64,
     span_cap: usize,
+    gate_enabled: bool,
 }
 
 impl SearchQuery {
@@ -121,6 +123,7 @@ impl SearchQuery {
             spans_per_trace: DEFAULT_SPANS_PER_TRACE,
             visited_ceiling: VISITED_ROWS_CEILING,
             span_cap: DEFAULT_SPAN_CAP,
+            gate_enabled: true,
         }
     }
 
@@ -165,6 +168,15 @@ impl SearchQuery {
     #[doc(hidden)]
     pub fn span_cap_for_tests(mut self, cap: usize) -> Self {
         self.span_cap = cap;
+        self
+    }
+
+    /// Test-only kill switch for the trace-level pre-assembly gate —
+    /// the differential gate-on/gate-off superset test's toggle. NOT a
+    /// tuning surface; production always runs with the gate.
+    #[doc(hidden)]
+    pub fn trace_gate_for_tests(mut self, enabled: bool) -> Self {
+        self.gate_enabled = enabled;
         self
     }
 }
@@ -644,6 +656,38 @@ pub fn search(
         file.extend(count, &mut work, &mut pool);
     }
 
+    // ── The trace-level pre-assembly gate (see the gate module) ──────
+    // Engaged only when a prunable trace-level condition exists, the
+    // candidate set is not pinned (a `trace:id =` lookup must always
+    // assemble), and no completion source failed during setup (every
+    // assembly is already degraded then — trace-level evaluation
+    // excludes all candidates as indeterminate, so there is nothing
+    // left to prune toward). Tail provenance is collected EAGERLY here
+    // — ids only, before `merged` takes its `&mut` tail borrows.
+    let mut gate = match &trace_level_eval {
+        Some(tl)
+            if query.gate_enabled
+                && tl.has_prunable_condition()
+                && !pinned
+                && !degraded_assembly =>
+        {
+            let mut tail_ids: HashSet<TraceId> = HashSet::new();
+            for (_, scan) in &tails {
+                for (trace_id, _) in scan.spans_with_ids() {
+                    if !trace_id.is_unset() {
+                        tail_ids.insert(trace_id);
+                    }
+                }
+            }
+            Some(TraceGate::new(
+                readers.iter().map(|(reader, _)| reader).collect(),
+                tail_ids,
+                tl,
+            ))
+        }
+        _ => None,
+    };
+
     // ── Phase 2: sessions over the whole completion snapshot ─────────
     let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = readers
         .iter()
@@ -728,6 +772,30 @@ pub fn search(
                 break;
             }
             let (_, trace_id) = pool.pop().expect("peeked above");
+            // The gate: skip the assembly when the rollup evidence
+            // proves a non-match. A pruned pop charges NOTHING — that
+            // is the incident fix. Corruption the gate discovers is
+            // surfaced per the skip-and-surface principle: the source
+            // is failed (SourceFailure + degraded assembly), so every
+            // LATER summary is inexact and trace-level evaluation
+            // excludes it — the corrupt file's spans can no longer
+            // reach the results even though `merged` still holds the
+            // session (point-of-discovery semantics, the same contract
+            // as a mid-merge read failure).
+            if let Some(g) = gate.as_mut() {
+                let decision = g.check(trace_id);
+                for idx in g.take_new_failures() {
+                    let who = origin.get(idx).map(String::as_str).unwrap_or("?");
+                    tracing::warn!(
+                        "sfsq traces: source {who} is corrupt (gate evidence); skipped and surfaced"
+                    );
+                    status.add(PartialReason::SourceFailure);
+                    degraded_assembly = true;
+                }
+                if decision == GateDecision::Prune {
+                    continue;
+                }
+            }
             let outcome = combine(&mut merged, trace_id, Some(query.span_cap), &|| {
                 cancel.is_cancelled()
             });
@@ -824,6 +892,10 @@ pub fn search(
         }
         // Progress is guaranteed: an unexhausted file either emits or
         // exhausts, so the threat re-check terminates the loop.
+    }
+
+    if let Some(g) = &gate {
+        tracing::debug!(stats = ?g.stats, "sfsq traces: trace-level gate");
     }
 
     // ── Final ordering: canonical rank, trimmed to the limit ─────────

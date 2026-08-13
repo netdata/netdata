@@ -252,12 +252,19 @@ pub fn whole_range(wal_path: &Path) -> wal::FrameRange {
 pub fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
     let out = dir.join(format!("{id}.sfst"));
     ng_index::build_sfst_traces_file(wal_path, &out, &ng_index::Metrics::new()).unwrap();
-    let bytes = std::fs::read(&out).unwrap();
+    sealed_source_at(&out, id)
+}
+
+/// A sealed-file source over an ALREADY-WRITTEN `.sfst` — for suites
+/// that doctor the sealed bytes (chunk corruption/removal) and must not
+/// re-seal over their surgery when building the source vectors.
+pub fn sealed_source_at(path: &Path, id: &str) -> TraceSource {
+    let bytes = std::fs::read(path).unwrap();
     let summary = sfst::read_summary(&bytes).unwrap();
     TraceSource::Sfst(TraceSfstCandidate {
         source_id: SourceId::new(id.to_string()),
         summary,
-        source: Source::File(out),
+        source: Source::File(path.to_owned()),
         coverage: None,
     })
 }

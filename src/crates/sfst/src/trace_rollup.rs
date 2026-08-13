@@ -115,6 +115,24 @@ impl TraceRollup {
     pub fn is_empty(&self) -> bool {
         self.min_start_ns.is_empty()
     }
+
+    /// Row index of `trace_id`, or `None` when this file holds no spans
+    /// of that trace. Binary search over the id column — validation
+    /// guarantees strictly increasing ids, so `partition_point` is exact.
+    pub fn find(&self, trace_id: TraceId) -> Option<usize> {
+        let n = self.trace_ids.len();
+        let mut lo = 0usize;
+        let mut hi = n;
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if self.trace_ids.get(mid) < trace_id {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        (lo < n && self.trace_ids.get(lo) == trace_id).then_some(lo)
+    }
 }
 
 /// One trace's in-progress aggregate (insertion phase).
@@ -363,6 +381,22 @@ mod tests {
         assert_eq!(ids, vec![tid(2), tid(5), tid(9)]);
         assert_eq!(sealed.len(), 3);
         assert!(!sealed.is_empty());
+    }
+
+    #[test]
+    fn find_hits_every_row_and_misses_between_and_beyond() {
+        let mut rows = TraceRollupRows::new();
+        rows.record_span(tid(9), sid(1), false, 1, 1, 0, false, None, None);
+        rows.record_span(tid(2), sid(1), false, 1, 1, 0, false, None, None);
+        rows.record_span(tid(5), sid(1), false, 1, 1, 0, false, None, None);
+        let sealed = rows.sealed(&[]);
+        assert_eq!(sealed.find(tid(2)), Some(0));
+        assert_eq!(sealed.find(tid(5)), Some(1));
+        assert_eq!(sealed.find(tid(9)), Some(2));
+        assert_eq!(sealed.find(tid(1)), None, "below the first row");
+        assert_eq!(sealed.find(tid(3)), None, "between rows");
+        assert_eq!(sealed.find(tid(200)), None, "past the last row");
+        assert_eq!(TraceRollup::default().find(tid(2)), None, "empty rollup");
     }
 
     #[test]
