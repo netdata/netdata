@@ -2,6 +2,12 @@
 
 ### Merged Pull Requests:
 
+- Rework Ceph collector as a Prometheus complement ([#23357](https://github.com/netdata/netdata/issues/23357))
+
+## [2.11.0] - 2026-08-12
+
+### Merged Pull Requests:
+
 - Stabilize runtime metrics shutdown test ([#22169](https://github.com/netdata/netdata/issues/22169))
 - Chore(go): go fix ([#22173](https://github.com/netdata/netdata/issues/22173))
 - Chore(go/ibm.d): remove buildtag comment ([#22174](https://github.com/netdata/netdata/issues/22174))
