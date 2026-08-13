@@ -208,7 +208,12 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->cloud_provider_type, "_cloud_provider_type");
     rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_type, "_cloud_instance_type");
     rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_region, "_cloud_instance_region");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
+    char os_family[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, os_family, sizeof(os_family), "_os");
+    if (!strcmp(os_family, "windows"))
+        info->host_os_name = strdupz("Microsoft Windows");
+    else
+        rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_name, "_os_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_version, "_os_version");

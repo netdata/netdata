@@ -227,10 +227,10 @@ if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
   done
 else
   # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
-  if [ -e "/host/etc/os-release" ]; then
+  if [ -f "/host/etc/os-release" ] && [ -r "/host/etc/os-release" ]; then
     load_os_release HOST /host/etc/os-release
     HOST_OS_DETECTION="/host/etc/os-release"
-  elif [ -e "/host/usr/lib/os-release" ]; then
+  elif [ -f "/host/usr/lib/os-release" ] && [ -r "/host/usr/lib/os-release" ]; then
     load_os_release HOST /host/usr/lib/os-release
     HOST_OS_DETECTION="/host/usr/lib/os-release"
   fi

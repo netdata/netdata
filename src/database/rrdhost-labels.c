@@ -407,6 +407,26 @@ static int os_metadata_labels_unittest(void) {
     return errors;
 }
 
+static int streamed_windows_system_info_unittest(void) {
+    RRDLABELS *labels = rrdlabels_create();
+    rrdlabels_add(labels, "_os", "windows", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_name", "Windows", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_version", "11", RRDLABEL_SRC_AUTO);
+
+    struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(labels);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    rrdhost_system_info_to_json_v1(wb, system_info);
+
+    int err = !strstr(buffer_tostring(wb), "Microsoft Windows");
+    fprintf(stderr, "  streamed Windows public OS name: %s\n", err ? "FAILED" : "OK");
+
+    buffer_free(wb);
+    rrdhost_system_info_free(system_info);
+    rrdlabels_destroy(labels);
+    return err;
+}
+
 int rrdhost_labels_unittest(void) {
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
     int errors = 0;
@@ -542,6 +562,7 @@ int rrdhost_labels_unittest(void) {
 
     errors += is_parent_label_unittest();
     errors += os_metadata_labels_unittest();
+    errors += streamed_windows_system_info_unittest();
 
     fprintf(stderr, "%s: %d errors\n", __FUNCTION__, errors);
     return errors;
