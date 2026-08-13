@@ -15,7 +15,7 @@ Edit `contexts.yaml`, `config.go`, or `module.yaml`, then run
 
 ```
 src/go/plugin/ibm.d/modules/<m>/
-├── module.yaml                # display name, description, icon, categories, link, keywords
+├── module.yaml                # display name, descriptions, icon, categories, link
 ├── config.go                  # Config struct -- parsed via Go AST
 ├── contexts/
 │   ├── contexts.yaml          # metric definitions: classes -> contexts -> dimensions
@@ -84,20 +84,25 @@ Inputs (per module):
   (`docgen/config_parser.go`) to extract `ConfigField` records
   (`docgen/main.go:57-78`).
 - `module.yaml` -- module-level metadata: name, display name,
-  description, icon, categories, link, keywords.
+  overview `description`, frontmatter `page_description`, icon,
+  categories, and link. `page_description` is the authoritative
+  source for an explicit integration-page description.
 
 Outputs (per module):
 
 - `metadata.yaml` -- written from `metadataTemplate`
   (`docgen/main.go:562`). The generated file opens with the
-  banner: `# Generated metadata.yaml for <module> module`. It
-  carries hardcoded scaffolding (`most_popular: false`,
-  default `update_every: 1` option, `endpoint: dummy://localhost`,
-  and a fixed prerequisite "Enable monitoring interface")
-  PLUS the dynamic content extracted from `contexts.yaml` and
-  `config.go`. Authors who want richer metadata.yaml content
-  must extend the template or `module.yaml`, NOT edit the
-  generated file.
+  banner: `# Generated metadata.yaml for <module> module`.
+  When `module.yaml` sets `page_description`, docgen emits it as
+  `meta.monitored_instance.description`; the repository-wide
+  documentation generator then uses that value for page
+  frontmatter. The file also carries hardcoded scaffolding
+  (default `update_every: 1` option,
+  `endpoint: dummy://localhost`, and a fixed prerequisite
+  "Enable monitoring interface") plus dynamic content extracted
+  from `contexts.yaml` and `config.go`. Authors who want richer
+  metadata content must extend the template or `module.yaml`,
+  not edit the generated file.
 - `config_schema.json` -- written from a separate template
   (`docgen/main.go:528`). Used by the dashboard's DYNCFG
   editor.
@@ -119,8 +124,8 @@ at `src/go/plugin/ibm.d/modules/<m>/generate.go:3`.
    - `contexts/contexts.yaml` to add/change/remove a metric
      class, context, or dimension;
    - `config.go` to add/change/remove a config field;
-   - `module.yaml` to change the display name, description,
-     categories, icon, etc.
+   - `module.yaml` to change the display name, overview or page
+     description, categories, icon, etc.
 2. Run from the repo root:
    ```bash
    go generate ./src/go/plugin/ibm.d/modules/<m>/...

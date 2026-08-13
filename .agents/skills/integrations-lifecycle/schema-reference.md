@@ -562,9 +562,9 @@ Required: `distro`, `version`, `support_type`, `notes`,
   `shared.json` propagate to all consumers immediately.
 
 - `additionalProperties: false` is NOT set on most schemas.
-  Unknown keys (`alternative_monitored_instances`,
-  `most_popular`) pass through silently into `integrations.js`
-  but no template renders them. See `gotchas.md`.
+  Unknown keys such as `alternative_monitored_instances` pass
+  through silently into `integrations.js` but no template
+  renders them. See `gotchas.md`.
 
 - Validation warnings are FATAL: `fail_on_warnings()`
   (`gen_integrations.py:150-160`) returns 1 on any warning,

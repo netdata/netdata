@@ -238,18 +238,15 @@ only spaces translated. Not URL-safe in the strict sense
 
 ## Schemas are NOT strict
 
-`additionalProperties: false` is NOT set on most schemas. Two
-known undocumented fields that pass through silently:
+`additionalProperties: false` is NOT set on most schemas. One
+known undocumented field that passes through silently:
 
 - `alternative_monitored_instances` -- seen in
   `src/go/plugin/go.d/collector/postgres/metadata.yaml:21`.
-- `most_popular` -- seen in ibm.d-generated `metadata.yaml`
-  and elsewhere.
 
-Neither is in `collector.json`. They appear in
-`integrations.js` but no template renders them. They are
-harmless but misleading -- maintainers may assume they do
-something.
+It is not in `collector.json`. It appears in `integrations.js`
+but no template renders it. It is harmless but misleading --
+maintainers may assume it does something.
 
 ## `global` scope renamed to `<instance> instance`
 
