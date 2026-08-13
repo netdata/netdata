@@ -57,6 +57,10 @@ void recursive_config_double_dir_load(
 // stays defined once, in paths.c, next to the call sites that motivate it.
 bool netdata_host_prefix_has_format_specifier(const char *prefix);
 
+// checks for fopen_secret_write(); paths_unittest() runs it, so it executes in CI
+// through `netdata -W unittest`. exported for the standalone test target too.
+int fopen_secret_write_unittest(void);
+
 int paths_unittest(void);
 
 #endif //NETDATA_PATHS_H

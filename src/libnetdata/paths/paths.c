@@ -498,6 +498,185 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
     freez(sdir);
 }
 
+// Checks for fopen_secret_write(). Lives here, next to the implementation, so
+// `netdata -W unittest` runs it in CI - the standalone target only wraps it.
+//
+// Every check runs under umask(0022) on purpose: plain fopen() would then produce
+// 0644, so an assertion of 0600 only passes if the helper's own fchmod() did the
+// work. A permissive umask is what makes these able to tell the helper apart from
+// fopen(). The process umask is restored before returning.
+//
+// Not covered here, because an unprivileged test process cannot construct the
+// precondition (a file it does not own, so that fchmod() fails): the
+// unlink-and-recreate path and the already-owner-only tolerance path. Those are
+// exercised out of tree - see .agents/sow/q/ for the docker recipe.
+int fopen_secret_write_unittest(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+#if defined(OS_WINDOWS)
+    // POSIX mode bits, symlinks and FIFOs do not carry their intended meaning here
+    fprintf(stderr, "%s() skipped on windows\n", __FUNCTION__);
+    return 0;
+#else
+    int errors = 0;
+    mode_t saved_umask = umask(0022);
+
+    char dir[] = "/tmp/nd-fopen-secret-write-XXXXXX";
+    if(!mkdtemp(dir)) {
+        fprintf(stderr, "  FAILED cannot create temp directory: %s\n", strerror(errno));
+        umask(saved_umask);
+        return 1;
+    }
+
+    char created[FILENAME_MAX + 1], control[FILENAME_MAX + 1], preexisting[FILENAME_MAX + 1];
+    char victim[FILENAME_MAX + 1], link[FILENAME_MAX + 1], fifo[FILENAME_MAX + 1], missing[FILENAME_MAX + 1];
+    snprintfz(created, sizeof(created), "%s/created", dir);
+    snprintfz(control, sizeof(control), "%s/control", dir);
+    snprintfz(preexisting, sizeof(preexisting), "%s/preexisting", dir);
+    snprintfz(victim, sizeof(victim), "%s/victim", dir);
+    snprintfz(link, sizeof(link), "%s/link", dir);
+    snprintfz(fifo, sizeof(fifo), "%s/fifo", dir);
+    snprintfz(missing, sizeof(missing), "%s/no-such-directory/file", dir);
+
+    struct stat st;
+    FILE *fp;
+
+    // a new file must be created 0600 even though umask(0022) would allow 0644
+    fp = fopen_secret_write(created, "w");
+    if(!fp) {
+        fprintf(stderr, "  FAILED cannot create '%s': %s\n", created, strerror(errno));
+        errors++;
+    }
+    else {
+        fprintf(fp, "secret");
+        if(fclose(fp) != 0) {
+            fprintf(stderr, "  FAILED cannot write '%s'\n", created);
+            errors++;
+        }
+
+        if(stat(created, &st) != 0 || (st.st_mode & 0777) != 0600) {
+            fprintf(stderr, "  FAILED new secret is mode %o, expected 600\n",
+                    stat(created, &st) == 0 ? (unsigned)(st.st_mode & 0777) : 0);
+            errors++;
+        }
+    }
+
+    // control: plain fopen() under the same umask must NOT be 0600 - this is what
+    // proves the assertion above tests the helper and not the umask
+    fp = fopen(control, "w");
+    if(!fp) {
+        fprintf(stderr, "  FAILED control: cannot create '%s'\n", control);
+        errors++;
+    }
+    else {
+        fclose(fp);
+        if(stat(control, &st) != 0 || (st.st_mode & 0777) != 0644) {
+            fprintf(stderr, "  FAILED control: plain fopen() is mode %o, expected 644 - "
+                            "these checks would prove nothing\n",
+                    stat(control, &st) == 0 ? (unsigned)(st.st_mode & 0777) : 0);
+            errors++;
+        }
+    }
+
+    // a file an older agent left at 0660 must be tightened, and a shorter secret
+    // must not leave a tail of the longer one behind
+    fp = fopen(preexisting, "w");
+    if(!fp || fprintf(fp, "a-long-previous-secret") < 0 || fclose(fp) != 0 || chmod(preexisting, 0660) != 0) {
+        fprintf(stderr, "  FAILED cannot set up the pre-existing 0660 secret\n");
+        errors++;
+    }
+    else {
+        fp = fopen_secret_write(preexisting, "w");
+        if(!fp) {
+            fprintf(stderr, "  FAILED cannot reopen '%s': %s\n", preexisting, strerror(errno));
+            errors++;
+        }
+        else {
+            fprintf(fp, "short");
+            fclose(fp);
+
+            char buf[128] = "";
+            if(stat(preexisting, &st) != 0 || (st.st_mode & 0777) != 0600) {
+                fprintf(stderr, "  FAILED pre-existing 0660 secret was not repaired to 600\n");
+                errors++;
+            }
+            if(read_txt_file(preexisting, buf, sizeof(buf)) != 0 || strcmp(buf, "short") != 0) {
+                fprintf(stderr, "  FAILED reopening did not truncate like fopen(.., \"w\")\n");
+                errors++;
+            }
+        }
+    }
+
+    // the secret directories are group-writable, so a symlink planted at the path
+    // must be refused - neither the target's mode nor its content may change
+    fp = fopen(victim, "w");
+    if(!fp || fprintf(fp, "victim") < 0 || fclose(fp) != 0 || symlink(victim, link) != 0) {
+        fprintf(stderr, "  FAILED cannot set up the symlink case\n");
+        errors++;
+    }
+    else {
+        fp = fopen_secret_write(link, "w");
+        if(fp) {
+            fprintf(stderr, "  FAILED a symlinked secret path was accepted\n");
+            fclose(fp);
+            errors++;
+        }
+
+        if(stat(victim, &st) != 0 || (st.st_mode & 0777) != 0644 || st.st_size != 6) {
+            fprintf(stderr, "  FAILED refusing a symlink changed its target\n");
+            errors++;
+        }
+    }
+
+    // a planted FIFO must be refused, not written into and not blocked on
+    if(mkfifo(fifo, 0600) != 0) {
+        fprintf(stderr, "  FAILED cannot set up the fifo case\n");
+        errors++;
+    }
+    else {
+        fp = fopen_secret_write(fifo, "w");
+        if(fp) {
+            fprintf(stderr, "  FAILED a non-regular secret path was accepted\n");
+            fclose(fp);
+            errors++;
+        }
+    }
+
+    // failure must be reported as NULL with errno set
+    errno = 0;
+    fp = fopen_secret_write(missing, "w");
+    if(fp) {
+        fprintf(stderr, "  FAILED a secret in a missing directory was accepted\n");
+        fclose(fp);
+        errors++;
+    }
+    else if(errno != ENOENT) {
+        fprintf(stderr, "  FAILED errno is %d, expected ENOENT (%d)\n", errno, ENOENT);
+        errors++;
+    }
+
+    // best effort cleanup
+    DIR *d = opendir(dir);
+    if(d) {
+        struct dirent *de;
+        char buf[FILENAME_MAX + 1];
+        while((de = readdir(d))) {
+            if(!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+                continue;
+            snprintfz(buf, sizeof(buf), "%s/%s", dir, de->d_name);
+            unlink(buf);
+        }
+        closedir(d);
+    }
+    rmdir(dir);
+
+    umask(saved_umask);
+
+    fprintf(stderr, "%s() %s\n", __FUNCTION__, errors ? "FAILED" : "passed");
+    return errors;
+#endif
+}
+
 int paths_unittest(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -585,6 +764,8 @@ int paths_unittest(void) {
     }
 
     netdata_configured_host_prefix = saved;
+
+    errors += fopen_secret_write_unittest();
 
     fprintf(stderr, "%s() %s\n", __FUNCTION__, errors ? "FAILED" : "passed");
     return errors;
