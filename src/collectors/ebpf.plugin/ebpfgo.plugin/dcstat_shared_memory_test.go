@@ -241,24 +241,30 @@ func TestMarkDCStatInactiveClearsOnlyDCStat(t *testing.T) {
 func TestDCStatStoreKeepsBaselineForIdlePID(t *testing.T) {
 	store := NewEbpfSharedMemoryStore()
 	app := libbpfloader.DCStatAppSnapshot{Pid: 42, Ct: 100, CacheAccess: 1000, NotFound: 100}
+	// A second, continuously active PID keeps the next-cycle map non-empty. Without
+	// it the baseline-rotation guard skips the rotation entirely and the assertion
+	// below would hold even if the stale branch dropped the baseline.
+	busy := libbpfloader.DCStatAppSnapshot{Pid: 43, CacheAccess: 1}
 
 	// Baseline, then enough unchanged cycles to be flagged as a stale candidate.
 	for range ebpfStaleCycles + 1 {
-		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+		busy.CacheAccess += 10
+		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app, busy})
 	}
-	if len(store.Snapshot()) != 0 {
-		t.Fatal("a stale candidate must not be published as a live row")
+	if snap := store.Snapshot(); len(snap) != 1 || snap[0].pid != 43 {
+		t.Fatalf("a stale candidate must not be published as a live row, got %+v", snap)
 	}
 
 	// The process was only idle: it wakes up and does 100 more lookups, 10 missed.
 	// The BPF ct stays where it was — the counters alone must revive the row.
 	app.CacheAccess = 1100
 	app.NotFound = 110
-	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+	busy.CacheAccess += 10
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app, busy})
 
 	snap := store.Snapshot()
-	if len(snap) != 1 {
-		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	if len(snap) != 2 || snap[0].pid != 42 {
+		t.Fatalf("Snapshot() = %+v, want PID 42 back as a live row", snap)
 	}
 	if snap[0].dc.CacheAccess != 100 {
 		t.Fatalf("cache_access delta = %d, want 100 (baseline must survive the idle window)",
@@ -489,5 +495,54 @@ func TestDCStatStaleUsesCountersNotCt(t *testing.T) {
 	}
 	if len(flagged) != 1 || flagged[0] != ebpfStaleCycles-1 {
 		t.Fatalf("stale flagged at cycles %v, want exactly [%d]", flagged, ebpfStaleCycles-1)
+	}
+}
+
+// TestCachestatStoreKeepsBaselineForIdlePID pins that a stale *candidate* keeps its
+// ct and counter baselines. Most candidates are idle-but-alive processes that the
+// caller's PidIsAlive check keeps in the BPF map; dropping their baseline made the
+// next burst of activity look like a first sample, losing one interval of deltas
+// and publishing a wrong hit ratio. Mirrors TestDCStatStoreKeepsBaselineForIdlePID.
+func TestCachestatStoreKeepsBaselineForIdlePID(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	app := libbpfloader.CachestatAppSnapshot{
+		Pid: 42, Ct: 100,
+		MarkPageAccessed: 1000, AddToPageCacheLru: 100,
+	}
+	// A second, continuously active PID. Without it the baseline-rotation guard
+	// (see TestCachestatStoreEmptySnapshotPreservesBaseline) would skip the whole
+	// rotation and mask the defect, which only shows when some other PID keeps the
+	// next-cycle map non-empty.
+	busy := libbpfloader.CachestatAppSnapshot{Pid: 43, MarkPageAccessed: 1}
+
+	// Baseline, then enough unchanged cycles to be flagged as a stale candidate.
+	for cycle := range cachestatStaleCycles + 1 {
+		busy.Ct = uint64(cycle + 1)
+		busy.MarkPageAccessed += 10
+		store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app, busy})
+	}
+	if snap := store.Snapshot(); len(snap) != 1 || snap[0].pid != 43 {
+		t.Fatalf("a stale candidate must not be published as a live row, got %+v", snap)
+	}
+
+	// The process was only idle: it wakes up with 100 more accesses, 10 of which
+	// missed the page cache.
+	app.Ct = 200
+	app.MarkPageAccessed = 1100
+	app.AddToPageCacheLru = 110
+
+	busy.Ct++
+	busy.MarkPageAccessed += 10
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{app, busy})
+
+	snap := store.Snapshot()
+	if len(snap) != 2 || snap[0].pid != 42 {
+		t.Fatalf("Snapshot() = %+v, want PID 42 back as a live row", snap)
+	}
+	// 100 accesses, 10 misses -> 90 hits, ratio 90. A dropped baseline yields a
+	// first sample: Prev == Curr, so hit/miss are 0 and the ratio is the idle 100.
+	if got := snap[0].cachestat; got.Hit != 90 || got.Miss != 10 || got.Ratio != 90 {
+		t.Fatalf("hit/miss/ratio = %d/%d/%d, want 90/10/90 (baseline must survive the idle window)",
+			got.Hit, got.Miss, got.Ratio)
 	}
 }

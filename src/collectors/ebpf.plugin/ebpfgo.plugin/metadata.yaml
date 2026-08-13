@@ -62,10 +62,11 @@ modules:
       configuration:
         file:
           name: "ebpf.d.conf"
-          description: "Primary configuration file for ebpf-go.plugin. The collector also accepts the legacy `ebpf.d/cachestat.conf` overlay for backward compatibility."
+          description: "Primary configuration file for ebpf-go.plugin. Enable the cachestat module in the `[ebpf programs]` section. The collector also accepts the legacy `ebpf.d/cachestat.conf` overlay for backward compatibility."
         options:
           description: |
-            All options are defined inside section `[global]`.
+            The `cachestat` option in section `[ebpf programs]` controls whether the module is loaded.
+            The options listed below are `[global]` overrides.
           folding:
             title: "Config options"
             enabled: true
@@ -224,10 +225,11 @@ modules:
       configuration:
         file:
           name: "ebpf.d.conf"
-          description: "Primary configuration file for ebpf-go.plugin. The collector also accepts the legacy `ebpf.d/dcstat.conf` overlay for backward compatibility."
+          description: "Primary configuration file for ebpf-go.plugin. Enable the dcstat module in the `[ebpf programs]` section. The collector also accepts the legacy `ebpf.d/dcstat.conf` overlay for backward compatibility."
         options:
           description: |
-            All options are defined inside section `[global]`.
+            The `dcstat` option in section `[ebpf programs]` controls whether the module is loaded.
+            The options listed below are `[global]` overrides.
           folding:
             title: "Config options"
             enabled: true

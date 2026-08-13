@@ -274,10 +274,11 @@ func runDCStatGlobalCollector(
 			return
 		}
 
-		// Lazy SHM open: allocate the publisher on the first cycle that has a
-		// non-empty store so the default config (no apps, no cgroups) does not
-		// pay the VMA cost.  The handle is mutated under the loop's
-		// single-goroutine guarantee so no extra lock is needed.
+		// Lazy SHM open: allocate the publisher on the first cycle that reaches
+		// here, so the default config (no apps, no cgroups) never pays the VMA
+		// cost — main.go leaves store nil in that case and the loop returns
+		// above.  The handle is mutated under the loop's single-goroutine
+		// guarantee so no extra lock is needed.
 		if handle.SharedMemory == nil {
 			publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
 			if perr != nil {

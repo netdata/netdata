@@ -15,6 +15,7 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <stddef.h> /* offsetof, used by ND_EBPF_ASSERT_PID_FIRST */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

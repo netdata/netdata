@@ -79,20 +79,22 @@ func (s *ebpfSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnaps
 
 	for _, app := range apps {
 		lastCt, seen := s.cachestatPrevCt[app.Pid]
+		stale := false
 		if seen && app.Ct == lastCt {
 			miss := s.cachestatMiss[app.Pid] + 1
 			if miss >= cachestatStaleCycles {
 				// ct stagnation threshold reached.  The caller will confirm
 				// liveness via libbpfloader.PidIsAlive and delete from the BPF
 				// map only if the process is gone.
+				stale = true
 				stalePIDs = append(stalePIDs, app.Pid)
-				continue
+			} else {
+				s.nextCachestatMs[app.Pid] = miss
 			}
-			s.nextCachestatMs[app.Pid] = miss
 		}
-		// New PID or ct advanced: miss count stays 0 (Go zero-value).
-
-		s.nextCachestatCt[app.Pid] = app.Ct
+		// New PID or ct advanced: miss count stays 0 (Go zero-value).  A stale
+		// candidate also resets it, so it is re-flagged every cachestatStaleCycles
+		// instead of forcing a kill() probe on every cycle.
 
 		current := netdataCachestat{
 			AddToPageCacheLru:  app.AddToPageCacheLru,
@@ -102,13 +104,27 @@ func (s *ebpfSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnaps
 		}
 		previous, hasPrevious := s.cachestatPrev[app.Pid]
 
+		// Carry the ct and counter baselines forward even for a stale candidate,
+		// exactly as UpdateDCStatApps does.  Most stale candidates are idle-but-
+		// alive processes that the caller's PidIsAlive check keeps: dropping their
+		// baseline here would make the next burst of activity look like a first
+		// sample, so one interval of deltas would be lost and the hit ratio for
+		// that interval would be wrong.  The state is bounded by the BPF map
+		// contents, so it disappears once the PID is confirmed dead and deleted.
+		s.nextCachestatCt[app.Pid] = app.Ct
+		s.nextCachestat[app.Pid] = current
+
+		if stale {
+			// No row this cycle: the caller decides whether the PID is dead.
+			continue
+		}
+
 		var ident ebpfModuleIdentity
 		copyCommFromSnapshot(&ident.comm, app.Comm)
 		ident.ppid = app.Ppid
 
 		s.cachestatData[app.Pid] = buildCachestatPublish(current, previous, app.Ct, hasPrevious)
 		s.cachestatIdent[app.Pid] = ident
-		s.nextCachestat[app.Pid] = current
 		pids, ordered = appendAscending(pids, app.Pid, ordered)
 	}
 
