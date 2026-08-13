@@ -85,14 +85,5 @@ func wrapCollectionError(component string, err error) error {
 }
 
 func (c *Collector) probeClusterIdentity(ctx context.Context) (string, error) {
-	fsid, err := c.apiClient.probeClusterIdentity(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	c.identityMu.Lock()
-	c.fsid = fsid
-	c.identityMu.Unlock()
-
-	return fsid, nil
+	return c.apiClient.probeClusterIdentity(ctx)
 }

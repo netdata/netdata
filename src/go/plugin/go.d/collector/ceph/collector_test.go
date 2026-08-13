@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -174,9 +175,7 @@ func TestCollector_V2CollectionAndChartCoverage(t *testing.T) {
 	require.NoError(t, c.Check(context.Background()))
 	require.NoError(t, collectOnce(c))
 
-	requireMetric(t, c, "component_collection_failed", metrix.Labels{
-		"component": "health", "fsid": "synthetic-fsid",
-	}, 0)
+	requireComponentStatus(t, c, "synthetic-fsid", "health", "success")
 	requireMetric(t, c, "cluster_physical_capacity_bytes", metrix.Labels{
 		"fsid": "synthetic-fsid", "state": "used",
 	}, 250000)
@@ -199,7 +198,7 @@ func TestCollector_V2CollectionAndChartCoverage(t *testing.T) {
 
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{
 		RequiredContexts: map[string][]string{
-			"ceph.component_collection_status":           {"health", "osds", "pools"},
+			"ceph.component_collection_status":           {"success", "failed"},
 			"ceph.cluster_physical_capacity_utilization": {"utilization"},
 			"ceph.osd_status":                            {"up", "down", "in", "out"},
 			"ceph.pool_io":                               {"read", "written"},
@@ -207,11 +206,15 @@ func TestCollector_V2CollectionAndChartCoverage(t *testing.T) {
 	})
 
 	chartFamilies := make(map[string]string)
+	componentCharts := make(map[string]map[string]string)
 	var clusterWrite, osdRead, poolRead *chartengine.CreateDimensionAction
 	for _, action := range prepareChartPlan(t, c).Actions {
 		switch action := action.(type) {
 		case chartengine.CreateChartAction:
 			chartFamilies[action.Meta.Context] = action.Meta.Family
+			if action.Meta.Context == "ceph.component_collection_status" {
+				componentCharts[action.ChartID] = action.Labels
+			}
 		case chartengine.CreateDimensionAction:
 			switch {
 			case action.ChartMeta.Context == "ceph.cluster_client_io" && action.Name == "written":
@@ -224,6 +227,11 @@ func TestCollector_V2CollectionAndChartCoverage(t *testing.T) {
 		}
 	}
 	assert.Equal(t, expectedChartFamilies(), chartFamilies)
+	assert.Equal(t, map[string]map[string]string{
+		"component_collection_status_health": {"component": "health", "fsid": "synthetic-fsid"},
+		"component_collection_status_osds":   {"component": "osds", "fsid": "synthetic-fsid"},
+		"component_collection_status_pools":  {"component": "pools", "fsid": "synthetic-fsid"},
+	}, componentCharts)
 	require.NotNil(t, clusterWrite)
 	assert.Equal(t, chartengine.AlgorithmAbsolute, clusterWrite.Algorithm)
 	assert.Equal(t, -1, clusterWrite.Multiplier)
@@ -315,7 +323,6 @@ func TestCollector_CheckFallsBackToLegacyMonitorIdentity(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 	require.NoError(t, c.Check(context.Background()))
-	assert.NotEmpty(t, c.clusterFSID())
 }
 
 func TestCollectorCleanupDoesNotLogout(t *testing.T) {
@@ -367,17 +374,13 @@ func TestCollector_PartialFailureCommitsDataAndComponentStatus(t *testing.T) {
 	defer c.Cleanup(context.Background())
 	require.NoError(t, collectOnce(c))
 
-	requireMetric(t, c, "component_collection_failed", metrix.Labels{
-		"component": "health", "fsid": "synthetic-fsid",
-	}, 0)
-	requireMetric(t, c, "component_collection_failed", metrix.Labels{
-		"component": "osds", "fsid": "synthetic-fsid",
-	}, 1)
-	requireMetric(t, c, "component_collection_failed", metrix.Labels{
-		"component": "pools", "fsid": "synthetic-fsid",
-	}, 0)
+	requireComponentStatus(t, c, "synthetic-fsid", "health", "success")
+	requireComponentStatus(t, c, "synthetic-fsid", "osds", "failed")
+	requireComponentStatus(t, c, "synthetic-fsid", "pools", "success")
 	_, ok := c.store.Read().StateSet("cluster_health_status", metrix.Labels{"fsid": "synthetic-fsid"})
 	assert.True(t, ok)
+	assert.Equal(t, map[string]float64{"success": 0, "failed": 1},
+		chartUpdateValues(t, prepareChartPlan(t, c), "component_collection_status_osds"))
 }
 
 func TestCollector_FullyFailedCycleAbortsWithoutPublishingMetrics(t *testing.T) {
@@ -468,12 +471,8 @@ func TestCollector_HealthCountsSkipUnboundedEntityRequests(t *testing.T) {
 	requireMetric(t, c, "cluster_pools", metrix.Labels{"fsid": "synthetic-fsid"}, 101)
 	assert.Zero(t, osdRequests.Load())
 	assert.Zero(t, poolRequests.Load())
-	requireMetric(t, c, "component_collection_failed", metrix.Labels{
-		"component": "osds", "fsid": "synthetic-fsid",
-	}, 0)
-	requireMetric(t, c, "component_collection_failed", metrix.Labels{
-		"component": "pools", "fsid": "synthetic-fsid",
-	}, 0)
+	requireComponentStatus(t, c, "synthetic-fsid", "osds", "success")
+	requireComponentStatus(t, c, "synthetic-fsid", "pools", "success")
 }
 
 func TestCollector_OSDWholeListCapIsAllOrNone(t *testing.T) {
@@ -554,33 +553,29 @@ func TestCollector_DynamicPoolMetricsPreserveNamesWithKnownChartCollision(t *tes
 
 func TestCollector_PoolsRejectDuplicateSelectedIdentity(t *testing.T) {
 	pools := []apiPoolResponse{validPoolResponse("pool-a"), validPoolResponse("pool-a")}
-	t.Run("name", func(t *testing.T) {
-		srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
-			switch r.URL.Path {
-			case urlPathApiHealthMinimal:
-				writeJSON(w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
-			case urlPathApiOsd:
-				w.Header().Set("X-Total-Count", "0")
-				writeJSON(w, http.StatusOK, []any{})
-			case urlPathApiPool:
-				writeJSON(w, http.StatusOK, pools)
-			default:
-				w.WriteHeader(http.StatusNotFound)
-			}
-		})
-		defer srv.Close()
-
-		c := newInitializedCollector(t, srv.URL, nil)
-		defer c.Cleanup(context.Background())
-		require.NoError(t, collectOnce(c))
-		requireMetric(t, c, "component_collection_failed", metrix.Labels{
-			"component": "pools", "fsid": "synthetic-fsid",
-		}, 1)
-		_, ok := c.store.Read().Value("pool_objects", metrix.Labels{
-			"fsid": "synthetic-fsid", "pool_name": pools[0].PoolName,
-		})
-		assert.False(t, ok)
+	srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case urlPathApiHealthMinimal:
+			writeJSON(w, http.StatusOK, map[string]any{"health": map[string]any{"status": "HEALTH_OK"}})
+		case urlPathApiOsd:
+			w.Header().Set("X-Total-Count", "0")
+			writeJSON(w, http.StatusOK, []any{})
+		case urlPathApiPool:
+			writeJSON(w, http.StatusOK, pools)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	})
+	defer srv.Close()
+
+	c := newInitializedCollector(t, srv.URL, nil)
+	defer c.Cleanup(context.Background())
+	require.NoError(t, collectOnce(c))
+	requireComponentStatus(t, c, "synthetic-fsid", "pools", "failed")
+	_, ok := c.store.Read().Value("pool_objects", metrix.Labels{
+		"fsid": "synthetic-fsid", "pool_name": pools[0].PoolName,
+	})
+	assert.False(t, ok)
 }
 
 func TestCollectObjectHealthAllowsIndependentCopyStates(t *testing.T) {
@@ -751,7 +746,7 @@ func TestPoolSampleRejectsInvalidUpstreamValues(t *testing.T) {
 		wantObjects int64
 		wantError   string
 	}{
-		"preserves integers above float precision": {
+		"parses integers above float precision without intermediate loss": {
 			objects: "9007199254740993", percentUsed: "0.5", wantObjects: 9007199254740993,
 		},
 		"rejects utilization above one": {
@@ -780,6 +775,7 @@ func TestPoolSampleRejectsInvalidUpstreamValues(t *testing.T) {
 
 func TestCollector_ChartTemplateContract(t *testing.T) {
 	template := New().ChartTemplateYAML()
+	collecttest.AssertChartTemplateSchema(t, template)
 	assert.NotContains(t, template, "priority:")
 	assert.NotContains(t, template, "lifecycle:")
 	assert.NotContains(t, template, "expire_after_cycles:")
@@ -799,6 +795,8 @@ func TestCollector_ChartTemplateContract(t *testing.T) {
 	require.Contains(t, rootGroups, "Pool")
 
 	require.NotNil(t, rootGroups["Internal"].ChartDefaults)
+	require.NotNil(t, rootGroups["Internal"].ChartDefaults.Instances)
+	assert.Equal(t, []string{"component"}, rootGroups["Internal"].ChartDefaults.Instances.ByLabels)
 	assert.Equal(t, []string{"fsid"}, rootGroups["Internal"].ChartDefaults.LabelPromoted)
 	require.NotNil(t, rootGroups["Cluster"].ChartDefaults)
 	assert.Equal(t, []string{"fsid"}, rootGroups["Cluster"].ChartDefaults.LabelPromoted)
@@ -834,6 +832,25 @@ func TestCollector_ChartTemplateContract(t *testing.T) {
 	}
 	visit("", spec.Groups)
 	assert.Equal(t, expectedChartFamilies(), actualFamilies)
+}
+
+func TestCollector_ComponentCollectionAlertContract(t *testing.T) {
+	alert, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
+	require.NoError(t, err)
+
+	config := string(alert)
+	start := strings.Index(config, "template: ceph_component_collection_failed")
+	require.NotEqual(t, -1, start)
+	block := config[start:]
+	if end := strings.Index(block, "\n template:"); end >= 0 {
+		block = block[:end]
+	}
+	assert.Contains(t, block, "on: ceph.component_collection_status")
+	assert.Contains(t, block, "calc: $failed")
+	assert.Contains(t, block, "${label:component}")
+	assert.NotContains(t, block, "$health_collection_failed")
+	assert.NotContains(t, block, "$osd_collection_failed")
+	assert.NotContains(t, block, "$pool_collection_failed")
 }
 
 func expectedChartFamilies() map[string]string {
@@ -962,6 +979,41 @@ func requireMetric(t *testing.T, c *Collector, name string, labels metrix.Labels
 	got, ok := c.store.Read(metrix.ReadFlatten()).Value(name, labels)
 	require.True(t, ok, "%s%v", name, labels)
 	assert.InDelta(t, want, got, 1e-9, "%s%v", name, labels)
+}
+
+func requireComponentStatus(t *testing.T, c *Collector, fsid, component, want string) {
+	t.Helper()
+	require.Contains(t, []string{"success", "failed"}, want)
+	state, ok := c.store.Read().StateSet("component_collection_status", metrix.Labels{
+		"fsid": fsid, "component": component,
+	})
+	require.True(t, ok, "component_collection_status{fsid=%q,component=%q}", fsid, component)
+	assert.Equal(t, map[string]bool{
+		"success": want == "success",
+		"failed":  want == "failed",
+	}, state.States)
+}
+
+func chartUpdateValues(t *testing.T, plan chartengine.Plan, chartID string) map[string]float64 {
+	t.Helper()
+	for _, action := range plan.Actions {
+		update, ok := action.(chartengine.UpdateChartAction)
+		if !ok || update.ChartID != chartID {
+			continue
+		}
+		values := make(map[string]float64, len(update.Values))
+		for _, value := range update.Values {
+			require.False(t, value.IsEmpty, value.Name)
+			if value.IsFloat {
+				values[value.Name] = value.Float64
+			} else {
+				values[value.Name] = float64(value.Int64)
+			}
+		}
+		return values
+	}
+	require.FailNow(t, "chart update not found", chartID)
+	return nil
 }
 
 func mustCycleController(t *testing.T, store metrix.CollectorStore) metrix.CycleController {

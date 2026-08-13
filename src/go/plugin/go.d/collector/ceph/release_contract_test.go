@@ -110,9 +110,7 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 
 			require.NoError(t, c.Check(context.Background()))
 			require.NoError(t, collectOnce(c))
-			requireMetric(t, c, "component_collection_failed", metrix.Labels{
-				"component": "health", "fsid": "synthetic-fsid",
-			}, 0)
+			requireComponentStatus(t, c, "synthetic-fsid", "health", "success")
 			requireMetric(t, c, "cluster_physical_capacity_bytes", metrix.Labels{
 				"fsid": "synthetic-fsid", "state": "used",
 			}, 250000)
@@ -195,6 +193,15 @@ func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
 	health := read("api_health_minimal.json")
 	osds := read("api_osd.json")
 	pools := read("api_pool_stats.json")
+	var identity struct {
+		MonStatus struct {
+			MonMap struct {
+				FSID string `json:"fsid"`
+			} `json:"monmap"`
+		} `json:"mon_status"`
+	}
+	require.NoError(t, json.Unmarshal(monitor, &identity))
+	require.NotEmpty(t, identity.MonStatus.MonMap.FSID)
 	recorder := &wireRecorder{}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -231,9 +238,8 @@ func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
 	defer c.Cleanup(context.Background())
 	require.NoError(t, c.Check(context.Background()))
 	require.NoError(t, collectOnce(c))
-	assert.NotEmpty(t, c.clusterFSID())
 	requireMetric(t, c, "pool_space_utilization_percent", metrix.Labels{
-		"fsid": c.clusterFSID(), "pool_name": "mySuperPool",
+		"fsid": identity.MonStatus.MonMap.FSID, "pool_name": "mySuperPool",
 	}, 100)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 	assert.Equal(t, expectedPacificRequests(), recorder.snapshot())

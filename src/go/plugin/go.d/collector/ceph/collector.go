@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -94,9 +93,6 @@ type Collector struct {
 	apiClient  *cephClient
 	funcRouter funcapi.MethodHandler
 
-	identityMu sync.RWMutex
-	fsid       string // a unique identifier for the cluster
-
 	osdMatcher  matcher.Matcher
 	poolMatcher matcher.Matcher
 }
@@ -162,12 +158,6 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}
-}
-
-func (c *Collector) clusterFSID() string {
-	c.identityMu.RLock()
-	defer c.identityMu.RUnlock()
-	return c.fsid
 }
 
 func (c *Collector) FunctionAvailable(functionID string) bool {

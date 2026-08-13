@@ -9,10 +9,12 @@ var enumPoints = map[string]metrix.StateSetPoint{
 	"disabled": {States: map[string]bool{"disabled": true}},
 	"down":     {States: map[string]bool{"down": true}},
 	"err":      {States: map[string]bool{"err": true}},
+	"failed":   {States: map[string]bool{"failed": true}},
 	"in":       {States: map[string]bool{"in": true}},
 	"inactive": {States: map[string]bool{"inactive": true}},
 	"ok":       {States: map[string]bool{"ok": true}},
 	"out":      {States: map[string]bool{"out": true}},
+	"success":  {States: map[string]bool{"success": true}},
 	"up":       {States: map[string]bool{"up": true}},
 	"warn":     {States: map[string]bool{"warn": true}},
 }
@@ -20,7 +22,7 @@ var enumPoints = map[string]metrix.StateSetPoint{
 type collectorMetrics struct {
 	meter metrix.SnapshotMeter
 
-	componentCollectionFailed    metrix.SnapshotGauge
+	componentCollectionStatus    metrix.StateSetInstrument
 	clusterHealthStatus          metrix.StateSetInstrument
 	clusterHosts                 metrix.SnapshotGauge
 	clusterMonitors              metrix.SnapshotGauge
@@ -71,7 +73,8 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 	return &collectorMetrics{
 		meter: meter,
 
-		componentCollectionFailed: meter.Gauge("component_collection_failed"),
+		componentCollectionStatus: meter.StateSet("component_collection_status",
+			metrix.WithStateSetStates("success", "failed"), metrix.WithStateSetMode(metrix.ModeEnum)),
 		clusterHealthStatus: meter.StateSet("cluster_health_status",
 			metrix.WithStateSetStates("ok", "warn", "err"), metrix.WithStateSetMode(metrix.ModeEnum)),
 		clusterHosts:                 meter.Gauge("cluster_hosts"),
@@ -154,9 +157,12 @@ func observeEnum(instrument metrix.StateSetInstrument, state string, labels metr
 }
 
 func (m *collectorMetrics) writeComponentStatuses(labels metrix.LabelSet, healthErr, osdErr, poolErr error) {
-	m.componentCollectionFailed.Observe(failedValue(healthErr), labels, m.componentLabels["health"])
-	m.componentCollectionFailed.Observe(failedValue(osdErr), labels, m.componentLabels["osds"])
-	m.componentCollectionFailed.Observe(failedValue(poolErr), labels, m.componentLabels["pools"])
+	m.componentCollectionStatus.ObserveStateSet(
+		enumPoints[collectionStatus(healthErr)], labels, m.componentLabels["health"])
+	m.componentCollectionStatus.ObserveStateSet(
+		enumPoints[collectionStatus(osdErr)], labels, m.componentLabels["osds"])
+	m.componentCollectionStatus.ObserveStateSet(
+		enumPoints[collectionStatus(poolErr)], labels, m.componentLabels["pools"])
 }
 
 func (m *collectorMetrics) writeOSD(fsid string, sample osdMetricSample) {
@@ -193,9 +199,9 @@ func (m *collectorMetrics) writePool(fsid string, sample poolMetricSample) {
 	m.poolOperations.ObserveTotal(float64(sample.writeOps), labels, m.directionLabels["write"])
 }
 
-func failedValue(err error) float64 {
+func collectionStatus(err error) string {
 	if err != nil {
-		return 1
+		return "failed"
 	}
-	return 0
+	return "success"
 }

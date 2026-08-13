@@ -3,8 +3,10 @@ context_namespace: ceph
 groups:
   - family: Internal
     metrics:
-      - component_collection_failed
+      - component_collection_status
     chart_defaults:
+      instances:
+        by_labels: [component]
       label_promotion: [fsid]
     charts:
       - id: component_collection_status
@@ -12,12 +14,10 @@ groups:
         context: component_collection_status
         units: status
         dimensions:
-          - selector: 'component_collection_failed{component="health"}'
-            name: health
-          - selector: 'component_collection_failed{component="osds"}'
-            name: osds
-          - selector: 'component_collection_failed{component="pools"}'
-            name: pools
+          - selector: 'component_collection_status{component_collection_status="success"}'
+            name: success
+          - selector: 'component_collection_status{component_collection_status="failed"}'
+            name: failed
 
   - family: Cluster
     chart_defaults:
