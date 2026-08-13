@@ -22,54 +22,20 @@ static bool mcp_api_key_generate_and_save(void) {
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
 
-    struct stat st;
-    if (stat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
-        netdata_log_error("MCP: API key file %s is not a regular file", path);
+    // fopen_secret_write() owns the symlink, regular-file and 0600 guarantees
+    FILE *fp = fopen_secret_write(path, "w");
+    if (!fp) {
+        netdata_log_error("MCP: Failed to create API key file %s: %s", path, strerror(errno));
         return false;
     }
 
-    // Validate the opened object before truncating it.
-    int fd = open(path, O_WRONLY | O_CREAT | O_NONBLOCK, 0600);
-    if (fd == -1) {
-        netdata_log_error("MCP: Failed to create API key file %s: %s", 
-                         path, strerror(errno));
-        return false;
-    }
-
-    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
-        netdata_log_error("MCP: API key file %s is not a regular file", path);
-        close(fd);
-        return false;
-    }
-
-    if (ftruncate(fd, 0) != 0) {
-        netdata_log_error("MCP: Failed to truncate API key file %s: %s", path, strerror(errno));
-        close(fd);
-        return false;
-    }
-    
-    // Write the UUID with newline
-    char buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 2]; // +1 for newline, +1 for null
-    snprintf(buffer, sizeof(buffer), "%s\n", mcp_dev_preview_api_key);
-    
-    ssize_t written = write(fd, buffer, MCP_DEV_PREVIEW_API_KEY_LENGTH + 1); // +1 for newline
-    if (written != (ssize_t)(MCP_DEV_PREVIEW_API_KEY_LENGTH + 1)) {
+    int written = fprintf(fp, "%s\n", mcp_dev_preview_api_key);
+    if (fclose(fp) != 0 || written != MCP_DEV_PREVIEW_API_KEY_LENGTH + 1) {
         netdata_log_error("MCP: Failed to write API key to file: %s", strerror(errno));
-        close(fd);
-        unlink(path);
-        return false;
-    }
-    
-    // Ensure file permissions are correct (only owner can read/write)
-    if (fchmod(fd, 0600) == -1) {
-        netdata_log_error("MCP: Failed to set permissions on API key file: %s", strerror(errno));
-        close(fd);
         unlink(path);
         return false;
     }
 
-    close(fd);
-    
     netdata_log_info("MCP: Generated new developer preview API key");
     return true;
 }

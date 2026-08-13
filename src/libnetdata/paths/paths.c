@@ -214,16 +214,29 @@ bool path_entry_is_file(const char *path, const char *entry) {
     return filename_is_file(filename);
 }
 
-FILE *fopen_secret_write(const char *filename, const char *mode) {
+static int close_keeping_errno(int fd) {
+    int saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return -1;
+}
+
+// Opens filename for writing and returns a file descriptor whose mode is 0600,
+// or -1 with errno set. When the file exists, is accessible to group or other,
+// and cannot be chmod()-ed, *replace_it is set: the caller may then remove the
+// file and retry with O_EXCL.
+static int fopen_secret_open_fd(const char *filename, int extra_flags, bool *replace_it) {
+    *replace_it = false;
+
     // O_CREAT's mode applies only when the file is created, and umask can still
     // clear bits from it, so fchmod() after the open is what actually pins 0600
     // - it also fixes a file left behind with wider permissions by an older
     // agent, or by fopen() before this helper existed.
     //
     // Deliberately no O_TRUNC: we truncate only after the mode is confirmed, so
-    // that a filesystem which rejects fchmod() (or an EPERM) leaves any existing
-    // secret intact instead of replacing it with an empty file.
-    int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+    // that a file we end up refusing keeps its previous content instead of being
+    // replaced by an empty one.
+    int flags = O_WRONLY | O_CREAT | O_CLOEXEC | extra_flags;
 
 #ifdef O_NOFOLLOW
     // the directory holding these secrets is group-writable (cloud.d is 0770), so
@@ -241,58 +254,77 @@ FILE *fopen_secret_write(const char *filename, const char *mode) {
 
     int fd = open(filename, flags, 0600);
     if(fd == -1)
-        return NULL;
+        return -1;
 
     struct stat st;
-    if(fstat(fd, &st) != 0) {
-        int saved_errno = errno;
-        close(fd);
-        errno = saved_errno;
-        return NULL;
-    }
+    if(fstat(fd, &st) != 0)
+        return close_keeping_errno(fd);
 
     // never write a secret into a FIFO, device, or anything else a third party
     // could be reading from the other end of.
     if(!S_ISREG(st.st_mode)) {
         close(fd);
         errno = EINVAL;
-        return NULL;
+        return -1;
     }
 
     if(fchmod(fd, 0600) != 0) {
         int saved_errno = errno;
 
-        // fchmod() is gated on ownership, not on write access. A secret left
-        // behind by an agent that ran as root is still writable through the
-        // netdata group while being un-chmod-able by the netdata user, and some
-        // filesystems (CIFS, vfat, several FUSE and bind mounts) refuse chmod
-        // outright. Failing here would permanently break claiming and bearer
-        // token persistence, so tolerate it when the file is already not
-        // accessible to group or other - there is nothing left to close then.
+        // fchmod() is gated on ownership, not on write access, so a secret left
+        // behind by an agent that ran as root is writable through the netdata
+        // group yet cannot be tightened. Some filesystems (CIFS, several FUSE and
+        // bind mounts) also refuse chmod outright.
         if(st.st_mode & 0077) {
+            // it is exposed and we cannot fix it in place - ask for a replacement
             close(fd);
+            *replace_it = true;
             errno = saved_errno;
-            return NULL;
+            return -1;
         }
 
+        // nothing is exposed, so keep going rather than failing the write
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "Cannot set mode 0600 on '%s' (%s), but it is already accessible only by its owner - continuing.",
                filename, strerror(saved_errno));
     }
 
+    return fd;
+}
+
+FILE *fopen_secret_write(const char *filename, const char *mode) {
+    bool replace_it = false;
+    int fd = fopen_secret_open_fd(filename, 0, &replace_it);
+
+    if(fd == -1 && replace_it) {
+        // The file is group or other accessible and un-chmod-able, so writing the
+        // secret into it would expose it. The secret directories are writable by
+        // the netdata group, so replace the file instead of failing permanently -
+        // this is a truncating open, so its old content is discarded either way.
+        int saved_errno = errno;
+
+        if(unlink(filename) != 0) {
+            errno = saved_errno;
+            return NULL;
+        }
+
+        // O_EXCL: if anything recreated the path in the meantime, fail instead of
+        // writing the secret into someone else's file
+        fd = fopen_secret_open_fd(filename, O_EXCL, &replace_it);
+    }
+
+    if(fd == -1)
+        return NULL;
+
     // now that the mode is pinned, make it behave like fopen(filename, "w")
     if(ftruncate(fd, 0) != 0) {
-        int saved_errno = errno;
-        close(fd);
-        errno = saved_errno;
+        close_keeping_errno(fd);
         return NULL;
     }
 
     FILE *fp = fdopen(fd, mode);
     if(!fp) {
-        int saved_errno = errno;
-        close(fd);
-        errno = saved_errno;
+        close_keeping_errno(fd);
         return NULL;
     }
 
