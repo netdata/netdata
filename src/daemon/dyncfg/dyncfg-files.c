@@ -21,7 +21,10 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
     char filename[FILENAME_MAX];
     snprintfz(filename, sizeof(filename), "%s/%s.dyncfg", dyncfg_globals.dir, escaped_id);
 
-    FILE *fp = fopen(filename, "w");
+    // job payloads are submitted by users and routinely carry credentials
+    // (database passwords, SNMP communities, API tokens), so they must not land
+    // group-readable under the daemon's umask.
+    FILE *fp = fopen_secret_write(filename, "w");
     if(!fp) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot create file '%s'", filename);
         return;

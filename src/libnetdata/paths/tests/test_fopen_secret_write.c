@@ -134,6 +134,58 @@ static void test_reports_failure(const char *dir) {
         fclose(fp);
 }
 
+// The secret directories are group-writable (cloud.d is 0770), so a group member
+// can plant a symlink where a secret is about to be written. The helper must not
+// follow it: neither the target's mode nor its contents may change.
+static void test_refuses_symlink(const char *dir) {
+    char target[FILENAME_MAX + 1];
+    char link[FILENAME_MAX + 1];
+    snprintfz(target, sizeof(target), "%s/symlink-target", dir);
+    snprintfz(link, sizeof(link), "%s/symlink", dir);
+
+    FILE *fp = fopen(target, "w");
+    if(!fp) {
+        failures += expect(false, "test setup must create the symlink target");
+        return;
+    }
+    fprintf(fp, "victim");
+    fclose(fp);
+
+    if(symlink(target, link) != 0) {
+        failures += expect(false, "test setup must create the symlink");
+        return;
+    }
+
+    fp = fopen_secret_write(link, "w");
+    failures += expect(fp == NULL, "fopen_secret_write() must refuse a symlinked secret path");
+    if(fp)
+        fclose(fp);
+
+    failures += expect(file_mode(target) == 0644, "refusing a symlink must not chmod its target");
+    failures += expect(file_contents_equal(target, "victim"), "refusing a symlink must not truncate its target");
+
+    unlink(link);
+}
+
+// A planted FIFO would either block the open until the attacker reads, or hand
+// them the secret. Both must be refused.
+static void test_refuses_fifo(const char *dir) {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/fifo", dir);
+
+    if(mkfifo(filename, 0600) != 0) {
+        failures += expect(false, "test setup must create the fifo");
+        return;
+    }
+
+    FILE *fp = fopen_secret_write(filename, "w");
+    failures += expect(fp == NULL, "fopen_secret_write() must refuse a non-regular secret path");
+    if(fp)
+        fclose(fp);
+
+    unlink(filename);
+}
+
 int main(void) {
     // Permissive on purpose - see the file header.
     umask(0022);
@@ -148,6 +200,8 @@ int main(void) {
     test_repairs_wide_permissions(dir);
     test_truncates_completely(dir);
     test_reports_failure(dir);
+    test_refuses_symlink(dir);
+    test_refuses_fifo(dir);
 
     // best effort cleanup
     DIR *d = opendir(dir);
