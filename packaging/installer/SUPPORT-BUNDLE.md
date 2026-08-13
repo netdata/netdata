@@ -55,7 +55,8 @@ document.**
 |---|---|
 | Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, via `timeout` or a portable watchdog — the watchdog kills the direct child only, a documented limitation); global deadline checked before each collector, so the hard runtime bound is deadline + one command timeout; size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only — writes only its private staging dir and the final artifacts, never restarts or reconfigures anything; artifacts are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
 | Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-WAS-DOWN.txt` marker is written instead of API captures |
-| Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below |
+| Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below. **One documented exception:** the streaming API key in `stream.conf` is kept verbatim (see "The streaming API key exception") |
+| Source bytes preserved | collected files keep their byte-order mark, their per-line terminators (CRLF/CR/LF, including on lines the sanitizer rewrote) and a missing final newline, so an encoding fault in the user's file is still visible in the bundle |
 | PII pseudonymized by default | IPs (v4+v6), MACs, emails, this host's names, the invoking user, child/mirrored node hostnames and stream destinations are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
 | Caps cannot expose secrets | all caps cut at LINE boundaries, so a secret can never straddle the cut and dodge the line-based sanitizer; a capped tail with no line break at all is withheld entirely; sanitizer failures withhold the file content (fail closed) |
 | Legible to humans AND AI agents | triage-ordered numbered directories; sanitized file copies have no injected provenance headers; provenance headers only on command captures; `MANIFEST.json` indexes every file with safe origin + sanitization state; `summary.txt` opens with a triage read-order |
@@ -70,7 +71,7 @@ document.**
 | Static builds (`/opt/netdata`) | tested paths | all paths resolved under the prefix |
 | FreeBSD | best effort | `/usr/local/etc/netdata` + `/var/db/netdata` paths, `sockstat` fallback, `ps -H` threads; no `/proc` items |
 | macOS (Homebrew) | best effort | `/usr/local` and `/opt/homebrew` prefixes, `sysctl`/`vm_stat` fallbacks, `ps -M` threads |
-| Windows | tested in CI | Windows PowerShell 5.1 runs the adversarial suite and builds/opens a complete fixture zip; PowerShell 7 runs the same sanitizer suite |
+| Windows | tested in CI | Windows PowerShell 5.1 runs the adversarial suite and builds/opens a complete fixture zip; PowerShell 7 runs the same sanitizer suite. Daemon logs come from the ETW channels (`Netdata/*`), not `NetdataWEL`, on any build with `HAVE_ETW` — which is every `OS_WINDOWS` build |
 
 Portability rules the POSIX script obeys (keep them when editing):
 
@@ -152,7 +153,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 |---|---|
 | systemd journal, **including `--namespace=netdata`** | the agent logs to its own journal namespace on systemd installs — plain `journalctl -u netdata` misses almost everything; support asks for "a complete log from start until the problem" |
 | `/var/log/netdata/*.log` tails (size-capped) | non-systemd installs, static builds, macOS/BSD |
-| Windows Event Log (`NetdataWEL` + Application, Netdata providers) | Windows agents log to the Event Log; Windows is a top-3 support theme |
+| Windows Event Log: the five **ETW channels** (`Netdata/Daemon`, `Netdata/Collectors`, `Netdata/Health`, `Netdata/Aclk`, `Netdata/Access`) plus `NetdataWEL` and Netdata records from `Application`, in one merged file, with channel state | every `OS_WINDOWS` build defines `HAVE_ETW` (`CMakeLists.txt`) and `netdata-conf-logs.c` then picks `etw`, so the daemon logs into the manifest-declared `Netdata/*` channels (`wevt_netdata_mc_generate.c`). Querying only `NetdataWEL` returned **no daemon logs at all** on a default install. Ordered for triage, with `Netdata/Access` last and on the smallest budget since it is by far the highest volume; channel state is included because a disabled or full channel is otherwise indistinguishable from "the agent logged nothing" |
 | updater service journal | update failures; the updater keeps no persistent log file |
 | **coredump metadata** (`coredumpctl list`, never the dumps) | tells support a dump exists and matches the crash time — the dump itself is fetched later only if needed |
 | docker marker file | in containers the log "files" are symlinks to stdout — history only exists in `docker logs` on the host; the bundle says raw logs must not be attached and gives a private capture/review/redaction workflow using the requested time window |
@@ -194,6 +195,29 @@ proxy, so diagnostic data cannot leave the host through a forced proxy.
 | DNS config, proxy env/config (sanitized) | claiming-behind-proxy is a recurring theme; DNS misconfiguration breaks cloud connectivity |
 | Netdata Cloud reachability (TCP plus certificate-validating HTTPS/TLS probe; no bundle data sent) | separates network problems from agent problems in one step |
 
+### `09-permissions/` — why the agent cannot read/execute something
+
+Mode bits alone explain almost nothing here: plugins rely on **file
+capabilities** and setuid bits, distributions apply **SELinux/AppArmor**
+confinement, and packagers use **ACLs**. None of that shows in an `ls -la`.
+
+| item | why |
+|---|---|
+| **`plugins.d`**: mode, ownership, setuid/setgid bits and per-file **capabilities** (`getcap`) | a dropped capability or lost setuid bit is a top cause of "this collector shows no data" — a stock install has seven capability-bearing plugins (`apps.plugin`, `debugfs.plugin`, `go.d.plugin`, `network-viewer.plugin`, `perf.plugin`, `slabinfo.plugin`, `systemd-journal.plugin`) and several setuid ones |
+| all netdata paths (config dir, `netdata.conf`, `stream.conf`, `ssl/`, log/lib/cache dirs, `plugins.d`, the binary): mode, owner, **extended attributes**, **security context**, **ACLs**, non-default ext2/3/4 file flags | an immutable (`i`) flag on a state directory silently blocks the agent's own writes, and an SELinux mislabel fails collectors with nothing in the agent log |
+| Windows: ACLs with inheritance state, protected-ACL detection, integrity labels, alternate data streams | a `Zone.Identifier` stream marks a file downloaded-and-blocked; a protected (inheritance-disabled) ACL is a common post-restore breakage |
+
+`plugins.d` locations come from the binary prefix, the known install prefixes
+and `<config>/custom-plugins.d`. A `[directories] plugins` override in
+`netdata.conf` is deliberately not read, so no config-derived value is ever
+handed to a collector.
+
+Tools are feature-detected and a missing one is reported rather than skipped.
+`getfattr` ships in the `attr` package, **not** installed by default on
+Debian/Ubuntu, so without it the collector falls back to `getcap` and `lsattr` —
+the attributes that actually break netdata. macOS uses `xattr -l`, FreeBSD
+`lsextattr`.
+
 ## What is NEVER collected
 
 These are excluded by design. **Do not add them.**
@@ -207,6 +231,53 @@ These are excluded by design. **Do not add them.**
 - metric values other than netdata's own bounded self-monitoring charts
 - anything outside netdata's own scope (no full system journals, no other
   services' logs, no packet captures)
+
+## The streaming API key exception
+
+The **streaming API key** is the one credential-shaped value the bundle keeps
+verbatim, in `04-config/stream.conf` only — both the `api key` / `proxy api key`
+values and the parent-side `[<API_KEY>]` / `[<MACHINE_GUID>]` section headers.
+Streaming problems are diagnosed by comparing what the child sends with what the
+parent accepts, and redacting it also collapsed every key section to an
+identical placeholder, making per-key settings unattributable.
+
+- **File-scoped and key-exact.** Only when the source file is named
+  `stream.conf` (keyed on the source path, never the bundle path), and only for
+  a key normalizing exactly to `api key` or `proxy api key`. Any other secret in
+  that file, and any `api key` elsewhere, is still redacted.
+- **Not applied to logs.** The parent also logs `api_key:'<key>'`
+  (`src/streaming/stream-receiver-connection.c`) and children send it as a
+  `key=` query parameter (`src/streaming/stream-connector.c`). Those stay
+  redacted — un-redacting them would loosen rules shared with genuinely secret
+  parameters such as `claim_token`.
+- **Disclosed to the recipient.** Stated in the bundle's `README.md` and
+  `summary.txt`, and flagged as `"streaming_api_key_redacted": false` in
+  `MANIFEST.json`.
+
+To opt out, remove or mask `04-config/stream.conf` before sending the bundle.
+
+## Encoding fidelity
+
+Redaction must not silently rewrite the bytes of a collected file, because the
+encoding *is* sometimes the bug (a BOM in `stream.conf`, a config saved with
+CRLF, a truncated file with no final newline).
+
+Preserved through sanitization on both platforms: the byte-order mark; each
+line's own terminator — CRLF, bare CR or LF — **including on lines the sanitizer
+rewrote**, which previously lost the CR; and the absence of a final newline.
+UTF-16/32 bodies are still withheld whole, since they carry NUL bytes. On
+Windows a source that is not valid UTF-8 round-trips through ISO-8859-1, so a
+Latin-1 config is not corrupted into U+FFFD.
+
+Two encodings need special handling by the POSIX sanitizer, and both are
+covered by `--selftest` vectors:
+
+- a **BOM** used to shift every `^`-anchored rule, so a BOM-prefixed
+  `[<API_KEY>]` header did not match the section rule and shipped verbatim. The
+  BOM is stripped for the redaction pass and restored afterwards.
+- a **CR-only** file is a single record to awk, so only its first key was ever
+  examined and later secrets shipped unredacted. It is translated to LF for the
+  pass and translated back.
 
 ## Redaction philosophy
 
@@ -222,7 +293,8 @@ Two facts do the heavy lifting and are why we do not chase completeness:
    bundle before sending it** (`summary.txt` and this document say so).
 
 Concretely, we redact credential-bearing config keys, URL/DSN credentials,
-JWT/Bearer/Basic tokens, PEM key blocks, `stream.conf` API-key sections, and
+JWT/Bearer/Basic tokens, PEM key blocks, `[<UUID>]` API-key sections outside
+`stream.conf` (see "The streaming API key exception"), and
 PII (IPs, MACs, emails, hostnames, usernames); and we never collect files that
 are *pure* secrets at all (the never-collect list). We deliberately do **not**
 try to parse arbitrary nested structure to prove no secret can ever slip
@@ -252,9 +324,11 @@ Two passes, one sweep, applied to **every** collected file:
      no sentence punctuation) so prose containing "token" is not mangled.
      Exemptions are decided by the KEY, never the value: keys ending in
      `file path dir directory protection support mode level port timeout
-     cookies secure log size options format type` describe secrets rather than being
+     cookies secure log size options` describe secrets rather than being
      secrets, so `bearer token protection = no` and `api key file = /path`
      stay readable while `TOKEN=false` and `PASSWORD=/x` are redacted;
+     plus the file-scoped, key-exact streaming API key exemption described in
+     "The streaming API key exception";
    - argv/env-style secrets mid-line (`-token=X`, `--password "X"`,
      `CLAIM_TOKEN=X`, `api key = X` inside captured process command lines),
      including single- and double-quoted values;
@@ -267,8 +341,9 @@ Two passes, one sweep, applied to **every** collected file:
      lines in access logs);
    - private-key PEM blocks — the WHOLE multi-line block is withheld from the
      BEGIN marker through the END marker (fail closed if END never arrives);
-   - `stream.conf` parent-side `[<UUID>]` section headers (they ARE the API
-     keys);
+   - `[<UUID>]` section headers, which are API keys or machine GUIDs — **except
+     in `stream.conf`**, where they are kept (see "The streaming API key
+     exception");
    - `bearer_tokens/` directory listings show a file COUNT only — the
      filenames are the tokens.
 2. **PII — on by default, `--no-obfuscate` / `-NoObfuscate` to disable:**
@@ -285,7 +360,16 @@ Two passes, one sweep, applied to **every** collected file:
      collection, so they pseudonymize consistently in every file) and
      `stream.conf` `destination` hosts regardless of TLD → `private-host-N`;
    - resolv.conf `search`/`domain` values → `[SEARCH-DOMAINS-WITHHELD]`
-     (corporate search domains are rarely under private TLDs).
+     (corporate search domains are rarely under private TLDs);
+   - Windows only: the machine's own Active Directory domain (NetBIOS and DNS
+     form) → `redacted-domain`. The `09-permissions` ACL captures print
+     `DOMAIN\user` throughout, and an AD domain name identifies the customer.
+     Replacement is by exact known value — the same approach used for the
+     hostname and the invoking user — because a generic `DOMAIN\user` pattern
+     cannot be distinguished from a Windows path segment such as
+     `C:\Users\Public`. Built-in authorities (`BUILTIN`, `NT AUTHORITY`,
+     `NT SERVICE`) are untouched. POSIX has no counterpart: `getfacl` there
+     yields local account names only.
 
 The private map is written next to the bundle (`*.pseudonym-map.tsv`) so the
 **user** can decode references if support asks "what is private-host-2?" — it
@@ -322,8 +406,11 @@ by these scripts.
 3. Respect the cost budget: nothing unbounded, nothing that queries metric
    data without a tight window, nothing that can block longer than the
    per-command timeout.
-4. If the item can contain credentials of a NEW shape, extend the sanitizer
+4. If the item can contain credentials or PII of a NEW shape, extend the sanitizer
    in **both** scripts and add the pattern to the Sanitization section above.
+   A COPIED file must go through `collect_file` / `Save-File` so its bytes are
+   preserved; do not add a collector that reads a user file and writes it out
+   itself.
 5. Mirror the change in the other script (`.sh` ↔ `.ps1`) or record explicitly
    in your PR why it is platform-specific.
 6. Test the redaction: add a vector to the built-in regression suite and run
@@ -338,7 +425,10 @@ by these scripts.
 ## Bundle format contract
 
 - Schema id: `netdata-support-bundle/v1` (in `MANIFEST.json`). Bump the suffix on
-  breaking layout changes; downstream ticket tooling may parse it.
+  breaking layout changes; downstream ticket tooling may parse it. The
+  `09-permissions/` section and the top-level `streaming_api_key_redacted` flag
+  were added in tool version 1.1.0 and are purely additive, so the schema id is
+  unchanged.
 - Command captures are `.txt` files starting with a
   `# netdata-support-bundle v<version> | command: ... | captured: <utc>` header; on POSIX
   they also end with an `# exit: N | duration: Ns` trailer. PowerShell command

@@ -124,6 +124,8 @@ func TestSNMPTrapsLogsFunctionInfoAndQuery(t *testing.T) {
 	assert.Equal(t, 200, defaults.RawResponse["status"])
 	assertResponseFacetIDs(t, defaults.RawResponse, snmptrapsfunc.DefaultLogFacets())
 	assertResponseColumnVisible(t, defaults.RawResponse, "TRAP_NAME")
+	assertResponseColumnFilter(t, defaults.RawResponse, "timestamp", "none")
+	assertNoResponseColumnFilter(t, defaults.RawResponse, "range")
 
 	query := handler.HandleRaw(context.Background(), funcapiRawRequest("logs", false, []byte(`{
   "last": 10,
@@ -391,11 +393,39 @@ func assertResponseFacetIDs(t *testing.T, response map[string]any, want []string
 
 func assertResponseColumnVisible(t *testing.T, response map[string]any, key string) {
 	t.Helper()
-	columns, ok := response["columns"].(map[string]any)
-	require.True(t, ok, "response columns type = %T", response["columns"])
+	column := requireResponseColumn(t, response, key)
+	assert.Equal(t, true, column["visible"])
+}
+
+func assertResponseColumnFilter(t *testing.T, response map[string]any, key, want string) {
+	t.Helper()
+	column := requireResponseColumn(t, response, key)
+	assert.Equal(t, want, column["filter"])
+}
+
+func assertNoResponseColumnFilter(t *testing.T, response map[string]any, forbidden string) {
+	t.Helper()
+	columns := requireResponseColumns(t, response)
+	for key, columnAny := range columns {
+		column, ok := columnAny.(map[string]any)
+		require.True(t, ok, "column %s type = %T", key, columnAny)
+		assert.NotEqual(t, forbidden, column["filter"], "column %s", key)
+	}
+}
+
+func requireResponseColumn(t *testing.T, response map[string]any, key string) map[string]any {
+	t.Helper()
+	columns := requireResponseColumns(t, response)
 	column, ok := columns[key].(map[string]any)
 	require.True(t, ok, "missing column %s in %#v", key, columns)
-	assert.Equal(t, true, column["visible"])
+	return column
+}
+
+func requireResponseColumns(t *testing.T, response map[string]any) map[string]any {
+	t.Helper()
+	columns, ok := response["columns"].(map[string]any)
+	require.True(t, ok, "response columns type = %T", response["columns"])
+	return columns
 }
 
 func assertLogsSourceSelectorMetadata(t *testing.T, response map[string]any) {

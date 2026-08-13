@@ -2,6 +2,12 @@
 
 ### Merged Pull Requests:
 
+- Rework Ceph collector as a Prometheus complement ([#23357](https://github.com/netdata/netdata/issues/23357))
+
+## [2.11.0] - 2026-08-12
+
+### Merged Pull Requests:
+
 - Stabilize runtime metrics shutdown test ([#22169](https://github.com/netdata/netdata/issues/22169))
 - Chore(go): go fix ([#22173](https://github.com/netdata/netdata/issues/22173))
 - Chore(go/ibm.d): remove buildtag comment ([#22174](https://github.com/netdata/netdata/issues/22174))
@@ -943,6 +949,11 @@
 - Fix macOS NVMe SMART IOKit lifecycle ([#23445](https://github.com/netdata/netdata/issues/23445))
 - Fix macOS smartctl IOKit paths in ndsudo ([#23447](https://github.com/netdata/netdata/issues/23447))
 - Regenerate integrations docs ([#23420](https://github.com/netdata/netdata/issues/23420))
+- Fix NPM catalog setup instructions and document application dependency mapping ([#23455](https://github.com/netdata/netdata/issues/23455))
+- Regenerate integrations docs ([#23457](https://github.com/netdata/netdata/issues/23457))
+- Logs: stop advertising a range filter on the timestamp column ([#23456](https://github.com/netdata/netdata/issues/23456))
+- Docs(mcp): explain GitHub app installation and token scope ([#23449](https://github.com/netdata/netdata/issues/23449))
+- Logs: align timestamp filters with systemd Journal SDK 0.8.1 ([#23458](https://github.com/netdata/netdata/issues/23458))
 
 ## [2.10.0] - 2026-04-09
 

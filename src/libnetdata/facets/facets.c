@@ -2806,7 +2806,9 @@ void facets_report(FACETS *facets, BUFFER *wb, DICTIONARY *used_hashes_registry)
                 RRDF_FIELD_SORT_DESCENDING|RRDF_FIELD_SORT_FIXED,
                 NULL,
                 RRDF_FIELD_SUMMARY_COUNT,
-                RRDF_FIELD_FILTER_RANGE,
+                // no column filter: the time range is controlled by has_history (after/before)
+                // and the anchor-based pagination, which both key on this column
+                RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_WRAP | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY,
                 NULL);
 

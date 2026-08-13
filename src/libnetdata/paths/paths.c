@@ -65,8 +65,6 @@ static int is_sysfs(const char *path, char **reason) {
 //   proc_stat.c       core_throttle_count_filename, package_throttle_count_filename,
 //                     scaling_cur_freq_filename, time_in_state_filename,
 //                     cpuidle_name_filename, cpuidle_time_filename
-//   proc_net_dev.c    path_to_sys_devices_virtual_net, path_to_sys_class_net_speed,
-//                     and the _duplex/_operstate/_carrier/_mtu variants
 //   proc_mdstat.c     mismatch_cnt_filename
 //
 // each is consumed like snprintfz(buffer, FILENAME_MAX, path_to_sys_block_device, disk).
@@ -77,6 +75,15 @@ static int is_sysfs(const char *path, char **reason) {
 //
 // a real host prefix never contains a '%'. supporting one would mean escaping
 // '%' -> '%%' at every template site above, not relaxing this rule.
+//
+// this rule only covers the prefix. the files listed above read their template
+// from netdata.conf (inicfg_get(), with the prefix-built path as the default),
+// so a config value replaces the format string outright and never reaches this
+// check - proc_diskstats.c:1371-1380, proc_stat.c:552-577, proc_mdstat.c:121.
+//
+// proc_net_dev.c used to be on this list; it now passes the prefix as a plain
+// %s argument instead of baking it into a template, which is the shape to
+// prefer for any new site.
 bool netdata_host_prefix_has_format_specifier(const char *prefix) {
     return prefix && strchr(prefix, '%') != NULL;
 }
