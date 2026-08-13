@@ -53,38 +53,18 @@ static char *get_mgmt_api_key(void) {
 
         // save it
 #ifdef O_NOFOLLOW
-        // O_RDWR avoids blocking on FIFOs (O_WRONLY blocks until a reader arrives).
-        // O_TRUNC is omitted so truncation only happens after fstat() confirms a regular file.
-        if(lstat(api_key_filename, &st) == 0 && !S_ISREG(st.st_mode)) {
-            netdata_log_error("Management API key file '%s' is not a regular file.", api_key_filename);
-            goto temp_key;
-        }
-
-        fd = open(api_key_filename, O_RDWR|O_CREAT|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW, 0600);
-        if(fd == -1) {
+        // fopen_secret_write() owns the symlink, regular-file and 0600 guarantees
+        FILE *fp = fopen_secret_write(api_key_filename, "w");
+        if(!fp) {
             netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
             goto temp_key;
         }
 
-        if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
-            netdata_log_error("Management API key file '%s' is not a regular file.", api_key_filename);
-            close(fd);
-            goto temp_key;
-        }
-
-        if(ftruncate(fd, 0) != 0) {
-            netdata_log_error("Cannot truncate management API key file '%s'.", api_key_filename);
-            close(fd);
-            goto temp_key;
-        }
-
-        if(write(fd, guid, GUID_LEN) != GUID_LEN) {
+        size_t written = fwrite(guid, 1, GUID_LEN, fp);
+        if(fclose(fp) != 0 || written != GUID_LEN) {
             netdata_log_error("Cannot write the unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file with enough space left.", api_key_filename);
-            close(fd);
             goto temp_key;
         }
-
-        close(fd);
 #else
         // Without O_NOFOLLOW: write to a uniquely named temp file then rename atomically.
         // Use mkstemp() so the temporary filename is not predictable.
