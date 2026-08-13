@@ -112,18 +112,23 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
     /* Charts are created for every live cgroup while dcstat is publishing —
      * deliberately NOT conditioned on this cgroup having directory-cache data.
      *
-     * Two earlier attempts got this wrong:
-     *   - a values-based guard (copied from cachestat) never fires for dcstat,
-     *     because dcstat's idle ratio is 0 where cachestat's is 100;
-     *   - a presence-based guard (cg->dcstat.ct != 0) hides every cgroup whose
-     *     PIDs carry no dcstat row.  With the default `collect pid = real
-     *     parent`, a container's main process is attributed to its runtime
-     *     shim's TGID, which lives outside the container cgroup, so v1
-     *     containers never qualified while systemd services (whose parent
-     *     chains stay inside the cgroup) did.
+     * This matches the C module this replaced, which created the charts for
+     * every cgroup it had refreshed that cycle and never tested the values:
+     *     if (!(ect->flags & NETDATA_EBPF_CGROUP_HAS_DC_CHART) && ect->updated)
+     *         ebpf_create_specific_dc_charts(ect->name, update_every);
      *
-     * The removed C module created these charts for every updated cgroup, and
-     * cachestat effectively does the same today, so this matches both. */
+     * Two narrower guards were tried here and both hid the charts:
+     *   - a values-based guard, which for dcstat can only pass while lookups are
+     *     actually happening (its idle ratio is 0, so every published value is 0
+     *     on a quiet interval);
+     *   - a presence-based guard (cg->dcstat.ct != 0), which hides any cgroup
+     *     whose PIDs carry no dcstat row — path lookups are far sparser than
+     *     page-cache activity, so cgroups routinely have none for long stretches.
+     *
+     * NOTE: cachestat deliberately differs — cgroup_ebpfgo_cachestat.c keeps a
+     * values-based guard, and a cgroup with no page-cache rows never reaches its
+     * calculate() step, so its charts stay hidden.  Do not "unify" the two:
+     * dcstat follows the C module it replaced. */
 
     const bool is_service = is_cgroup_systemd_service(cg);
     const char *ratio_context = is_service ? "systemd.service.dc_ratio" : "cgroup.dc_ratio";
