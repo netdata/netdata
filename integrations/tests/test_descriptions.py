@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unicodedata
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from jsonschema import ValidationError
@@ -39,6 +40,7 @@ from gen_docs_integrations import (
     create_overview,
     read_integrations_js,
 )
+from gen_npm_catalog import PAGE_DESCRIPTIONS
 
 
 MODE_BY_TYPE = {
@@ -177,6 +179,7 @@ VALID_EXPLICIT_DESCRIPTIONS = {
     "non-ASCII URL lookalike": "Monitor K://example identifiers as plain Unicode text across reliable production systems.",
     "balanced nested parentheses": "Monitor service health (including nested (optional) detail) across reliable production systems.",
     "internal colon": "Monitor service health by state: ready, degraded, and failed across reliable production systems.",
+    "non-terminal ellipsis": "Monitor service health across ready… degraded, and failed states with reliable production metrics.",
 }
 VALID_EXPLICIT_DESCRIPTIONS.update(COMMONMARK_PLAIN_TEXT_DESCRIPTIONS)
 
@@ -209,6 +212,8 @@ INVALID_EXPLICIT_DESCRIPTIONS = {
     "high surrogate": "Monitor service behavior and health across production \ud800 systems reliably.",
     "low surrogate": "Monitor service behavior and health across production \udfff systems reliably.",
     "terminal colon": "Monitor service health and behavior across reliable production systems safely:",
+    "terminal ellipsis": "Monitor service health and behavior across reliable production systems safely…",
+    "terminal ASCII ellipsis": "Monitor service health and behavior across reliable production systems safely...",
     "missing closing parenthesis": "Monitor service health (including optional detail across reliable production systems safely.",
     "unexpected closing parenthesis": "Monitor service health including optional detail) across reliable production systems safely.",
     "misordered parentheses": "Monitor service health )(with optional detail across reliable production systems safely.",
@@ -307,6 +312,71 @@ ACCURACY_OVERRIDE_TARGETS = {
     "windows.plugin-PerflibHyperV-Hyper-V",
 }
 
+TERMINAL_ELLIPSIS_OVERRIDE_TARGETS = {
+    "debugfs.plugin-libsensors-Linux_Hardware_Sensors_(libsensors)",
+    "export-blueflood",
+    "export-graphite",
+    "export-json",
+    "export-kairosdb",
+    "export-mongodb",
+    "export-opentsdb",
+    "go.d.plugin-ap-Access_Points",
+    "go.d.plugin-clickhouse-ClickHouse",
+    "go.d.plugin-ethtool-Optical_modules",
+    "go.d.plugin-nginx-NGINX",
+    "go.d.plugin-nginxunit-NGINX_Unit",
+    "go.d.plugin-redis-Redis",
+    "go.d.plugin-snmp-A10_Thunder",
+    "go.d.plugin-snmp-APC_PDU",
+    "go.d.plugin-snmp-APC_UPS",
+    "go.d.plugin-snmp-Cisco_ICM",
+    "go.d.plugin-snmp-Cisco_SB",
+    "go.d.plugin-snmp-Cisco_UCS",
+    "go.d.plugin-snmp-Eaton_Epdu",
+    "go.d.plugin-snmp-Eaton_UPS",
+    "go.d.plugin-snmp-Exagrid",
+    "go.d.plugin-snmp-HPE_MSA",
+    "go.d.plugin-snmp-HP_ILO",
+    "go.d.plugin-snmp-HP_Ilo4",
+    "go.d.plugin-snmp-IDRAC",
+    "go.d.plugin-snmp-Isilon",
+    "go.d.plugin-snmp-Peplink",
+    "go.d.plugin-snmp_topology-BGP_Peering_Topology",
+    "go.d.plugin-snmp_traps-SNMP_Trap_Node_Attribution",
+    "go.d.plugin-vsphere-vSphere_Topology",
+    "ibm.d.plugin-db2-IBM_DB2",
+    "ibm.d.plugin-websphere_pmi-IBM_WebSphere_PMI",
+    "idlejitter.plugin-idlejitter.plugin-Idle_OS_Jitter",
+    "network-viewer.plugin-network-viewer-Live_Network_Connections",
+    "proc.plugin-/sys/devices/system/edac/mc-Memory_modules_(DIMMs)",
+    "proc.plugin-/sys/kernel/mm/ksm-Kernel_Same-Page_Merging",
+    "scim",
+    "service-discovery-http",
+    "windows.plugin-PerflibAD-Active_Directory",
+}
+
+NPM_PAGE_DESCRIPTION_TARGETS = {
+    "A10 Thunder",
+    "APC PDU",
+    "APC UPS",
+    "BGP Peering Topology",
+    "Cisco ICM",
+    "Cisco SB",
+    "Cisco UCS",
+    "Eaton Epdu",
+    "Eaton UPS",
+    "Exagrid",
+    "HP ILO",
+    "HP Ilo4",
+    "HPE MSA",
+    "IDRAC",
+    "Isilon",
+    "Live Network Connections",
+    "Peplink",
+    "SNMP Trap Node Attribution",
+    "vSphere Topology",
+}
+
 
 def remove_fenced_code(markdown):
     return re.sub(r"```.*?```|~~~.*?~~~", " ", markdown, flags=re.DOTALL)
@@ -358,11 +428,17 @@ Monitor **short** metrics. Collect enough detail to pass meta-description valida
 """
         self.assertEqual(extract_description_from_overview(overview), "Monitor **short** metrics.")
 
-    def test_long_description_is_trimmed_at_a_word_boundary(self):
-        description = normalize_description("word " * 80, summarize=False)
+    def test_mechanical_truncation_fails_final_validation(self):
+        integration = {
+            "id": "terminal-ellipsis",
+            "overview": "# Example\n\n## Overview\n\n" + "word " * 80,
+        }
+        description = extract_description_from_overview(integration["overview"], for_meta=True)
         self.assertLessEqual(len(description), MAX_DESCRIPTION_LENGTH)
         self.assertTrue(description.endswith("…"))
         self.assertNotIn(" …", description)
+        with self.assertRaisesRegex(ValueError, "ends with an ellipsis"):
+            get_integration_meta_description(integration)
 
     def test_terminal_colon_extraction_fails_final_validation(self):
         integration = {
@@ -503,6 +579,8 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             validate_description(description, integration["id"])
             self.assertEqual(description, get_integration_meta_description(integration))
             self.assertFalse(description.endswith(":"), integration["id"])
+            self.assertFalse(description.endswith("…"), integration["id"])
+            self.assertFalse(description.endswith("..."), integration["id"])
             self.assertTrue(parentheses_are_balanced(description), integration["id"])
             descriptions.append(unicodedata.normalize("NFC", description.casefold()))
 
@@ -510,7 +588,7 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
         self.assertEqual(len(descriptions), len(set(descriptions)))
         self.assertTrue(all(MIN_DESCRIPTION_LENGTH <= len(value) <= MAX_DESCRIPTION_LENGTH for value in descriptions))
 
-    def test_complete_corpus_and_accuracy_override_inventory(self):
+    def test_complete_corpus_and_override_inventories(self):
         report = description_report(self.documented)
         self.assertEqual(report["pages"], len(self.documented))
         self.assertEqual(
@@ -522,6 +600,38 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
         self.assertTrue(ACCURACY_OVERRIDE_TARGETS.issubset(by_id))
         for integration_id in ACCURACY_OVERRIDE_TARGETS:
             self.assertIsNotNone(get_description_override(by_id[integration_id]), integration_id)
+
+        self.assertEqual(len(TERMINAL_ELLIPSIS_OVERRIDE_TARGETS), 40)
+        self.assertTrue(TERMINAL_ELLIPSIS_OVERRIDE_TARGETS.issubset(by_id))
+        for integration_id in TERMINAL_ELLIPSIS_OVERRIDE_TARGETS:
+            description = get_description_override(by_id[integration_id])
+            self.assertIsNotNone(description, integration_id)
+            self.assertFalse(description.endswith("…"), integration_id)
+            self.assertFalse(description.endswith("..."), integration_id)
+
+    def test_npm_page_description_mapping_is_fully_consumed(self):
+        source = yaml.load(
+            (REPO_ROOT / "src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml").read_text(encoding="utf-8")
+        )
+        described_names = Counter(
+            module["meta"]["monitored_instance"]["name"]
+            for module in source["modules"]
+            if "description" in module["meta"]["monitored_instance"]
+        )
+        self.assertEqual(set(PAGE_DESCRIPTIONS), NPM_PAGE_DESCRIPTION_TARGETS)
+        self.assertEqual(described_names, Counter({name: 1 for name in NPM_PAGE_DESCRIPTION_TARGETS}))
+
+    def test_ibm_page_descriptions_are_owned_by_module_sources(self):
+        modules = (
+            "src/go/plugin/ibm.d/modules/db2",
+            "src/go/plugin/ibm.d/modules/websphere/pmi",
+        )
+        for module_dir in modules:
+            with self.subTest(module=module_dir):
+                source = yaml.load((REPO_ROOT / module_dir / "module.yaml").read_text(encoding="utf-8"))
+                generated = yaml.load((REPO_ROOT / module_dir / "metadata.yaml").read_text(encoding="utf-8"))
+                description = generated["modules"][0]["meta"]["monitored_instance"]["description"]
+                self.assertEqual(description, source["page_description"])
 
     def test_logo_and_maintenance_badges_have_alt_text(self):
         integration = next(item for item in self.documented if item["integration_type"] == "collector")

@@ -10,6 +10,7 @@ modules:
         icon_filename: clickhouse.svg
         categories:
           - data-collection.databases
+        description: 'Monitor ClickHouse connections, queries, resources, replication, I/O, and data operations through its HTTP interface and system tables.'
       keywords:
         - database
       related_resources:

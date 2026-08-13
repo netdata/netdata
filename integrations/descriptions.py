@@ -236,6 +236,8 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append("starts a CommonMark block")
     if description.endswith(":"):
         errors.append("ends with a colon")
+    if description.endswith(("…", "...")):
+        errors.append("ends with an ellipsis")
     if not parentheses_are_balanced(description):
         errors.append("contains unbalanced parentheses")
     if '"' in description or "\\" in description:

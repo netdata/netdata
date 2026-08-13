@@ -89,9 +89,9 @@ otherwise derives it from overview prose; it validates length, plain-text form, 
 writing. Explicit input must already be trimmed and contain no C0/C1 controls, surrogate code points, Unicode line/paragraph
 separators, or Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`); accepted input is emitted
 exactly as authored. A leading CommonMark unordered-list or one-to-nine-digit ordered-list marker, and a value consisting only of a
-hyphen thematic break, are also rejected. Terminal colons and unbalanced round parentheses are rejected as incomplete fragments;
-nested balanced parentheses remain valid. Ordinary internal hyphens, plus signs, and digits remain valid. Duplicate identity alone is
-NFC-normalized and case-folded.
+hyphen thematic break, are also rejected. Terminal colons, terminal ellipses (Unicode `…` or ASCII `...`), and unbalanced round
+parentheses are rejected as incomplete fragments; nested balanced parentheses remain valid. Ordinary internal hyphens, plus signs,
+and digits remain valid. Duplicate identity alone is NFC-normalized and case-folded.
 Normalization and truncation apply only to derived overview prose. See `description-authoring.md` for the source fields and
 authoring rules.
 

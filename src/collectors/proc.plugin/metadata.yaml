@@ -1589,6 +1589,7 @@ modules:
         categories:
           - data-collection.hardware-and-sensors
         icon_filename: "microchip.svg"
+        description: 'Monitor correctable and uncorrectable ECC memory errors reported by Linux EDAC for each memory controller and DIMM.'
       related_resources:
         integrations:
           list: []
@@ -1823,6 +1824,7 @@ modules:
         categories:
           - data-collection.operating-systems
         icon_filename: "microchip.svg"
+        description: 'Monitor Linux Kernel Samepage Merging activity and effectiveness, including shared pages, scan rates, savings, and memory deduplication behavior.'
       related_resources:
         integrations:
           list: []

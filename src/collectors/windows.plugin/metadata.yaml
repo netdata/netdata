@@ -2542,6 +2542,7 @@ modules:
         categories:
           - data-collection.applications
         icon_filename: "windows.svg"
+        description: 'Monitor Active Directory operations, replication, LDAP activity, binds, queues, database work, cleanup, security descriptors, and SAM metrics.'
       related_resources:
         integrations:
           list: []
