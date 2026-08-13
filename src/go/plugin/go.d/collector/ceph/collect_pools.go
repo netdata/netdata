@@ -4,7 +4,6 @@ package ceph
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -12,7 +11,7 @@ import (
 )
 
 type poolMetricSample struct {
-	key              string
+	name             string
 	objects          int64
 	available        int64
 	used             int64
@@ -23,19 +22,19 @@ type poolMetricSample struct {
 	writtenBytes     int64
 }
 
-func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error {
+func (c *Collector) collectPools(ctx context.Context, fsid string) (bool, error) {
 	var pools []apiPoolResponse
 	if err := c.apiClient.getJSON(ctx, "list pool statistics", urlPathApiPool, hdrAcceptVersion,
 		url.Values{
 			"stats": {"true"},
 		}, &pools); err != nil {
-		return err
+		return false, err
 	}
 	seenPoolNames := make(map[string]bool)
 	for _, pool := range pools {
 		if c.poolMatcher.MatchString(pool.PoolName) {
 			if seenPoolNames[pool.PoolName] {
-				return fmt.Errorf("list pool statistics returned a duplicate selected pool name")
+				return false, fmt.Errorf("list pool statistics returned a duplicate selected pool name")
 			}
 			seenPoolNames[pool.PoolName] = true
 		}
@@ -48,58 +47,20 @@ func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error
 		}
 		sample, err := poolSample(pool)
 		if err != nil {
-			return err
+			return false, err
 		}
 		selected = append(selected, sample)
 		if len(selected) > c.MaxPools {
-			c.suppressEntityMetrics("pool", c.seenPools)
 			c.Limit("pool-cardinality", 1, time.Hour).Warningf(
 				"selected pool count exceeds max_pools=%d; no per-pool metrics will be collected; narrow pool_selector or raise max_pools",
 				c.MaxPools)
-			return nil
+			return false, nil
 		}
 	}
-	if err := validatePoolChartKeys(selected); err != nil {
-		return err
-	}
-
-	now := c.now()
-	seen := make(map[string]bool, len(selected))
 	for _, sample := range selected {
-		seen[sample.key] = true
+		c.metrics.writePool(fsid, sample)
 	}
-	deferred := c.retireCollidingEntityOwners("pool", c.seenPools, seen)
-	var chartErrs []error
-	for _, sample := range selected {
-		if deferred[sample.key] {
-			continue
-		}
-		state, ok := c.seenPools[sample.key]
-		if !ok {
-			if err := c.addPoolCharts(sample.key); err != nil {
-				chartErrs = append(chartErrs, fmt.Errorf("add charts for pool %q: %w", sample.key, err))
-				continue
-			}
-			state = &entityState{}
-			c.seenPools[sample.key] = state
-		}
-		state.lastSeen = now
-		emitPoolMetrics(mx, sample)
-	}
-	c.expireMissingEntities("pool", c.seenPools, seen, now)
-	return errors.Join(chartErrs...)
-}
-
-func validatePoolChartKeys(samples []poolMetricSample) error {
-	seen := make(map[string]bool, len(samples))
-	for _, sample := range samples {
-		key := normalizedEntityChartKey("pool", sample.key)
-		if seen[key] {
-			return fmt.Errorf("selected pool names collide after legacy chart-ID normalization")
-		}
-		seen[key] = true
-	}
-	return nil
+	return len(selected) > 0, nil
 }
 
 func poolSample(pool apiPoolResponse) (poolMetricSample, error) {
@@ -133,7 +94,7 @@ func poolSample(pool apiPoolResponse) (poolMetricSample, error) {
 		return poolMetricSample{}, fmt.Errorf("list pool statistics returned utilization ratio outside the 0-1 range")
 	}
 	return poolMetricSample{
-		key:              pool.PoolName,
+		name:             pool.PoolName,
 		objects:          parsed[0],
 		available:        parsed[1],
 		used:             parsed[2],
@@ -143,16 +104,4 @@ func poolSample(pool apiPoolResponse) (poolMetricSample, error) {
 		readBytes:        parsed[5],
 		writtenBytes:     parsed[6],
 	}, nil
-}
-
-func emitPoolMetrics(mx map[string]int64, sample poolMetricSample) {
-	px := "pool_" + sample.key + "_"
-	mx[px+"objects"] = sample.objects
-	mx[px+"space_used_bytes"] = sample.used
-	mx[px+"space_avail_bytes"] = sample.available
-	mx[px+"space_utilization"] = int64(sample.utilizationRatio * 100 * precision)
-	mx[px+"read_ops"] = sample.readOps
-	mx[px+"read_bytes"] = sample.readBytes
-	mx[px+"write_ops"] = sample.writeOps
-	mx[px+"written_bytes"] = sample.writtenBytes
 }

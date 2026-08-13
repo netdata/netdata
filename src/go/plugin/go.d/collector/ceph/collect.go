@@ -6,64 +6,74 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 )
 
-const precision = 1000
+type metricCount struct {
+	value   int64
+	present bool
+}
 
-var (
-	maxInt64Float       = math.Nextafter(float64(math.MaxInt64), 0)
-	maxScaledInt64Float = math.Nextafter(float64(math.MaxInt64)/precision, 0)
-)
+type healthCollectionResult struct {
+	observed bool
+	osds     metricCount
+	pools    metricCount
+}
 
-func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
-	mx := make(map[string]int64)
-
-	if _, err := c.probeClusterIdentity(ctx); err != nil {
-		return nil, err
+func (c *Collector) collect(ctx context.Context) error {
+	fsid, err := c.probeClusterIdentity(ctx)
+	if err != nil {
+		return err
 	}
-	c.addClusterChartsOnce.Do(c.addClusterCharts)
+	clusterLabels := c.metrics.clusterLabels(fsid)
 
-	healthErr := c.collectHealth(ctx, mx)
+	health, healthErr := c.collectHealth(ctx, clusterLabels)
 
+	var osdObserved bool
 	var osdErr error
-	if c.shouldSkipEntityCollection("osd", c.OSDSelector, mx["osds_num"], c.MaxOSDs) {
-		c.suppressEntityMetrics("osd", c.seenOsds)
-	} else {
-		osdErr = c.collectOsds(ctx, mx)
+	if !c.shouldSkipEntityCollection("osd", c.OSDSelector, health.osds, c.MaxOSDs) {
+		osdObserved, osdErr = c.collectOsds(ctx, fsid)
 	}
 
+	var poolObserved bool
 	var poolErr error
-	if c.shouldSkipEntityCollection("pool", c.PoolSelector, mx["pools_num"], c.MaxPools) {
-		c.suppressEntityMetrics("pool", c.seenPools)
-	} else {
-		poolErr = c.collectPools(ctx, mx)
+	if !c.shouldSkipEntityCollection("pool", c.PoolSelector, health.pools, c.MaxPools) {
+		poolObserved, poolErr = c.collectPools(ctx, fsid)
 	}
 
-	err := errors.Join(
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	err = errors.Join(
 		wrapCollectionError("health", healthErr),
 		wrapCollectionError("OSD", osdErr),
 		wrapCollectionError("pool", poolErr),
 	)
-	if len(mx) == 0 {
-		return nil, err
+	if !health.observed && !osdObserved && !poolObserved {
+		if err != nil {
+			return err
+		}
+		return errors.New("no metrics collected")
 	}
 
-	mx["health_collection_failed"] = boolInt64(healthErr != nil)
-	mx["osd_collection_failed"] = boolInt64(osdErr != nil)
-	mx["pool_collection_failed"] = boolInt64(poolErr != nil)
-	return mx, err
+	c.metrics.writeComponentStatuses(clusterLabels, healthErr, osdErr, poolErr)
+	if err != nil {
+		// A component failure does not invalidate the other independently collected
+		// samples. Returning nil commits the partial cycle and the status metrics.
+		c.Limit("collection", 1, time.Minute).Error(err)
+	}
+	return nil
 }
 
-func (c *Collector) shouldSkipEntityCollection(kind, selector string, count int64, limit int) bool {
-	if strings.TrimSpace(selector) != "*" || count <= int64(limit) {
+func (c *Collector) shouldSkipEntityCollection(kind, selector string, count metricCount, limit int) bool {
+	if !count.present || strings.TrimSpace(selector) != "*" || count.value <= int64(limit) {
 		return false
 	}
 	c.Limit(kind+"-cardinality", 1, time.Hour).Warningf(
 		"cluster reports %d %ss, exceeding max_%ss=%d; no per-%s metrics will be collected; narrow %s_selector or raise max_%ss",
-		count, kind, kind, limit, kind, kind, kind)
+		count.value, kind, kind, limit, kind, kind, kind)
 	return true
 }
 
@@ -74,22 +84,6 @@ func wrapCollectionError(component string, err error) error {
 	return fmt.Errorf("collect %s features: %w", component, err)
 }
 
-func boolInt64(value bool) int64 {
-	if value {
-		return 1
-	}
-	return 0
-}
-
 func (c *Collector) probeClusterIdentity(ctx context.Context) (string, error) {
-	fsid, err := c.apiClient.probeClusterIdentity(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	c.identityMu.Lock()
-	c.fsid = fsid
-	c.identityMu.Unlock()
-
-	return fsid, nil
+	return c.apiClient.probeClusterIdentity(ctx)
 }

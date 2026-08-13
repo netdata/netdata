@@ -4,7 +4,6 @@ package ceph
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -12,19 +11,14 @@ import (
 	"time"
 )
 
-const (
-	entityAbsenceGrace  = time.Minute
-	hdrAcceptVersionV11 = "application/vnd.ceph.api.v1.1+json"
-)
+const hdrAcceptVersionV11 = "application/vnd.ceph.api.v1.1+json"
 
 type osdMetricSample struct {
-	key         string
+	uuid        string
 	deviceClass string
 	name        string
-	up          int64
-	down        int64
-	in          int64
-	out         int64
+	up          bool
+	in          bool
 	total       int64
 	available   int64
 	readOps     float64
@@ -35,13 +29,13 @@ type osdMetricSample struct {
 	applyMS     float64
 }
 
-func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error {
+func (c *Collector) collectOsds(ctx context.Context, fsid string) (bool, error) {
 	osds, err := c.fetchAllOSDs(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := validateOSDs(osds); err != nil {
-		return err
+		return false, err
 	}
 
 	selected := make([]osdMetricSample, 0, min(c.MaxOSDs, len(osds)))
@@ -55,42 +49,16 @@ func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error 
 		}
 		selected = append(selected, osdSample(osd, name))
 		if len(selected) > c.MaxOSDs {
-			c.suppressEntityMetrics("osd", c.seenOsds)
 			c.Limit("osd-cardinality", 1, time.Hour).Warningf(
 				"selected OSD count exceeds max_osds=%d; no per-OSD metrics will be collected; narrow osd_selector or raise max_osds",
 				c.MaxOSDs)
-			return nil
+			return false, nil
 		}
 	}
-	if err := validateOSDChartKeys(selected); err != nil {
-		return err
-	}
-
-	now := c.now()
-	seen := make(map[string]bool, len(selected))
 	for _, sample := range selected {
-		seen[sample.key] = true
+		c.metrics.writeOSD(fsid, sample)
 	}
-	deferred := c.retireCollidingEntityOwners("osd", c.seenOsds, seen)
-	var chartErrs []error
-	for _, sample := range selected {
-		if deferred[sample.key] {
-			continue
-		}
-		state, ok := c.seenOsds[sample.key]
-		if !ok {
-			if err := c.addOsdCharts(sample.key, sample.deviceClass, sample.name); err != nil {
-				chartErrs = append(chartErrs, fmt.Errorf("add charts for OSD %q: %w", sample.key, err))
-				continue
-			}
-			state = &entityState{}
-			c.seenOsds[sample.key] = state
-		}
-		state.lastSeen = now
-		emitOSDMetrics(mx, sample)
-	}
-	c.expireMissingEntities("osd", c.seenOsds, seen, now)
-	return errors.Join(chartErrs...)
+	return len(selected) > 0, nil
 }
 
 func (c *Collector) fetchAllOSDs(ctx context.Context) ([]apiOsdResponse, error) {
@@ -160,7 +128,7 @@ func validateOSDs(osds []apiOsdResponse) error {
 			osd.OsdStats.PerfStat.CommitLatencyMs, osd.OsdStats.PerfStat.ApplyLatencyMs,
 		}
 		for _, value := range values {
-			if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > maxScaledInt64Float {
+			if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
 				return fmt.Errorf("list OSDs returned invalid rate or latency values")
 			}
 		}
@@ -168,23 +136,13 @@ func validateOSDs(osds []apiOsdResponse) error {
 	return nil
 }
 
-func validateOSDChartKeys(samples []osdMetricSample) error {
-	seen := make(map[string]bool, len(samples))
-	for _, sample := range samples {
-		key := normalizedEntityChartKey("osd", sample.key)
-		if seen[key] {
-			return fmt.Errorf("selected OSD UUIDs collide after legacy chart-ID normalization")
-		}
-		seen[key] = true
-	}
-	return nil
-}
-
 func osdSample(osd apiOsdResponse, name string) osdMetricSample {
 	sample := osdMetricSample{
-		key:         osd.UUID,
+		uuid:        osd.UUID,
 		deviceClass: osd.Tree.DeviceClass,
 		name:        name,
+		up:          osd.Up == 1,
+		in:          osd.In == 1,
 		total:       osd.OsdStats.Statfs.Total,
 		available:   osd.OsdStats.Statfs.Available,
 		readOps:     osd.Stats.OpR,
@@ -194,31 +152,5 @@ func osdSample(osd apiOsdResponse, name string) osdMetricSample {
 		commitMS:    osd.OsdStats.PerfStat.CommitLatencyMs,
 		applyMS:     osd.OsdStats.PerfStat.ApplyLatencyMs,
 	}
-	if osd.Up == 1 {
-		sample.up = 1
-	} else {
-		sample.down = 1
-	}
-	if osd.In == 1 {
-		sample.in = 1
-	} else {
-		sample.out = 1
-	}
 	return sample
-}
-
-func emitOSDMetrics(mx map[string]int64, sample osdMetricSample) {
-	px := "osd_" + sample.key + "_"
-	mx[px+"status_up"] = sample.up
-	mx[px+"status_down"] = sample.down
-	mx[px+"status_in"] = sample.in
-	mx[px+"status_out"] = sample.out
-	mx[px+"space_used_bytes"] = sample.total - sample.available
-	mx[px+"space_avail_bytes"] = sample.available
-	mx[px+"read_ops"] = int64(sample.readOps * precision)
-	mx[px+"read_bytes"] = int64(sample.readBytes * precision)
-	mx[px+"write_ops"] = int64(sample.writeOps * precision)
-	mx[px+"written_bytes"] = int64(sample.writeBytes * precision)
-	mx[px+"commit_latency_ms"] = int64(sample.commitMS * precision)
-	mx[px+"apply_latency_ms"] = int64(sample.applyMS * precision)
 }

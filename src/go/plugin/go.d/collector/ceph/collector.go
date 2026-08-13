@@ -7,12 +7,12 @@ import (
 	_ "embed"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -28,7 +28,7 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:          func() collectorapi.CollectorV1 { return New() },
+		CreateV2:        func() collectorapi.CollectorV2 { return New() },
 		Config:          func() any { return &Config{} },
 		SharedFunctions: cephfunc.Methods,
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -42,6 +42,8 @@ func init() {
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
+
 	return &Collector{
 		Config: Config{
 			OSDSelector:  "*",
@@ -60,12 +62,10 @@ func New() *Collector {
 				},
 			},
 		},
-		charts:      &collectorapi.Charts{},
 		osdMatcher:  matcher.TRUE(),
 		poolMatcher: matcher.TRUE(),
-		seenPools:   make(map[string]*entityState),
-		seenOsds:    make(map[string]*entityState),
-		now:         time.Now,
+		store:       store,
+		metrics:     newCollectorMetrics(store),
 	}
 }
 
@@ -82,30 +82,19 @@ type Config struct {
 	web.HTTPConfig         `         yaml:",inline"                            json:""`
 }
 
-type entityState struct {
-	lastSeen time.Time
-}
-
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts               *collectorapi.Charts
-	addClusterChartsOnce sync.Once
+	store   metrix.CollectorStore
+	metrics *collectorMetrics
 
 	httpClient *http.Client
 	apiClient  *cephClient
 	funcRouter funcapi.MethodHandler
 
-	identityMu sync.RWMutex
-	fsid       string // a unique identifier for the cluster
-
 	osdMatcher  matcher.Matcher
 	poolMatcher matcher.Matcher
-
-	seenPools map[string]*entityState
-	seenOsds  map[string]*entityState
-	now       func() time.Time
 }
 
 func (c *Collector) Configuration() any {
@@ -148,31 +137,19 @@ func (c *Collector) Init(context.Context) error {
 
 func (c *Collector) Check(ctx context.Context) error {
 	_, err := c.probeClusterIdentity(ctx)
-	if err == nil && !c.FunctionOnly {
-		c.addClusterChartsOnce.Do(c.addClusterCharts)
-	}
 	return err
 }
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
 
-func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+func (c *Collector) Collect(ctx context.Context) error {
 	if c.FunctionOnly {
 		return nil
 	}
-
-	mx, err := c.collect(ctx)
-	if err != nil {
-		c.Limit("collection", 1, time.Minute).Error(err)
-	}
-
-	if len(mx) == 0 {
-		return nil
-	}
-
-	return mx
+	return c.collect(ctx)
 }
+
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
+
+func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
 
 func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
@@ -181,12 +158,6 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}
-}
-
-func (c *Collector) clusterFSID() string {
-	c.identityMu.RLock()
-	defer c.identityMu.RUnlock()
-	return c.fsid
 }
 
 func (c *Collector) FunctionAvailable(functionID string) bool {

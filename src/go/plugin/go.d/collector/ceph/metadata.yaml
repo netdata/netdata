@@ -328,7 +328,7 @@ modules:
       - name: ceph_component_collection_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.component_collection_status
-        info: 'One or more Ceph metric components for cluster ${label:fsid} are failing'
+        info: 'Ceph ${label:component} metric collection for cluster ${label:fsid} is failing'
       - name: ceph_cluster_physical_capacity_utilization
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.cluster_physical_capacity_utilization
@@ -341,17 +341,25 @@ modules:
         The default job emits the complete metric set. Per-entity metrics additionally honor their selectors and caps.
       availability: []
       scopes:
+        - name: component
+          description: These metrics refer to one Ceph API collection component.
+          labels:
+            - name: fsid
+              description: Unique Ceph cluster identifier.
+            - name: component
+              description: Ceph API collection component.
+          metrics:
+            - name: ceph.component_collection_status
+              description: Ceph Component Collection Status
+              unit: status
+              chart_type: line
+              dimensions: [{name: success}, {name: failed}]
         - name: cluster
           description: These metrics refer to the entire Ceph cluster.
           labels:
             - name: fsid
               description: Unique Ceph cluster identifier.
           metrics:
-            - name: ceph.component_collection_status
-              description: Ceph Component Collection Status
-              unit: status
-              chart_type: line
-              dimensions: [{name: health}, {name: osds}, {name: pools}]
             - name: ceph.cluster_status
               description: Ceph Cluster Status
               unit: status

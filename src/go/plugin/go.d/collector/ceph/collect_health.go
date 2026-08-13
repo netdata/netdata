@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) error {
+func (c *Collector) collectHealth(ctx context.Context, labels metrix.LabelSet) (healthCollectionResult, error) {
+	var result healthCollectionResult
 	var resp apiHealthMinimalResponse
 	if err := c.apiClient.getJSON(ctx, "get minimal health", urlPathApiHealthMinimal, hdrAcceptVersion, nil, &resp); err != nil {
-		return err
+		return result, err
 	}
 	var errs []error
 	missing := func(feature, section string) {
@@ -33,10 +36,8 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 		status := strings.ToLower(resp.Health.Status)
 		switch status {
 		case "health_err", "health_warn", "health_ok":
-			for _, key := range []string{"health_err", "health_warn", "health_ok"} {
-				mx[key] = 0
-			}
-			mx[status] = 1
+			observeEnum(c.metrics.clusterHealthStatus, strings.TrimPrefix(status, "health_"), labels)
+			result.observed = true
 		default:
 			errs = append(errs, fmt.Errorf("health_status: unknown status %q", resp.Health.Status))
 		}
@@ -47,13 +48,15 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 	} else if *resp.Hosts < 0 {
 		errs = append(errs, errors.New("hosts: negative host count"))
 	} else {
-		mx["hosts_num"] = *resp.Hosts
+		c.metrics.clusterHosts.Observe(float64(*resp.Hosts), labels)
+		result.observed = true
 	}
 
 	if resp.MonStatus == nil {
 		missing("monitors", "mon_status")
 	} else {
-		mx["monitors_num"] = int64(len(resp.MonStatus.MonMap.Mons))
+		c.metrics.clusterMonitors.Observe(float64(len(resp.MonStatus.MonMap.Mons)), labels)
+		result.observed = true
 	}
 
 	if resp.OsdMap == nil {
@@ -68,33 +71,39 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 			}
 		}
 		if valid {
-			mx["osds_num"] = int64(len(resp.OsdMap.Osds))
-			for _, key := range []string{"up", "down", "in", "out"} {
-				mx["osds_"+key+"_num"] = 0
-			}
+			counts := map[string]int64{"up": 0, "down": 0, "in": 0, "out": 0}
 			for _, osd := range resp.OsdMap.Osds {
 				if osd.In == 1 {
-					mx["osds_in_num"]++
+					counts["in"]++
 				} else {
-					mx["osds_out_num"]++
+					counts["out"]++
 				}
 				if osd.Up == 1 {
-					mx["osds_up_num"]++
+					counts["up"]++
 				} else {
-					mx["osds_down_num"]++
+					counts["down"]++
 				}
 			}
+			count := int64(len(resp.OsdMap.Osds))
+			c.metrics.clusterOSDs.Observe(float64(count), labels)
+			for _, status := range []string{"up", "down", "in", "out"} {
+				c.metrics.clusterOSDsByStatus.Observe(float64(counts[status]), labels, c.metrics.statusLabels[status])
+			}
+			result.osds = metricCount{value: count, present: true}
+			result.observed = true
 		}
 	}
 
 	if resp.MgrMap == nil {
 		missing("managers", "mgr_map")
 	} else {
-		mx["mgr_active_num"] = 0
+		active := 0
 		if resp.MgrMap.ActiveName != "" {
-			mx["mgr_active_num"] = 1
+			active = 1
 		}
-		mx["mgr_standby_num"] = int64(len(resp.MgrMap.Standbys))
+		c.metrics.clusterManagers.Observe(float64(active), labels, c.metrics.statusLabels["active"])
+		c.metrics.clusterManagers.Observe(float64(len(resp.MgrMap.Standbys)), labels, c.metrics.statusLabels["standby"])
+		result.observed = true
 	}
 
 	if resp.Rgw == nil {
@@ -102,7 +111,8 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 	} else if *resp.Rgw < 0 {
 		errs = append(errs, errors.New("object_gateways: negative gateway count"))
 	} else {
-		mx["rgw_num"] = *resp.Rgw
+		c.metrics.clusterObjectGateways.Observe(float64(*resp.Rgw), labels)
+		result.observed = true
 	}
 
 	if resp.IscsiDaemons == nil {
@@ -111,9 +121,10 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 		resp.IscsiDaemons.Down > math.MaxInt64-resp.IscsiDaemons.Up {
 		errs = append(errs, errors.New("iscsi_gateways: invalid gateway counts"))
 	} else {
-		mx["iscsi_daemons_num"] = resp.IscsiDaemons.Up + resp.IscsiDaemons.Down
-		mx["iscsi_daemons_up_num"] = resp.IscsiDaemons.Up
-		mx["iscsi_daemons_down_num"] = resp.IscsiDaemons.Down
+		c.metrics.clusterISCSIGateways.Observe(float64(resp.IscsiDaemons.Up+resp.IscsiDaemons.Down), labels)
+		c.metrics.clusterISCSIGatewaysByStatus.Observe(float64(resp.IscsiDaemons.Up), labels, c.metrics.statusLabels["up"])
+		c.metrics.clusterISCSIGatewaysByStatus.Observe(float64(resp.IscsiDaemons.Down), labels, c.metrics.statusLabels["down"])
+		result.observed = true
 	}
 
 	if resp.Df == nil {
@@ -123,34 +134,41 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 		if df.TotalBytes < 0 || df.TotalUsedRawBytes < 0 || df.TotalAvailBytes < 0 ||
 			df.TotalUsedRawBytes > df.TotalBytes || df.TotalAvailBytes > df.TotalBytes {
 			errs = append(errs, errors.New("capacity: invalid capacity values"))
-		} else if df.TotalBytes > 0 {
-			mx["raw_capacity_used_bytes"] = df.TotalUsedRawBytes
-			mx["raw_capacity_avail_bytes"] = df.TotalAvailBytes
-			mx["raw_capacity_utilization"] = percent(df.TotalUsedRawBytes, df.TotalBytes)
 		} else {
-			mx["raw_capacity_used_bytes"] = 0
-			mx["raw_capacity_avail_bytes"] = 0
-			mx["raw_capacity_utilization"] = 0
+			utilization := 0.0
+			if df.TotalBytes > 0 {
+				utilization = percent(df.TotalUsedRawBytes, df.TotalBytes)
+			}
+			c.metrics.clusterCapacityBytes.Observe(float64(df.TotalUsedRawBytes), labels, c.metrics.stateLabels["used"])
+			c.metrics.clusterCapacityBytes.Observe(float64(df.TotalAvailBytes), labels, c.metrics.stateLabels["avail"])
+			c.metrics.clusterCapacityUtilization.Observe(utilization, labels)
+			result.observed = true
 		}
 	}
 
 	if resp.PgInfo == nil {
 		missing("objects", "pg_info")
 	} else {
-		collectObjectHealth(resp.PgInfo.ObjectStats, mx, &errs)
+		if err := c.collectObjectHealth(resp.PgInfo.ObjectStats, labels); err != nil {
+			errs = append(errs, err)
+		} else {
+			result.observed = true
+		}
 	}
 
 	if resp.Pools == nil {
 		missing("pools_summary", "pools")
 	} else {
-		mx["pools_num"] = int64(len(*resp.Pools))
+		count := int64(len(*resp.Pools))
+		c.metrics.clusterPools.Observe(float64(count), labels)
+		result.pools = metricCount{value: count, present: true}
+		result.observed = true
 	}
 
 	if resp.PgInfo == nil {
 		missing("pgs", "pg_info")
 	} else {
-		pgsPerOsd, err := scaledNonnegative(resp.PgInfo.PgsPerOsd)
-		if err != nil {
+		if err := validateNonnegativeValues(resp.PgInfo.PgsPerOsd); err != nil {
 			errs = append(errs, fmt.Errorf("pgs: invalid PGs-per-OSD value: %w", err))
 		} else {
 			counts := make(map[string]int64, 4)
@@ -172,11 +190,12 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 				total += count
 			}
 			if valid {
-				mx["pgs_num"] = total
+				c.metrics.clusterPGs.Observe(float64(total), labels)
 				for _, category := range []string{"clean", "working", "warning", "unknown"} {
-					mx["pg_status_category_"+category] = counts[category]
+					c.metrics.clusterPGsByStatus.Observe(float64(counts[category]), labels, c.metrics.statusLabels[category])
 				}
-				mx["pgs_per_osd"] = pgsPerOsd
+				c.metrics.clusterPGsPerOSD.Observe(resp.PgInfo.PgsPerOsd, labels)
+				result.observed = true
 			}
 		}
 	}
@@ -186,20 +205,20 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 		missing("recovery", "client_perf")
 	} else {
 		perf := resp.ClientPerf
-		values, err := scaledNonnegativeValues(perf.ReadBytesSec, perf.ReadOpPerSec, perf.WriteBytesSec, perf.WriteOpPerSec)
-		if err != nil {
+		if err := validateNonnegativeValues(perf.ReadBytesSec, perf.ReadOpPerSec, perf.WriteBytesSec, perf.WriteOpPerSec); err != nil {
 			errs = append(errs, fmt.Errorf("client_io: invalid performance value: %w", err))
 		} else {
-			mx["client_perf_read_bytes_sec"] = values[0]
-			mx["client_perf_read_op_per_sec"] = values[1]
-			mx["client_perf_write_bytes_sec"] = values[2]
-			mx["client_perf_write_op_per_sec"] = values[3]
+			c.metrics.clusterClientIOBytes.Observe(perf.ReadBytesSec, labels, c.metrics.directionLabels["read"])
+			c.metrics.clusterClientIOBytes.Observe(perf.WriteBytesSec, labels, c.metrics.directionLabels["written"])
+			c.metrics.clusterClientIOPS.Observe(perf.ReadOpPerSec, labels, c.metrics.directionLabels["read"])
+			c.metrics.clusterClientIOPS.Observe(perf.WriteOpPerSec, labels, c.metrics.directionLabels["write"])
+			result.observed = true
 		}
-		value, err := scaledNonnegative(perf.RecoveringBytesPerSec)
-		if err != nil {
+		if err := validateNonnegativeValues(perf.RecoveringBytesPerSec); err != nil {
 			errs = append(errs, fmt.Errorf("recovery: invalid performance value: %w", err))
 		} else {
-			mx["client_perf_recovering_bytes_per_sec"] = value
+			c.metrics.clusterRecoveryBytes.Observe(perf.RecoveringBytesPerSec, labels)
+			result.observed = true
 		}
 	}
 
@@ -209,70 +228,58 @@ func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) erro
 		status := strings.ToLower(*resp.ScrubStatus)
 		switch status {
 		case "disabled", "active", "inactive":
-			for _, key := range []string{"disabled", "active", "inactive"} {
-				mx["scrub_status_"+key] = 0
-			}
-			mx["scrub_status_"+status] = 1
+			observeEnum(c.metrics.clusterScrubStatus, status, labels)
+			result.observed = true
 		default:
 			errs = append(errs, fmt.Errorf("scrub_status: unknown status %q", *resp.ScrubStatus))
 		}
 	}
 
-	return errors.Join(errs...)
+	return result, errors.Join(errs...)
 }
 
-func scaledNonnegativeValues(values ...float64) ([]int64, error) {
-	result := make([]int64, len(values))
-	for i, value := range values {
-		scaled, err := scaledNonnegative(value)
-		if err != nil {
-			return nil, err
+func validateNonnegativeValues(values ...float64) error {
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+			return errors.New("value is negative or non-finite")
 		}
-		result[i] = scaled
 	}
-	return result, nil
+	return nil
 }
 
-func scaledNonnegative(value float64) (int64, error) {
-	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > maxScaledInt64Float {
-		return 0, errors.New("value is negative, non-finite, or outside the supported range")
-	}
-	return int64(value * precision), nil
-}
-
-func collectObjectHealth(stats struct {
+func (c *Collector) collectObjectHealth(stats struct {
 	NumObjects          int64 `json:"num_objects"`
 	NumObjectCopies     int64 `json:"num_object_copies"`
 	NumObjectsDegraded  int64 `json:"num_objects_degraded"`
 	NumObjectsMisplaced int64 `json:"num_objects_misplaced"`
 	NumObjectsUnfound   int64 `json:"num_objects_unfound"`
-}, mx map[string]int64, errs *[]error) {
+}, labels metrix.LabelSet) error {
 	if stats.NumObjects < 0 || stats.NumObjectCopies < 0 || stats.NumObjectsDegraded < 0 ||
 		stats.NumObjectsMisplaced < 0 || stats.NumObjectsUnfound < 0 ||
 		stats.NumObjectsDegraded > stats.NumObjectCopies ||
 		stats.NumObjectsMisplaced > stats.NumObjectCopies ||
 		stats.NumObjectsUnfound > stats.NumObjects {
-		*errs = append(*errs, errors.New("objects: invalid object/copy health counters"))
-		return
+		return errors.New("objects: invalid object/copy health counters")
 	}
-	mx["objects_num"] = stats.NumObjects
+	c.metrics.clusterObjects.Observe(float64(stats.NumObjects), labels)
 
-	if stats.NumObjectCopies == 0 {
-		mx["objects_degraded_ratio"] = 0
-		mx["objects_misplaced_ratio"] = 0
-	} else {
-		mx["objects_degraded_ratio"] = percent(stats.NumObjectsDegraded, stats.NumObjectCopies)
-		mx["objects_misplaced_ratio"] = percent(stats.NumObjectsMisplaced, stats.NumObjectCopies)
+	degraded, misplaced := 0.0, 0.0
+	if stats.NumObjectCopies > 0 {
+		degraded = percent(stats.NumObjectsDegraded, stats.NumObjectCopies)
+		misplaced = percent(stats.NumObjectsMisplaced, stats.NumObjectCopies)
 	}
-	if stats.NumObjects == 0 {
-		mx["objects_unfound_ratio"] = 0
-	} else {
-		mx["objects_unfound_ratio"] = percent(stats.NumObjectsUnfound, stats.NumObjects)
+	unfound := 0.0
+	if stats.NumObjects > 0 {
+		unfound = percent(stats.NumObjectsUnfound, stats.NumObjects)
 	}
+	c.metrics.clusterObjectCopiesHealth.Observe(degraded, labels, c.metrics.stateLabels["degraded"])
+	c.metrics.clusterObjectCopiesHealth.Observe(misplaced, labels, c.metrics.stateLabels["misplaced"])
+	c.metrics.clusterObjectsUnfound.Observe(unfound, labels)
+	return nil
 }
 
-func percent(value, total int64) int64 {
-	return int64(float64(value) / float64(total) * 100 * precision)
+func percent(value, total int64) float64 {
+	return float64(value) / float64(total) * 100
 }
 
 func pgStatusCategory(status string) string {
