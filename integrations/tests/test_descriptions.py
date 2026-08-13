@@ -244,9 +244,28 @@ MAP_DESCRIPTION_TARGETS = {
     "packaging/installer/methods/gcp.md",
     "src/registry/CONFIGURATION.md",
     "src/registry/README.md",
+    "src/libnetdata/clocks/README.md",
+    "src/libnetdata/socket/README.md",
     "src/streaming/README.md",
     "src/web/api/formatters/csv/README.md",
     "src/web/api/formatters/json/README.md",
+}
+
+LIBNETDATA_REFERENCE_LINKS = {
+    "src/libnetdata/clocks/README.md": {
+        "clocks.h",
+        "time_t_arithmetic.h",
+    },
+    "src/libnetdata/socket/README.md": {
+        "connect-to.h",
+        "listen-sockets.h",
+        "nd-poll.h",
+        "nd-sock.h",
+        "poll-events.h",
+        "security.h",
+        "socket-peers.h",
+        "socket.h",
+    },
 }
 
 
@@ -786,6 +805,26 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
             mode="agent-notification",
         )
         self.assertEqual(top_level_heading_count(markdown), 1, "notify-sms")
+
+    def test_libnetdata_reference_pages_have_owned_content_and_valid_source_links(self):
+        for relative_path, required_links in LIBNETDATA_REFERENCE_LINKS.items():
+            page_path = REPO_ROOT / relative_path
+            markdown = page_path.read_text(encoding="utf-8")
+            self.assertEqual(top_level_heading_count(markdown), 1, relative_path)
+            self.assertRegex(markdown, r"(?m)^## ", relative_path)
+
+            link_targets = set(re.findall(r"\[[^]]+\]\(([^)]+)\)", markdown))
+            source_url_prefix = (
+                "https://github.com/netdata/netdata/blob/master/"
+                f"{page_path.parent.relative_to(REPO_ROOT).as_posix()}/"
+            )
+            source_links = {target for target in link_targets if target.startswith(source_url_prefix)}
+            linked_files = {target.removeprefix(source_url_prefix) for target in source_links}
+            self.assertTrue(required_links.issubset(linked_files), relative_path)
+            for linked_file in linked_files:
+                target_path = (page_path.parent / linked_file).resolve()
+                self.assertTrue(target_path.is_relative_to(REPO_ROOT), f"{relative_path}: {linked_file}")
+                self.assertTrue(target_path.is_file(), f"{relative_path}: {linked_file}")
 
 
 if __name__ == "__main__":

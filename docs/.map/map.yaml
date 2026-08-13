@@ -1254,6 +1254,7 @@ sidebar:
           - meta:
               label: Clocks
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/clocks/README.md
+              description: Use libnetdata clock APIs for wall-clock timestamps, monotonic elapsed time, heartbeat scheduling, sleeps, and safe time arithmetic.
           - meta:
               label: Netdata ini config files
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/config/README.md
@@ -1306,6 +1307,7 @@ sidebar:
           - meta:
               label: Socket
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/socket/README.md
+              description: Use libnetdata socket APIs for connections, listeners, polling, peer details, access checks, and optional TLS transport.
       - meta:
           label: Running a Local Dashboard through Cloudflare Tunnels
           edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/running-through-cf-tunnels.md
