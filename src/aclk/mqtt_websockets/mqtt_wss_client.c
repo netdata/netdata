@@ -129,6 +129,56 @@ struct mqtt_wss_client_struct {
 #endif
 };
 
+#if defined(OS_WINDOWS)
+// WSAPoll() accepts Winsock sockets, not CRT pipe handles. Create a connected
+// loopback pair so every descriptor in the ACLK poll set is a socket.
+static bool mqtt_wss_create_wakeup_sockets(int fds[2]) {
+    SOCKET listener = INVALID_SOCKET;
+    SOCKET reader = INVALID_SOCKET;
+    SOCKET writer = INVALID_SOCKET;
+    struct sockaddr_in address = { 0 };
+    int address_len = sizeof(address);
+    u_long nonblocking = 1;
+
+    listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(listener == INVALID_SOCKET)
+        goto fail;
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if(bind(listener, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR ||
+       listen(listener, 1) == SOCKET_ERROR ||
+       getsockname(listener, (struct sockaddr *)&address, &address_len) == SOCKET_ERROR)
+        goto fail;
+
+    writer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(writer == INVALID_SOCKET || connect(writer, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
+        goto fail;
+
+    reader = accept(listener, NULL, NULL);
+    if(reader == INVALID_SOCKET)
+        goto fail;
+
+    if(ioctlsocket(reader, FIONBIO, &nonblocking) == SOCKET_ERROR ||
+       ioctlsocket(writer, FIONBIO, &nonblocking) == SOCKET_ERROR)
+        goto fail;
+
+    closesocket(listener);
+    fds[PIPE_READ_END] = (int)reader;
+    fds[PIPE_WRITE_END] = (int)writer;
+    return true;
+
+fail:
+    if(listener != INVALID_SOCKET)
+        closesocket(listener);
+    if(reader != INVALID_SOCKET)
+        closesocket(reader);
+    if(writer != INVALID_SOCKET)
+        closesocket(writer);
+    return false;
+}
+#endif
+
 static void mqtt_wss_close_sockfd(mqtt_wss_client client)
 {
     if (client->sockfd >= 0)
@@ -187,7 +237,12 @@ mqtt_wss_client mqtt_wss_new(
         goto fail_1;
     }
 
-#ifdef __APPLE__
+#if defined(OS_WINDOWS)
+    if (!mqtt_wss_create_wakeup_sockets(client->write_notif_pipe)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create ACLK wakeup sockets");
+        goto fail_2;
+    }
+#elif defined(__APPLE__)
     if (pipe(client->write_notif_pipe)) {
 #else
     if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
@@ -229,8 +284,8 @@ void mqtt_wss_destroy(mqtt_wss_client client)
 {
     mqtt_ng_destroy(client->mqtt);
 
-    close(client->write_notif_pipe[PIPE_WRITE_END]);
-    close(client->write_notif_pipe[PIPE_READ_END]);
+    sock_close(client->write_notif_pipe[PIPE_WRITE_END]);
+    sock_close(client->write_notif_pipe[PIPE_READ_END]);
 
     ws_client_destroy(client->ws_client);
 
@@ -626,14 +681,22 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
 
 static void mqtt_wss_wakeup(mqtt_wss_client client)
 {
+#if defined(OS_WINDOWS)
+    (void)send(client->write_notif_pipe[PIPE_WRITE_END], " ", 1, 0);
+#else
     if(write(client->write_notif_pipe[PIPE_WRITE_END], " ", 1) <= 0) { ; }
+#endif
 }
 
 #define THROWAWAY_BUF_SIZE 32
 char throwaway[THROWAWAY_BUF_SIZE];
 static void util_clear_pipe(int fd)
 {
+#if defined(OS_WINDOWS)
+    (void)recv(fd, throwaway, THROWAWAY_BUF_SIZE, 0);
+#else
     if(read(fd, throwaway, THROWAWAY_BUF_SIZE) <= 0)  { ; }
+#endif
 }
 
 static void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {

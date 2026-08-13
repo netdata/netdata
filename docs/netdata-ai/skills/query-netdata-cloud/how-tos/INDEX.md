@@ -70,6 +70,7 @@ skill-verification harness questions for `verify/questions.md`; replace each
 
 ### Collectors / jobs
 
+- [`diagnose-cloud-function-timeouts.md`](./diagnose-cloud-function-timeouts.md) -- distinguish a slow agent Function from an ACLK/Cloud transport timeout using matching direct and Cloud requests.
 - `find-failed-collection-jobs.md` (stub -- not yet authored)
 - `is-collector-monitoring-X-and-frequency.md` (stub -- not yet authored)
 
