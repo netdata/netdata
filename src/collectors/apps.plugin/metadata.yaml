@@ -148,7 +148,7 @@ modules:
               dimensions:
                 - name: misses
             - name: app.ebpf_dc_hit
-              description: Percentage of files inside directory cache.
+              description: Percentage of directory lookups resolved by the cache.
               unit: "%"
               chart_type: line
               dimensions:

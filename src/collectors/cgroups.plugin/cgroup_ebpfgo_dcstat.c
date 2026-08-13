@@ -141,7 +141,7 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
         cg,
         &cg->st_dcstat_ratio,
         "dc_hit_ratio",
-        "Percentage of files inside directory cache",
+        "Percentage of directory lookups resolved by the cache",
         "directory_cache",
         ratio_context,
         "ratio",

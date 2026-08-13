@@ -372,7 +372,7 @@ static const struct apps_ebpf_chart apps_cachestat_charts[] = {
 /* Chart ids, contexts, units, and priorities match the ones the C dcstat module
  * published, so existing dashboards keep working after the port to ebpf-go. */
 static const struct apps_ebpf_chart apps_dcstat_charts[] = {
-    { "ebpf_dc_hit",       "Percentage of files inside directory cache.", "%",       "line",    20265, "ratio", "absolute"    },
+    { "ebpf_dc_hit",       "Percentage of directory lookups resolved by the cache.", "%",       "line",    20265, "ratio", "absolute"    },
     { "ebpf_dc_reference", "Count file access.",                          "files/s", "stacked", 20266, "files", "incremental" },
     { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files/s", "stacked", 20267, "files", "incremental" },
     { "ebpf_dc_not_found", "Files not found.",                            "files/s", "stacked", 20268, "files", "incremental" },

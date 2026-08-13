@@ -303,7 +303,7 @@ modules:
           labels: []
           metrics:
             - name: filesystem.dc_hit_ratio
-              description: "Share of directory lookups this interval that the kernel resolved from the directory cache, as a percentage — `(reference - miss) / reference`. It measures lookup resolution, not how many files are held in the cache. Computed from this interval's counters, so it reflects current behaviour rather than a lifetime average; an interval with no lookups reports 0. The C implementation of this collector divided lifetime totals instead."
+              description: "Percentage of directory lookups resolved by the cache — `(reference - miss) / reference`. It measures lookup resolution, not how many files are held in the cache. Computed from this interval's counters, so it reflects current behaviour rather than a lifetime average; an interval with no lookups reports 0. The C implementation of this collector divided lifetime totals instead."
               unit: "%"
               chart_type: line
               dimensions:

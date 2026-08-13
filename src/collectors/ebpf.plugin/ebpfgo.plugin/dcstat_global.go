@@ -58,7 +58,7 @@ type dcstatGlobalChart struct {
 var dcstatGlobalCharts = []dcstatGlobalChart{
 	{
 		id:      "dc_hit_ratio",
-		title:   "Percentage of files inside directory cache",
+		title:   "Percentage of directory lookups resolved by the cache",
 		units:   "%",
 		context: "filesystem.dc_hit_ratio",
 		order:   21200,

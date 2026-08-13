@@ -77,7 +77,7 @@ func TestFormatDCStatGlobalCharts(t *testing.T) {
 	updateEvery := 7
 
 	ratio := formatDCStatGlobalChart(dcstatGlobalCharts[0], updateEvery)
-	wantRatioHeader := "HOST ''\n\nCHART 'filesystem.dc_hit_ratio' '' 'Percentage of files inside directory cache' '%' 'directory_cache' 'filesystem.dc_hit_ratio' 'line' '21200' '7' '' 'ebpf-go.plugin' 'dcstat'\n"
+	wantRatioHeader := "HOST ''\n\nCHART 'filesystem.dc_hit_ratio' '' 'Percentage of directory lookups resolved by the cache' '%' 'directory_cache' 'filesystem.dc_hit_ratio' 'line' '21200' '7' '' 'ebpf-go.plugin' 'dcstat'\n"
 	if !strings.Contains(ratio, wantRatioHeader) {
 		t.Fatalf("ratio chart = %q, want substring %q", ratio, wantRatioHeader)
 	}
