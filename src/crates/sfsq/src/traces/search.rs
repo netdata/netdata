@@ -92,9 +92,12 @@
 //!    copies carry no unset parent at all (the gate then declines the
 //!    no-root prune it could have made — conservative, not wrong).
 //!    Requires producers that contradict themselves across resends.
-//! 3. **Multi-valued `name`.** The seal records the LAST `name` entry
-//!    of the root span; evaluation reads the FIRST. Divergent only for
-//!    a crafted frame; the single-valued OTLP assumption is explicit.
+//! 3. **Multi-valued `name` — CLOSED by first-entry capture.** The
+//!    seal now records the FIRST `name`/`kind`/`status` entry of the
+//!    root span, the same value every evaluation path reads (only a
+//!    crafted frame carries more than one), so the recorded facets
+//!    cannot diverge from the evaluated ones — and the tie abstention's
+//!    facet comparison agrees between the seal and the tail fold.
 //!
 //! The differential gate-on/gate-off superset test runs on tie-free,
 //! single-valued, corruption-free corpora — inside the mechanisms the

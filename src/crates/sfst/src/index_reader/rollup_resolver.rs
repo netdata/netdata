@@ -20,15 +20,20 @@
 //! - ANYTHING else — a ref outside the field's range (chunk validation
 //!   checks only `< kv_total`, so a corrupted ref can point into
 //!   another field), an in-range ref past the decoded entries (a gap),
-//!   an entry without the `key=value` shape, or an undecodable chunk —
-//!   is [`Corrupt`](RollupRefOutcome::Corrupt): the file has proven it
+//!   an entry whose key does not literally carry the
+//!   `"{field_name}="` prefix (a decodable chunk holding another
+//!   field's keys), or an undecodable chunk — is
+//!   [`Corrupt`](RollupRefOutcome::Corrupt): the file has proven it
 //!   cannot be trusted. The caller escalates per the corrupt-file
 //!   principle (skip the file as a failed source AND surface the skip);
 //!   it must never treat `Corrupt` as absence or as a non-match.
 //!
-//! Values render through the same lossy-UTF-8 + first-`=` split the
-//! canonical row path uses ([`kv_value`](super::kv_value)), so the gate
-//! and the post-assembly truth cannot diverge on rendering. Low/mid
+//! Values render through the same lossy-UTF-8 render the canonical row
+//! path uses, and the prefix strip is value-identical to
+//! [`kv_value`](super::kv_value)'s first-`=` split on every proven key
+//! (field names carry no `=`, and value-embedded `=` bytes survive
+//! both), so the gate and the post-assembly truth cannot diverge on
+//! rendering. Low/mid
 //! dictionaries decode as one table (their decode is a walk anyway);
 //! high-card chunks stay random-access with a per-ref memo — the gate
 //! only ever tests the few refs recorded roots carry, never the
@@ -126,7 +131,7 @@ impl<'r, 'a> RollupRootResolver<'r, 'a> {
                     let value = memo.entry(off).or_insert_with(|| {
                         ((off as usize) < chunk.len())
                             .then(|| String::from_utf8_lossy(chunk.key(off as usize)).into_owned())
-                            .and_then(|key| key.split_once('=').map(|(_, v)| v.to_string()))
+                            .and_then(|key| value_half(&key, field_name))
                     });
                     match value {
                         Some(v) => RollupRefOutcome::Value(v),
@@ -144,6 +149,17 @@ fn in_field_offset(kv_ref: u32, start: u32, cardinality: u32) -> Option<u32> {
     kv_ref
         .checked_sub(start)
         .filter(|&off| off < cardinality)
+}
+
+/// The value half of `key`, PROVEN to belong to `field_name`: the key
+/// must literally start with `"{field_name}="` — an entry inside the
+/// field's metadata range whose key names another field is a decodable
+/// corruption the range check alone cannot catch, and yields `None`
+/// (→ [`RollupRefOutcome::Corrupt`]), never an unproven value.
+fn value_half(key: &str, field_name: &str) -> Option<String> {
+    let rest = key.strip_prefix(field_name)?;
+    let value = rest.strip_prefix('=')?;
+    Some(value.to_string())
 }
 
 /// Locate `field_name`'s KvId range and decode its dictionary once.
@@ -198,7 +214,7 @@ fn decode_field(reader: &IndexReader<'_>, field_name: &str) -> FieldState {
         };
         let values = keys
             .into_iter()
-            .map(|key| key.split_once('=').map(|(_, v)| v.to_string()))
+            .map(|key| value_half(&key, field_name))
             .collect();
         return FieldState::Table {
             start,

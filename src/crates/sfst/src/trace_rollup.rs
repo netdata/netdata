@@ -124,6 +124,33 @@ impl TraceRollup {
                 ));
             }
         }
+        // Internal consistency — the invariants pruning consumers treat
+        // as proof, enforced as far as a self-contained check can: a
+        // non-claiming row must carry only sentinels (a flipped flag
+        // beside real root fields is a detectable contradiction), and
+        // the envelope must be well-formed (end = start ⊕ duration ≥
+        // start for every honest producer). A CONSISTENT lie — flag and
+        // fields forged together — remains outside the trust model, the
+        // same boundary as row-completeness (rows cannot be proven
+        // complete without re-reading TRCE, which would defeat the
+        // rollup's purpose).
+        for i in 0..n {
+            if self.root_is_true_root[i] != ROOT_CLAIM_TRUE
+                && (!self.root_span_ids.get(i).is_unset()
+                    || self.root_kinds[i] != 0
+                    || self.root_service_refs[i] != ROLLUP_NO_REF
+                    || self.root_name_refs[i] != ROLLUP_NO_REF)
+            {
+                return Err(crate::Error::CorruptIndex(
+                    "non-claiming trace rollup row carries root fields".into(),
+                ));
+            }
+            if self.min_start_ns[i] > self.max_end_ns[i] {
+                return Err(crate::Error::CorruptIndex(
+                    "trace rollup envelope is inverted".into(),
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -536,5 +563,19 @@ mod tests {
         broken.trace_ids.push(dup);
         broken.trace_ids.push(dup);
         assert!(broken.validate(0).is_err(), "duplicate ids");
+
+        // Internal contradictions a pruning consumer would act on: a
+        // flipped claim flag beside real root fields, and an inverted
+        // envelope. (A CONSISTENT lie stays outside the trust model.)
+        let mut broken = good.clone();
+        broken.root_is_true_root[0] = ROOT_CLAIM_NONE; // fields still set
+        assert!(
+            broken.validate(0).is_err(),
+            "non-claiming row with root fields"
+        );
+
+        let mut broken = good.clone();
+        broken.min_start_ns[0] = broken.max_end_ns[0] + 1;
+        assert!(broken.validate(0).is_err(), "inverted envelope");
     }
 }

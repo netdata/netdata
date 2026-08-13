@@ -117,7 +117,14 @@ pub(crate) fn merge_trace_sources(
             // Tails resolve roots unconditionally (cheap — in-memory,
             // no string table); a roots-free caller drops them HERE so
             // `MergedTrace.root` is uniformly absent, never
-            // sealed-absent-but-tail-present.
+            // sealed-absent-but-tail-present. WITHHELD rows (the tie
+            // abstention) arrive as `root: None` and simply do not
+            // compete — another source's claimed root may win the
+            // merge even though the withheld candidates could be
+            // earlier. Accepted: this fold is the DISPLAY/aggregate
+            // path, whose cross-source root pick is already documented
+            // as approximate (see the module docs); filters never read
+            // it, and the gate treats WITHHELD as unprunable.
             if !resolve_roots {
                 continue;
             }

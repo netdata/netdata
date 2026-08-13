@@ -534,23 +534,35 @@ fn populate_trace_row_index(
                     // The trace rollup folds this span: name/raw-kind/status
                     // captured by storage key from the just-interned span
                     // entries (tokens[base + j] is span.entries[j]'s slot).
+                    // FIRST entry wins per facet — the same value every
+                    // evaluation path reads (span_field / the tail fold /
+                    // canonical materialization all take the first), so
+                    // a crafted multi-valued frame cannot make the
+                    // recorded facets diverge from the evaluated ones.
+                    // Honest OTLP spans carry each of these exactly once.
                     {
                         let base = resource_tokens.len() + scope_tokens.len();
                         let mut name_slot = None;
-                        let mut kind = 0i32;
-                        let mut is_error = false;
+                        let mut kind = None;
+                        let mut is_error = None;
                         for (j, e) in span.entries.iter().enumerate() {
                             if Some(e.node) == name_node {
-                                name_slot = Some(tokens[base + j]);
-                            } else if Some(e.node) == kind_node {
-                                if let ng_flatten::Value::Int(k) = &e.value {
-                                    kind = *k as i32;
+                                if name_slot.is_none() {
+                                    name_slot = Some(tokens[base + j]);
                                 }
-                            } else if Some(e.node) == status_node {
-                                is_error = matches!(&e.value,
-                                    ng_flatten::Value::Str(s) if s == "ERROR");
+                            } else if Some(e.node) == kind_node {
+                                if kind.is_none() {
+                                    if let ng_flatten::Value::Int(k) = &e.value {
+                                        kind = Some(*k as i32);
+                                    }
+                                }
+                            } else if Some(e.node) == status_node && is_error.is_none() {
+                                is_error = Some(matches!(&e.value,
+                                    ng_flatten::Value::Str(s) if s == "ERROR"));
                             }
                         }
+                        let kind = kind.unwrap_or(0);
+                        let is_error = is_error.unwrap_or(false);
                         // An empty/malformed parent id normalized to the
                         // all-zero UNSET at ingest — the typed check IS the
                         // OTLP root convention.

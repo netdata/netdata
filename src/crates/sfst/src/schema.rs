@@ -692,23 +692,27 @@ impl HighField {
     }
 
     /// Recompute `offsets` from `key_lens`. Called after deserialize (where
-    /// `offsets` is skipped and so arrives empty).
-    pub(crate) fn rebuild_offsets(&mut self) {
+    /// `offsets` is skipped and so arrives empty). Returns `false` for a
+    /// CRC-valid but structurally corrupt chunk — summed key lengths
+    /// overflowing or disagreeing with `keys_blob` — so the reader can
+    /// surface corruption instead of `key()` slicing out of bounds (a
+    /// panic) or, worse, a wrapped sum slicing the WRONG bytes silently.
+    #[must_use]
+    pub(crate) fn rebuild_offsets(&mut self) -> bool {
         self.offsets.clear();
         self.offsets.reserve(self.key_lens.len() + 1);
         let mut acc = 0u32;
         self.offsets.push(0);
         for &len in &self.key_lens {
-            acc += len;
+            let Some(next) = acc.checked_add(len) else {
+                return false;
+            };
+            acc = next;
             self.offsets.push(acc);
         }
-        // `keys_blob` concatenates every key, so its length must equal the summed
-        // key lengths; a mismatch means a truncated/corrupt chunk.
-        debug_assert_eq!(
-            self.keys_blob.len(),
-            acc as usize,
-            "HighField keys_blob length inconsistent with key_lens (corrupt)"
-        );
+        // `keys_blob` concatenates every key, so its length must equal the
+        // summed key lengths.
+        self.keys_blob.len() == acc as usize
     }
 
     /// Number of keys.
@@ -834,22 +838,26 @@ impl StreamBatch {
     }
 
     /// Recompute `row_offsets` from `row_lens`. Called after deserialize.
-    pub(crate) fn rebuild_offsets(&mut self) {
+    /// Returns `false` for a CRC-valid but structurally corrupt chunk —
+    /// summed row lengths overflowing or disagreeing with `kv_bytes` — so
+    /// the reader can surface corruption instead of `row()` slicing out
+    /// of bounds (same contract as `HighField::rebuild_offsets`).
+    #[must_use]
+    pub(crate) fn rebuild_offsets(&mut self) -> bool {
         self.row_offsets.clear();
         self.row_offsets.reserve(self.row_lens.len() + 1);
         let mut acc = 0u32;
         self.row_offsets.push(0);
         for &len in &self.row_lens {
-            acc += len;
+            let Some(next) = acc.checked_add(len) else {
+                return false;
+            };
+            acc = next;
             self.row_offsets.push(acc);
         }
         // Every KvId is a fixed 4 bytes, so the buffer must hold exactly
-        // `total_ids * 4`; a mismatch means a truncated/corrupt chunk.
-        debug_assert_eq!(
-            self.kv_bytes.len(),
-            acc as usize * 4,
-            "StreamBatch kv_bytes length inconsistent with row_lens (corrupt)"
-        );
+        // `total_ids * 4`.
+        self.kv_bytes.len() == acc as usize * 4
     }
 
     /// Number of log rows in this batch.

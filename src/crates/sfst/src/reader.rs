@@ -251,8 +251,13 @@ impl<'a> ChunkReader<'a> {
     pub(crate) fn high_field(&self, index: u16) -> Result<HighField, Error> {
         let mut high: HighField = unpack(self.high_field_raw(index)?)?;
         // `offsets` is `#[serde(skip)]`, so it deserializes empty — derive it
-        // from the decoded `key_lens` before the chunk is used.
-        high.rebuild_offsets();
+        // from the decoded `key_lens` before the chunk is used. A length
+        // mismatch is corruption the CRC cannot catch alone.
+        if !high.rebuild_offsets() {
+            return Err(Error::CorruptIndex(
+                "high-card field chunk key lengths disagree with its key blob".into(),
+            ));
+        }
         Ok(high)
     }
 
@@ -529,7 +534,12 @@ impl<'a> ChunkReader<'a> {
         let mut batch: StreamBatch = unpack(self.stream_batch_raw(index)?)?;
         // `row_offsets` is `#[serde(skip)]`, so it deserializes empty —
         // derive it from the decoded `row_lens` before the batch is used.
-        batch.rebuild_offsets();
+        // A length mismatch is corruption the CRC cannot catch alone.
+        if !batch.rebuild_offsets() {
+            return Err(Error::CorruptIndex(
+                "stream batch row lengths disagree with its kv bytes".into(),
+            ));
+        }
         Ok(batch)
     }
 
