@@ -209,8 +209,12 @@ impl TraceRollupRows {
         }
         // The earliest genuinely-unset-parent span wins the root
         // (the summary_root convention). Equal starts tie-break by
-        // ascending span id — the combiner total order's next key — so
-        // the pick is deterministic regardless of storage order.
+        // ascending span id — the combiner total order's next key.
+        // On a FULL (start_ns, span_id) tie the strict `<` keeps the
+        // FIRST-STORED span, while the canonical pick continues through
+        // (kind, content): a ruled, documented divergence (recall-miss
+        // only — see sfsq's search module docs), NOT a determinism
+        // guarantee.
         if parent_unset
             && acc
                 .root

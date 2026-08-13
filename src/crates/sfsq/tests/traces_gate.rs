@@ -79,11 +79,22 @@ fn hex(n: u8) -> String {
     sfst::TraceId::from(tid(n)).to_string()
 }
 
-/// One summary rendered comparable across gate settings.
-type Norm = (
-    Vec<(String, Option<String>, Option<String>, i64, i64, usize, bool)>,
-    QueryStatus,
+/// One summary rendered comparable across gate settings — trace-level
+/// values AND span-level attachments, so the differential sweep also
+/// catches a gate-induced change in which spans ride along.
+type NormRow = (
+    String,
+    Option<String>,
+    Option<String>,
+    i64,
+    i64,
+    usize,
+    usize,
+    usize,
+    Vec<(i64, i64)>,
+    bool,
 );
+type Norm = (Vec<NormRow>, QueryStatus);
 
 fn norm(data: &SearchData) -> Norm {
     (
@@ -97,6 +108,12 @@ fn norm(data: &SearchData) -> Norm {
                     t.start_ns,
                     t.duration_ns,
                     t.span_count,
+                    t.error_count,
+                    t.matched_count,
+                    t.matched_spans
+                        .iter()
+                        .map(|s| (s.start_ns, s.duration_ns))
+                        .collect(),
                     t.exact,
                 )
             })
@@ -706,6 +723,139 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
         ),
         "a ref into an absent field can never be proven"
     );
+}
+
+/// The second recorded status delta, pinned (review finding): a pruned
+/// candidate's assembly never runs, so corruption living only in
+/// assembly-read chunks (here `SPAN`) goes UNDISCOVERED when the gate
+/// prunes the candidate — gate-off assembles and surfaces
+/// `SourceFailure`. Same designed class as the SizeCap delta.
+#[test]
+fn pruning_masks_assembly_only_corruption_by_design() {
+    let dir = tempfile::tempdir().unwrap();
+    let cold = vec![kv_str("service.name", "cold")];
+    let reqs = vec![req_with(cold, None, &[root_span(
+        1, 0x11, 100 * NS, 101 * NS, "op",
+    )])];
+    let wal = write_wal(dir.path(), reqs, "masked");
+    drop(sealed_source(dir.path(), &wal, "one"));
+    let path = sealed_path(dir.path(), "one");
+    // SPAN is read by assembly only (discovery reads TRCE/TIMS; the
+    // gate reads TBLM/TRSU) — the shape that separates the two paths.
+    corrupt_chunk(&path, *b"SPAN");
+    let sources = || both_roles(|| vec![sealed_source_at(&path, "one")]);
+    let q = || SearchQuery::new(pred(vec![root_service_eq("hot")]));
+
+    let on = run(sources(), q());
+    assert!(on.traces.is_empty());
+    assert_eq!(
+        on.status,
+        QueryStatus::Complete,
+        "the prune never reads SPAN: corruption stays undiscovered"
+    );
+
+    let off = run(sources(), q().trace_gate_for_tests(false));
+    assert!(off.traces.is_empty());
+    assert!(
+        off.status.has(PartialReason::SourceFailure),
+        "assembly discovers what the prune skipped: {:?}",
+        off.status
+    );
+}
+
+/// The ruled recorded-vs-canonical divergence, pinned AS accepted
+/// behavior (mechanism 1 in search's module docs): two unset-parent
+/// spans sharing `(start_ns, span_id)` with different kinds and
+/// per-kind services. The rollup records the first-stored span; the
+/// canonical root is the combiner-order winner — a filtered search may
+/// omit the trace under `Complete`, while the pinned by-id lookup
+/// (which bypasses the gate) still returns it. If this test ever fails,
+/// either the ruling was implemented away (seal-side hardening) or the
+/// gate started diverging somewhere new — both need a human.
+#[test]
+fn ruled_root_tie_divergence_is_recall_miss_only() {
+    let dir = tempfile::tempdir().unwrap();
+    // Same span id + start; CLIENT(3)/svc-first stored first,
+    // SERVER(2)/svc-canon second — the combiner orders by kind, so the
+    // canonical root is the SERVER copy while the rollup records the
+    // first-stored CLIENT copy.
+    let first = req_with(vec![kv_str("service.name", "svc-first")], None, &[SpanSpec {
+        kind: 3,
+        ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
+    }]);
+    let second = req_with(vec![kv_str("service.name", "svc-canon")], None, &[SpanSpec {
+        kind: 2,
+        ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
+    }]);
+    let wal = write_wal(dir.path(), vec![first, second], "tie");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+
+    let q = || SearchQuery::new(pred(vec![root_service_eq("svc-canon")]));
+    let off = run(sources(), q().trace_gate_for_tests(false));
+    let canonical_finds = ids(&off);
+    let on = run(sources(), q());
+    if canonical_finds == vec![hex(1)] {
+        // The divergent shape materialized: the gate-on filtered list
+        // omits the match, Complete — the accepted recall miss.
+        assert!(on.traces.is_empty(), "ruled divergence: filtered omit");
+        assert_eq!(on.status, QueryStatus::Complete);
+    } else {
+        // Storage order put the canonical winner in the rollup too —
+        // then there is no divergence to accept.
+        assert_eq!(norm(&on), norm(&off));
+    }
+    // The trace stays findable by id regardless (pins bypass the gate).
+    let by_id = run(
+        sources(),
+        SearchQuery::new(pred(vec![builtin(
+            BuiltinField::TraceId,
+            CompareOp::Eq,
+            vec![text(&hex(1))],
+        )])),
+    );
+    assert_eq!(ids(&by_id), vec![hex(1)]);
+}
+
+/// High-tier root-name dictionaries resolve through the gate: 1100
+/// distinct names push `name` past the high-card threshold (10× the
+/// default 100), exercising the resolver's random-access + memo path.
+#[test]
+fn high_tier_resolution_matches_gate_off() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let names: Vec<&'static str> = (0..1100)
+        .map(|i| &*Box::leak(format!("op-{i:04}").into_boxed_str()))
+        .collect();
+    let reqs: Vec<ExportTraceServiceRequest> = (0..1100u64)
+        .map(|i| {
+            let mut trace = [0u8; 16];
+            trace[14..16].copy_from_slice(&(i as u16 + 1).to_be_bytes());
+            req_with(svc.clone(), None, &[SpanSpec {
+                trace,
+                end: (i + 1) * NS + 50,
+                ..sp(0x10, 0, (i + 1) * NS, names[i as usize])
+            }])
+        })
+        .collect();
+    let wal = write_wal(dir.path(), reqs, "hightier");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let q = || {
+        SearchQuery::new(pred(vec![builtin(
+            BuiltinField::RootName,
+            CompareOp::Eq,
+            vec![text("op-1090")],
+        )]))
+    };
+    let on = run(sources(), q());
+    let off = run(sources(), q().trace_gate_for_tests(false));
+    assert_eq!(ids(&on), ids(&off), "same trace found either way");
+    assert_eq!(on.traces.len(), 1);
+    // 1099 non-matching candidates: gate-off burns the assembled
+    // ceiling proving nothing else outranks; gate-on PRUNES them via
+    // high-tier ref resolution and proves the answer complete — the
+    // resolution path under test is what makes the prunes possible.
+    assert_eq!(on.status, QueryStatus::Complete);
+    assert!(off.status.has(PartialReason::WorkCeiling));
 }
 
 // ── The differential sweep ───────────────────────────────────────────

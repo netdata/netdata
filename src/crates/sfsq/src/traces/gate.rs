@@ -47,10 +47,26 @@
 //! see [`sfst::RollupRootResolver`]) — becomes a FAILED SOURCE from the
 //! point of discovery: the gate stops consulting it, and the caller
 //! surfaces the skip (`SourceFailure` + degraded assembly), never a
-//! silent downgrade. The candidate that exposed the corruption
-//! conservatively assembles. An ABSENT chunk is a version fact, not
+//! silent downgrade. The candidate that exposed the corruption is
+//! excluded either way: a resolver-corrupt ref returns `Assemble`
+//! directly, while a TBLM/TRSU decode failure only drops the file from
+//! the evidence set — the candidate MAY then prune on the remaining
+//! files, which is result-neutral ONLY because the caller's
+//! `degraded_assembly` flag makes the truth path exclude every
+//! post-discovery candidate as indeterminate. If that tri-state
+//! exclusion ever weakens, this prune becomes a false prune — the two
+//! contracts are coupled. An ABSENT chunk is a version fact, not
 //! corruption: absent TBLM = might-contain for every candidate; absent
 //! TRSU = Uncovered.
+//!
+//! One consequence is RECORDED as a deliberate status delta: a pruned
+//! candidate's assembly never runs, so corruption living only in chunks
+//! that assembly alone reads (columns, stream batches) goes
+//! UNDISCOVERED on gate-engaged queries that prune the affected
+//! candidates — gate-off would have surfaced `SourceFailure`. Same
+//! class as the pinned SizeCap delta: the would-have-been partials of a
+//! pruned candidate are unobserved by design (and gate-off queries
+//! never read TRSU, so laziness of discovery cuts both ways).
 //!
 //! # Cost accounting
 //!
@@ -64,7 +80,16 @@
 use std::collections::HashSet;
 
 use super::predicate::{EvalMatcher, GateRootField, TraceLevelEval};
-use super::vocab::resource_service_field;
+use super::vocab::{BuiltinField, resource_service_field};
+
+/// The `name` dictionary spelling, from the shared vocabulary — the
+/// same source the truth path reads, never hand-written (a divergent
+/// spelling would resolve as `Corrupt` and spuriously fail files).
+fn name_field() -> &'static str {
+    BuiltinField::Name
+        .dictionary_field()
+        .expect("Name is dictionary-backed")
+}
 
 /// The gate's verdict for one popped candidate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -220,10 +245,11 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         // Coverage-complete now holds over the surviving files.
 
         // ── Root rule: prune iff ≥1 true-root claim and ALL fail ─────
-        // The condition list is copied out (matchers borrow the eval,
-        // not the gate) so per-row file state stays freely borrowable.
-        let conditions: Vec<(GateRootField, &'e EvalMatcher)> = self.root_conditions.clone();
-        'condition: for (field, matcher) in conditions {
+        // Index-iterated, copying each (Copy) pair out per round — the
+        // matcher borrows the eval, not the gate, so per-row file state
+        // stays freely borrowable without cloning the list per pop.
+        'condition: for ci in 0..self.root_conditions.len() {
+            let (field, matcher) = self.root_conditions[ci];
             let mut claiming = 0usize;
             for &RowEvidence { file, row } in &rows {
                 if self.files[file].failed {
@@ -301,16 +327,16 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         kv_ref: u32,
         matcher: &EvalMatcher,
     ) -> RowVerdict {
-        let field_name = match field {
-            GateRootField::Service => self.service_field.clone(),
-            GateRootField::Name => "name".to_string(),
+        let field_name: &str = match field {
+            GateRootField::Service => &self.service_field,
+            GateRootField::Name => name_field(),
         };
         let entry = &mut self.files[file];
         let reader = entry.reader;
         let resolver = entry
             .resolver
             .get_or_insert_with(|| sfst::RollupRootResolver::new(reader));
-        match resolver.resolve(&field_name, kv_ref) {
+        match resolver.resolve(field_name, kv_ref) {
             sfst::RollupRefOutcome::Value(value) => {
                 if matcher.value_matches(value) {
                     RowVerdict::Matches

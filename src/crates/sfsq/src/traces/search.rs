@@ -2,7 +2,8 @@
 //!
 //! [`search`] evaluates a span-local predicate (the positive stage-A
 //! subset of the [`Predicate`] grammar) across a validated pair of
-//! source sets and returns EXACT, most-recent-first trace summaries via
+//! source sets and returns EXACT, most-recent-first trace summaries —
+//! exact up to the ruled root-divergence carve-out below — via
 //! the pinned two-phase design:
 //!
 //! - **Phase 1 (over-approximation, window set):** each candidate file's
@@ -41,6 +42,43 @@
 //! ranked result is complete returns an EMPTY result with
 //! [`Cancelled`](PartialReason::Cancelled) (plus any reasons already
 //! observed).
+//!
+//! # Recorded-vs-canonical root divergence (the accepted ruling)
+//!
+//! The trace-level gate ([`gate`](super::gate)) prunes root-selection
+//! candidates on the sealed rollup's RECORDED per-file root, while the
+//! post-assembly truth evaluates the CANONICAL root
+//! (`Trace::summary_root`). The two picks diverge in exactly three
+//! mechanisms, all accepted by explicit project ruling as
+//! ignore-and-document (recall-miss only; seal-side tie-break hardening
+//! was rejected as unjustified recorder/combiner lockstep). Under any of
+//! them, a FILTERED search may omit a matching trace while reporting
+//! `Complete`; the trace stays findable unfiltered, by id (`trace:id`
+//! pins bypass the gate), and in the aggregate panels:
+//!
+//! 1. **Tie-breaking.** The rollup recorder keeps the FIRST-STORED
+//!    unset-parent span on a full `(start_ns, span_id)` tie (its `<`
+//!    comparator is strict), while the canonical pick continues through
+//!    the combiner total order `(start_ns, span_id, kind, content)`.
+//!    A shared-span-id root pair (the Zipkin-bridge client/server
+//!    shape) with equal starts and per-kind values can therefore record
+//!    one root while the canonical root is the other. Equal-start ties
+//!    with DISTINCT span ids stay deterministic (ascending span id).
+//! 2. **Stored-vs-retained.** The recorder folds STORED rows; the
+//!    combiner works on RETAINED canonical copies — a recorded root can
+//!    be a stored row whose canonical `(span_id, kind)` copy lives
+//!    elsewhere with a different parent/name (the "phantom root"); when
+//!    every true-root claim is a phantom, the canonical path falls back
+//!    to an orphan root no rollup row claims. Requires producers that
+//!    contradict themselves across resends.
+//! 3. **Multi-valued `name`.** The seal records the LAST `name` entry
+//!    of the root span; evaluation reads the FIRST. Divergent only for
+//!    a crafted frame; the single-valued OTLP assumption is explicit.
+//!
+//! The differential gate-on/gate-off superset test runs on tie-free,
+//! single-valued, corruption-free corpora — inside the mechanisms the
+//! divergence is accepted; everywhere else gate-on and gate-off must be
+//! byte-identical.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;

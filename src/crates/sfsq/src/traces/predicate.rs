@@ -1120,8 +1120,9 @@ impl TraceLevelEval {
     /// The gate-prunable POSITIVE root conditions: `(field, matcher)`.
     /// Negated (`!=`, `!~`) root conditions are deliberately absent —
     /// the gate cannot PROVE an assembled root equals a specific value
-    /// (multiple candidate roots plus the documented divergence
-    /// mechanisms), so they never prune and the gate never sees them.
+    /// (multiple candidate roots plus the ruled divergence mechanisms
+    /// documented in [`search`](super::search)'s module docs), so they
+    /// never prune and the gate never sees them.
     pub(crate) fn prunable_root_conditions(
         &self,
     ) -> impl Iterator<Item = (GateRootField, &EvalMatcher)> {
