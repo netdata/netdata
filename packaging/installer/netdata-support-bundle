@@ -14,8 +14,14 @@
 #   - Works with or without a running agent, with or without root (degrades gracefully).
 #   - Zero system impact: idle CPU/IO priority, per-command timeouts, global deadline,
 #     size caps, strictly read-only outside its own staging dir.
-#   - Secrets are ALWAYS redacted (non-optional). PII (IPs, MACs, emails, hostnames)
-#     pseudonymized by default; --no-obfuscate disables PII pass only.
+#   - Secrets are ALWAYS redacted (non-optional), with ONE documented exception:
+#     the streaming API key in stream.conf is kept verbatim (it is what support
+#     needs to match a child against its parent - netdata/netdata#23448).
+#     PII (IPs, MACs, emails, hostnames) pseudonymized by default;
+#     --no-obfuscate disables PII pass only.
+#   - Collected files keep their original bytes: BOM, line terminators and a
+#     missing final newline survive redaction, and what was observed is recorded
+#     per file in MANIFEST.json, so encoding faults stay diagnosable.
 #   - Bundle is legible to humans AND AI agents: triage-ordered directories, pristine
 #     file copies, provenance in MANIFEST.json, human summary.txt, README.md inside.
 #
@@ -43,7 +49,7 @@ if [ -z "${ND_SUPPORT_BUNDLE_DEMOTED:-}" ]; then
   exec nice -n 19 sh "$0" "$@"
 fi
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 OUTDIR="/tmp"
 SINCE_HOURS=24
 CMD_TIMEOUT=10
@@ -85,6 +91,8 @@ mkdir -p "$WORK"
 MAP_FILE="$STAGING/map.tsv"; : > "$MAP_FILE"
 MANIFEST_ROWS="$STAGING/manifest.rows"; : > "$MANIFEST_ROWS"
 ERRORS="$STAGING/errors.txt"; : > "$ERRORS"
+# what the sanitizer must preserve for the file it is currently processing
+ENC_BOM_BYTES=0; ENC_FINAL=true; ENC_CRONLY=0
 
 cleanup() { [ "$KEEP_STAGING" = "1" ] || rm -rf "$STAGING"; }
 trap cleanup EXIT
@@ -162,9 +170,42 @@ RUN_USER=$(id -un 2>/dev/null || echo "")
 case "$RUN_USER" in root|netdata|"") RUN_USER="" ;; *) : ;; esac
 [ ${#RUN_USER} -lt 3 ] && RUN_USER=""
 
+# encoding_probe <staged-file> - work out what the sanitizer must preserve:
+# where the BOM ends, whether the file ends with a terminator, and whether it
+# uses CR-only line endings. Redaction used to silently normalize all three
+# away (netdata/netdata#23448).
+encoding_probe() {
+  _ef="$1"
+  ENC_BOM_BYTES=0; ENC_FINAL=true; ENC_CRONLY=0
+  case "$(head -c 4 "$_ef" 2>/dev/null | od -An -tx1 2>/dev/null | tr -d ' \n')" in
+    efbbbf*)  ENC_BOM_BYTES=3 ;;
+    fffe0000|0000feff) ENC_BOM_BYTES=4 ;;
+    fffe*|feff*) ENC_BOM_BYTES=2 ;;
+    *) : ;;
+  esac
+  # CR is a line terminator too, so a CR-terminated file is not missing its
+  # final newline - sanitize_file relies on this to not eat that last byte
+  case "$(tail -c 1 "$_ef" 2>/dev/null | od -An -tx1 | tr -d ' \n')" in
+    0a|0d) : ;;
+    *) ENC_FINAL=false ;;
+  esac
+  # CR-only (classic Mac) endings make the whole file ONE awk record, so only
+  # its first key would ever be examined - sanitize_file translates for the pass
+  if [ "$(LC_ALL=C tr -dc '\n' < "$_ef" 2>/dev/null | wc -c | tr -d ' ')" = "0" ] &&
+     [ "$(LC_ALL=C tr -dc '\r' < "$_ef" 2>/dev/null | wc -c | tr -d ' ')" != "0" ]; then
+    ENC_CRONLY=1
+  fi
+  return 0
+}
+
+# sanitize_file <staged-file> [context]
+# context "stream" marks stream.conf, the one file where the streaming API key
+# is kept verbatim (netdata/netdata#23448). Every other file, and every other
+# secret key inside stream.conf, is redacted as before.
 sanitize_file() {
-  _f="$1"
+  _f="$1"; _ctx="${2:-}"
   [ -f "$_f" ] || return 0
+  encoding_probe "$_f"
   # binary/UTF-16 input would make line-based redaction byte-unsafe: withhold
   _b_all=$(wc -c < "$_f")
   _b_txt=$(LC_ALL=C tr -d '\000' < "$_f" | wc -c)
@@ -172,7 +213,23 @@ sanitize_file() {
     echo "[content withheld: file contains NUL bytes (binary or UTF-16?)]" > "$_f"
     return 0
   fi
-  if awk -v obf="$OBFUSCATE" -v mapfile="$MAP_FILE" \
+  # A BOM shifts every ^-anchored rule in the sanitizer: a BOM'd "[<API_KEY>]"
+  # header did NOT match the section rule and shipped verbatim. Strip the BOM
+  # for the redaction pass and restore the exact bytes afterwards.
+  _sanin="$_f"; _bomstripped=0
+  if [ "$ENC_BOM_BYTES" -gt 0 ]; then
+    if tail -c "+$((ENC_BOM_BYTES + 1))" "$_f" > "$_f.nobom" 2>>"$ERRORS"; then
+      _sanin="$_f.nobom"; _bomstripped=1
+    fi
+  fi
+  # A CR-only file is a single record to awk, so every rule would see one giant
+  # line and only its FIRST key would be examined - later secrets would ship
+  # unredacted. Translate CR to LF for the pass and translate back after, which
+  # redacts correctly and still reproduces the original bytes.
+  if [ "$ENC_CRONLY" = "1" ]; then
+    if LC_ALL=C tr '\r' '\n' < "$_sanin" > "$_f.lf" 2>>"$ERRORS"; then _sanin="$_f.lf"; fi
+  fi
+  if awk -v ctx="$_ctx" -v obf="$OBFUSCATE" -v mapfile="$MAP_FILE" \
       -v host_short="$HOST_SHORT" -v host_fqdn="$HOST_FQDN" -v run_user="$RUN_USER" '
   BEGIN {
     nsec = split("api key,apikey,token,password,passwd,pwd,secret,community,bearer,webhook,license key,auth,credential,cookie,passphrase,proxy user,proxy pass,username,dsn,private key,access key,session,recipient,account sid,priv key", SK, ",");
@@ -196,6 +253,15 @@ sanitize_file() {
     if (lk ~ /(^| )(file|path|dir|directory|protection|support|mode|level|port|timeout|cookies|secure|log|size|options)$/) return 1;
     return 0;
   }
+  function streaming_api_key(lk) {
+    # netdata/netdata#23448: the STREAMING api key is not treated as a secret -
+    # support needs its value to tell whether a child and its parent agree.
+    # Scoped to stream.conf (ctx) and to an EXACT key match, so a third-party
+    # "api key" in any other file, and any other secret key inside stream.conf,
+    # is still redacted. Deliberately NOT applied to access logs, where the same
+    # value appears via stream-receiver-connection.c and a "key=" query param.
+    return (ctx == "stream" && (lk == "api key" || lk == "proxy api key"));
+  }
   function redact_kv(line,   i, k, pos, posc, pose, key, lk) {
     # ini/yaml/env style: <key> = value | <key>: value | KEY=value
     # (JSON-shaped lines are owned by redact_json, which preserves quoting)
@@ -213,6 +279,7 @@ sanitize_file() {
       lk = tolower(key);
       gsub(/[-_]/, " ", lk);
       if (diagnostic_key(lk)) return line;
+      if (streaming_api_key(lk)) return line;
       for (i = 1; i <= nsec; i++) {
         if (index(lk, SK[i]) > 0 && substr(line, pos + 1) ~ /[^ \t]/)
           return substr(line, 1, pos) " [REDACTED]";
@@ -444,14 +511,20 @@ sanitize_file() {
   {
     # NOTE: no {n,m} regex intervals anywhere in this program - older BSD awks
     # treat them as literal braces, which would silently disable redaction.
+    # Split a CRLF terminator off first and re-append it at print time. Two
+    # reasons: redaction rules used to rebuild lines without the CR (silently
+    # converting a CRLF file to mixed endings), and a trailing CR otherwise
+    # becomes part of the matched VALUE ("TOKEN=false\r"), skewing the rules.
+    line = $0; cr = "";
+    if (line ~ /\r$/) { cr = "\r"; sub(/\r$/, "", line); }
     # PEM private keys are multi-line: withhold the WHOLE block, fail closed
     # if the END marker never arrives.
     if (inpem) {
-      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY/) inpem = 0;
+      if (line ~ /-----END [A-Z ]*PRIVATE KEY/) inpem = 0;
       next;
     }
-    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY/) {
-      print "[REDACTED PRIVATE KEY BLOCK]";
+    if (line ~ /-----BEGIN [A-Z ]*PRIVATE KEY/) {
+      print "[REDACTED PRIVATE KEY BLOCK]" cr;
       inpem = 1;
       next;
     }
@@ -464,10 +537,12 @@ sanitize_file() {
     # are still withheld. This matches typical support-bundle tools: redact the
     # well-defined cases, and rely on the user reviewing the bundle before
     # sending it. See SUPPORT-BUNDLE.md "Redaction philosophy".
-    line = $0;
-    # stream.conf parent side: [<API_KEY>] / [<MACHINE_GUID>] section headers ARE secrets
-    if (line ~ /^[ \t]*\[[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]\][ \t]*$/) {
-      print "[REDACTED-KEY-SECTION]"; next;
+    # [<UUID>] section headers are API keys (or machine GUIDs). In stream.conf
+    # they are kept: support needs to see WHICH key each section configures, and
+    # collapsing them all to one placeholder also made per-key settings
+    # unattributable. Everywhere else they are still withheld.
+    if (ctx != "stream" && line ~ /^[ \t]*\[[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]\][ \t]*$/) {
+      print "[REDACTED-KEY-SECTION]" cr; next;
     }
     line = redact_kv(line);
     if (line ~ /"[^"]+"[ \t]*:[ \t]*/) line = redact_json(line);
@@ -515,7 +590,7 @@ sanitize_file() {
       m = substr(rest, RSTART, RLENGTH);
       sub(/[ ]?=.*/, "", m);
       lk = tolower(m); gsub(/[-_]/, " ", lk);
-      if (diagnostic_key(lk))
+      if (diagnostic_key(lk) || streaming_api_key(lk))
         out = out substr(rest, 1, RSTART + RLENGTH - 1);
       else
         out = out substr(rest, 1, RSTART - 1) m " = [REDACTED]";
@@ -540,12 +615,33 @@ sanitize_file() {
       # other local users appear in mount tables / paths when run as root
       line = gensub_home(line);
     }
-    print line;
-  }' "$_f" > "$_f.san" 2>>"$ERRORS"; then
-    mv "$_f.san" "$_f"
+    print line cr;
+  }' "$_sanin" > "$_f.san" 2>>"$ERRORS"; then
+    if [ "$ENC_CRONLY" = "1" ]; then
+      LC_ALL=C tr '\n' '\r' < "$_f.san" > "$_f.san2" 2>>"$ERRORS" && mv "$_f.san2" "$_f.san"
+    fi
+    # restore the exact BOM bytes the source had, so an encoding fault in the
+    # user's file is still visible in the bundle
+    if [ "$_bomstripped" = "1" ]; then
+      head -c "$ENC_BOM_BYTES" "$_f" > "$_f.out" 2>>"$ERRORS"
+    else
+      : > "$_f.out"
+    fi
+    cat "$_f.san" >> "$_f.out"
+    # awk always terminates its last line: drop that byte again when the source
+    # had no final newline, so a truncated source file still looks truncated
+    if [ "$ENC_FINAL" = "false" ]; then
+      _osz=$(wc -c < "$_f.out" | tr -d ' ')
+      _lastout=$(tail -c 1 "$_f.out" 2>/dev/null | od -An -tx1 | tr -d ' \n')
+      if [ "${_osz:-0}" -gt 0 ] && { [ "$_lastout" = "0a" ] || [ "$_lastout" = "0d" ]; }; then
+        head -c "$((_osz - 1))" "$_f.out" > "$_f.out2" 2>>"$ERRORS" && mv "$_f.out2" "$_f.out"
+      fi
+    fi
+    mv "$_f.out" "$_f"
+    rm -f "$_f.san" "$_f.nobom" "$_f.lf" "$_f.out2"
   else
     # fail CLOSED: never ship content the sanitizer could not process
-    rm -f "$_f.san"
+    rm -f "$_f.san" "$_f.san2" "$_f.nobom" "$_f.lf" "$_f.out" "$_f.out2"
     echo "[netdata-support-bundle] sanitization failed for this file - content withheld for safety" > "$_f"
   fi
 }
@@ -559,7 +655,8 @@ json_str() { # collapse newlines/tabs, escape backslashes and quotes
 manifest_add() {
   _rel="$1"; _kind="$2"; _origin="$3"; _title="$4"
   _bytes=0; [ -f "$WORK/$_rel" ] && _bytes=$(wc -c < "$WORK/$_rel" | tr -d ' ')
-  printf '{"path":"%s","kind":"%s","origin":"%s","title":"%s","bytes":%s,"pii_obfuscated":%s}\n' \
+  printf '{"path":"%s","kind":"%s","origin":"%s","title":"%s","bytes":%s,"pii_obfuscated":%s}
+' \
     "$(json_str "$_rel")" "$_kind" "$(json_str "$_origin")" "$(json_str "$_title")" "$_bytes" \
     "$([ "$OBFUSCATE" = "1" ] && echo true || echo false)" >> "$MANIFEST_ROWS"
 }
@@ -603,6 +700,10 @@ collect_file() {
   _rel="$1"; _title="$2"; _src="$3"; _cap="${4:-$FILE_CAP}"
   deadline_exceeded && return 0
   [ -f "$_src" ] && [ -r "$_src" ] || return 0
+  # stream.conf is the one file whose streaming API key is kept verbatim; the
+  # context is keyed on the SOURCE name, never on the bundle path
+  _fctx=""
+  case "${_src##*/}" in stream.conf) _fctx="stream" ;; *) : ;; esac
   # a symlinked final component is not a real config/log file we chose to
   # collect; refuse it so a swapped link cannot redirect us to another target
   # (symlinked parent DIRECTORIES resolve normally - only the leaf is checked)
@@ -628,7 +729,7 @@ collect_file() {
     cat "$_src" > "$_out" 2>>"$ERRORS"
     _origin="$_src"
   fi
-  sanitize_file "$_out"
+  sanitize_file "$_out" "$_fctx"
   manifest_add "$_rel" "file" "$_origin" "$_title"
 }
 
@@ -777,6 +878,89 @@ VECTORS
   printf 'nul-test \000 password=SENTINEL-NUL\n' > "$_tf.nul"
   sanitize_file "$_tf.nul"
   grep -q "content withheld" "$_tf.nul" || { echo "FAIL: NUL-bearing file was not withheld" >&2; _fails=$((_fails + 1)); }
+
+  # --- stream.conf context (netdata/netdata#23448): the STREAMING api key is
+  # --- kept verbatim, while every other secret in the same file is redacted
+  _sf="$_tf.stream"
+  cat > "$_sf" <<'STREAMVEC'
+[stream]
+    enabled = yes
+    api key = 11111111-2222-3333-4444-555555555555
+    proxy api key = 99999999-8888-7777-6666-555555555555
+    password = SENTINEL-STREAM-PW
+[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]
+    enabled = yes
+STREAMVEC
+  _obf_save3="$OBFUSCATE"; OBFUSCATE=1
+  sanitize_file "$_sf" stream
+  OBFUSCATE="$_obf_save3"
+  s_present() {
+    grep -qF -- "$1" "$_sf" || { echo "FAIL (over-redaction): $2" >&2; _fails=$((_fails + 1)); }
+  }
+  s_present "api key = 11111111-2222-3333-4444-555555555555" "streaming api key was redacted in stream context"
+  s_present "proxy api key = 99999999-8888-7777-6666-555555555555" "proxy api key was redacted in stream context"
+  s_present "[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]" "stream.conf [<API_KEY>] section header was redacted"
+  grep -q "SENTINEL-STREAM-PW" "$_sf" && \
+    { echo "FAIL (leak): a non-api-key secret survived in stream.conf" >&2; _fails=$((_fails + 1)); }
+  # the SAME api key line must still be redacted WITHOUT the stream context
+  _sf2="$_tf.nostream"
+  printf 'api key = 11111111-2222-3333-4444-555555555555\n[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]\n' > "$_sf2"
+  sanitize_file "$_sf2"
+  grep -q "11111111-2222" "$_sf2" && \
+    { echo "FAIL (leak): api key kept outside stream.conf (context leaked)" >&2; _fails=$((_fails + 1)); }
+  grep -q "REDACTED-KEY-SECTION" "$_sf2" || \
+    { echo "FAIL (leak): [<UUID>] section not redacted outside stream.conf" >&2; _fails=$((_fails + 1)); }
+
+  # --- encoding fidelity (netdata/netdata#23448): a BOM, CRLF endings and a
+  # --- missing final newline must all survive redaction, and a BOM must NOT
+  # --- shift the ^-anchored rules (it used to defeat the section redaction)
+  _ef="$_tf.enc"
+  printf '\357\273\277[11111111-2222-3333-4444-555555555555]\r\npassword = SENTINEL-ENC\r\nlast line without newline' > "$_ef"
+  _obf_save4="$OBFUSCATE"; OBFUSCATE=1
+  sanitize_file "$_ef"
+  OBFUSCATE="$_obf_save4"
+  [ "$(head -c 3 "$_ef" 2>/dev/null | od -An -tx1 | tr -d ' \n')" = "efbbbf" ] || \
+    { echo "FAIL: the UTF-8 BOM was stripped by sanitization" >&2; _fails=$((_fails + 1)); }
+  grep -q "REDACTED-KEY-SECTION" "$_ef" || \
+    { echo "FAIL (leak): a BOM defeated the [<UUID>] section redaction" >&2; _fails=$((_fails + 1)); }
+  grep -q "11111111-2222" "$_ef" && \
+    { echo "FAIL (leak): BOM'd api key section survived" >&2; _fails=$((_fails + 1)); }
+  grep -q "SENTINEL-ENC" "$_ef" && \
+    { echo "FAIL (leak): secret survived in the encoding vector" >&2; _fails=$((_fails + 1)); }
+  [ "$(LC_ALL=C tr -dc '\r' < "$_ef" | wc -c | tr -d ' ')" -ge 2 ] || \
+    { echo "FAIL: CRLF line endings were lost (including on the redacted line)" >&2; _fails=$((_fails + 1)); }
+  [ "$(tail -c 1 "$_ef" | wc -l | tr -d ' ')" = "0" ] || \
+    { echo "FAIL: a final newline was added to a source that had none" >&2; _fails=$((_fails + 1)); }
+  # --- CR-only (classic Mac) endings: awk sees ONE record, so without the
+  # --- translation only the first key would be examined and later secrets
+  # --- would ship unredacted
+  _cf="$_tf.cronly"
+  printf '[stream]\r    enabled = yes\r    password = SENTINEL-CRONLY\r' > "$_cf"
+  sanitize_file "$_cf"
+  grep -q "SENTINEL-CRONLY" "$_cf" && \
+    { echo "FAIL (leak): secret in a CR-only file was not redacted" >&2; _fails=$((_fails + 1)); }
+  [ "$(LC_ALL=C tr -dc '\r' < "$_cf" | wc -c | tr -d ' ')" = "3" ] || \
+    { echo "FAIL: CR-only line endings were not reproduced" >&2; _fails=$((_fails + 1)); }
+  [ "$(LC_ALL=C tr -dc '\n' < "$_cf" | wc -c | tr -d ' ')" = "0" ] || \
+    { echo "FAIL: CR-only file gained LF terminators" >&2; _fails=$((_fails + 1)); }
+  # a CR-only file that does NOT end in a terminator must not gain one
+  _cf2="$_tf.cronly2"
+  printf 'a = 1\rpassword = SENTINEL-CRONLY2\rlast' > "$_cf2"
+  sanitize_file "$_cf2"
+  grep -q "SENTINEL-CRONLY2" "$_cf2" && \
+    { echo "FAIL (leak): secret in a terminator-less CR-only file survived" >&2; _fails=$((_fails + 1)); }
+  [ "$(tail -c 1 "$_cf2" | od -An -tx1 | tr -d ' \n')" = "0d" ] && \
+    { echo "FAIL: CR-only file without a final terminator gained one" >&2; _fails=$((_fails + 1)); }
+  # a BOM on a CR-only file must still survive (the CR translation must not
+  # bypass the BOM restore)
+  _cf3="$_tf.bomcr"
+  printf '\357\273\277a = 1\rpassword = SENTINEL-BOMCR\r' > "$_cf3"
+  sanitize_file "$_cf3"
+  [ "$(head -c 3 "$_cf3" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ] || \
+    { echo "FAIL: BOM lost on a CR-only file" >&2; _fails=$((_fails + 1)); }
+  grep -q "SENTINEL-BOMCR" "$_cf3" && \
+    { echo "FAIL (leak): secret in a BOM'd CR-only file survived" >&2; _fails=$((_fails + 1)); }
+
   if [ "$_fails" -eq 0 ]; then
     echo "netdata-support-bundle selftest: ALL PASS"
     exit 0
@@ -965,7 +1149,7 @@ if [ -n "$CONFDIR" ]; then
       /\.(pem|key)\$/ { next }
       { print }"'
   collect_file 04-config/netdata.conf "On-disk main config" "$CONFDIR/netdata.conf"
-  collect_file 04-config/stream.conf "Streaming config (parent/child; api key redacted)" "$CONFDIR/stream.conf"
+  collect_file 04-config/stream.conf "Streaming config (parent/child; the streaming api key is KEPT VERBATIM - see README.md)" "$CONFDIR/stream.conf"
   collect_file 04-config/exporting.conf "Exporting engine config (credentials redacted)" "$CONFDIR/exporting.conf"
   collect_file 04-config/go.d.conf "go.d orchestrator config (module enable/disable)" "$CONFDIR/go.d.conf"
   # every user-customized config, nested dirs included (go.d/sd/, go.d/ss/,
@@ -1142,6 +1326,134 @@ collect_cmd 08-network/cloud-connectivity.txt "Reachability of Netdata Cloud (DN
   else echo "neither curl nor wget available"; fi; true'
 
 # =============================================================================
+# 09-permissions
+# =============================================================================
+info "collecting: permissions"
+# plugins.d discovery: the binary's own prefix, the known install prefixes, and
+# <config>/custom-plugins.d, which the agent also searches by default
+# (plugins_d.c). A [directories] plugins override in netdata.conf is not read:
+# it is rare, and keeping every path here out of user-controlled input means
+# nothing config-derived ever reaches a collector.
+PLUGINSD_DIRS=""
+_add_pluginsd() {
+  [ -n "${1:-}" ] || return 0
+  [ -d "$1" ] || return 0
+  case " $PLUGINSD_DIRS " in *" $1 "*) return 0 ;; *) : ;; esac
+  PLUGINSD_DIRS="$PLUGINSD_DIRS $1"
+}
+if [ -n "${NETDATA_BIN:-}" ]; then
+  case "$NETDATA_BIN" in
+    */usr/sbin/netdata|*/usr/bin/netdata) _add_pluginsd "${NETDATA_BIN%/usr/*}/usr/libexec/netdata/plugins.d" ;;
+    *) : ;;
+  esac
+  _add_pluginsd "$(dirname "$(dirname "$NETDATA_BIN")")/libexec/netdata/plugins.d"
+fi
+for d in /usr/libexec/netdata/plugins.d /usr/lib/netdata/plugins.d \
+         /opt/netdata/usr/libexec/netdata/plugins.d \
+         /usr/local/libexec/netdata/plugins.d \
+         /opt/homebrew/libexec/netdata/plugins.d; do
+  _add_pluginsd "$d"
+done
+[ -n "$CONFDIR" ] && _add_pluginsd "$CONFDIR/custom-plugins.d"
+PLUGINSD_DIRS="${PLUGINSD_DIRS# }"
+
+# The directory list reaches the child as positional ARGUMENTS, never as text
+# spliced into the program: one of these paths can come from the [directories]
+# plugins value in netdata.conf, and a path containing a quote would otherwise
+# close the quoted program and run as shell code with the bundle's privileges.
+# shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
+collect_cmd 09-permissions/plugins-d.txt "plugins.d: modes, ownership, setuid/setgid bits and file CAPABILITIES (lost capabilities are a top cause of a plugin collecting nothing)" sh -c '
+  if [ "$#" -eq 0 ]; then echo "(no plugins.d directory found on this host)"; exit 0; fi
+  for d in "$@"; do
+    echo "===== $d ====="
+    ls -ld "$d" 2>/dev/null
+    echo "-- contents --"
+    ls -la "$d" 2>/dev/null | head -200
+    echo "-- setuid/setgid entries --"
+    s=$(find "$d" -maxdepth 1 -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null | head -50)
+    if [ -n "$s" ]; then printf "%s\n" "$s"; else echo "(none)"; fi
+    echo "-- file capabilities --"
+    if command -v getcap >/dev/null 2>&1; then
+      c=$(getcap -r "$d" 2>/dev/null | head -50)
+      if [ -n "$c" ]; then printf "%s\n" "$c"; else echo "(no file has capabilities set)"; fi
+    else
+      echo "(getcap not available - file capabilities could NOT be checked)"
+    fi
+    # NOTE: a trailing "+" in the listing means "alternate access method", which
+    # on netdata installs is usually the security.capability xattr shown above,
+    # NOT an ACL. ACLs for the directory itself are in netdata-paths.txt.
+  done
+  true' sh $PLUGINSD_DIRS
+
+# every netdata-owned path worth reporting permissions for; the cache dir stays
+# TOP-LEVEL only (recursing it would enumerate thousands of dbengine files)
+_PERM_PATHS=""
+for _p in "$CONFDIR" "$CONFDIR/netdata.conf" "$CONFDIR/stream.conf" "$CONFDIR/ssl" \
+          "$LOGDIR" "$LIBDIR" "$LIBDIR/cloud.d" "$LIBDIR/registry" "$CACHEDIR" \
+          $PLUGINSD_DIRS "${NETDATA_BIN:-}"; do
+  [ -n "$_p" ] || continue
+  [ -e "$_p" ] || continue
+  case " $_PERM_PATHS " in *" $_p "*) continue ;; *) : ;; esac
+  _PERM_PATHS="$_PERM_PATHS $_p"
+done
+_PERM_PATHS="${_PERM_PATHS# }"
+
+# paths reach the child as positional ARGUMENTS - see the note above
+# shellcheck disable=SC2086  # deliberate word-split of the discovered path list
+collect_cmd 09-permissions/netdata-paths.txt "Modes, ownership, extended attributes, security contexts (SELinux/AppArmor) and POSIX ACLs for netdata's directories, configs and binary" sh -c '
+  if [ "$#" -eq 0 ]; then echo "(no netdata paths found on this host)"; exit 0; fi
+  has_selinux=0; [ -e /sys/fs/selinux ] && has_selinux=1
+  for p in "$@"; do
+    echo "===== $p ====="
+    ls -ld "$p" 2>/dev/null
+    stat -c "mode=%A(%a) owner=%U(%u) group=%G(%g) type=%F" "$p" 2>/dev/null \
+      || stat -f "mode=%Sp(%Lp) owner=%Su group=%Sg" "$p" 2>/dev/null \
+      || true
+    if [ "$has_selinux" = "1" ]; then
+      ls -ldZ "$p" 2>/dev/null || echo "(ls -Z unsupported)"
+    fi
+    if command -v getfattr >/dev/null 2>&1; then
+      # -m - includes the security.* and trusted.* namespaces, which is where
+      # SELinux labels and file capabilities actually live
+      a=$(getfattr -d -m - --absolute-names "$p" 2>/dev/null | grep -v "^#" | grep -v "^$" | head -20)
+      if [ -n "$a" ]; then echo "xattrs:"; printf "%s\n" "$a"; else echo "xattrs: (none set)"; fi
+    elif command -v xattr >/dev/null 2>&1; then
+      a=$(xattr -l "$p" 2>/dev/null | head -20)
+      if [ -n "$a" ]; then echo "xattrs (macOS):"; printf "%s\n" "$a"; else echo "xattrs: (none set)"; fi
+    elif command -v lsextattr >/dev/null 2>&1; then
+      a=$( { lsextattr -q system "$p" 2>/dev/null; lsextattr -q user "$p" 2>/dev/null; } | head -20)
+      if [ -n "$a" ]; then echo "xattrs (FreeBSD):"; printf "%s\n" "$a"; else echo "xattrs: (none set)"; fi
+    else
+      echo "xattrs: (getfattr/xattr/lsextattr absent - the checkable namespaces are reported below)"
+    fi
+    # Reported unconditionally: getfattr lives in the "attr" package, which is
+    # NOT installed by default on Debian/Ubuntu, and these cover the attributes
+    # that actually break netdata - security.capability (a dropped capability
+    # stops a plugin dead) and the ext2/3/4 immutable/append-only flags (which
+    # silently block the agent from writing its own state).
+    if command -v getcap >/dev/null 2>&1; then
+      c=$(getcap "$p" 2>/dev/null)
+      if [ -n "$c" ]; then echo "capabilities: $c"; else echo "capabilities: (none set)"; fi
+    else
+      echo "capabilities: (getcap not available)"
+    fi
+    if command -v lsattr >/dev/null 2>&1; then
+      # lsattr only works on ext-family filesystems; elsewhere it is silent.
+      # "e" (extent) is the ext4 default, so report only NON-default flags -
+      # an immutable ("i") or append-only ("a") flag is the interesting case.
+      l=$(lsattr -d "$p" 2>/dev/null | grep -vE "^-*e-* ")
+      [ -n "$l" ] && echo "file flags (non-default): $l"
+    fi
+    if command -v getfacl >/dev/null 2>&1; then
+      f=$(getfacl -p "$p" 2>/dev/null | grep -v "^#" | grep -v "^$" | head -20)
+      if [ -n "$f" ]; then echo "acl:"; printf "%s\n" "$f"; else echo "acl: (none)"; fi
+    else
+      echo "acl: (getfacl not available)"
+    fi
+  done
+  true' sh $_PERM_PATHS
+
+# =============================================================================
 # summary + manifest + README
 # =============================================================================
 info "writing summary and manifest"
@@ -1167,6 +1479,8 @@ CRASH_HINT=""
   echo "runtime seconds:  $(( $(now_s) - START_TS ))"
   echo "ran as root:      $([ "$(id -u)" = "0" ] && echo yes || echo no)"
   echo "pii obfuscation:  $([ "$OBFUSCATE" = "1" ] && echo on || echo OFF)"
+  [ -f "$WORK/04-config/stream.conf" ] && \
+    echo "streaming key:    PRESENT VERBATIM in 04-config/stream.conf (by design - see README.md)"
   echo
   echo "agent version:    ${AGENT_VERSION:-unknown}"
   _agent_note=""
@@ -1190,10 +1504,11 @@ CRASH_HINT=""
   echo
   echo "READ ORDER FOR TRIAGE:"
   echo "  crashes/won't start -> 06-state/status-file.json, 05-logs/, 01-system/kernel-messages.txt"
-  echo "  collector issues    -> 04-config/go.d*, 05-logs/collector.log"
+  echo "  collector issues    -> 04-config/go.d*, 05-logs/collector.log, 09-permissions/plugins-d.txt"
   echo "  streaming issues    -> 04-config/stream.conf, 07-runtime/node-instances.json, 01-system/clock-timesync.txt"
   echo "  cloud/claiming      -> 06-state/cloud-state.txt, 07-runtime/aclk-state.json, 08-network/"
   echo "  performance         -> 03-process/threads-cpu.txt, 06-state/db-disk-usage.txt, 07-runtime/node-instances.json"
+  echo "  permission denied   -> 09-permissions/ (modes, capabilities, xattrs, SELinux/AppArmor, ACLs)"
 } > "$WORK/summary.txt"
 manifest_add summary.txt file generated "Human summary"
 
@@ -1201,11 +1516,22 @@ cat > "$WORK/README.md" <<'EOF'
 # Netdata Support Bundle
 
 Generated by `netdata-support-bundle`. Contents are SANITIZED:
-secrets (tokens, api keys, passwords) are always redacted; by default IPs,
+secrets (tokens, api keys, passwords) are redacted; by default IPs,
 MACs, emails and hostnames are replaced with stable pseudonyms (`ip-1`,
 `redacted-host`, `[EMAIL]`, `[MAC]`) - consistent across all files, so
 cross-referencing still works. The pseudonym map stays on the user's machine,
 next to the tarball - it is NOT in this bundle.
+
+**One deliberate exception:** the **streaming API key** is kept VERBATIM in
+`04-config/stream.conf` (both `api key` values and `[<API_KEY>]` section
+headers). It is the value support needs to tell whether a child and its parent
+agree, so it is not treated as a secret. If your threat model differs, remove or
+mask it in `04-config/stream.conf` before sending the bundle. Note the same key
+IS still redacted in `05-logs/access.log`, where it also appears.
+
+Collected files keep their original bytes: a byte-order mark, CRLF or CR line
+endings and a missing final newline all survive redaction, so an encoding fault
+in a config file is still visible here.
 
 ## Layout (triage order)
 
@@ -1221,6 +1547,7 @@ next to the tarball - it is NOT in this bundle.
 | `06-state/` | daemon status file (crash record), state/db disk usage, claim state |
 | `07-runtime/` | live API captures: info, node instances, alerts, aclk state, buildinfo |
 | `08-network/` | listening sockets, DNS, proxy, Netdata Cloud reachability |
+| `09-permissions/` | modes, ownership, setuid bits, file capabilities, extended attributes, SELinux/AppArmor contexts and ACLs - including every `plugins.d` |
 
 ## Conventions
 
@@ -1242,6 +1569,8 @@ manifest_add README.md file generated "Bundle documentation"
   echo "  \"runtime_seconds\": $(( $(now_s) - START_TS )),"
   echo "  \"pii_obfuscated\": $([ "$OBFUSCATE" = "1" ] && echo true || echo false),"
   echo "  \"secrets_redacted\": true,"
+  # the one documented exception to secrets_redacted (netdata/netdata#23448)
+  echo "  \"streaming_api_key_redacted\": false,"
   echo "  \"agent_running\": $([ -n "${NETDATA_PID:-}" ] && echo true || echo false),"
   echo "  \"agent_api_reachable\": $([ "$api_ok" = "1" ] && echo true || echo false),"
   echo "  \"is_container\": $([ "$IS_CONTAINER" = "1" ] && echo true || echo false),"
