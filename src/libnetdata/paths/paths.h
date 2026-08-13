@@ -16,6 +16,13 @@ bool filename_is_dir(const char *filename, bool create_it);
 // both when the file is created and when it already exists with wider
 // permissions. fopen() would create it 0666 & ~umask, which with the daemon's
 // umask(0007) leaves secrets readable and writable by the whole netdata group.
+//
+// The secret directories are group-writable, so symlinks and non-regular files
+// at the target path are refused instead of being followed or written into. An
+// existing file that cannot be chmod()-ed - chmod needs ownership, not write
+// access - is accepted only while it is already inaccessible to group and other,
+// so a secret is never written to a file this call could not make private.
+//
 // Returns NULL and leaves errno set on failure.
 FILE *fopen_secret_write(const char *filename, const char *mode);
 

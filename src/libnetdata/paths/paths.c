@@ -223,15 +223,61 @@ FILE *fopen_secret_write(const char *filename, const char *mode) {
     // Deliberately no O_TRUNC: we truncate only after the mode is confirmed, so
     // that a filesystem which rejects fchmod() (or an EPERM) leaves any existing
     // secret intact instead of replacing it with an empty file.
-    int fd = open(filename, O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+    int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+
+#ifdef O_NOFOLLOW
+    // the directory holding these secrets is group-writable (cloud.d is 0770), so
+    // the final path component is attacker-controllable: without this we would
+    // chmod and truncate whatever a planted symlink points at.
+    flags |= O_NOFOLLOW;
+#endif
+
+#ifdef O_NONBLOCK
+    // if a FIFO was planted at the path, fail instead of blocking until a reader
+    // appears. POSIX makes this a no-op for regular files, so the returned stream
+    // behaves exactly as before for real secrets.
+    flags |= O_NONBLOCK;
+#endif
+
+    int fd = open(filename, flags, 0600);
     if(fd == -1)
         return NULL;
 
-    if(fchmod(fd, 0600) != 0) {
+    struct stat st;
+    if(fstat(fd, &st) != 0) {
         int saved_errno = errno;
         close(fd);
         errno = saved_errno;
         return NULL;
+    }
+
+    // never write a secret into a FIFO, device, or anything else a third party
+    // could be reading from the other end of.
+    if(!S_ISREG(st.st_mode)) {
+        close(fd);
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if(fchmod(fd, 0600) != 0) {
+        int saved_errno = errno;
+
+        // fchmod() is gated on ownership, not on write access. A secret left
+        // behind by an agent that ran as root is still writable through the
+        // netdata group while being un-chmod-able by the netdata user, and some
+        // filesystems (CIFS, vfat, several FUSE and bind mounts) refuse chmod
+        // outright. Failing here would permanently break claiming and bearer
+        // token persistence, so tolerate it when the file is already not
+        // accessible to group or other - there is nothing left to close then.
+        if(st.st_mode & 0077) {
+            close(fd);
+            errno = saved_errno;
+            return NULL;
+        }
+
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Cannot set mode 0600 on '%s' (%s), but it is already accessible only by its owner - continuing.",
+               filename, strerror(saved_errno));
     }
 
     // now that the mode is pinned, make it behave like fopen(filename, "w")
