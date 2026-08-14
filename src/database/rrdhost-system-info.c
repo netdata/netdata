@@ -210,7 +210,12 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_region, "_cloud_instance_region");
     char os_family[RRDLABELS_MAX_VALUE_LENGTH + 1];
     rrdlabels_get_value_strcpyz(labels, os_family, sizeof(os_family), "_os");
-    if (!strcmp(os_family, "windows"))
+    // Accept "windows", "Windows", "WINDOWS" and similar case variants of the
+    // OS family. The lowercase form is the canonical value produced by
+    // src/libnetdata/os/os.c (os_type = "linux"/"windows"/"freebsd"/"macos");
+    // case-insensitive match keeps the override robust against labels that
+    // round-trip through pluginsd or streaming without canonicalisation.
+    if (!strcasecmp(os_family, "windows"))
         info->host_os_name = strdupz("Microsoft Windows");
     else
         rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");

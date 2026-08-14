@@ -189,6 +189,35 @@ load_os_release() {
   return 0
 }
 
+load_lsb_release() {
+  lsb_release_file="$1"
+
+  # an existing but unreadable file must not shadow the next candidate path
+  if [ -z "${lsb_release_file}" ] || [ ! -f "${lsb_release_file}" ] || [ ! -r "${lsb_release_file}" ]; then
+    return 1
+  fi
+
+  while IFS= read -r lsb_release_line || [ -n "${lsb_release_line}" ]; do
+    case "${lsb_release_line}" in
+      DISTRIB_ID=*|DISTRIB_RELEASE=*|DISTRIB_CODENAME=*)
+        lsb_release_key="${lsb_release_line%%=*}"
+        lsb_release_value="${lsb_release_line#*=}"
+        case "${lsb_release_value}" in
+          \"*\") lsb_release_value="${lsb_release_value#\"}"; lsb_release_value="${lsb_release_value%\"}" ;;
+          \'*\') lsb_release_value="${lsb_release_value#\'}"; lsb_release_value="${lsb_release_value%\'}" ;;
+        esac
+        case "${lsb_release_key}" in
+          DISTRIB_ID) DISTRIB_ID="${lsb_release_value}" ;;
+          DISTRIB_RELEASE) DISTRIB_RELEASE="${lsb_release_value}" ;;
+          DISTRIB_CODENAME) DISTRIB_CODENAME="${lsb_release_value}" ;;
+        esac
+        ;;
+    esac
+  done < "${lsb_release_file}"
+
+  return 0
+}
+
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
   CONTAINER_ID=$(sw_vers -productName)
   CONTAINER_ID_LIKE="macOS"
@@ -220,7 +249,7 @@ else
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
+      load_lsb_release /etc/lsb-release
       if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
       if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
       if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
@@ -271,7 +300,7 @@ else
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
+      load_lsb_release /etc/lsb-release
       if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
       if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
       if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
