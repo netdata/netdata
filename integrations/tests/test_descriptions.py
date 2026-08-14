@@ -536,6 +536,14 @@ def load_learn_read_metadata():
 
 
 class DescriptionNormalizationTest(unittest.TestCase):
+    def test_non_mapping_meta_fails_with_an_actionable_error(self):
+        for meta in (None, [], "invalid", 42, True):
+            with self.subTest(meta=meta), self.assertRaisesRegex(
+                ValueError,
+                "meta must be a mapping",
+            ):
+                get_description_override({"id": "invalid-meta", "meta": meta})
+
     def test_catalog_fallback_rejects_an_invalid_explicit_description(self):
         integration = {
             "id": "collector-test-invalid",

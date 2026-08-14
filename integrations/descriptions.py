@@ -222,13 +222,17 @@ def extract_description_from_overview(overview: str, *, for_meta: bool = False) 
 
 def get_description_override(integration: Dict[str, Any]) -> Optional[str]:
     """Return the exact explicit metadata description, if present and valid."""
+    integration_id = integration.get("id", _MISSING_ID)
     meta = integration.get("meta", {})
+    if not isinstance(meta, dict):
+        raise ValueError(
+            f"Invalid description for {integration_id}: meta must be a mapping: {meta!r}"
+        )
     monitored_instance = meta.get("monitored_instance")
     owner = monitored_instance if isinstance(monitored_instance, dict) else meta
     if not isinstance(owner, dict) or "description" not in owner:
         return None
 
-    integration_id = integration.get("id", _MISSING_ID)
     value = owner["description"]
     if not isinstance(value, str):
         raise ValueError(f"Invalid description for {integration_id}: must be a string: {value!r}")
