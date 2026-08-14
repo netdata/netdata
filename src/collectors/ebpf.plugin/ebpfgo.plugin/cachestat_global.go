@@ -243,7 +243,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 		if store != nil {
 			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 			if err != nil {
-				logPluginErr("cachestat.snapshot", "cachestat", "snapshot-apps", err)
+				logPluginErr("cachestat.snapshot_apps", "cachestat", "snapshot-apps", err)
 			} else {
 				staleCandidates := store.UpdateApps(apps)
 				if len(staleCandidates) > 0 {

@@ -246,7 +246,7 @@ func runDCStatGlobalCollector(
 
 		apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 		if err != nil {
-			logPluginErr("dcstat.snapshot", "dcstat", "snapshot-apps", err)
+			logPluginErr("dcstat.snapshot_apps", "dcstat", "snapshot-apps", err)
 			// No valid per-PID data this cycle.  Drop dcstat's rows as well as its
 			// flag: when another module owns the segment we cannot stamp the header
 			// ourselves, so the cleared state has to already be in the store for
