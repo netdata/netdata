@@ -90,6 +90,13 @@ async fn main() -> anyhow::Result<()> {
     if args.count == 0 || args.count > MAX_COUNT {
         anyhow::bail!("--count must be between 1 and {MAX_COUNT}");
     }
+    // The whole corpus is materialized in memory before the first batch
+    // is sent, so the event total needs the same bound as the span count.
+    if args.count.saturating_mul(args.events_per_span) > MAX_COUNT {
+        anyhow::bail!(
+            "--count x --events-per-span must not exceed {MAX_COUNT} total events"
+        );
+    }
     args::init_tls_and_logging(&args.common.log_level);
 
     let spread = (args.count as u64).saturating_mul(args.spacing_nanos);
