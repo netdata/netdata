@@ -84,6 +84,18 @@ jobs:
             packaging/**/*.md
             packaging/repoconfig/
             src/go/tools/topology-ip-intel-downloader/README.md
+      - name: Check Go files
+        id: check-go-files
+        if: github.event_name == 'pull_request'
+        uses: step-security/changed-files@v45
+        with:
+          files: |
+            *.go
+            go.mod
+            go.sum
+            **/*.go
+            **/go.mod
+            **/go.sum
       - name: Check static build files
         id: check-static-build-files
         uses: step-security/changed-files@v45
@@ -126,7 +138,7 @@ jobs:
         id: check-go
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${{ steps.check-source-files.outputs.other_changed_files }}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+            if [ "${{ steps.check-go-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
               echo 'skip-go=' >> "${GITHUB_OUTPUT}"
             else
               echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
