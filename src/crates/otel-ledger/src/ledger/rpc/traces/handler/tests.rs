@@ -278,6 +278,11 @@ async fn span_cap_returns_the_earliest_spans_and_a_size_cap_partial() {
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["status"], json!({"partial": ["size_cap"]}));
     assert_eq!(v["items"]["returned"], 2);
+    // Pin WHICH spans: the globally earliest two (fixture starts ascend
+    // with the span id), so a latest-two regression fails here, not only
+    // in the combiner's own unit test.
+    assert_eq!(v["spans"][0]["span_id"], "01".repeat(8));
+    assert_eq!(v["spans"][1]["span_id"], "02".repeat(8));
 }
 
 #[tokio::test]
