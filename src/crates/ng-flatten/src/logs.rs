@@ -382,8 +382,8 @@ pub struct PreparedLogFrame {
     pub ts_range: Option<(u64, u64)>,
     /// Malformed trace/span ids cleared during normalization (already warned).
     pub bad_ids: MalformedIds,
-    /// Attribute keys sanitized (`'='` → `'_'`) during flattening (already
-    /// warned).
+    /// Attribute keys sanitized during flattening (`'='` → `'_'`, empty
+    /// keys → `"_"`; already warned).
     pub sanitized_keys: u64,
     /// Records dropped as out-of-window by the ingestion [`TimeBounds`]
     /// (0 when no bounds were applied). The caller reports these to the client.
@@ -397,7 +397,7 @@ pub struct PreparedLogFrame {
 /// ingestor so the recipe exists exactly once.
 ///
 /// Logs the aggregated per-request warnings itself (cleared malformed ids,
-/// sanitized `'='` keys) — one owner for the message text too; the counts are
+/// sanitized keys) — one owner for the message text too; the counts are
 /// still returned for callers that want them.
 pub fn prepare_log_frame(
     mut req: ExportLogsServiceRequest,
