@@ -142,7 +142,7 @@ at `src/go/plugin/ibm.d/modules/<m>/generate.go:3`.
    ```bash
    ./integrations/pip.sh
    python3 integrations/gen_integrations.py
-   python3 integrations/gen_docs_integrations.py -c ibm.d/<m>
+   python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<m>
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
    ```

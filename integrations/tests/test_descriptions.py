@@ -36,6 +36,7 @@ from descriptions import (
 )
 from _common import make_validator
 from gen_docs_integrations import (
+    _select_integrations,
     build_readme_from_integration,
     create_overview,
     read_integrations_js,
@@ -952,6 +953,16 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.categories, cls.integrations = read_integrations_js("integrations/integrations.js")
+
+    def test_ibm_d_guide_uses_actual_scoped_collector_key(self):
+        guide = (REPO_ROOT / ".agents/skills/integrations-lifecycle/ibm-d.md").read_text(encoding="utf-8")
+        expected = "python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<m>"
+        stale = "python3 integrations/gen_docs_integrations.py -c ibm.d/<m>"
+        self.assertIn(expected, guide)
+        self.assertNotIn(stale, guide)
+        selected = _select_integrations(self.integrations, "ibm.d.plugin/db2")
+        self.assertTrue(selected)
+        self.assertEqual({item["meta"]["module_name"] for item in selected}, {"db2"})
 
     def test_map_descriptions_are_present_valid_and_unique(self):
         map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))
