@@ -115,7 +115,7 @@ pub(crate) fn merge_trace_sources(
             m.span_count = m.span_count.saturating_add(a.span_count);
             m.error_count = m.error_count.saturating_add(a.error_count);
             // Tails resolve roots unconditionally (cheap — in-memory,
-            // no string table); a roots-free caller drops them HERE so
+            // no dictionary decode); a roots-free caller drops them HERE so
             // `MergedTrace.root` is uniformly absent, never
             // sealed-absent-but-tail-present. WITHHELD rows (the tie
             // abstention) arrive as `root: None` and simply do not

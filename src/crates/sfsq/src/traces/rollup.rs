@@ -148,10 +148,9 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
 
 /// The envelope-and-counts view of a sealed file's `TRSU` rows — the
 /// grid path. `root` is always `None` here (UNRESOLVED, not honest-absent):
-/// resolving roots needs the file string table, which is O(distinct
-/// kv pairs in the whole file) to build, and the overview grid discards
-/// roots anyway. Root-consuming callers (slowest, facets) use
-/// [`sealed_trace_aggregates`].
+/// resolving roots needs the root-field dictionaries decoded, and the
+/// overview grid discards roots anyway. Root-consuming callers (slowest,
+/// facets) use [`sealed_trace_aggregates`].
 ///
 /// Precondition: `rollup` comes from `IndexReader::trace_rollup()` (the
 /// validating accessor) — the struct-of-arrays fields are indexed in

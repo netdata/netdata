@@ -86,7 +86,7 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     assert_eq!(tail, sealed, "the parity contract");
 
     // The roots-free grid view is the SAME rows minus root resolution —
-    // no string table involved, everything else value-for-value.
+    // no dictionary decode involved, everything else value-for-value.
     let envelopes = sealed_trace_envelopes(&reader.trace_rollup().unwrap());
     let rootless: Vec<_> = sealed
         .into_iter()
@@ -132,6 +132,29 @@ fn the_fold_pins_every_rollup_semantic() {
     // claimed (the seal marks the row WITHHELD; the fold reads None).
     assert_eq!(d.span_count, 2);
     assert!(d.root.is_none(), "ambiguous tie → claim withheld");
+}
+
+#[test]
+fn corrupt_root_ref_escalates_instead_of_rendering_a_wrong_root() {
+    // A root ref pointing into ANOTHER field's KvId range is corruption
+    // evidence for the whole file (the resolver's closed rule) — the
+    // sealed fold must error so the caller fails the source, never
+    // render the other field's value as a root.
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "corrupt-ref");
+    let out = dir.path().join("corrupt-ref.sfst");
+    ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
+    let bytes = std::fs::read(&out).unwrap();
+    let reader = sfst::IndexReader::open(&bytes).unwrap();
+
+    // Row 0 (trace A) claims a true root; its name ref lives in the
+    // span-name field's range — as a SERVICE ref it stays inside the
+    // kv table (chunk validation cannot catch it) but outside the
+    // service field: the class a bare string-table lookup mis-renders.
+    let mut rollup = reader.trace_rollup().unwrap();
+    rollup.root_service_refs[0] = rollup.root_name_refs[0];
+    let err = sealed_trace_aggregates(&rollup, &reader).unwrap_err();
+    assert!(matches!(err, sfst::Error::CorruptIndex(_)), "{err}");
 }
 
 #[test]
