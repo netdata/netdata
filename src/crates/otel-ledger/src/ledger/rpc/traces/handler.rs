@@ -92,6 +92,15 @@ impl OtelTracesHandler {
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
         let mut query = TraceQuery::new(trace_id);
         if let Some(cap) = params.span_cap {
+            // The wire may TIGHTEN the engine's runaway-merge bound,
+            // never loosen it — an oversized cap would defeat the
+            // default's documented purpose (see DEFAULT_SPAN_CAP).
+            if cap > sfsq::traces::DEFAULT_SPAN_CAP {
+                return Err(handler_err(format!(
+                    "invalid otel-traces request: 'span_cap' {cap} exceeds the maximum {}",
+                    sfsq::traces::DEFAULT_SPAN_CAP
+                )));
+            }
             query = query.span_cap(cap);
         }
 

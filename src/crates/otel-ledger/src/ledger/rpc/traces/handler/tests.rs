@@ -313,6 +313,11 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
             json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 0}}),
             "zero span cap",
         ),
+        // The wire may only tighten the runaway-merge bound.
+        (
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 65_537}}),
+            "exceeds the maximum",
+        ),
         // Assembly bounds: both-or-neither, ordered, width-capped.
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100}}),
@@ -557,6 +562,11 @@ async fn invalid_search_requests_are_clean_client_errors() {
         let msg = err.to_string();
         assert!(msg.contains(needle), "for {body}: {msg}");
     }
+    // The boundary itself is legal (locks the cap against an accidental
+    // off-by-one `<`).
+    call_on(&h, as_mode("search", json!({"limit": 1000})))
+        .await
+        .expect("limit == max succeeds");
 }
 
 #[tokio::test]

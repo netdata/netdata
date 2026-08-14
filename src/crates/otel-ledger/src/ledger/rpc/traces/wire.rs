@@ -377,7 +377,8 @@ pub struct TraceParams {
     /// The trace id: 32 hex chars (16 bytes), case-insensitive — the
     /// W3C trace-context text form.
     pub id: String,
-    /// Span cap override (engine default 65,536; zero rejected).
+    /// Span cap override — may only TIGHTEN the engine default
+    /// (65,536): zero and values beyond the default are client errors.
     #[serde(default)]
     pub span_cap: Option<usize>,
     /// Optional assembly bounds, unix seconds: only files whose
