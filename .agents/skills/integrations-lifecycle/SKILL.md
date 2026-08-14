@@ -49,9 +49,9 @@ does the in-app integrations page get its data?".
    and generator-owned copy. Change the authoritative source for
    the file kind, regenerate producer-owned metadata, and then run
    the integration pipeline locally to validate the normalized
-   input. Deliver
-   committed generated documentation through one of the two
-   supported routes in item 3.
+   input. Do not include producer-generated metadata or generated
+   documentation in a source PR; the post-merge workflow owns those
+   committed artifacts as described in item 3.
 
    `src/collectors/COLLECTORS.md` is the source page for
    Learn's "Monitor anything with Netdata" page. It is generated
@@ -88,11 +88,11 @@ does the in-app integrations page get its data?".
 3. **The CI workflow auto-opens a "Regenerate integrations
    docs" PR.** After a `metadata.yaml` change merges to
    `master`, `.github/workflows/generate-integrations.yml`
-   regenerates every per-integration `.md` and the umbrella
-   pages and opens a PR for a maintainer to merge. Two delivery
-   routes are supported: regenerate and commit the pages in the
-   source PR, or leave them unchanged and let this workflow open
-   the follow-up PR. Record the selected route in the source PR.
+   first regenerates NPM and ibm.d metadata from their authoritative
+   inputs, then regenerates every per-integration `.md` and the
+   umbrella pages, and opens a PR for a maintainer to merge. Source
+   PRs contain the authoritative inputs, generators, contracts, and
+   tests; the generated-artifact PR contains the derived files.
    The pull-request `check-markdown.yml` workflow regenerates
    pages for link validation but does not fail merely because
    that regeneration changes the checkout. Earlier guidance

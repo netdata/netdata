@@ -2196,6 +2196,7 @@ modules:
       community: true
       monitored_instance:
         name: AWS Quota
+        description: Monitor AWS Service Quotas and usage exposed by the AWS Quota Exporter.
         link: https://github.com/emylincon/aws_quota_exporter
         icon_filename: aws.svg
         categories:

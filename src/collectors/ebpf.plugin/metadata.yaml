@@ -250,7 +250,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
+        metrics_description: "Monitor Linux process and thread creation by tracing kernel task-creation functions with eBPF."
         method_description: "Attach tracing (kprobe or tracepoint, and trampoline) to internal kernel functions."
       supported_platforms:
         include:
@@ -1004,7 +1004,7 @@ modules:
         - Hard Disk
     overview:
       data_collection:
-        metrics_description: "Monitors when swap has I/O events and applications executing events."
+        metrics_description: "Monitor Linux swap reads and writes by tracing kernel swap I/O functions with eBPF."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include:

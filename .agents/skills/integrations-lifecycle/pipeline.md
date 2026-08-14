@@ -72,18 +72,18 @@ The generator owns
 `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml`.
 It derives that tracked metadata from SNMP device profiles, the
 trap-profile catalogue, and explicit generator-owned copy such as
-the page-description map. Run it before `gen_integrations.py`
-whenever those sources or the generator change:
+the page-description map. Both integration workflows run it before
+`gen_integrations.py`; run the same order locally whenever those
+sources or the generator change:
 
 ```bash
 python3 integrations/gen_npm_catalog.py
 python3 integrations/gen_integrations.py
 ```
 
-The integrations workflows do not run this producer. Skipping the
-first command leaves the tracked NPM metadata stale even though the
-downstream integration generators can still succeed. The producer
-also writes the untracked
+Skipping the first command locally leaves the tracked NPM metadata
+stale even though the downstream integration generators can still
+succeed. The producer also writes the untracked
 `src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt`
 diagnostic; inspect it, but do not stage it as generated catalog
 content.
@@ -322,6 +322,8 @@ Before cleanup or any file write, a full run resolves and validates descriptions
 documentation modes. Generation fails if any description is missing, duplicated, outside 50–160 characters, or contains
 leading or trailing whitespace, a C0/C1 control, a surrogate code point, a Unicode line or paragraph separator, a
 Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), a URL, a double quote, or a backslash.
+Mechanical Markdown reduction preserves underscores so it cannot silently fuse identifier text; final validation rejects the result
+and requires an explicit plain-text override.
 It also rejects descriptions beginning with a CommonMark unordered-list or one-to-nine-digit ordered-list marker, plus descriptions
 that consist only of a hyphen thematic break. Terminal colons, terminal ellipses (Unicode `…` or ASCII `...`), and unbalanced round
 parentheses are rejected as incomplete fragments; nested balanced parentheses remain valid. Ordinary internal hyphens, plus signs,
@@ -481,8 +483,10 @@ Repo path: `.github/workflows/generate-integrations.yml`.
     integration tests, and the integration, collector, and secrets
     documentation generators.
 - `integrations/gen_npm_catalog.py` and
-  `gen_doc_service_discovery_page.py` are not trigger paths and are
-  not executed by this workflow; both remain manual producer gaps.
+  the SNMP profile/trap sources are trigger paths. ibm.d `module.yaml`,
+  `config.go`, generator directives, contexts, docgen, and metricgen are
+  trigger paths. `gen_doc_service_discovery_page.py` remains outside this
+  workflow.
 - `workflow_dispatch` -- manual.
 
 ### Concurrency
@@ -499,22 +503,25 @@ Repo path: `.github/workflows/generate-integrations.yml`.
 1. `actions/checkout@v7` (depth 1, recursive submodules).
 2. `apt install python3-venv` + `./integrations/pip.sh` to
    install Python deps.
-3. `python3 integrations/gen_integrations.py`.
-4. `python3 integrations/gen_taxonomy.py` -- writes and validates
+3. Set up the Go version from `src/go/go.mod`, run
+   `gen_npm_catalog.py`, and run `go generate` across all ibm.d modules.
+4. `python3 integrations/gen_integrations.py`.
+5. `python3 integrations/gen_taxonomy.py` -- writes and validates
    the runtime taxonomy artifact.
-5. `python3 -m unittest integrations.tests.test_taxonomy`.
-6. `python3 -m unittest integrations.tests.test_descriptions`.
-7. Run `gen_docs_integrations.py`,
+6. `python3 -m unittest integrations.tests.test_taxonomy`.
+7. `python3 -m unittest integrations.tests.test_descriptions`.
+8. Run `gen_docs_integrations.py`,
    `gen_doc_collector_page.py`, and `gen_doc_secrets_page.py`.
-8. **NOT** `gen_doc_service_discovery_page.py` -- gap.
-9. Remove `go.d.plugin`, the virtual environment,
-   `integrations.js`, `integrations.json`, and `taxonomy.json` so
+9. **NOT** `gen_doc_service_discovery_page.py` -- gap.
+10. Remove `go.d.plugin`, the virtual environment,
+   `integrations.js`, `integrations.json`, `taxonomy.json`, and the
+   NPM diagnostic report so
    the auto-PR cannot commit runtime artifacts.
-10. `peter-evans/create-pull-request@v8` -- branch
+11. `peter-evans/create-pull-request@v8` -- branch
    `integrations-regen`, label `integrations-update`, title
    `Regenerate integrations docs`, token
    `NETDATABOT_GITHUB_TOKEN`. Reviewed and merged manually.
-11. Slack failure notification on master failures.
+12. Slack failure notification on master failures.
 
 ## CI workflow 2 -- `check-markdown.yml`
 
@@ -526,6 +533,8 @@ Repo path: `.github/workflows/check-markdown.yml`.
   - `**/*.md`, `**/*.mdx`
   - `docs/**`, `**/metadata.yaml`, `**/taxonomy.yaml`,
     `integrations/**`
+  - NPM SNMP profile/trap sources and ibm.d producer inputs,
+    contexts, docgen, and metricgen.
 
 ### Steps
 
@@ -535,16 +544,18 @@ Repo path: `.github/workflows/check-markdown.yml`.
 2. Use `actions/setup-python@v7` with Python 3.10, create a virtual
    environment, and install both Learn ingest requirements and
    `./integrations/pip.sh` dependencies.
-3. Run `gen_integrations.py`.
-4. Run `check_collector_taxonomy.py --pr-diff
+3. Set up Go from `netdata/src/go/go.mod`, then run the NPM and ibm.d
+   source-metadata producers.
+4. Run `gen_integrations.py`.
+5. Run `check_collector_taxonomy.py --pr-diff
    <base-sha>...<head-sha>`, then the taxonomy and description
    unittest modules. This workflow checks changed-collector taxonomy
    coverage and taxonomy tooling but does not generate
    `taxonomy.json`.
-5. Run `gen_docs_integrations.py`,
+6. Run `gen_docs_integrations.py`,
    `gen_doc_collector_page.py`, and `gen_doc_secrets_page.py`
    (same gap on the service-discovery page generator).
-6. Run `learn/ingest/ingest.py --local-repo netdata:...
+7. Run `learn/ingest/ingest.py --local-repo netdata:...
    --ignore-on-prem-repo --fail-links-netdata`
    -- validates that all generated Markdown links resolve through
    Learn's ingest pipeline.
@@ -577,28 +588,25 @@ scripts directly during active development.
    python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
    python3 -m unittest integrations.tests.test_taxonomy
    python3 -m unittest integrations.tests.test_descriptions
-   # When committing generated docs in the source PR:
+   # Validate the generated docs locally; do not stage them in the source PR:
    python3 integrations/gen_docs_integrations.py -c go.d.plugin/foo
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
    ```
-3. Developer records one generated-documentation delivery route:
-   - commit the regenerated `integrations/foo.md`, symlinked `README.md` (if
-     applicable), and affected umbrella pages in the source PR; or
-   - leave existing generated pages unchanged and use the automatic post-merge
-     regeneration PR.
+3. Developer inspects the complete generated diff but stages only the
+   authoritative source, generator, contract, workflow, and test changes.
+   Generated metadata, `integrations/foo.md`, generated `README.md`, and
+   umbrella pages remain unchanged in the source PR.
 4. PR is opened. `check-markdown.yml` runs, regenerates the
    same files in CI, and validates Learn ingest. It does not
    assert that regeneration leaves the checkout clean; failures
    come from generation, taxonomy, or Learn-ingest validation.
 5. Reviewer checks collector consistency, including taxonomy
    coverage for changed chart contexts.
-6. PR merges. `generate-integrations.yml` triggers on master,
-   regenerates everything, and opens an `integrations-regen`
-   PR if anything is now stale. This PR carries the generated
-   pages when the source PR selected the post-merge route and is
-   normally empty when the source PR committed them. Maintainer
-   merges it when it contains changes.
+6. PR merges. `generate-integrations.yml` triggers on master, runs the
+   NPM and ibm.d producers, regenerates everything, and opens an
+   `integrations-regen` PR containing the derived changes. A maintainer
+   reviews and merges that generated-artifact PR.
 7. Cloud-frontend's own CI (in
    `${NETDATA_REPOS_DIR}/dashboard/cloud-frontend/`) runs
    `gen_integrations.py` against the new master and copies

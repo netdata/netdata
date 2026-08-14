@@ -150,11 +150,10 @@ When reviewing a PR that touches a collector, verify:
    is the generated artifact (no `integrations/` subdir).
 
 6. **Generated integration documentation has an explicit delivery route.** The
-   author MUST run the metadata pipeline locally for source validation, then
-   choose and document one route:
-   - regenerate and commit `integrations/<slug>.md` in the source PR; or
-   - leave committed generated pages unchanged so `generate-integrations.yml`
-     opens the follow-up regeneration PR after the source reaches `master`.
+   author MUST run the metadata pipeline locally for source validation and
+   leave committed generated pages unchanged in the source PR.
+   `generate-integrations.yml` opens the follow-up regeneration PR after the
+   source reaches `master`.
 
    `check-markdown.yml` regenerates pages before Learn link validation but does
    not assert a clean Git diff. Earlier guidance incorrectly claimed that an

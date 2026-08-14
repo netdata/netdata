@@ -147,7 +147,8 @@ relative path to docgen is `../../docgen` for top-level modules and
    ```
    This invokes BOTH `metricgen` (on `contexts.yaml`) and
    `docgen` (on the module).
-3. Commit ALL generated files together with the source change:
+3. Inspect and validate ALL generated files, but do not stage them in the
+   source PR:
    - `metadata.yaml`
    - `README.md`
    - `config_schema.json`
@@ -161,8 +162,11 @@ relative path to docgen is `../../docgen` for top-level modules and
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
    ```
-5. Commit the regenerated `<plugin-dir>/integrations/<slug>.md`
-   and umbrella pages too, in the same PR.
+5. Confirm the generated diff contains only the expected derived changes.
+   After the source PR merges, `generate-integrations.yml` runs this producer
+   chain again and opens the separate generated-artifact PR containing the
+   generated ibm.d files, `<plugin-dir>/integrations/<slug>.md`, and umbrella
+   pages.
 
 ## Why ibm.d is generated this way
 

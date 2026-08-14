@@ -71,6 +71,8 @@ The generator resolves each description in this order:
    - It never removes markup, collapses whitespace, truncates, or falls back to overview prose when an explicit value is invalid.
 2. Otherwise, derive it mechanically from the first useful prose in the rendered overview.
    - Markdown and HTML are reduced to plain text.
+   - Underscores are preserved rather than silently deleting part of an identifier. Final validation then rejects the derived value,
+     requiring an explicit plain-text override that describes the concept without corrupting the identifier.
    - Sentences are included until the description reaches 50 characters.
    - Text longer than 160 characters is trimmed at a word boundary with a terminal Unicode ellipsis. Final validation rejects that
      incomplete result, so its source record needs a complete explicit override.

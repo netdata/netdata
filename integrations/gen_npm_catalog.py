@@ -123,6 +123,7 @@ PAGE_DESCRIPTIONS = {
     'Isilon': 'Monitor Dell Isilon storage metrics over SNMP with automatic profile recognition and no manual OID configuration.',
     'Live Network Connections': 'Map live application dependencies from host socket tables, including local processes, remote endpoints, and Linux workload ownership.',
     'Peplink': 'Monitor Peplink router metrics over SNMP with automatic profile recognition and no manual OID configuration.',
+    'SNMP Trap Reverse DNS Enrichment': 'Add reverse DNS hostnames to SNMP traps through cached PTR lookups of their source addresses.',
     'SNMP Trap Node Attribution': 'Attribute each SNMP trap to an unambiguous Netdata node when possible, otherwise retaining it under a bounded source label.',
     'vSphere Topology': 'Map VMware vSphere clusters, hosts, virtual machines, datastores, networks, and port groups with placement and utilization overlays.',
 }

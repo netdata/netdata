@@ -22,7 +22,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors processors statistics on host.
+          Monitor processor performance statistics on Windows hosts through Perflib.
         method_description: |
           It queries Processor object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2290,7 +2290,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors application built with .NET
+          Monitor runtime and performance statistics for applications built with .NET through Perflib.
         method_description: |
           It queries different NET Framework objects per process from Perflib in order to gather the metrics.
       supported_platforms:

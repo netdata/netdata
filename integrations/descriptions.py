@@ -87,7 +87,9 @@ def markdown_to_plain_text(markdown: str) -> str:
     text = re.sub(r"<https?://[^>]+>", " ", text)
     text = re.sub(r"<[^>]+>", " ", text)
     text = _BARE_URL_RE.sub(" ", text)
-    text = re.sub(r"[`*_~]+", "", text)
+    # Preserve underscores so identifiers cannot silently change meaning. The
+    # final plain-text contract rejects them and requires an explicit override.
+    text = re.sub(r"[`*~]+", "", text)
     text = re.sub(r"\s+", " ", html.unescape(text)).strip()
     if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
         text = text[1:-1].strip()

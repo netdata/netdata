@@ -124,7 +124,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
-        description: Monitor A10 Thunder ADC metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - a10
         - thunder
@@ -508,7 +507,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
-        description: Monitor APC PDU power distribution metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - apc
         - pdu
@@ -557,7 +555,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
-        description: Monitor APC UPS power and battery metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - apc
         - ups
@@ -2657,7 +2654,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: cisco.svg
-        description: Monitor Cisco ICM device metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - cisco
         - icm
@@ -3125,7 +3121,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: cisco.svg
-        description: Monitor Cisco SB device metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - cisco
         - sb
@@ -3228,7 +3223,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: cisco.svg
-        description: Monitor Cisco UCS server metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - cisco
         - ucs
@@ -4110,7 +4104,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
-        description: Monitor Eaton ePDU power distribution metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - eaton
         - epdu
@@ -4159,7 +4152,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
-        description: Monitor Eaton UPS power and battery metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - eaton
         - ups
@@ -4209,7 +4201,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
-        description: Monitor ExaGrid storage metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - exagrid
         - snmp
@@ -4839,7 +4830,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: hp.svg
-        description: Monitor HP iLO server hardware metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - hp
         - ilo
@@ -4890,7 +4880,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: hp.svg
-        description: Monitor HP iLO 4 server hardware metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - hp
         - ilo4
@@ -4992,7 +4981,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: hp.svg
-        description: Monitor HPE MSA storage metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - hpe
         - msa
@@ -5477,7 +5465,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: dell.svg
-        description: Monitor Dell iDRAC server hardware metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - idrac
         - snmp
@@ -5625,7 +5612,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: dell.svg
-        description: Monitor Dell Isilon storage metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - isilon
         - snmp
@@ -7143,7 +7129,6 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
-        description: Monitor Peplink router metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - peplink
         - snmp
@@ -9581,7 +9566,6 @@ modules:
         categories:
           - network-performance-monitoring.topologies
         icon_filename: SNMP.png
-        description: Map BGP peer relationships between routers, including remote autonomous system numbers and session state from standard and vendor MIBs.
       keywords:
         - bgp
         - peering
@@ -9668,7 +9652,6 @@ modules:
         categories:
           - network-performance-monitoring.topologies
         icon_filename: network.svg
-        description: Map live application dependencies from host socket tables, including local processes, remote endpoints, and Linux workload ownership.
       keywords:
         - network connections
         - sockets
@@ -9800,7 +9783,6 @@ modules:
         categories:
           - network-performance-monitoring.topologies
         icon_filename: vmware.svg
-        description: Map VMware vSphere clusters, hosts, virtual machines, datastores, networks, and port groups with placement and utilization overlays.
       keywords:
         - vsphere
         - vmware
@@ -49446,7 +49428,6 @@ modules:
         categories:
           - network-performance-monitoring.traps
         icon_filename: SNMP.png
-        description: Attribute each SNMP trap to an unambiguous Netdata node when possible, otherwise retaining it under a bounded source label.
       keywords:
         - vnode
         - identity

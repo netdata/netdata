@@ -90,7 +90,7 @@ python3 integrations/gen_integrations.py
 python3 integrations/gen_taxonomy.py --check-only
 python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
 python3 -m unittest integrations.tests.test_taxonomy
-# When committing generated docs in this PR:
+# Validate the generated docs locally; do not stage them in the source PR:
 python3 integrations/gen_docs_integrations.py -c go.d.plugin/<module>
 python3 integrations/gen_doc_collector_page.py
 python3 integrations/gen_doc_secrets_page.py
@@ -98,9 +98,10 @@ python3 integrations/gen_doc_secrets_page.py
 python3 integrations/gen_doc_service_discovery_page.py
 ```
 
-Skip the three generated-doc commands when the source PR explicitly selects the
-automatic post-merge regeneration route. `check-markdown.yml` and
-`generate-integrations.yml` run them in CI.
+Do not skip the three generated-doc commands: they validate the source locally.
+`check-markdown.yml` repeats them in the PR, and
+`generate-integrations.yml` commits their final output to the separate
+post-merge regeneration PR.
 
 Use the repo-local `.venv/bin/python` when one exists for the current
 worktree. If your local base branch is not `master`, adjust the `--pr-diff`
@@ -120,9 +121,9 @@ git status --porcelain |
   rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true
 ```
 
-Commit source and taxonomy changes together. Either commit regenerated docs in
-the same PR or state that `generate-integrations.yml` will open the post-merge
-regeneration PR; do not leave the delivery route implicit.
+Commit source and taxonomy changes together, without generated documentation.
+`generate-integrations.yml` opens the separate post-merge regeneration PR; name
+that delivery route in the source PR description.
 Do not commit gitignored runtime artifacts such as
 `integrations/integrations.js`, `integrations/integrations.json`, or
 `integrations/taxonomy.json`.

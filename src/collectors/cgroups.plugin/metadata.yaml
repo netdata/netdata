@@ -958,7 +958,7 @@ modules:
       <<: *meta
       monitored_instance:
         name: Systemd Services
-        description: "Monitor systemd service CPU, memory, disk I/O, network, and page cache activity through Linux cgroups."
+        description: "Monitor systemd service CPU, memory, disk I/O, and page cache activity through Linux cgroups."
         link: ""
         icon_filename: systemd.svg
         categories:
@@ -972,9 +972,9 @@ modules:
         - cgroups
     overview:
       <<: *overview
-      data-collection:
+      data_collection:
         <<: *data_collection
-        metrics_description: "Monitor Systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups."
+        metrics_description: "Monitor systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups."
     alerts: []
     metrics:
       folding:

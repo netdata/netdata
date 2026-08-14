@@ -15,8 +15,8 @@ banner conventions and edit rules.
 | `src/collectors/COLLECTORS.md` | `gen_doc_collector_page.py` | **YES** | as above |
 | `src/collectors/SECRETS.md` | `gen_doc_secrets_page.py` | **YES** | as above |
 | `src/collectors/SERVICE-DISCOVERY.md` | `gen_doc_service_discovery_page.py` | **YES** | **NOT** in `generate-integrations.yml` -- manual or cmake `render-docs` only -- see `gotchas.md` |
-| `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml` | `integrations/gen_npm_catalog.py` | **YES** | manual source-first regeneration; the integrations workflows do not run this producer |
-| `src/go/plugin/ibm.d/modules/<m>/metadata.yaml` | ibm.d `docgen` | **YES** | manual `go generate ./...` -- never CI |
+| `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml` | `integrations/gen_npm_catalog.py` | **YES** | `generate-integrations.yml` generated-artifact PR; verified in `check-markdown.yml` |
+| `src/go/plugin/ibm.d/modules/<m>/metadata.yaml` | ibm.d `docgen` | **YES** | `generate-integrations.yml` generated-artifact PR; verified in `check-markdown.yml` |
 | `src/go/plugin/ibm.d/modules/<m>/README.md` | ibm.d `docgen` | **YES** | as above |
 | `src/go/plugin/ibm.d/modules/<m>/config_schema.json` | ibm.d `docgen` | **YES** | as above |
 | `src/go/plugin/ibm.d/modules/<m>/contexts/zz_generated_contexts.go` | ibm.d `metricgen` | **YES** | as above |
@@ -25,6 +25,18 @@ banner conventions and edit rules.
 | `integrations/taxonomy/sections.yaml` | taxonomy framework author | **YES** | validated by `gen_taxonomy.py` |
 | `integrations/taxonomy/icons.yaml` | taxonomy framework author | **YES** | validated by `gen_taxonomy.py` |
 | `integrations/taxonomy.json` | `gen_taxonomy.py` | NO -- gitignored (`.gitignore:164`) | generated locally/CI; downstream cloud-frontend contract |
+
+## Pull-request delivery boundary
+
+A source PR changes authoritative metadata, producer inputs, generators,
+schemas, workflows, tests, and maintainer contracts. It does not commit any
+file in the generated rows above. After the source PR merges,
+`generate-integrations.yml` runs the NPM and ibm.d producers before the shared
+generators and opens the separate generated-artifact PR containing every
+derived change.
+
+Local regeneration is still mandatory validation. Inspect its complete diff
+and fixed point, but do not stage that output in the source PR.
 
 ## Banner conventions per file kind
 
@@ -195,7 +207,8 @@ See `ibm-d.md` for the full chain.
 ## Maintainer rules
 
 1. **Per-integration `.md` files: NEVER edit by hand.** Edit
-   the source `metadata.yaml`, regenerate, commit.
+   the source `metadata.yaml` and validate regeneration locally. The separate
+   post-merge regeneration PR commits the generated files.
 2. **Symlinked `README.md` files: NEVER edit by hand.** Same
    reason -- they point at the generated `.md`.
 3. **`src/health/notifications/<dir>/README.md`: NEVER edit by

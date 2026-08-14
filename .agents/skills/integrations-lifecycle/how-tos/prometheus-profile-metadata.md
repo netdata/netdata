@@ -57,8 +57,10 @@ For every stock profile:
    `overview.data_collection.metrics_description`. Summarize the entities,
    capabilities, and processing stages; do not copy the complete chart/family
    ledger.
-7. Run the normal integration generators and commit the required generated
-   Markdown. Do not hand-edit generated integration pages.
+7. Run the normal integration generators locally to validate the source. Do
+   not commit generated Markdown in the source PR; after merge,
+   `generate-integrations.yml` opens the separate generated-artifact PR. Never
+   hand-edit generated integration pages.
 8. Preserve the Prometheus taxonomy opt-out unless the runtime collector gains
    a real stable-context contract.
 

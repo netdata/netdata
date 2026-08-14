@@ -41,6 +41,7 @@ from gen_docs_integrations import (
     create_overview,
     read_integrations_js,
 )
+from gen_doc_collector_page import get_integration_description
 from gen_npm_catalog import PAGE_DESCRIPTIONS
 
 
@@ -356,6 +357,48 @@ TERMINAL_ELLIPSIS_OVERRIDE_TARGETS = {
     "windows.plugin-PerflibAD-Active_Directory",
 }
 
+REVIEWED_DESCRIPTION_TARGETS = {
+    "cgroups.plugin-/sys/fs/cgroup-Systemd_Services": (
+        "Monitor systemd service CPU, memory, disk I/O, and page cache activity through Linux cgroups."
+    ),
+    "debugfs.plugin-audit-Linux_Audit_Subsystem": (
+        "Monitor Linux kernel audit status, backlog utilization, lost events, failure mode, and enabled state."
+    ),
+    "ebpf.plugin-processes-eBPF_Processes": (
+        "Monitor Linux process and thread creation by tracing kernel task-creation functions with eBPF."
+    ),
+    "ebpf.plugin-swap-eBPF_SWAP": (
+        "Monitor Linux swap reads and writes by tracing kernel swap I/O functions with eBPF."
+    ),
+    "go.d.plugin-dnsmasq_dhcp-Dnsmasq_DHCP": (
+        "Monitor Dnsmasq DHCP leases and utilization across configured address ranges."
+    ),
+    "go.d.plugin-prometheus-AWS_Quota": (
+        "Monitor AWS Service Quotas and usage exposed by the AWS Quota Exporter."
+    ),
+    "go.d.plugin-snmp_traps-SNMP_Trap_Reverse_DNS_Enrichment": (
+        "Add reverse DNS hostnames to SNMP traps through cached PTR lookups of their source addresses."
+    ),
+    "proc.plugin-/proc/net/softnet_stat-Softnet_Statistics": (
+        "Monitor Linux softnet packet processing, including drops, quota exhaustion, RPS, flow-limit, and GRO activity."
+    ),
+    "proc.plugin-/sys/block/zram-ZRAM": (
+        "Monitor zRAM device capacity, compression, memory use, and I/O activity on Linux systems."
+    ),
+    "proc.plugin-/sys/class/infiniband-InfiniBand": (
+        "Monitor InfiniBand network interface traffic, errors, and status."
+    ),
+    "proc.plugin-/proc/spl/kstat/zfs/arcstats-ZFS_Adaptive_Replacement_Cache": (
+        "Monitor ZFS Adaptive Replacement Cache (ARC) performance and memory statistics."
+    ),
+    "windows.plugin-PerflibNetFramework-NET_Framework": (
+        "Monitor runtime and performance statistics for applications built with .NET through Perflib."
+    ),
+    "windows.plugin-PerflibProcessor-Processor": (
+        "Monitor processor performance statistics on Windows hosts through Perflib."
+    ),
+}
+
 NPM_PAGE_DESCRIPTION_TARGETS = {
     "A10 Thunder",
     "APC PDU",
@@ -374,6 +417,7 @@ NPM_PAGE_DESCRIPTION_TARGETS = {
     "Isilon",
     "Live Network Connections",
     "Peplink",
+    "SNMP Trap Reverse DNS Enrichment",
     "SNMP Trap Node Attribution",
     "vSphere Topology",
 }
@@ -399,6 +443,20 @@ def parse_description_with_learn_legacy_parser(description_line):
 
 
 class DescriptionNormalizationTest(unittest.TestCase):
+    def test_catalog_fallback_rejects_an_invalid_explicit_description(self):
+        integration = {
+            "id": "collector-test-invalid",
+            "meta": {
+                "monitored_instance": {
+                    "name": "Invalid Description Fixture",
+                    "description": "too short",
+                }
+            },
+            "overview": "",
+        }
+        with self.assertRaisesRegex(ValueError, "outside 50-160 characters"):
+            get_integration_description(integration)
+
     def test_markdown_is_reduced_to_plain_text(self):
         source = "Monitor [PostgreSQL](https://postgresql.org) `queries` and **connections** across the server."
         self.assertEqual(
@@ -589,6 +647,13 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
         self.assertEqual(len(descriptions), len(set(descriptions)))
         self.assertTrue(all(MIN_DESCRIPTION_LENGTH <= len(value) <= MAX_DESCRIPTION_LENGTH for value in descriptions))
 
+    def test_mechanical_extraction_never_fuses_underscored_identifiers(self):
+        source = "Monitor kernel audit state through `NETLINK_AUDIT` with reliable backlog and loss metrics."
+        derived = normalize_description(source, summarize=True)
+        self.assertIn("NETLINK_AUDIT", derived)
+        with self.assertRaisesRegex(ValueError, "Markdown-special character"):
+            validate_description(derived, "underscored-identifier")
+
     def test_complete_corpus_and_override_inventories(self):
         report = description_report(self.documented)
         self.assertEqual(report["pages"], len(self.documented))
@@ -609,6 +674,20 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             self.assertIsNotNone(description, integration_id)
             self.assertFalse(description.endswith("…"), integration_id)
             self.assertFalse(description.endswith("..."), integration_id)
+
+    def test_reviewed_descriptions_match_authoritative_source_copy(self):
+        by_id = {integration["id"]: integration for integration in self.documented}
+        self.assertTrue(REVIEWED_DESCRIPTION_TARGETS.keys() <= by_id.keys())
+        for integration_id, expected in REVIEWED_DESCRIPTION_TARGETS.items():
+            with self.subTest(integration_id=integration_id):
+                self.assertEqual(get_integration_meta_description(by_id[integration_id]), expected)
+
+        systemd = by_id["cgroups.plugin-/sys/fs/cgroup-Systemd_Services"]
+        self.assertIn(
+            "Monitor systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups.",
+            systemd["overview"],
+        )
+        self.assertNotIn("network", systemd["overview"].casefold())
 
     def test_npm_page_description_mapping_is_fully_consumed(self):
         source = yaml.load(
@@ -994,6 +1073,28 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                     {item["meta"]["module_name"] for item in selected},
                     {module_name},
                 )
+
+    def test_ci_generates_authoritative_source_metadata_before_public_docs(self):
+        workflows = (
+            REPO_ROOT / ".github/workflows/check-markdown.yml",
+            REPO_ROOT / ".github/workflows/generate-integrations.yml",
+        )
+        for workflow in workflows:
+            with self.subTest(workflow=workflow.name):
+                text = workflow.read_text(encoding="utf-8")
+                npm = text.index("python3 integrations/gen_npm_catalog.py")
+                ibm = text.index("go generate ./plugin/ibm.d/modules/...")
+                shared = text.index("python3 integrations/gen_integrations.py")
+                docs = text.index("python3 integrations/gen_docs_integrations.py")
+                self.assertLess(npm, shared)
+                self.assertLess(ibm, shared)
+                self.assertLess(shared, docs)
+                self.assertIn("actions/setup-go@v7", text)
+
+        post_merge = workflows[1].read_text(encoding="utf-8")
+        self.assertIn("python3 integrations/gen_npm_catalog.py", post_merge)
+        self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", post_merge)
+        self.assertIn("peter-evans/create-pull-request@v8", post_merge)
 
     def test_map_descriptions_are_present_valid_and_unique(self):
         map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))
