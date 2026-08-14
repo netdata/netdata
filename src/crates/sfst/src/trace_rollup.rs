@@ -93,6 +93,14 @@ impl TraceRollup {
     /// increasing trace ids (the seal sorts; a crafted duplicate would
     /// silently double-count in every cross-source merge).
     pub(crate) fn validate(&self, kv_total: u32) -> Result<(), crate::Error> {
+        // `len()` floors (`bytes / WIDTH`), so a trailing-bytes arena would
+        // pass the parallelism check alone — reject non-whole arenas
+        // explicitly, like `LinkIndex::validate` and the per-row readers do.
+        if !self.trace_ids.well_formed() || !self.root_span_ids.well_formed() {
+            return Err(crate::Error::CorruptIndex(
+                "trace rollup id arena is not a whole number of ids".into(),
+            ));
+        }
         let n = self.min_start_ns.len();
         let parallel = self.trace_ids.len() == n
             && self.root_span_ids.len() == n
@@ -577,5 +585,18 @@ mod tests {
         let mut broken = good.clone();
         broken.min_start_ns[0] = broken.max_end_ns[0] + 1;
         assert!(broken.validate(0).is_err(), "inverted envelope");
+
+        // An id arena with trailing bytes: len() floors to the right
+        // count, so only the well_formed() check catches it.
+        let mut broken = good.clone();
+        let raw = bincode::serde::encode_to_vec(
+            serde_bytes::ByteBuf::from(vec![7u8; 33]), // 2 ids + 1 trailing byte
+            bincode::config::standard(),
+        )
+        .unwrap();
+        broken.trace_ids = bincode::serde::decode_from_slice(&raw, bincode::config::standard())
+            .unwrap()
+            .0;
+        assert!(broken.validate(0).is_err(), "trailing arena bytes");
     }
 }
