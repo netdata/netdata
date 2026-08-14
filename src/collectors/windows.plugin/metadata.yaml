@@ -561,7 +561,7 @@ modules:
       module_name: PerflibNetwork
       monitored_instance:
         name: Network Subsystem
-        description: "Monitor Windows network interface bandwidth, packet activity, errors, and connection state through Perflib."
+        description: "Monitor Windows network interface traffic, errors, drops, queue length, and offload activity through Perflib."
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
           - data-collection.networking
@@ -2290,7 +2290,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor runtime and performance statistics for applications built with .NET through Perflib.
+          Monitor runtime and performance statistics for applications built with .NET Framework through Perflib.
         method_description: |
           It queries different NET Framework objects per process from Perflib in order to gather the metrics.
       supported_platforms:

@@ -246,8 +246,12 @@ Add `go generate` to your development workflow:
 ```bash
 # After modifying contexts.yaml, config.go, or module.yaml
 go generate
-git add metadata.yaml config_schema.json README.md
+git add config_schema.json
 ```
+
+Commit `config_schema.json` when runtime configuration changes. Inspect
+`metadata.yaml` and `README.md` locally, but leave them for the post-merge
+generated-artifact PR.
 
 ### 5. Review Generated Docs
 

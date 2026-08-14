@@ -57,7 +57,7 @@ HEAD of `master` at the time this skill was last updated.
          v
 +--------------------------------+
 | gen_doc_service_discovery_page.py |  (src/collectors/SERVICE-DISCOVERY.md)
-+--------------------------------+   NOT in CI today -- see gotchas.md
++--------------------------------+
 ```
 
 All four downstream scripts read the **same** `integrations.js`
@@ -458,11 +458,9 @@ Mirror of the secrets stage for service discovery. Reads
 `src/collectors/SERVICE-DISCOVERY.md` (committed, `:382`).
 Most content is static (`SD_PAGE` dict, `:21-257`).
 
-**KNOWN GAP**: this stage is NOT wired into the
-`generate-integrations.yml` workflow. CI does not run it. The
-file in tree drifts from metadata.yaml until a developer runs
-the script manually (or a future PR adds it to CI). See
-`gotchas.md` and the SOW followups.
+Both documentation workflows run this stage after the shared integration
+catalog. Pull requests validate its output before Learn ingest, and the
+post-merge workflow includes the tracked result in the generated-artifact PR.
 
 ## CI workflow 1 -- `generate-integrations.yml`
 
@@ -480,13 +478,11 @@ Repo path: `.github/workflows/generate-integrations.yml`.
     metadata;
   - `integrations/_common.py`, `descriptions.py`, the integration
     and taxonomy generators, taxonomy seed/check tooling, all
-    integration tests, and the integration, collector, and secrets
-    documentation generators.
+    integration tests, and all four documentation generators.
 - `integrations/gen_npm_catalog.py` and
   the SNMP profile/trap sources are trigger paths. ibm.d `module.yaml`,
   `config.go`, generator directives, contexts, docgen, and metricgen are
-  trigger paths. `gen_doc_service_discovery_page.py` remains outside this
-  workflow.
+  trigger paths. `gen_doc_service_discovery_page.py` is also a trigger path.
 - `workflow_dispatch` -- manual.
 
 ### Concurrency
@@ -510,18 +506,17 @@ Repo path: `.github/workflows/generate-integrations.yml`.
    the runtime taxonomy artifact.
 6. `python3 -m unittest integrations.tests.test_taxonomy`.
 7. `python3 -m unittest integrations.tests.test_descriptions`.
-8. Run `gen_docs_integrations.py`,
-   `gen_doc_collector_page.py`, and `gen_doc_secrets_page.py`.
-9. **NOT** `gen_doc_service_discovery_page.py` -- gap.
-10. Remove `go.d.plugin`, the virtual environment,
+8. Run `gen_docs_integrations.py`, `gen_doc_collector_page.py`,
+   `gen_doc_secrets_page.py`, and `gen_doc_service_discovery_page.py`.
+9. Remove `go.d.plugin`, the virtual environment,
    `integrations.js`, `integrations.json`, `taxonomy.json`, and the
    NPM diagnostic report so
    the auto-PR cannot commit runtime artifacts.
-11. `peter-evans/create-pull-request@v8` -- branch
+10. `peter-evans/create-pull-request@v8` -- branch
    `integrations-regen`, label `integrations-update`, title
    `Regenerate integrations docs`, token
    `NETDATABOT_GITHUB_TOKEN`. Reviewed and merged manually.
-12. Slack failure notification on master failures.
+11. Slack failure notification on master failures.
 
 ## CI workflow 2 -- `check-markdown.yml`
 
@@ -552,9 +547,8 @@ Repo path: `.github/workflows/check-markdown.yml`.
    unittest modules. This workflow checks changed-collector taxonomy
    coverage and taxonomy tooling but does not generate
    `taxonomy.json`.
-6. Run `gen_docs_integrations.py`,
-   `gen_doc_collector_page.py`, and `gen_doc_secrets_page.py`
-   (same gap on the service-discovery page generator).
+6. Run `gen_docs_integrations.py`, `gen_doc_collector_page.py`,
+   `gen_doc_secrets_page.py`, and `gen_doc_service_discovery_page.py`.
 7. Run `learn/ingest/ingest.py --local-repo netdata:...
    --ignore-on-prem-repo --fail-links-netdata`
    -- validates that all generated Markdown links resolve through
@@ -592,6 +586,7 @@ scripts directly during active development.
    python3 integrations/gen_docs_integrations.py -c go.d.plugin/foo
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
+   python3 integrations/gen_doc_service_discovery_page.py
    ```
 3. Developer inspects the complete generated diff but stages only the
    authoritative source, generator, contract, workflow, and test changes.

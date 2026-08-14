@@ -370,12 +370,24 @@ func yamlScalar(value string) (string, error) {
 	return strings.TrimSuffix(string(data), "\n"), nil
 }
 
+func indentContinuation(spaces int, text string) string {
+	lines := strings.Split(text, "\n")
+	prefix := strings.Repeat(" ", spaces)
+	for i := 1; i < len(lines); i++ {
+		if lines[i] != "" {
+			lines[i] = prefix + lines[i]
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (g *DocGenerator) generateMetadata(contexts *Config, moduleInfo *ModuleInfo) error {
 	tmpl := template.Must(template.New("metadata").Funcs(template.FuncMap{
-		"lower":      strings.ToLower,
-		"title":      strings.Title,
-		"indent":     indent,
-		"yamlScalar": yamlScalar,
+		"lower":              strings.ToLower,
+		"title":              strings.Title,
+		"indent":             indent,
+		"indentContinuation": indentContinuation,
+		"yamlScalar":         yamlScalar,
 	}).Parse(metadataTemplate))
 
 	// Prepare template data
@@ -585,7 +597,7 @@ modules:
         categories:{{range .ModuleInfo.Categories}}
           - {{.}}{{end}}
         icon_filename: "{{.ModuleInfo.Icon}}"
-{{if .ModuleInfo.PageDescription}}        description: {{yamlScalar .ModuleInfo.PageDescription}}
+{{if .ModuleInfo.PageDescription}}        description: {{yamlScalar .ModuleInfo.PageDescription | indentContinuation 8}}
 {{end}}      related_resources:
         integrations:
           list: []

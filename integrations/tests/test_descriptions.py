@@ -38,6 +38,7 @@ from descriptions import (  # noqa: E402
 from _common import make_validator  # noqa: E402
 from gen_docs_integrations import (  # noqa: E402
     _select_integrations,
+    _validate_complete_description_corpus,
     build_readme_from_integration,
     create_overview,
     read_integrations_js,
@@ -388,6 +389,13 @@ TERMINAL_ELLIPSIS_OVERRIDE_TARGETS = {
 }
 
 REVIEWED_DESCRIPTION_TARGETS = {
+    "cgroups.plugin-/sys/fs/cgroup-Kubernetes_Containers": (
+        "Monitor Kubernetes pod and container CPU, memory, disk I/O, and network utilization through Linux cgroups."
+    ),
+    "debugfs.plugin-libsensors-Linux_Hardware_Sensors_(libsensors)": (
+        "Collect hardware sensor readings from Linux hwmon chips, including temperature, voltage, current, "
+        "fan speed, power, energy, humidity, and intrusion state."
+    ),
     "cgroups.plugin-/sys/fs/cgroup-Systemd_Services": (
         "Monitor systemd service CPU, memory, disk I/O, and page cache activity through Linux cgroups."
     ),
@@ -403,6 +411,13 @@ REVIEWED_DESCRIPTION_TARGETS = {
     "go.d.plugin-dnsmasq_dhcp-Dnsmasq_DHCP": (
         "Monitor Dnsmasq DHCP leases and utilization across configured address ranges."
     ),
+    "go.d.plugin-k8s_kubelet-Kubelet": (
+        "Monitor Kubernetes Kubelet containers, pods, runtime operations, storage, and request metrics."
+    ),
+    "go.d.plugin-ntpd-NTPd": (
+        "Monitor a configured NTP daemon's clock offset, jitter, frequency, dispersion, stratum, precision, "
+        "and optional peer timing metrics."
+    ),
     "go.d.plugin-prometheus-AWS_Quota": (
         "Monitor AWS Service Quotas and usage exposed by the AWS Quota Exporter."
     ),
@@ -412,20 +427,43 @@ REVIEWED_DESCRIPTION_TARGETS = {
     "proc.plugin-/proc/net/softnet_stat-Softnet_Statistics": (
         "Monitor Linux softnet packet processing, including drops, quota exhaustion, RPS, flow-limit, and GRO activity."
     ),
+    "proc.plugin-/proc/net/sockstat-Socket_statistics": (
+        "Monitor Linux socket usage across address families plus IPv4 protocol memory statistics reported "
+        "through procfs."
+    ),
+    "proc.plugin-/sys/kernel/mm/ksm-Kernel_Same-Page_Merging": (
+        "Monitor Linux Kernel Samepage Merging activity and effectiveness, including shared pages, savings, "
+        "ratios, and memory deduplication behavior."
+    ),
     "proc.plugin-/sys/block/zram-ZRAM": (
         "Monitor zRAM device capacity, compression, memory use, and I/O activity on Linux systems."
     ),
     "proc.plugin-/sys/class/infiniband-InfiniBand": (
-        "Monitor InfiniBand network interface traffic, errors, and status."
+        "Monitor InfiniBand network interface traffic and errors."
     ),
     "proc.plugin-/proc/spl/kstat/zfs/arcstats-ZFS_Adaptive_Replacement_Cache": (
         "Monitor ZFS Adaptive Replacement Cache (ARC) performance and memory statistics."
     ),
     "windows.plugin-PerflibNetFramework-NET_Framework": (
-        "Monitor runtime and performance statistics for applications built with .NET through Perflib."
+        "Monitor runtime and performance statistics for applications built with .NET Framework through Perflib."
     ),
     "windows.plugin-PerflibProcessor-Processor": (
         "Monitor processor performance statistics on Windows hosts through Perflib."
+    ),
+    "freebsd.plugin-dev.cpu.0.freq-dev.cpu.0.freq": (
+        "Monitor the current FreeBSD CPU scaling frequency through sysctl."
+    ),
+    "freebsd.plugin-getifaddrs-getifaddrs": (
+        "Monitor FreeBSD network interface traffic, packets, errors, drops, and collision events."
+    ),
+    "freebsd.plugin-kern.ipc.sem-kern.ipc.sem": (
+        "Monitor FreeBSD System V IPC semaphore set and semaphore counts."
+    ),
+    "freebsd.plugin-vm.vmtotal-vm.vmtotal": (
+        "Monitor FreeBSD active, running, and blocked process counts plus total real memory in use."
+    ),
+    "windows.plugin-PerflibNetwork-Network_Subsystem": (
+        "Monitor Windows network interface traffic, errors, drops, queue length, and offload activity through Perflib."
     ),
 }
 
@@ -741,6 +779,35 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             self.assertFalse(description.endswith("…"), integration_id)
             self.assertFalse(description.endswith("..."), integration_id)
 
+    def test_scoped_generation_rejects_a_collision_outside_the_selection(self):
+        description = (
+            "Monitor duplicate service latency and availability across reliable production systems."
+        )
+        integrations = [
+            {
+                "id": "go.d.plugin-one-One",
+                "integration_type": "collector",
+                "meta": {
+                    "plugin_name": "go.d.plugin",
+                    "module_name": "one",
+                    "monitored_instance": {"description": description},
+                },
+            },
+            {
+                "id": "go.d.plugin-two-Two",
+                "integration_type": "collector",
+                "meta": {
+                    "plugin_name": "go.d.plugin",
+                    "module_name": "two",
+                    "monitored_instance": {"description": description},
+                },
+            },
+        ]
+
+        self.assertEqual(len(_select_integrations(integrations, "go.d.plugin/one")), 1)
+        with self.assertRaisesRegex(ValueError, "Duplicate generated descriptions"):
+            _validate_complete_description_corpus(integrations)
+
     def test_reviewed_descriptions_match_authoritative_source_copy(self):
         by_id = {integration["id"]: integration for integration in self.documented}
         self.assertLessEqual(REVIEWED_DESCRIPTION_TARGETS.keys(), by_id.keys())
@@ -754,6 +821,16 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             systemd["overview"],
         )
         self.assertNotIn("network", systemd["overview"].casefold())
+
+    def test_cgroups_kubernetes_overview_uses_the_schema_key(self):
+        source = yaml.load((REPO_ROOT / "src/collectors/cgroups.plugin/metadata.yaml").read_text(encoding="utf-8"))
+        kubernetes = next(
+            module
+            for module in source["modules"]
+            if module["meta"]["monitored_instance"]["name"] == "Kubernetes Containers"
+        )
+        self.assertIn("data_collection", kubernetes["overview"])
+        self.assertNotIn("data-collection", kubernetes["overview"])
 
     def test_npm_page_description_mapping_is_fully_consumed(self):
         source = yaml.load(
@@ -1160,10 +1237,27 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                 ibm = text.index("go generate ./plugin/ibm.d/modules/...")
                 shared = text.index("python3 integrations/gen_integrations.py")
                 docs = text.index("python3 integrations/gen_docs_integrations.py")
+                service_discovery = text.index("python3 integrations/gen_doc_service_discovery_page.py")
                 self.assertLess(npm, shared)
                 self.assertLess(ibm, shared)
                 self.assertLess(shared, docs)
+                self.assertLess(shared, service_discovery)
                 self.assertIn("actions/setup-go@v7", text)
+
+                environment = "virtualenv" if workflow.name == "generate-integrations.yml" else "venv"
+                for command in (
+                    "python3 integrations/gen_docs_integrations.py",
+                    "python3 integrations/gen_doc_collector_page.py",
+                    "python3 integrations/gen_doc_secrets_page.py",
+                    "python3 integrations/gen_doc_service_discovery_page.py",
+                ):
+                    command_offset = text.index(command)
+                    run_block = text.rfind("run: |", 0, command_offset)
+                    self.assertIn(
+                        f"source ./{environment}/bin/activate",
+                        text[run_block:command_offset],
+                        command,
+                    )
 
         post_merge = workflows[1].read_text(encoding="utf-8")
         self.assertIn("python3 integrations/gen_npm_catalog.py", post_merge)

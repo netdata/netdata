@@ -108,8 +108,9 @@ worktree. If your local base branch is not `master`, adjust the `--pr-diff`
 range to the PR base.
 
 If service-discovery rules or `sdext` metadata changed, run
-`python3 integrations/gen_doc_service_discovery_page.py` and commit
-`src/collectors/SERVICE-DISCOVERY.md`; this is not handled by CI for you.
+`python3 integrations/gen_doc_service_discovery_page.py` and inspect the
+result. Leave `src/collectors/SERVICE-DISCOVERY.md` to the post-merge
+generated-artifact PR with the other derived documentation.
 
 ## 6. Before opening the PR
 

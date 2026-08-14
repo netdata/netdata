@@ -107,15 +107,18 @@ does the in-app integrations page get its data?".
    - `config_schema.json` (the dashboard's DYNCFG editor),
    - the stock `.conf` (what `/etc/netdata/...` ships),
    - `health.d/*.conf` (the alert definitions),
-   - `README.md` (which is a symlink to the generated
-     `integrations/<slug>.md` for single-integration plugins).
+   - the authoritative documentation source. Generated integration pages and
+     umbrella pages are validated locally but committed by the post-merge
+     generated-artifact PR.
    See `consistency.md` for what is and is NOT automatically
    enforced.
 
-5. **ibm.d is different.** ibm.d module `metadata.yaml`,
-   `README.md`, and `config_schema.json` are GENERATED from
-   `contexts.yaml` + `config.go` + `module.yaml` via
-   `go generate`. NEVER hand-edit them. See `ibm-d.md`.
+5. **ibm.d is different.** ibm.d generates runtime files
+   (`zz_generated_contexts.go`, `config_schema.json`) and documentation files
+   (`metadata.yaml`, `README.md`) from `contexts.yaml`, `config.go`, and
+   `module.yaml`. Never hand-edit them. Runtime outputs stay with runtime source
+   changes; documentation outputs are validated locally and committed by the
+   post-merge generated-artifact PR. See `ibm-d.md`.
 
 6. **The dashboard consumes generated integration artifacts.**
    The cloud-frontend at

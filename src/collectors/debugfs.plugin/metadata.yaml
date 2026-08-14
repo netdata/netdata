@@ -543,7 +543,7 @@ modules:
         categories:
           - data-collection.hardware-and-sensors
         icon_filename: 'microchip.svg'
-        description: 'Collect hardware sensor readings from Linux hwmon chips, including temperature, voltage, fan speed, power, energy, humidity, and intrusion state.'
+        description: 'Collect hardware sensor readings from Linux hwmon chips, including temperature, voltage, current, fan speed, power, energy, humidity, and intrusion state.'
       related_resources:
         integrations:
           list: []

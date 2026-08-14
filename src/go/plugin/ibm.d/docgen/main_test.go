@@ -9,8 +9,21 @@ import (
 )
 
 func TestGenerateMetadataSerializesPageDescription(t *testing.T) {
-	const pageDescription = "Monitor service health by state: ready, degraded, and failed across reliable production systems."
+	tests := map[string]string{
+		"internal colon": "Monitor service health by state: ready, degraded, and failed across reliable production systems.",
+		// The shared schema rejects multiline descriptions later. Docgen must
+		// still serialize source YAML safely so validation receives valid YAML.
+		"multiline rejected by central schema": "Monitor service health across reliable production systems.\nTrack degraded states.",
+	}
+	for name, pageDescription := range tests {
+		t.Run(name, func(t *testing.T) {
+			testGenerateMetadataSerializesPageDescription(t, pageDescription)
+		})
+	}
+}
 
+func testGenerateMetadataSerializesPageDescription(t *testing.T, pageDescription string) {
+	t.Helper()
 	dir := t.TempDir()
 	contextsPath := filepath.Join(dir, "contexts.yaml")
 	configPath := filepath.Join(dir, "config.go")
@@ -20,10 +33,10 @@ func TestGenerateMetadataSerializesPageDescription(t *testing.T) {
 	writeTestFile(t, contextsPath, "{}\n")
 	writeTestFile(t, configPath, "package fixture\n\ntype Config struct {\n\tEndpoint string `yaml:\"endpoint,omitempty\" json:\"endpoint\"`\n}\n")
 	writeTestFile(t, initPath, "package fixture\n\nfunc defaultConfig() Config {\n\treturn Config{Endpoint: \"\"}\n}\n")
-	writeTestFile(t, modulePath, `name: fixture
-display_name: Fixture
-page_description: "Monitor service health by state: ready, degraded, and failed across reliable production systems."
-description: |
+	writeTestFile(t, modulePath, "name: fixture\n"+
+		"display_name: Fixture\n"+
+		"page_description: "+string(mustYAML(t, pageDescription))+
+		`description: |
   Monitor fixture service health and performance.
 icon: fixture.svg
 categories:
@@ -65,6 +78,15 @@ link: https://example.com
 	if got := metadata.Modules[0].Meta.MonitoredInstance.Description; got != pageDescription {
 		t.Fatalf("generated page description %q, want %q", got, pageDescription)
 	}
+}
+
+func mustYAML(t *testing.T, value string) []byte {
+	t.Helper()
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal fixture YAML: %v", err)
+	}
+	return data
 }
 
 func writeTestFile(t *testing.T, path, content string) {

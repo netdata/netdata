@@ -100,19 +100,15 @@ before assuming the code does the obvious thing.
 - **Treat this file as dead code.** Do NOT rely on it.
   Follow-up must be tracked by a GitHub issue before implementation starts.
 
-### `gen_doc_service_discovery_page.py` is NOT in CI
+### `gen_doc_service_discovery_page.py` runs in both documentation workflows
 
-- File exists, runs correctly when invoked manually.
-- Workflow `.github/workflows/generate-integrations.yml`
-  runs only `gen_integrations.py`, `gen_docs_integrations.py`,
-  `gen_doc_collector_page.py`, `gen_doc_secrets_page.py`
-  (`generate-integrations.yml:48-63`).
-- Workflow `.github/workflows/check-markdown.yml` has the
-  same gap.
-- Consequence: `src/collectors/SERVICE-DISCOVERY.md` drifts
-  from source `metadata.yaml` until a developer manually
-  runs `python3 integrations/gen_doc_service_discovery_page.py`.
-- Follow-up must be tracked by a GitHub issue before implementation starts.
+- `.github/workflows/generate-integrations.yml` runs it after the shared
+  integration catalog and includes `src/collectors/SERVICE-DISCOVERY.md` in
+  the post-merge generated-artifact PR.
+- `.github/workflows/check-markdown.yml` runs the same producer before the
+  disposable Learn ingest.
+- Source PRs still run it locally to inspect the result, but leave the tracked
+  generated page to the post-merge workflow.
 
 ### `integrations/schemas/distros.json` is unused
 
@@ -351,11 +347,7 @@ with their marketing headers. None has a `<!--startmeta` block,
 none has any DO-NOT-EDIT comment.
 
 A maintainer who edits these files directly will have their
-edits silently overwritten on the next CI run (for
-COLLECTORS.md and SECRETS.md). For SERVICE-DISCOVERY.md the
-absence of CI wiring means manual edits stick until someone
-runs the script -- giving a false sense that hand-editing is
-acceptable.
+edits silently overwritten on the next CI run.
 
 ## Edge case in `build_path`
 

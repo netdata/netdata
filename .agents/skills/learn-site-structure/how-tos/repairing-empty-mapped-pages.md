@@ -10,8 +10,10 @@ MDX in the Learn repository: `ingest/ingest.py` deletes and rebuilds that tree o
 2. Inspect the source Markdown and the generated Learn MDX. If both are empty, the ingest is preserving an empty source correctly;
    the fix belongs in the source repository, not in Learn.
 3. Check whether the source is hand-authored or generated. A generated integration page carries the integration marker and must be
-   repaired in its `metadata.yaml`; an ordinary mapped README or Markdown file is repaired directly.
-4. Add an accurate `meta.description` to the existing map node. Learn injects that value as frontmatter during ingest.
+   repaired in its authoritative integration metadata or producer input; its generated map entry is not the description source. An
+   ordinary mapped README or Markdown file is repaired directly.
+4. For an ordinary mapped page, add an accurate `meta.description` to the existing map node. Learn injects that value as frontmatter
+   during ingest. For a generated integration page, add the description to the owning metadata or producer input and regenerate.
 5. Add source-level regression coverage for the objective defect: map ownership, description presence, semantic heading structure,
    and resolvable links. Do not use a word-count target as a completeness proxy.
 6. Run the map schema check and a disposable full Learn ingest with the changed repository supplied through `--local-repo`. Inspect

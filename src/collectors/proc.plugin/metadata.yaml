@@ -1825,7 +1825,7 @@ modules:
         categories:
           - data-collection.operating-systems
         icon_filename: "microchip.svg"
-        description: 'Monitor Linux Kernel Samepage Merging activity and effectiveness, including shared pages, scan rates, savings, and memory deduplication behavior.'
+        description: 'Monitor Linux Kernel Samepage Merging activity and effectiveness, including shared pages, savings, ratios, and memory deduplication behavior.'
       related_resources:
         integrations:
           list: []
@@ -2983,7 +2983,7 @@ modules:
         - rdma
     overview:
       data_collection:
-        metrics_description: "Monitor InfiniBand network interface traffic, errors, and status."
+        metrics_description: "Monitor InfiniBand network interface traffic and errors."
         method_description: ""
       supported_platforms:
         include: []
@@ -3693,7 +3693,7 @@ modules:
       module_name: /proc/net/sockstat
       monitored_instance:
         name: Socket statistics
-        description: "Monitor Linux IPv4 socket usage and memory statistics reported through procfs."
+        description: "Monitor Linux socket usage across address families plus IPv4 protocol memory statistics reported through procfs."
         link: ""
         categories:
           - data-collection.networking

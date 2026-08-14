@@ -675,6 +675,14 @@ def _select_integrations(integrations, collector_key: str = None):
     return selected
 
 
+def _validate_complete_description_corpus(integrations):
+    """Validate every public description before any scoped generation."""
+    documented = _select_integrations(integrations)
+    if not documented:
+        raise ValueError("generated integrations input contains no documentation records")
+    return description_report(documented)
+
+
 # -----------------------------
 # CLI entry
 # -----------------------------
@@ -699,6 +707,7 @@ def main():
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
+    _validate_complete_description_corpus(integrations)
     selected_integrations = _select_integrations(integrations, args.collector)
 
     if args.collector and not selected_integrations:

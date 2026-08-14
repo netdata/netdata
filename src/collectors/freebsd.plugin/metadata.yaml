@@ -104,7 +104,7 @@ modules:
       module_name: vm.vmtotal
       monitored_instance:
         name: vm.vmtotal
-        description: "Monitor FreeBSD active and blocked processes plus virtual and shared memory totals."
+        description: "Monitor FreeBSD active, running, and blocked process counts plus total real memory in use."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -397,7 +397,7 @@ modules:
       module_name: dev.cpu.0.freq
       monitored_instance:
         name: dev.cpu.0.freq
-        description: "Monitor the current FreeBSD CPU scaling frequency and its response to system load."
+        description: "Monitor the current FreeBSD CPU scaling frequency through sysctl."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -1149,7 +1149,7 @@ modules:
       module_name: kern.ipc.sem
       monitored_instance:
         name: kern.ipc.sem
-        description: "Monitor FreeBSD System V IPC semaphore sets, semaphores, and operation counters."
+        description: "Monitor FreeBSD System V IPC semaphore set and semaphore counts."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -2786,7 +2786,7 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: getifaddrs
-        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, and operational state."
+        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, and collision events."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking

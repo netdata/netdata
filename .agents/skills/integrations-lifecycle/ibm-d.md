@@ -147,12 +147,18 @@ relative path to docgen is `../../docgen` for top-level modules and
    ```
    This invokes BOTH `metricgen` (on `contexts.yaml`) and
    `docgen` (on the module).
-3. Inspect and validate ALL generated files, but do not stage them in the
-   source PR:
+3. Inspect and validate ALL generated files:
    - `metadata.yaml`
    - `README.md`
    - `config_schema.json`
    - `contexts/zz_generated_contexts.go`
+   For a documentation-only `module.yaml` change, leave the derived metadata,
+   README, and integration pages to the post-merge generated-artifact PR. If
+   `contexts.yaml` or `config.go` changes runtime behavior, commit the required
+   runtime outputs (`contexts/zz_generated_contexts.go` and/or
+   `config_schema.json`) in the source PR so compiled code and configuration
+   stay synchronized. The post-merge route is not a substitute for runtime
+   correctness.
 4. Run the integrations regen locally to update the
    per-integration `.md` and the umbrella pages:
    ```bash
@@ -165,8 +171,9 @@ relative path to docgen is `../../docgen` for top-level modules and
 5. Confirm the generated diff contains only the expected derived changes.
    After the source PR merges, `generate-integrations.yml` runs this producer
    chain again and opens the separate generated-artifact PR containing the
-   generated ibm.d files, `<plugin-dir>/integrations/<slug>.md`, and umbrella
-   pages.
+   generated documentation files, `<plugin-dir>/integrations/<slug>.md`, and
+   umbrella pages. Runtime outputs required by step 3 have already shipped in
+   the source PR.
 
 ## Why ibm.d is generated this way
 

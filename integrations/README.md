@@ -1,13 +1,10 @@
 To generate a copy of `integrations.js` and validate collector
 taxonomy locally, you will need:
 
-- Python 3.6 or newer (only tested on Python 3.10 currently, should work
-  on any version of Python newer than 3.6).
-- The following third-party Python modules:
-    - `jsonschema`
-    - `referencing`
-    - `jinja2`
-    - `ruamel.yaml`
+- Python 3.10 or newer.
+- The generation and test dependencies installed by
+  `./integrations/pip.sh`, including `jsonschema`, `referencing`, `jinja2`,
+  `ruamel.yaml`, and `markdown-it-py`.
 - A local checkout of https://github.com/netdata/netdata
 - A local checkout of https://github.com/netdata/go.d.plugin. The script
   expects this to be checked out in a directory called `go.d.plugin`
@@ -33,6 +30,7 @@ the Agent repo root:
 - `integrations/gen_docs_integrations.py`
 - `integrations/gen_doc_collector_page.py`
 - `integrations/gen_doc_secrets_page.py`
+- `integrations/gen_doc_service_discovery_page.py`
 
 These scripts must be run _from this specific location_, as they use
 their own path to figure out where all the files they need are.

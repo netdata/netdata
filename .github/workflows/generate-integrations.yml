@@ -39,6 +39,7 @@ on:
       - 'integrations/gen_docs_integrations.py'
       - 'integrations/gen_doc_collector_page.py'
       - 'integrations/gen_doc_secrets_page.py'
+      - 'integrations/gen_doc_service_discovery_page.py'
   workflow_dispatch: null
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref.
   group: integrations-${{ github.ref }}
@@ -97,15 +98,23 @@ jobs:
       - name: Generate Integrations Documentation
         id: generate-integrations-documentation
         run: |
+          source ./virtualenv/bin/activate
           python3 integrations/gen_docs_integrations.py
       - name: Generate src/collectors/COLLECTORS.md
         id: generate-collectors-md
         run: |
+          source ./virtualenv/bin/activate
           python3 integrations/gen_doc_collector_page.py
       - name: Generate src/collectors/SECRETS.md
         id: generate-secrets-md
         run: |
+          source ./virtualenv/bin/activate
           python3 integrations/gen_doc_secrets_page.py
+      - name: Generate src/collectors/SERVICE-DISCOVERY.md
+        id: generate-service-discovery-md
+        run: |
+          source ./virtualenv/bin/activate
+          python3 integrations/gen_doc_service_discovery_page.py
       - name: Clean Up Temporary Data
         id: clean
         run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json integrations/taxonomy.json src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
@@ -144,6 +153,7 @@ jobs:
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
               Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
               Generate src/collectors/SECRETS.md: ${{ steps.generate-secrets-md.outcome }}
+              Generate src/collectors/SERVICE-DISCOVERY.md: ${{ steps.generate-service-discovery-md.outcome }}
               Clean Up Temporary Data: ${{ steps.clean.outcome }}
               Create PR: ${{ steps.create-pr.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

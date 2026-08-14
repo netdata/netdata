@@ -85,7 +85,7 @@ An explicit description MUST:
 - be one line of plain text with no C0/C1 control character, including tabs, no surrogate code point or Unicode line/paragraph
   separator, no Markdown-special character (`*`, `_`, `[`, `]`, `<`, `>`, `#`, backtick, or `~`), no CommonMark list marker or
   hyphen thematic break at the beginning, and no URL, double quote, or backslash;
-- not begin with `- `, `+ `, `* `, or a one-to-nine-digit ordered-list marker such as `1. ` or `1) `, and not consist only of
+- not begin with `- `, `+ `, `* `, or a one-to-nine-digit ordered-list marker such as `1.` followed by a space or `1)` followed by a space, and not consist only of
   three or more hyphens separated by optional spaces. Internal hyphens, plus signs, and digits remain valid plain text;
 - be a complete statement: it must not end with `:`, the Unicode ellipsis `…`, or the ASCII ellipsis `...`, and every round
   parenthesis must be balanced. Nested balanced parentheses are valid;
