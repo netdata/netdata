@@ -13,8 +13,8 @@
 //! in [`super::wire`], and the mapping to and from the engine in
 //! [`super::adapter`]. What stays here is the netdata-plugin glue: the
 //! `FunctionHandler` impl, the capability declaration, and the
-//! lock/scheduling dance. (The GET args→payload shim is signal-agnostic
-//! and lives in the parent `rpc` module.)
+//! lock/scheduling dance. (The LOGS-ONLY GET args→payload shim lives in
+//! the parent `rpc` module; traces installs its own.)
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
