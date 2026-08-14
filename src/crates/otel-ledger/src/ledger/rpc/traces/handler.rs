@@ -31,9 +31,9 @@ use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
     AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, DEFAULT_SLOWEST_LIMIT,
-    OverviewQuery, OverviewRequestError, SearchQuery, SearchRequestError, SearchSources,
-    SlowestQuery, SlowestRequestError, TimeWindow, TraceQuery, TraceRequestError, attribute_names,
-    attribute_values, overview, search, slowest, trace_by_id,
+    OverviewQuery, OverviewRequestError, SLOWEST_LIMIT_MAX, SPANS_PER_TRACE_MAX, SearchQuery,
+    SearchRequestError, SearchSources, SlowestQuery, SlowestRequestError, TimeWindow, TraceQuery,
+    TraceRequestError, attribute_names, attribute_values, overview, search, slowest, trace_by_id,
 };
 
 use super::adapter::{
@@ -92,6 +92,14 @@ impl OtelTracesHandler {
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
         let mut query = TraceQuery::new(trace_id);
         if let Some(cap) = params.span_cap {
+            // Pre-capture twin of the engine's ZeroSpanCap check.
+            if cap == 0 {
+                return Err(handler_err(
+                    "invalid otel-traces request: a zero span cap would return nothing; \
+                     omit the cap or raise it"
+                        .to_string(),
+                ));
+            }
             // The wire may TIGHTEN the engine's runaway-merge bound,
             // never loosen it — an oversized cap would defeat the
             // default's documented purpose (see DEFAULT_SPAN_CAP).
@@ -188,6 +196,16 @@ impl OtelTracesHandler {
                 params.limit,
                 super::wire::SEARCH_LIMIT_MAX
             )));
+        }
+        // Pre-capture twin of the engine's own check: reject before the
+        // registry read and chunk builds capture() performs (the engine
+        // re-checks as defense in depth).
+        if let Some(spt) = params.spans_per_trace {
+            if spt > SPANS_PER_TRACE_MAX {
+                return Err(client_err(format!(
+                    "spans_per_trace {spt} exceeds the library maximum {SPANS_PER_TRACE_MAX}"
+                )));
+            }
         }
         let cursor = params
             .anchor
@@ -326,6 +344,13 @@ impl OtelTracesHandler {
             query = query.owner(parse_owner_word(word).map_err(client_err)?);
         }
         if let Some(max) = params.max_keys {
+            // Pre-capture twin of the engine's own check.
+            if max == 0 {
+                return Err(client_err(
+                    "a zero key/value limit would return nothing; omit the limit or raise it"
+                        .into(),
+                ));
+            }
             query = query.max_keys(max);
         }
         let (sources, window) = self
@@ -358,6 +383,13 @@ impl OtelTracesHandler {
         let (owner, key) = parse_enumeration_key(&params.key).map_err(client_err)?;
         let mut query = AttributeValuesQuery::new(owner, key);
         if let Some(max) = params.max_values {
+            // Pre-capture twin of the engine's own check.
+            if max == 0 {
+                return Err(client_err(
+                    "a zero key/value limit would return nothing; omit the limit or raise it"
+                        .into(),
+                ));
+            }
             query = query.max_values(max);
         }
         let (sources, window) = self
@@ -449,6 +481,19 @@ impl OtelTracesHandler {
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
         let limit = params.limit.unwrap_or(DEFAULT_SLOWEST_LIMIT);
+        // Pre-capture twins of the engine's own checks: reject before
+        // the registry read and chunk builds capture() performs (the
+        // engine re-checks as defense in depth).
+        if limit == 0 {
+            return Err(client_err(
+                "a zero limit would return nothing; slowest has no unbounded option".into(),
+            ));
+        }
+        if limit > SLOWEST_LIMIT_MAX {
+            return Err(client_err(format!(
+                "limit {limit} exceeds the library maximum {SLOWEST_LIMIT_MAX}"
+            )));
+        }
 
         let (sources, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
