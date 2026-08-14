@@ -61,6 +61,12 @@ jobs:
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
+            *.go
+            go.mod
+            go.sum
+            **/*.go
+            **/go.mod
+            **/go.sum
             **/*.cmake
             CMakeLists.txt
             netdata-installer.sh
@@ -126,7 +132,7 @@ jobs:
         id: check-go
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${{ steps.check-source-files.outputs.other_changed_files }}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+            if [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
               echo 'skip-go=' >> "${GITHUB_OUTPUT}"
             else
               echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
