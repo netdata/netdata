@@ -654,6 +654,68 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
 mod tests {
     use super::*;
 
+    /// The torn-tail clamp: a WAL truncated mid-frame serves only the
+    /// intact prefix, and a header-only file yields an empty range —
+    /// never a bounded scan that relabels truncation as "complete".
+    #[test]
+    fn wal_sources_clamp_to_the_last_complete_frame() {
+        let dir = tempfile::tempdir().unwrap();
+        let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+        let mut writer = wal::Writer::new(
+            dir.path(),
+            wal::Config::default(),
+            seq,
+            wal::FileStamp {
+                pipeline_id: 1,
+                payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+            },
+            wal::test_identity(),
+        )
+        .unwrap();
+        writer
+            .write_frame(
+                0,
+                b"",
+                &[7u8; 200],
+                wal::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: file_registry::TimestampNs(1),
+                    log_ts_range: None,
+                },
+            )
+            .unwrap();
+        writer.shutdown_all().unwrap();
+        let path = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| p.extension().is_some_and(|x| x == "wal"))
+            .expect("one WAL");
+
+        let range_of = |p: &PathBuf| -> wal::FrameRange {
+            match build_sources(&[], std::slice::from_ref(p)).unwrap().pop().unwrap() {
+                TraceSource::Tail(t) => t.coverage.range,
+                _ => panic!("expected a tail source"),
+            }
+        };
+
+        // Intact: the range reaches EOF.
+        let len = std::fs::metadata(&path).unwrap().len();
+        assert_eq!(range_of(&path).end(), len);
+
+        // Truncated mid-frame: clamp to the last complete boundary.
+        let f = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        f.set_len(len - 1).unwrap();
+        let clamped = range_of(&path);
+        assert!(clamped.end() < len - 1, "tail dropped, prefix kept");
+        assert_eq!(clamped.end(), wal::HEADER_SIZE as u64, "one-frame file: prefix is empty");
+
+        // Header-only: empty range, no error.
+        f.set_len(wal::HEADER_SIZE as u64).unwrap();
+        let empty = range_of(&path);
+        assert_eq!((empty.start(), empty.end()), (wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64));
+    }
+
     /// The CLI word table must stay in lockstep with the engine's
     /// builtin-field set: a variant without a word would make `key_word`
     /// PANIC while rendering `attributes` output (the parse side already
