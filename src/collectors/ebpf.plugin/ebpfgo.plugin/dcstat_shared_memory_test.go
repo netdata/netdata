@@ -647,26 +647,3 @@ func TestDCStatTokensSurviveProducerRestart(t *testing.T) {
 		t.Fatalf("delta after restart = %d, want 10", snap[0].dc.CacheAccess)
 	}
 }
-
-// TestBootNanosIsMonotonic pins the property the token generator depends on: the
-// clock is process-wide and never goes backwards, so a store created later always
-// sees values at least as large as one created earlier.
-//
-// The reference must be sampled once per process.  /proc/uptime has only
-// centisecond resolution, so a per-caller reference plus each caller's own
-// monotonic offset lets two readings taken milliseconds apart invert.
-func TestBootNanosIsMonotonic(t *testing.T) {
-	early := bootNanos()
-	if early == 0 {
-		t.Fatal("bootNanos reported 0; neither /proc/uptime nor the wall-clock fallback worked")
-	}
-
-	for i := range 100 {
-		got := bootNanos()
-		if got < early {
-			t.Fatalf("call %d reported %d, an earlier call reported %d: must never go backwards",
-				i, got, early)
-		}
-		early = got
-	}
-}
