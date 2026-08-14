@@ -120,6 +120,14 @@ pub(crate) fn otlp_req_at(
     span_starts_ns: &[u64],
     service: &str,
 ) -> ExportTraceServiceRequest {
+    // The fixture id space is u8 (span ids are vec![i; 8] with i: u8):
+    // 256+ starts would wrap the count to 0 and the zip below would
+    // silently build no spans.
+    assert!(
+        span_starts_ns.len() <= u8::MAX as usize,
+        "{} spans would wrap the fixture's u8 count",
+        span_starts_ns.len()
+    );
     let mut req = otlp_req_svc(trace_byte, span_starts_ns.len() as u8, 0, service);
     let spans = &mut req.resource_spans[0].scope_spans[0].spans;
     for (span, &start) in spans.iter_mut().zip(span_starts_ns) {
