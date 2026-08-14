@@ -127,9 +127,18 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
             SpanKind::Internal
         };
 
+        // The span's full extent (see end_time_unix_nano below): events
+        // clamp to it so they stay span-contained at any events_per_span
+        // (unclamped, k >= 3 or duration_nanos == 0 landed events past
+        // the end of leaf spans).
+        let extent = p.duration_nanos.saturating_add(
+            (m - 1 - j).saturating_mul(p.spacing_nanos.saturating_add(p.duration_nanos)),
+        );
         let events = (0..p.events_per_span as u64)
             .map(|k| {
-                let time = start.saturating_add((k + 1).saturating_mul(p.duration_nanos / 4 + 1));
+                let time = start.saturating_add(
+                    (k + 1).saturating_mul(p.duration_nanos / 4 + 1).min(extent),
+                );
                 if k == 0 {
                     Event {
                         time_unix_nano: time,
@@ -200,12 +209,11 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
             name,
             kind: kind as i32,
             start_time_unix_nano: start,
-            // `duration + (m-1-j)·(spacing+duration)`: parents always envelope
-            // their children (each level up gains one child's start-gap plus
-            // duration), and `m == 1` degenerates to exactly `duration_nanos`.
-            end_time_unix_nano: start.saturating_add(p.duration_nanos.saturating_add(
-                (m - 1 - j).saturating_mul(p.spacing_nanos.saturating_add(p.duration_nanos)),
-            )),
+            // `extent = duration + (m-1-j)·(spacing+duration)`: parents always
+            // envelope their children (each level up gains one child's
+            // start-gap plus duration), and `m == 1` degenerates to exactly
+            // `duration_nanos`.
+            end_time_unix_nano: start.saturating_add(extent),
             attributes: vec![kv("span.index", str_val(&i.to_string()))],
             events,
             links,
