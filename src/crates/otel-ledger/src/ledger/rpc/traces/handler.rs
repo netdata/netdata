@@ -90,6 +90,14 @@ impl OtelTracesHandler {
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let trace_id = parse_trace_id(&params.id)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        // Pre-capture twin of the engine's UnsetTraceId check (the
+        // parser deliberately lets the sentinel through).
+        if trace_id.is_unset() {
+            return Err(handler_err(
+                "invalid otel-traces request: the all-zero (unset) trace id cannot be looked up"
+                    .to_string(),
+            ));
+        }
         let mut query = TraceQuery::new(trace_id);
         if let Some(cap) = params.span_cap {
             // Pre-capture twin of the engine's ZeroSpanCap check.

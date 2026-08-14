@@ -899,6 +899,12 @@ async fn slowest_limit_truncates_and_zero_is_a_client_error() {
     let body = as_mode("slowest", body);
     let err = call_on(&h, body).await.expect_err("zero limit");
     assert!(err.to_string().contains("zero limit"), "{err}");
+
+    let mut body = window_body();
+    merge(&mut body, json!({"limit": 1001}));
+    let body = as_mode("slowest", body);
+    let err = call_on(&h, body).await.expect_err("limit beyond max");
+    assert!(err.to_string().contains("exceeds the library maximum"), "{err}");
 }
 
 #[tokio::test]
