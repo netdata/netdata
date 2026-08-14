@@ -104,7 +104,8 @@ async fn main() -> anyhow::Result<()> {
     if args.spans_per_trace > MAX_SPANS_PER_TRACE {
         anyhow::bail!("--spans-per-trace must not exceed {MAX_SPANS_PER_TRACE}");
     }
-    let max_trace_index = (args.count as u64) / (args.spans_per_trace.max(1) as u64);
+    let max_trace_index =
+        (args.count.saturating_sub(1) as u64) / (args.spans_per_trace.max(1) as u64);
     if args.seed.saturating_add(max_trace_index) >= 1u64 << 43 {
         anyhow::bail!("--seed + trace count must stay below 2^43 (id bit budget)");
     }

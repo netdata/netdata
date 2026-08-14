@@ -129,8 +129,9 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
 
         // The span's full extent (see end_time_unix_nano below): events
         // clamp to it so they stay span-contained at any events_per_span
-        // (unclamped, k >= 3 or duration_nanos == 0 landed events past
-        // the end of leaf spans).
+        // (unclamped, an event landed past a leaf span's end whenever
+        // (k+1)*(duration/4+1) > extent — at the default duration that
+        // is k >= 3; at small or zero durations, earlier).
         let extent = p.duration_nanos.saturating_add(
             (m - 1 - j).saturating_mul(p.spacing_nanos.saturating_add(p.duration_nanos)),
         );
