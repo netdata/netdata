@@ -293,7 +293,7 @@ else
   if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
     if [ -f "/host/etc/lsb-release" ]; then
       if [ "${HOST_OS_DETECTION}" = "unknown" ]; then
-        HOST_OS_DETECTION="/etc/lsb-release"
+        HOST_OS_DETECTION="/host/etc/lsb-release"
       else
         HOST_OS_DETECTION="Mixed"
       fi
