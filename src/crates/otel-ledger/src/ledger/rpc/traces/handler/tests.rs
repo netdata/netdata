@@ -545,6 +545,7 @@ async fn invalid_search_requests_are_clean_client_errors() {
     let h = handler_with_search_corpus().await;
     for (body, needle) in [
         (json!({"limit": 0}), "zero 'limit'"),
+        (json!({"limit": 1001}), "exceeds the maximum"),
         (json!({"spans_per_trace": 200}), "exceeds the library maximum"),
         (json!({"selections": {"bogus": ["x"]}}), "unknown selection key"),
         (json!({"anchor": "junk"}), "malformed anchor"),

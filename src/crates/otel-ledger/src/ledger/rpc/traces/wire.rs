@@ -231,8 +231,9 @@ pub struct SearchParams {
     pub after: u32,
     #[serde(default)]
     pub before: u32,
-    /// Result limit (top-K most-recent-first). Zero is a client
-    /// error — search has no unbounded option.
+    /// Result limit (top-K most-recent-first). Zero and beyond
+    /// [`SEARCH_LIMIT_MAX`] are client errors — search has no unbounded
+    /// option (the slowest-mode precedent).
     #[serde(default = "default_limit")]
     pub limit: usize,
     /// Matched spans attached per returned trace (engine default 3,
@@ -269,6 +270,16 @@ pub struct SearchParams {
 fn default_limit() -> usize {
     sfsq::traces::DEFAULT_SEARCH_LIMIT
 }
+
+/// Wire maximum for [`SearchParams::limit`], mirroring the engine's
+/// [`sfsq::traces::SLOWEST_LIMIT_MAX`] bound on the sibling mode. The
+/// cap lives at the wire, not the engine: the cursor walk legitimately
+/// re-runs the engine with `limit = served + limit` (served itself
+/// capped at 10,000), so the engine-side limit is bounded by
+/// construction once the client half is capped here. Without this cap a
+/// caller-chosen limit scales the assembly ceiling (`limit × 16`)
+/// unboundedly.
+pub const SEARCH_LIMIT_MAX: usize = 1000;
 
 /// Presence-preserving selector deserializer: serde's stock
 /// `Option<Value>` maps a present-but-`null` key to `None`, which would

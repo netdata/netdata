@@ -170,6 +170,16 @@ impl OtelTracesHandler {
                 "a zero 'limit' would return nothing; search has no unbounded option".into(),
             ));
         }
+        // The wire cap on the CLIENT half of the limit; the engine's
+        // effective limit (served + limit on cursor walks) is bounded by
+        // construction once this side is capped (see SEARCH_LIMIT_MAX).
+        if params.limit > super::wire::SEARCH_LIMIT_MAX {
+            return Err(client_err(format!(
+                "'limit' {} exceeds the maximum {}",
+                params.limit,
+                super::wire::SEARCH_LIMIT_MAX
+            )));
+        }
         let cursor = params
             .anchor
             .as_deref()
