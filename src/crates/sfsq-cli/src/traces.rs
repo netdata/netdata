@@ -67,8 +67,19 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
     if sfsts.is_empty() && wals.is_empty() {
         bail!("provide at least one --sfst or --wal source");
     }
+    // Source identity is the path STRING (SourceId, wal_id), so the same
+    // file through two aliases (symlink, relative vs absolute) would pass
+    // the engine's DuplicateSource check and be scanned twice, inflating
+    // UNSET-span counts. Canonicalize once so aliases collide and the
+    // duplicate is rejected instead.
+    let canonical = |path: &PathBuf| -> Result<PathBuf> {
+        path.canonicalize()
+            .with_context(|| format!("cannot resolve {}", path.display()))
+    };
+    let sfsts = sfsts.iter().map(&canonical).collect::<Result<Vec<_>>>()?;
+    let wals = wals.iter().map(&canonical).collect::<Result<Vec<_>>>()?;
     let mut sources: Vec<TraceSource> = Vec::new();
-    for path in sfsts {
+    for path in &sfsts {
         let summary = sfst::read_summary_path(path)
             .with_context(|| format!("not a readable SFST: {}", path.display()))?;
         sources.push(TraceSource::Sfst(TraceSfstCandidate {
@@ -78,7 +89,7 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
             coverage: None,
         }));
     }
-    for path in wals {
+    for path in &wals {
         let len = std::fs::metadata(path)
             .with_context(|| format!("stat {}", path.display()))?
             .len();
