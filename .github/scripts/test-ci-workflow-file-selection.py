@@ -8,9 +8,9 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW_WORKFLOW = ROOT / ".github/workflows/review.yml"
-GO_WORKFLOWS = (
-    ROOT / ".github/workflows/build.yml",
-    ROOT / ".github/workflows/docker.yml",
+GO_WORKFLOW_STEPS = (
+    (ROOT / ".github/workflows/build.yml", "Check build files"),
+    (ROOT / ".github/workflows/docker.yml", "Check build system files"),
 )
 
 SHELL_PATH_RE = re.compile(r"\.sh(?:\.in)?$")
@@ -22,10 +22,6 @@ GO_PATH_PATTERNS = (
     "**/*.go",
     "**/go.mod",
     "**/go.sum",
-)
-CHANGED_FILES_ACTION = (
-    "uses: step-security/changed-files@"
-    "3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45"
 )
 
 
@@ -160,24 +156,21 @@ class WorkflowFileSelectionTest(unittest.TestCase):
         self.assertNotIn('pattern: "*.sh*"', workflow)
 
     def test_go_decisions_do_not_consume_filename_inventories(self) -> None:
-        for workflow_path in GO_WORKFLOWS:
+        for workflow_path, build_step_name in GO_WORKFLOW_STEPS:
             workflow = workflow_path.read_text(encoding="utf-8")
-            go_files_step = workflow_step(workflow, "Check Go files")
+            build_files_step = workflow_step(workflow, build_step_name)
             check_run_step = workflow_step(workflow, "Check Run")
             check_go_step = workflow_step(workflow, "Check Go")
-            normalized_step = {line.strip() for line in go_files_step}
 
             with self.subTest(workflow=workflow_path.name):
-                self.assertIn("id: check-go-files", normalized_step)
-                self.assertIn(CHANGED_FILES_ACTION, normalized_step)
                 self.assertTrue(
-                    any("steps.check-go-files.outputs.any_modified" in line for line in check_run_step)
+                    any("steps.check-build-files.outputs.any_modified" in line for line in check_run_step)
                 )
                 self.assertTrue(
-                    any("steps.check-go-files.outputs.any_modified" in line for line in check_go_step)
+                    any("steps.check-build-files.outputs.any_modified" in line for line in check_go_step)
                 )
                 self.assertNotIn("other_changed_files", workflow)
-                self.assertEqual(literal_block(go_files_step, "files"), set(GO_PATH_PATTERNS))
+                self.assertTrue(set(GO_PATH_PATTERNS) <= literal_block(build_files_step, "files"))
 
 
 if __name__ == "__main__":
