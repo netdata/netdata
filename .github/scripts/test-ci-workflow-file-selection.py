@@ -163,12 +163,19 @@ class WorkflowFileSelectionTest(unittest.TestCase):
         for workflow_path in GO_WORKFLOWS:
             workflow = workflow_path.read_text(encoding="utf-8")
             go_files_step = workflow_step(workflow, "Check Go files")
+            check_run_step = workflow_step(workflow, "Check Run")
+            check_go_step = workflow_step(workflow, "Check Go")
             normalized_step = {line.strip() for line in go_files_step}
 
             with self.subTest(workflow=workflow_path.name):
                 self.assertIn("id: check-go-files", normalized_step)
                 self.assertIn(CHANGED_FILES_ACTION, normalized_step)
-                self.assertIn("steps.check-go-files.outputs.any_modified", workflow)
+                self.assertTrue(
+                    any("steps.check-go-files.outputs.any_modified" in line for line in check_run_step)
+                )
+                self.assertTrue(
+                    any("steps.check-go-files.outputs.any_modified" in line for line in check_go_step)
+                )
                 self.assertNotIn("other_changed_files", workflow)
                 self.assertEqual(literal_block(go_files_step, "files"), set(GO_PATH_PATTERNS))
 

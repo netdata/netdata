@@ -129,7 +129,7 @@ jobs:
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-go-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
