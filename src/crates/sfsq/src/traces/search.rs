@@ -229,6 +229,10 @@ impl SearchQuery {
     /// unconditionally.
     #[doc(hidden)]
     pub fn span_cap_for_tests(mut self, cap: usize) -> Self {
+        // The combiner's guard is debug-only; enforce the documented
+        // precondition here so a release-mode test cannot silently turn
+        // every candidate into an empty SizeCap result.
+        assert_ne!(cap, 0, "span_cap must be non-zero");
         self.span_cap = cap;
         self
     }
