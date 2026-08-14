@@ -47,7 +47,7 @@ func TestBootSourcesShareOneDomain(t *testing.T) {
 	}
 }
 
-// TestReadBootNanosOrdersReferencesWithinOneTick pins that two references taken
+// TestBootNanosOrdersReferencesWithinOneTick pins that two references taken
 // inside the same /proc/uptime tick are still strictly ordered.
 //
 // /proc/uptime only has centisecond resolution. If it were the primary source,
@@ -55,21 +55,21 @@ func TestBootSourcesShareOneDomain(t *testing.T) {
 // identical base, and the one that started later — with a smaller monotonic
 // offset — could publish a token BELOW the watermark the earlier one left. The
 // nanosecond-resolution clock removes that window.
-func TestReadBootNanosOrdersReferencesWithinOneTick(t *testing.T) {
+func TestBootNanosOrdersReferencesWithinOneTick(t *testing.T) {
 	if _, ok := bootNanosFromClock(); !ok {
 		t.Skip("nanosecond boot clock unavailable; /proc/uptime resolution is expected to be coarse")
 	}
 
 	const samples = 200
 	var distinct int
-	prev := readBootNanos()
+	prev := bootNanos()
 	if prev == 0 {
-		t.Fatal("readBootNanos returned 0 while a boot clock is available")
+		t.Fatal("bootNanos returned 0 while a boot clock is available")
 	}
 
 	deadline := time.Now().Add(5 * time.Millisecond)
 	for i := range samples {
-		got := readBootNanos()
+		got := bootNanos()
 		if got < prev {
 			t.Fatalf("sample %d went backwards: %d after %d", i, got, prev)
 		}
@@ -107,4 +107,72 @@ func TestBootNanosIsMonotonic(t *testing.T) {
 		}
 		early = got
 	}
+}
+
+// TestBootNanosIncludesSuspendedTime pins that the reported value tracks the
+// boot clock across a suspend/resume rather than a monotonic clock that stops
+// while the machine is asleep.
+//
+// The earlier implementation sampled the boot clock once and advanced it with
+// time.Since, which is CLOCK_MONOTONIC and excludes suspend. That made the
+// function contradict its own contract: the value lagged the true boot clock by
+// the whole suspended duration.
+func TestBootNanosIncludesSuspendedTime(t *testing.T) {
+	const (
+		beforeSuspend = uint64(60 * time.Second)
+		suspended     = uint64(time.Hour)
+	)
+
+	fake := beforeSuspend
+	swapBootClock(t, func() (uint64, bool) { return fake, true })
+
+	before := bootNanos()
+
+	// The machine suspends for an hour. CLOCK_BOOTTIME advances by the full hour;
+	// a monotonic-based offset does not move at all while suspended.
+	fake = beforeSuspend + suspended
+	after := bootNanos()
+
+	// Assert on the advance, not on absolute values: only the advance
+	// distinguishes the boot clock from a monotonic one, and the wall time the
+	// test itself consumes is irrelevant to it.
+	advanced := after - before
+	const tolerance = uint64(time.Second)
+	if after < before || advanced+tolerance < suspended {
+		t.Fatalf("across a %v suspend bootNanos() advanced by %v, want ~%v: "+
+			"elapsed time must include the suspended duration",
+			time.Duration(suspended), time.Duration(advanced), time.Duration(suspended))
+	}
+}
+
+// TestBootNanosFallsBackWhenClockUnavailable pins the degraded path: with no
+// boot clock, the coarse /proc/uptime reference still yields a boot-relative,
+// non-decreasing value rather than zero or a wall-clock magnitude.
+func TestBootNanosFallsBackWhenClockUnavailable(t *testing.T) {
+	if _, ok := bootNanosFromProcUptime(); !ok {
+		t.Skip("/proc/uptime unavailable on this host")
+	}
+	swapBootClock(t, func() (uint64, bool) { return 0, false })
+
+	first := bootNanos()
+	if first == 0 {
+		t.Fatal("fallback produced 0 while /proc/uptime is readable")
+	}
+
+	const wallClockFloor = uint64(1_000_000_000_000_000_000)
+	if first >= wallClockFloor {
+		t.Fatalf("fallback produced a wall-clock magnitude value: %d", first)
+	}
+
+	if second := bootNanos(); second < first {
+		t.Fatalf("fallback went backwards: %d after %d", second, first)
+	}
+}
+
+// swapBootClock installs a clock for one test and restores the real one after.
+func swapBootClock(t *testing.T, reader bootClockReader) {
+	t.Helper()
+	previous := readBootClock
+	readBootClock = reader
+	t.Cleanup(func() { readBootClock = previous })
 }

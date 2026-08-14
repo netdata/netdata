@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+// bootClockReader returns nanoseconds since boot, reporting false when this
+// platform or kernel cannot supply them.  It exists so the degrade path is
+// reachable from tests without depending on the host's clocks, mirroring the
+// kallsymsOpener seam in dcstat_targets.go.
+type bootClockReader func() (uint64, bool)
+
+// readBootClock is the live boot clock.  Tests swap it; production never does.
+var readBootClock bootClockReader = bootNanosFromClock
+
 // bootNanos reports nanoseconds since boot, the same domain the BPF `ct` field
 // carries on the object flavors that stamp it at all.
 //
@@ -30,14 +39,25 @@ import (
 // that took the fallback would publish tokens around 1.7e18 instead of ~1e13,
 // pushing every consumer watermark decades into the future and freezing the
 // charts permanently for every later instance, not just its own.
-//
-// The reference is sampled ONCE per process.  The /proc/uptime fallback has only
-// centisecond resolution, so sampling it per caller would let two references
-// taken milliseconds apart disagree by up to 10 ms in either direction; one
-// shared reference plus Go's monotonic clock keeps every caller on a single
-// timeline.
 func bootNanos() uint64 {
-	ref := bootClockRef()
+	// Preferred path: read the boot clock live, so the value includes any time
+	// the machine spent suspended.  Nothing is cached, so there is no second
+	// clock domain to drift against.
+	if ns, ok := readBootClock(); ok {
+		return ns
+	}
+
+	// Degraded path, only when the kernel cannot serve CLOCK_BOOTTIME.
+	// /proc/uptime has centisecond resolution, so re-reading it per call would
+	// return a stair-step that stalls for 10 ms at a time; it is sampled once and
+	// advanced with Go's monotonic clock instead.
+	//
+	// That elapsed portion is CLOCK_MONOTONIC and so excludes suspend, which
+	// makes the result lag the true boot clock by the suspended duration.  This
+	// is safe in the only direction that matters: it can only make this
+	// instance's tokens SMALLER than real boot time, and any later instance
+	// re-reads the boot clock, which is always at least what this one published.
+	ref := uptimeRef()
 	return ref.base + uint64(time.Since(ref.start))
 }
 
@@ -46,28 +66,14 @@ type bootClock struct {
 	start time.Time // monotonic reference taken together with base
 }
 
-var bootClockRef = sync.OnceValue(func() bootClock {
-	return bootClock{base: readBootNanos(), start: time.Now()}
+// uptimeRef samples the coarse fallback reference once per process.  Sampling it
+// per caller would let two references taken milliseconds apart disagree by up to
+// 10 ms in either direction; one shared reference keeps every caller on a single
+// timeline.
+var uptimeRef = sync.OnceValue(func() bootClock {
+	base, _ := bootNanosFromProcUptime() // 0 when unavailable: degraded, still boot-relative
+	return bootClock{base: base, start: time.Now()}
 })
-
-// readBootNanos returns nanoseconds since boot, preferring the nanosecond-
-// resolution clock and falling back to /proc/uptime, which is the same
-// boot-relative domain at centisecond resolution (and the source libnetdata's
-// boottime.c uses).
-//
-// If neither is available it returns 0.  That degrades this instance — its own
-// tokens start below any watermark a previous instance left — but it stays in
-// the boot domain, so it cannot poison the watermark for instances that come
-// after it.
-func readBootNanos() uint64 {
-	if ns, ok := bootNanosFromClock(); ok {
-		return ns
-	}
-	if ns, ok := bootNanosFromProcUptime(); ok {
-		return ns
-	}
-	return 0
-}
 
 // bootNanosFromProcUptime parses the first field of /proc/uptime, seconds since
 // boot including time spent suspended.
