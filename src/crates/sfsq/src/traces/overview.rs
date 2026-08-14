@@ -103,8 +103,8 @@ impl OverviewQuery {
     }
 
     /// Also compute the top-root-service/operation facet lists. OFF by
-    /// default: resolving roots makes the sealed path build the
-    /// whole-file string table, so the default paint stays cheap and
+    /// default: resolving roots makes the sealed path decode the
+    /// root-field dictionaries, so the default paint stays cheap and
     /// the facet rail opts in.
     pub fn root_facets(mut self, on: bool) -> Self {
         self.root_facets = on;
@@ -225,8 +225,8 @@ pub fn overview(
         op: "overview",
         visited_ceiling: query.visited_ceiling,
         ceiling_reason: PartialReason::OverviewCeiling,
-        // The grid itself discards roots — the sealed path pays for
-        // the file string table ONLY when the facet lists need them.
+        // The grid itself discards roots — the sealed path decodes the
+        // root-field dictionaries ONLY when the facet lists need them.
         resolve_roots: query.root_facets,
     };
     let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)

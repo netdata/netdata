@@ -352,9 +352,9 @@ fn json_number_to_value(n: serde_json::Number) -> Av {
 /// timestamps first (see [`normalize_log_request`] / [`Record`]); a record with
 /// `time_unix_nano == 0` flattens to `ts == 0`.
 ///
-/// Also returns the number of attribute keys sanitized (`'='` → `'_'`, the
-/// key=value delimiter rule) so the caller can log one aggregated warning per
-/// request.
+/// Also returns the number of attribute keys sanitized (`'='` → `'_'` per the
+/// key=value delimiter rule; empty keys degraded to `"_"`) so the caller can
+/// log one aggregated warning per request.
 pub fn flatten_log_request(request: ExportLogsServiceRequest) -> (FlattenedLogRequest, u64) {
     let mut flattener = Flattener::new();
     let resources = flatten_log_into(&mut flattener, request);
@@ -435,7 +435,8 @@ pub fn prepare_log_frame(
     if sanitized_keys > 0 {
         tracing::warn!(
             sanitized_keys,
-            "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
+            "sanitized attribute keys at ingest ('=' rewritten to '_' — the key=value \
+             delimiter — and empty keys degraded to '_')",
         );
     }
     // Hashes are filled at emit time by the flattener; no second pass.

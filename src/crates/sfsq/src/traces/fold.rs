@@ -17,9 +17,9 @@
 //!   source may overshoot by its whole cost; the caller names the
 //!   reason. The budget bounds WORK, not memory (the map peaks at the
 //!   processed prefix's distinct traces), and it does NOT charge the
-//!   root-resolving path's string-table build — that cost is
-//!   O(distinct kv pairs in the file), bounded per file by the format
-//!   and by capture in file count.
+//!   root-resolving path's dictionary decodes — that cost is bounded by
+//!   the two root fields' cardinality per file, and by capture in file
+//!   count.
 //! - The merge itself: envelopes widen, stored-row counts saturate
 //!   (resends count), and the cross-source root pick — the SMALLEST candidate
 //!   root span id wins; on EQUAL ids the first candidate (SourceId
@@ -62,7 +62,7 @@ pub(crate) struct SourceFoldSpec {
     /// The caller's own ceiling reason (each op names its own).
     pub ceiling_reason: PartialReason,
     /// Whether the merge carries roots. `true`: sealed sources resolve
-    /// them (the string-table-paying [`sealed_trace_aggregates`] view)
+    /// them (the dictionary-decoding [`sealed_trace_aggregates`] view)
     /// and tail-resolved roots merge. `false`: sealed sources read the
     /// roots-free [`sealed_trace_envelopes`] view and the merge DROPS
     /// the tail-resolved roots too, so `MergedTrace.root` is uniformly

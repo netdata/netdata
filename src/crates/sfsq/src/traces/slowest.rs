@@ -4,8 +4,8 @@
 //! The SAME cross-source merge as the overview (envelopes widen,
 //! stored-row counts saturate) but KEEPING roots: the list rows
 //! display root service/name, so the sealed side pays for the
-//! root-resolving [`sealed_trace_aggregates`] view (file string table)
-//! the grid path deliberately skips. Merged traces clip by
+//! root-resolving [`sealed_trace_aggregates`] view (root-field
+//! dictionary decodes) the grid path deliberately skips. Merged traces clip by
 //! envelope-start (the alignment rule shared with the overview),
 //! then rank by envelope duration DESC (`trace_id` ASC tie-break) and
 //! truncate to the requested top-K.

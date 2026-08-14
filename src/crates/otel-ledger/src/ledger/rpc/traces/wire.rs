@@ -323,8 +323,8 @@ pub struct OverviewParams {
     #[serde(default)]
     pub before: u32,
     /// Also compute the top-root-service/operation facet lists.
-    /// OPT-IN: resolving roots costs the sealed
-    /// sources' string tables, so the default paint stays cheap and
+    /// OPT-IN: resolving roots costs the sealed sources' root-field
+    /// dictionary decodes, so the default paint stays cheap and
     /// the facet rail sets this. `null`, `false`, and absent all mean
     /// off; only `true` opts in.
     #[serde(default)]

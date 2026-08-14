@@ -311,9 +311,9 @@ impl Flattener {
         }
     }
 
-    /// How many attribute keys were sanitized (`'='` → `'_'`, the key=value
-    /// delimiter rule) so far. Callers log one aggregated warning per request
-    /// when non-zero.
+    /// How many attribute keys were sanitized so far — `'='` rewritten to
+    /// `'_'` (the key=value delimiter rule) or an empty key degraded to
+    /// `"_"`. Callers log one aggregated warning per request when non-zero.
     pub fn sanitized_keys(&self) -> u64 {
         self.sanitized_keys
     }

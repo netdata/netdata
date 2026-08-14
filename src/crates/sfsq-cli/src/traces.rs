@@ -618,10 +618,12 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
     }
 
     // The dev shape: one flat set of paths serves both roles (window =
-    // completion — trivially a subset).
+    // completion — trivially a subset). Built ONCE — TraceSource clones
+    // cheaply, and build_sources now scans every WAL's frame boundaries.
+    let window = build_sources(&args.sfsts, &args.wals)?;
     let sources = SearchSources {
-        window: build_sources(&args.sfsts, &args.wals)?,
-        completion: build_sources(&args.sfsts, &args.wals)?,
+        completion: window.clone(),
+        window,
     };
     let data = search(
         sources,
