@@ -99,7 +99,26 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
                 path.display()
             );
         }
-        let range = wal::FrameRange::new(wal::HEADER_SIZE as u64, len);
+        // The bounded reader treats a frame crossing its end bound as an
+        // expected torn tail — designed for `end = valid_up_to`, not a
+        // physical file length. Scan the frame headers first so a
+        // truncated tail is SURFACED and only complete frames are read
+        // (the `discover` module's convention; corrupt data never drops
+        // silently under a `complete` status).
+        let boundaries =
+            wal::scan_frame_boundaries(path, wal::FrameRange::new(wal::HEADER_SIZE as u64, len))
+                .with_context(|| format!("scanning frames of {}", path.display()))?;
+        let valid_end = boundaries
+            .last()
+            .map_or(wal::HEADER_SIZE as u64, |b| b.end_offset);
+        if valid_end != len {
+            tracing::warn!(
+                "{}: torn or truncated tail — complete frames end at byte {valid_end} of {len}; \
+                 reading the intact prefix only",
+                path.display()
+            );
+        }
+        let range = wal::FrameRange::new(wal::HEADER_SIZE as u64, valid_end);
         sources.push(TraceSource::Tail(TraceWalTail {
             source_id: SourceId::new(path.display().to_string()),
             path: path.clone(),
