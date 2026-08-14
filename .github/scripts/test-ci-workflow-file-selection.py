@@ -23,6 +23,10 @@ GO_PATH_PATTERNS = (
     "**/go.mod",
     "**/go.sum",
 )
+CHANGED_FILES_ACTION = (
+    "uses: step-security/changed-files@"
+    "3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45"
+)
 
 
 def shell_trigger_matches(path: str) -> bool:
@@ -39,7 +43,61 @@ def go_group_matches(path: str) -> bool:
     return any(candidate.match(pattern) for pattern in GO_PATH_PATTERNS)
 
 
+def workflow_step(workflow: str, name: str) -> list[str]:
+    lines = workflow.splitlines()
+    marker = f"- name: {name}"
+    starts = [index for index, line in enumerate(lines) if line.strip() == marker]
+
+    if len(starts) != 1:
+        raise ValueError(f"expected one {name!r} step, found {len(starts)}")
+
+    start = starts[0]
+    end = next(
+        (
+            index
+            for index in range(start + 1, len(lines))
+            if lines[index].strip().startswith("- name: ")
+        ),
+        len(lines),
+    )
+    return lines[start:end]
+
+
+def literal_block(step: list[str], key: str) -> set[str]:
+    marker = f"{key}: |"
+    starts = [index for index, line in enumerate(step) if line.strip() == marker]
+
+    if len(starts) != 1:
+        raise ValueError(f"expected one {key!r} block, found {len(starts)}")
+
+    start = starts[0]
+    indentation = len(step[start]) - len(step[start].lstrip())
+    values = []
+    for line in step[start + 1:]:
+        if line.strip() and len(line) - len(line.lstrip()) <= indentation:
+            break
+        if line.strip():
+            values.append(line.strip())
+
+    return set(values)
+
+
 class WorkflowFileSelectionTest(unittest.TestCase):
+    def test_literal_block_ignores_indentation_and_blank_lines(self) -> None:
+        workflow = """
+  - name: Example
+    with:
+      files: |
+        *.go
+
+        go.mod
+  - name: Next step
+    run: true
+"""
+
+        step = workflow_step(workflow, "Example")
+        self.assertEqual(literal_block(step, "files"), {"*.go", "go.mod"})
+
     def test_shell_trigger_and_scanner_accept_only_supported_suffixes(self) -> None:
         accepted = (
             "install.sh",
@@ -95,21 +153,24 @@ class WorkflowFileSelectionTest(unittest.TestCase):
 
     def test_workflows_use_the_tested_shell_contract(self) -> None:
         workflow = REVIEW_WORKFLOW.read_text(encoding="utf-8")
+        shellcheck_step = workflow_step(workflow, "Run shellcheck")
 
         self.assertIn(r"grep -Eq '\.sh(\.in)?$'", workflow)
-        self.assertIn("pattern: |\n            *.sh\n            *.sh.in", workflow)
+        self.assertEqual(literal_block(shellcheck_step, "pattern"), {"*.sh", "*.sh.in"})
         self.assertNotIn('pattern: "*.sh*"', workflow)
 
     def test_go_decisions_do_not_consume_filename_inventories(self) -> None:
         for workflow_path in GO_WORKFLOWS:
             workflow = workflow_path.read_text(encoding="utf-8")
+            go_files_step = workflow_step(workflow, "Check Go files")
+            normalized_step = {line.strip() for line in go_files_step}
 
             with self.subTest(workflow=workflow_path.name):
-                self.assertIn("id: check-go-files", workflow)
+                self.assertIn("id: check-go-files", normalized_step)
+                self.assertIn(CHANGED_FILES_ACTION, normalized_step)
                 self.assertIn("steps.check-go-files.outputs.any_modified", workflow)
                 self.assertNotIn("other_changed_files", workflow)
-                for pattern in GO_PATH_PATTERNS:
-                    self.assertIn(f"            {pattern}\n", workflow)
+                self.assertEqual(literal_block(go_files_step, "files"), set(GO_PATH_PATTERNS))
 
 
 if __name__ == "__main__":

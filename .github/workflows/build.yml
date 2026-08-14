@@ -87,7 +87,7 @@ jobs:
       - name: Check Go files
         id: check-go-files
         if: github.event_name == 'pull_request'
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           files: |
             *.go
