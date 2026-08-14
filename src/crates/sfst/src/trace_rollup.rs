@@ -587,10 +587,14 @@ mod tests {
         assert!(broken.validate(0).is_err(), "inverted envelope");
 
         // An id arena with trailing bytes: len() floors to the right
-        // count, so only the well_formed() check catches it.
+        // count, so only the well_formed() check catches it — the ids
+        // stay distinct and increasing so every OTHER check passes.
         let mut broken = good.clone();
+        let mut arena = vec![1u8; 16]; // id 1
+        arena.extend_from_slice(&[2u8; 16]); // id 2 (strictly greater)
+        arena.push(0xAA); // the trailing byte
         let raw = bincode::serde::encode_to_vec(
-            serde_bytes::ByteBuf::from(vec![7u8; 33]), // 2 ids + 1 trailing byte
+            serde_bytes::ByteBuf::from(arena),
             bincode::config::standard(),
         )
         .unwrap();
