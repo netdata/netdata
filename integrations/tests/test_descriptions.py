@@ -708,7 +708,7 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
 
     def test_reviewed_descriptions_match_authoritative_source_copy(self):
         by_id = {integration["id"]: integration for integration in self.documented}
-        self.assertTrue(REVIEWED_DESCRIPTION_TARGETS.keys() <= by_id.keys())
+        self.assertLessEqual(REVIEWED_DESCRIPTION_TARGETS.keys(), by_id.keys())
         for integration_id, expected in REVIEWED_DESCRIPTION_TARGETS.items():
             with self.subTest(integration_id=integration_id):
                 self.assertEqual(get_integration_meta_description(by_id[integration_id]), expected)

@@ -12,6 +12,8 @@ from typing import Any, Dict, Iterable, Optional
 
 MIN_DESCRIPTION_LENGTH = 50
 MAX_DESCRIPTION_LENGTH = 160
+_MISSING_ID = "<missing-id>"
+_OVERVIEW_HEADING = "## Overview"
 
 DOCUMENTATION_TYPES = {
     "agent_notification",
@@ -35,9 +37,8 @@ _BARE_URL_RE = re.compile(_ASCII_URL_PREFIX_PATTERN + r"\S*")
 _URL_SYNTAX_RE = re.compile(_ASCII_URL_PREFIX_PATTERN)
 _MARKDOWN_LINK_RE = re.compile(r"!?\[([^]]*)\]\([^)]*\)")
 _MARKDOWN_SPECIAL_CHARACTER_RE = re.compile(r"[*_\[\]<>#`~]")
-_COMMONMARK_BLOCK_START_RE = re.compile(
-    r"^(?:[-+*] |[0-9]{1,9}[.)] |-(?: *-){2,}$)"
-)
+_COMMONMARK_LIST_START_RE = re.compile(r"^(?:[-+*] |\d{1,9}[.)] )")
+_COMMONMARK_THEMATIC_BREAK_RE = re.compile(r"^-(?: *-){2,}$")
 _RELATED_RESOURCE_RE = re.compile(
     r'\{% relatedResource id="[^"]*" %\}(.*?)\{% /relatedResource %\}',
     re.DOTALL,
@@ -101,9 +102,9 @@ def extract_first_sentence(text: str) -> str:
     if not text:
         return text
 
-    match = re.match(r"^(.*?\.)\s", text)
+    match = re.search(r"\.\s", text)
     if match:
-        return match.group(1).strip()
+        return text[: match.start() + 1].strip()
     if text.endswith("."):
         return text.strip()
     return text.strip()
@@ -114,8 +115,8 @@ def _first_prose_paragraph(markdown: str) -> Optional[str]:
         return None
 
     text = _remove_admonition_blocks(_remove_fenced_blocks(markdown))
-    if "## Overview" in text:
-        text = text.split("## Overview", 1)[1]
+    if _OVERVIEW_HEADING in text:
+        text = text.split(_OVERVIEW_HEADING, 1)[1]
     else:
         text = re.sub(r"^# [^\n]+\n", "", text, count=1)
 
@@ -165,32 +166,39 @@ def normalize_description(text: str, *, summarize: bool) -> str:
     return _truncate(plain)
 
 
+def _legacy_overview_paragraph(overview: str) -> Optional[str]:
+    _, separator, body = overview.partition(_OVERVIEW_HEADING)
+    if not separator:
+        return None
+
+    paragraph = []
+    for raw_line in body.strip().splitlines():
+        line = raw_line.strip()
+        if not line:
+            if paragraph:
+                break
+            continue
+        if line.startswith(("#", "Plugin:", "Module:")):
+            if paragraph:
+                break
+            continue
+        paragraph.append(line)
+
+    return " ".join(paragraph) or None
+
+
+def _legacy_overview_description(overview: str) -> Optional[str]:
+    paragraph = _legacy_overview_paragraph(overview)
+    if not paragraph:
+        return None
+    first_sentence = extract_first_sentence(paragraph)
+    return re.sub(r"\s+", " ", first_sentence) if first_sentence else None
+
+
 def extract_description_from_overview(overview: str, *, for_meta: bool = False) -> Optional[str]:
     """Extract overview prose, preserving the existing catalog output by default."""
     if not for_meta:
-        parts = overview.split("## Overview", 1)
-        if len(parts) <= 1:
-            return None
-
-        paragraph = []
-        for line in parts[1].strip().split("\n"):
-            line = line.strip()
-            if not line and not paragraph:
-                continue
-            if line.startswith(("#", "Plugin:", "Module:")):
-                if paragraph:
-                    break
-                continue
-            if line:
-                paragraph.append(line)
-            elif paragraph:
-                break
-
-        if not paragraph:
-            return None
-
-        first_sentence = extract_first_sentence(" ".join(paragraph))
-        return re.sub(r"\s+", " ", first_sentence) if first_sentence else None
+        return _legacy_overview_description(overview)
 
     paragraph = _first_prose_paragraph(overview)
     if not paragraph:
@@ -206,7 +214,7 @@ def get_description_override(integration: Dict[str, Any]) -> Optional[str]:
     if not isinstance(owner, dict) or "description" not in owner:
         return None
 
-    integration_id = integration.get("id", "<missing-id>")
+    integration_id = integration.get("id", _MISSING_ID)
     value = owner["description"]
     if not isinstance(value, str):
         raise ValueError(f"Invalid description for {integration_id}: must be a string: {value!r}")
@@ -234,7 +242,10 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append("contains a URL")
     if _MARKDOWN_SPECIAL_CHARACTER_RE.search(description):
         errors.append("contains a Markdown-special character")
-    if _COMMONMARK_BLOCK_START_RE.search(description):
+    if (
+        _COMMONMARK_LIST_START_RE.search(description)
+        or _COMMONMARK_THEMATIC_BREAK_RE.search(description)
+    ):
         errors.append("starts a CommonMark block")
     if description.endswith(":"):
         errors.append("ends with a colon")
@@ -251,7 +262,7 @@ def validate_description(description: str, integration_id: str) -> None:
 
 def get_integration_meta_description(integration: Dict[str, Any]) -> str:
     """Resolve the override-first description used in generated page frontmatter."""
-    integration_id = integration.get("id", "<missing-id>")
+    integration_id = integration.get("id", _MISSING_ID)
     description = get_description_override(integration)
     if description is None:
         description = extract_description_from_overview(integration.get("overview", ""), for_meta=True)
@@ -271,7 +282,7 @@ def build_description_index(integrations: Iterable[Dict[str, Any]]) -> Dict[str,
         if integration.get("integration_type") not in DOCUMENTATION_TYPES:
             continue
 
-        integration_id = integration.get("id", "<missing-id>")
+        integration_id = integration.get("id", _MISSING_ID)
         description = get_integration_meta_description(integration)
         descriptions[integration_id] = description
         identity = unicodedata.normalize("NFC", description.casefold())
