@@ -310,14 +310,28 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
  * in their tables and in which target fields they read, so both drive the same
  * pair of emitters instead of carrying a copy of each loop. */
 struct apps_ebpf_chart {
-    const char *suffix;
+    const char *suffix; /* context suffix: app.<suffix> */
     const char *title;
     const char *units;
     const char *style;
     int         priority;
     const char *dim;
     const char *algo;
+    /* Chart-id suffix, used when it differs from the context suffix; NULL means
+     * the two are identical.  The C dcstat module shipped two charts whose id did
+     * NOT match their context (_ebpf_not_cache with app.ebpf_dc_not_cache, and
+     * _ebpf_not_found with app.ebpf_dc_not_found).  Chart ids are the per-app
+     * instance identity, so deriving them from the context suffix would rename
+     * them and split each instance on upgrade.  The mismatch is preserved
+     * deliberately. */
+    const char *id_suffix;
 };
+
+/* The chart-id suffix, falling back to the context suffix when no override is set. */
+static inline const char *apps_ebpf_chart_id(const struct apps_ebpf_chart *chart)
+{
+    return chart->id_suffix ? chart->id_suffix : chart->suffix;
+}
 
 static void send_ebpf_charts_to_netdata(
     struct target *w,
@@ -334,7 +348,7 @@ static void send_ebpf_charts_to_netdata(
     const char *wname = string2str(w->name);
     for (size_t i = 0; i < count; i++) {
         fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' %s %s.%s %s %d %d\n",
-                type, name, charts[i].suffix, charts[i].title, charts[i].units, family,
+                type, name, apps_ebpf_chart_id(&charts[i]), charts[i].title, charts[i].units, family,
                 type, charts[i].suffix, charts[i].style, charts[i].priority, update_every);
         send_CLABEL_COMMIT(lbl_name, wname);
         fprintf(stdout, "DIMENSION %s '' %s 1 1\n", charts[i].dim, charts[i].algo);
@@ -356,26 +370,33 @@ static void send_ebpf_data_to_netdata(
 
     const char *name = string2str(w->clean_name);
     for (size_t i = 0; i < count; i++) {
-        send_BEGIN(type, name, charts[i].suffix, dt);
+        send_BEGIN(type, name, apps_ebpf_chart_id(&charts[i]), dt);
         send_SET(charts[i].dim, values[i]);
         send_END();
     }
 }
 
 static const struct apps_ebpf_chart apps_cachestat_charts[] = {
-    { "ebpf_cachestat_hit_ratio",   "Hit ratio",                "%",        "line",    20260, "ratio",  "absolute"    },
-    { "ebpf_cachestat_dirty_pages", "Number of dirty pages",    "page/s",   "stacked", 20261, "pages",  "incremental" },
-    { "ebpf_cachestat_access",      "Number of accessed files", "hits/s",   "stacked", 20262, "hits",   "incremental" },
-    { "ebpf_cachestat_misses",      "Files out of page cache",  "misses/s", "stacked", 20263, "misses", "incremental" },
+    { "ebpf_cachestat_hit_ratio",   "Hit ratio",                "%",        "line",    20260, "ratio",  "absolute",    NULL },
+    { "ebpf_cachestat_dirty_pages", "Number of dirty pages",    "page/s",   "stacked", 20261, "pages",  "incremental", NULL },
+    { "ebpf_cachestat_access",      "Number of accessed files", "hits/s",   "stacked", 20262, "hits",   "incremental", NULL },
+    { "ebpf_cachestat_misses",      "Files out of page cache",  "misses/s", "stacked", 20263, "misses", "incremental", NULL },
 };
 
-/* Chart ids, contexts, units, and priorities match the ones the C dcstat module
- * published, so existing dashboards keep working after the port to ebpf-go. */
+/* Chart ids, contexts, dimensions, and priorities match the ones the C dcstat
+ * module published, so existing per-app chart instances and dashboards keep
+ * resolving.  Two ids need the id_suffix override because the C module did not
+ * derive them from the context.
+ *
+ * The UNITS deliberately differ: C published pre-computed interval totals as
+ * `files` with the `absolute` algorithm, while ebpf-go publishes the raw
+ * cumulative counters as `files/s` with `incremental` and lets the database
+ * derive the rate.  See the module metadata for the operator-facing note. */
 static const struct apps_ebpf_chart apps_dcstat_charts[] = {
-    { "ebpf_dc_hit",       "Percentage of directory lookups resolved by the cache.", "%",       "line",    20265, "ratio", "absolute"    },
-    { "ebpf_dc_reference", "Count file access.",                          "files/s", "stacked", 20266, "files", "incremental" },
-    { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files/s", "stacked", 20267, "files", "incremental" },
-    { "ebpf_dc_not_found", "Files not found.",                            "files/s", "stacked", 20268, "files", "incremental" },
+    { "ebpf_dc_hit",       "Percentage of directory lookups resolved by the cache.", "%",       "line",    20265, "ratio", "absolute",    NULL },
+    { "ebpf_dc_reference", "Count file access.",                          "files/s", "stacked", 20266, "files", "incremental", NULL },
+    { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files/s", "stacked", 20267, "files", "incremental", "ebpf_not_cache" },
+    { "ebpf_dc_not_found", "Files not found.",                            "files/s", "stacked", 20268, "files", "incremental", "ebpf_not_found" },
 };
 
 static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
