@@ -255,19 +255,26 @@ func (s *ebpfSharedMemoryStore) rebuildEntriesLocked() {
 //
 // Presence in a module's identity map is not enough: a BPF entry created
 // between process start and the first bpf_get_current_comm() carries an empty
-// comm, so an empty cachestat identity must not shadow a populated dcstat one.
+// comm, and the upstream BPF sources skip that call entirely on kernels below
+// 4.11.  An empty identity from either module must therefore never shadow a
+// populated one from the other.
+//
+// ppid is always 0 today — neither module's snapshot populates it — so isEmpty()
+// effectively tests comm alone.  It still checks both fields so this stays
+// correct if a module starts reporting a parent.
 func (s *ebpfSharedMemoryStore) buildRowLocked(pid uint32) ebpfPidStat {
 	row := ebpfPidStat{pid: pid}
 
-	// Pick the identity to publish: cachestat always wins when present, even
-	// with an empty identity (preserves the single-module behaviour recorded in
-	// the cache).  dcstat only contributes when its identity is populated; an
-	// empty dcstat identity with no cachestat entry leaves the row at zero.
+	// Pick the identity to publish: cachestat wins when it actually learned
+	// something, then dcstat on the same terms.  Neither module may publish an
+	// empty identity while the other holds a populated one; when both are empty
+	// (or absent) the row stays at zero, which is what a single module with no
+	// identity produced before.
 	csIdent, csOK := s.cachestatIdent[pid]
 	dcIdent, dcOK := s.dcstatIdent[pid]
 	var ident ebpfModuleIdentity
 	switch {
-	case csOK:
+	case csOK && !csIdent.isEmpty():
 		ident = csIdent
 	case dcOK && !dcIdent.isEmpty():
 		ident = dcIdent

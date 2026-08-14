@@ -647,3 +647,60 @@ func TestDCStatTokensSurviveProducerRestart(t *testing.T) {
 		t.Fatalf("delta after restart = %d, want 10", snap[0].dc.CacheAccess)
 	}
 }
+
+// TestSharedStoreIdentityPrefersPopulatedModule pins that neither module may
+// publish an empty identity while the other holds a populated one.
+//
+// A BPF entry created between process start and the first bpf_get_current_comm()
+// carries an empty comm — and on kernels below 4.11 the upstream BPF sources skip
+// that call entirely — so an empty identity from the preferred module is a real
+// occurrence, not a theoretical one. Preferring it discards usable metadata that
+// the other module already has.
+func TestSharedStoreIdentityPrefersPopulatedModule(t *testing.T) {
+	named := [libbpfloader.DCStatAppCommLen]byte{'d', 'c', 'p', 'r', 'o', 'c'}
+	var unnamed [libbpfloader.CachestatAppCommLen]byte
+
+	store := NewEbpfSharedMemoryStore()
+	// cachestat sees the PID but learned no name; dcstat has one.
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
+		{Pid: 77, Comm: unnamed, MarkPageAccessed: 5},
+	})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 77, Comm: named, CacheAccess: 5},
+	})
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if snap[0].comm[0] == 0 {
+		t.Fatal("an empty cachestat identity shadowed dcstat's populated one")
+	}
+	if got := string(snap[0].comm[:6]); got != "dcproc" {
+		t.Fatalf("comm = %q, want %q", got, "dcproc")
+	}
+}
+
+// TestSharedStoreIdentityKeepsCachestatPriority pins the other direction: when
+// cachestat does know the name it stays the preferred source, so the fix above
+// did not invert the documented precedence.
+func TestSharedStoreIdentityKeepsCachestatPriority(t *testing.T) {
+	csName := [libbpfloader.CachestatAppCommLen]byte{'c', 's', 'p', 'r', 'o', 'c'}
+	dcName := [libbpfloader.DCStatAppCommLen]byte{'d', 'c', 'p', 'r', 'o', 'c'}
+
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
+		{Pid: 77, Comm: csName, MarkPageAccessed: 5},
+	})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 77, Comm: dcName, CacheAccess: 5},
+	})
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if got := string(snap[0].comm[:6]); got != "csproc" {
+		t.Fatalf("comm = %q, want cachestat's %q", got, "csproc")
+	}
+}
