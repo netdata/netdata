@@ -86,11 +86,11 @@ Flow data is powerful but easy to misuse. The mistakes below are the ones that c
 
 **The mistake.** You see `RAW_BYTES = 5000` for a flow and assume 5000 bytes was the actual traffic.
 
-**Why it's wrong.** `RAW_BYTES` is the unscaled byte count from the exporter. With sampling at 1-in-1000, the actual traffic was approximately 5 000 000 bytes. The scaled value is in `BYTES`.
+**Why it's wrong.** `RAW_BYTES` is the selected canonical byte counter before Netdata applies sampling. With sampling at 1-in-1000, the actual traffic was approximately 5 000 000 bytes. The scaled value is in `BYTES`.
 
 **What it costs.** A bandwidth estimate that is wrong by the sampling factor — typically 100× to 2000× too low — and capacity or anomaly conclusions drawn from those wrong numbers.
 
-**How to avoid it.** Use `BYTES` (auto-scaled per-flow) for normal analysis. Use `RAW_BYTES` only when you specifically need the exporter's literal pre-scaling counts — for example, when comparing the per-flow record to the exporter's own logs.
+**How to avoid it.** Use `BYTES` (auto-scaled per-flow) for normal analysis. Use `RAW_BYTES` only when you need the selected counter before sampling multiplication — for example, when comparing the per-flow record to the exporter's own logs.
 
 ## 9. Comparing flow counts across protocols
 
@@ -113,7 +113,7 @@ Flow data is powerful but easy to misuse. The mistakes below are the ones that c
 | Geographic firewall of shame | Use ASN, whitelist cloud and CDN providers |
 | Duration as latency | Use SNMP/ICMP/APM for latency |
 | Microburst hunting | Use packet capture or hardware telemetry |
-| Raw bytes confusion | Use `BYTES` (auto-scaled per-flow); use `RAW_BYTES` only when you need the exporter's literal pre-scaling counts |
+| Raw bytes confusion | Use `BYTES` (auto-scaled per-flow); use `RAW_BYTES` only when you need the selected counter before sampling multiplication |
 | Cross-protocol flow counts | Use bytes (scaled), not flow counts |
 
 ## What's next

@@ -69,27 +69,38 @@ func lessDynamicDimension(lhs, rhs dynamicDimensionOrderEntry) bool {
 	return lhs.name < rhs.name
 }
 
-func enforceLifecycleCaps(
+func enforceLifecycleCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) ([]RemoveDimensionAction, []RemoveChartAction) {
 	if len(chartsByID) == 0 || state == nil {
 		return nil, nil
 	}
-	removeCharts := enforceChartInstanceCaps(currentSuccessSeq, chartsByID, state)
-	removeDims := enforceDimensionCaps(currentSuccessSeq, chartsByID, state)
+	removeCharts := enforceChartInstanceCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
+	removeDims := enforceDimensionCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
 	return removeDims, removeCharts
 }
 
-func enforceChartInstanceCaps(
+func enforceChartInstanceCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) []RemoveChartAction {
-	observedByTemplate := make(map[string][]string)
+	var observedByTemplate map[string][]string
 	for chartID, cs := range chartsByID {
+		if cs.lifecycle.MaxInstances <= 0 {
+			continue
+		}
+		if observedByTemplate == nil {
+			observedByTemplate = make(map[string][]string)
+		}
 		observedByTemplate[cs.templateID] = append(observedByTemplate[cs.templateID], chartID)
+	}
+	if len(observedByTemplate) == 0 {
+		return nil
 	}
 	for templateID := range observedByTemplate {
 		sort.Strings(observedByTemplate[templateID])
@@ -97,10 +108,10 @@ func enforceChartInstanceCaps(
 
 	existingByTemplate := make(map[string][]string)
 	for chartID, matChart := range state.charts {
+		if _, enabled := observedByTemplate[matChart.templateID]; !enabled {
+			continue
+		}
 		existingByTemplate[matChart.templateID] = append(existingByTemplate[matChart.templateID], chartID)
-	}
-	for templateID := range existingByTemplate {
-		sort.Strings(existingByTemplate[templateID])
 	}
 
 	removeCharts := make([]RemoveChartAction, 0)
@@ -120,9 +131,6 @@ func enforceChartInstanceCaps(
 		// max_instances is a soft cap:
 		// currently active chart instances are never evicted in the same successful cycle.
 		maxInstances := lifecycle.MaxInstances
-		if maxInstances <= 0 {
-			continue
-		}
 
 		existingIDs := existingByTemplate[templateID]
 		existingSet := make(map[string]struct{}, len(existingIDs))
@@ -190,7 +198,20 @@ func enforceChartInstanceCaps(
 			// If all existing instances are active and no new ones were observed, overflow remains
 			// and the soft cap may be temporarily exceeded.
 			for i := len(newObserved) - 1; i >= 0 && overflow > 0; i-- {
-				delete(chartsByID, newObserved[i])
+				chartID := newObserved[i]
+				if observe != nil {
+					cs := chartsByID[chartID]
+					fact := PlanRouteDiagnostic{
+						Decision: PlanRouteLifecycleRejected,
+						Reason:   PlanRouteReasonChartInstanceCap,
+						ChartID:  chartID,
+					}
+					if cs != nil {
+						fact.ChartTemplateID = cs.templateID
+					}
+					observe(fact)
+				}
+				delete(chartsByID, chartID)
 				overflow--
 			}
 		}
@@ -198,42 +219,49 @@ func enforceChartInstanceCaps(
 	return removeCharts
 }
 
-func enforceDimensionCaps(
+func enforceDimensionCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) []RemoveDimensionAction {
 	// Per-chart dimension caps: evict least-recently-seen inactive dims first, then drop new dims.
-	removeDims := make([]RemoveDimensionAction, 0)
-	chartIDs := make([]string, 0, len(chartsByID))
-	for chartID := range chartsByID {
+	var chartIDs []string
+	for chartID, cs := range chartsByID {
+		if cs.lifecycle.Dimensions.MaxDims <= 0 {
+			continue
+		}
+		if chartIDs == nil {
+			chartIDs = make([]string, 0, len(chartsByID))
+		}
 		chartIDs = append(chartIDs, chartID)
 	}
+	if len(chartIDs) == 0 {
+		return nil
+	}
 	sort.Strings(chartIDs)
+
+	removeDims := make([]RemoveDimensionAction, 0)
 	for _, chartID := range chartIDs {
 		cs := chartsByID[chartID]
 		maxDims := cs.lifecycle.Dimensions.MaxDims
-		if maxDims <= 0 {
-			continue
-		}
 		matChart := state.charts[chartID]
 		existingCount := 0
 		if matChart != nil {
 			existingCount = len(matChart.dimensions)
 		}
 
-		newNames := make([]string, 0, cs.observedCount)
+		newCount := 0
 		for name, entry := range cs.entries {
 			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
 				continue
 			}
 			if matChart == nil || matChart.dimensions[name] == nil {
-				newNames = append(newNames, name)
+				newCount++
 			}
 		}
-		sort.Strings(newNames)
 
-		total := existingCount + len(newNames)
+		total := existingCount + newCount
 		if total <= maxDims {
 			continue
 		}
@@ -291,6 +319,15 @@ func enforceDimensionCaps(
 				name := orderedObserved[i]
 				if matChart != nil && matChart.dimensions[name] != nil {
 					continue
+				}
+				if observe != nil {
+					observe(PlanRouteDiagnostic{
+						Decision:        PlanRouteLifecycleRejected,
+						Reason:          PlanRouteReasonDimensionCap,
+						ChartTemplateID: cs.templateID,
+						ChartID:         chartID,
+						DimensionName:   name,
+					})
 				}
 				delete(cs.entries, name)
 				cs.observedCount--

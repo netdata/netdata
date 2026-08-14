@@ -1,7 +1,10 @@
 queries:
   - uses: security-extended
 
+# Note: for C/C++, paths-ignore only applies when analyzing without building.
+# This workflow builds the code, so these entries do not filter the analysis.
+# Results under build/ are dropped from the SARIF in .github/workflows/codeql.yml
+# instead.
 paths-ignore:
-  - build/**
   - externaldeps/**
   - "**/vendored/**"

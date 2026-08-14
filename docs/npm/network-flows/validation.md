@@ -44,7 +44,7 @@ The SNMP-derived bandwidth: from your SNMP monitoring (Netdata's `snmp.d`, your 
 
 **Not acceptable: more than 30% gap.** That indicates one of:
 
-- UDP drops at the kernel. Check the alert mentioned above, or run `sudo ss -uamn sport = :2055` / `sudo ss -uamn sport = :6343` and inspect the `d<N>` value inside the `skmem:(...)` line (the `sock_drop` counter increments on every dropped datagram). The `-n` flag keeps the port numeric in the output.
+- UDP drops at the kernel. On Linux, check `kernel_dropped` in `netflow.input_packets`, or run `sudo ss -uamn sport = :2055` / `sudo ss -uamn sport = :6343` and inspect the `d<N>` value inside the `skmem:(...)` line (the `sock_drop` counter increments on every dropped datagram). The `-n` flag keeps the port numeric in the output.
 - Sampling rate not honoured (the exporter is sampling but not communicating the rate). See "Sampling rate verification" below.
 - Wrong interfaces being exported.
 
@@ -105,8 +105,11 @@ These are charts the plugin already exposes. Tune the alert thresholds to your e
 | Signal | Where | Suggested alert |
 |---|---|---|
 | `udp_received` rate dropped | `netflow.input_packets` | Sustained 0 during business hours indicates the listener is up but no exporter is sending. |
-| `parse_errors` rising | `netflow.input_packets` | Sustained > 5% of `udp_received` indicates the wire is producing malformed datagrams. |
-| `template_errors` rising | `netflow.input_packets` | Sustained > 1% of `udp_received` after the warm-up period indicates an exporter sends data records before templates. |
+| `kernel_dropped` rising | `netflow.input_packets` | Any sustained Linux listener-buffer loss means traffic never reached the decoder. |
+| `parse_errors` rising | `netflow.decoder_exceptions` | Compare with `udp_received`; sustained errors indicate malformed or unsupported datagrams. |
+| Missing-template Sets rising | `netflow.flow_sets` | Sustained `v9_missing_template` or `ipfix_missing_template` after warm-up means Data Sets arrive without an available template. |
+| Recognized packets intentionally ignored | `netflow.decoder_exceptions` | `disabled_protocol_packets` means valid traffic is excluded by protocol configuration. |
+| Decoded rows not reaching storage | `netflow.flow_rows` | `decoded` must equal `classifier_filtered + journaled + write_failed`; alert on any `write_failed`. |
 | Memory/state growing | `netflow.facet_values`, `netflow.tier_index_entries`, `netflow.open_tiers`; optional `netflow.memory_accounted_bytes` | Default count charts show state-cardinality growth. If byte diagnostics are enabled and `unaccounted` climbs linearly without ingest growth, suspect unattributed allocation. |
 | `decoder_scopes` unbounded growth | `netflow.decoder_scopes` | An exporter is rotating template IDs; investigate per-router behaviour. |
 | Disk write errors | `netflow.raw_journal_ops` `write_errors` | Any non-zero indicates filesystem trouble. |

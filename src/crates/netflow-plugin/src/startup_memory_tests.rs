@@ -187,12 +187,6 @@ async fn profile_live_startup_memory() -> anyhow::Result<StartupMemoryReport> {
         snapshot: current_process_memory()?,
     });
 
-    query_service.initialize_facets().await?;
-    phases.push(StartupMemoryPhase {
-        name: "initialize_facets",
-        snapshot: current_process_memory()?,
-    });
-
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(std::sync::RwLock::new(tiering::OpenTierState::default()));
     let tier_flow_indexes = Arc::new(std::sync::RwLock::new(
@@ -207,6 +201,12 @@ async fn profile_live_startup_memory() -> anyhow::Result<StartupMemoryReport> {
     )?;
     phases.push(StartupMemoryPhase {
         name: "ingest_service_new",
+        snapshot: current_process_memory()?,
+    });
+
+    query_service.initialize_facets_before_ingest().await?;
+    phases.push(StartupMemoryPhase {
+        name: "initialize_facets",
         snapshot: current_process_memory()?,
     });
 

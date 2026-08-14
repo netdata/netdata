@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(crate) fn rank_aggregates(
     aggregates: HashMap<GroupKey, AggregatedFlow>,
     overflow: Option<AggregatedFlow>,
@@ -7,7 +8,36 @@ pub(crate) fn rank_aggregates(
     limit: usize,
 ) -> RankedAggregates {
     let grouped_total = aggregates.len();
-    let mut grouped: Vec<AggregatedFlow> = aggregates.into_values().collect();
+    let grouped = aggregates.into_values().collect();
+    rank_aggregate_rows(grouped, overflow, sort_by, limit, grouped_total)
+}
+
+pub(crate) fn rank_aggregates_with_retained_keys(
+    aggregates: HashMap<GroupKey, AggregatedFlow>,
+    overflow: Option<AggregatedFlow>,
+    sort_by: SortBy,
+    limit: usize,
+) -> (RankedAggregates, HashSet<GroupKey>) {
+    let grouped_total = aggregates.len();
+    let mut grouped = Vec::with_capacity(grouped_total);
+    let mut retained_group_keys = HashSet::with_capacity(grouped_total);
+    for (key, row) in aggregates {
+        retained_group_keys.insert(key);
+        grouped.push(row);
+    }
+    (
+        rank_aggregate_rows(grouped, overflow, sort_by, limit, grouped_total),
+        retained_group_keys,
+    )
+}
+
+fn rank_aggregate_rows(
+    mut grouped: Vec<AggregatedFlow>,
+    overflow: Option<AggregatedFlow>,
+    sort_by: SortBy,
+    limit: usize,
+    grouped_total: usize,
+) -> RankedAggregates {
     if let Some(overflow_row) = overflow {
         grouped.push(overflow_row);
     }
@@ -128,6 +158,35 @@ pub(crate) fn rank_projected_compact_aggregates(
         truncated,
         other_count,
     })
+}
+
+pub(crate) fn rank_compact_top_aggregates(
+    aggregates: Vec<CompactAggregatedFlow>,
+    overflow: Option<CompactAggregatedFlow>,
+    sort_by: SortBy,
+    limit: usize,
+) -> RankedCompactAggregates {
+    let mut rows = aggregates;
+    if let Some(overflow_row) = overflow {
+        rows.push(overflow_row);
+    }
+    rows.sort_by(|a, b| compare_compact_aggregated(a, b, sort_by));
+
+    let limit = sanitize_explicit_limit(limit);
+    let truncated = rows.len() > limit;
+    let other_count = if truncated {
+        let rest = rows.split_off(limit);
+        rest.len()
+    } else {
+        0
+    };
+
+    RankedCompactAggregates {
+        rows,
+        other: None,
+        truncated,
+        other_count,
+    }
 }
 
 #[cfg(test)]

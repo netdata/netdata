@@ -44,7 +44,7 @@ and the rest -- without maintaining the prefix list yourself.
 
 For the full network-identity concept (merge order, jq output shape, TLS
 verification, failure modes), see
-[Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Network Identity](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 Periodic HTTPS GET against the Service Tags JSON, jq transform via the

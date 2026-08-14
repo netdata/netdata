@@ -174,11 +174,13 @@ The following alerts are available:
 | [ whoisquery_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/whoisquery.conf) | whoisquery.time_until_expiration | time until the domain name registration expires |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -194,9 +196,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| whoisquery.time_until_expiration | expiry | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| whoisquery.time_until_expiration | Time Until Domain Expiration | expiry | seconds |
 
 
 

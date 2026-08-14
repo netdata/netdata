@@ -10,8 +10,20 @@ from unittest.mock import patch
 INTEGRATIONS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INTEGRATIONS_DIR))
 
+import _common
 import check_collector_taxonomy
 import gen_taxonomy
+
+
+class TaxonomySourceTest(unittest.TestCase):
+    def test_flow_metadata_is_loaded_once_and_available_to_taxonomy(self):
+        collector_paths = {path for _, path, _ in _common.COLLECTOR_SOURCES}
+        flow_paths = {path for _, path, _ in _common.FLOWS_SOURCES}
+        taxonomy_paths = {path for _, path, _ in _common.TAXONOMY_SOURCES}
+
+        self.assertTrue(flow_paths)
+        self.assertTrue(flow_paths.isdisjoint(collector_paths))
+        self.assertTrue(flow_paths.issubset(taxonomy_paths))
 
 
 class TaxonomySchemaTest(unittest.TestCase):
@@ -319,7 +331,7 @@ class TaxonomyResolverTest(unittest.TestCase):
     def test_metadata_loader_warnings_are_taxonomy_findings(self):
         original_len = len(gen_taxonomy.WARNINGS)
 
-        def fake_load_collectors():
+        def fake_load_collectors(*_args):
             gen_taxonomy.WARNINGS.append(('metadata.yaml', 'invalid metadata'))
             return []
 
@@ -685,7 +697,7 @@ modules:
         with patch.object(check_collector_taxonomy, 'run_git', return_value=diff), \
                 patch.object(
                     check_collector_taxonomy,
-                    'get_collector_metadata_entries',
+                    'get_metadata_entries',
                     return_value=[('netdata/netdata', collector_metadata)],
                 ), \
                 patch.object(

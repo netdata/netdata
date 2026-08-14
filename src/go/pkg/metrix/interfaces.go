@@ -58,7 +58,9 @@ type Reader interface {
 	StateSet(name string, labels Labels) (StateSetPoint, bool)
 	MeasureSet(name string, labels Labels) (MeasureSetPoint, bool)
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
-	// MetricMeta resolves metadata by metric name in the active reader view.
+	// MetricMeta resolves metadata by metric name in the active reader view and
+	// host scope. A freshness-filtered reader may fall back to stale metadata in
+	// that same scope, never to metadata from another scope.
 	// With Read(ReadFlatten()), lookups use flattened scalar series names.
 	// Example: histogram families resolve via *_bucket/*_count/*_sum names.
 	MetricMeta(name string) (MetricMeta, bool)
@@ -92,6 +94,14 @@ type Reader interface {
 // Callers must not mutate returned label slices.
 type SeriesIdentityRawIterator interface {
 	ForEachSeriesIdentityRaw(fn func(identity SeriesIdentity, meta SeriesMeta, name string, labels []Label, v SampleValue))
+}
+
+// FreshVisibleHostScopesReader is an optional CollectorStore reader capability
+// that returns the host scopes containing at least one series visible under
+// freshness-filtered Read() semantics. The result is deterministic and is not
+// affected by ReadRaw(). Returned scope metadata is defensively cloned.
+type FreshVisibleHostScopesReader interface {
+	FreshVisibleHostScopes() []HostScope
 }
 
 // Writer is the declaration/write entrypoint for collection stores.

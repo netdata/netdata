@@ -24,10 +24,13 @@ func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("chartengine: nil template spec")
 	}
-	if err := spec.Validate(); err != nil {
+	if _, err := charttpl.Validate(spec); err != nil {
 		return nil, fmt.Errorf("chartengine: invalid template spec: %w", err)
 	}
+	return compileValidated(spec, revision)
+}
 
+func compileValidated(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	c := compiler{
 		metricsSet: make(map[string]struct{}),
 	}
@@ -94,9 +97,8 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 	selectorKeySet := make(map[string]struct{})
 	dynamicDimensionKeys := make(map[string]struct{})
 
-	metricKinds := make(map[string]bool)
 	for i := range chart.Dimensions {
-		compiledDim, err := compileDimension(chart.Dimensions[i], scope.metrics)
+		compiledDim, err := compileDimension(chart.Dimensions[i], chart.Aggregation, scope.metrics)
 		if err != nil {
 			return program.Chart{}, fmt.Errorf("dimension[%d]: %w", i, err)
 		}
@@ -108,12 +110,9 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		for _, key := range compiledDim.dynamicLabelKeys {
 			dynamicDimensionKeys[key] = struct{}{}
 		}
-		for _, kind := range compiledDim.metricKinds {
-			metricKinds[kind] = true
-		}
 	}
 
-	algorithm, err := resolveAlgorithm(chart.Algorithm, metricKinds)
+	algorithm, err := compileAlgorithm(chart.Algorithm)
 	if err != nil {
 		return program.Chart{}, err
 	}
@@ -137,22 +136,23 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		return program.Chart{}, fmt.Errorf("id: %w", err)
 	}
 
-	instanceByLabels, err := compileInstanceByLabels(chart.Instances)
+	instanceLabels, err := compileInstanceLabels(chart.Instances)
 	if err != nil {
-		return program.Chart{}, fmt.Errorf("instances.by_labels: %w", err)
+		return program.Chart{}, fmt.Errorf("instances: %w", err)
 	}
 
 	labelMode := program.PromotionModeAutoIntersection
 	promote := normalizeUnique(chart.LabelPromoted)
-	if len(promote) > 0 {
+	if chart.LabelPromoted != nil {
 		labelMode = program.PromotionModeExplicitIntersection
 	}
 
 	identity := program.ChartIdentity{
 		IDTemplate:       idTemplate,
-		InstanceByLabels: instanceByLabels,
+		InstanceByLabels: instanceLabels.required,
+		OptionalByLabels: instanceLabels.optional,
 		ContextNamespace: append([]string(nil), scope.contextParts...),
-		Static:           len(instanceByLabels) == 0,
+		Static:           len(instanceLabels.required) == 0 && len(instanceLabels.optional) == 0,
 	}
 	metaFamily := composeFamily(scope.familyParts, chart.Family)
 
@@ -177,9 +177,8 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 			},
 			Precedence: program.DefaultLabelPrecedence(),
 		},
-		Lifecycle:       compileLifecycle(chart.Lifecycle),
-		Dimensions:      dimensions,
-		CollisionReduce: program.ReduceSum,
+		Lifecycle:  compileLifecycle(chart.Lifecycle),
+		Dimensions: dimensions,
 	}
 
 	return out, nil
@@ -189,10 +188,13 @@ type compiledDimension struct {
 	dimension        program.Dimension
 	selectorKeys     []string
 	dynamicLabelKeys []string
-	metricKinds      []string
 }
 
-func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}) (compiledDimension, error) {
+func compileDimension(
+	dim charttpl.Dimension,
+	chartAggregation charttpl.Aggregation,
+	visibleMetrics map[string]struct{},
+) (compiledDimension, error) {
 	compiledSel, err := metrixselector.ParseCompiled(dim.Selector)
 	if err != nil {
 		return compiledDimension{}, fmt.Errorf("selector: %w", err)
@@ -229,8 +231,11 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 		dynamicLabelKeys = append(dynamicLabelKeys, nameFromLabel)
 	}
 
-	metricKinds := metricKindsFromNames(meta.MetricNames)
 	options := compileDimensionOptions(dim.Options)
+	aggregation, err := compileAggregation(chartAggregation)
+	if err != nil {
+		return compiledDimension{}, err
+	}
 
 	return compiledDimension{
 		dimension: program.Dimension{
@@ -243,6 +248,7 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 			NameTemplate:            nameTemplate,
 			NameFromLabel:           nameFromLabel,
 			InferNameFromSeriesMeta: inferFromSeriesMeta,
+			Aggregation:             aggregation,
 			Hidden:                  options.hidden,
 			Multiplier:              options.multiplier,
 			Divisor:                 options.divisor,
@@ -251,14 +257,28 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 		},
 		selectorKeys:     append([]string(nil), meta.ConstrainedLabelKeys...),
 		dynamicLabelKeys: normalizeUnique(dynamicLabelKeys),
-		metricKinds:      metricKinds,
 	}, nil
 }
 
+func compileAggregation(raw charttpl.Aggregation) (program.Aggregation, error) {
+	switch raw {
+	case "", charttpl.AggregationSum:
+		return program.AggregationSum, nil
+	case charttpl.AggregationMin:
+		return program.AggregationMin, nil
+	case charttpl.AggregationMax:
+		return program.AggregationMax, nil
+	case charttpl.AggregationAvg:
+		return program.AggregationAvg, nil
+	default:
+		return 0, fmt.Errorf("aggregation: unsupported value %q", raw)
+	}
+}
+
 type compiledDimensionOptions struct {
-	hidden     bool
 	multiplier int
 	divisor    int
+	hidden     bool
 	float      bool
 }
 
@@ -281,30 +301,18 @@ func compileDimensionOptions(in *charttpl.DimensionOptions) compiledDimensionOpt
 	return out
 }
 
-func resolveAlgorithm(raw string, metricKinds map[string]bool) (program.Algorithm, error) {
+func compileAlgorithm(raw string) (program.Algorithm, error) {
 	normalized := strings.TrimSpace(raw)
-	if normalized != "" {
-		switch normalized {
-		case string(program.AlgorithmAbsolute):
-			return program.AlgorithmAbsolute, nil
-		case string(program.AlgorithmIncremental):
-			return program.AlgorithmIncremental, nil
-		default:
-			return "", fmt.Errorf("invalid algorithm %q", raw)
-		}
-	}
-
-	// Inference baseline:
-	// - counter-like selectors => incremental
-	// - gauge-like selectors => absolute
-	// - mixed inferred kinds must be explicit.
-	if metricKinds["counter_like"] && metricKinds["gauge_like"] {
-		return "", fmt.Errorf("algorithm inference is ambiguous for mixed metric kinds; set algorithm explicitly")
-	}
-	if metricKinds["counter_like"] {
+	switch normalized {
+	case "":
+		return program.AlgorithmAuto, nil
+	case string(program.AlgorithmAbsolute):
+		return program.AlgorithmAbsolute, nil
+	case string(program.AlgorithmIncremental):
 		return program.AlgorithmIncremental, nil
+	default:
+		return program.AlgorithmAuto, fmt.Errorf("invalid algorithm %q", raw)
 	}
-	return program.AlgorithmAbsolute, nil
 }
 
 func resolveChartType(raw string) (program.ChartType, error) {
@@ -342,46 +350,40 @@ func compileLifecycle(in *charttpl.Lifecycle) program.LifecyclePolicy {
 	return out
 }
 
-func compileInstanceByLabels(instances *charttpl.Instances) ([]program.InstanceLabelSelector, error) {
+type compiledInstanceLabels struct {
+	required []program.InstanceLabelSelector
+	optional []string
+}
+
+func compileInstanceLabels(instances *charttpl.Instances) (compiledInstanceLabels, error) {
 	if instances == nil {
-		return nil, nil
+		return compiledInstanceLabels{}, nil
 	}
-	out := make([]program.InstanceLabelSelector, 0, len(instances.ByLabels))
+
+	out := compiledInstanceLabels{
+		required: make([]program.InstanceLabelSelector, 0, len(instances.ByLabels)),
+		optional: make([]string, 0, len(instances.OptionalByLabels)),
+	}
 	for _, token := range instances.ByLabels {
 		t := strings.TrimSpace(token)
 		switch {
 		case t == "*":
-			out = append(out, program.InstanceLabelSelector{IncludeAll: true})
+			out.required = append(out.required, program.InstanceLabelSelector{IncludeAll: true})
 		case strings.HasPrefix(t, "!"):
 			key := strings.TrimSpace(strings.TrimPrefix(t, "!"))
 			if key == "" {
-				return nil, fmt.Errorf("exclude token must include label key")
+				return compiledInstanceLabels{}, fmt.Errorf("by_labels: exclude token must include label key")
 			}
-			out = append(out, program.InstanceLabelSelector{Exclude: true, Key: key})
+			out.required = append(out.required, program.InstanceLabelSelector{Exclude: true, Key: key})
 		default:
-			out = append(out, program.InstanceLabelSelector{Key: t})
+			out.required = append(out.required, program.InstanceLabelSelector{Key: t})
 		}
+	}
+
+	for _, raw := range instances.OptionalByLabels {
+		out.optional = append(out.optional, strings.TrimSpace(raw))
 	}
 	return out, nil
-}
-
-func metricKindsFromNames(names []string) []string {
-	seen := make(map[string]struct{})
-	for _, name := range names {
-		switch {
-		case strings.HasSuffix(name, "_total"):
-			seen["counter_like"] = struct{}{}
-		case strings.HasSuffix(name, "_count"):
-			seen["counter_like"] = struct{}{}
-		case strings.HasSuffix(name, "_sum"):
-			seen["counter_like"] = struct{}{}
-		case strings.HasSuffix(name, "_bucket"):
-			seen["counter_like"] = struct{}{}
-		default:
-			seen["gauge_like"] = struct{}{}
-		}
-	}
-	return mapKeysSorted(seen)
 }
 
 func supportsRuntimeInferredDimension(meta metrixselector.Meta) bool {
@@ -428,6 +430,21 @@ func composeFamily(parts []string, leaf string) string {
 
 func buildTemplateID(groupPath []int, chartIndex int) string {
 	return fmt.Sprintf("g%s.c%d", pathIndexes(groupPath), chartIndex)
+}
+
+// ChartTemplateIDAt returns the compiler-assigned template ID for a decoded
+// spec chart position. It lets diagnostic consumers correlate route facts with
+// the source spec without reproducing compiler identity formatting.
+func ChartTemplateIDAt(groupPath []int, chartIndex int) (string, bool) {
+	if len(groupPath) == 0 || chartIndex < 0 {
+		return "", false
+	}
+	for _, index := range groupPath {
+		if index < 0 {
+			return "", false
+		}
+	}
+	return buildTemplateID(groupPath, chartIndex), true
 }
 
 func pathIndexes(path []int) string {

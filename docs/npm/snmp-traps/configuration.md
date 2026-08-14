@@ -441,47 +441,22 @@ Profile metrics are disabled by default. Enable them only after you know which t
 ```yaml
 profile_metrics:
   enabled: true
-  mode: exact
   include:
     - cisco.config.changed  # example only: replace with a loaded operator-profile rule
-  identity:
-    device: source
-    unresolved_source: source_label
-    source_id_privacy: hash
-  limits:
-    max_rules: 500
-    max_sources: 2000
-    max_resources_per_source: 512
-    max_instances_per_job: 50000
-    overflow: drop_and_count
 ```
 
 | Key | Default | Notes |
 |---|---|---|
 | `enabled` | `false` | When `true`, evaluates selected profile metric rules for successfully committed traps. |
-| `mode` | `none` | `none`, `auto`, `exact`, or `combined`. `none` disables rule evaluation even if `enabled` is `true`. |
-| `include` | `[]` | Rule names to enable with `exact` or `combined`. Setting `include` with `none` or `auto` causes job validation failure when `enabled` is `true`; when `enabled` is `false`, `profile_metrics` is disabled and `include` is ignored. |
-| `identity.device` | `source` | `source`, `source_label`, or `listener`. |
-| `identity.unresolved_source` | `source_label` | `source_label` or `drop_metric_instance`. |
-| `identity.source_id_privacy` | `hash` | `hash` emits a stable local hash. `raw` emits the selected source value and can expose source IPs or labels in metric labels. |
-| `limits.max_rules` | `500` | Maximum enabled metric rules evaluated by this job. |
-| `limits.max_sources` | `2000` | Maximum non-listener source identities tracked by this job. |
-| `limits.max_resources_per_source` | `512` | Default resource cap per source and resource class. |
-| `limits.max_instances_per_job` | `50000` | Maximum profile-derived metric instances for this job. |
-| `limits.overflow` | `drop_and_count` | Only `drop_and_count` is supported. Over-cap metric instances are skipped, accepted traps are still committed, and diagnostics increment. |
-
-Selection modes:
-
-- `none`: no profile metric rules are evaluated.
-- `auto`: enables rules marked `auto_safe: true`.
-- `exact`: enables only rule names listed in `include`.
-- `combined`: enables `auto_safe: true` rules plus rule names listed in `include`.
+| `include` | `[]` | Explicit rule names to enable. At least one rule is required when `enabled` is `true`. |
 
 If an `include` name does not match a loaded rule, the listener job fails validation with `profile_metrics.include rule "<name>" not found` and does not start. If the rule exists but is disabled in the profile, validation fails with `profile_metrics.include rule "<name>" is disabled by profile`.
 
+Device-attributable metrics use vnode host scope when enrichment finds an unambiguous vnode. Otherwise they use a bounded, hashed source label under the listener job. Fixed safety policies cap selected rules at 500, sources at 2,000, resources at 512 per source and resource class by default, and profile-derived instances at 50,000 per job. Over-cap metric instances are skipped and counted; accepted traps are still committed.
+
 Only committed traps update profile metrics. For the exact update rule and the diagnostics chart, see [Metrics](/docs/npm/snmp-traps/metrics.md#profile-defined-metrics).
 
-Do not enable `auto` blindly on unreviewed custom rules. Profile metrics create time-series, so rule identity and labels must be bounded. For rule syntax and cardinality rules, see [SNMP Trap Profile Format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
+Profile metrics create time-series, so select only reviewed rules with bounded identity and labels. For rule syntax and cardinality rules, see [SNMP Trap Profile Format](/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md).
 
 ## Common configurations
 
@@ -562,7 +537,7 @@ For a relayed setup, set both `allowlist.source_cidrs` and `source.trusted_relay
 - **SNMPv3 authentication fails.** Check username, engine ID, auth protocol, privacy protocol, and resolved secret values. Do not paste real keys into the config while debugging.
 - **Rate limiting hides events you expected to see.** Temporarily use `mode: sample` or disable the limiter while validating sender volume.
 - **Dedup hides repeated traps.** Disable dedup during validation, or add bounded `key_varbinds` when one OID represents multiple distinct resources.
-- **Profile metrics create too many series.** Use `mode: exact`, review the selected rules, keep `source_id_privacy: hash`, and lower the `limits` values if needed.
+- **Profile metrics create too many series.** Review the explicitly selected rules and remove rules with unnecessarily broad resource identity. Fixed runtime caps skip and count excess instances.
 
 ## What's next
 

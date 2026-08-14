@@ -108,11 +108,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,12 +126,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv6.icmp | received, sent | messages/s |
-| ipv6.icmpredir | received, sent | redirects/s |
-| ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
-| ipv6.icmpechos | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
-| ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv6.icmp | IPv6 ICMP Messages | received, sent | messages/s |
+| ipv6.icmpredir | IPv6 ICMP Redirects | received, sent | redirects/s |
+| ipv6.icmperrors | IPv6 ICMP Errors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
+| ipv6.icmpechos | IPv6 ICMP Echo | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
+| ipv6.icmprouter | IPv6 Router Messages | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmpneighbor | IPv6 Neighbor Messages | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmptypes | IPv6 ICMP Types | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |

@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -91,8 +93,8 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netfilter.synproxy_syn_received | received | packets/s |
-| netfilter.synproxy_conn_reopened | reopened | connections/s |
-| netfilter.synproxy_cookies | valid, invalid, retransmits | cookies/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netfilter.synproxy_syn_received | SYNPROXY SYN Packets received | received | packets/s |
+| netfilter.synproxy_conn_reopened | SYNPROXY Connections Reopened | reopened | connections/s |
+| netfilter.synproxy_cookies | SYNPROXY TCP Cookies | valid, invalid, retransmits | cookies/s |

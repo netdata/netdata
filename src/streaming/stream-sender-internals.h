@@ -10,6 +10,46 @@
 #include "stream-parents.h"
 #include "stream-circular-buffer.h"
 
+static inline bool stream_sender_parse_replay_endpoint(const char *value, time_t *endpoint) {
+    if(!value || !endpoint || value[0] < '0' || value[0] > '9')
+        return false;
+
+    char *endptr;
+    int saved_errno = errno;
+    errno = 0;
+    uintmax_t parsed = strtoumax(value, &endptr, 10);
+    int conversion_errno = errno;
+    errno = saved_errno;
+
+    uintmax_t maximum = (uintmax_t)nd_time_t_max();
+    if(maximum > (uintmax_t)ULONG_MAX)
+        maximum = (uintmax_t)ULONG_MAX;
+    if(maximum > (uintmax_t)SIZE_MAX)
+        maximum = (uintmax_t)SIZE_MAX;
+
+    if(conversion_errno != 0 || *endptr != '\0' || parsed > maximum)
+        return false;
+
+    *endpoint = (time_t)parsed;
+    return true;
+}
+
+static inline bool stream_sender_parse_replay_endpoints(
+    const char *after, const char *before, time_t *parsed_after, time_t *parsed_before)
+{
+    if(!parsed_after || !parsed_before)
+        return false;
+
+    time_t validated_after;
+    time_t validated_before;
+    bool valid = stream_sender_parse_replay_endpoint(after, &validated_after) &&
+                 stream_sender_parse_replay_endpoint(before, &validated_before);
+
+    *parsed_after = valid ? validated_after : 0;
+    *parsed_before = valid ? validated_before : 0;
+    return valid;
+}
+
 // connector thread
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTING                          0
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTED                           1

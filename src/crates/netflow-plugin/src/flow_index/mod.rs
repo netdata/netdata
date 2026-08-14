@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::hash::Hasher;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use crate::memory_estimation::hash_table_allocation_bytes;
 use hashbrown::HashTable;
 use std::mem::size_of;
 use storage::{FlowStorage, implicit_default_field_value};
@@ -266,6 +267,7 @@ where
 {
     schema: FlowSchema,
     field_stores: Box<[FieldStore]>,
+    implicit_default_field_ids: Option<Box<[FieldId]>>,
     flow_lookup: HashTable<u32>,
     flow_storage: FlowStorage,
     hasher: H,
@@ -330,7 +332,7 @@ where
             .map(|field| FieldStore::new(field.kind()))
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        let flow_storage = if implicit_defaults {
+        let (flow_storage, implicit_default_field_ids) = if implicit_defaults {
             let default_field_ids = schema
                 .fields()
                 .iter()
@@ -341,14 +343,21 @@ where
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_boxed_slice();
-            FlowStorage::sparse_with_implicit_defaults(schema.len(), default_field_ids)?
+            (
+                FlowStorage::sparse_with_implicit_defaults(
+                    schema.len(),
+                    default_field_ids.clone(),
+                )?,
+                Some(default_field_ids),
+            )
         } else {
-            FlowStorage::dense(schema.len())
+            (FlowStorage::dense(schema.len()), None)
         };
 
         Ok(Self {
             schema,
             field_stores,
+            implicit_default_field_ids,
             flow_lookup: HashTable::new(),
             flow_storage,
             hasher,
@@ -393,6 +402,12 @@ where
             });
         }
 
+        if let Some(default_field_ids) = &self.implicit_default_field_ids
+            && value == implicit_default_field_value(field.kind())
+        {
+            return Ok(default_field_ids[field_index]);
+        }
+
         self.field_stores[field_index].get_or_insert(value, &self.hasher)
     }
 
@@ -411,6 +426,12 @@ where
                 expected: field.kind(),
                 actual: value.kind(),
             });
+        }
+
+        if let Some(default_field_ids) = &self.implicit_default_field_ids
+            && value == implicit_default_field_value(field.kind())
+        {
+            return Ok(Some(default_field_ids[field_index]));
         }
 
         Ok(self.field_stores[field_index].find(value, &self.hasher))
@@ -561,7 +582,7 @@ where
             });
         }
 
-        Ok(self.hasher.hash_u32_slice(field_ids))
+        Ok(self.flow_storage.hash_field_ids(field_ids, &self.hasher))
     }
 
     pub fn flow_field_id(&self, flow_id: FlowId, field_index: usize) -> Option<FieldId> {
@@ -590,10 +611,14 @@ where
                 .map(FieldStore::estimated_heap_bytes)
                 .sum::<usize>(),
             flow_lookup_bytes: hash_table_allocation_bytes(
-                self.flow_lookup.capacity(),
+                self.flow_lookup.num_buckets(),
                 size_of::<u32>(),
             ),
-            row_storage_bytes: self.flow_storage.estimated_heap_bytes(),
+            row_storage_bytes: self.flow_storage.estimated_heap_bytes().saturating_add(
+                self.implicit_default_field_ids
+                    .as_ref()
+                    .map_or(0, |field_ids| field_ids.len() * size_of::<FieldId>()),
+            ),
         }
     }
 }
@@ -777,7 +802,7 @@ impl TextFieldStore {
     }
 
     fn estimated_heap_bytes(&self) -> usize {
-        hash_table_allocation_bytes(self.lookup.capacity(), size_of::<u32>())
+        hash_table_allocation_bytes(self.lookup.num_buckets(), size_of::<u32>())
             + self.entries.capacity() * size_of::<TextEntry>()
             + self.arena.capacity()
     }
@@ -843,7 +868,7 @@ macro_rules! define_numeric_store {
             }
 
             fn estimated_heap_bytes(&self) -> usize {
-                hash_table_allocation_bytes(self.lookup.capacity(), size_of::<u32>())
+                hash_table_allocation_bytes(self.lookup.num_buckets(), size_of::<u32>())
                     + self.values.capacity() * size_of::<$ty>()
             }
         }
@@ -967,9 +992,9 @@ impl IpFieldStore {
     }
 
     fn estimated_heap_bytes(&self) -> usize {
-        hash_table_allocation_bytes(self.v4_lookup.capacity(), size_of::<u32>())
+        hash_table_allocation_bytes(self.v4_lookup.num_buckets(), size_of::<u32>())
             + self.v4_values.capacity() * size_of::<u32>()
-            + hash_table_allocation_bytes(self.v6_lookup.capacity(), size_of::<u32>())
+            + hash_table_allocation_bytes(self.v6_lookup.num_buckets(), size_of::<u32>())
             + self.v6_values.capacity() * size_of::<[u8; 16]>()
     }
 }
@@ -1057,13 +1082,11 @@ impl FieldStore {
     }
 }
 
-fn hash_table_allocation_bytes(capacity: usize, element_size: usize) -> usize {
-    capacity.saturating_mul(element_size.saturating_add(1))
-}
-
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
     use std::collections::BTreeSet;
+    use std::rc::Rc;
 
     use proptest::prelude::*;
 
@@ -1088,6 +1111,28 @@ mod tests {
 
         fn build_hasher(&self) -> Self::Hasher {
             ConstantHasher
+        }
+    }
+
+    #[derive(Clone)]
+    struct CountingHashStrategy(Rc<Cell<usize>>);
+
+    struct CountingHasher(Rc<Cell<usize>>);
+
+    impl Hasher for CountingHasher {
+        fn finish(&self) -> u64 {
+            self.0.set(self.0.get().saturating_add(1));
+            0
+        }
+
+        fn write(&mut self, _bytes: &[u8]) {}
+    }
+
+    impl HashStrategy for CountingHashStrategy {
+        type Hasher = CountingHasher;
+
+        fn build_hasher(&self) -> Self::Hasher {
+            CountingHasher(Rc::clone(&self.0))
         }
     }
 
@@ -1329,6 +1374,131 @@ mod tests {
                 ])
                 .expect("find sparse flow"),
             Some(flow_id)
+        );
+    }
+
+    #[test]
+    fn implicit_defaults_reuse_seeded_field_ids_without_hashing() {
+        let hash_calls = Rc::new(Cell::new(0));
+        let strategy = CountingHashStrategy(Rc::clone(&hash_calls));
+        let mut index = FlowIndex::with_hasher_and_implicit_defaults(
+            [
+                FieldSpec::new("FLOW_VERSION", FieldKind::Text),
+                FieldSpec::new("PROTOCOL", FieldKind::U8),
+            ],
+            strategy,
+        )
+        .expect("index");
+
+        hash_calls.set(0);
+        assert_eq!(
+            index
+                .get_or_insert_field_value(0, FieldValue::Text(""))
+                .expect("default text"),
+            0
+        );
+        assert_eq!(
+            index
+                .get_or_insert_field_value(1, FieldValue::U8(0))
+                .expect("default u8"),
+            0
+        );
+        assert_eq!(
+            index
+                .find_field_value(0, FieldValue::Text(""))
+                .expect("find default text"),
+            Some(0)
+        );
+        assert_eq!(hash_calls.get(), 0, "defaults must bypass field hashing");
+
+        let _ = index
+            .get_or_insert_field_value(0, FieldValue::Text("netflow-v5"))
+            .expect("non-default text");
+        assert!(
+            hash_calls.get() > 0,
+            "non-default values still use interning"
+        );
+    }
+
+    #[test]
+    fn implicit_default_field_ids_are_included_in_memory_breakdown() {
+        let index = FlowIndex::new_with_implicit_defaults([
+            FieldSpec::new("FLOW_VERSION", FieldKind::Text),
+            FieldSpec::new("PROTOCOL", FieldKind::U8),
+            FieldSpec::new("OUT_IF", FieldKind::U32),
+        ])
+        .expect("index");
+        let expected_retained_ids = 3 * size_of::<FieldId>();
+        let breakdown = index.estimated_memory_breakdown();
+
+        assert_eq!(
+            breakdown.row_storage_bytes,
+            index.flow_storage.estimated_heap_bytes() + expected_retained_ids
+        );
+    }
+
+    #[test]
+    fn sparse_flow_hash_matches_the_stored_row_hash() {
+        let mut index = FlowIndex::new_with_implicit_defaults([
+            FieldSpec::new("FLOW_VERSION", FieldKind::Text),
+            FieldSpec::new("PROTOCOL", FieldKind::U8),
+            FieldSpec::new("OUT_IF", FieldKind::U32),
+        ])
+        .expect("index");
+
+        let field_ids = [
+            index
+                .get_or_insert_field_value(0, FieldValue::Text("v5"))
+                .expect("flow version"),
+            index
+                .get_or_insert_field_value(1, FieldValue::U8(0))
+                .expect("default protocol"),
+            index
+                .get_or_insert_field_value(2, FieldValue::U32(17))
+                .expect("out interface"),
+        ];
+        let expected_hash = index.hash_field_ids(&field_ids).expect("hash");
+        let flow_id = index
+            .insert_flow_by_field_ids(&field_ids)
+            .expect("insert sparse flow");
+
+        assert_eq!(
+            index.flow_storage.row_hash(flow_id, &index.hasher),
+            Some(expected_hash)
+        );
+    }
+
+    #[test]
+    fn sparse_flows_remain_distinct_under_total_hash_collision() {
+        let mut index = FlowIndex::with_hasher_and_implicit_defaults(
+            [
+                FieldSpec::new("FLOW_VERSION", FieldKind::Text),
+                FieldSpec::new("PROTOCOL", FieldKind::U8),
+            ],
+            ConstantHashStrategy,
+        )
+        .expect("index");
+
+        let defaults = [FieldValue::Text(""), FieldValue::U8(0)];
+        let version = [FieldValue::Text("v5"), FieldValue::U8(0)];
+        let protocol = [FieldValue::Text(""), FieldValue::U8(6)];
+
+        let default_flow = index.get_or_insert_flow(&defaults).expect("default flow");
+        let version_flow = index.get_or_insert_flow(&version).expect("version flow");
+        let protocol_flow = index.get_or_insert_flow(&protocol).expect("protocol flow");
+
+        assert_eq!(index.flow_count(), 3);
+        assert_eq!(
+            index.find_flow(&defaults).expect("find defaults"),
+            Some(default_flow)
+        );
+        assert_eq!(
+            index.find_flow(&version).expect("find version"),
+            Some(version_flow)
+        );
+        assert_eq!(
+            index.find_flow(&protocol).expect("find protocol"),
+            Some(protocol_flow)
         );
     }
 

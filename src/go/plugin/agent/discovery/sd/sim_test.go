@@ -7,14 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
@@ -32,23 +33,30 @@ type discoverySim struct {
 
 // discoverySimExt is an extended simulation that also checks exposed configs
 type discoverySimExt struct {
-	configs          []confFile
-	wantPipelines    []*mockPipeline
-	wantExposedCount int
-	wantExposed      []wantExposedCfg
+	configs            []confFile
+	wantPipelines      []*mockPipeline
+	wantExposed        []wantExposedCfg
+	wantOutputContains string
 }
 
 type wantExposedCfg struct {
 	discovererType string
 	name           string
+	source         string
 	sourceType     string
 	status         dyncfg.Status
+}
+
+func exposedCacheCount(cache *dyncfg.ExposedCache[sdConfig]) int {
+	return reflect.ValueOf(cache).Elem().FieldByName("items").Len()
 }
 
 func (sim *discoverySimExt) run(t *testing.T) {
 	fact := &mockFactory{}
 	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
+		epoch:      1,
+		attempts:   newTestAttemptAuthority(t),
 		Logger:     logger.New(),
 		pluginName: testPluginName,
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
@@ -58,22 +66,22 @@ func (sim *discoverySimExt) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		dyncfgApi:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		dyncfgApi:   dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
 		seen:        dyncfg.NewSeenCache[sdConfig](),
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
 		discoverers: testDiscovererRegistry(),
-		// dyncfgCh is intentionally nil to trigger auto-enable in tests
+		runModePolicy: policy.RunModePolicy{
+			AutoEnableDiscovered: true,
+		},
 	}
 	mgr.sdCb = &sdCallbacks{sd: mgr}
 	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    mgr.Logger,
 		API:       mgr.dyncfgApi,
 		Seen:      mgr.seen,
 		Exposed:   mgr.exposed,
 		Callbacks: mgr.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
@@ -110,14 +118,22 @@ func (sim *discoverySimExt) run(t *testing.T) {
 
 	// Check exposed configs after SD goroutine has stopped (no race on entry.Status).
 	// Caches survive shutdown — StopAll only stops pipelines, doesn't clear caches.
-	assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
+	if sim.wantExposed != nil {
+		assert.Equal(t, len(sim.wantExposed), exposedCacheCount(mgr.exposed), "exposed configs count")
+	}
 	for _, want := range sim.wantExposed {
 		entry, ok := mgr.exposed.LookupByKey(want.discovererType + ":" + want.name)
 		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
 			continue
 		}
 		assert.Equal(t, want.sourceType, entry.Cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
+		if want.source != "" {
+			assert.Equal(t, want.source, entry.Cfg.Source(), "exposed config '%s:%s' source", want.discovererType, want.name)
+		}
 		assert.Equal(t, want.status, entry.Status, "exposed config '%s:%s' status", want.discovererType, want.name)
+	}
+	if sim.wantOutputContains != "" {
+		assert.Contains(t, buf.String(), sim.wantOutputContains)
 	}
 }
 
@@ -125,6 +141,8 @@ func (sim *discoverySim) run(t *testing.T) {
 	fact := &mockFactory{}
 	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
+		epoch:      1,
+		attempts:   newTestAttemptAuthority(t),
 		Logger:     logger.New(),
 		pluginName: testPluginName,
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
@@ -134,23 +152,22 @@ func (sim *discoverySim) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		dyncfgApi:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		dyncfgApi:   dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
 		seen:        dyncfg.NewSeenCache[sdConfig](),
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
 		discoverers: testDiscovererRegistry(),
-		// dyncfgCh is intentionally nil to trigger auto-enable in tests
-		// (simulates terminal mode where netdata is not available)
+		runModePolicy: policy.RunModePolicy{
+			AutoEnableDiscovered: true,
+		},
 	}
 	mgr.sdCb = &sdCallbacks{sd: mgr}
 	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    mgr.Logger,
 		API:       mgr.dyncfgApi,
 		Seen:      mgr.seen,
 		Exposed:   mgr.exposed,
 		Callbacks: mgr.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
@@ -232,6 +249,10 @@ type mockPipeline struct {
 	name    string
 	started bool
 	stopped bool
+}
+
+func (m *mockPipeline) Test(context.Context) (bool, error) {
+	return false, nil
 }
 
 func (m *mockPipeline) Run(ctx context.Context, _ chan<- []*confgroup.Group) {

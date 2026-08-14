@@ -218,11 +218,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -234,16 +236,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tengine.bandwidth_total | in, out | B/s |
-| tengine.connections_total | accepted | connections/s |
-| tengine.requests_total | processed | requests/s |
-| tengine.requests_per_response_code_family_total | 2xx, 3xx, 4xx, 5xx, other | requests/s |
-| tengine.requests_per_response_code_detailed_total | 200, 206, 302, 304, 403, 404, 419, 499, 500, 502, 503, 504, 508, other | requests/s |
-| tengine.requests_upstream_total | requests | requests/s |
-| tengine.tries_upstream_total | calls | calls/s |
-| tengine.requests_upstream_per_response_code_family_total | 4xx, 5xx | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| tengine.bandwidth_total | Bandwidth | in, out | B/s |
+| tengine.connections_total | Connections | accepted | connections/s |
+| tengine.requests_total | Requests | processed | requests/s |
+| tengine.requests_per_response_code_family_total | Requests Per Response Code Family | 2xx, 3xx, 4xx, 5xx, other | requests/s |
+| tengine.requests_per_response_code_detailed_total | Requests Per Response Code Detailed | 200, 206, 302, 304, 403, 404, 419, 499, 500, 502, 503, 504, 508, other | requests/s |
+| tengine.requests_upstream_total | Number Of Requests Calling For Upstream | requests | requests/s |
+| tengine.tries_upstream_total | Number Of Times Calling For Upstream | calls | calls/s |
+| tengine.requests_upstream_per_response_code_family_total | Upstream Requests Per Response Code Family | 4xx, 5xx | requests/s |
 
 
 

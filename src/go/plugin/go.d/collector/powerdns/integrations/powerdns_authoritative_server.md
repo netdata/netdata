@@ -212,11 +212,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -228,13 +230,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerdns.questions_in | udp, tcp | questions/s |
-| powerdns.questions_out | udp, tcp | questions/s |
-| powerdns.cache_usage | query-cache-hit, query-cache-miss, packetcache-hit, packetcache-miss | events/s |
-| powerdns.cache_size | query-cache, packet-cache, key-cache, meta-cache | entries |
-| powerdns.latency | latency | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerdns.questions_in | Incoming questions | udp, tcp | questions/s |
+| powerdns.questions_out | Outgoing questions | udp, tcp | questions/s |
+| powerdns.cache_usage | Cache Usage | query-cache-hit, query-cache-miss, packetcache-hit, packetcache-miss | events/s |
+| powerdns.cache_size | Cache Size | query-cache, packet-cache, key-cache, meta-cache | entries |
+| powerdns.latency | Answer latency | latency | microseconds |
 
 
 

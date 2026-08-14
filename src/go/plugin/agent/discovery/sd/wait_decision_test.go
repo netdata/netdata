@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -33,7 +32,7 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 
 				require.Eventually(t, sd.handler.WaitingForDecision, time.Second, 10*time.Millisecond)
 
-				sd.dyncfgCh <- dyncfg.NewFunction(functions.Function{
+				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
 					UID:  "enable-job1",
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
 				})
@@ -83,7 +82,7 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				require.True(t, sd.handler.WaitingForDecision(), "wait gate should still be open before decision")
 
 				// Send the matching enable for cfg1 — this clears the wait gate.
-				sd.dyncfgCh <- dyncfg.NewFunction(functions.Function{
+				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
 					UID:  "enable-job1",
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
 				})
@@ -126,12 +125,14 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 	confProv := &mockConfigProvider{ch: make(chan confFile)}
 
 	sd := &ServiceDiscovery{
+		epoch:          1,
+		attempts:       newTestAttemptAuthority(t),
 		Logger:         logger.New(),
 		confProv:       confProv,
 		pluginName:     testPluginName,
-		fnReg:          functions.NewManager(),
+		fnReg:          waitTestFunctionRegistry{},
 		discoverers:    testDiscovererRegistry(),
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))),
+		dyncfgApi:      dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&out))),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
@@ -141,7 +142,6 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 	}
 	sd.sdCb = &sdCallbacks{sd: sd}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    sd.Logger,
 		API:       sd.dyncfgApi,
 		Seen:      sd.seen,
 		Exposed:   sd.exposed,
@@ -150,8 +150,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 			return cfg.PipelineKey()
 		},
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
@@ -164,7 +163,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 	})
 
 	send := func(context.Context, []*confgroup.Group) {}
-	sd.mgr = NewPipelineManager(sd.Logger, sd.newPipeline, send)
+	sd.mgr = NewPipelineManager(sd.Logger, send)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sd.ctx = ctx
@@ -177,6 +176,11 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 
 	return sd, confProv.ch, cancel, done
 }
+
+type waitTestFunctionRegistry struct{}
+
+func (waitTestFunctionRegistry) RegisterPrefix(string, string, functions.Handler) {}
+func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                  {}
 
 func stopWaitTestServiceDiscovery(t *testing.T, sd *ServiceDiscovery, cancel context.CancelFunc, done <-chan struct{}) {
 	t.Helper()

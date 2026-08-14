@@ -135,11 +135,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -151,34 +153,35 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.vfs_unlink | delete | calls/s |
-| cgroup.vfs_write | write | calls/s |
-| cgroup.vfs_write_error | write | calls/s |
-| cgroup.vfs_read | read | calls/s |
-| cgroup.vfs_read_error | read | calls/s |
-| cgroup.vfs_write_bytes | write | bytes/s |
-| cgroup.vfs_read_bytes | read | bytes/s |
-| cgroup.vfs_fsync | fsync | calls/s |
-| cgroup.vfs_fsync_error | fsync | calls/s |
-| cgroup.vfs_open | open | calls/s |
-| cgroup.vfs_open_error | open | calls/s |
-| cgroup.vfs_create | create | calls/s |
-| cgroup.vfs_create_error | create | calls/s |
-| services.vfs_unlink | a dimension per systemd service | calls/s |
-| services.vfs_write | a dimension per systemd service | calls/s |
-| services.vfs_write_error | a dimension per systemd service | calls/s |
-| services.vfs_read | a dimension per systemd service | calls/s |
-| services.vfs_read_error | a dimension per systemd service | calls/s |
-| services.vfs_write_bytes | a dimension per systemd service | bytes/s |
-| services.vfs_read_bytes | a dimension per systemd service | bytes/s |
-| services.vfs_fsync | a dimension per systemd service | calls/s |
-| services.vfs_fsync_error | a dimension per systemd service | calls/s |
-| services.vfs_open | a dimension per systemd service | calls/s |
-| services.vfs_open_error | a dimension per systemd service | calls/s |
-| services.vfs_create | a dimension per systemd service | calls/s |
-| services.vfs_create_error | a dimension per systemd service | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.vfs_unlink | Files deleted | delete | calls/s |
+| cgroup.vfs_write | Write to disk | write | calls/s |
+| cgroup.vfs_write_error | Fails to write | write | calls/s |
+| cgroup.vfs_read | Read from disk | read | calls/s |
+| cgroup.vfs_read_error | Fails to read | read | calls/s |
+| cgroup.vfs_write_bytes | Bytes written on disk | write | bytes/s |
+| cgroup.vfs_read_bytes | Bytes read from disk | read | bytes/s |
+| cgroup.vfs_fsync | Calls to vfs_fsync. | fsync | calls/s |
+| cgroup.vfs_fsync_error | Sync error | fsync | calls/s |
+| cgroup.vfs_open | Calls to vfs_open. | open | calls/s |
+| cgroup.vfs_open_error | Open error | open | calls/s |
+| cgroup.vfs_create | Calls to vfs_create. | create | calls/s |
+| cgroup.vfs_create_error | Create error | create | calls/s |
+| services.vfs_unlink | Files deleted | a dimension per systemd service | calls/s |
+| services.vfs_write | Write to disk | a dimension per systemd service | calls/s |
+| services.vfs_write_error | Fails to write | a dimension per systemd service | calls/s |
+| services.vfs_read | Read from disk | a dimension per systemd service | calls/s |
+| services.vfs_read_error | Fails to read | a dimension per systemd service | calls/s |
+| services.vfs_write_bytes | Bytes written on disk | a dimension per systemd service | bytes/s |
+| services.vfs_read_bytes | Bytes read from disk | a dimension per systemd service | bytes/s |
+| services.vfs_fsync | Calls to vfs_fsync. | a dimension per systemd service | calls/s |
+| services.vfs_fsync_error | Sync error | a dimension per systemd service | calls/s |
+| services.vfs_open | Calls to vfs_open. | a dimension per systemd service | calls/s |
+| services.vfs_open_error | Open error | a dimension per systemd service | calls/s |
+| services.vfs_create | Calls to vfs_create. | a dimension per systemd service | calls/s |
+| services.vfs_create_error | Create error | a dimension per systemd service | calls/s |
+
 
 ### Per eBPF VFS instance
 
@@ -188,18 +191,19 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.vfs_deleted_objects | delete | calls/s |
-| filesystem.vfs_io | read, write | calls/s |
-| filesystem.vfs_io_bytes | read, write | bytes/s |
-| filesystem.vfs_io_error | read, write | calls/s |
-| filesystem.vfs_fsync | fsync | calls/s |
-| filesystem.vfs_fsync_error | fsync | calls/s |
-| filesystem.vfs_open | open | calls/s |
-| filesystem.vfs_open_error | open | calls/s |
-| filesystem.vfs_create | create | calls/s |
-| filesystem.vfs_create_error | create | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filesystem.vfs_deleted_objects | Remove files | delete | calls/s |
+| filesystem.vfs_io | Calls to IO | read, write | calls/s |
+| filesystem.vfs_io_bytes | Bytes written and read | read, write | bytes/s |
+| filesystem.vfs_io_error | Fails to write or read | read, write | calls/s |
+| filesystem.vfs_fsync | Calls to vfs_fsync. | fsync | calls/s |
+| filesystem.vfs_fsync_error | Fails to synchronize | fsync | calls/s |
+| filesystem.vfs_open | Calls to vfs_open. | open | calls/s |
+| filesystem.vfs_open_error | Fails to open a file | open | calls/s |
+| filesystem.vfs_create | Calls to vfs_create. | create | calls/s |
+| filesystem.vfs_create_error | Fails to create a file. | create | calls/s |
+
 
 ### Per apps
 
@@ -213,18 +217,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_call_vfs_unlink | calls | calls/s |
-| app.ebpf_call_vfs_write | calls | calls/s |
-| app.ebpf_call_vfs_write_error | calls | calls/s |
-| app.ebpf_call_vfs_read | calls | calls/s |
-| app.ebpf_call_vfs_read_error | calls | calls/s |
-| app.ebpf_call_vfs_write_bytes | writes | bytes/s |
-| app.ebpf_call_vfs_read_bytes | reads | bytes/s |
-| app.ebpf_call_vfs_fsync | calls | calls/s |
-| app.ebpf_call_vfs_fsync_error | calls | calls/s |
-| app.ebpf_call_vfs_open | calls | calls/s |
-| app.ebpf_call_vfs_open_error | calls | calls/s |
-| app.ebpf_call_vfs_create | calls | calls/s |
-| app.ebpf_call_vfs_create_error | calls | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.ebpf_call_vfs_unlink | Files deleted | calls | calls/s |
+| app.ebpf_call_vfs_write | Write to disk | calls | calls/s |
+| app.ebpf_call_vfs_write_error | Fails to write | calls | calls/s |
+| app.ebpf_call_vfs_read | Read from disk | calls | calls/s |
+| app.ebpf_call_vfs_read_error | Fails to read | calls | calls/s |
+| app.ebpf_call_vfs_write_bytes | Bytes written on disk | writes | bytes/s |
+| app.ebpf_call_vfs_read_bytes | Bytes read on disk | reads | bytes/s |
+| app.ebpf_call_vfs_fsync | Calls to vfs_fsync. | calls | calls/s |
+| app.ebpf_call_vfs_fsync_error | Sync error | calls | calls/s |
+| app.ebpf_call_vfs_open | Calls to vfs_open. | calls | calls/s |
+| app.ebpf_call_vfs_open_error | Open error | calls | calls/s |
+| app.ebpf_call_vfs_create | Calls to vfs_create. | calls | calls/s |
+| app.ebpf_call_vfs_create_error | Create error | calls | calls/s |

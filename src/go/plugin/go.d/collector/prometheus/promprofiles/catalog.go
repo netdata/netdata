@@ -4,9 +4,9 @@ package promprofiles
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -22,15 +22,11 @@ const profilesDirName = "prometheus.profiles"
 
 var log = logger.New().With("component", "prometheus/promprofiles")
 
-// validProfileName constrains a profile's identity (its file basename) and the
-// optional app field.
-var validProfileName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-
 // IsValidProfileName reports whether name satisfies the profile-identity
 // constraint. Callers that reference a profile by name (config entries, for
 // example) use it to reject names no catalog profile can ever have.
 func IsValidProfileName(name string) bool {
-	return validProfileName.MatchString(name)
+	return profilecatalog.DefaultValidName(name)
 }
 
 // NormalizeProfileKey is the canonical (case-insensitive) name transform shared
@@ -44,7 +40,7 @@ type DirSpec = profilecatalog.DirSpec
 // Catalog wraps the shared profile catalog with Prometheus-specific queries:
 // case-insensitive resolution and discovery-ordered listing.
 type Catalog struct {
-	profilecatalog.Catalog[Profile]
+	core profilecatalog.Catalog[Profile]
 }
 
 // LoadFromDefaultDirs builds the catalog from the stock and user directories.
@@ -68,45 +64,72 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	if err != nil {
 		return Catalog{}, err
 	}
-	return Catalog{Catalog: core}, nil
+	return Catalog{core: core}, nil
 }
 
-// decodeProfile strict-decodes the profile header (match, app, and the template
-// as an un-decoded node), retains the raw bytes for lazy hydration, and
-// validates the header. A user profile additionally validates its template at
-// load, so a broken user profile is skipped (the stock profile of the same name
-// survives); stock template validation is deferred to first use.
+// decodeProfile strict-decodes the one top-level profile document, retaining
+// immutable raw bytes and cheap fallback/relabel-presence signals for lazy stock
+// hydration. User profiles hydrate all deferred fields eagerly so a broken
+// override is skipped and valid stock survives.
 func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) {
-	var hdr profileHeader
+	var doc profileDocument[yaml.Node, yaml.Node, yaml.Node]
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
-	if err := dec.Decode(&hdr); err != nil {
+	if err := dec.Decode(&doc); err != nil {
 		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", baseName, err)
 	}
 
+	app := ""
+	if doc.App != nil {
+		app = *doc.App
+	}
 	p := Profile{
-		Name:  baseName,
-		Match: hdr.Match,
-		App:   hdr.App,
-		lazy:  &lazyTemplate{raw: data},
+		Name:            baseName,
+		Match:           doc.Match,
+		App:             app,
+		autogenSelector: nil,
+		lazy: &lazyProfile{
+			raw:             bytes.Clone(data),
+			hasApp:          doc.App != nil,
+			hasFallbackType: doc.FallbackType.Kind != 0,
+			hasRelabeling:   doc.Relabeling.Kind != 0,
+		},
+	}
+	if doc.Autogen != nil {
+		if doc.Autogen.Selector == nil {
+			return Profile{}, fmt.Errorf("profile %q: 'autogen.selector' is required when 'autogen' is set", baseName)
+		}
+		p.autogenSelector = cloneSelectorExpr(doc.Autogen.Selector)
 	}
 	if err := p.validateHeader(); err != nil {
 		return Profile{}, err
 	}
 	if !isStock {
-		if _, err := p.Template(); err != nil {
+		_, templateErr := p.Template()
+		_, fallbackTypeErr := p.FallbackType()
+		_, relabelingErr := p.Relabeling()
+		if err := errors.Join(templateErr, fallbackTypeErr, relabelingErr); err != nil {
 			return Profile{}, err
 		}
 	}
 	return p, nil
 }
 
+// Get returns an ownership-safe profile copy.
+func (c Catalog) Get(name string) (Profile, bool) {
+	profile, ok := c.core.Get(name)
+	if !ok {
+		return Profile{}, false
+	}
+	return profile.clone(), true
+}
+
 // OrderedProfiles returns all profiles in deterministic discovery order.
 func (c Catalog) OrderedProfiles() []Profile {
-	named := c.InOrder()
+	named := c.core.InOrder()
 	out := make([]Profile, 0, len(named))
 	for _, n := range named {
-		out = append(out, n.Profile)
+		out = append(out, n.Profile.clone())
 	}
 	return out
 }

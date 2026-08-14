@@ -96,11 +96,13 @@ The following alerts are available:
 | [ ecc_memory_dimm_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -119,9 +121,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.edac_mc_errors | correctable, uncorrectable, correctable_noinfo, uncorrectable_noinfo | errors |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.edac_mc_errors | Memory Controller (MC) Error Detection And Correction (EDAC) Errors | correctable, uncorrectable, correctable_noinfo, uncorrectable_noinfo | errors |
+
 
 ### Per memory module
 
@@ -142,6 +145,6 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.edac_mc_errors | correctable, uncorrectable | errors |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.edac_mc_errors | DIMM Error Detection And Correction (EDAC) Errors | correctable, uncorrectable | errors |

@@ -419,17 +419,17 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             nd_log_limit_static_global_var(erl, 1, 0);
             nd_log_limit(&erl,  NDLS_DAEMON, NDLP_WARNING,
                          "STREAM SND REPLAY WARNING: 'host:%s/chart:%s' misaligned dimensions, "
-                         "update every (min: %ld, max: %ld), "
-                         "start time (min: %ld, max: %ld), "
-                         "end time (min %ld, max %ld), "
-                         "now %ld, last end time sent %ld, "
-                         "min start time is fixed to %ld",
+                         "update every (min: %" PRId64 ", max: %" PRId64 "), "
+                         "start time (min: %" PRId64 ", max: %" PRId64 "), "
+                         "end time (min %" PRId64 ", max %" PRId64 "), "
+                         "now %" PRId64 ", last end time sent %" PRId64 ", "
+                         "min start time is fixed to %" PRId64,
                         rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
-                        min_update_every, max_update_every,
-                        min_start_time, max_start_time,
-                        min_end_time, max_end_time,
-                        now, last_end_time_in_buffer,
-                        fix_min_start_time
+                        (int64_t)min_update_every, (int64_t)max_update_every,
+                        (int64_t)min_start_time, (int64_t)max_start_time,
+                        (int64_t)min_end_time, (int64_t)max_end_time,
+                        (int64_t)now, (int64_t)last_end_time_in_buffer,
+                        (int64_t)fix_min_start_time
                         );
 #endif
 
@@ -467,10 +467,11 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                     true,
                     "STREAM SND REPLAY: current remaining sender buffer of %zu bytes cannot fit the "
                     "message size %zu bytes for chart '%s' of host '%s'. "
-                    "Sending partial replication response %ld to %ld, %s (original: %ld to %ld, %s).",
+                    "Sending partial replication response %" PRId64 " to %" PRId64 ", %s "
+                    "(original: %" PRId64 " to %" PRId64 ", %s).",
                     buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
-                    q->query.after, q->query.before, q->query.enable_streaming?"true":"false",
-                    q->request.after, q->request.before, q->request.enable_streaming?"true":"false");
+                    (int64_t)q->query.after, (int64_t)q->query.before, q->query.enable_streaming?"true":"false",
+                    (int64_t)q->request.after, (int64_t)q->request.before, q->request.enable_streaming?"true":"false");
 
                 q->query.interrupted = true;
 
@@ -1045,8 +1046,8 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
         }
 
         if (!rse_to_delete)
-            fatal("STREAM SND REPLAY: 'host:%s/chart:%s' Cannot find sort entry to delete for time %ld.",
-                  rrdhost_hostname(rq->sender->host), string2str(rq->chart_id), rq->after);
+            fatal("STREAM SND REPLAY: 'host:%s/chart:%s' Cannot find sort entry to delete for time %" PRId64 ".",
+                  rrdhost_hostname(rq->sender->host), string2str(rq->chart_id), (int64_t)rq->after);
 
     }
 

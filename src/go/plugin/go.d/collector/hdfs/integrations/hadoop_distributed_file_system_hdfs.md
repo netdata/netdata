@@ -221,11 +221,13 @@ The following alerts are available:
 | [ hdfs_num_failed_volumes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.num_failed_volumes | number of failed volumes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -237,32 +239,32 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | DataNode | NameNode |
-|:------|:----------|:----|:---:|:---:|
-| hdfs.heap_memory | committed, used | MiB | • | • |
-| hdfs.gc_count_total | gc | events/s | • | • |
-| hdfs.gc_time_total | ms | ms | • | • |
-| hdfs.gc_threshold | info, warn | events/s | • | • |
-| hdfs.threads | new, runnable, blocked, waiting, timed_waiting, terminated | num | • | • |
-| hdfs.logs_total | info, error, warn, fatal | logs/s | • | • |
-| hdfs.rpc_bandwidth | received, sent | kilobits/s | • | • |
-| hdfs.rpc_calls | calls | calls/s | • | • |
-| hdfs.open_connections | open | connections | • | • |
-| hdfs.call_queue_length | length | num | • | • |
-| hdfs.avg_queue_time | time | ms | • | • |
-| hdfs.avg_processing_time | time | ms | • | • |
-| hdfs.capacity | remaining, used | KiB |   | • |
-| hdfs.used_capacity | dfs, non_dfs | KiB |   | • |
-| hdfs.load | load | load |   | • |
-| hdfs.volume_failures_total | failures | events/s |   | • |
-| hdfs.files_total | files | num |   | • |
-| hdfs.blocks_total | blocks | num |   | • |
-| hdfs.blocks | corrupt, missing, under_replicated | num |   | • |
-| hdfs.data_nodes | live, dead, stale | num |   | • |
-| hdfs.datanode_capacity | remaining, used | KiB | • |   |
-| hdfs.datanode_used_capacity | dfs, non_dfs | KiB | • |   |
-| hdfs.datanode_failed_volumes | failed volumes | num | • |   |
-| hdfs.datanode_bandwidth | reads, writes | KiB/s | • |   |
+| Metric | Description | Dimensions | Unit | DataNode | NameNode |
+|:------|:------------|:----------|:----|:---:|:---:|
+| hdfs.heap_memory | Heap Memory | committed, used | MiB | • | • |
+| hdfs.gc_count_total | GC Events | gc | events/s | • | • |
+| hdfs.gc_time_total | GC Time | ms | ms | • | • |
+| hdfs.gc_threshold | Number of Times That the GC Threshold is Exceeded | info, warn | events/s | • | • |
+| hdfs.threads | Number of Threads | new, runnable, blocked, waiting, timed_waiting, terminated | num | • | • |
+| hdfs.logs_total | Number of Logs | info, error, warn, fatal | logs/s | • | • |
+| hdfs.rpc_bandwidth | RPC Bandwidth | received, sent | kilobits/s | • | • |
+| hdfs.rpc_calls | RPC Calls | calls | calls/s | • | • |
+| hdfs.open_connections | RPC Open Connections | open | connections | • | • |
+| hdfs.call_queue_length | RPC Call Queue Length | length | num | • | • |
+| hdfs.avg_queue_time | RPC Avg Queue Time | time | ms | • | • |
+| hdfs.avg_processing_time | RPC Avg Processing Time | time | ms | • | • |
+| hdfs.capacity | Capacity Across All Datanodes | remaining, used | KiB |   | • |
+| hdfs.used_capacity | Used Capacity Across All Datanodes | dfs, non_dfs | KiB |   | • |
+| hdfs.load | Number of Concurrent File Accesses (read/write) Across All DataNodes | load | load |   | • |
+| hdfs.volume_failures_total | Number of Volume Failures Across All Datanodes | failures | events/s |   | • |
+| hdfs.files_total | Number of Tracked Files | files | num |   | • |
+| hdfs.blocks_total | Number of Allocated Blocks in the System | blocks | num |   | • |
+| hdfs.blocks | Number of Problem Blocks (can point to an unhealthy cluster) | corrupt, missing, under_replicated | num |   | • |
+| hdfs.data_nodes | Number of Data Nodes By Status | live, dead, stale | num |   | • |
+| hdfs.datanode_capacity | Capacity | remaining, used | KiB | • |   |
+| hdfs.datanode_used_capacity | Used Capacity | dfs, non_dfs | KiB | • |   |
+| hdfs.datanode_failed_volumes | Number of Failed Volumes | failed volumes | num | • |   |
+| hdfs.datanode_bandwidth | Bandwidth | reads, writes | KiB/s | • |   |
 
 
 

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: litellm
+metadata_example:
+  integration_id: collector-go.d.plugin-prometheus-litellm
+  example_name: LiteLLM
+  job_name: litellm
+cases:
+  single:
+    environment:
+      litellm: {mode: single}
+      process_runtime: {platform_runtime: cpython}
+      python_gc: {}
+    fixture: fixtures/litellm_all_metrics.prom
+    coverage: true
+    expected: {verdict: PASS}
+    future_inputs:
+      generated_created:
+        name: litellm_future_created
+        type: gauge
+  multiprocess:
+    environment:
+      litellm: {mode: multiprocess}
+      process_runtime: {platform_runtime: cpython}
+      python_gc: {}
+    fixture: fixtures/litellm_multiprocess.prom
+    coverage: true
+    expected: {verdict: PASS}

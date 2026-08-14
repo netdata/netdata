@@ -213,11 +213,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -229,11 +231,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| fluentd.retry_count | a dimension per plugin | count |
-| fluentd.buffer_queue_length | a dimension per plugin | queue_length |
-| fluentd.buffer_total_queued_size | a dimension per plugin | queued_size |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| fluentd.retry_count | Plugin Retry Count | a dimension per plugin | count |
+| fluentd.buffer_queue_length | Plugin Buffer Queue Length | a dimension per plugin | queue_length |
+| fluentd.buffer_total_queued_size | Plugin Buffer Total Size | a dimension per plugin | queued_size |
 
 
 

@@ -134,7 +134,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Time Grouping Method");
-        buffer_json_member_add_string(buffer, "description", "Method to group data points over time. The 'extremes' method returns the maximum value for positive numbers and the minimum value for negative numbers, which is particularly useful for showing the highest peaks in both directions on charts.");
+        buffer_json_member_add_string(buffer, "description", "Method to group data points over time. The 'extremes' method returns the maximum value for positive numbers and the minimum value for negative numbers, which is particularly useful for showing the highest peaks in both directions on charts. The 'latest' method returns the most recent collected value of each time frame, which is useful for reading the current value of a metric.");
         buffer_json_member_add_string(buffer, "default", "average");
         
         // Define enum of possible values
@@ -154,6 +154,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
         buffer_json_add_array_item_string(buffer, "countif");  // requires time_group_options parameter
         buffer_json_add_array_item_string(buffer, "extremes");  // for each time frame, returns max for positive values and min for negative values
+        buffer_json_add_array_item_string(buffer, "latest");  // for each time frame, returns the most recent collected value
         buffer_json_array_close(buffer);
     }
     buffer_json_object_close(buffer); // time_group

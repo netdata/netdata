@@ -76,6 +76,7 @@ impl<'de> Deserialize<'de> for FlowsRequest {
         let term = trimmed_term.to_string();
 
         validate_selection_fields(&raw.selections).map_err(D::Error::custom)?;
+        validate_ip_selection_values(&raw.selections).map_err(D::Error::custom)?;
 
         Ok(Self {
             mode,

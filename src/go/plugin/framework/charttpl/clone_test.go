@@ -32,9 +32,11 @@ func TestGroupClone(t *testing.T) {
 	clone.Metrics = append(clone.Metrics, "extra")
 	clone.ChartDefaults.LabelPromoted[0] = "mutated"
 	clone.ChartDefaults.Instances.ByLabels[0] = "mutated"
+	clone.ChartDefaults.Instances.OptionalByLabels[0] = "mutated"
 	clone.Charts[0].Title = "MUTATED"
 	clone.Charts[0].LabelPromoted[0] = "mutated"
 	clone.Charts[0].Instances.ByLabels[0] = "mutated"
+	clone.Charts[0].Instances.OptionalByLabels[0] = "mutated"
 	clone.Charts[0].Lifecycle.MaxInstances = 999
 	clone.Charts[0].Lifecycle.Dimensions.MaxDims = 999
 	clone.Charts[0].Dimensions[0].Name = "MUTATED"
@@ -64,16 +66,23 @@ func richGroup() Group {
 		Metrics:          []string{"metric_a"},
 		ChartDefaults: &ChartDefaults{
 			LabelPromoted: []string{"region"},
-			Instances:     &Instances{ByLabels: []string{"resource_uid"}},
+			Instances: &Instances{
+				ByLabels:         []string{"resource_uid"},
+				OptionalByLabels: []string{"pid"},
+			},
 		},
 		Charts: []Chart{
 			{
 				Title:         "Chart A",
 				Context:       "chart_a",
 				Units:         "units/s",
+				Aggregation:   AggregationMax,
 				Type:          "line",
 				LabelPromoted: []string{"zone"},
-				Instances:     &Instances{ByLabels: []string{"id"}},
+				Instances: &Instances{
+					ByLabels:         []string{"id"},
+					OptionalByLabels: []string{"pid"},
+				},
 				Lifecycle: &Lifecycle{
 					MaxInstances:      10,
 					ExpireAfterCycles: 5,

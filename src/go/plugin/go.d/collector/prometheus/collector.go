@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 //go:embed "config_schema.json"
@@ -31,31 +32,50 @@ func init() {
 }
 
 func New() *Collector {
-	return &Collector{
-		Config: Config{
-			HTTPConfig: web.HTTPConfig{
-				ClientConfig: web.ClientConfig{
-					Timeout: confopt.Duration(time.Second * 10),
-				},
+	return NewWithOptions()
+}
+
+// DefaultConfig returns an independent copy of the collector's runtime
+// configuration defaults.
+func DefaultConfig() Config {
+	return Config{
+		HTTPConfig: web.HTTPConfig{
+			ClientConfig: web.ClientConfig{
+				Timeout: confopt.Duration(time.Second * 10),
 			},
-			MaxTS:          2000,
-			MaxTSPerMetric: 200,
-			Profiles:       ProfilesConfig{Mode: profilesModeAuto},
 		},
+		MaxTS:          2000,
+		MaxTSPerMetric: 200,
+		Profiles:       ProfilesConfig{Mode: profilesModeAuto},
+	}
+}
+
+// NewWithOptions constructs a collector with explicit non-configuration
+// dependencies. Runtime job configuration remains in Config.
+func NewWithOptions(opts ...CollectorOption) *Collector {
+	c := &Collector{
+		Config:             DefaultConfig(),
 		store:              metrix.NewCollectorStore(),
 		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
+		}
+	}
+	return c
 }
 
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prom          prometheus.Prometheus
-	relabelBlocks []relabelBlock
-	store         metrix.CollectorStore
-	writer        *metricFamilyWriter
-	runtime       *promRuntime
+	prom             prometheus.Prometheus
+	jobRelabel       *relabel.Pipeline
+	store            metrix.CollectorStore
+	writer           *metricFamilyWriter
+	runtime          *promRuntime
+	pipelineObserver PipelineDiagnosticObserver
 
 	// loadProfileCatalog resolves the profile catalog; a field so tests inject a fake.
 	loadProfileCatalog func() (promprofiles.Catalog, error)
@@ -78,17 +98,17 @@ func (c *Collector) Init(context.Context) error {
 
 	// With no relabeling blocks the scrape keeps the direct, no-buffering Scrape fast
 	// path; invalid rules or match patterns fail Init here.
-	blocks, err := c.initRelabelBlocks()
+	pipeline, err := relabel.NewPipeline(c.Relabeling)
 	if err != nil {
 		return fmt.Errorf("init relabeling: %v", err)
 	}
-	c.relabelBlocks = blocks
+	c.jobRelabel = pipeline
 
-	gaugeFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Gauge)
+	gaugeFallback, err := compileFallbackTypeMatcher(c.FallbackType.Gauge)
 	if err != nil {
 		return fmt.Errorf("init gauge fallback type matcher: %v", err)
 	}
-	counterFallback, err := c.initFallbackTypeMatcher(c.FallbackType.Counter)
+	counterFallback, err := compileFallbackTypeMatcher(c.FallbackType.Counter)
 	if err != nil {
 		return fmt.Errorf("init counter fallback type matcher: %v", err)
 	}
@@ -97,6 +117,7 @@ func (c *Collector) Init(context.Context) error {
 		maxTSPerMetric:        c.MaxTSPerMetric,
 		isFallbackTypeGauge:   gaugeFallback,
 		isFallbackTypeCounter: counterFallback,
+		observePipeline:       c.pipelineObserver,
 	}, c.Logger)
 
 	return nil

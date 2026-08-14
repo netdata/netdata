@@ -108,11 +108,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,7 +126,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ipc_semaphores | semaphores | semaphores |
-| system.ipc_mutexes | mutexes | mutexes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.ipc_semaphores | IPC Semaphores | semaphores | semaphores |
+| system.ipc_mutexes | IPC Mutexes | mutexes | mutexes |

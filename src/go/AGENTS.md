@@ -113,6 +113,31 @@ approval tier is satisfied.
   `metrix.DescriptorRetention` accessor. See `src/go/pkg/metrix/README.md`
   ("Descriptor Lifecycle and Retention").
 
+## Evidence Before Complexity
+
+Readability and maintainability are the default for Go control-plane and
+framework code. Complexity needs evidence; a plausible future problem is not a
+requirement.
+
+- Code MUST NOT introduce population, byte, concurrency, queue, retry, or
+  backpressure limits, nor add accounting, scheduling, pooling, caching, custom
+  data structures, or lifecycle machinery, unless the design follows from a
+  concrete correctness, liveness, protocol, compatibility, or security contract,
+  a documented scale requirement, or a measured production workload.
+- The justification MUST identify the input or producer, the failure being
+  prevented, the expected scale, and why simpler slices, maps, channels, or
+  direct ownership are insufficient. A round number, hypothetical abuse case,
+  or benchmark in isolation is not evidence of a product requirement.
+- Protocol- and security-derived bounds MUST remain tied to their source with a
+  concise rationale and boundary tests. Do not generalize one per-item bound
+  into an aggregate process policy without separate evidence.
+- When a limit has no valid requirement, remove the policy and its coupled
+  machinery. Raising it to an effectively unreachable value is not the clean
+  end state.
+- Do not add allocation- or latency-oriented complexity until the path is shown
+  to be hot by its production frequency, a profile, or representative benchmark.
+  Once a path is established as hot, follow "Hot-Path And Benchmark Discipline."
+
 ## Hot-Path And Benchmark Discipline
 
 metrix commit/collect, per-sample/per-write, and per-cycle code are hot paths that
@@ -131,12 +156,35 @@ run for every collector on every cycle.
 - Keep bench comments in sync with the code they measure, in the same change, with
   self-contained wording (no round/session references).
 
+## Go Formatting
+
+`gofmt` and `goimports` are the baseline. This repository additionally
+RECOMMENDS (not CI-enforced) a fuller formatting pipeline that keeps line
+wrapping tight and keyed struct literals readable:
+
+1. `golines -m 120 -t 4 -w <paths>` — join over-wrapped signatures/calls and
+   split lines past ~120 columns. SKIP this step if `golines` is not installed
+   (`go install github.com/segmentio/golines@latest`).
+2. `go run ./tools/expandstructs <paths>` — put each keyed struct-literal field
+   on its own line. Formats source in-process with `go/format`.
+3. `goimports -w <paths>` — order imports.
+
+Conventions this encodes:
+
+- Keep a signature / call / return / composite literal on ONE line when it fits
+  within ~120 columns; wrap only when it does not.
+- Keyed struct literals of a named type go ONE field per line.
+
+`gofmt`/`goimports` cannot express these two rules, so they are not CI-enforced;
+re-run the pipeline if code drifts. See `tools/expandstructs/README.md`.
+
 ## Validation For Go Changes
 
 Run the narrowest command that actually exercises the change; do not claim
 full-project validation from a narrow one.
 
-- Always: `gofmt` clean and `go vet ./<pkg>/` clean.
+- Always: formatted per "Go Formatting" above (at minimum `gofmt` clean) and
+  `go vet ./<pkg>/` clean.
 - Unit: `go test -count=1 ./<pkg>/...` for every package you touched.
 - Concurrency: add `-race` for concurrency-sensitive packages (`metrix`, the job
   runtime, `plugin/agent/jobmgr`).
@@ -145,6 +193,22 @@ full-project validation from a narrow one.
   proven against real users, not just its own package.
 - Reproduce a reviewer-reported bug as a FAILING test first, then fix to green
   (repo-wide working-style rule).
+- Prefer `testify/require` for test prerequisites and `testify/assert` for
+  comparisons when applicable. Use `t.Fatal` or `t.Fatalf` directly when it
+  represents genuine test control flow or has no clearer assertion equivalent.
+
+## Go Review And Reachability
+
+- Start review at the declared interface and the shipped production adapter.
+  Inspect implementation internals behind that boundary only when the contract
+  leaves relevant behavior unspecified or concrete evidence points across it.
+  Do not make a caller responsible for arbitrary private behavior of every
+  implementation.
+- Before deleting Go code as unused, check all relevant reference forms:
+  selector reads and writes, struct literals, constructor arguments, method
+  values, interface satisfaction, reflection, build-tagged and platform files,
+  generated code, and test-only injection. A call-site-only search is not proof
+  of unreachability.
 
 ## Batching And Review
 

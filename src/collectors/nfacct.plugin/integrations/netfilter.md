@@ -108,11 +108,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,12 +126,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netfilter.netlink_new | new, ignore, invalid | connections/s |
-| netfilter.netlink_changes | insert, delete, delete_list | changes/s |
-| netfilter.netlink_search | searched, search_restart, found | searches/s |
-| netfilter.netlink_errors | icmp_error, insert_failed, drop, early_drop | events/s |
-| netfilter.netlink_expect | created, deleted, new | expectations/s |
-| netfilter.nfacct_packets | a dimension per nfacct object | packets/s |
-| netfilter.nfacct_bytes | a dimension per nfacct object | kilobytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netfilter.netlink_new | Connection Tracker New Connections | new, ignore, invalid | connections/s |
+| netfilter.netlink_changes | Connection Tracker Changes | insert, delete, delete_list | changes/s |
+| netfilter.netlink_search | Connection Tracker Searches | searched, search_restart, found | searches/s |
+| netfilter.netlink_errors | Connection Tracker Errors | icmp_error, insert_failed, drop, early_drop | events/s |
+| netfilter.netlink_expect | Connection Tracker Expectations | created, deleted, new | expectations/s |
+| netfilter.nfacct_packets | Netfilter Accounting Packets | a dimension per nfacct object | packets/s |
+| netfilter.nfacct_bytes | Netfilter Accounting Bandwidth | a dimension per nfacct object | kilobytes/s |

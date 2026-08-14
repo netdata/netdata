@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,10 +122,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| aspnet.application_restarts | restarts | restarts |
-| aspnet.worker_process_restarts | restarts | restarts |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| aspnet.application_restarts | Number of times the application has been restarted. | restarts | restarts |
+| aspnet.worker_process_restarts | Number of times a worker process has restarted on the machine. | restarts | restarts |
+
 
 ### Per ASP.NET Applications
 
@@ -137,34 +140,34 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| aspnet.anonymous_request | requests | requests |
-| aspnet.compilation_totals | compilations | compilations |
-| aspnet.errors_during_preprocessing | preprocessing | errors |
-| aspnet.errors_during_compilation | compilation | errors |
-| aspnet.errors_during_execution | execution | errors |
-| aspnet.errors_during_unhandled_execution | unhandled | errors |
-| aspnet.requests_byte_total | in, out | bytes |
-| aspnet.requests_executing | executing | requests |
-| aspnet.requests_failed | executing | requests |
-| aspnet.requests_not_found | not found | requests |
-| aspnet.requests_not_authorized | not_authorized | requests |
-| aspnet.requests_in_application_queue | queue | requests |
-| aspnet.requests_timeout | timeout | requests |
-| aspnet.requests_succeeded | success | requests |
-| aspnet.sessions_active | active | sessions |
-| aspnet.sessions_abandoned | abandoned | sessions |
-| aspnet.sessions_abandoned | abandoned | sessions |
-| aspnet.sessions_timed_out | timed out | sessions |
-| aspnet.transactions_aborted | aborted | transactions |
-| aspnet.transactions_committed | committed | transactions |
-| aspnet.transactions_pending | pending | transactions |
-| aspnet.events_raised_per_sec | raised | events |
-| aspnet.error_events_raised_per_sec | events | errors |
-| aspnet.events_audit_success | events | errors |
-| aspnet.events_audit_failure | audit | failures |
-| aspnet.membership_auth_success | success | auth |
-| aspnet.form_authentication_success | success | auth |
-| aspnet.form_authentication_success | success | auth |
-| aspnet.form_authentication_failure | failure | auth |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| aspnet.anonymous_request | Number of requests utilizing anonymous authentication. | requests | requests |
+| aspnet.compilation_totals | Number of source files dynamically compiled. | compilations | compilations |
+| aspnet.errors_during_preprocessing | Errors During Preprocessing. | preprocessing | errors |
+| aspnet.errors_during_compilation | Errors During Compilation. | compilation | errors |
+| aspnet.errors_during_execution | Errors During Execution. | execution | errors |
+| aspnet.errors_during_unhandled_execution | Errors Unhandled During Execution. | unhandled | errors |
+| aspnet.requests_byte_total | Size of responses and request. | in, out | bytes |
+| aspnet.requests_executing | The number of requests currently executing. | executing | requests |
+| aspnet.requests_failed | Number of failed requests. | executing | requests |
+| aspnet.requests_not_found | Requests for resources that were not found. | not found | requests |
+| aspnet.requests_not_authorized | Requests that were not authorized. | not_authorized | requests |
+| aspnet.requests_in_application_queue | Requests in the application queue. | queue | requests |
+| aspnet.requests_timeout | Requests that timed out. | timeout | requests |
+| aspnet.requests_succeeded | Requests that executed successfully. | success | requests |
+| aspnet.sessions_active | Sessions currently active. | active | sessions |
+| aspnet.sessions_abandoned | Sessions explicitly abandoned. | abandoned | sessions |
+| aspnet.sessions_abandoned | Sessions explicitly abandoned. | abandoned | sessions |
+| aspnet.sessions_timed_out | Sessions timed out. | timed out | sessions |
+| aspnet.transactions_aborted | Transactions Aborted. | aborted | transactions |
+| aspnet.transactions_committed | Transactions Committed. | committed | transactions |
+| aspnet.transactions_pending | Transactions Pending. | pending | transactions |
+| aspnet.events_raised_per_sec | Instrumentation events. | raised | events |
+| aspnet.error_events_raised_per_sec | Runtime error events raised. | events | errors |
+| aspnet.events_audit_success | Audit successes in the application. | events | errors |
+| aspnet.events_audit_failure | Audit Failure Events Raised | audit | failures |
+| aspnet.membership_auth_success | Membership Authentication Success. | success | auth |
+| aspnet.form_authentication_success | Membership Authentication Failure. | success | auth |
+| aspnet.form_authentication_success | Forms Authentication Success. | success | auth |
+| aspnet.form_authentication_failure | Forms Authentication Failure. | failure | auth |

@@ -2,6 +2,10 @@
 
 #include "plugin_macos.h"
 
+#define _COMMON_PLUGIN_NAME "macos.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "iokit"
+#include "../common-contexts/common-contexts.h"
+
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/storage/IOBlockStorageDriver.h>
@@ -20,10 +24,88 @@
 #define KILO_FACTOR 1024
 #define MEGA_FACTOR 1048576     // 1024 * 1024
 #define GIGA_FACTOR 1073741824  // 1024 * 1024 * 1024
+#define DISK_UTILIZATION_MAX_PERCENT 100
+#define IOKIT_DISK_STATE_PRUNE_AFTER_UT (10ULL * 60ULL * USEC_PER_SEC)
+
+struct iokit_disk_state {
+    ND_DISK_UTIL disk_util;
+    RRDSET *st_io;
+    RRDSET *st_ops;
+    RRDSET *st_iotime;
+    RRDSET *st_await;
+    RRDSET *st_avgsz;
+    RRDSET *st_svctm;
+    collected_number bytes_read;
+    collected_number bytes_write;
+    collected_number operations_read;
+    collected_number operations_write;
+    collected_number duration_read_ns;
+    collected_number duration_write_ns;
+    collected_number busy_time_ns;
+    usec_t last_busy_time_ut;
+    usec_t last_seen_ut;
+    bool previous_sample_seen;
+};
+
+static DICTIONARY *iokit_disk_states = NULL;
+
+static void macos_iokit_disk_state_delete_cb(
+    const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct iokit_disk_state *d = value;
+
+    rrdset_is_obsolete___safe_from_collector_thread(d->st_io);
+    rrdset_is_obsolete___safe_from_collector_thread(d->st_ops);
+    rrdset_is_obsolete___safe_from_collector_thread(d->disk_util.st_util);
+    rrdset_is_obsolete___safe_from_collector_thread(d->st_iotime);
+    rrdset_is_obsolete___safe_from_collector_thread(d->st_await);
+    rrdset_is_obsolete___safe_from_collector_thread(d->st_avgsz);
+    rrdset_is_obsolete___safe_from_collector_thread(d->st_svctm);
+}
+
+static DICTIONARY *macos_iokit_disk_states_create(void)
+{
+    if (likely(iokit_disk_states))
+        return iokit_disk_states;
+
+    iokit_disk_states = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL,
+        sizeof(struct iokit_disk_state));
+    if (likely(iokit_disk_states))
+        dictionary_register_delete_callback(iokit_disk_states, macos_iokit_disk_state_delete_cb, NULL);
+
+    return iokit_disk_states;
+}
+
+static void macos_iokit_disk_util_labels_cb(RRDSET *st, void *data)
+{
+    rrdlabels_add(st->rrdlabels, "device", data, RRDLABEL_SRC_AUTO);
+}
+
+static void macos_iokit_prune_disk_states(usec_t now_ut)
+{
+    if (unlikely(!iokit_disk_states))
+        return;
+
+    struct iokit_disk_state *d;
+    dfe_start_write(iokit_disk_states, d) {
+        if (d->last_seen_ut && now_ut > d->last_seen_ut &&
+            now_ut - d->last_seen_ut > IOKIT_DISK_STATE_PRUNE_AFTER_UT)
+            dictionary_del(iokit_disk_states, d_dfe.name);
+    }
+    dfe_done(d);
+
+    dictionary_garbage_collect(iokit_disk_states);
+}
+
+void macos_iokit_cleanup(void)
+{
+    dictionary_destroy(iokit_disk_states);
+    iokit_disk_states = NULL;
+}
 
 int do_macos_iokit(int update_every, usec_t dt) {
-    (void)dt;
-
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     static SIMPLE_PATTERN *disabled_net_interfaces = NULL;
 
@@ -56,6 +138,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
     }
 
     RRDSET *st;
+    usec_t now_ut = now_monotonic_usec();
 
     mach_port_t         main_port;
     io_registry_entry_t drive, drive_media;
@@ -82,16 +165,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
         collected_number duration_write_ns;
         collected_number busy_time_ns;
     } cur_diskstat;
-    struct prev_diskstat {
-        collected_number bytes_read;
-        collected_number bytes_write;
-        collected_number operations_read;
-        collected_number operations_write;
-        collected_number duration_read_ns;
-        collected_number duration_write_ns;
-        collected_number busy_time_ns;
-    } prev_diskstat;
-
     // NEEDED BY: do_space, do_inodes
     struct statfs *mntbuf;
     int mntsize, i;
@@ -157,6 +230,11 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     // --------------------------------------------------------------------
 
+                    DICTIONARY *disk_states = macos_iokit_disk_states_create();
+                    struct iokit_disk_state *disk_state =
+                        disk_states ? dictionary_set(disk_states, diskstat.name, NULL, sizeof(*disk_state)) : NULL;
+                    bool have_previous_disk_sample = disk_state && disk_state->previous_sample_seen;
+
                     /* Get bytes read. */
                     if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsBytesReadKey)))) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.bytes_read);
@@ -181,7 +259,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "KiB/s"
                                 , "macos.plugin"
                                 , "iokit"
-                                , 2000
+                                , NETDATA_CHART_PRIO_DISK_IO
                                 , update_every
                                 , RRDSET_TYPE_AREA
                         );
@@ -191,8 +269,11 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                     }
 
-                    prev_diskstat.bytes_read = rrddim_set(st, "reads", diskstat.bytes_read);
-                    prev_diskstat.bytes_write = rrddim_set(st, "writes", diskstat.bytes_write);
+                    if (likely(disk_state))
+                        disk_state->st_io = st;
+
+                    rrddim_set(st, "reads", diskstat.bytes_read);
+                    rrddim_set(st, "writes", diskstat.bytes_write);
                     rrdset_done(st);
 
                     /* Get number of reads. */
@@ -217,7 +298,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "operations/s"
                                 , "macos.plugin"
                                 , "iokit"
-                                , 2001
+                                , NETDATA_CHART_PRIO_DISK_OPS
                                 , update_every
                                 , RRDSET_TYPE_LINE
                         );
@@ -227,8 +308,11 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                     }
 
-                    prev_diskstat.operations_read = rrddim_set(st, "reads", diskstat.reads);
-                    prev_diskstat.operations_write = rrddim_set(st, "writes", diskstat.writes);
+                    if (likely(disk_state))
+                        disk_state->st_ops = st;
+
+                    rrddim_set(st, "reads", diskstat.reads);
+                    rrddim_set(st, "writes", diskstat.writes);
                     rrdset_done(st);
 
                     /* Get reads time. */
@@ -241,30 +325,52 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         CFNumberGetValue(number, kCFNumberSInt64Type, &diskstat.time_write);
                     }
 
-                    st = rrdset_find_active_bytype_localhost("disk_util", diskstat.name);
-                    if (unlikely(!st)) {
-                        st = rrdset_create_localhost(
-                                "disk_util"
-                                , diskstat.name
-                                , NULL
-                                , "utilization"
-                                , "disk.util"
-                                , "Disk Utilization Time"
-                                , "% of time working"
-                                , "macos.plugin"
-                                , "iokit"
-                                , 2004
-                                , update_every
-                                , RRDSET_TYPE_AREA
-                        );
-
-                        rrddim_add(st, "utilization", NULL, 1, 10000000, RRD_ALGORITHM_INCREMENTAL);
-                        rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
-                    }
-
                     cur_diskstat.busy_time_ns = (diskstat.time_read + diskstat.time_write);
-                    prev_diskstat.busy_time_ns = rrddim_set(st, "utilization", cur_diskstat.busy_time_ns);
-                    rrdset_done(st);
+                    collected_number disk_ops_delta = 0;
+                    if (likely(
+                            have_previous_disk_sample && diskstat.reads >= disk_state->operations_read &&
+                            diskstat.writes >= disk_state->operations_write))
+                        disk_ops_delta =
+                            (diskstat.reads - disk_state->operations_read) +
+                            (diskstat.writes - disk_state->operations_write);
+
+                    bool have_busy_time_delta = false;
+                    collected_number busy_time_delta_ns = 0;
+
+                    if (likely(disk_state)) {
+                        collected_number previous_busy_time_ns = disk_state->busy_time_ns;
+                        bool busy_time_monotonic = cur_diskstat.busy_time_ns >= previous_busy_time_ns;
+                        usec_t elapsed_ut = disk_state->last_busy_time_ut && now_ut > disk_state->last_busy_time_ut ?
+                                                now_ut - disk_state->last_busy_time_ut :
+                                                0;
+
+                        if (likely(have_previous_disk_sample && busy_time_monotonic)) {
+                            busy_time_delta_ns = cur_diskstat.busy_time_ns - previous_busy_time_ns;
+                            have_busy_time_delta = true;
+                        }
+
+                        uint64_t disk_utilization = 0;
+                        if (likely(have_busy_time_delta && elapsed_ut)) {
+                            nsec_t elapsed_ns = elapsed_ut * NSEC_PER_USEC;
+                            NETDATA_DOUBLE utilization =
+                                (NETDATA_DOUBLE)busy_time_delta_ns * DISK_UTILIZATION_MAX_PERCENT /
+                                (NETDATA_DOUBLE)elapsed_ns;
+
+                            if (utilization > DISK_UTILIZATION_MAX_PERCENT)
+                                utilization = DISK_UTILIZATION_MAX_PERCENT;
+
+                            disk_utilization = (uint64_t)utilization;
+                        }
+
+                        common_disk_util(
+                            &disk_state->disk_util,
+                            diskstat.name,
+                            NULL,
+                            disk_utilization,
+                            update_every,
+                            macos_iokit_disk_util_labels_cb,
+                            diskstat.name);
+                    }
 
                     /* Get reads latency. */
                     if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsLatentReadTimeKey)))) {
@@ -288,7 +394,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                 , "milliseconds/s"
                                 , "macos.plugin"
                                 , "iokit"
-                                , 2022
+                                , NETDATA_CHART_PRIO_DISK_IOTIME
                                 , update_every
                                 , RRDSET_TYPE_LINE
                         );
@@ -298,16 +404,46 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                     }
 
+                    if (likely(disk_state))
+                        disk_state->st_iotime = st;
+
                     cur_diskstat.duration_read_ns = diskstat.time_read + diskstat.latency_read;
                     cur_diskstat.duration_write_ns = diskstat.time_write + diskstat.latency_write;
-                    prev_diskstat.duration_read_ns = rrddim_set(st, "reads", cur_diskstat.duration_read_ns);
-                    prev_diskstat.duration_write_ns = rrddim_set(st, "writes", cur_diskstat.duration_write_ns);
+                    rrddim_set(st, "reads", cur_diskstat.duration_read_ns);
+                    rrddim_set(st, "writes", cur_diskstat.duration_write_ns);
                     rrdset_done(st);
 
                     // calculate differential charts
                     // only if this is not the first time we run
 
                     if (likely(dt)) {
+                        collected_number reads_delta = 0;
+                        collected_number writes_delta = 0;
+                        collected_number duration_read_delta_ns = 0;
+                        collected_number duration_write_delta_ns = 0;
+                        collected_number bytes_read_delta = 0;
+                        collected_number bytes_write_delta = 0;
+
+                        if (likely(have_previous_disk_sample)) {
+                            if (diskstat.reads > disk_state->operations_read) {
+                                reads_delta = diskstat.reads - disk_state->operations_read;
+                                if (cur_diskstat.duration_read_ns >= disk_state->duration_read_ns)
+                                    duration_read_delta_ns =
+                                        cur_diskstat.duration_read_ns - disk_state->duration_read_ns;
+                                if (diskstat.bytes_read >= disk_state->bytes_read)
+                                    bytes_read_delta = diskstat.bytes_read - disk_state->bytes_read;
+                            }
+
+                            if (diskstat.writes > disk_state->operations_write) {
+                                writes_delta = diskstat.writes - disk_state->operations_write;
+                                if (cur_diskstat.duration_write_ns >= disk_state->duration_write_ns)
+                                    duration_write_delta_ns =
+                                        cur_diskstat.duration_write_ns - disk_state->duration_write_ns;
+                                if (diskstat.bytes_write >= disk_state->bytes_write)
+                                    bytes_write_delta = diskstat.bytes_write - disk_state->bytes_write;
+                            }
+                        }
+
                         st = rrdset_find_active_bytype_localhost("disk_await", diskstat.name);
                         if (unlikely(!st)) {
                             st = rrdset_create_localhost(
@@ -320,7 +456,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , "milliseconds/operation"
                                     , "macos.plugin"
                                     , "iokit"
-                                    , 2005
+                                    , NETDATA_CHART_PRIO_DISK_AWAIT
                                     , update_every
                                     , RRDSET_TYPE_LINE
                             );
@@ -330,10 +466,11 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                         }
 
-                        rrddim_set(st, "reads", (diskstat.reads - prev_diskstat.operations_read) ?
-                            (cur_diskstat.duration_read_ns - prev_diskstat.duration_read_ns) / (diskstat.reads - prev_diskstat.operations_read) : 0);
-                        rrddim_set(st, "writes", (diskstat.writes - prev_diskstat.operations_write) ?
-                            (cur_diskstat.duration_write_ns - prev_diskstat.duration_write_ns) / (diskstat.writes - prev_diskstat.operations_write) : 0);
+                        if (likely(disk_state))
+                            disk_state->st_await = st;
+
+                        rrddim_set(st, "reads", reads_delta > 0 ? duration_read_delta_ns / reads_delta : 0);
+                        rrddim_set(st, "writes", writes_delta > 0 ? duration_write_delta_ns / writes_delta : 0);
                         rrdset_done(st);
 
                         st = rrdset_find_active_bytype_localhost("disk_avgsz", diskstat.name);
@@ -348,7 +485,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , "KiB/operation"
                                     , "macos.plugin"
                                     , "iokit"
-                                    , 2006
+                                    , NETDATA_CHART_PRIO_DISK_AVGSZ
                                     , update_every
                                     , RRDSET_TYPE_AREA
                             );
@@ -358,10 +495,11 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                         }
 
-                        rrddim_set(st, "reads", (diskstat.reads - prev_diskstat.operations_read) ?
-                            (diskstat.bytes_read - prev_diskstat.bytes_read) / (diskstat.reads - prev_diskstat.operations_read) : 0);
-                        rrddim_set(st, "writes", (diskstat.writes - prev_diskstat.operations_write) ?
-                            (diskstat.bytes_write - prev_diskstat.bytes_write) / (diskstat.writes - prev_diskstat.operations_write) : 0);
+                        if (likely(disk_state))
+                            disk_state->st_avgsz = st;
+
+                        rrddim_set(st, "reads", reads_delta > 0 ? bytes_read_delta / reads_delta : 0);
+                        rrddim_set(st, "writes", writes_delta > 0 ? bytes_write_delta / writes_delta : 0);
                         rrdset_done(st);
 
                         st = rrdset_find_active_bytype_localhost("disk_svctm", diskstat.name);
@@ -376,7 +514,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                                     , "milliseconds/operation"
                                     , "macos.plugin"
                                     , "iokit"
-                                    , 2007
+                                    , NETDATA_CHART_PRIO_DISK_SVCTM
                                     , update_every
                                     , RRDSET_TYPE_LINE
                             );
@@ -385,9 +523,26 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             rrdlabels_add(st->rrdlabels, "device", diskstat.name, RRDLABEL_SRC_AUTO);
                         }
 
-                        rrddim_set(st, "svctm", ((diskstat.reads - prev_diskstat.operations_read) + (diskstat.writes - prev_diskstat.operations_write)) ?
-                            (cur_diskstat.busy_time_ns - prev_diskstat.busy_time_ns) / ((diskstat.reads - prev_diskstat.operations_read) + (diskstat.writes - prev_diskstat.operations_write)) : 0);
+                        if (likely(disk_state))
+                            disk_state->st_svctm = st;
+
+                        rrddim_set(
+                            st, "svctm",
+                            have_busy_time_delta && disk_ops_delta > 0 ? busy_time_delta_ns / disk_ops_delta : 0);
                         rrdset_done(st);
+                    }
+
+                    if (likely(disk_state)) {
+                        disk_state->bytes_read = diskstat.bytes_read;
+                        disk_state->bytes_write = diskstat.bytes_write;
+                        disk_state->operations_read = diskstat.reads;
+                        disk_state->operations_write = diskstat.writes;
+                        disk_state->duration_read_ns = cur_diskstat.duration_read_ns;
+                        disk_state->duration_write_ns = cur_diskstat.duration_write_ns;
+                        disk_state->busy_time_ns = cur_diskstat.busy_time_ns;
+                        disk_state->last_busy_time_ut = now_ut;
+                        disk_state->last_seen_ut = now_ut;
+                        disk_state->previous_sample_seen = true;
                     }
                 }
 
@@ -402,6 +557,8 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
         /* Release. */
         IOObjectRelease(drive_list);
+
+        macos_iokit_prune_disk_states(now_ut);
     }
 
     if (likely(do_io)) {

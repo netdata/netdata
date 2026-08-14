@@ -17,7 +17,7 @@ For a complete explanation of node states, state transitions, and when nodes mov
 
 **Stale means this node is a Child that has stopped streaming to its Parent, but the Parent still retains its historical data.**
 
-You can't delete a Stale node because the Parent is alive/connected to the Cloud and has data for the Stale node. The UI disables the "Remove" option to protect this historical data and maintain the parent-child relationship integrity.<br/>
+You can't delete a Stale node because the Parent is alive/connected to the Cloud and has data for the Stale node. The UI disables the "Delete" option to protect this historical data and maintain the parent-child relationship integrity.<br/>
 
 This is why stale nodes show "Delete is disabled" - the system prevents deletion while the parent node still holds queryable metrics data for that child.<br/>
 </details>
@@ -40,7 +40,7 @@ This is why stale nodes show "Delete is disabled" - the system prevents deletion
 
 :::note
 
-You need **Admin** role in your Space to remove nodes. The CLI method requires a system with Netdata Agent installed.
+Deleting a node from the Space requires the **Admin** role; removing it from a room only requires **Manager** or **Admin**. The CLI method requires a system with Netdata Agent installed.
 
 :::
 
@@ -68,7 +68,7 @@ Stale status does not apply to standalone nodes — stale specifically means a c
 
 :::note
 
-The **Remove** option is only available in the **Space Settings** view. It will appear disabled in the "All Nodes" room or other parts of the UI.
+The trash icon here performs the **Delete** action, which removes the node from the Space entirely and requires the **Admin** role. This is different from the **Remove** action shown in room views, which only removes a node from that specific room. Remove is unavailable in the default "All Nodes" room — shown disabled or replaced with a different delete option depending on the view — but works normally in other rooms.
 
 :::
 
@@ -167,11 +167,13 @@ To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packa
 
 ## Troubleshooting
 
+**"Remove option is disabled" (or "node removal is not allowed in this room")**: The room-scoped **Remove** action is unavailable in the default "All Nodes" room by design — some views show it disabled, others replace it with a different delete option — but it works normally in other rooms. This is not the Stale-node "Delete is disabled" case described below. To remove an Offline node from the Space entirely, use **Delete** in Space Settings > Nodes instead. See the note under **Removing Offline Standalone Nodes (UI Method)** above for the Remove vs. Delete distinction.
+
 **"Delete is disabled"**: The node is Stale, not Offline. Use the CLI approach for child nodes.
 
 **"Command not found"**: Ensure you're running `netdatacli` on a system with Netdata Agent installed.
 
-**"Permission denied"**: You need **Admin** role in the Space to remove nodes.
+**"Permission denied"**: Deleting a node from the Space requires the **Admin** role; removing a node from a room requires **Manager** or **Admin**.
 
 **"Node '\<name>' (machine guid: \<guid>) is our localhost - not changing it"**: The machine GUID you provided belongs to the agent where you are running `netdatacli`—in this procedure, that should be the Parent Agent—not the stale child node you want to remove. This usually happens when you accidentally copy the Parent's own machine GUID instead of the stale child's. Verify you are using the correct machine GUID by checking the stale child's node info in Netdata Cloud — the GUID must belong to the disconnected child, not the Parent Agent you are logged into.
 

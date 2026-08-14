@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +31,7 @@ func TestRequest_Copy(t *testing.T) {
 					"X-Api-Key": "secret",
 				},
 				Username:      "username",
-				Password:      "password",
+				Password:      "test-password",
 				ProxyUsername: "proxy_username",
 				ProxyPassword: "proxy_password",
 			},
@@ -92,7 +94,7 @@ func TestNewHTTPRequest(t *testing.T) {
 	// Create a temporary file for bearer token test
 	tmpDir := t.TempDir()
 	bearerTokenFile := filepath.Join(tmpDir, "token")
-	err := os.WriteFile(bearerTokenFile, []byte("test-bearer-token"), 0644)
+	err := os.WriteFile(bearerTokenFile, []byte("test-token"), 0o644)
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -159,7 +161,7 @@ func TestNewHTTPRequest(t *testing.T) {
 			},
 			validate: func(t *testing.T, req *http.Request, cfg RequestConfig) {
 				auth := req.Header.Get("Authorization")
-				assert.Equal(t, "Bearer test-bearer-token", auth)
+				assert.Equal(t, "Bearer test-token", auth)
 			},
 		},
 		"bearer token file not found": {
@@ -180,7 +182,7 @@ func TestNewHTTPRequest(t *testing.T) {
 			validate: func(t *testing.T, req *http.Request, cfg RequestConfig) {
 				// Should have bearer token, not basic auth
 				auth := req.Header.Get("Authorization")
-				assert.Equal(t, "Bearer test-bearer-token", auth)
+				assert.Equal(t, "Bearer test-token", auth)
 
 				// Basic auth should not be set
 				_, _, ok := req.BasicAuth()
@@ -275,6 +277,110 @@ func TestNewHTTPRequest(t *testing.T) {
 			if test.validate != nil {
 				test.validate(t, httpReq, test.req)
 			}
+		})
+	}
+}
+
+func TestBearerTokenFileBounds(t *testing.T) {
+	token := strings.Repeat("t", int(safefile.MaxSize))
+	tests := map[string]struct {
+		prepare  func(t *testing.T) string
+		wantAuth string
+		wantErrs []error
+	}{
+		"accepts a regular file at the limit": {
+			prepare: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "token")
+				require.NoError(t, os.WriteFile(path, []byte(token), 0o600))
+				return path
+			},
+			wantAuth: "Bearer " + token,
+		},
+		"rejects a regular file over the limit": {
+			prepare: func(t *testing.T) string {
+				path := filepath.Join(t.TempDir(), "token")
+				require.NoError(t, os.WriteFile(path, make([]byte, safefile.MaxSize+1), 0o600))
+				return path
+			},
+			wantErrs: []error{safefile.ErrFile, safefile.ErrTooLarge},
+		},
+		"rejects a non-regular opened object": {
+			prepare:  func(t *testing.T) string { return t.TempDir() },
+			wantErrs: []error{safefile.ErrFile, safefile.ErrNotRegular},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			req, err := NewHTTPRequest(RequestConfig{
+				URL:             "http://example.com",
+				BearerTokenFile: tc.prepare(t),
+			})
+
+			if len(tc.wantErrs) > 0 {
+				require.Error(t, err)
+				for _, wantErr := range tc.wantErrs {
+					require.ErrorIs(t, err, wantErr)
+				}
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.wantAuth, req.Header.Get("Authorization"))
+		})
+	}
+}
+
+func TestBearerTokenFileOutsideK8sSuppression(t *testing.T) {
+	if hostinfo.IsInsideK8sCluster() {
+		t.Skip("suppression applies only outside Kubernetes")
+	}
+
+	req, err := NewHTTPRequest(RequestConfig{
+		URL:             "http://example.com",
+		BearerTokenFile: "/var/run/secrets/netdata-test-missing-token",
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, req.Header.Get("Authorization"))
+}
+
+func TestOptionalK8sTokenFileError(t *testing.T) {
+	tests := map[string]struct {
+		path      string
+		insideK8s bool
+		err       error
+		want      bool
+	}{
+		"missing secret outside Kubernetes": {
+			path: "/var/run/secrets/netdata-test-missing-token",
+			err:  os.ErrNotExist,
+			want: true,
+		},
+		"missing secret inside Kubernetes": {
+			path:      "/var/run/secrets/netdata-test-missing-token",
+			insideK8s: true,
+			err:       os.ErrNotExist,
+		},
+		"missing file outside the secrets directory": {
+			path: "/tmp/netdata-test-missing-token",
+			err:  os.ErrNotExist,
+		},
+		"permission failure": {
+			path: "/var/run/secrets/netdata-test-token",
+			err:  os.ErrPermission,
+		},
+		"oversized file": {
+			path: "/var/run/secrets/netdata-test-token",
+			err:  safefile.ErrTooLarge,
+		},
+		"non-regular file": {
+			path: "/var/run/secrets/netdata-test-token",
+			err:  safefile.ErrNotRegular,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, isOptionalK8sTokenFileError(tc.path, tc.insideK8s, tc.err))
 		})
 	}
 }

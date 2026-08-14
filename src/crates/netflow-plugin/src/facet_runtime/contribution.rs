@@ -13,9 +13,12 @@ const HASHMAP_ENTRY_OVERHEAD_BYTES: usize = size_of::<usize>() * 2;
 pub(crate) trait FacetValueSink {
     fn insert_text_static(&mut self, field: &'static str, value: &str);
     fn insert_u8_static(&mut self, field: &'static str, value: u8);
+    fn insert_u8_present_static(&mut self, field: &'static str, value: u8);
     fn insert_u16_static(&mut self, field: &'static str, value: u16);
+    fn insert_u16_present_static(&mut self, field: &'static str, value: u16);
     fn insert_u32_static(&mut self, field: &'static str, value: u32);
-    fn insert_u64_static(&mut self, field: &'static str, value: u64);
+    fn insert_u32_present_static(&mut self, field: &'static str, value: u32);
+    fn insert_u64_present_static(&mut self, field: &'static str, value: u64);
     fn insert_ip_static(&mut self, field: &'static str, value: Option<IpAddr>);
 }
 
@@ -31,6 +34,22 @@ impl FacetFileContribution {
 
     pub(super) fn iter(&self) -> impl Iterator<Item = (&'static str, &FacetStore)> + '_ {
         self.fields.iter().map(|(field, store)| (*field, store))
+    }
+
+    pub(super) fn merge_from(&mut self, other: &Self) -> bool {
+        let mut changed = false;
+        for (field, store) in other.iter() {
+            match self.fields.entry(field) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    changed |= entry.get_mut().merge_from(store);
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(store.clone());
+                    changed = true;
+                }
+            }
+        }
+        changed
     }
 
     pub(super) fn from_scanned_values(values: BTreeMap<String, BTreeSet<String>>) -> Self {
@@ -129,13 +148,6 @@ impl FacetFileContribution {
         let _ = store.insert_u32(value);
     }
 
-    pub(crate) fn insert_u64_static(&mut self, field: &'static str, value: u64) {
-        if value == 0 {
-            return;
-        }
-        self.insert_u64_present_static(field, value);
-    }
-
     pub(crate) fn insert_u64_present_static(&mut self, field: &'static str, value: u64) {
         let Some(spec) = facet_field_spec_static(field) else {
             return;
@@ -196,16 +208,28 @@ impl FacetValueSink for FacetFileContribution {
         FacetFileContribution::insert_u8_static(self, field, value);
     }
 
+    fn insert_u8_present_static(&mut self, field: &'static str, value: u8) {
+        FacetFileContribution::insert_u8_present_static(self, field, value);
+    }
+
     fn insert_u16_static(&mut self, field: &'static str, value: u16) {
         FacetFileContribution::insert_u16_static(self, field, value);
+    }
+
+    fn insert_u16_present_static(&mut self, field: &'static str, value: u16) {
+        FacetFileContribution::insert_u16_present_static(self, field, value);
     }
 
     fn insert_u32_static(&mut self, field: &'static str, value: u32) {
         FacetFileContribution::insert_u32_static(self, field, value);
     }
 
-    fn insert_u64_static(&mut self, field: &'static str, value: u64) {
-        FacetFileContribution::insert_u64_static(self, field, value);
+    fn insert_u32_present_static(&mut self, field: &'static str, value: u32) {
+        FacetFileContribution::insert_u32_present_static(self, field, value);
+    }
+
+    fn insert_u64_present_static(&mut self, field: &'static str, value: u64) {
+        FacetFileContribution::insert_u64_present_static(self, field, value);
     }
 
     fn insert_ip_static(&mut self, field: &'static str, value: Option<IpAddr>) {
@@ -284,17 +308,17 @@ where
             continue;
         }
 
+        if let Some(spec) = facet_field_spec(field) {
+            contribution.insert_raw_spec(*spec, value.as_ref());
+        }
+
         match field {
             "PROTOCOL" => protocol = Some(value.into_owned()),
             "ICMPV4_TYPE" => icmpv4_type = Some(value.into_owned()),
             "ICMPV4_CODE" => icmpv4_code = Some(value.into_owned()),
             "ICMPV6_TYPE" => icmpv6_type = Some(value.into_owned()),
             "ICMPV6_CODE" => icmpv6_code = Some(value.into_owned()),
-            _ => {
-                if let Some(spec) = facet_field_spec(field) {
-                    contribution.insert_raw_spec(*spec, value.as_ref());
-                }
-            }
+            _ => {}
         }
     }
 
@@ -328,11 +352,12 @@ fn append_record_core_fields(sink: &mut impl FacetValueSink, record: &FlowRecord
     sink.insert_text_static("EXPORTER_SITE", &record.exporter_site);
     sink.insert_text_static("EXPORTER_REGION", &record.exporter_region);
     sink.insert_text_static("EXPORTER_TENANT", &record.exporter_tenant);
+    sink.insert_u8_present_static("PROTOCOL", record.protocol);
     if record.has_etype() {
-        sink.insert_u16_static("ETYPE", record.etype);
+        sink.insert_u16_present_static("ETYPE", record.etype);
     }
     if record.has_forwarding_status() {
-        sink.insert_u8_static("FORWARDING_STATUS", record.forwarding_status);
+        sink.insert_u8_present_static("FORWARDING_STATUS", record.forwarding_status);
     }
     if record.has_direction() {
         sink.insert_text_static("DIRECTION", record.direction.as_str());
@@ -383,20 +408,20 @@ fn append_record_interface_fields(sink: &mut impl FacetValueSink, record: &FlowR
     sink.insert_text_static("IN_IF_DESCRIPTION", &record.in_if_description);
     sink.insert_text_static("OUT_IF_DESCRIPTION", &record.out_if_description);
     if record.has_in_if_speed() {
-        sink.insert_u64_static("IN_IF_SPEED", record.in_if_speed);
+        sink.insert_u64_present_static("IN_IF_SPEED", record.in_if_speed);
     }
     if record.has_out_if_speed() {
-        sink.insert_u64_static("OUT_IF_SPEED", record.out_if_speed);
+        sink.insert_u64_present_static("OUT_IF_SPEED", record.out_if_speed);
     }
     sink.insert_text_static("IN_IF_PROVIDER", &record.in_if_provider);
     sink.insert_text_static("OUT_IF_PROVIDER", &record.out_if_provider);
     sink.insert_text_static("IN_IF_CONNECTIVITY", &record.in_if_connectivity);
     sink.insert_text_static("OUT_IF_CONNECTIVITY", &record.out_if_connectivity);
     if record.has_in_if_boundary() {
-        sink.insert_u8_static("IN_IF_BOUNDARY", record.in_if_boundary);
+        sink.insert_u8_present_static("IN_IF_BOUNDARY", record.in_if_boundary);
     }
     if record.has_out_if_boundary() {
-        sink.insert_u8_static("OUT_IF_BOUNDARY", record.out_if_boundary);
+        sink.insert_u8_present_static("OUT_IF_BOUNDARY", record.out_if_boundary);
     }
 }
 
@@ -409,10 +434,10 @@ fn append_record_transport_fields(sink: &mut impl FacetValueSink, record: &FlowR
     sink.insert_u16_static("SRC_PORT_NAT", record.src_port_nat);
     sink.insert_u16_static("DST_PORT_NAT", record.dst_port_nat);
     if record.has_src_vlan() {
-        sink.insert_u16_static("SRC_VLAN", record.src_vlan);
+        sink.insert_u16_present_static("SRC_VLAN", record.src_vlan);
     }
     if record.has_dst_vlan() {
-        sink.insert_u16_static("DST_VLAN", record.dst_vlan);
+        sink.insert_u16_present_static("DST_VLAN", record.dst_vlan);
     }
     if let Some(mac) = format_mac(record.src_mac) {
         sink.insert_text_static("SRC_MAC", &mac);
@@ -425,47 +450,44 @@ fn append_record_transport_fields(sink: &mut impl FacetValueSink, record: &FlowR
 fn append_record_header_fields(sink: &mut impl FacetValueSink, record: &FlowRecord) {
     sink.insert_u8_static("IPTTL", record.ipttl);
     if record.has_iptos() {
-        sink.insert_u8_static("IPTOS", record.iptos);
+        sink.insert_u8_present_static("IPTOS", record.iptos);
     }
     sink.insert_u32_static("IPV6_FLOW_LABEL", record.ipv6_flow_label);
     if record.has_tcp_flags() {
-        sink.insert_u8_static("TCP_FLAGS", record.tcp_flags);
+        sink.insert_u8_present_static("TCP_FLAGS", record.tcp_flags);
     }
     sink.insert_u32_static("IP_FRAGMENT_ID", record.ip_fragment_id);
     sink.insert_u16_static("IP_FRAGMENT_OFFSET", record.ip_fragment_offset);
+    if record.has_icmpv4_type() {
+        sink.insert_u8_present_static("ICMPV4_TYPE", record.icmpv4_type);
+    }
+    if record.has_icmpv4_code() {
+        sink.insert_u8_present_static("ICMPV4_CODE", record.icmpv4_code);
+    }
+    if record.has_icmpv6_type() {
+        sink.insert_u8_present_static("ICMPV6_TYPE", record.icmpv6_type);
+    }
+    if record.has_icmpv6_code() {
+        sink.insert_u8_present_static("ICMPV6_CODE", record.icmpv6_code);
+    }
     sink.insert_text_static("MPLS_LABELS", &record.mpls_labels);
 }
 
 fn append_record_virtual_icmp_fields(sink: &mut impl FacetValueSink, record: &FlowRecord) {
-    let protocol = (record.protocol != 0).then_some(record.protocol.to_string());
-    let icmpv4_type = record
-        .has_icmpv4_type()
-        .then_some(record.icmpv4_type.to_string());
-    let icmpv4_code = record
-        .has_icmpv4_code()
-        .then_some(record.icmpv4_code.to_string());
-    let icmpv6_type = record
-        .has_icmpv6_type()
-        .then_some(record.icmpv6_type.to_string());
-    let icmpv6_code = record
-        .has_icmpv6_code()
-        .then_some(record.icmpv6_code.to_string());
+    let (field, icmp_type, icmp_code) = match record.protocol {
+        1 if record.has_icmpv4_type() && record.has_icmpv4_code() => {
+            ("ICMPV4", record.icmpv4_type, record.icmpv4_code)
+        }
+        58 if record.has_icmpv6_type() && record.has_icmpv6_code() => {
+            ("ICMPV6", record.icmpv6_type, record.icmpv6_code)
+        }
+        _ => return,
+    };
 
-    if let Some(value) = presentation::icmp_virtual_value(
-        "ICMPV4",
-        protocol.as_deref(),
-        icmpv4_type.as_deref(),
-        icmpv4_code.as_deref(),
-    ) {
-        sink.insert_text_static("ICMPV4", &value);
-    }
-    if let Some(value) = presentation::icmp_virtual_value(
-        "ICMPV6",
-        protocol.as_deref(),
-        icmpv6_type.as_deref(),
-        icmpv6_code.as_deref(),
-    ) {
-        sink.insert_text_static("ICMPV6", &value);
+    if let Some(value) =
+        presentation::icmp_virtual_value_from_parts(record.protocol, icmp_type, icmp_code)
+    {
+        sink.insert_text_static(field, value.as_ref());
     }
 }
 
@@ -531,6 +553,7 @@ mod tests {
             dst_port: 443,
             ipttl: 64,
             ipv6_flow_label: 1234,
+            ip_fragment_id: 70_000,
             mpls_labels: "100-200".to_string(),
             ..FlowRecord::default()
         };
@@ -550,7 +573,8 @@ mod tests {
 
         let mut data = Vec::new();
         let mut refs = Vec::new();
-        record.encode_to_journal_buf(&mut data, &mut refs);
+        let mut value_starts = Vec::new();
+        record.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
 
         let encoded = facet_contribution_from_encoded_fields(refs.iter().map(|r| &data[r.clone()]));
         let direct = facet_contribution_from_record(&record);
@@ -559,5 +583,115 @@ mod tests {
             contribution_strings(&direct),
             contribution_strings(&encoded)
         );
+        assert_eq!(
+            contribution_strings(&direct).get("IP_FRAGMENT_ID"),
+            Some(&vec!["70000".to_string()]),
+            "fragment IDs above u16::MAX must survive direct and encoded contribution paths"
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("PROTOCOL"),
+            Some(&vec!["6".to_string()]),
+            "protocol must survive direct and encoded contribution paths"
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("DIRECTION"),
+            Some(&vec!["ingress".to_string()]),
+            "direction must use its logical text representation"
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("ICMPV4_TYPE"),
+            Some(&vec!["8".to_string()])
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("ICMPV4_CODE"),
+            Some(&vec!["0".to_string()])
+        );
+    }
+
+    #[test]
+    fn record_and_encoded_contributions_preserve_zero_protocol() {
+        let record = FlowRecord {
+            flow_version: "v9",
+            protocol: 0,
+            ..FlowRecord::default()
+        };
+        let mut data = Vec::new();
+        let mut refs = Vec::new();
+        let mut value_starts = Vec::new();
+        record.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
+        assert!(
+            refs.iter()
+                .any(|range| &data[range.clone()] == b"PROTOCOL=0"),
+            "the raw journal must encode required protocol zero explicitly"
+        );
+
+        let encoded = facet_contribution_from_encoded_fields(refs.iter().map(|r| &data[r.clone()]));
+        let direct = facet_contribution_from_record(&record);
+
+        assert_eq!(
+            contribution_strings(&direct),
+            contribution_strings(&encoded)
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("PROTOCOL"),
+            Some(&vec!["0".to_string()]),
+            "protocol zero is a journaled value, not an absent optional field"
+        );
+    }
+
+    #[test]
+    fn record_and_encoded_contributions_preserve_present_numeric_zeroes() {
+        let mut record = FlowRecord {
+            flow_version: "v9",
+            protocol: 17,
+            ..FlowRecord::default()
+        };
+        record.set_etype(0);
+        record.set_forwarding_status(0);
+        record.set_in_if_speed(0);
+        record.set_out_if_speed(0);
+        record.set_in_if_boundary(0);
+        record.set_out_if_boundary(0);
+        record.set_src_vlan(0);
+        record.set_dst_vlan(0);
+        record.set_iptos(0);
+        record.set_tcp_flags(0);
+        record.set_icmpv4_type(0);
+        record.set_icmpv4_code(0);
+        record.set_icmpv6_type(0);
+        record.set_icmpv6_code(0);
+
+        let mut data = Vec::new();
+        let mut refs = Vec::new();
+        let mut value_starts = Vec::new();
+        record.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
+
+        let encoded = facet_contribution_from_encoded_fields(refs.iter().map(|r| &data[r.clone()]));
+        let direct = facet_contribution_from_record(&record);
+        let direct_values = contribution_strings(&direct);
+
+        assert_eq!(direct_values, contribution_strings(&encoded));
+        for field in [
+            "ETYPE",
+            "FORWARDING_STATUS",
+            "IN_IF_SPEED",
+            "OUT_IF_SPEED",
+            "IN_IF_BOUNDARY",
+            "OUT_IF_BOUNDARY",
+            "SRC_VLAN",
+            "DST_VLAN",
+            "IPTOS",
+            "TCP_FLAGS",
+            "ICMPV4_TYPE",
+            "ICMPV4_CODE",
+            "ICMPV6_TYPE",
+            "ICMPV6_CODE",
+        ] {
+            assert_eq!(
+                direct_values.get(field),
+                Some(&vec!["0".to_string()]),
+                "{field} must distinguish present zero from missing"
+            );
+        }
     }
 }

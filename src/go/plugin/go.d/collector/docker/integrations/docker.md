@@ -179,11 +179,13 @@ The following alerts are available:
 | [ docker_container_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf) | docker.container_state | Docker container ${label:container_name} is currently exited. This alert is disabled by default. To enable it, modify the chart labels filter in the stock health configuration (docker.conf) from container_name=!* to match your container names. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -195,12 +197,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| docker.containers_state | running, paused, stopped | containers |
-| docker.containers_health_status | healthy, unhealthy, not_running_unhealthy, starting, no_healthcheck | containers |
-| docker.images | active, dangling | images |
-| docker.images_size | size | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| docker.containers_state | Total number of Docker containers in various states | running, paused, stopped | containers |
+| docker.containers_health_status | Total number of Docker containers in various health states | healthy, unhealthy, not_running_unhealthy, starting, no_healthcheck | containers |
+| docker.images | Total number of Docker images in various states | active, dangling | images |
+| docker.images_size | Total size of all Docker images | size | bytes |
+
 
 ### Per container
 
@@ -215,11 +218,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| docker.container_state | running, paused, exited, created, restarting, removing, dead | state |
-| docker.container_health_status | healthy, unhealthy, not_running_unhealthy, starting, no_healthcheck | status |
-| docker.container_writeable_layer_size | writeable_layer | size |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| docker.container_state | Docker container state | running, paused, exited, created, restarting, removing, dead | state |
+| docker.container_health_status | Docker container health status | healthy, unhealthy, not_running_unhealthy, starting, no_healthcheck | status |
+| docker.container_writeable_layer_size | Docker container writable layer size | writeable_layer | size |
 
 
 

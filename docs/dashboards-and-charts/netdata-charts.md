@@ -187,6 +187,16 @@ The **Group by** dropdown allows you to apply different grouping strategies on t
 | Group by Dimension | Aggregate data across all nodes by dimension                                                              |
 | Group by Label     | Summarize data based on label values                                                                      |
 
+The **Group by** option works together with the [Aggregate Functions dropdown](#aggregate-functions-dropdown). **Group by** decides how time-series are organized into chart lines, while the **Aggregate function** decides how multiple values combine *within* each group. Changing either one can change the number you see, even on the same chart.
+
+A common case is the network Bandwidth chart (`net.net`). Its dimensions are directional — `received` is displayed as positive and `sent` as negative (opposite signs, on an area chart). With **Group by Dimension**, `received` and `sent` stay as separate lines, so you can read each direction independently. With **Group by Instance**, both directions collapse into a single line per interface. Under the **Sum** aggregate function, the positive `received` and negative `sent` values then add up to a *net* value (received minus sent), not the total traffic — which is why the same interface can show very different numbers under the two groupings.
+
+:::tip
+
+To view total traffic on a specific interface, keep **Group by Dimension** and read `received` and `sent` separately — each represents one direction. Use the **Instances** dropdown to filter the chart to a single interface. Avoid using **Sum** to combine dimensions that have opposite signs: it produces a net difference, not a total.
+
+:::
+
 :::tip
 
 To see each node's hostname in the chart legend (the Dimensions Bar at the bottom of the chart), use **Group by Node**. Each node appears as a separate labeled dimension.

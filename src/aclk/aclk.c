@@ -532,9 +532,6 @@ const char *aclk_status_to_string(void) {
         return https_client_resp_t_2str((https_client_resp_t)status);
 
     switch(status) {
-        case ACLK_STATUS_CONNECTED:
-            return "connected";
-
         case ACLK_STATUS_OFFLINE:
             return "offline";
 
@@ -1058,7 +1055,7 @@ void aclk_send_node_instances()
 
 void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
-    aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
+    (void)aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname, NULL);
 }
 
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)

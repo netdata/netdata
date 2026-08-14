@@ -207,11 +207,13 @@ The following alerts are available:
 | [ vcsa_software_packages_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.software_packages_health_status | VCSA software packages security updates are available. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -259,16 +261,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vcsa.system_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.applmgmt_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.load_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.mem_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.swap_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.database_storage_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.storage_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.software_packages_health_status | green, red, orange, gray, unknown | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vcsa.system_health_status | VCSA Overall System health status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.applmgmt_health_status | VCSA ApplMgmt health status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.load_health_status | VCSA Load health status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.mem_health_status | VCSA Memory health status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.swap_health_status | VCSA Swap health status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.database_storage_health_status | VCSA Database Storage health status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.storage_health_status | VCSA Storage health status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.software_packages_health_status | VCSA Software Updates health status | green, red, orange, gray, unknown | status |
 
 
 

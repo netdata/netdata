@@ -2,6 +2,7 @@ use crate::facet_catalog::{AutocompleteMatchKind, FacetValueKind};
 use allocative::{Allocative, Key, Visitor};
 use bitvec::prelude::*;
 use hashbrown::HashTable;
+use ipnet::IpNet;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use std::hash::Hasher;
@@ -286,6 +287,13 @@ impl FacetStore {
             Self::SparseU32(store) => autocomplete_match_roaring(store, term, limit, match_kind),
             Self::SparseU64(store) => autocomplete_match_roaring(store, term, limit, match_kind),
             Self::IpAddr(store) => store.autocomplete_matches(term, limit, match_kind),
+        }
+    }
+
+    pub(super) fn mark_matching_ip_networks(&self, networks: &[IpNet], matched: &mut [bool]) {
+        debug_assert_eq!(networks.len(), matched.len());
+        if let Self::IpAddr(store) = self {
+            store.mark_matching_networks(networks, matched);
         }
     }
 
@@ -708,6 +716,60 @@ impl IpValueStore {
         values.sort_unstable();
         values.truncate(limit);
         values
+    }
+
+    fn mark_matching_networks(&self, networks: &[IpNet], matched: &mut [bool]) {
+        for (index, network) in networks.iter().enumerate() {
+            if matched[index] {
+                continue;
+            }
+            let IpNet::V4(network) = network else {
+                continue;
+            };
+            let start = u32::from(network.network());
+            let end = u32::from(network.broadcast());
+            let before = if start == 0 {
+                0
+            } else {
+                self.v4_values.rank(u64::from(start - 1))
+            };
+            matched[index] = self.v4_values.rank(u64::from(end)) > before;
+        }
+
+        let v6_ranges = networks
+            .iter()
+            .enumerate()
+            .filter_map(|(index, network)| {
+                if matched[index] {
+                    return None;
+                }
+                let IpNet::V6(network) = network else {
+                    return None;
+                };
+                Some((
+                    index,
+                    u128::from(network.network()),
+                    u128::from(network.broadcast()),
+                ))
+            })
+            .collect::<Vec<_>>();
+        if v6_ranges.is_empty() {
+            return;
+        }
+
+        let mut remaining = v6_ranges.len();
+        for value in &self.v6_values {
+            let value = u128::from_be_bytes(*value);
+            for &(index, start, end) in &v6_ranges {
+                if !matched[index] && (start..=end).contains(&value) {
+                    matched[index] = true;
+                    remaining -= 1;
+                }
+            }
+            if remaining == 0 {
+                break;
+            }
+        }
     }
 
     fn merge_from(&mut self, other: &Self) -> bool {

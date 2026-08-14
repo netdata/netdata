@@ -20,13 +20,9 @@ type labelSliceView struct {
 }
 
 func (v labelSliceView) Get(key string) (string, bool) {
-	for _, item := range v.items {
-		if item.Key == key {
-			return item.Value, true
-		}
-		if item.Key > key {
-			break
-		}
+	i := sort.Search(len(v.items), func(i int) bool { return v.items[i].Key >= key })
+	if i < len(v.items) && v.items[i].Key == key {
+		return v.items[i].Value, true
 	}
 	return "", false
 }
@@ -70,15 +66,37 @@ type InferredDimension struct {
 	Name            string
 }
 
+type dimensionAlgorithm uint8
+
+const (
+	dimensionAlgorithmAbsolute dimensionAlgorithm = iota
+	dimensionAlgorithmIncremental
+)
+
+func compactDimensionAlgorithm(algorithm program.Algorithm) dimensionAlgorithm {
+	if algorithm == program.AlgorithmIncremental {
+		return dimensionAlgorithmIncremental
+	}
+	return dimensionAlgorithmAbsolute
+}
+
+func (a dimensionAlgorithm) programAlgorithm() program.Algorithm {
+	if a == dimensionAlgorithmIncremental {
+		return program.AlgorithmIncremental
+	}
+	return program.AlgorithmAbsolute
+}
+
 type dimensionState struct {
-	hidden     bool
-	float      bool
-	static     bool
-	order      int
-	sortKey    dimensionSortKey
-	algorithm  program.Algorithm
-	multiplier int
-	divisor    int
+	sortKey     dimensionSortKey
+	order       int
+	multiplier  int
+	divisor     int
+	algorithm   dimensionAlgorithm
+	hidden      bool
+	float       bool
+	static      bool
+	aggregation program.Aggregation
 }
 
 type dimensionSortKind uint8
@@ -94,9 +112,57 @@ type dimensionSortKey struct {
 }
 
 type dimBuildEntry struct {
-	seenSeq uint64
-	value   metrix.SampleValue
+	seenSeq      uint64
+	observations uint64
+	value        metrix.SampleValue
 	dimensionState
+}
+
+func (e *dimBuildEntry) aggregate(value metrix.SampleValue) {
+	if e.aggregation == program.AggregationSum {
+		e.value += value
+		return
+	}
+	e.aggregateNonSum(value)
+}
+
+func (e *dimBuildEntry) aggregateNonSum(value metrix.SampleValue) {
+	switch e.aggregation {
+	case program.AggregationMin:
+		if math.IsNaN(e.value) || (!math.IsNaN(value) && value < e.value) {
+			e.value = value
+		}
+	case program.AggregationMax:
+		if math.IsNaN(e.value) || (!math.IsNaN(value) && value > e.value) {
+			e.value = value
+		}
+	case program.AggregationAvg:
+		e.observations++
+		e.value = runningAverage(e.value, value, e.observations)
+	}
+}
+
+func runningAverage(current, value metrix.SampleValue, observations uint64) metrix.SampleValue {
+	if math.IsNaN(current) || math.IsNaN(value) {
+		return math.NaN()
+	}
+	if math.IsInf(current, 0) {
+		if math.IsInf(value, 0) && math.Signbit(current) != math.Signbit(value) {
+			return math.NaN()
+		}
+		return current
+	}
+	if math.IsInf(value, 0) {
+		return value
+	}
+
+	n := float64(observations)
+	delta := value - current
+	if !math.IsInf(delta, 0) {
+		return math.FMA(delta, 1/n, current)
+	}
+
+	return current*((n-1)/n) + value/n
 }
 
 type chartState struct {
@@ -111,14 +177,16 @@ type chartState struct {
 }
 
 type planBuildContext struct {
-	out         *Plan
-	reader      metrix.Reader
-	collectMeta metrix.CollectMeta
-	buildCycle  uint64
-	prog        *program.Program
-	cache       *routeCache
-	index       matchIndex
-	flat        metrix.Reader
+	out               *Plan
+	reader            metrix.Reader
+	collectMeta       metrix.CollectMeta
+	buildCycle        uint64
+	prog              *program.Program
+	cache             *routeCache
+	routeCacheEnabled bool
+	routeObserver     func(PlanRouteDiagnostic)
+	index             matchIndex
+	flat              metrix.Reader
 
 	seenInfer        map[string]struct{}
 	chartsByID       map[string]*chartState
@@ -213,17 +281,25 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	}
 	sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 
-	// Route-cache lifecycle follows metrix snapshot membership.
-	phaseStartedAt = time.Now()
-	retainStats := ctx.cache.RetainSeen(ctx.collectMeta.LastSuccessSeq)
-	sample.phaseRetainSeconds = time.Since(phaseStartedAt).Seconds()
-	sample.routeCacheEntries = retainStats.EntriesAfter
-	sample.routeCacheRetained = retainStats.EntriesAfter
-	sample.routeCachePruned = retainStats.Pruned
-	sample.routeCacheFullDrop = retainStats.FullDrop
+	// Route-cache lifecycle follows metrix snapshot membership. Diagnostic plans
+	// bypass it completely so repeated attempts retain complete route facts.
+	if ctx.routeCacheEnabled {
+		phaseStartedAt = time.Now()
+		retainStats := ctx.cache.RetainSeen(ctx.collectMeta.LastSuccessSeq)
+		sample.phaseRetainSeconds = time.Since(phaseStartedAt).Seconds()
+		sample.routeCacheEntries = retainStats.EntriesAfter
+		sample.routeCacheRetained = retainStats.EntriesAfter
+		sample.routeCachePruned = retainStats.Pruned
+		sample.routeCacheFullDrop = retainStats.FullDrop
+	}
 
 	phaseStartedAt = time.Now()
-	removeByCapDims, removeByCapCharts := enforceLifecycleCaps(ctx.collectMeta.LastSuccessSeq, ctx.chartsByID, ctx.materialized)
+	removeByCapDims, removeByCapCharts := enforceLifecycleCapsWithObserver(
+		ctx.collectMeta.LastSuccessSeq,
+		ctx.chartsByID,
+		ctx.materialized,
+		ctx.routeObserver,
+	)
 	sample.phaseLifecycleCapsSec = time.Since(phaseStartedAt).Seconds()
 	sample.lifecycleRemovedDimensionByCap = len(removeByCapDims)
 	sample.lifecycleRemovedChartByCap = len(removeByCapCharts)
@@ -350,20 +426,22 @@ func (e *Engine) preparePlanBuildContext(
 	chartsCap := max(e.state.hints.chartsByID, len(materialized.charts))
 	seenInferCap := e.state.hints.seenInfer
 	return &planBuildContext{
-		out:              out,
-		reader:           reader,
-		collectMeta:      collectMeta,
-		buildCycle:       buildCycle,
-		prog:             prog,
-		cache:            cache,
-		index:            index,
-		flat:             reader,
-		seenInfer:        make(map[string]struct{}, seenInferCap),
-		chartsByID:       make(map[string]*chartState, chartsCap),
-		chartOwners:      chartOwners,
-		dimCapHints:      dimCapHints,
-		materialized:     materialized,
-		materializedByID: materialized.charts,
+		out:               out,
+		reader:            reader,
+		collectMeta:       collectMeta,
+		buildCycle:        buildCycle,
+		prog:              prog,
+		cache:             cache,
+		routeCacheEnabled: e.state.cfg.routeObserver == nil,
+		routeObserver:     e.state.cfg.routeObserver,
+		index:             index,
+		flat:              reader,
+		seenInfer:         make(map[string]struct{}, seenInferCap),
+		chartsByID:        make(map[string]*chartState, chartsCap),
+		chartOwners:       chartOwners,
+		dimCapHints:       dimCapHints,
+		materialized:      materialized,
+		materializedByID:  materialized.charts,
 	}, nil
 }
 
@@ -392,20 +470,44 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
 			if trackStats {
 				ctx.seriesFilteredBySeq++
-				ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				if ctx.routeCacheEnabled {
+					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				}
+				if ctx.routeObserver != nil {
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:       PlanRouteSeriesFilteredBySequence,
+						SeriesIdentity: identity,
+						MetricName:     name,
+					})
+				}
 			}
 			return
 		}
 		if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
 			if trackStats {
 				ctx.seriesFilteredBySel++
-				ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				if ctx.routeCacheEnabled {
+					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
+				}
+				if ctx.routeObserver != nil {
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:       PlanRouteSeriesFilteredBySelector,
+						SeriesIdentity: identity,
+						MetricName:     name,
+					})
+				}
 			}
 			return
 		}
 
+		observer := ctx.routeObserver
+		if !trackStats {
+			observer = nil
+		}
 		routes, hit, err := e.resolveSeriesRoutes(
 			ctx.cache,
+			ctx.routeCacheEnabled,
+			observer,
 			identity,
 			name,
 			labels,
@@ -419,7 +521,7 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			firstErr = err
 			return
 		}
-		if trackStats {
+		if trackStats && ctx.routeCacheEnabled {
 			if hit {
 				e.addRouteCacheHit()
 				ctx.routeCacheHits++
@@ -429,7 +531,7 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			}
 		}
 		if len(routes) == 0 {
-			autoRoutes, ok, err := e.resolveAutogenRoute(ctx.reader, name, labels, meta)
+			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
 			if err != nil {
 				firstErr = err
 				return
@@ -443,6 +545,21 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			} else {
 				if trackStats {
 					ctx.seriesUnmatched++
+					if ctx.routeObserver != nil {
+						ruleScope := ""
+						if ruleIndex >= 0 && ruleIndex < len(e.state.cfg.autogen.Rules) {
+							ruleScope = e.state.cfg.autogen.Rules[ruleIndex].Scope
+						}
+						ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+							Decision:         PlanRouteUnmatched,
+							Reason:           reason,
+							SeriesIdentity:   identity,
+							MetricName:       name,
+							MetricFamilyName: diagnosticMetricFamilyName(name, labels, meta),
+							AutogenRuleIndex: ruleIndex,
+							AutogenRuleScope: ruleScope,
+						})
+					}
 				}
 				return
 			}
@@ -462,7 +579,8 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				}
 				continue
 			}
-			if err := ctx.accumulateRoute(ctx.index, route, identity, meta, labels, v); err != nil {
+			route = finalizeRouteAlgorithm(route, meta.Kind)
+			if err := ctx.accumulateRoute(ctx.index, route, identity, name, meta, labels, v); err != nil {
 				firstErr = err
 				return
 			}
@@ -488,6 +606,7 @@ func (ctx *planBuildContext) accumulateRoute(
 	index matchIndex,
 	route routeBinding,
 	identity metrix.SeriesIdentity,
+	metricName string,
 	seriesMeta metrix.SeriesMeta,
 	labels metrix.LabelView,
 	value metrix.SampleValue,
@@ -496,6 +615,7 @@ func (ctx *planBuildContext) accumulateRoute(
 	if exists && cs.templateID != route.ChartTemplateID {
 		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
 			// Template wins over autogen on chart-id collision.
+			ctx.observeAutogenDisplacement(route, identity, metricName, cs.templateID)
 			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 			delete(ctx.chartsByID, route.ChartID)
 			cs = nil
@@ -503,6 +623,20 @@ func (ctx *planBuildContext) accumulateRoute(
 		} else {
 			// Cross-template rendered-id collision.
 			// Existing owner keeps chart-id ownership.
+			if ctx.routeObserver != nil {
+				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+					Decision:                PlanRouteCollisionRejected,
+					SeriesIdentity:          identity,
+					MetricName:              metricName,
+					ChartTemplateID:         route.ChartTemplateID,
+					DimensionIndex:          route.DimensionIndex,
+					ChartID:                 route.ChartID,
+					DimensionName:           route.DimensionName,
+					DimensionKeyLabel:       route.DimensionKeyLabel,
+					ExistingChartTemplateID: cs.templateID,
+					Autogen:                 route.Autogen,
+				})
+			}
 			return nil
 		}
 	}
@@ -511,11 +645,26 @@ func (ctx *planBuildContext) accumulateRoute(
 		if ownerExists && ownerTemplateID != route.ChartTemplateID {
 			if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
 				// Template wins over autogen on chart-id collision.
+				ctx.observeAutogenDisplacement(route, identity, metricName, ownerTemplateID)
 				ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 				delete(ctx.chartsByID, route.ChartID)
 			} else {
 				// Cross-template rendered-id collision.
 				// Existing owner keeps chart-id ownership.
+				if ctx.routeObserver != nil {
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:                PlanRouteCollisionRejected,
+						SeriesIdentity:          identity,
+						MetricName:              metricName,
+						ChartTemplateID:         route.ChartTemplateID,
+						DimensionIndex:          route.DimensionIndex,
+						ChartID:                 route.ChartID,
+						DimensionName:           route.DimensionName,
+						DimensionKeyLabel:       route.DimensionKeyLabel,
+						ExistingChartTemplateID: ownerTemplateID,
+						Autogen:                 route.Autogen,
+					})
+				}
 				return nil
 			}
 		}
@@ -560,16 +709,18 @@ func (ctx *planBuildContext) accumulateRoute(
 	}
 	if entry.seenSeq != cs.currentBuildSeq {
 		entry.seenSeq = cs.currentBuildSeq
+		entry.observations = 1
 		entry.value = value
 		entry.dimensionState = dimensionState{
-			hidden:     route.Hidden,
-			float:      route.Float,
-			static:     route.Static,
-			order:      route.DimensionIndex,
-			sortKey:    sortKey,
-			algorithm:  route.Algorithm,
-			multiplier: route.Multiplier,
-			divisor:    route.Divisor,
+			hidden:      route.Hidden,
+			float:       route.Float,
+			static:      route.Static,
+			order:       route.DimensionIndex,
+			sortKey:     sortKey,
+			aggregation: route.Aggregation,
+			algorithm:   compactDimensionAlgorithm(route.Algorithm),
+			multiplier:  route.Multiplier,
+			divisor:     route.Divisor,
 		}
 		cs.observedCount++
 	} else {
@@ -579,7 +730,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		if entry.float != route.Float {
 			// First-observed float flag wins within one build; conflicting routes are ignored.
 		}
-		entry.value += value
+		entry.aggregate(value)
 	}
 
 	if cs.labelTracker.observeMembership(identity, route.DimensionKeyLabel) {
@@ -602,6 +753,41 @@ func (ctx *planBuildContext) accumulateRoute(
 				Name:            route.DimensionName,
 			})
 		}
+	}
+	if ctx.routeObserver != nil {
+		policy := labelPolicyForTemplate(index, route.ChartTemplateID, route.Autogen)
+		if policy == nil {
+			return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+		}
+		instanceLabels, ok := diagnosticChartInstanceLabels(policy.instancePlan, labels)
+		if !ok {
+			return fmt.Errorf("chartengine: accepted route has unresolved instance labels for chart template %q", route.ChartTemplateID)
+		}
+		promotionMode, promotedLabels := diagnosticLabelPromotion(policy)
+		ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+			Decision:           PlanRouteAccepted,
+			SeriesIdentity:     identity,
+			MetricName:         metricName,
+			MetricFamilyName:   diagnosticMetricFamilyName(metricName, labels, seriesMeta),
+			ChartTemplateID:    route.ChartTemplateID,
+			DimensionIndex:     route.DimensionIndex,
+			ChartID:            route.ChartID,
+			DimensionName:      route.DimensionName,
+			DimensionKeyLabel:  route.DimensionKeyLabel,
+			InstanceLabels:     instanceLabels,
+			Context:            cs.meta.Context,
+			Family:             cs.meta.Family,
+			Units:              cs.meta.Units,
+			Algorithm:          string(route.Algorithm),
+			Aggregation:        diagnosticAggregation(route.Aggregation),
+			Presentation:       string(cs.meta.Type),
+			SeriesKind:         diagnosticMetricKind(seriesMeta.Kind),
+			Multiplier:         route.Multiplier,
+			Divisor:            route.Divisor,
+			LabelPromotionMode: promotionMode,
+			PromotedLabels:     promotedLabels,
+			Autogen:            route.Autogen,
+		})
 	}
 	return nil
 }
@@ -676,7 +862,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 					Name:       name,
 					Hidden:     entry.hidden,
 					Float:      entry.float,
-					Algorithm:  entry.algorithm,
+					Algorithm:  entry.algorithm.programAlgorithm(),
 					Multiplier: entry.multiplier,
 					Divisor:    entry.divisor,
 				})

@@ -148,11 +148,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -165,10 +167,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| postfix.qemails | emails | emails |
-| postfix.qsize | size | KiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| postfix.qemails | Postfix Queue Emails | emails | emails |
+| postfix.qsize | Postfix Queue Emails Size | size | KiB |
 
 
 

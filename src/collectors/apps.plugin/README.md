@@ -179,11 +179,11 @@ airdrop-sharing: sharingd
 
 #### Windows process fields
 
-| Field   | Description                                                      | Example                                                 |
-|---------|------------------------------------------------------------------|---------------------------------------------------------|
-| comm    | Performance Monitor instance name (may include instance numbers) | `chrome#12`                                             |
-| cmdline | Full path to the executable (without command line arguments)     | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
-| name    | Friendly name from file description or service display name      | `Google Chrome`                                         |
+| Field   | Description                                                      | Example                                                                   |
+|---------|------------------------------------------------------------------|---------------------------------------------------------------------------|
+| comm    | Performance Monitor instance name (may include instance numbers) | `chrome#12`                                                               |
+| cmdline | Full command line including executable path and arguments        | `"C:\Program Files\Google\Chrome\Application\chrome.exe" --type=renderer` |
+| name    | Friendly name from file description or service display name      | `Google Chrome`                                                           |
 
 > On Windows:
 > - All pattern types (exact, prefix, suffix, substring) also match against the **name** field
@@ -202,20 +202,21 @@ You can use asterisks (`*`) to create patterns:
 > - **Netdata v2.5.2 and earlier**: Windows patterns match against `comm` and `cmdline` fields
 > - **Netdata v2.5.3 and later**: Windows patterns match against `comm`, `cmdline`, and `name` (friendly name) fields
 
-| Mode      | Pattern     | Description                            | Unix-like                 | Windows           |
-|-----------|-------------|----------------------------------------|---------------------------|-------------------|
-| exact     | `firefox`   | Matches **comm** exactly               | ✓ Yes                     | ✓ Yes             |
-| prefix    | `firefox*`  | Matches **comm** starting with firefox | ✓ Yes                     | ✓ Yes             |
-| suffix    | `*fox`      | Matches **comm** ending with fox       | ✓ Yes                     | ✓ Yes             |
-| substring | `*firefox*` | Searches within **cmdline**            | ✓ Yes (full command line) | ✓ Yes (full path) |
+| Mode      | Pattern     | Description                            | Unix-like                 | Windows                                  |
+|-----------|-------------|----------------------------------------|---------------------------|------------------------------------------|
+| exact     | `firefox`   | Matches **comm** exactly               | ✓ Yes                     | ✓ Yes                                    |
+| prefix    | `firefox*`  | Matches **comm** starting with firefox | ✓ Yes                     | ✓ Yes                                    |
+| suffix    | `*fox`      | Matches **comm** ending with fox       | ✓ Yes                     | ✓ Yes                                    |
+| substring | `*firefox*` | Searches within **cmdline**            | ✓ Yes (full command line) | ✓ Yes (full command line with arguments) |
 
 **Note on substring matching (`*pattern*`):**
 
 - On Unix-like systems: Searches within the full command line including arguments
-- On Windows: Searches within the full executable path (e.g., `C:\Program Files\Mozilla Firefox\firefox.exe`)
+- On Windows: Searches within the full command line including arguments (e.g., `"C:\Program Files\Mozilla Firefox\firefox.exe" -ProfileManager`)
 
 - Asterisks can be placed anywhere within pattern (e.g., `fi*fox`) without affecting the matching criteria (**comm** or **cmdline**).
 - To include process names with spaces, enclose them in quotes (single or double), like this: `'Plex Media Serv'` or `"my other process"`.
+- **Substring patterns that contain spaces** — such as a pattern matching part of a command line including arguments — must be enclosed in quotes too; otherwise the spaces split the pattern into separate entries. For example, `'*my_app.exe --mode production*'` is one substring pattern, while the unquoted `*my_app.exe --mode production*` is read as three separate patterns (`*my_app.exe`, `--mode`, `production*`).
 - To include processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`.
 - To include processes with double quotes, enclose them in single quotes: `'process with this " double quote'`.
 - The order of the entries in the configuration list is crucial. The first matching entry will be used, so it's important to follow a top-down hierarchy. Processes that don't match any entry will inherit the group from their parent processes.
@@ -283,7 +284,7 @@ You can use the Netdata `processes` function to verify that your `apps_groups.co
 
 3. **Troubleshooting tips**:
     - If a process shows the wrong Category, check the exact process name in the function output
-    - On Windows, remember that the `name` field is used for default categories but NOT for pattern matching
+    - On Windows, the `name` field is used for both default categories and pattern matching (alongside `comm` and `cmdline`)
     - Remember that the first matching pattern wins - check your pattern order
     - For inherited groups, verify the parent process has the correct Category
 
@@ -343,10 +344,9 @@ The `--pss` option controls PSS sampling behavior:
 
 ### Integration with eBPF
 
-To monitor network bandwidth (upload and download) per application, enable the [`socket` program](/src/collectors/ebpf.plugin/README.md#ebpf-programs-configuration-options) (disabled by default) in `ebpf.d.conf`, then enable the `apps` option in `ebpf.d/network.conf` for the [eBPF Socket](/src/collectors/ebpf.plugin/integrations/ebpf_socket.md) collector. This adds a per-application **Bandwidth** chart alongside the other eBPF apps charts.
+`apps.plugin` receives per-PID eBPF counters (page-cache hits and socket statistics) from `ebpfgo.plugin` via a shared-memory segment. When `ebpfgo.plugin` is running with the `cachestat` or `socket` programs enabled (configured via `ebpf.d/cachestat.conf` and `ebpf.d/socket.conf` respectively), `apps.plugin` merges those counters into its per-application view and emits eBPF charts under the **eBPF syscall** section.
 
-If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you should edit your
-[`ebpf.d.conf`](/src/collectors/ebpf.plugin/README.md#configure-the-ebpf-collector) file to ensure the eBPF program is enabled.
+> **Note** — Per-application network bandwidth charts (previously provided by the C `socket` thread) have been removed. Per-cgroup and per-service network charts are now emitted by `cgroups.plugin`. Network-viewer provides on-demand per-connection detail through the `network-protocols` function.
 
 Also see our [guide on troubleshooting apps with eBPF metrics](/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md) for ideas on how to interpret these charts in a few scenarios.
 

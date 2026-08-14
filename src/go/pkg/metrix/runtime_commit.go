@@ -8,10 +8,8 @@ func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnaps
 
 	oldSnap := r.core.snapshot.Load()
 	next := &readSnapshot{
-		collectMeta: oldSnap.collectMeta,
-		series:      make(map[string]*committedSeries, 1),
-		// byName index is built lazily by readers for runtime snapshots.
-		byName:       nil,
+		collectMeta:  oldSnap.collectMeta,
+		series:       make(map[string]*committedSeries, 1),
 		runtimeBase:  oldSnap,
 		runtimeDepth: oldSnap.runtimeDepth + 1,
 	}
@@ -106,7 +104,6 @@ func (r *runtimeStoreBackend) compactRuntimeSnapshot(snap *readSnapshot, nowUnix
 	return &readSnapshot{
 		collectMeta:  snap.collectMeta,
 		series:       series,
-		byName:       nil,
 		runtimeBase:  nil,
 		runtimeDepth: 0,
 	}, evicted

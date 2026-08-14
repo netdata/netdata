@@ -21,8 +21,9 @@ use journal_sdk_log_writer::{
     Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy,
 };
 use journal_sdk_registry::{Monitor, Origin, Registry, Source};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
@@ -61,11 +62,20 @@ mod bench_support;
 #[path = "ingest_bench_tests.rs"]
 mod bench_tests;
 #[cfg(test)]
+#[path = "ingest_capacity_bench_tests.rs"]
+mod capacity_bench_tests;
+#[cfg(test)]
+#[path = "ingest_capacity_bench_wire.rs"]
+mod capacity_bench_wire;
+#[cfg(test)]
 #[path = "ingest_resource_bench_support.rs"]
 mod resource_bench_support;
 #[cfg(test)]
 #[path = "ingest_resource_bench_tests.rs"]
 mod resource_bench_tests;
+#[cfg(test)]
+#[path = "ingest_storage_bench_tests.rs"]
+mod storage_bench_tests;
 #[cfg(test)]
 #[path = "ingest_test_support.rs"]
 mod test_support;

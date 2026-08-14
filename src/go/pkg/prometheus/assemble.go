@@ -177,6 +177,7 @@ func (a *assembler) addSummarySum(sample Sample) {
 	mf := a.summaryFamily(name)
 	s := a.summaryFor(mf, assemblyKey{name: name, hash: sample.Labels.Hash()}, sample.Labels)
 	s.sum = sample.Value
+	s.hasSum = true
 }
 
 func (a *assembler) addSummaryCount(sample Sample) {
@@ -184,6 +185,7 @@ func (a *assembler) addSummaryCount(sample Sample) {
 	mf := a.summaryFamily(name)
 	s := a.summaryFor(mf, assemblyKey{name: name, hash: sample.Labels.Hash()}, sample.Labels)
 	s.count = sample.Value
+	s.hasCount = true
 }
 
 func (a *assembler) addHistogramBucket(sample Sample) {
@@ -243,6 +245,8 @@ func (a *assembler) summaryFor(mf *MetricFamily, key assemblyKey, lbs labels.Lab
 	} else {
 		m.summary.sum = 0
 		m.summary.count = 0
+		m.summary.hasSum = false
+		m.summary.hasCount = false
 		m.summary.quantiles = m.summary.quantiles[:0]
 	}
 

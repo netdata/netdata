@@ -106,6 +106,35 @@ When reviewing a PR that touches a collector, verify:
    - `metadata.yaml` -- the option appears under
      `setup.configuration.options.list`.
 
+   The option's `group` and the DynCfg tab that shows it MUST
+   name the same thing. `metadata.yaml` `group` becomes the
+   doc's Group column; `config_schema.json`
+   `uiSchema.ui:options.tabs[].title` becomes the UI tab. When
+   the two vocabularies differ, an operator reading the doc
+   cannot find the option in the UI. Rules:
+   - Every `group` MUST equal a tab title, or take the
+     `Tab / Subgroup` form whose first segment is a tab title.
+     `Tab / Subgroup` exists because tabs can only group whole
+     top-level schema properties, so a doc group refining a
+     nested concern (query timing, tag filters) cannot be its
+     own tab.
+   - Every tab title MUST be named by at least one `group`, or
+     the doc can never point at that tab.
+   - Name the section after the config key the operator types,
+     so the doc column, the UI tab, and the YAML key read alike.
+   - List tabs in the order the doc lists the groups.
+   - Most collectors predate this rule and still disagree, so do
+     NOT copy grouping from a neighbouring collector; derive it
+     from that collector's own keys.
+   - Once a collector's two artifacts agree, keep them that way
+     by calling
+     `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")`
+     from its tests. It checks per option that the tab listing
+     the option's root property is the first segment of its
+     group, and that every tab is named by some group. The call
+     is opt-in because most collectors would fail it today;
+     `cloudwatch` and `azure_monitor` are the worked examples.
+
 4. **Alert changes have matching `metadata.yaml.alerts`
    entries.** If `health.d/<plugin>.conf` adds, removes, or
    renames an alert, `metadata.yaml.modules.<m>.alerts[]` must
@@ -120,11 +149,16 @@ When reviewing a PR that touches a collector, verify:
    `agent_notification` is a special case: the README itself
    is the generated artifact (no `integrations/` subdir).
 
-6. **`integrations/<slug>.md` regenerated.** The author
-   should have run the pipeline locally and committed the
-   updated `.md` file. `check-markdown.yml` will re-run the
-   pipeline in CI; if the author's commit and CI's regen
-   diverge, the PR fails.
+6. **Generated integration documentation has an explicit delivery route.** The
+   author MUST run the metadata pipeline locally for source validation, then
+   choose and document one route:
+   - regenerate and commit `integrations/<slug>.md` in the source PR; or
+   - leave committed generated pages unchanged so `generate-integrations.yml`
+     opens the follow-up regeneration PR after the source reaches `master`.
+
+   `check-markdown.yml` regenerates pages before Learn link validation but does
+   not assert a clean Git diff. Earlier guidance incorrectly claimed that an
+   uncommitted regeneration diff failed the source PR.
 
 7. **Umbrella pages.** If the diff added or removed a
    collector, `src/collectors/COLLECTORS.md` should reflect
@@ -176,10 +210,12 @@ For now, the consistency rule is a review-time policy.
 ## Anti-patterns to flag in review
 
 - "I only changed the code; the docs can be a follow-up PR."
-  -> No. Affected collector consistency artifacts move in one PR.
+  -> No for source artifacts. Metadata, schema, stock config, alerts, taxonomy,
+  and hand-written docs move with the behavior. Only generated integration
+  pages may use the documented automatic post-merge route.
 - "The integration page on Learn doesn't show my new option."
-  -> Author forgot to update `metadata.yaml` AND regenerate
-  `integrations/<slug>.md`.
+  -> Verify that `metadata.yaml` changed and that either the source PR committed
+  `integrations/<slug>.md` or the post-merge regeneration PR completed.
 - "I edited `integrations/<slug>.md` directly to fix a
   description." -> No. That file is generated. Edit
   `metadata.yaml` and regenerate.

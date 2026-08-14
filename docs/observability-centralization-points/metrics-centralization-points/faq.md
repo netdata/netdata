@@ -74,6 +74,29 @@ We recommend using Netdata Cloud to avoid receiving duplicate alert notification
 </details>
 
 <details>
+<summary><strong>How do I centrally control or disable default stock alerts for all child nodes from the Parent, so new children do not trigger their own alerts?</strong></summary><br/>
+
+By default, each child runs its own health checks and fires its stock alerts, so every new child you stream in will alert until you change this.
+
+To manage all alerts from the Parent instead:
+
+1. **Turn off the health watchdog on the children.** In each child's `netdata.conf`, disable health so the child no longer evaluates or fires any alerts locally:
+
+   ```ini
+   [health]
+       enabled = no
+   ```
+
+   This is the alert-control part of running children in Thin Mode. Because this is a `netdata.conf` change, **restart** the child Agent to apply it — `netdatacli reload-health` only reloads `health.d/*.conf` files, not `netdata.conf`.
+
+2. **Manage the alerts on the Parent.** The Parent evaluates health checks for every streamed child by default, so you only tune or disable stock alerts once, on the Parent. To override thresholds, silence notifications, or selectively disable specific stock alerts centrally, see [Overriding Stock Alerts](/src/health/overriding-stock-alerts.md).
+
+With health disabled on the children, any new child you stream to the Parent inherits the alert policy you set on the Parent and never fires its own stock alerts. The [Feature Comparison](/docs/observability-centralization-points/metrics-centralization-points/README.md) table summarizes which features each role runs by default.
+
+<br/>
+</details>
+
+<details>
 <summary><strong>Should I configure local collectors (like httpcheck) on both Parents in an HA cluster?</strong></summary><br/>
 
 Local collectors such as `httpcheck` are synthetic checks that run on the Netdata node where they are configured. They do not run against data streamed from child nodes. Each Parent in a cluster is a full Netdata node, so a local collector only runs on the Parent where you configure it.

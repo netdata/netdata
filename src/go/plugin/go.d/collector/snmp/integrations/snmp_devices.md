@@ -208,7 +208,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
 |  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
-|  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
+|  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence. |  | no |
 
 <a id="option-snmpv3-user-level"></a>
 ##### user.level
@@ -410,6 +410,30 @@ jobs:
 ```
 </details>
 
+###### Additional node labels
+
+Because `create_vnode` defaults to true, each SNMP job automatically creates a Virtual Node for its device — no separate vnode definition file is needed.
+Use `vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: core-switch
+    update_every: 10
+    hostname: 192.0.2.20
+    community: public
+    options:
+      version: 2
+    vnode:
+      labels:
+        site: dc1
+        rack: a12
+
+```
+</details>
+
 
 
 ## Alerts
@@ -433,6 +457,7 @@ The following alerts are available:
 | [ snmp_bgp_peer_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.update_traffic | ML anomaly detection on per-peer BGP UPDATE traffic |
 | [ snmp_bgp_peer_family_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.update_traffic | ML anomaly detection on per-peer-family BGP UPDATE traffic |
 | [ snmp_bgp_peer_family_prefixes_accepted_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.route_counts.current | ML anomaly detection on accepted-prefix gauges where the vendor MIB exposes them |
+
 
 
 ## Metrics
@@ -503,6 +528,7 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 - When the source model is peer-family scoped, alerts and chart labels include AFI/SAFI so operators can distinguish otherwise similar peers.
 
 
+
 ### Per device licensing
 
 Shared device-level licensing health metrics emitted when the matched SNMP profile provides licensing telemetry. Supported profile coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. MikroTik support is intentionally limited to the RouterOS upgrade-entitlement fields exposed by SNMP, and epoch-like placeholder `mtxrLicUpgrUntil` values are ignored.
@@ -515,14 +541,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| snmp.license.remaining_time | remaining_time | seconds |
-| snmp.license.authorization_remaining_time | remaining_time | seconds |
-| snmp.license.certificate_remaining_time | remaining_time | seconds |
-| snmp.license.grace_remaining_time | remaining_time | seconds |
-| snmp.license.usage_percent | usage_percent | percentage |
-| snmp.license.state | healthy, informational, degraded, broken, ignored | licenses |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| snmp.license.remaining_time | Earliest remaining time to expiry across monitored licenses and subscriptions on the device. | remaining_time | seconds |
+| snmp.license.authorization_remaining_time | Earliest remaining time for licensing authorization timers on the device. | remaining_time | seconds |
+| snmp.license.certificate_remaining_time | Earliest remaining time for licensing certificate timers on the device. | remaining_time | seconds |
+| snmp.license.grace_remaining_time | Earliest remaining time for licensing grace or evaluation timers on the device. | remaining_time | seconds |
+| snmp.license.usage_percent | Highest usage pressure across finite licensing pools on the device. | usage_percent | percentage |
+| snmp.license.state | Count of licensing rows on the device by normalized state bucket: healthy, informational, degraded, broken, and ignored. | healthy, informational, degraded, broken, ignored | licenses |
 
 
 

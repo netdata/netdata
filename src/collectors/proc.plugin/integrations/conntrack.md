@@ -80,11 +80,13 @@ The following alerts are available:
 | [ netfilter_conntrack_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/netfilter.conf) | netfilter.conntrack_sockets | netfilter connection tracker table size utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -96,11 +98,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netfilter.conntrack_sockets | connections | active connections |
-| netfilter.conntrack_new | new, ignore, invalid | connections/s |
-| netfilter.conntrack_changes | inserted, deleted, delete_list | changes/s |
-| netfilter.conntrack_expect | created, deleted, new | expectations/s |
-| netfilter.conntrack_search | searched, restarted, found | searches/s |
-| netfilter.conntrack_errors | icmp_error, error_failed, drop, early_drop | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netfilter.conntrack_sockets | Connection Tracker Connections | connections | active connections |
+| netfilter.conntrack_new | Connection Tracker New Connections | new, ignore, invalid | connections/s |
+| netfilter.conntrack_changes | Connection Tracker Changes | inserted, deleted, delete_list | changes/s |
+| netfilter.conntrack_expect | Connection Tracker Expectations | created, deleted, new | expectations/s |
+| netfilter.conntrack_search | Connection Tracker Searches | searched, restarted, found | searches/s |
+| netfilter.conntrack_errors | Connection Tracker Errors | icmp_error, error_failed, drop, early_drop | events/s |

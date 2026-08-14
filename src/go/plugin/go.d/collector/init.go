@@ -7,6 +7,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/activemq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/adaptecraid"
@@ -112,7 +113,6 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rspamd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/samba"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sensors"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smartctl"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/spigotmc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sql"
@@ -149,8 +149,15 @@ func init() {
 	// exposing package-global registries from the individual collector packages.
 	deviceStore := ddsnmp.NewDeviceStore()
 	trapEnrichment := snmptopology.NewTrapEnrichmentHandle()
+	reverseDNS := reversedns.New(reversedns.Config{
+		LookupTimeout: reversedns.DefaultLookupTimeout,
+		PositiveTTL:   reversedns.DefaultPositiveTTL,
+		NegativeTTL:   reversedns.DefaultNegativeTTL,
+		MaxEntries:    reversedns.DefaultMaxEntries,
+		MaxConcurrent: reversedns.DefaultMaxConcurrent,
+	})
 
 	snmp.Register(deviceStore)
-	snmptopology.Register(deviceStore, trapEnrichment)
-	snmptraps.Register(deviceStore, trapEnrichment)
+	snmptopology.Register(deviceStore, trapEnrichment, reverseDNS)
+	snmptraps.Register(deviceStore, trapEnrichment, reverseDNS)
 }

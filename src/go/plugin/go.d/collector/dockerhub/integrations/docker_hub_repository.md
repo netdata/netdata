@@ -162,11 +162,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -178,14 +180,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dockerhub.pulls_sum | sum | pulls |
-| dockerhub.pulls | a dimension per repository | pulls |
-| dockerhub.pulls_rate | a dimension per repository | pulls/s |
-| dockerhub.stars | a dimension per repository | stars |
-| dockerhub.status | a dimension per repository | status |
-| dockerhub.last_updated | a dimension per repository | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dockerhub.pulls_sum | Pulls Summary | sum | pulls |
+| dockerhub.pulls | Pulls | a dimension per repository | pulls |
+| dockerhub.pulls_rate | Pulls Rate | a dimension per repository | pulls/s |
+| dockerhub.stars | Stars | a dimension per repository | stars |
+| dockerhub.status | Current Status | a dimension per repository | status |
+| dockerhub.last_updated | Time Since Last Updated | a dimension per repository | seconds |
 
 
 

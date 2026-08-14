@@ -167,10 +167,19 @@ func (a *API) FUNCRESULT(result FunctionResult) {
 	_, _ = buf.WriteTo(a)
 }
 
-// CONFIGCREATE creates a new configuration
+// CONFIGCREATE creates a new configuration. Invalid fields are ignored; use
+// TryCONFIGCREATE when the caller must observe an encoding rejection.
 func (a *API) CONFIGCREATE(opts ConfigOpts) {
+	_ = a.TryCONFIGCREATE(opts)
+}
+
+// TryCONFIGCREATE creates a new configuration or returns an encoding error.
+func (a *API) TryCONFIGCREATE(opts ConfigOpts) error {
 	// https://learn.netdata.cloud/docs/contributing/external-plugins/#config
 
+	if err := opts.Validate(); err != nil {
+		return err
+	}
 	_, _ = a.Write([]byte("CONFIG " +
 		opts.ID + " " +
 		"create" + " " +
@@ -181,16 +190,40 @@ func (a *API) CONFIGCREATE(opts ConfigOpts) {
 		opts.Source + "' '" +
 		opts.SupportedCommands + "' 0x0000 0x0000\n\n",
 	))
+	return nil
 }
 
-// CONFIGDELETE deletes a configuration
+// CONFIGDELETE deletes a configuration. Invalid IDs are ignored; use
+// TryCONFIGDELETE when the caller must observe an encoding rejection.
 func (a *API) CONFIGDELETE(id string) {
-	_, _ = a.Write([]byte("CONFIG " + id + " delete\n\n"))
+	_ = a.TryCONFIGDELETE(id)
 }
 
-// CONFIGSTATUS updates a configuration status
+// TryCONFIGDELETE deletes a configuration or returns an encoding error.
+func (a *API) TryCONFIGDELETE(id string) error {
+	if !ValidBareProtocolField(id) {
+		return fmt.Errorf("netdataapi: invalid CONFIG id")
+	}
+	_, _ = a.Write([]byte("CONFIG " + id + " delete\n\n"))
+	return nil
+}
+
+// CONFIGSTATUS updates a configuration status. Invalid fields are ignored; use
+// TryCONFIGSTATUS when the caller must observe an encoding rejection.
 func (a *API) CONFIGSTATUS(id, status string) {
+	_ = a.TryCONFIGSTATUS(id, status)
+}
+
+// TryCONFIGSTATUS updates a configuration status or returns an encoding error.
+func (a *API) TryCONFIGSTATUS(id, status string) error {
+	if !ValidBareProtocolField(id) {
+		return fmt.Errorf("netdataapi: invalid CONFIG id")
+	}
+	if !ValidBareProtocolField(status) {
+		return fmt.Errorf("netdataapi: invalid CONFIG status")
+	}
 	_, _ = a.Write([]byte("CONFIG " + id + " status " + status + "\n\n"))
+	return nil
 }
 
 // FUNCTIONGLOBAL registers a global function with Netdata.

@@ -191,11 +191,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -207,30 +209,30 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pika.connections | accepted | connections |
-| pika.clients | connected | clients |
-| pika.memory | used | bytes |
-| pika.connected_replicas | connected | replicas |
-| pika.commands | processed | commands/s |
-| pika.commands_calls | a dimension per command | calls/s |
-| pika.database_strings_keys | a dimension per database | keys |
-| pika.database_strings_expires_keys | a dimension per database | keys |
-| pika.database_strings_invalid_keys | a dimension per database | keys |
-| pika.database_hashes_keys | a dimension per database | keys |
-| pika.database_hashes_expires_keys | a dimension per database | keys |
-| pika.database_hashes_invalid_keys | a dimension per database | keys |
-| pika.database_lists_keys | a dimension per database | keys |
-| pika.database_lists_expires_keys | a dimension per database | keys |
-| pika.database_lists_invalid_keys | a dimension per database | keys |
-| pika.database_zsets_keys | a dimension per database | keys |
-| pika.database_zsets_expires_keys | a dimension per database | keys |
-| pika.database_zsets_invalid_keys | a dimension per database | keys |
-| pika.database_sets_keys | a dimension per database | keys |
-| pika.database_sets_expires_keys | a dimension per database | keys |
-| pika.database_sets_invalid_keys | a dimension per database | keys |
-| pika.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| pika.connections | Connections | accepted | connections |
+| pika.clients | Clients | connected | clients |
+| pika.memory | Memory usage | used | bytes |
+| pika.connected_replicas | Connected replicas | connected | replicas |
+| pika.commands | Processed commands | processed | commands/s |
+| pika.commands_calls | Calls per command | a dimension per command | calls/s |
+| pika.database_strings_keys | Strings type keys per database | a dimension per database | keys |
+| pika.database_strings_expires_keys | Strings type expires keys per database | a dimension per database | keys |
+| pika.database_strings_invalid_keys | Strings type invalid keys per database | a dimension per database | keys |
+| pika.database_hashes_keys | Hashes type keys per database | a dimension per database | keys |
+| pika.database_hashes_expires_keys | Hashes type expires keys per database | a dimension per database | keys |
+| pika.database_hashes_invalid_keys | Hashes type invalid keys per database | a dimension per database | keys |
+| pika.database_lists_keys | Lists type keys per database | a dimension per database | keys |
+| pika.database_lists_expires_keys | Lists type expires keys per database | a dimension per database | keys |
+| pika.database_lists_invalid_keys | Lists type invalid keys per database | a dimension per database | keys |
+| pika.database_zsets_keys | Zsets type keys per database | a dimension per database | keys |
+| pika.database_zsets_expires_keys | Zsets type expires keys per database | a dimension per database | keys |
+| pika.database_zsets_invalid_keys | Zsets type invalid keys per database | a dimension per database | keys |
+| pika.database_sets_keys | Sets type keys per database | a dimension per database | keys |
+| pika.database_sets_expires_keys | Sets type expires keys per database | a dimension per database | keys |
+| pika.database_sets_invalid_keys | Sets invalid keys per database | a dimension per database | keys |
+| pika.uptime | Uptime | uptime | seconds |
 
 
 

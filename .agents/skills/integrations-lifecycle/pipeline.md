@@ -484,7 +484,7 @@ build system, it runs the same generator chain (with
 Useful for local validation. NOT a substitute for running the
 scripts directly during active development.
 
-## End-to-end: a single PR's flow
+## End-to-end: a source PR's flow
 
 1. Developer edits `src/go/plugin/go.d/collector/foo/metadata.yaml`
    (and any other affected consistency-rule files:
@@ -497,23 +497,28 @@ scripts directly during active development.
    python3 integrations/gen_taxonomy.py --check-only
    python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
    python3 -m unittest integrations.tests.test_taxonomy
+   # When committing generated docs in the source PR:
    python3 integrations/gen_docs_integrations.py -c go.d.plugin/foo
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
    ```
-3. Developer commits the regenerated `integrations/foo.md`,
-   the symlinked `README.md` (if applicable), and the updated
-   `src/collectors/COLLECTORS.md` if the collector list
-   changed.
+3. Developer records one generated-documentation delivery route:
+   - commit the regenerated `integrations/foo.md`, symlinked `README.md` (if
+     applicable), and affected umbrella pages in the source PR; or
+   - leave existing generated pages unchanged and use the automatic post-merge
+     regeneration PR.
 4. PR is opened. `check-markdown.yml` runs, regenerates the
-   same files in CI, and validates Learn ingest. If the dev's
-   committed files differ from CI's regen, the PR fails.
+   same files in CI, and validates Learn ingest. It does not
+   assert that regeneration leaves the checkout clean; failures
+   come from generation, taxonomy, or Learn-ingest validation.
 5. Reviewer checks collector consistency, including taxonomy
    coverage for changed chart contexts.
 6. PR merges. `generate-integrations.yml` triggers on master,
    regenerates everything, and opens an `integrations-regen`
-   PR if anything is now stale (typically nothing, because the
-   dev already committed the regen). Maintainer merges.
+   PR if anything is now stale. This PR carries the generated
+   pages when the source PR selected the post-merge route and is
+   normally empty when the source PR committed them. Maintainer
+   merges it when it contains changes.
 7. Cloud-frontend's own CI (in
    `${NETDATA_REPOS_DIR}/dashboard/cloud-frontend/`) runs
    `gen_integrations.py` against the new master and copies

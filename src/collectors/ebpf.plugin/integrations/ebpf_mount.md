@@ -131,11 +131,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -147,7 +149,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mount_points.call | mount, umount | calls/s |
-| mount_points.error | mount, umount | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mount_points.call | Calls to mount and umount syscalls | mount, umount | calls/s |
+| mount_points.error | Errors to mount and umount file systems | mount, umount | calls/s |

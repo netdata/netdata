@@ -222,11 +222,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -238,23 +240,24 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| oracledb.sessions | session | sessions |
-| oracledb.average_active_sessions | active | sessions |
-| oracledb.sessions_utilization | session_limit | percent |
-| oracledb.current_logons | logons | logons |
-| oracledb.logons | logons | logons/s |
-| oracledb.database_wait_time_ratio | db_wait_time | percent |
-| oracledb.sql_service_response_time | sql_resp_time | seconds |
-| oracledb.enqueue_timeouts | enqueue | timeouts/s |
-| oracledb.disk_io | read, written | bytes/s |
-| oracledb.disk_iops | read, write | operations/s |
-| oracledb.sorts | memory, disk | sorts/s |
-| oracledb.table_scans | short_table, long_table | scans/s |
-| oracledb.cache_hit_ratio | buffer, cursor, library, row | percent |
-| oracledb.global_cache_blocks | corrupted, lost | blocks/s |
-| oracledb.activity | parse, execute, user_commits, user_rollbacks | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| oracledb.sessions | Sessions | session | sessions |
+| oracledb.average_active_sessions | Average Active Sessions | active | sessions |
+| oracledb.sessions_utilization | Sessions Limit % | session_limit | percent |
+| oracledb.current_logons | Current Logons | logons | logons |
+| oracledb.logons | Logons | logons | logons/s |
+| oracledb.database_wait_time_ratio | Database Wait Time Ratio | db_wait_time | percent |
+| oracledb.sql_service_response_time | SQL Service Response Time | sql_resp_time | seconds |
+| oracledb.enqueue_timeouts | Enqueue Timeouts | enqueue | timeouts/s |
+| oracledb.disk_io | Disk IO | read, written | bytes/s |
+| oracledb.disk_iops | Disk IOPS | read, write | operations/s |
+| oracledb.sorts | Sorts | memory, disk | sorts/s |
+| oracledb.table_scans | Table Scans | short_table, long_table | scans/s |
+| oracledb.cache_hit_ratio | Cache Hit Ratio | buffer, cursor, library, row | percent |
+| oracledb.global_cache_blocks | Global Cache Blocks | corrupted, lost | blocks/s |
+| oracledb.activity | Activities | parse, execute, user_commits, user_rollbacks | events/s |
+
 
 ### Per tablespace
 
@@ -269,10 +272,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| oracledb.tablespace_utilization | utilization | percent |
-| oracledb.tablespace_usage | avail, used | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| oracledb.tablespace_utilization | Tablespace Utilization | utilization | percent |
+| oracledb.tablespace_usage | Tablespace Usage | avail, used | bytes |
+
 
 ### Per wait class
 
@@ -286,9 +290,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| oracledb.wait_class_wait_time | wait_time | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| oracledb.wait_class_wait_time | Wait Class Wait Time | wait_time | milliseconds |
 
 
 

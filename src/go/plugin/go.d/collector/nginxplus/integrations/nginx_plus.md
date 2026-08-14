@@ -217,11 +217,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -233,17 +235,18 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.client_connections_rate | accepted, dropped | connections/s |
-| nginxplus.client_connections_count | active, idle | connections |
-| nginxplus.ssl_handshakes_rate | successful, failed | handshakes/s |
-| nginxplus.ssl_handshakes_failures_rate | no_common_protocol, no_common_cipher, timeout, peer_rejected_cert | failures/s |
-| nginxplus.ssl_verification_errors_rate | no_cert, expired_cert, revoked_cert, hostname_mismatch, other | errors/s |
-| nginxplus.ssl_session_reuses_rate | ssl_session | reuses/s |
-| nginxplus.http_requests_rate | requests | requests/s |
-| nginxplus.http_requests_count | requests | requests |
-| nginxplus.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.client_connections_rate | Client connections rate | accepted, dropped | connections/s |
+| nginxplus.client_connections_count | Client connections | active, idle | connections |
+| nginxplus.ssl_handshakes_rate | SSL handshakes rate | successful, failed | handshakes/s |
+| nginxplus.ssl_handshakes_failures_rate | SSL handshakes failures rate | no_common_protocol, no_common_cipher, timeout, peer_rejected_cert | failures/s |
+| nginxplus.ssl_verification_errors_rate | SSL verification errors rate | no_cert, expired_cert, revoked_cert, hostname_mismatch, other | errors/s |
+| nginxplus.ssl_session_reuses_rate | Session reuses during SSL handshak | ssl_session | reuses/s |
+| nginxplus.http_requests_rate | HTTP requests rate | requests | requests/s |
+| nginxplus.http_requests_count | HTTP requests | requests | requests |
+| nginxplus.uptime | Uptime | uptime | seconds |
+
 
 ### Per http server zone
 
@@ -257,13 +260,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.http_server_zone_requests_rate | requests | requests/s |
-| nginxplus.http_server_zone_responses_per_code_class_rate | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
-| nginxplus.http_server_zone_traffic_rate | received, sent | bytes/s |
-| nginxplus.http_server_zone_requests_processing_count | processing | requests |
-| nginxplus.http_server_zone_requests_discarded_rate | discarded | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.http_server_zone_requests_rate | HTTP Server Zone requests rate | requests | requests/s |
+| nginxplus.http_server_zone_responses_per_code_class_rate | HTTP Server Zone responses rate | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
+| nginxplus.http_server_zone_traffic_rate | HTTP Server Zone traffic | received, sent | bytes/s |
+| nginxplus.http_server_zone_requests_processing_count | HTTP Server Zone currently processed requests | processing | requests |
+| nginxplus.http_server_zone_requests_discarded_rate | HTTP Server Zone requests discarded rate | discarded | requests/s |
+
 
 ### Per http location zone
 
@@ -277,12 +281,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.http_location_zone_requests_rate | requests | requests/s |
-| nginxplus.http_location_zone_responses_per_code_class_rate | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
-| nginxplus.http_location_zone_traffic_rate | received, sent | bytes/s |
-| nginxplus.http_location_zone_requests_discarded_rate | discarded | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.http_location_zone_requests_rate | HTTP Location Zone requests rate | requests | requests/s |
+| nginxplus.http_location_zone_responses_per_code_class_rate | HTTP Location Zone responses rate | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
+| nginxplus.http_location_zone_traffic_rate | HTTP Location Zone traffic rate | received, sent | bytes/s |
+| nginxplus.http_location_zone_requests_discarded_rate | HTTP Location Zone requests discarded rate | discarded | requests/s |
+
 
 ### Per http upstream
 
@@ -297,11 +302,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.http_upstream_peers_count | peers | peers |
-| nginxplus.http_upstream_zombies_count | zombie | servers |
-| nginxplus.http_upstream_keepalive_count | keepalive | connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.http_upstream_peers_count | HTTP Upstream peers | peers | peers |
+| nginxplus.http_upstream_zombies_count | HTTP Upstream zombies | zombie | servers |
+| nginxplus.http_upstream_keepalive_count | HTTP Upstream keepalive | keepalive | connections |
+
 
 ### Per http upstream server
 
@@ -318,16 +324,17 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.http_upstream_server_requests_rate | requests | requests/s |
-| nginxplus.http_upstream_server_responses_per_code_class_rate | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
-| nginxplus.http_upstream_server_response_time | response | milliseconds |
-| nginxplus.http_upstream_server_response_header_time | header | milliseconds |
-| nginxplus.http_upstream_server_traffic_rate | received, sent | bytes/s |
-| nginxplus.http_upstream_server_state | up, down, draining, unavail, checking, unhealthy | state |
-| nginxplus.http_upstream_server_connections_count | active | connections |
-| nginxplus.http_upstream_server_downtime | downtime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.http_upstream_server_requests_rate | HTTP Upstream Server requests | requests | requests/s |
+| nginxplus.http_upstream_server_responses_per_code_class_rate | HTTP Upstream Server responses | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
+| nginxplus.http_upstream_server_response_time | HTTP Upstream Server average response time | response | milliseconds |
+| nginxplus.http_upstream_server_response_header_time | HTTP Upstream Server average response header time | header | milliseconds |
+| nginxplus.http_upstream_server_traffic_rate | HTTP Upstream Server traffic rate | received, sent | bytes/s |
+| nginxplus.http_upstream_server_state | HTTP Upstream Server state | up, down, draining, unavail, checking, unhealthy | state |
+| nginxplus.http_upstream_server_connections_count | HTTP Upstream Server connections | active | connections |
+| nginxplus.http_upstream_server_downtime | HTTP Upstream Server downtime | downtime | seconds |
+
 
 ### Per http cache
 
@@ -341,12 +348,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.http_cache_state | warm, cold | state |
-| nginxplus.http_cache_iops | served, written, bypass | responses/s |
-| nginxplus.http_cache_io | served, written, bypass | bytes/s |
-| nginxplus.http_cache_size | size | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.http_cache_state | HTTP Cache state | warm, cold | state |
+| nginxplus.http_cache_iops | HTTP Cache size | served, written, bypass | responses/s |
+| nginxplus.http_cache_io | HTTP Cache IOPS | served, written, bypass | bytes/s |
+| nginxplus.http_cache_size | HTTP Cache IO | size | bytes |
+
 
 ### Per stream server zone
 
@@ -360,13 +368,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.stream_server_zone_connections_rate | accepted | connections/s |
-| nginxplus.stream_server_zone_sessions_per_code_class_rate | 2xx, 4xx, 5xx | sessions/s |
-| nginxplus.stream_server_zone_traffic_rate | received, sent | bytes/s |
-| nginxplus.stream_server_zone_connections_processing_count | processing | connections |
-| nginxplus.stream_server_zone_connections_discarded_rate | discarded | connections/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.stream_server_zone_connections_rate | Stream Server Zone connections rate | accepted | connections/s |
+| nginxplus.stream_server_zone_sessions_per_code_class_rate | Stream Server Zone sessions rate | 2xx, 4xx, 5xx | sessions/s |
+| nginxplus.stream_server_zone_traffic_rate | Stream Server Zone traffic rate | received, sent | bytes/s |
+| nginxplus.stream_server_zone_connections_processing_count | Stream Server Zone connections processed | processing | connections |
+| nginxplus.stream_server_zone_connections_discarded_rate | Stream Server Zone connections discarded | discarded | connections/s |
+
 
 ### Per stream upstream
 
@@ -381,10 +390,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.stream_upstream_peers_count | peers | peers |
-| nginxplus.stream_upstream_zombies_count | zombie | servers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.stream_upstream_peers_count | Stream Upstream peers | peers | peers |
+| nginxplus.stream_upstream_zombies_count | Stream Upstream zombies | zombie | servers |
+
 
 ### Per stream upstream server
 
@@ -401,13 +411,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.stream_upstream_server_connections_rate | forwarded | connections/s |
-| nginxplus.stream_upstream_server_traffic_rate | received, sent | bytes/s |
-| nginxplus.stream_upstream_server_state | up, down, unavail, checking, unhealthy | state |
-| nginxplus.stream_upstream_server_downtime | downtime | seconds |
-| nginxplus.stream_upstream_server_connections_count | active | connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.stream_upstream_server_connections_rate | Stream Upstream Server connections | forwarded | connections/s |
+| nginxplus.stream_upstream_server_traffic_rate | Stream Upstream Server traffic rate | received, sent | bytes/s |
+| nginxplus.stream_upstream_server_state | Stream Upstream Server state | up, down, unavail, checking, unhealthy | state |
+| nginxplus.stream_upstream_server_downtime | Stream Upstream Server downtime | downtime | seconds |
+| nginxplus.stream_upstream_server_connections_count | Stream Upstream Server connections | active | connections |
+
 
 ### Per resolver zone
 
@@ -421,10 +432,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxplus.resolver_zone_requests_rate | name, srv, addr | requests/s |
-| nginxplus.resolver_zone_responses_rate | noerror, formerr, servfail, nxdomain, notimp, refused, timedout, unknown | responses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nginxplus.resolver_zone_requests_rate | Resolver requests rate | name, srv, addr | requests/s |
+| nginxplus.resolver_zone_responses_rate | Resolver responses rate | noerror, formerr, servfail, nxdomain, notimp, refused, timedout, unknown | responses/s |
 
 
 

@@ -70,6 +70,13 @@ typedef struct query_engine_ops {
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
 
+    // the LATEST grouping with a single output point covering the metric's
+    // last stored sample is answered from the collector's cached value,
+    // without querying the storage engine (no query plan is built)
+    bool latest_fast_path;
+    NETDATA_DOUBLE latest_fast_path_value;
+    time_t latest_fast_path_time;
+
     struct {
         time_t expanded_after;
         time_t expanded_before;

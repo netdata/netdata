@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,6 +46,45 @@ template:
 `, match)
 }
 
+func profileYAMLWithAutogenSelector(match string, allow, deny []string) string {
+	var selector strings.Builder
+	if allow != nil {
+		if len(allow) == 0 {
+			selector.WriteString("    allow: []\n")
+		} else {
+			selector.WriteString("    allow:\n")
+			for _, item := range allow {
+				fmt.Fprintf(&selector, "      - %q\n", item)
+			}
+		}
+	}
+	if deny != nil {
+		if len(deny) == 0 {
+			selector.WriteString("    deny: []\n")
+		} else {
+			selector.WriteString("    deny:\n")
+			for _, item := range deny {
+				fmt.Fprintf(&selector, "      - %q\n", item)
+			}
+		}
+	}
+	return fmt.Sprintf(`match: "%s"
+autogen:
+  selector:
+%stemplate:
+  family: test
+  metrics:
+    - test_metric_total
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: test_metric_total
+          name: total
+`, match, selector.String())
+}
+
 // profileYAMLNoChart has a valid header but a structurally invalid template (a
 // group with no chart), so it decodes fine but fails template hydration.
 func profileYAMLNoChart(match string) string {
@@ -52,6 +93,30 @@ template:
   family: test
 `, match)
 }
+
+func profileYAMLWithRelabeling(match, relabeling string) string {
+	return strings.Replace(profileYAML(match), "template:\n", "relabeling:\n"+relabeling+"template:\n", 1)
+}
+
+func profileYAMLWithFallbackType(match, fallbackType string) string {
+	return strings.Replace(profileYAML(match), "template:\n", "fallback_type:"+fallbackType+"\ntemplate:\n", 1)
+}
+
+const validFallbackType = `
+  gauge:
+    - app_value
+  counter:
+    - app_requests
+`
+
+const validRelabeling = `  - match: "app_*"
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "app_(.*)"
+        target_label: __name__
+        replacement: "app_normalized_${1}"
+        action: replace
+`
 
 func loadCatalog(t *testing.T, files ...fileSpec) (Catalog, error) {
 	t.Helper()
@@ -71,7 +136,7 @@ func loadCatalog(t *testing.T, files ...fileSpec) (Catalog, error) {
 
 // TestLoadFromDirs_headerDecodeAndValidation covers the strict header decode and
 // header-level validation that Prometheus applies at load time (the lazy design
-// keeps these eager while deferring only the chart template).
+// keeps these eager while deferring profile-owned policies and the chart template).
 func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 	tests := map[string]struct {
 		content string
@@ -92,6 +157,56 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 			content: profileYAML(""),
 			wantErr: true,
 		},
+		"valid autogen selector is accepted eagerly and by lazy template decode": {
+			content: profileYAMLWithAutogenSelector(
+				"app_*",
+				[]string{`app_metric{region=~"west|east"}`},
+				[]string{`app_metric{environment="dev"}`},
+			),
+		},
+		"empty autogen object is fatal": {
+			content: strings.Replace(profileYAML("app_*"), "template:\n", "autogen: {}\ntemplate:\n", 1),
+			wantErr: true,
+		},
+		"null autogen selector is fatal": {
+			content: strings.Replace(profileYAML("app_*"), "template:\n", "autogen:\n  selector: null\ntemplate:\n", 1),
+			wantErr: true,
+		},
+		"empty autogen selector is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", nil, nil),
+			wantErr: true,
+		},
+		"explicit empty selector lists are fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{}, []string{}),
+			wantErr: true,
+		},
+		"strict yaml rejects unknown autogen field": {
+			content: strings.Replace(
+				profileYAMLWithAutogenSelector("app_*", nil, []string{"metric*"}),
+				"  selector:",
+				"  unknown:",
+				1,
+			),
+			wantErr: true,
+		},
+		"whitespace-only autogen selector entry is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", nil, []string{"  "}),
+			wantErr: true,
+		},
+		"invalid autogen selector is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{`metric{region="west",}`}, nil),
+			wantErr: true,
+		},
+		"valid allow-only selector is accepted": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{"app_*"}, nil),
+		},
+		"valid deny-only selector is accepted": {
+			content: profileYAMLWithAutogenSelector("app_*", nil, []string{"app_*"}),
+		},
+		"invalid selector after a valid entry is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{"app_*", `metric{region="west",}`}, nil),
+			wantErr: true,
+		},
 	}
 
 	for name, tc := range tests {
@@ -104,6 +219,319 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProfileTemplateHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: &metric app_metric
+template:
+  family: test
+  metrics: [*metric]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: *metric
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	_, err = profile.Template()
+	require.NoError(t, err)
+}
+
+func TestProfileRelabelHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: app_*
+app: &target app_normalized
+relabeling:
+  - match: app_raw
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_raw
+        target_label: __name__
+        replacement: *target
+template:
+  family: test
+  metrics: [app_normalized]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: app_normalized
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	blocks, err := profile.Relabeling()
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+	require.Len(t, blocks[0].MetricRelabelConfigs, 1)
+	assert.Equal(t, "app_normalized", blocks[0].MetricRelabelConfigs[0].Replacement)
+}
+
+func TestProfileFallbackHydrationPreservesCrossFieldYAMLAnchors(t *testing.T) {
+	content := `match: &metric app_value
+fallback_type:
+  gauge: [*metric]
+template:
+  family: test
+  metrics: [*metric]
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: *metric
+          name: value
+`
+
+	cat, err := loadCatalog(t, fileSpec{name: "app.yaml", content: content})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	fallbackType, err := profile.FallbackType()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"app_value"}, fallbackType.Gauge)
+}
+
+func TestLoadFromDirs_stockFallbackTypeHydratesLazily(t *testing.T) {
+	tests := map[string]struct {
+		fallbackType string
+		want         FallbackType
+		wantErr      string
+	}{
+		"valid": {
+			fallbackType: validFallbackType,
+			want: FallbackType{
+				Gauge:   []string{"app_value"},
+				Counter: []string{"app_requests"},
+			},
+		},
+		"null": {
+			fallbackType: " null",
+			wantErr:      "'fallback_type' must not be empty",
+		},
+		"empty object": {
+			fallbackType: " {}",
+			wantErr:      "'fallback_type' must contain at least one gauge or counter pattern",
+		},
+		"empty lists": {
+			fallbackType: "\n  gauge: []\n  counter: []",
+			wantErr:      "'fallback_type' must contain at least one gauge or counter pattern",
+		},
+		"unknown field": {
+			fallbackType: "\n  unknown: true",
+			wantErr:      "field unknown not found",
+		},
+		"blank gauge pattern": {
+			fallbackType: "\n  gauge: ['   ']",
+			wantErr:      "'fallback_type.gauge[0]' must not be empty",
+		},
+		"padded gauge pattern": {
+			fallbackType: "\n  gauge: [' app_value ']",
+			wantErr:      "'fallback_type.gauge[0]' must not have leading or trailing whitespace",
+		},
+		"invalid counter pattern": {
+			fallbackType: "\n  counter: ['[']",
+			wantErr:      "'fallback_type.counter[0]'",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithFallbackType("app_*", tc.fallbackType),
+			})
+			require.NoError(t, err, "stock fallback policy must remain lazy")
+
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+			assert.True(t, p.HasFallbackType(), "a present fallback_type key must be visible without hydration")
+
+			got, err1 := p.FallbackType()
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err1, tc.wantErr)
+				_, err2 := p.FallbackType()
+				assert.Equal(t, err1, err2, "the hydration error must be memoized")
+				return
+			}
+			require.NoError(t, err1)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestProfile_FallbackTypeAbsent(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAML("app_*")})
+	require.NoError(t, err)
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+
+	assert.False(t, p.HasFallbackType())
+	got, err := p.FallbackType()
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+func TestProfile_HasAppPreservesDocumentPresence(t *testing.T) {
+	withApp := strings.Replace(profileYAML("app_*"), "template:\n", "app: service\ntemplate:\n", 1)
+	cat, err := loadCatalog(t,
+		fileSpec{stock: true, name: "with_app.yaml", content: withApp},
+		fileSpec{stock: true, name: "without_app.yaml", content: profileYAML("app_*")},
+	)
+	require.NoError(t, err)
+
+	profile, ok := cat.Get("with_app")
+	require.True(t, ok)
+	assert.True(t, profile.HasApp())
+	assert.Equal(t, "service", profile.App)
+
+	profile, ok = cat.Get("without_app")
+	require.True(t, ok)
+	assert.False(t, profile.HasApp())
+	assert.Empty(t, profile.App)
+}
+
+func TestLoadFromDirs_userBadFallbackTypeSkippedStockSurvives(t *testing.T) {
+	cat, err := loadCatalog(t,
+		fileSpec{stock: true, name: "app.yaml", content: profileYAML("stock_*")},
+		fileSpec{stock: false, name: "app.yaml", content: profileYAMLWithFallbackType("user_*", " {}")},
+	)
+	require.NoError(t, err)
+
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, "stock_*", p.Match)
+	assert.False(t, p.HasFallbackType())
+}
+
+func TestProfile_FallbackTypeReturnsIndependentCopies(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{
+		stock:   true,
+		name:    "app.yaml",
+		content: profileYAMLWithFallbackType("app_*", validFallbackType),
+	})
+	require.NoError(t, err)
+
+	assertIndependent := func(t *testing.T, p Profile) {
+		t.Helper()
+		first, err := p.FallbackType()
+		require.NoError(t, err)
+		first.Gauge[0] = "changed"
+		first.Counter[0] = "changed"
+
+		second, err := p.FallbackType()
+		require.NoError(t, err)
+		assert.Equal(t, []string{"app_value"}, second.Gauge)
+		assert.Equal(t, []string{"app_requests"}, second.Counter)
+	}
+
+	fromGet, ok := cat.Get("app")
+	require.True(t, ok)
+	assertIndependent(t, fromGet)
+
+	ordered := cat.OrderedProfiles()
+	require.Len(t, ordered, 1)
+	assertIndependent(t, ordered[0])
+
+	resolved, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	require.Len(t, resolved, 1)
+	assertIndependent(t, resolved[0])
+}
+
+func TestProfile_FallbackTypeConcurrent(t *testing.T) {
+	for name, fallbackType := range map[string]string{
+		"success": validFallbackType,
+		"error":   "\n  gauge: ['[']",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithFallbackType("app_*", fallbackType),
+			})
+			require.NoError(t, err)
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+
+			var wg sync.WaitGroup
+			for range 16 {
+				wg.Go(func() {
+					got, err := p.FallbackType()
+					if name == "error" {
+						assert.Error(t, err)
+						assert.Empty(t, got)
+					} else {
+						assert.NoError(t, err)
+						assert.Equal(t, []string{"app_value"}, got.Gauge)
+					}
+				})
+			}
+			wg.Wait()
+		})
+	}
+}
+
+func TestProfileAutogenSelectorOwnership(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{
+		stock: true,
+		name:  "app.yaml",
+		content: profileYAMLWithAutogenSelector(
+			"app_*",
+			[]string{"app_*", `app_metric{region="west"}`},
+			[]string{`app_metric{environment="dev"}`, "μέτρο*"},
+		),
+	})
+	require.NoError(t, err)
+	want := &metrixselector.Expr{
+		Allow: []string{"app_*", `app_metric{region="west"}`},
+		Deny:  []string{`app_metric{environment="dev"}`, "μέτρο*"},
+	}
+
+	fromGet, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, fromGet.AutogenSelector())
+	accessorCopy := fromGet.AutogenSelector()
+	accessorCopy.Allow[0] = "accessor_mutation"
+	accessorCopy.Deny[0] = "accessor_mutation"
+	assert.Equal(t, want, fromGet.AutogenSelector())
+
+	fromGet.autogenSelector.Allow[0] = "get_mutation"
+	fromGet.autogenSelector.Deny[0] = "get_mutation"
+	afterGetMutation, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, afterGetMutation.AutogenSelector())
+
+	ordered := cat.OrderedProfiles()
+	require.Len(t, ordered, 1)
+	ordered[0].autogenSelector.Allow[0] = "ordered_mutation"
+	ordered[0].autogenSelector.Deny[0] = "ordered_mutation"
+	afterOrderedMutation, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, afterOrderedMutation.AutogenSelector())
+
+	resolved, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	require.Len(t, resolved, 1)
+	resolved[0].autogenSelector.Allow[0] = "resolve_mutation"
+	resolved[0].autogenSelector.Deny[0] = "resolve_mutation"
+	afterResolveMutation, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, afterResolveMutation.AutogenSelector())
+
+	template, err := afterResolveMutation.Template()
+	require.NoError(t, err)
+	assert.NotEmpty(t, template.Charts)
 }
 
 // TestLoadFromDirs_stockTemplateHydratesLazily verifies a stock profile with a
@@ -143,6 +571,168 @@ func TestLoadFromDirs_userBadTemplateSkippedStockSurvives(t *testing.T) {
 	tmpl, err := got[0].Template()
 	require.NoError(t, err, "the surviving stock template must hydrate")
 	assert.NotEmpty(t, tmpl.Charts)
+}
+
+func TestLoadFromDirs_stockRelabelingHydratesLazily(t *testing.T) {
+	tests := map[string]struct {
+		relabeling string
+		wantBlocks int
+		wantErr    string
+	}{
+		"valid": {
+			relabeling: validRelabeling,
+			wantBlocks: 1,
+		},
+		"null": {
+			relabeling: "  null\n",
+			wantErr:    "'relabeling' must not be empty",
+		},
+		"empty": {
+			relabeling: "  []\n",
+			wantErr:    "'relabeling' must not be empty",
+		},
+		"invalid block field": {
+			relabeling: strings.Replace(validRelabeling, "    metric_relabel_configs:", "    unknown: true\n    metric_relabel_configs:", 1),
+			wantErr:    "field unknown not found",
+		},
+		"invalid rule field": {
+			relabeling: strings.Replace(validRelabeling, "        action: replace", "        unknown: true\n        action: replace", 1),
+			wantErr:    "field unknown not found",
+		},
+		"invalid rule": {
+			relabeling: strings.Replace(validRelabeling, "action: replace", "action: bogus", 1),
+			wantErr:    "unknown relabel action",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithRelabeling("app_*", tc.relabeling),
+			})
+			require.NoError(t, err, "stock relabeling must remain lazy")
+
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+			assert.True(t, p.HasRelabeling(), "a present relabeling key must be visible without hydration")
+
+			blocks, err1 := p.Relabeling()
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err1, tc.wantErr)
+				_, err2 := p.Relabeling()
+				assert.Equal(t, err1, err2, "the hydration error must be memoized")
+				return
+			}
+			require.NoError(t, err1)
+			assert.Len(t, blocks, tc.wantBlocks)
+
+			tmpl, err := p.Template()
+			require.NoError(t, err, "relabeling must not break template hydration")
+			assert.NotEmpty(t, tmpl.Charts)
+		})
+	}
+}
+
+func TestProfile_RelabelingAbsent(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAML("app_*")})
+	require.NoError(t, err)
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+
+	assert.False(t, p.HasRelabeling())
+	blocks, err := p.Relabeling()
+	require.NoError(t, err)
+	assert.Nil(t, blocks)
+}
+
+func TestLoadFromDirs_userBadRelabelingSkippedStockSurvives(t *testing.T) {
+	bad := strings.Replace(validRelabeling, "action: replace", "action: bogus", 1)
+	cat, err := loadCatalog(t,
+		fileSpec{stock: true, name: "app.yaml", content: profileYAML("stock_*")},
+		fileSpec{stock: false, name: "app.yaml", content: profileYAMLWithRelabeling("user_*", bad)},
+	)
+	require.NoError(t, err)
+
+	p, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, "stock_*", p.Match)
+	assert.False(t, p.HasRelabeling())
+}
+
+func TestProfile_RelabelingReturnsIndependentCopies(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{
+		stock:   true,
+		name:    "app.yaml",
+		content: profileYAMLWithRelabeling("app_*", validRelabeling),
+	})
+	require.NoError(t, err)
+
+	assertIndependent := func(t *testing.T, p Profile) {
+		t.Helper()
+		first, err := p.Relabeling()
+		require.NoError(t, err)
+		require.Len(t, first, 1)
+		require.Len(t, first[0].MetricRelabelConfigs, 1)
+		firstRegex := first[0].MetricRelabelConfigs[0].Regex.Regexp
+		first[0].Match = "changed_*"
+		first[0].MetricRelabelConfigs[0].SourceLabels[0] = "changed"
+		firstRegex.Longest()
+
+		second, err := p.Relabeling()
+		require.NoError(t, err)
+		require.Len(t, second, 1)
+		assert.Equal(t, "app_*", second[0].Match)
+		assert.Equal(t, []string{"__name__"}, second[0].MetricRelabelConfigs[0].SourceLabels)
+		assert.NotSame(t, firstRegex, second[0].MetricRelabelConfigs[0].Regex.Regexp)
+	}
+
+	fromGet, ok := cat.Get("app")
+	require.True(t, ok)
+	assertIndependent(t, fromGet)
+
+	ordered := cat.OrderedProfiles()
+	require.Len(t, ordered, 1)
+	assertIndependent(t, ordered[0])
+
+	resolved, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	require.Len(t, resolved, 1)
+	assertIndependent(t, resolved[0])
+}
+
+func TestProfile_RelabelingConcurrent(t *testing.T) {
+	for name, relabeling := range map[string]string{
+		"success": validRelabeling,
+		"error":   strings.Replace(validRelabeling, "action: replace", "action: bogus", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			cat, err := loadCatalog(t, fileSpec{
+				stock:   true,
+				name:    "app.yaml",
+				content: profileYAMLWithRelabeling("app_*", relabeling),
+			})
+			require.NoError(t, err)
+			p, ok := cat.Get("app")
+			require.True(t, ok)
+
+			var wg sync.WaitGroup
+			for range 16 {
+				wg.Go(func() {
+					blocks, err := p.Relabeling()
+					if name == "error" {
+						assert.Error(t, err)
+						assert.Nil(t, blocks)
+					} else {
+						assert.NoError(t, err)
+						assert.Len(t, blocks, 1)
+					}
+				})
+			}
+			wg.Wait()
+		})
+	}
 }
 
 // TestProfile_TemplateConcurrent exercises concurrent hydration of a shared

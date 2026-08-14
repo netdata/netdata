@@ -1,8 +1,26 @@
 use super::super::*;
 use super::IngestService;
 use std::future::poll_fn;
+#[cfg(target_os = "linux")]
+use std::os::fd::AsRawFd;
 use std::task::Poll;
 use tokio::io::ReadBuf;
+
+#[cfg(target_os = "linux")]
+fn udp_socket_inode(socket: &UdpSocket) -> Option<u64> {
+    let target = fs::read_link(format!("/proc/self/fd/{}", socket.as_raw_fd())).ok()?;
+    let target = target.to_str()?;
+    target
+        .strip_prefix("socket:[")?
+        .strip_suffix(']')?
+        .parse()
+        .ok()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn udp_socket_inode(_socket: &UdpSocket) -> Option<u64> {
+    None
+}
 
 async fn recv_from_any_listener(
     sockets: &[UdpSocket],
@@ -27,10 +45,29 @@ async fn recv_from_any_listener(
 }
 
 impl IngestService {
-    pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
+    #[allow(dead_code)]
+    pub(crate) async fn run(self, shutdown: CancellationToken) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |_| {}).await
+    }
+
+    pub(crate) async fn run_with_listener_ready_signal(
+        self,
+        shutdown: CancellationToken,
+        listener_ready: CancellationToken,
+    ) -> Result<()> {
+        self.run_with_listener_ready(shutdown, move |_| listener_ready.cancel())
+            .await
+    }
+
+    async fn run_with_listener_ready(
+        mut self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(&[UdpSocket]),
+    ) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
 
         let sockets = self.bind_listeners_and_start_workers().await?;
+        listener_ready(&sockets);
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
         let mut next_socket_index = 0_usize;
         let mut entries_since_sync = 0_usize;
@@ -49,6 +86,9 @@ impl IngestService {
                     let (socket_index, received, source) = match recv {
                         Ok(result) => result,
                         Err(err) => {
+                            self.metrics
+                                .udp_receive_errors
+                                .fetch_add(1, Ordering::Relaxed);
                             tracing::warn!("udp recv error: {}", err);
                             continue;
                         }
@@ -79,9 +119,12 @@ impl IngestService {
             let socket = UdpSocket::bind(&listen)
                 .await
                 .with_context(|| format!("failed to bind {}", listen))?;
-            Self::expand_receive_buffer(&socket, &listen);
+            self.expand_receive_buffer(&socket, &listen);
             sockets.push(socket);
         }
+        self.metrics.replace_udp_listener_socket_inodes(
+            sockets.iter().filter_map(udp_socket_inode).collect(),
+        );
         self.spawn_tier_commit_workers();
         Ok(sockets)
     }
@@ -105,9 +148,7 @@ impl IngestService {
             // rotation and at shutdown. Facet state still persists on the tick
             // cadence, and the entry counter keeps accumulating so shutdown
             // performs one final sync.
-            if let Err(err) = self.facet_runtime.persist_if_dirty() {
-                tracing::warn!("facet runtime persist failed: {}", err);
-            }
+            self.persist_facets_if_dirty();
             entries_since_sync
         };
         self.persist_decoder_state_if_due(now);
@@ -124,10 +165,13 @@ impl IngestService {
     /// what absorbs those stalls; the OS default (typically ~208 KiB, only a
     /// few tens of datagrams) overflows after a few milliseconds at high flow
     /// rates. The kernel caps unprivileged requests at net.core.rmem_max.
-    fn expand_receive_buffer(socket: &UdpSocket, listen: &str) {
+    fn expand_receive_buffer(&self, socket: &UdpSocket, listen: &str) {
         const REQUESTED_RECV_BUFFER_BYTES: usize = 64 * 1024 * 1024;
         let sock_ref = socket2::SockRef::from(socket);
         if let Err(err) = sock_ref.set_recv_buffer_size(REQUESTED_RECV_BUFFER_BYTES) {
+            self.metrics
+                .udp_socket_setup_errors
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!(
                 "failed to expand UDP receive buffer for {}: {}",
                 listen,
@@ -143,6 +187,9 @@ impl IngestService {
                 REQUESTED_RECV_BUFFER_BYTES
             ),
             Err(err) => {
+                self.metrics
+                    .udp_socket_setup_errors
+                    .fetch_add(1, Ordering::Relaxed);
                 tracing::warn!(
                     "failed to read back UDP receive buffer for {}: {}",
                     listen,
@@ -158,16 +205,19 @@ impl IngestService {
         payload: &[u8],
         mut entries_since_sync: usize,
     ) -> usize {
-        if payload.is_empty() {
-            return entries_since_sync;
-        }
-
         self.metrics
             .udp_packets_received
             .fetch_add(1, Ordering::Relaxed);
         self.metrics
             .udp_bytes_received
             .fetch_add(payload.len() as u64, Ordering::Relaxed);
+
+        if payload.is_empty() {
+            self.metrics
+                .udp_empty_packets
+                .fetch_add(1, Ordering::Relaxed);
+            return entries_since_sync;
+        }
 
         let receive_time_usec = now_usec();
         let packet_context = self.prepare_decoder_state_namespace(source, payload);
@@ -180,7 +230,9 @@ impl IngestService {
         self.metrics
             .update_decoder_scope_snapshot(self.decoders.decoder_scope_snapshot());
         self.metrics.apply_decode_stats(&batch.stats);
-
+        if batch.stats.parser_source_evictions > 0 {
+            self.persist_decoder_state();
+        }
         for flow in batch.flows {
             if self.ingest_decoded_record(receive_time_usec, &flow) {
                 entries_since_sync += 1;
@@ -199,7 +251,7 @@ impl IngestService {
     ) -> bool {
         self.ingest_decoded_record_internal(
             receive_time_usec,
-            flow.source_realtime_usec.unwrap_or(receive_time_usec),
+            flow.source_realtime_usec,
             &flow.record,
             true,
         )
@@ -208,7 +260,7 @@ impl IngestService {
     fn ingest_decoded_record_internal(
         &mut self,
         receive_time_usec: u64,
-        source_realtime_usec: u64,
+        source_realtime_usec: Option<u64>,
         record: &crate::flow::FlowRecord,
         observe_tiers: bool,
     ) -> bool {
@@ -223,6 +275,9 @@ impl IngestService {
                 .facet_runtime
                 .observe_active_record(Path::new(&active_path), record)
         {
+            self.metrics
+                .facet_active_update_errors
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!("facet runtime raw write update failed: {}", err);
         }
 
@@ -235,11 +290,10 @@ impl IngestService {
     fn write_raw_record_internal(
         &mut self,
         receive_time_usec: u64,
-        source_realtime_usec: u64,
+        source_realtime_usec: Option<u64>,
         record: &crate::flow::FlowRecord,
     ) -> std::result::Result<Option<String>, ()> {
-        let timestamps = EntryTimestamps::default()
-            .with_source_realtime_usec(source_realtime_usec)
+        let mut timestamps = EntryTimestamps::default()
             .with_entry_realtime_usec(receive_time_usec)
             .with_entry_monotonic_usec(match self.journal_host.monotonic_usec() {
                 Ok(value) => value,
@@ -251,6 +305,13 @@ impl IngestService {
                     return Err(());
                 }
             });
+        // The ENTRY header already stores receive time. Persist source time
+        // only when a selected exporter/flow timestamp differs from it.
+        if let Some(source_realtime_usec) =
+            source_realtime_usec.filter(|&value| value != receive_time_usec)
+        {
+            timestamps = timestamps.with_source_realtime_usec(source_realtime_usec);
+        }
 
         if let Err(err) =
             self.encode_buf
@@ -303,9 +364,7 @@ impl IngestService {
         self.tier_handoff.begin_shutdown();
         let _ = self.sync_if_needed(entries_since_sync);
         super::tier_commit::join_workers(std::mem::take(&mut self.tier_worker_handles));
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
         self.persist_decoder_state();
     }
 
@@ -418,11 +477,18 @@ impl IngestService {
             tracing::warn!("journal sync failed: {}", err);
         }
 
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
 
         0
+    }
+
+    fn persist_facets_if_dirty(&self) {
+        if let Err(err) = self.facet_runtime.persist_if_dirty() {
+            self.metrics
+                .facet_persist_errors
+                .fetch_add(1, Ordering::Relaxed);
+            tracing::warn!("facet runtime persist failed: {}", err);
+        }
     }
 
     /// Pre-worker mode only (in-process tests/benchmarks); after the workers
@@ -444,9 +510,7 @@ impl IngestService {
             tracing::warn!("tier journal sync failed: {}", err);
             return 1;
         }
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
         0
     }
 
@@ -472,6 +536,28 @@ impl IngestService {
     }
 
     #[cfg(test)]
+    pub(crate) async fn run_with_listener_ready_for_test(
+        self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(Vec<(std::net::SocketAddr, Option<usize>)>),
+    ) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |sockets| {
+            listener_ready(
+                sockets
+                    .iter()
+                    .map(|socket| {
+                        (
+                            socket.local_addr().expect("read bound listener address"),
+                            socket2::SockRef::from(socket).recv_buffer_size().ok(),
+                        )
+                    })
+                    .collect(),
+            );
+        })
+        .await
+    }
+
+    #[cfg(test)]
     pub(crate) fn tier_commit_workers_started_for_test(&self) -> bool {
         !self.tier_worker_handles.is_empty()
     }
@@ -492,7 +578,7 @@ impl IngestService {
         receive_time_usec: u64,
         record: &crate::flow::FlowRecord,
     ) -> bool {
-        self.ingest_decoded_record_internal(receive_time_usec, receive_time_usec, record, true)
+        self.ingest_decoded_record_internal(receive_time_usec, None, record, true)
     }
 
     #[cfg(test)]
@@ -544,12 +630,7 @@ impl IngestService {
         mut entries_since_sync: usize,
     ) -> usize {
         for record in records {
-            if self.ingest_decoded_record_internal(
-                receive_time_usec,
-                receive_time_usec,
-                record,
-                true,
-            ) {
+            if self.ingest_decoded_record_internal(receive_time_usec, None, record, true) {
                 entries_since_sync += 1;
             }
         }
@@ -567,12 +648,7 @@ impl IngestService {
         run_tier_maintenance: bool,
     ) -> usize {
         for record in records {
-            if self.ingest_decoded_record_internal(
-                receive_time_usec,
-                receive_time_usec,
-                record,
-                observe_tiers,
-            ) {
+            if self.ingest_decoded_record_internal(receive_time_usec, None, record, observe_tiers) {
                 entries_since_sync += 1;
             }
         }

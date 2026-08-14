@@ -182,11 +182,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -198,18 +200,18 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| freeradius.authentication | requests, responses | packets/s |
-| freeradius.authentication_access_responses | accepts, rejects, challenges | packets/s |
-| freeradius.bad_authentication | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
-| freeradius.proxy_authentication | requests, responses | packets/s |
-| freeradius.proxy_authentication_access_responses | accepts, rejects, challenges | packets/s |
-| freeradius.proxy_bad_authentication | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
-| freeradius.accounting | requests, responses | packets/s |
-| freeradius.bad_accounting | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
-| freeradius.proxy_accounting | requests, responses | packets/s |
-| freeradius.proxy_bad_accounting | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| freeradius.authentication | Authentication | requests, responses | packets/s |
+| freeradius.authentication_access_responses | Authentication Responses | accepts, rejects, challenges | packets/s |
+| freeradius.bad_authentication | Bad Authentication Requests | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
+| freeradius.proxy_authentication | Authentication | requests, responses | packets/s |
+| freeradius.proxy_authentication_access_responses | Authentication Responses | accepts, rejects, challenges | packets/s |
+| freeradius.proxy_bad_authentication | Bad Authentication Requests | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
+| freeradius.accounting | Accounting | requests, responses | packets/s |
+| freeradius.bad_accounting | Bad Accounting Requests | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
+| freeradius.proxy_accounting | Accounting | requests, responses | packets/s |
+| freeradius.proxy_bad_accounting | Bad Accounting Requests | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
 
 
 

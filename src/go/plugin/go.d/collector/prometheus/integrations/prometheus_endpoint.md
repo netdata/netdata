@@ -85,14 +85,14 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. |  | yes |
 |  | timeout | HTTP request timeout (seconds). | 10 | no |
-|  | expected_prefix | If set, the job's check passes only when at least one scraped metric name starts with this prefix. Guards against scraping an unexpected endpoint. |  | no |
+|  | expected_prefix | If set, the job's check passes only when at least one post-job, pre-profile metric name starts with this prefix. Guards against scraping an unexpected endpoint; profile-owned relabeling cannot satisfy it. |  | no |
 | **Customization** | app | Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name. |  | no |
 | **Filters** | [selector](#option-filters-selector) | Time series selector (filter). |  | no |
-| **Limits** | max_time_series | Global time series limit. If an endpoint returns more time series than this, the data is not processed. | 2000 | no |
-|  | max_time_series_per_metric | Per-metric time series limit. Metrics with more time series than this are skipped. | 200 | no |
-| **Customization** | [fallback_type](#option-customization-fallback-type) | Fallback type rules for untyped metrics. |  | no |
-|  | [relabeling](#option-customization-relabeling) | Prometheus-compatible metric relabeling, applied before charts are built. |  | no |
-|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles. Disable with mode `none`. | auto | no |
+| **Limits** | max_time_series | Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed. | 2000 | no |
+|  | max_time_series_per_metric | Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped. | 200 | no |
+| **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
+|  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
+|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`. | auto | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -133,7 +133,15 @@ selector:
 <a id="option-customization-fallback-type"></a>
 ##### fallback_type
 
-This option allows you to process Untyped metrics as Counter or Gauge instead of ignoring them.
+This job option allows you to process untyped metrics as Counter or Gauge instead of ignoring them.
+Classification uses the post-job, pre-profile metric name. Profile relabeling preserves the selected
+type but cannot create or change it by renaming the final metric.
+
+Selected profiles may provide exporter-owned `fallback_type` defaults inside their own `match` scope.
+Job gauge rules take precedence over job counter rules, and both job rule sets take precedence over
+every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
+belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
+counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
 
 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
 - Option syntax:
@@ -152,21 +160,22 @@ fallback_type:
 <a id="option-customization-relabeling"></a>
 ##### relabeling
 
-A list of relabeling blocks. Each block applies a list of Prometheus
-`metric_relabel_configs` rules to the metrics whose name matches `match`. See the
-[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md)
-for the full action set and more examples.
+A list of job-owned relabeling blocks, applied after `selector` and before profile selection. Each block
+applies a list of Prometheus `metric_relabel_configs` rules to the metrics whose name matches `match`.
+Profiles may own the same block format for exporter normalization after selection. See the
+[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
+the full action set and more examples.
 
-- `match`: Netdata simple patterns matched against the full metric name — including
-  any `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact
-  `app_lat` (space-separated; `*` matches any sequence, `?` any character, a leading
-  `!` negates). Use `*` to target every metric. Required.
-- `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`,
-  `regex`, `modulus`, `target_label`, `replacement`, `action`), applied in order to
-  the scraped samples before charts are built.
+- `match`: Netdata simple patterns matched against the full metric name — including any
+  `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact `app_lat`
+  (space-separated; `*` matches any sequence, `?` any character, a leading `!` negates). Use `*` to
+  target every metric. Required.
+- `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`, `regex`, `modulus`,
+  `target_label`, `replacement`, `action`), applied in order to the scraped samples before charts are
+  built.
 
-Relabeling that would corrupt a histogram or summary — splitting it, dropping a
-component, mutating the `le`/`quantile` label, or merging two families — is rejected.
+Relabeling that would corrupt a histogram or summary — splitting it, dropping a component, mutating the
+`le`/`quantile` label, or merging two families — is rejected.
 
 ```yaml
 relabeling:
@@ -182,14 +191,32 @@ relabeling:
 <a id="option-customization-profiles"></a>
 ##### profiles
 
-Profiles ship curated charts for recognized exporters. `profiles.mode` selects them:
+Profiles ship curated charts for recognized exporters -- see the
+[profile format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/profile-format.md) for the file format and how
+to author your own. `profiles.mode` selects them:
 
 - `auto` (default): every profile whose `match` hits at least one scraped metric.
-- `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).
+- `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its
+  check).
 - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
 - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
 
-Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+Selection uses post-job, pre-profile family names. A selected profile may carry `fallback_type` rules
+that classify untyped scalar families inside its `match` scope and `relabeling` blocks that normalize
+matching source families automatically before chart routing. Job fallback policy takes precedence;
+conflicting profile rules use the same ordering as normalization. Each original family is
+processed only by the first applicable profile normalizer: profile-name order in `auto`, configured
+entry order in `exact`, and configured entries followed by remaining auto profiles in name order in
+`combined`. Later profile pipelines do not see the family. All selected templates consume the same
+final names and labels; the collector does not create a private metric stream per profile.
+
+Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the
+other block are ignored. Metrics not covered by an authored profile chart keep their generic autogen
+charts unless an applicable profile `autogen.selector` rejects them. Every selector is limited to its
+profile's `match` scope; when scopes overlap, every applicable selector must accept the series. This
+changes fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
+Stock profiles leave unknown future families eligible for generic fallback; closed fallback selectors are a
+user-owned deployment policy, not a stock-profile authoring pattern.
 
 ```yaml
 profiles:
@@ -379,6 +406,7 @@ jobs:
 ## Alerts
 
 There are no alerts configured by default for this integration.
+
 
 
 ## Metrics

@@ -218,11 +218,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -234,32 +236,32 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| riak.kv.throughput | gets, puts | operations/s |
-| riak.dt.vnode_updates | counters, sets, maps | operations/s |
-| riak.search | queries | queries/s |
-| riak.search.documents | indexed | documents/s |
-| riak.consistent.operations | gets, puts | operations/s |
-| riak.kv.latency.get | mean, median, 95, 99, 100 | ms |
-| riak.kv.latency.put | mean, median, 95, 99, 100 | ms |
-| riak.dt.latency.counter_merge | mean, median, 95, 99, 100 | ms |
-| riak.dt.latency.set_merge | mean, median, 95, 99, 100 | ms |
-| riak.dt.latency.map_merge | mean, median, 95, 99, 100 | ms |
-| riak.search.latency.query | median, min, 95, 99, 999, max | ms |
-| riak.search.latency.index | median, min, 95, 99, 999, max | ms |
-| riak.consistent.latency.get | mean, median, 95, 99, 100 | ms |
-| riak.consistent.latency.put | mean, median, 95, 99, 100 | ms |
-| riak.vm | processes | total |
-| riak.vm.memory.processes | allocated, used | MB |
-| riak.kv.siblings_encountered.get | mean, median, 95, 99, 100 | siblings |
-| riak.kv.objsize.get | mean, median, 95, 99, 100 | KB |
-| riak.search.vnodeq_size | mean, median, 95, 99, 100 | messages |
-| riak.search.index | index_fail, bad_entry, extract_fail | errors |
-| riak.core.protobuf_connections | active | connections |
-| riak.core.repairs | read | repairs |
-| riak.core.fsm_active | get, put, secondary index, list keys | fsms |
-| riak.core.fsm_rejected | get, put | fsms |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| riak.kv.throughput | Reads &amp; writes coordinated by this node | gets, puts | operations/s |
+| riak.dt.vnode_updates | Update operations coordinated by local vnodes by data type | counters, sets, maps | operations/s |
+| riak.search | Search queries on the node | queries | queries/s |
+| riak.search.documents | Documents indexed by search | indexed | documents/s |
+| riak.consistent.operations | Consistent node operations | gets, puts | operations/s |
+| riak.kv.latency.get | Time between reception of a client GET request and subsequent response to client | mean, median, 95, 99, 100 | ms |
+| riak.kv.latency.put | Time between reception of a client PUT request and subsequent response to client | mean, median, 95, 99, 100 | ms |
+| riak.dt.latency.counter_merge | Time it takes to perform an Update Counter operation | mean, median, 95, 99, 100 | ms |
+| riak.dt.latency.set_merge | Time it takes to perform an Update Set operation | mean, median, 95, 99, 100 | ms |
+| riak.dt.latency.map_merge | Time it takes to perform an Update Map operation | mean, median, 95, 99, 100 | ms |
+| riak.search.latency.query | Search query latency | median, min, 95, 99, 999, max | ms |
+| riak.search.latency.index | Time it takes Search to index a new document | median, min, 95, 99, 999, max | ms |
+| riak.consistent.latency.get | Strongly consistent read latency | mean, median, 95, 99, 100 | ms |
+| riak.consistent.latency.put | Strongly consistent write latency | mean, median, 95, 99, 100 | ms |
+| riak.vm | Total processes running in the Erlang VM | processes | total |
+| riak.vm.memory.processes | Memory allocated &amp; used by Erlang processes | allocated, used | MB |
+| riak.kv.siblings_encountered.get | Number of siblings encountered during GET operations by this node during the past minute | mean, median, 95, 99, 100 | siblings |
+| riak.kv.objsize.get | Object size encountered by this node during the past minute | mean, median, 95, 99, 100 | KB |
+| riak.search.vnodeq_size | Number of unprocessed messages in the vnode message queues of Search on this node in the past minute | mean, median, 95, 99, 100 | messages |
+| riak.search.index | Errors encountered by Search | index_fail, bad_entry, extract_fail | errors |
+| riak.core.protobuf_connections | Protocol buffer connections by status | active | connections |
+| riak.core.repairs | Number of repair operations this node has coordinated | read | repairs |
+| riak.core.fsm_active | Active finite state machines by kind | get, put, secondary index, list keys | fsms |
+| riak.core.fsm_rejected | Finite state machines being rejected by Sidejobs overload protection | get, put | fsms |
 
 
 

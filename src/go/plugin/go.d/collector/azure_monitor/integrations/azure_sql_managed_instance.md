@@ -633,11 +633,13 @@ The following alerts are available:
 | [ am_sql_managed_instance_io_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.io_requests | SQL MI I/O requests on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -659,13 +661,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.sql_managed_instance.cpu | average, maximum | percentage |
-| azure_monitor.sql_managed_instance.io_throughput | read, written | bytes/s |
-| azure_monitor.sql_managed_instance.io_requests | average | requests/s |
-| azure_monitor.sql_managed_instance.storage | reserved, used | MiB |
-| azure_monitor.sql_managed_instance.virtual_core_count | average | cores |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.sql_managed_instance.cpu | Azure SQL Managed Instance CPU Utilization | average, maximum | percentage |
+| azure_monitor.sql_managed_instance.io_throughput | Azure SQL Managed Instance I/O Throughput | read, written | bytes/s |
+| azure_monitor.sql_managed_instance.io_requests | Azure SQL Managed Instance I/O Requests | average | requests/s |
+| azure_monitor.sql_managed_instance.storage | Azure SQL Managed Instance Storage | reserved, used | MiB |
+| azure_monitor.sql_managed_instance.virtual_core_count | Azure SQL Managed Instance Virtual Core Count | average | cores |
 
 
 

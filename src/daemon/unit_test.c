@@ -2114,7 +2114,7 @@ static int test_query_window_resampling_boundaries(void) {
     } while(0)
 
     for(RRDR_TIME_GROUPING grouping = RRDR_GROUPING_AVERAGE;
-        grouping <= RRDR_GROUPING_EXTREMES; grouping++) {
+        grouping <= RRDR_GROUPING_LATEST; grouping++) {
         QUERY_TARGET qt;
         query_window_test_target_init(
             &qt, 1000000001, 1000000600, 10, 60, grouping, RRDR_OPTION_NOT_ALIGNED, 1);

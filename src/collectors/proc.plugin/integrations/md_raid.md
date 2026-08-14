@@ -83,11 +83,13 @@ The following alerts are available:
 | [ mdstat_nonredundant_last_collected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.nonredundant | number of seconds since the last successful data collection |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -99,9 +101,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| md.health | a dimension per md array | failed disks |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| md.health | Faulty Devices In MD | a dimension per md array | failed disks |
+
 
 ### Per md array
 
@@ -116,11 +119,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| md.disks | inuse, down | disks |
-| md.mismatch_cnt | count | unsynchronized blocks |
-| md.status | check, resync, recovery, reshape | percent |
-| md.expected_time_until_operation_finish | finish_in | seconds |
-| md.operation_speed | speed | KiB/s |
-| md.nonredundant | available | boolean |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| md.disks | Disks Stats | inuse, down | disks |
+| md.mismatch_cnt | Mismatch Count | count | unsynchronized blocks |
+| md.status | Current Status | check, resync, recovery, reshape | percent |
+| md.expected_time_until_operation_finish | Approximate Time Until Finish | finish_in | seconds |
+| md.operation_speed | Operation Speed | speed | KiB/s |
+| md.nonredundant | Nonredundant Array Availability | available | boolean |

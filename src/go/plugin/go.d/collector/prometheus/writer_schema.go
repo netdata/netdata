@@ -21,90 +21,158 @@ type metricFamilySchema struct {
 	histogramBounds  []float64
 }
 
-func deriveMetricFamilySchema(mf *prompkg.MetricFamily, typ commonmodel.MetricType) (metricFamilySchema, bool) {
+func deriveMetricFamilySchema(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
+	invalidValue := false
 	for _, metric := range mf.Metrics() {
-		schema, ok := deriveMetricSchema(metric, typ)
-		if ok {
-			return schema, true
+		schema, reason := inspectMetricSchema(metric, typ, allowUntypedFallback)
+		if reason == "" {
+			return schema, ""
+		}
+		if reason == PipelineReasonInvalidSeriesValue {
+			invalidValue = true
 		}
 	}
 
-	return metricFamilySchema{}, false
+	if invalidValue {
+		return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
+	}
+	return metricFamilySchema{}, PipelineReasonInvalidFamilySchema
 }
 
-func deriveMetricSchema(metric prompkg.Metric, typ commonmodel.MetricType) (metricFamilySchema, bool) {
+func (w *metricFamilyWriter) inspectMetricFamilySchema(
+	mf *prompkg.MetricFamily,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
+	if handle, ok := w.handles[mf.Name()]; ok {
+		if handle.typ != typ {
+			return metricFamilySchema{}, PipelineReasonFamilyTypeDrift
+		}
+		return metricFamilySchema{
+			summaryQuantiles: handle.summaryQuantiles,
+			histogramBounds:  handle.histogramBounds,
+		}, ""
+	}
+	return deriveMetricFamilySchema(mf, typ, allowUntypedFallback)
+}
+
+// inspectMetricSchema separates an incompatible metric representation/schema
+// from a structurally valid series whose value cannot be written. The writer
+// uses the distinction only for diagnostics; both outcomes remain unwritable.
+func inspectMetricSchema(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	allowUntypedFallback bool,
+) (metricFamilySchema, PipelineReason) {
 	var schema metricFamilySchema
 
 	switch typ {
 	case commonmodel.MetricTypeGauge:
-		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeGauge); !ok {
-			return metricFamilySchema{}, false
+		value, ok := metricScalarRawValue(metric, commonmodel.MetricTypeGauge, allowUntypedFallback)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if !isFinite(value) {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 	case commonmodel.MetricTypeCounter:
-		if _, ok := metricScalarValue(metric, commonmodel.MetricTypeCounter); !ok {
-			return metricFamilySchema{}, false
+		value, ok := metricScalarRawValue(metric, commonmodel.MetricTypeCounter, allowUntypedFallback)
+		if !ok {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
+		}
+		if !isFinite(value) {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 	case commonmodel.MetricTypeSummary:
 		summary := metric.Summary()
 		if summary == nil {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		qs, ok := summaryQuantiles(summary)
 		if !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		if _, ok := toSummaryPoint(summary); !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 		schema.summaryQuantiles = qs
 	case commonmodel.MetricTypeHistogram:
 		histogram := metric.Histogram()
-		if histogram == nil {
-			return metricFamilySchema{}, false
+		if histogram == nil || len(histogram.Buckets()) == 0 {
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		bounds, ok := histogramBounds(histogram)
 		if !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesSchema
 		}
 		if _, ok := toHistogramPoint(histogram); !ok {
-			return metricFamilySchema{}, false
+			return metricFamilySchema{}, PipelineReasonInvalidSeriesValue
 		}
 		schema.histogramBounds = bounds
 	default:
-		return metricFamilySchema{}, false
+		return metricFamilySchema{}, PipelineReasonUnsupportedType
 	}
 
-	return schema, true
+	return schema, ""
 }
 
 // metricIsWritable reports whether a series can be written under the family's canonical schema.
 // Only the distribution schema must match (metrix keys hist/summary schema by metric name); label
 // keys may differ between series and are written per-series.
-func metricIsWritable(metric prompkg.Metric, typ commonmodel.MetricType, schema metricFamilySchema) bool {
-	metricSchema, ok := deriveMetricSchema(metric, typ)
-	if !ok {
-		return false
-	}
-	return slices.Equal(schema.summaryQuantiles, metricSchema.summaryQuantiles) &&
-		slices.Equal(schema.histogramBounds, metricSchema.histogramBounds)
+func metricIsWritable(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	schema metricFamilySchema,
+	allowUntypedFallback bool,
+) bool {
+	return metricSchemaRejectionReason(metric, typ, schema, allowUntypedFallback) == ""
 }
 
-func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType) (float64, bool) {
+func metricSchemaRejectionReason(
+	metric prompkg.Metric,
+	typ commonmodel.MetricType,
+	schema metricFamilySchema,
+	allowUntypedFallback bool,
+) PipelineReason {
+	metricSchema, reason := inspectMetricSchema(metric, typ, allowUntypedFallback)
+	if reason != "" {
+		return reason
+	}
+	if !slices.Equal(schema.summaryQuantiles, metricSchema.summaryQuantiles) ||
+		!slices.Equal(schema.histogramBounds, metricSchema.histogramBounds) {
+		return PipelineReasonDistributionSchemaDrift
+	}
+	return ""
+}
+
+func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType, allowUntypedFallback bool) (float64, bool) {
+	value, ok := metricScalarRawValue(metric, typ, allowUntypedFallback)
+	return value, ok && isFinite(value)
+}
+
+func metricScalarRawValue(metric prompkg.Metric, typ commonmodel.MetricType, allowUntypedFallback bool) (float64, bool) {
 	switch typ {
 	case commonmodel.MetricTypeGauge:
-		if gauge := metric.Gauge(); gauge != nil && isFinite(gauge.Value()) {
+		if gauge := metric.Gauge(); gauge != nil {
 			return gauge.Value(), true
 		}
 	case commonmodel.MetricTypeCounter:
-		if counter := metric.Counter(); counter != nil && isFinite(counter.Value()) {
+		if counter := metric.Counter(); counter != nil {
 			return counter.Value(), true
 		}
 	}
 
-	// Untyped fallthrough: a family resolved to gauge/counter via fallback_type carries its value in
-	// Untyped() (a real typed gauge/counter already returned from the switch). This is the only way a
-	// gauge/counter-typed family reaches here.
-	if untyped := metric.Untyped(); untyped != nil && isFinite(untyped.Value()) {
+	// Ordinary family-level fallback resolves after assembly, so its value remains in Untyped(). The
+	// profile-normalized path binds eligible samples before relabeling; bound mode must reject an
+	// ineligible untyped sample merged into the same final family as a bound gauge/counter sample.
+	if !allowUntypedFallback {
+		return 0, false
+	}
+	if untyped := metric.Untyped(); untyped != nil {
 		return untyped.Value(), true
 	}
 
@@ -112,13 +180,14 @@ func metricScalarValue(metric prompkg.Metric, typ commonmodel.MetricType) (float
 }
 
 func toSummaryPoint(summary *prompkg.Summary) (metrix.SummaryPoint, bool) {
-	if summary == nil || len(summary.Quantiles()) == 0 {
+	if summary == nil || !summary.HasCountAndSum() {
 		return metrix.SummaryPoint{}, false
 	}
 	// A Prometheus summary leaves every quantile NaN for an empty observation window. Skip the
 	// whole summary so a chart is not created until it has a real value (consistent with the
-	// scalar NaN-skip); writing resumes once any quantile is observed.
-	if summary.IsNaN() {
+	// scalar NaN-skip); writing resumes once any quantile is observed. A summary without
+	// configured quantiles still carries valid count and sum values, so this check does not apply.
+	if summary.AllQuantilesNaN() {
 		return metrix.SummaryPoint{}, false
 	}
 	if !isFinite(summary.Count()) || !isFinite(summary.Sum()) || summary.Count() < 0 {
@@ -197,8 +266,11 @@ func toHistogramPoint(histogram *prompkg.Histogram) (metrix.HistogramPoint, bool
 }
 
 func summaryQuantiles(summary *prompkg.Summary) ([]float64, bool) {
-	if summary == nil || len(summary.Quantiles()) == 0 {
+	if summary == nil {
 		return nil, false
+	}
+	if len(summary.Quantiles()) == 0 {
+		return nil, true
 	}
 
 	qs := make([]float64, 0, len(summary.Quantiles()))

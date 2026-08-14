@@ -91,7 +91,7 @@ func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCan
 	clock := newReverseDNSTestClock()
 	warmed := make(chan string, 4)
 	registry := newTopologyRegistry()
-	registry.reverseDNS = newTopologyReverseDNSResolverWithConfig(topologyReverseDNSConfig{
+	dns := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
 		now:         clock.Now,
 		timeout:     time.Second,
 		positiveTTL: time.Hour,
@@ -102,6 +102,8 @@ func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCan
 			return []string{ip + ".example.test"}, nil
 		},
 	})
+	registry.reverseDNS = dns.resolver
+	registry.reverseDNSWarmer = dns.topologyReverseDNSWarmer
 	registry.setReverseDNSWarmContext(context.Background())
 
 	cache := newTopologyCache()

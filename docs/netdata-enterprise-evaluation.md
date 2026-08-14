@@ -167,17 +167,17 @@ For metrics, Netdata maintains ingested samples as close to the edge as possible
 
 For detailed information see [Disk Requirements and Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
 
-For logs, Netdata uses standard systemd-journal files (readable with journalctl). Standard systemd-journald practices apply (archiving, backup, centralization, exporting, etc) and Forward Secure Sealing (FSS) is supported.
+For logs collected from systemd journals, Netdata reads standard journal files (also readable with `journalctl`), so standard systemd-journald practices such as archiving, backup, centralization, exporting, and Forward Secure Sealing apply. OpenTelemetry logs use the OpenTelemetry plugin's indexed storage and configured retention limits.
 
 ## Integration
 
 Netdata is an open platform.
 
-It can ingest metrics in commonly used open standards, including OpenMetrics, StatsD, JSON, etc. OpenTelemetry support is scheduled for Q3 2025. Netdata also has approximately 800+ data collection modules and plugins to directly collect data from applications.
+It can ingest metrics in commonly used open standards, including OpenMetrics, StatsD, JSON, and OpenTelemetry OTLP/gRPC. Netdata also receives OpenTelemetry logs and has approximately 800+ data collection modules and plugins to directly collect data from applications.
 
 Netdata can export metrics to Prometheus, InfluxDB, Graphite, OpenTSDB, TimescaleDB, and more.
 
-For logs, standard systemd-journal practices apply.
+For systemd journal sources, standard systemd-journald practices apply. OpenTelemetry log storage has its own rotation and retention configuration.
 
 For alert notifications, Netdata supports PagerDuty, Slack, Teams, email (SMTP), Discord, Telegram, Jira, ServiceNow, and custom webhooks.
 

@@ -4,16 +4,16 @@
 
 - **What it does**: collects metrics from databases, middleware, services, APIs, and infrastructure components using built-in collectors.
 - **How you use it**:
-  - set collector-specific jobs in `config/go.d/*.conf`,
-  - restart Netdata and the collector jobs start automatically.
+    - set collector-specific jobs in `config/go.d/*.conf`,
+    - restart Netdata and the collector jobs start automatically.
 - **Operational behavior**:
-  - runs as a separate process from Netdata core (visible in `ps fax`),
-  - lifecycle is managed by Netdata (start/stop/restart),
-  - communicates through the external plugin pipe.
+    - runs as a separate process from Netdata core (visible in `ps fax`),
+    - lifecycle is managed by Netdata (start/stop/restart),
+    - communicates through the external plugin pipe.
 - **Scale model**:
-  - supports many collectors,
-  - each collector can run multiple jobs,
-  - collectors can be added/extended independently.
+    - supports many collectors,
+    - each collector can run multiple jobs,
+    - collectors can be added/extended independently.
 
 ### Required Linux capabilities
 
@@ -128,7 +128,6 @@ All capabilities are set automatically during Netdata installation using the [of
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rspamd)                         |            Rspamd             |
 | [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/samba)                           |             Samba             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/scaleio)                       |       Dell EMC ScaleIO        |
-| [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/sensors)                       |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp)                             |             SNMP              |
 | [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squid)                           |             Squid             |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squidlog)                     |             Squid             |

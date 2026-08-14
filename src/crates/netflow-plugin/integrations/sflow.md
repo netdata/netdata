@@ -31,7 +31,7 @@ and sampling rate information.
 For full documentation including how sFlow differs fundamentally from NetFlow (packet
 sampling vs aggregated flows), vendor configuration examples (Arista, Juniper, Aruba CX,
 Ruckus, hsflowd), and the limits of sampled data, see the
-[Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
+[Network Flows Overview](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/README.md).
 
 
 The plugin uses the same configurable UDP listener set as NetFlow/IPFIX. sFlow datagrams are identified by
@@ -87,7 +87,7 @@ Enable sFlow via the `protocols.sflow` option.
 | listener.listen | UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values. | 0.0.0.0:2055, 0.0.0.0:6343 | no |
 | protocols.sflow | Enable sFlow decoding. | yes | no |
 | journal.journal_dir | Directory for journal files (relative to NETDATA_CACHE_DIR). | flows | no |
-| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention. | 10GB | no |
+| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention. | 10GB | no |
 | journal.tiers.&lt;tier&gt;.duration_of_journal_files | Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap. | null | no |
 
 
@@ -130,7 +130,7 @@ protocols:
 
 ### Verifying sFlow is arriving and diagnosing failures
 
-See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
+See [Troubleshooting](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/troubleshooting.md) for
 the full diagnostic recipe. sFlow-specific gotchas: Netdata creates Network Flow rows
 from sFlow flow samples (`flow_sample` / `expanded_flow_sample`) only. Counter-only
 streams (`counters_sample` / `expanded_counters_sample`) are valid sFlow and increment
@@ -139,5 +139,5 @@ records for the Flow Explorer, Sankey, time-series, or maps. Bytes/packets are
 statistical estimates that won't match SNMP byte-for-byte, and VLAN information comes
 from `ExtendedSwitch` records only -- not from 802.1Q tags inside the sampled header.
 See also
-[Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
-and the sFlow section of [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
+[Validation and Data Quality](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/validation.md)
+and the sFlow section of [Anti-patterns](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/anti-patterns.md).

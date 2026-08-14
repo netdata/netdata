@@ -245,6 +245,7 @@ The following alerts are available:
 | [ consul_license_expiration_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/consul.conf) | consul.license_expiration_time | Consul Enterprise licence expiration time on node ${label:node_name} datacenter ${label:datacenter} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -252,6 +253,7 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 The set of metrics depends on the [Consul Agent mode](https://developer.hashicorp.com/consul/docs/install/glossary#agent).
+
 
 
 ### Per Consul instance
@@ -262,41 +264,42 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | Leader | Follower | Client |
-|:------|:----------|:----|:---:|:---:|:---:|
-| consul.client_rpc_requests_rate | rpc | requests/s | • | • | • |
-| consul.client_rpc_requests_exceeded_rate | exceeded | requests/s | • | • | • |
-| consul.client_rpc_requests_failed_rate | failed | requests/s | • | • | • |
-| consul.memory_allocated | allocated | bytes | • | • | • |
-| consul.memory_sys | sys | bytes | • | • | • |
-| consul.gc_pause_time | gc_pause | seconds | • | • | • |
-| consul.kvs_apply_time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • | • |   |
-| consul.kvs_apply_operations_rate | kvs_apply | ops/s | • | • |   |
-| consul.txn_apply_time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • | • |   |
-| consul.txn_apply_operations_rate | txn_apply | ops/s | • | • |   |
-| consul.autopilot_health_status | healthy, unhealthy | status | • | • |   |
-| consul.autopilot_failure_tolerance | failure_tolerance | servers | • | • |   |
-| consul.autopilot_server_health_status | healthy, unhealthy | status | • | • |   |
-| consul.autopilot_server_stable_time | stable | seconds | • | • |   |
-| consul.autopilot_server_serf_status | active, failed, left, none | status | • | • |   |
-| consul.autopilot_server_voter_status | voter, not_voter | status | • | • |   |
-| consul.network_lan_rtt | min, max, avg | ms | • | • |   |
-| consul.raft_commit_time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • |   |   |
-| consul.raft_commits_rate | commits | commits/s | • |   |   |
-| consul.raft_leader_last_contact_time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • |   |   |
-| consul.raft_leader_oldest_log_age | oldest_log_age | seconds | • |   |   |
-| consul.raft_follower_last_contact_leader_time | leader_last_contact | ms |   | • |   |
-| consul.raft_rpc_install_snapshot_time | quantile_0.5, quantile_0.9, quantile_0.99 | ms |   | • |   |
-| consul.raft_leader_elections_rate | leader | elections/s | • | • |   |
-| consul.raft_leadership_transitions_rate | leadership | transitions/s | • | • |   |
-| consul.server_leadership_status | leader, not_leader | status | • | • |   |
-| consul.raft_thread_main_saturation_perc | quantile_0.5, quantile_0.9, quantile_0.99 | percentage | • | • |   |
-| consul.raft_thread_fsm_saturation_perc | quantile_0.5, quantile_0.9, quantile_0.99 | percentage | • | • |   |
-| consul.raft_fsm_last_restore_duration | last_restore_duration | ms | • | • |   |
-| consul.raft_boltdb_freelist_bytes | freelist | bytes | • | • |   |
-| consul.raft_boltdb_logs_per_batch_rate | written | logs/s | • | • |   |
-| consul.raft_boltdb_store_logs_time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • | • |   |
-| consul.license_expiration_time | license_expiration | seconds | • | • | • |
+| Metric | Description | Dimensions | Unit | Leader | Follower | Client |
+|:------|:------------|:----------|:----|:---:|:---:|:---:|
+| consul.client_rpc_requests_rate | Client RPC requests | rpc | requests/s | • | • | • |
+| consul.client_rpc_requests_exceeded_rate | Client rate-limited RPC requests | exceeded | requests/s | • | • | • |
+| consul.client_rpc_requests_failed_rate | Client failed RPC requests | failed | requests/s | • | • | • |
+| consul.memory_allocated | Memory allocated by the Consul process | allocated | bytes | • | • | • |
+| consul.memory_sys | Memory obtained from the OS | sys | bytes | • | • | • |
+| consul.gc_pause_time | Garbage collection stop-the-world pause time | gc_pause | seconds | • | • | • |
+| consul.kvs_apply_time | KVS apply time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • | • |   |
+| consul.kvs_apply_operations_rate | KVS apply operations | kvs_apply | ops/s | • | • |   |
+| consul.txn_apply_time | Transaction apply time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • | • |   |
+| consul.txn_apply_operations_rate | Transaction apply operations | txn_apply | ops/s | • | • |   |
+| consul.autopilot_health_status | Autopilot cluster health status | healthy, unhealthy | status | • | • |   |
+| consul.autopilot_failure_tolerance | Autopilot cluster failure tolerance | failure_tolerance | servers | • | • |   |
+| consul.autopilot_server_health_status | Autopilot server health status | healthy, unhealthy | status | • | • |   |
+| consul.autopilot_server_stable_time | Autopilot server stable time | stable | seconds | • | • |   |
+| consul.autopilot_server_serf_status | Autopilot server Serf status | active, failed, left, none | status | • | • |   |
+| consul.autopilot_server_voter_status | Autopilot server Raft voting membership | voter, not_voter | status | • | • |   |
+| consul.network_lan_rtt | Network lan RTT | min, max, avg | ms | • | • |   |
+| consul.raft_commit_time | Raft commit time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • |   |   |
+| consul.raft_commits_rate | Raft commits rate | commits | commits/s | • |   |   |
+| consul.raft_leader_last_contact_time | Raft leader last contact time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • |   |   |
+| consul.raft_leader_oldest_log_age | Raft leader oldest log age | oldest_log_age | seconds | • |   |   |
+| consul.raft_follower_last_contact_leader_time | Raft follower last contact with the leader time | leader_last_contact | ms |   | • |   |
+| consul.raft_rpc_install_snapshot_time | Raft RPC install snapshot time | quantile_0.5, quantile_0.9, quantile_0.99 | ms |   | • |   |
+| consul.raft_leader_elections_rate | Raft leader elections rate | leader | elections/s | • | • |   |
+| consul.raft_leadership_transitions_rate | Raft leadership transitions rate | leadership | transitions/s | • | • |   |
+| consul.server_leadership_status | Server leadership status | leader, not_leader | status | • | • |   |
+| consul.raft_thread_main_saturation_perc | Raft main thread saturation | quantile_0.5, quantile_0.9, quantile_0.99 | percentage | • | • |   |
+| consul.raft_thread_fsm_saturation_perc | Raft FSM thread saturation | quantile_0.5, quantile_0.9, quantile_0.99 | percentage | • | • |   |
+| consul.raft_fsm_last_restore_duration | Raft last restore duration | last_restore_duration | ms | • | • |   |
+| consul.raft_boltdb_freelist_bytes | Raft BoltDB freelist | freelist | bytes | • | • |   |
+| consul.raft_boltdb_logs_per_batch_rate | Raft BoltDB logs written per batch | written | logs/s | • | • |   |
+| consul.raft_boltdb_store_logs_time | Raft BoltDB store logs time | quantile_0.5, quantile_0.9, quantile_0.99 | ms | • | • |   |
+| consul.license_expiration_time | License expiration time | license_expiration | seconds | • | • | • |
+
 
 ### Per node check
 
@@ -312,9 +315,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | Leader | Follower | Client |
-|:------|:----------|:----|:---:|:---:|:---:|
-| consul.node_health_check_status | passing, maintenance, warning, critical | status | • | • | • |
+| Metric | Description | Dimensions | Unit | Leader | Follower | Client |
+|:------|:------------|:----------|:----|:---:|:---:|:---:|
+| consul.node_health_check_status | Node health check status | passing, maintenance, warning, critical | status | • | • | • |
+
 
 ### Per service check
 
@@ -331,9 +335,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | Leader | Follower | Client |
-|:------|:----------|:----|:---:|:---:|:---:|
-| consul.service_health_check_status | passing, maintenance, warning, critical | status | • | • | • |
+| Metric | Description | Dimensions | Unit | Leader | Follower | Client |
+|:------|:------------|:----------|:----|:---:|:---:|:---:|
+| consul.service_health_check_status | Service health check status | passing, maintenance, warning, critical | status | • | • | • |
 
 
 

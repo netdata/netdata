@@ -28,9 +28,9 @@ NetFlow v9 with variable-length fields, vendor-specific information elements,
 and template withdrawal. Each record exposes the same core fields as NetFlow plus
 any additional IEs the exporter provides.
 
-For full documentation including vendor configuration examples (Cisco, Juniper, Arista,
-ASA NSEL), biflow handling, sampling caveats, and verification steps, see the
-[Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
+For full documentation including vendor configuration examples (Cisco, Juniper, Arista),
+biflow handling, sampling caveats, and verification steps, see the
+[Network Flows Overview](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/README.md).
 
 
 The plugin uses the same configurable UDP listener set as NetFlow. IPFIX messages are identified by
@@ -85,8 +85,10 @@ Enable IPFIX via the `protocols.ipfix` option.
 |:-----|:------------|:--------|:---------:|
 | listener.listen | UDP listener endpoints for NetFlow/IPFIX and sFlow datagrams. YAML accepts either a scalar endpoint or a list of endpoints; CLI accepts repeated `--netflow-listen` flags or comma-delimited values. | 0.0.0.0:2055, 0.0.0.0:6343 | no |
 | protocols.ipfix | Enable IPFIX decoding. | yes | no |
+| protocols.sampling_cache_max_entries | Maximum learned NetFlow v9/IPFIX sampling-rate entries across all exporter streams. Must be positive. | 100000 | no |
+| protocols.sampling_cache_max_entries_per_stream | Maximum learned sampling-rate entries for one exporter stream. Must be positive; values above the global limit are clamped. | 65536 | no |
 | journal.journal_dir | Directory for journal files (relative to NETDATA_CACHE_DIR). | flows | no |
-| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier hard size cap. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. Set to `null` for time-only retention. | 10GB | no |
+| journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention. | 10GB | no |
 | journal.tiers.&lt;tier&gt;.duration_of_journal_files | Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap. | null | no |
 
 
@@ -129,8 +131,10 @@ protocols:
 
 ### Verifying flow data is arriving and diagnosing failures
 
-See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
-the full diagnostic recipe. For IPFIX specifically, watch the `template_errors` dimension
-on `netflow.input_packets` -- IPFIX is template-driven and data records arriving before
-their templates are dropped. See also
-[Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality).
+See [Troubleshooting](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/troubleshooting.md) for
+the full diagnostic recipe. Use `netflow.input_packets` for UDP arrival,
+`netflow.protocol_packets` for v5/v7/v9/IPFIX/sFlow identification, and
+`netflow.decoder_exceptions` for parse failures. For v9/IPFIX, watch the
+missing-template dimensions on `netflow.flow_sets`; Data Sets arriving before
+their templates cannot be decoded. See also
+[Validation and Data Quality](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/validation.md).

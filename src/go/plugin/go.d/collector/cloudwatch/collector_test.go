@@ -102,11 +102,20 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 }
 
 func testCompiledSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
-	series, err := resolveSeriesPolicies("test", nil, nil, profile, compileProfileSeries(profile))
+	series, err := resolveSeriesPolicies("test", nil, nil, profile, testSelectedProfileSeries(profile))
 	if err != nil {
 		panic(err)
 	}
 	return series
+}
+
+func testSelectedProfileSeries(profile cwprofiles.ResolvedProfile) []selectedSeriesSpec {
+	base := compileProfileSeries(profile)
+	selected := make([]selectedSeriesSpec, len(base))
+	for i, item := range base {
+		selected[i] = selectedSeriesSpec{profileSeriesSpec: item}
+	}
+	return selected
 }
 
 func resolvedTargetNames(c *Collector) []string {

@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: fastapi
+future_inputs:
+  generated_created:
+    name: http_future_created
+    type: gauge
+cases:
+  inprogress_disabled:
+    environment:
+      fastapi: {inprogress: disabled, status_grouping: grouped, highr_population: all, streaming_duration: included, custom_labels: none, metric_naming: default, inprogress_naming: default}
+    fixture: fixtures/fastapi_all_metrics.prom
+    coverage: true
+    expected: {verdict: PASS}
+  inprogress_unlabeled:
+    environment:
+      fastapi: {inprogress: unlabeled, status_grouping: grouped, highr_population: all, streaming_duration: included, custom_labels: none, metric_naming: default, inprogress_naming: default}
+    fixture: fixtures/fastapi_inprogress_unlabeled.prom
+    coverage: true
+    expected: {verdict: PASS}
+  inprogress_labeled:
+    environment:
+      fastapi: {inprogress: labeled, status_grouping: grouped, highr_population: all, streaming_duration: included, custom_labels: none, metric_naming: default, inprogress_naming: default}
+    fixture: fixtures/fastapi_inprogress_labeled.prom
+    coverage: true
+    expected: {verdict: PASS}
+  configured_status_and_duration_modes:
+    environment:
+      fastapi: {inprogress: disabled, status_grouping: exact, highr_population: 2xx_only, streaming_duration: excluded, custom_labels: none, metric_naming: default, inprogress_naming: default}
+    fixture: fixtures/fastapi_configured_modes.prom
+    coverage: true
+    expected: {verdict: PASS}

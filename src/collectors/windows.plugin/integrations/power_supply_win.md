@@ -109,11 +109,13 @@ The following alerts are available:
 | [ power_supply_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf) | powersupply.capacity | percentage of remaining power supply capacity |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -129,7 +131,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powersupply.capacity | capacity | percentage |
-| powersupply.voltage | now | V |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powersupply.capacity | Battery capacity | capacity | percentage |
+| powersupply.voltage | Power supply voltage | now | V |

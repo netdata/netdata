@@ -630,11 +630,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -656,34 +658,34 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.app_service.requests | requests | requests/s |
-| azure_monitor.app_service.response_time | average | seconds |
-| azure_monitor.app_service.http_status | 2xx, 3xx, 4xx, 5xx | responses/s |
-| azure_monitor.app_service.http_error_detail | 101_websocket, 401_unauthorized, 403_forbidden, 404_not_found, 406_not_acceptable | responses/s |
-| azure_monitor.app_service.cpu | average | percentage |
-| azure_monitor.app_service.cpu_time | total | seconds |
-| azure_monitor.app_service.memory_usage | average_working_set, working_set, private | bytes |
-| azure_monitor.app_service.health | average | percentage |
-| azure_monitor.app_service.network_traffic | received, sent | bytes/s |
-| azure_monitor.app_service.connections | average | connections |
-| azure_monitor.app_service.io_throughput | read, write, other | bytes/s |
-| azure_monitor.app_service.io_operations | read, write, other | operations/s |
-| azure_monitor.app_service.threads | average | threads |
-| azure_monitor.app_service.handles | average | handles |
-| azure_monitor.app_service.gc_collections | gen0, gen1, gen2 | collections/s |
-| azure_monitor.app_service.function_executions | total | executions/s |
-| azure_monitor.app_service.function_execution_units | total | MB-milliseconds/s |
-| azure_monitor.app_service.always_ready_function_executions | total | executions/s |
-| azure_monitor.app_service.always_ready_function_execution_units | total | MB-milliseconds/s |
-| azure_monitor.app_service.always_ready_units | total | units |
-| azure_monitor.app_service.on_demand_function_executions | total | executions/s |
-| azure_monitor.app_service.on_demand_function_execution_units | total | MB-milliseconds/s |
-| azure_monitor.app_service.request_queue | queued | requests |
-| azure_monitor.app_service.instances | running | instances |
-| azure_monitor.app_service.assemblies | loaded | assemblies |
-| azure_monitor.app_service.app_domains | loaded, unloaded | domains |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.app_service.requests | Azure App Service Requests | requests | requests/s |
+| azure_monitor.app_service.response_time | Azure App Service Response Time | average | seconds |
+| azure_monitor.app_service.http_status | Azure App Service HTTP Status Codes | 2xx, 3xx, 4xx, 5xx | responses/s |
+| azure_monitor.app_service.http_error_detail | Azure App Service HTTP Error Detail | 101_websocket, 401_unauthorized, 403_forbidden, 404_not_found, 406_not_acceptable | responses/s |
+| azure_monitor.app_service.cpu | Azure App Service CPU Utilization | average | percentage |
+| azure_monitor.app_service.cpu_time | Azure App Service CPU Time | total | seconds |
+| azure_monitor.app_service.memory_usage | Azure App Service Memory Usage | average_working_set, working_set, private | bytes |
+| azure_monitor.app_service.health | Azure App Service Health Check Status | average | percentage |
+| azure_monitor.app_service.network_traffic | Azure App Service Network Traffic | received, sent | bytes/s |
+| azure_monitor.app_service.connections | Azure App Service Connections | average | connections |
+| azure_monitor.app_service.io_throughput | Azure App Service IO Throughput | read, write, other | bytes/s |
+| azure_monitor.app_service.io_operations | Azure App Service IO Operations | read, write, other | operations/s |
+| azure_monitor.app_service.threads | Azure App Service Threads | average | threads |
+| azure_monitor.app_service.handles | Azure App Service Handles | average | handles |
+| azure_monitor.app_service.gc_collections | Azure App Service .NET GC Collections | gen0, gen1, gen2 | collections/s |
+| azure_monitor.app_service.function_executions | Azure App Service Function Executions | total | executions/s |
+| azure_monitor.app_service.function_execution_units | Azure App Service Function Execution Units | total | MB-milliseconds/s |
+| azure_monitor.app_service.always_ready_function_executions | Azure App Service Always Ready Function Executions | total | executions/s |
+| azure_monitor.app_service.always_ready_function_execution_units | Azure App Service Always Ready Function Execution Units | total | MB-milliseconds/s |
+| azure_monitor.app_service.always_ready_units | Azure App Service Always Ready Units | total | units |
+| azure_monitor.app_service.on_demand_function_executions | Azure App Service On Demand Function Executions | total | executions/s |
+| azure_monitor.app_service.on_demand_function_execution_units | Azure App Service On Demand Function Execution Units | total | MB-milliseconds/s |
+| azure_monitor.app_service.request_queue | Azure App Service Request Queue | queued | requests |
+| azure_monitor.app_service.instances | Azure App Service Instance Count | running | instances |
+| azure_monitor.app_service.assemblies | Azure App Service .NET Assemblies | loaded | assemblies |
+| azure_monitor.app_service.app_domains | Azure App Service App Domains | loaded, unloaded | domains |
 
 
 

@@ -1465,7 +1465,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "no"
             }
@@ -1479,7 +1483,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
@@ -1493,7 +1501,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
@@ -1507,7 +1519,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
@@ -1521,7 +1537,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
@@ -7226,7 +7246,8 @@
             "trimmed-median20",
             "trimmed-median25",
             "ema",
-            "extremes"
+            "extremes",
+            "latest"
           ],
           "default": "average"
         }
@@ -7280,7 +7301,8 @@
             "trimmed-median20",
             "trimmed-median25",
             "ema",
-            "extremes"
+            "extremes",
+            "latest"
           ],
           "default": "average"
         }

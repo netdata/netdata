@@ -10,7 +10,16 @@ endmeta-->
 
 # Network Topologies
 
-Netdata shows you how your network is connected — which device links to which, and where each part of your infrastructure sits — built automatically from the devices you already monitor.
+Netdata shows you how your infrastructure is connected — which device links to which, which service depends on which,
+and where each part sits — built automatically from what you already monitor.
+
+Two maps, in the same view:
+
+- **The network fabric** — your switches and routers and the links between them, read over SNMP from the devices themselves.
+- **Your applications** — what each process is talking to, read from the host's kernel, and on Linux which container and Kubernetes workload owns it.
+
+Neither needs topology-specific setup: once you are monitoring the devices and running Agents on the hosts, the maps
+build themselves. There is nothing to instrument, no topology to declare, and no diagram to maintain.
 
 ![Network topology overview](https://www.netdata.cloud/img/network/snmp-topology-overview.png)
 
@@ -34,22 +43,37 @@ The result is a live Layer 2 and Layer 3 map, kept current as devices come and g
 - **Find what's affected** — what sits downstream of a link or device that's in trouble.
 - **Locate an endpoint** — which switch port an address is on, cross-referenced from forwarding and neighbor data.
 
-## Beyond the device fabric
+## Your applications, mapped the same way
 
-The same topology view brings in other infrastructure, each in the same form so it sits alongside your device topology:
+The device fabric tells you how the wires run. On a monitored host, Netdata also reads the kernel's live socket table
+and maps the software: what each process is talking to, and on Linux which container, image, systemd unit, or
+Kubernetes pod, namespace, and workload owns it — without instrumenting any of it (`topology:network-connections`).
 
-- **Live network connections** — what your hosts and services are talking to right now (`topology:network-connections`).
-- **Netdata streaming** — how your Agents connect to each other (`topology:streaming`).
-- **VMware vSphere** — datacenters, clusters, resource pools, hosts, VMs, datastores, and networks (`topology:vsphere`).
-- **Cato Networks** — Cato SASE sites, devices, POPs, and BGP peers (`topology:cato_networks`).
+You can regroup that map by process name, container, or PID, so you can look at the host at whichever level answers
+your question — the services it runs, or exactly which worker process opened a connection.
 
-The device fabric (`topology:snmp`), live connections, and streaming come up automatically; vSphere and Cato come from their own collectors, configured separately.
+The map is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only. A host install
+needs nothing configured. Running the Agent in a container needs a few extra privileges, which
+[Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md) lists.
 
 ![Live network connections function](https://www.netdata.cloud/img/dashboard-screens/functions-network-connections.png)
 
 Live host and service connections (`topology:network-connections`) appear in the same topology view, alongside your device fabric.
 
+See [Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md) for what it maps and how to use it.
+
+## Other sources in the same view
+
+The topology view brings in the rest of your infrastructure in the same form, so it all sits together:
+
+- **Netdata streaming** — how your Agents connect to each other (`topology:streaming`).
+- **VMware vSphere** — datacenters, clusters, resource pools, hosts, VMs, datastores, and networks (`topology:vsphere`).
+- **Cato Networks** — Cato SASE sites, devices, POPs, and BGP peers (`topology:cato_networks`).
+
+The device fabric (`topology:snmp`) and application dependencies come up on their own once the devices and hosts are monitored. The streaming map appears once Agents are streaming to a Parent (configured in `stream.conf`); vSphere and Cato come from their own collectors, configured separately.
+
 ## Where to start
 
-- Topology comes up on its own once you're [monitoring devices](/docs/npm/device-metrics/README.md) — open the topology view in Netdata.
+- Application dependencies come up on their own — open the topology view in Netdata on any monitored host.
+- The device fabric comes up once you're [monitoring devices](/docs/npm/device-metrics/README.md) over SNMP.
 - The entries in this section list each discovery method and source, and what each one contributes to the map.

@@ -20,7 +20,9 @@ The Network Monitor dashboard brings devices, topology, flows, and trap events t
 
 - **Device metrics (SNMP)** — poll routers, switches, firewalls, access points, UPSs, and PDUs. Netdata matches each device to a vendor profile by its `sysObjectID` and collects interfaces (traffic, errors, discards, operational state), system and host resources, and vendor-specific hardware, environmental, and protocol metrics. Every metric is a chart you can alert on, with interactive per-interface and per-device tables.
 
-- **Topology** — see how your network connects. Netdata builds Layer 2 maps (LLDP, CDP, MAC/FDB, STP) and Layer 3 maps (BGP, OSPF, ARP), plus live host connections, the Netdata streaming hierarchy, and virtual infrastructure (VMware vSphere, Cato).
+- **Topology** — see how your network connects. Netdata builds Layer 2 maps (LLDP, CDP, MAC/FDB, STP) and Layer 3 maps (BGP, OSPF, ARP), plus the Netdata streaming hierarchy and virtual infrastructure (VMware vSphere, Cato).
+
+- **Application dependencies** — see how your software connects. On monitored hosts (Linux, FreeBSD, and macOS), Netdata reads the kernel's live socket table and maps what each process is talking to; on Linux each one is also attributed to the container, image, systemd unit, or Kubernetes pod that owns it — with no instrumentation and no sidecars. A standard host install needs nothing configured; running the Agent in a container needs a few extra privileges.
 
 - **BGP monitoring** — peer state, advertised and received prefixes, and session health on your routers, with an interactive peer table and alerts on session changes.
 
@@ -40,6 +42,7 @@ Netdata ships profiles for hundreds of device and trap vendors. Each capability 
 
 - **Monitor your devices** → [Device Metrics](/docs/npm/device-metrics/README.md)
 - **See how they connect** → [Topologies](/docs/npm/topology/README.md)
+- **See how your software connects** → [Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md)
 - **Watch routing and licensing** → [BGP Monitoring](/docs/npm/bgp/README.md) and [Licensing Monitoring](/docs/npm/licensing/README.md)
 - **Analyze their traffic** → [Network Flows](/docs/npm/network-flows/README.md)
 - **Catch their events and logs** → [SNMP Traps](/docs/npm/snmp-traps/README.md) and [Syslog from Network Devices](/docs/npm/syslog/README.md)

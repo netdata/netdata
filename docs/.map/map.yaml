@@ -175,6 +175,16 @@ sidebar:
               label: Disk & Retention
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md
           - meta:
+              label: Extreme Cardinality Protection
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/extreme-cardinality-protection.md
+              description: How Netdata limits long-term resource use from short-lived chart instances, and how metadata cleanup affects disk space.
+              keywords:
+                - cardinality
+                - ephemerality
+                - retention
+                - metadata
+                - netdata-meta.db
+          - meta:
               label: Impact on Cloud VMs
               edit_url: https://github.com/netdata/netdata/edit/master/docs/impact-on-resources.md
               description: Recommended VM sizing and the resource impact of running Netdata on cloud VMs (AWS, Azure, GCP).
@@ -451,10 +461,36 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/cgroups.plugin/README.md
           description: Monitor containers and virtual machines via Linux cgroups, with friendly name resolution for Docker, Kubernetes, Podman, LXC, libvirt, Proxmox, and more.
       - meta:
-          label: OpenTelemetry Metrics
+          label: OpenTelemetry
           edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
-          description: Ingesting storing and visualizing OpenTelemetry metrics
+          description: Ingest OpenTelemetry metrics and logs with the Netdata Agent.
           path: OpenTelemetry
+        items:
+          - meta:
+              label: OTLP Ingestion
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
+              description: Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent
+              keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
+          - meta:
+              label: Metrics Collection
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/metrics-collection.md
+              description: Collect Prometheus, Redis, NGINX, PostgreSQL, and host metrics through OpenTelemetry Collector receivers
+              keywords: [opentelemetry, otel, prometheus, redis, nginx, postgresql, hostmetrics, receivers]
+          - meta:
+              label: Logs Collection
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-collection.md
+              description: Collect systemd journal, application file, and syslog records through OpenTelemetry Collector receivers
+              keywords: [opentelemetry, otel, journald, filelog, syslog, logs, receivers]
+          - meta:
+              label: Transformations
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/transformations.md
+              description: Parse, enrich, normalize, and filter OpenTelemetry logs before exporting them to Netdata
+              keywords: [opentelemetry, otel, ottl, transform, filter, json, logs]
+          - meta:
+              label: Logs-to-Metrics
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md
+              description: Count matching OpenTelemetry log records and chart their rate in Netdata
+              keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
       - meta:
           label: Secrets Management
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SECRETS.md
@@ -472,6 +508,16 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/cloudwatch/profile-format.md
           description: Define CloudWatch namespaces, supported regions, resource dimensions, metrics, statistics, and dynamic charts in reusable profiles.
           keywords: [aws, cloudwatch, profiles, collectors, metrics]
+      - meta:
+          label: Prometheus Profile Format
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/profile-format.md
+          description: Define curated chart profiles for Prometheus endpoints, with scoped autogen selectors that filter the fallback charts of unmatched metrics.
+          keywords: [prometheus, profiles, autogen, collectors, charts]
+      - meta:
+          label: Prometheus Metric Relabeling
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md
+          description: Rewrite, derive, or drop scraped Prometheus metrics and labels with Prometheus-compatible metric_relabel_configs rules before charts are built.
+          keywords: [prometheus, relabeling, metric_relabel_configs, labels, collectors]
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics
@@ -552,12 +598,16 @@ sidebar:
       - meta:
           label: Topologies
           edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/README.md
-          description: See how your network is connected — Layer 2 and Layer 3 device topology, live connections, and virtual infrastructure.
+          description: See how your infrastructure is connected — Layer 2 and Layer 3 device topology, application dependencies, and virtual infrastructure.
         items:
           - meta:
               label: Discovery Methods
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/discovery-methods.md
               description: What LLDP, CDP, FDB, ARP, STP, BGP, and OSPF each contribute to the map.
+          - meta:
+              label: Application Dependency Mapping
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/topology/dependency-mapping.md
+              description: Which process, container, and Kubernetes workload talks to which, read from the kernel with no instrumentation.
       # BGP Monitoring
       - meta:
           label: BGP Monitoring
@@ -685,7 +735,7 @@ sidebar:
           - meta:
               label: Metrics
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/metrics.md
-              description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and per-source metrics.
+              description: Read receiver pipeline health, severity and category rates, processing errors, deduplication, and optional profile-defined metrics.
           - meta:
               label: Alerts
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/alerts.md
@@ -1037,6 +1087,11 @@ sidebar:
       label: Developer and Contributor Corner
       edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/README.md
     items:
+      - meta:
+          label: Netdata Support Bundle
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/netdata-support-bundle.md
+          description: Collect a sanitized diagnostics archive from a Netdata Agent and attach it to a support ticket or bug report.
+          keywords: [support bundle, diagnostics, troubleshooting, bug report, support ticket, sanitized logs]
       - meta:
           label: REST API
           edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/README.md

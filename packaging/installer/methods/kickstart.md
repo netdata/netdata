@@ -132,6 +132,10 @@ If `curl` fails to download the install script with `curl: (60) SSL certificate 
 
 If you see a message like `File not found when checking for remote file at https://repository.netdata.cloud/repos/repoconfig` while running `kickstart.sh`, it is an informational notice. It means a remote file check during installation did not succeed, but this does not stop or break the installation — the installer continues automatically to the next step. The message is not specific to any particular Linux distribution and can appear on any supported system.
 
+### Switching from a vendor-packaged native install
+
+Systems such as XCP-ng and XOA ship Netdata through their own package repositories, and these bundled packages are often older than the latest release. `kickstart.sh` does not recognize these installs and is not designed to safely update, reinstall, or uninstall them. See the "Switching From a Vendor-Packaged Native Install" section under [Switching Install Types](/docs/learn/switching-install-types.md#switching-install-types) for the full procedure to remove the existing package and switch to a static build or another install type.
+
 ## Related Docs
 
 - [Connect to Netdata Cloud](/src/claim/README.md)

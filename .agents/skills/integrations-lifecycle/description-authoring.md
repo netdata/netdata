@@ -60,16 +60,17 @@ does for them.
 
 Use the right metadata field for the job:
 
-| Content | Field |
-|---|---|
-| What the integration is / what data it provides | First sentence of `overview.data_collection.metrics_description` |
-| How collection works | `overview.data_collection.method_description` |
-| Defaults and auto-detection | `overview.default_behavior.auto_detection.description` |
-| Limits, retention, sizing, and cardinality | `overview.default_behavior.limits.description` |
-| CPU, memory, disk, or network impact | `overview.default_behavior.performance_impact.description` |
-| Configuration settings | `setup.configuration.options.list[].description` |
-| Example-specific behavior | `setup.configuration.examples.list[].description` |
-| Failure modes and fixes | `troubleshooting.problems.list[].description` |
+| Content                                         | Field                                                                                       |
+|-------------------------------------------------|---------------------------------------------------------------------------------------------|
+| What the integration is / what data it provides | First sentence of `overview.data_collection.metrics_description`                            |
+| How collection works                            | `overview.data_collection.method_description`                                               |
+| Defaults and auto-detection                     | `overview.default_behavior.auto_detection.description`                                      |
+| Limits, retention, sizing, and cardinality      | `overview.default_behavior.limits.description`                                              |
+| CPU, memory, disk, or network impact            | `overview.default_behavior.performance_impact.description`                                  |
+| Metric chart title                              | `metrics.scopes[].metrics[].description`; copy the code-defined chart title when one exists |
+| Configuration settings                          | `setup.configuration.options.list[].description`                                            |
+| Example-specific behavior                       | `setup.configuration.examples.list[].description`                                           |
+| Failure modes and fixes                         | `troubleshooting.problems.list[].description`                                               |
 
 Configuration option descriptions are allowed to describe settings.
 Catalog descriptions are not.

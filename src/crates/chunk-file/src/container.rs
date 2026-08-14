@@ -69,7 +69,9 @@ pub enum Error {
     /// The TOC failed to parse or validate — carries the raw layer's
     /// structured error so callers can match the specific failure
     /// (duplicate id, non-monotonic offset, out-of-bounds, ...).
-    #[error("TOC error: {0}")]
+    /// Transparent: embedding the source in the message while also
+    /// chaining it would print it twice in anyhow chains.
+    #[error(transparent)]
     Toc(#[from] crate::Error),
 
     /// The container framing is malformed beyond the TOC itself —
@@ -100,7 +102,7 @@ pub enum Error {
     },
 
     /// Underlying I/O failed (streaming writer).
-    #[error("I/O error: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 

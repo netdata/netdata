@@ -187,11 +187,13 @@ The following alerts are available:
 | [ memcached_out_of_cache_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -203,22 +205,22 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| memcached.cache | available, used | MiB |
-| memcached.net | in, out | kilobits/s |
-| memcached.connections | current, rejected, total | connections/s |
-| memcached.items | current, total | items |
-| memcached.evicted_reclaimed | reclaimed, evicted | items |
-| memcached.get | hints, misses | requests |
-| memcached.get_rate | rate | requests/s |
-| memcached.set_rate | rate | requests/s |
-| memcached.delete | hits, misses | requests |
-| memcached.cas | hits, misses, bad value | requests |
-| memcached.increment | hits, misses | requests |
-| memcached.decrement | hits, misses | requests |
-| memcached.touch | hits, misses | requests |
-| memcached.touch_rate | rate | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| memcached.cache | Cache Size | available, used | MiB |
+| memcached.net | Network | in, out | kilobits/s |
+| memcached.connections | Connections | current, rejected, total | connections/s |
+| memcached.items | Items | current, total | items |
+| memcached.evicted_reclaimed | Evicted and Reclaimed Items | reclaimed, evicted | items |
+| memcached.get | Get Requests | hints, misses | requests |
+| memcached.get_rate | Get Request Rate | rate | requests/s |
+| memcached.set_rate | Set Request Rate | rate | requests/s |
+| memcached.delete | Delete Requests | hits, misses | requests |
+| memcached.cas | Check and Set Requests | hits, misses, bad value | requests |
+| memcached.increment | Increment Requests | hits, misses | requests |
+| memcached.decrement | Decrement Requests | hits, misses | requests |
+| memcached.touch | Touch Requests | hits, misses | requests |
+| memcached.touch_rate | Touch Request Rate | rate | requests/s |
 
 
 

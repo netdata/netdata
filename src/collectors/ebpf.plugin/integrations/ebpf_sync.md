@@ -146,11 +146,13 @@ The following alerts are available:
 | [ sync_freq ](https://github.com/netdata/netdata/blob/master/src/health/health.d/synchronization.conf) | mem.sync | number of sync() system calls. Every call causes all pending modifications to filesystem metadata and cached file data to be written to the underlying filesystems. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -162,9 +164,9 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.file_sync | fsync, fdatasync | calls/s |
-| mem.memory_map | msync | calls/s |
-| mem.sync | sync, syncfs | calls/s |
-| mem.file_segment | sync_file_range | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.file_sync | Monitor calls to fsync(2) and fdatasync(2). | fsync, fdatasync | calls/s |
+| mem.memory_map | Monitor calls to msync(2). | msync | calls/s |
+| mem.sync | Monitor calls to sync(2) and syncfs(2). | sync, syncfs | calls/s |
+| mem.file_segment | Monitor calls to sync_file_range(2). | sync_file_range | calls/s |

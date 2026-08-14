@@ -149,11 +149,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -165,21 +167,22 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| varnish.client_session_connections | accepted, dropped | connections/s |
-| varnish.client_requests | received | requests/s |
-| varnish.cache_hit_ratio_total | hit, miss, hitpass, hitmiss | percent |
-| varnish.cache_hit_ratio_delta | hit, miss, hitpass, hitmiss | percent |
-| varnish.cache_expired_objects | expired | objects/s |
-| varnish.cache_lru_activity | nuked, moved | objects/s |
-| varnish.threads | threads | threads |
-| varnish.thread_management_activity | created, failed, destroyed, limited | threads/s |
-| varnish.thread_queue_len | queue_length | threads |
-| varnish.backends_requests | sent | requests/s |
-| varnish.esi_parsing_issues | errors, warnings | issues/s |
-| varnish.mgmt_process_uptime | uptime | seconds |
-| varnish.child_process_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| varnish.client_session_connections | Connections Statistics | accepted, dropped | connections/s |
+| varnish.client_requests | Client Requests | received | requests/s |
+| varnish.cache_hit_ratio_total | Cache Hit Ratio Total | hit, miss, hitpass, hitmiss | percent |
+| varnish.cache_hit_ratio_delta | Cache Hit Ratio Current Poll | hit, miss, hitpass, hitmiss | percent |
+| varnish.cache_expired_objects | Cache Expired Objects | expired | objects/s |
+| varnish.cache_lru_activity | Cache LRU Activity | nuked, moved | objects/s |
+| varnish.threads | Threads In All Pools | threads | threads |
+| varnish.thread_management_activity | Thread Management Activity | created, failed, destroyed, limited | threads/s |
+| varnish.thread_queue_len | Session Queue Length | queue_length | threads |
+| varnish.backends_requests | Backend Requests | sent | requests/s |
+| varnish.esi_parsing_issues | ESI Parsing Issues | errors, warnings | issues/s |
+| varnish.mgmt_process_uptime | Management Process Uptime | uptime | seconds |
+| varnish.child_process_uptime | Child Process Uptime | uptime | seconds |
+
 
 ### Per Backend
 
@@ -189,9 +192,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| varnish.backend_data_transfer | req_header, req_body, resp_header, resp_body | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| varnish.backend_data_transfer | Backend Data Transfer | req_header, req_body, resp_header, resp_body | bytes/s |
+
 
 ### Per Storage
 
@@ -201,10 +205,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| varnish.storage_space_usage | free, used | bytes |
-| varnish.storage_allocated_objects | allocated | objects |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| varnish.storage_space_usage | Storage Space Usage | free, used | bytes |
+| varnish.storage_allocated_objects | Storage Allocated Objects | allocated | objects |
 
 
 

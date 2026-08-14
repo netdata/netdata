@@ -147,11 +147,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -168,14 +170,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ap.clients | clients | clients |
-| ap.net | received, sent | kilobits/s |
-| ap.packets | received, sent | packets/s |
-| ap.issues | retries, failures | issues/s |
-| ap.signal | average signal | dBm |
-| ap.bitrate | receive, transmit | Mbps |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ap.clients | Connected clients | clients | clients |
+| ap.net | Bandwidth | received, sent | kilobits/s |
+| ap.packets | Packets | received, sent | packets/s |
+| ap.issues | Transmit Issues | retries, failures | issues/s |
+| ap.signal | Average Signal | average signal | dBm |
+| ap.bitrate | Bitrate | receive, transmit | Mbps |
 
 
 

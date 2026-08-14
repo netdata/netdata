@@ -638,11 +638,13 @@ The following alerts are available:
 | [ am_express_route_circuit_qos_drop_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | ExpressRoute QoS egress drops on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -664,15 +666,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.express_route_circuit.arp_availability | average | percentage |
-| azure_monitor.express_route_circuit.bgp_availability | average | percentage |
-| azure_monitor.express_route_circuit.throughput | in, out | bits/s |
-| azure_monitor.express_route_circuit.bandwidth_utilization | ingress, egress | percentage |
-| azure_monitor.express_route_circuit.qos_dropped_bits | in, out | bits/s |
-| azure_monitor.express_route_circuit.fastpath_routes | maximum | routes |
-| azure_monitor.express_route_circuit.global_reach_throughput | in, out | bits/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.express_route_circuit.arp_availability | Azure ExpressRoute Circuit ARP Availability | average | percentage |
+| azure_monitor.express_route_circuit.bgp_availability | Azure ExpressRoute Circuit BGP Availability | average | percentage |
+| azure_monitor.express_route_circuit.throughput | Azure ExpressRoute Circuit Throughput | in, out | bits/s |
+| azure_monitor.express_route_circuit.bandwidth_utilization | Azure ExpressRoute Circuit Bandwidth Utilization | ingress, egress | percentage |
+| azure_monitor.express_route_circuit.qos_dropped_bits | Azure ExpressRoute Circuit QoS Dropped Bits | in, out | bits/s |
+| azure_monitor.express_route_circuit.fastpath_routes | Azure ExpressRoute Circuit FastPath Routes | maximum | routes |
+| azure_monitor.express_route_circuit.global_reach_throughput | Azure ExpressRoute Circuit GlobalReach Throughput | in, out | bits/s |
 
 
 

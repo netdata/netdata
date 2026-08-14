@@ -5,7 +5,6 @@ package metrix
 import (
 	"fmt"
 	"maps"
-	"sort"
 	"strings"
 )
 
@@ -82,26 +81,4 @@ func hostScopeEqual(a, b HostScope) bool {
 		return false
 	}
 	return maps.Equal(a.Labels, b.Labels)
-}
-
-func sortedHostScopes(scopes map[string]HostScope) []HostScope {
-	if len(scopes) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(scopes))
-	for key := range scopes {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	out := make([]HostScope, 0, len(keys))
-	if scope, ok := scopes[""]; ok {
-		out = append(out, cloneHostScope(scope))
-	}
-	for _, key := range keys {
-		if key == "" {
-			continue
-		}
-		out = append(out, cloneHostScope(scopes[key]))
-	}
-	return out
 }

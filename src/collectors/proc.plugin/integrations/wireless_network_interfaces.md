@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -91,11 +93,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| wireless.status | status | status |
-| wireless.link_quality | link_quality | value |
-| wireless.signal_level | signal_level | dBm |
-| wireless.noise_level | noise_level | dBm |
-| wireless.discarded_packets | nwid, crypt, frag, retry, misc | packets/s |
-| wireless.missed_beacons | missed_beacons | frames/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| wireless.status | Internal status reported by interface. | status | status |
+| wireless.link_quality | Overall quality of the link. This is an aggregate value, and depends on the driver and hardware. | link_quality | value |
+| wireless.signal_level | The signal level is the wireless signal power level received by the wireless client. The closer the value is to 0, the stronger the signal. | signal_level | dBm |
+| wireless.noise_level | The noise level indicates the amount of background noise in your environment. The closer the value to 0, the greater the noise level. | noise_level | dBm |
+| wireless.discarded_packets | Packet discarded in the wireless adapter due to wireless specific problems. | nwid, crypt, frag, retry, misc | packets/s |
+| wireless.missed_beacons | Number of missed beacons. | missed_beacons | frames/s |

@@ -58,6 +58,14 @@ type profileSeriesSpec struct {
 	Name        string
 }
 
+// selectedSeriesSpec carries the job-selection query sources attached to one
+// profile-defined series. They are resolved once while compiling the plan.
+type selectedSeriesSpec struct {
+	profileSeriesSpec
+	groupQuery cwquery.Source
+	itemQuery  cwquery.Source
+}
+
 type compiledSeries struct {
 	Ordinal     int
 	MetricIndex int
@@ -91,6 +99,6 @@ func (c *Collector) ensurePlan() error {
 	c.Infof("CloudWatch: compiled %d collection scope(s) across %d target(s) and %d profile(s)",
 		len(plan.Scopes), len(plan.Targets), len(plan.Profiles))
 	c.Debugf("CloudWatch tuning: update_every=%ds, discovery.refresh_every=%ds, recently_active_only=%v, limits.max_discovery_groups=%d",
-		c.UpdateEvery, c.Discovery.RefreshEvery, c.recentlyActiveOnly(), c.Limits.maxDiscoveryGroups())
+		c.UpdateEvery, c.Discovery.RefreshEvery, c.recentlyActiveOnly(), c.Limits.MaxDiscoveryGroups)
 	return nil
 }

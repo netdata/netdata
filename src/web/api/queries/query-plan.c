@@ -511,6 +511,47 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_ops_get(RRDR *r, QUERY_ENGINE_OPS_CACHE 
     return ops;
 }
 
+// the LATEST grouping asks for the most recent collected value; when the
+// query wants a single point and its window covers the metric's last stored
+// sample, the answer is the collector's cached last_stored_value - serve it
+// without building a query plan, so the storage engine is never touched.
+// options that change the value semantics (anomaly-bit, natural points,
+// a pinned tier) fall back to the normal execution path.
+static bool query_latest_fast_path(RRDR *r, QUERY_ENGINE_OPS *ops) {
+    QUERY_TARGET *qt = r->internal.qt;
+
+    // natural points are not excluded: with a single output point the
+    // whole window is one group, so natural and virtual points agree;
+    // resampling is excluded conservatively (it reshapes the window)
+    if(r->time_grouping.add_flush != RRDR_GROUPING_LATEST ||
+        qt->window.points != 1 ||
+        qt->request.resampling_time > 0 ||
+        (qt->window.options & (RRDR_OPTION_SELECTED_TIER|RRDR_OPTION_ANOMALY_BIT)))
+        return false;
+
+    // the single output bucket spans (after, before]
+    time_t db_last = ops->qm->tiers[0].db_last_time_s;
+    if(db_last <= qt->window.after || db_last > qt->window.before)
+        return false;
+
+    // NAN when there is no live dimension (archived metric), or when the
+    // collector's last sample is a gap - the storage query serves those.
+    // A collector tick between the query-target snapshot (db_last) and
+    // this read can make the value one sample fresher than the window
+    // end - accepted: latest serves the current value, freshness beats
+    // label fidelity here (same stance as serving the un-quantized
+    // double and zero anomaly/reset bits)
+    QUERY_DIMENSION *qd = query_dimension(qt, ops->qm->link.query_dimension_id);
+    NETDATA_DOUBLE v = rrdmetric_acquired_last_stored_value(qd->rma);
+    if(!netdata_double_isnumber(v))
+        return false;
+
+    ops->latest_fast_path = true;
+    ops->latest_fast_path_value = v;
+    ops->latest_fast_path_time = db_last;
+    return true;
+}
+
 QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id) {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -523,6 +564,9 @@ QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache
         .query_granularity = (time_t)(r->view.update_every / r->view.group),
         .group_value_flags = RRDR_VALUE_NOTHING,
     };
+
+    if(query_latest_fast_path(r, ops))
+        return ops;
 
     if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points)) {
         rrd2rrdr_query_ops_release(cache, ops);

@@ -3,23 +3,25 @@
 package snmp_traps
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
+	"maps"
 	"net/netip"
 	"regexp"
-	"strconv"
-	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/dedup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/jobruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output/otlp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/profilemetrics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/receiver"
 )
 
 const (
-	maxJobNameLen             = 64
-	minSNMPv3PassphraseLen    = 8
-	defaultDynamicEngineIDMax = 4096
+	maxJobNameLen = 64
 )
-
-var defaultAllowlistCIDRs = []string{"0.0.0.0/0", "::/0"}
 
 var trapJobNameRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
@@ -31,19 +33,146 @@ var (
 	errJobNameNoMatch = errors.New("job name must match ^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 )
 
-var validAuthProtos = map[string]bool{
-	"none": true, "md5": true, "sha": true,
-	"sha224": true, "sha256": true, "sha384": true, "sha512": true,
+type validatedConfig struct {
+	versions      []string
+	trustedRelays []netip.Prefix
+	runtime       jobruntime.Policy
 }
 
-var validPrivProtos = map[string]bool{
-	"none": true, "des": true, "aes": true,
-	"aes192": true, "aes256": true, "aes192c": true, "aes256c": true,
+func (c Config) Validate() error {
+	_, err := validateConfig(c)
+	return err
 }
 
-var validRateLimitModes = map[string]bool{
-	"drop":   true,
-	"sample": true,
+func validateConfig(c Config) (validatedConfig, error) {
+	var validated validatedConfig
+
+	if err := validateJobName(c.Name); err != nil {
+		return validated, err
+	}
+	listen := toReceiverListenConfig(c.Listen)
+	if err := receiver.ValidateListen(listen); err != nil {
+		return validated, err
+	}
+
+	versions, err := receiver.NormalizeVersions(c.Versions)
+	if err != nil {
+		return validated, err
+	}
+	validated.versions = versions
+	users := toReceiverUSMUsers(c.USMUsers)
+	if err := receiver.ValidateUSMUsers(users, c.DynamicEngineID); err != nil {
+		return validated, err
+	}
+	if err := receiver.ValidateEngineIDWhitelist(c.EngineIDWhitelist); err != nil {
+		return validated, err
+	}
+	if err := receiver.ValidateLocalEngineID(c.LocalEngineID); err != nil {
+		return validated, err
+	}
+
+	allowlist, err := receiver.NormalizeSourceAllowlist(c.Allowlist.SourceCIDRs)
+	if err != nil {
+		return validated, err
+	}
+	trustedRelays, err := receiver.NormalizeTrustedRelays(c.Source.TrustedRelays)
+	if err != nil {
+		return validated, err
+	}
+	validated.trustedRelays = trustedRelays
+
+	if err := receiver.ValidateRateLimit(toReceiverRateLimitConfig(c.RateLimit)); err != nil {
+		return validated, err
+	}
+	dedupPolicy, err := dedup.Normalize(dedup.Config{
+		Enabled:         c.Dedup.Enabled,
+		WindowSec:       c.Dedup.WindowSec,
+		CacheMaxEntries: c.Dedup.CacheMaxEntries,
+		KeyVarbinds:     c.Dedup.KeyVarbinds,
+	})
+	if err != nil {
+		return validated, err
+	}
+
+	var otlpPolicy otlp.Policy
+	if c.OTLP.Enabled {
+		policy, err := otlp.Normalize(otlp.Config{
+			Endpoint:       c.OTLP.Endpoint,
+			Headers:        maps.Clone(c.OTLP.Headers),
+			RequestTimeout: c.OTLP.RequestTimeout,
+			FlushInterval:  c.OTLP.FlushInterval,
+			BatchSize:      c.OTLP.BatchSize,
+			QueueCapacity:  c.OTLP.QueueCapacity,
+		})
+		if err != nil {
+			return validated, err
+		}
+		otlpPolicy = policy
+	}
+	journalEnabled := c.Journal.enabled()
+	if !journalEnabled && !c.OTLP.Enabled {
+		return validated, errors.New("at least one SNMP trap output backend must be enabled: journal.enabled or otlp.enabled")
+	}
+
+	if err := validateOverrides(c.Overrides); err != nil {
+		return validated, err
+	}
+	if err := receiver.ValidateDynamicEngineID(c.DynamicEngineID, c.DynamicEngineIDMax, c.EngineIDWhitelist); err != nil {
+		return validated, err
+	}
+	if err := receiver.ValidateV3Requirements(versions, users, c.DynamicEngineID, c.EngineIDWhitelist); err != nil {
+		return validated, err
+	}
+
+	var retention journal.Retention
+	if journalEnabled {
+		retention, err = parseRetentionConfig(c.Retention)
+		if err != nil {
+			return validated, err
+		}
+	}
+
+	profileMetrics, err := profilemetrics.Normalize(c.ProfileMetrics.Enabled, c.ProfileMetrics.Include)
+	if err != nil {
+		return validated, err
+	}
+	receiverPolicy := receiver.NewPolicy(receiver.PolicyConfig{
+		Listen:             listen,
+		Versions:           versions,
+		Communities:        c.Communities,
+		USMUsers:           users,
+		EngineIDWhitelist:  c.EngineIDWhitelist,
+		LocalEngineID:      c.LocalEngineID,
+		DynamicEngineID:    c.DynamicEngineID,
+		DynamicEngineIDMax: c.DynamicEngineIDMax,
+		SourceAllowlist:    allowlist,
+		TrustedRelays:      trustedRelays,
+		RateLimit:          toReceiverRateLimitConfig(c.RateLimit),
+	})
+	overrides := make([]jobruntime.Override, len(c.Overrides))
+	for i, override := range c.Overrides {
+		overrides[i] = jobruntime.Override{
+			OID:      override.OID,
+			Category: override.Category,
+			Severity: override.Severity,
+			Labels:   override.Labels,
+		}
+	}
+	validated.runtime = jobruntime.NewPolicy(jobruntime.PolicyConfig{
+		JobName:               c.Name,
+		Receiver:              receiverPolicy,
+		JournalEnabled:        journalEnabled,
+		Journal:               retention.Config(),
+		OTLPEnabled:           c.OTLP.Enabled,
+		OTLP:                  otlpPolicy,
+		Dedup:                 dedupPolicy,
+		ProfileMetrics:        profileMetrics,
+		ReverseDNSEnabled:     c.ReverseDNS.Enabled,
+		Overrides:             overrides,
+		BaseChartTemplateYAML: chartTemplateYAML,
+	})
+
+	return validated, nil
 }
 
 func validateJobName(name string) error {
@@ -59,237 +188,39 @@ func validateJobName(name string) error {
 	return nil
 }
 
-func validateEndpoints(endpoints []EndpointConfig) error {
-	if len(endpoints) == 0 {
-		return errors.New("at least one endpoint is required")
+func toReceiverListenConfig(cfg ListenConfig) receiver.ListenConfig {
+	endpoints := make([]receiver.Endpoint, len(cfg.Endpoints))
+	for i, endpoint := range cfg.Endpoints {
+		endpoints[i] = receiver.Endpoint{
+			Protocol: endpoint.Protocol,
+			Address:  endpoint.Address,
+			Port:     endpoint.Port,
+		}
 	}
-
-	seen := make(map[string]struct{}, len(endpoints))
-	for i, ep := range endpoints {
-		proto := strings.ToLower(ep.Protocol)
-		switch proto {
-		case "udp":
-		default:
-			return fmt.Errorf("endpoint %d: unsupported protocol %q (only udp is supported)", i, proto)
-		}
-
-		if ep.Address == "" {
-			return fmt.Errorf("endpoint %d: address is required", i)
-		}
-
-		if ep.Port < 1 || ep.Port > 65535 {
-			return fmt.Errorf("endpoint %d: port must be between 1 and 65535, got %d", i, ep.Port)
-		}
-
-		addrStr := net.JoinHostPort(ep.Address, strconv.Itoa(ep.Port))
-		udpAddr, err := net.ResolveUDPAddr("udp", addrStr)
-		if err != nil {
-			return fmt.Errorf("endpoint %d: invalid address/port %q: %v", i, addrStr, err)
-		}
-		key := proto + "/" + udpAddr.String()
-		if _, ok := seen[key]; ok {
-			return fmt.Errorf("endpoint %d: duplicate endpoint %q", i, key)
-		}
-		seen[key] = struct{}{}
-	}
-	return nil
+	return receiver.ListenConfig{Endpoints: endpoints, ReceiveBuffer: cfg.ReceiveBuffer}
 }
 
-func validateListenConfig(cfg ListenConfig) error {
-	if err := validateEndpoints(cfg.Endpoints); err != nil {
-		return err
+func toReceiverUSMUsers(users []USMUserConfig) []receiver.USMUser {
+	out := make([]receiver.USMUser, len(users))
+	for i, user := range users {
+		out[i] = receiver.USMUser{
+			Username:  user.Username,
+			EngineID:  user.EngineID,
+			AuthProto: user.AuthProto,
+			AuthKey:   user.AuthKey,
+			PrivProto: user.PrivProto,
+			PrivKey:   user.PrivKey,
+		}
 	}
-	if cfg.ReceiveBuffer < 0 {
-		return fmt.Errorf("listen.receive_buffer must be zero or positive, got %d", cfg.ReceiveBuffer)
-	}
-	if cfg.ReceiveBuffer > maxListenerReceiveBuffer {
-		return fmt.Errorf("listen.receive_buffer must be <= %d, got %d", maxListenerReceiveBuffer, cfg.ReceiveBuffer)
-	}
-	return nil
+	return out
 }
 
-func validateVersions(versions []string) ([]string, error) {
-	if len(versions) == 0 {
-		return nil, errors.New("at least one SNMP version is required")
+func toReceiverRateLimitConfig(cfg RateLimitConfig) receiver.RateLimitConfig {
+	return receiver.RateLimitConfig{
+		Enabled:      cfg.Enabled,
+		PerSourcePPS: cfg.PerSourcePPS,
+		Mode:         cfg.Mode,
 	}
-
-	seen := make(map[string]struct{}, len(versions))
-	normalized := make([]string, 0, len(versions))
-	for i, version := range versions {
-		version = strings.ToLower(strings.TrimSpace(version))
-		switch version {
-		case "v1", "v2c", "v3":
-		default:
-			return nil, fmt.Errorf("version %d: unsupported SNMP version %q (must be v1, v2c, or v3)", i, version)
-		}
-		if _, ok := seen[version]; ok {
-			return nil, fmt.Errorf("version %d: duplicate SNMP version %q", i, version)
-		}
-		seen[version] = struct{}{}
-		normalized = append(normalized, version)
-	}
-	return normalized, nil
-}
-
-type usmUserKey struct {
-	username string
-	engineID string
-}
-
-func validateUSMUsers(users []USMUserConfig, dynamicOpt ...bool) error {
-	dynamic := len(dynamicOpt) > 0 && dynamicOpt[0]
-	seen := make(map[usmUserKey]bool, len(users))
-	for i, u := range users {
-		if u.Username == "" {
-			return fmt.Errorf("usm_users[%d]: username is required", i)
-		}
-		if u.EngineID == "" {
-			if !dynamic {
-				return fmt.Errorf("usm_users[%d]: engine_id is required for static v3 jobs", i)
-			}
-		} else {
-			if _, err := parseEngineIDHex(u.EngineID); err != nil {
-				return fmt.Errorf("usm_users[%d]: engine_id: %w", i, err)
-			}
-		}
-		key := usmUserKey{
-			username: u.Username,
-			engineID: strings.ToLower(strings.TrimSpace(u.EngineID)),
-		}
-		if seen[key] {
-			return fmt.Errorf("usm_users[%d]: duplicate user %q for engine %q", i, u.Username, u.EngineID)
-		}
-		seen[key] = true
-
-		authProto := strings.ToLower(u.AuthProto)
-		if authProto == "" {
-			authProto = "none"
-		}
-		if !validAuthProtos[authProto] {
-			return fmt.Errorf("usm_users[%d]: invalid auth_proto %q (must be one of: none, md5, sha, sha224, sha256, sha384, sha512)", i, u.AuthProto)
-		}
-
-		privProto := strings.ToLower(u.PrivProto)
-		if privProto == "" {
-			privProto = "none"
-		}
-		if !validPrivProtos[privProto] {
-			return fmt.Errorf("usm_users[%d]: invalid priv_proto %q (must be one of: none, des, aes, aes192, aes256, aes192c, aes256c)", i, u.PrivProto)
-		}
-
-		if authProto == "none" && privProto != "none" {
-			return fmt.Errorf("usm_users[%d]: priv_proto %q requires auth_proto (noAuthNoPriv only supports none/none)", i, privProto)
-		}
-
-		if authProto != "none" {
-			if u.AuthKey == "" {
-				return fmt.Errorf("usm_users[%d]: auth_key is required when auth_proto is %q", i, authProto)
-			}
-			if len(u.AuthKey) < minSNMPv3PassphraseLen {
-				return fmt.Errorf("usm_users[%d]: auth_key must be at least %d characters", i, minSNMPv3PassphraseLen)
-			}
-		}
-
-		if privProto != "none" {
-			if u.PrivKey == "" {
-				return fmt.Errorf("usm_users[%d]: priv_key is required when priv_proto is %q", i, privProto)
-			}
-			if len(u.PrivKey) < minSNMPv3PassphraseLen {
-				return fmt.Errorf("usm_users[%d]: priv_key must be at least %d characters", i, minSNMPv3PassphraseLen)
-			}
-		}
-	}
-	return nil
-}
-
-func validateEngineIDWhitelist(ids []string) error {
-	seen := make(map[string]bool, len(ids))
-	for i, id := range ids {
-		if _, err := parseEngineIDHex(id); err != nil {
-			return fmt.Errorf("engine_id_whitelist[%d]: %w", i, err)
-		}
-		key := strings.ToLower(strings.TrimSpace(id))
-		if seen[key] {
-			return fmt.Errorf("engine_id_whitelist[%d]: duplicate engine ID %q", i, id)
-		}
-		seen[key] = true
-	}
-	return nil
-}
-
-func parseEngineIDHex(id string) ([]byte, error) {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return nil, errors.New("empty engine ID")
-	}
-	b, err := hex.DecodeString(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid hex %q: %w", id, err)
-	}
-	if len(b) < 5 || len(b) > 32 {
-		return nil, fmt.Errorf("engine ID must be 5-32 bytes (got %d bytes)", len(b))
-	}
-	if isAllByte(b, 0x00) || isAllByte(b, 0xff) {
-		return nil, errors.New("engine ID must not be all zeros or all 0xff bytes")
-	}
-	return b, nil
-}
-
-func validateLocalEngineID(hexStr string) error {
-	if hexStr == "" {
-		return nil
-	}
-	_, err := parseEngineIDHex(hexStr)
-	return err
-}
-
-func validateAllowlist(al AllowlistConfig) ([]netip.Prefix, error) {
-	if len(al.SourceCIDRs) == 0 {
-		al.SourceCIDRs = defaultAllowlistCIDRs
-	}
-	return parseCIDRList("allowlist.source_cidrs", al.SourceCIDRs)
-}
-
-func validateTrustedRelays(cfg SourceConfig) ([]netip.Prefix, error) {
-	return parseCIDRList("source.trusted_relays", cfg.TrustedRelays)
-}
-
-func parseCIDRList(field string, cidrs []string) ([]netip.Prefix, error) {
-	var prefixes []netip.Prefix
-	for i, cidr := range cidrs {
-		prefix, err := netip.ParsePrefix(cidr)
-		if err != nil {
-			return nil, fmt.Errorf("%s[%d]: invalid CIDR %q: %v", field, i, cidr, err)
-		}
-		prefixes = append(prefixes, prefix)
-	}
-	return prefixes, nil
-}
-
-func validateRateLimit(cfg RateLimitConfig) error {
-	if !cfg.Enabled {
-		return nil
-	}
-	if cfg.PerSourcePPS < 0 {
-		return fmt.Errorf("rate_limit.per_source_pps must be non-negative, got %d", cfg.PerSourcePPS)
-	}
-	mode := normalizeRateLimitMode(cfg.Mode)
-	if !validRateLimitModes[mode] {
-		return fmt.Errorf("rate_limit.mode must be 'drop' or 'sample', got %q", cfg.Mode)
-	}
-	return nil
-}
-
-func validateDeferredConfig(cfg Config) error {
-	if cfg.DynamicEngineID {
-		if len(cfg.EngineIDWhitelist) > 0 {
-			return errors.New("dynamic_engine_id_discovery and engine_id_whitelist are mutually exclusive; when dynamic discovery is enabled, engine_id_whitelist must be empty")
-		}
-	}
-	if cfg.DynamicEngineIDMax < 0 {
-		return fmt.Errorf("dynamic_engine_id_max_pairs must be non-negative, got %d", cfg.DynamicEngineIDMax)
-	}
-	return nil
 }
 
 func validateOverrides(overrides []OverrideConfig) error {
@@ -297,13 +228,13 @@ func validateOverrides(overrides []OverrideConfig) error {
 		if o.OID == "" {
 			return fmt.Errorf("overrides[%d]: oid is required", i)
 		}
-		if !isNumericOID(o.OID) {
+		if !model.IsNumericOID(o.OID) {
 			return fmt.Errorf("overrides[%d]: invalid oid %q", i, o.OID)
 		}
-		if o.Category != "" && !validCategories[o.Category] {
+		if o.Category != "" && !catalog.ValidCategory(o.Category) {
 			return fmt.Errorf("overrides[%d]: invalid category %q", i, o.Category)
 		}
-		if o.Severity != "" && !validSeverities[o.Severity] {
+		if o.Severity != "" && !catalog.ValidSeverity(o.Severity) {
 			return fmt.Errorf("overrides[%d]: invalid severity %q", i, o.Severity)
 		}
 		for key := range o.Labels {

@@ -288,11 +288,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -304,12 +306,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| phpdaemon.workers | alive, shutdown | workers |
-| phpdaemon.alive_workers | idle, busy, reloading | workers |
-| phpdaemon.idle_workers | preinit, init, initialized | workers |
-| phpdaemon.uptime | time | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| phpdaemon.workers | Workers | alive, shutdown | workers |
+| phpdaemon.alive_workers | Alive Workers State | idle, busy, reloading | workers |
+| phpdaemon.idle_workers | Idle Workers State | preinit, init, initialized | workers |
+| phpdaemon.uptime | Uptime | time | seconds |
 
 
 

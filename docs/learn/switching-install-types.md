@@ -86,6 +86,38 @@ For all install types other than Docker images, you can use this officially supp
 <br/>
 
 <details>
+<summary><strong>Switching From a Vendor-Packaged Native Install</strong></summary><br/>
+
+Some systems ship Netdata through their own package repositories instead of Netdata's official ones (for example XCP-ng and XOA). These installs have no `.install-type` file that `kickstart.sh` recognizes, so it is not designed to safely update, reinstall, or uninstall them, and attempting to do so may fail or leave the system in a broken state.
+
+To switch to a different install type:
+
+1. **Stop the Agent:**
+
+   ```bash
+   sudo systemctl stop netdata
+   ```
+
+2. **Remove the existing package with your system's package manager.** For example:
+   - **XCP-ng** (RPM-based): `sudo yum remove netdata` or `sudo dnf remove netdata`
+   - **XOA** (Debian-based): `sudo apt remove netdata`
+
+3. **Back up your configuration and data** using the appropriate method above.
+
+4. **Install Netdata using the kickstart script:**
+
+   ```bash
+   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
+   sh /tmp/netdata-kickstart.sh [OPTIONS_FOR_DESIRED_INSTALL_TYPE]
+   ```
+
+5. **Restore your backups** to the appropriate paths in the new installation.
+
+</details>
+
+<br/>
+
+<details>
 <summary><strong>Switching From Native/Static/Local to Docker</strong></summary><br/>
 
 To switch from a native, static, or local install to a Docker image:

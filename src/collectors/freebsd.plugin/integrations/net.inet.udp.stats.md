@@ -109,11 +109,13 @@ The following alerts are available:
 | [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -125,7 +127,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv4.udppackets | received, sent | packets/s |
-| ipv4.udperrors | InErrors, NoPorts, RcvbufErrors, InCsumErrors, IgnoredMulti | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv4.udppackets | IPv4 UDP Packets | received, sent | packets/s |
+| ipv4.udperrors | IPv4 UDP Errors | InErrors, NoPorts, RcvbufErrors, InCsumErrors, IgnoredMulti | events/s |

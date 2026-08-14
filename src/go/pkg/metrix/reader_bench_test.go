@@ -13,13 +13,13 @@ var (
 	benchmarkReaderCountSink int
 )
 
-// Reader benchmarks guard lookup, flattening, and iteration paths before the
-// package-layout refactor. Latest results are measured on a developer laptop,
-// not CI, and should be treated as before/after trend indicators.
+// Reader benchmarks guard lookup and iteration paths. Latest results are
+// measured on a developer laptop, not CI, and should be treated as before/after
+// trend indicators. CollectorStore flatten construction and cached acquisition
+// have dedicated cold and warm benchmarks in collector_store_scope_bench_test.go.
 // Latest (developer laptop, -count=10): ValueLookup s1 76-79ns/2allocs, s1000
-// 82-84ns/2; FlattenConstruction s10 52us/1135allocs, s100 586us/10706;
-// ForEachSeriesIdentityRaw s100 371ns/2, s1000 4.7us/2; RuntimeOverlayValueLookup
-// d1 76ns/2, d64 440-468ns/2.
+// 82-84ns/2; ForEachSeriesIdentityRaw s100 371ns/2, s1000 4.7us/2;
+// RuntimeOverlayValueLookup d1 76ns/2, d64 440-468ns/2.
 func BenchmarkReaderValueLookup(b *testing.B) {
 	tests := []int{1, 1000}
 
@@ -37,26 +37,6 @@ func BenchmarkReaderValueLookup(b *testing.B) {
 					b.Fatal("expected value")
 				}
 				benchmarkReaderValueSink = v
-			}
-		})
-	}
-}
-
-func BenchmarkReaderFlattenConstruction(b *testing.B) {
-	tests := []int{10, 100}
-
-	for _, totalSeries := range tests {
-		b.Run(fmt.Sprintf("series_%d", totalSeries), func(b *testing.B) {
-			s := benchmarkCommittedMixedStore(b, totalSeries)
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				r := s.Read(ReadFlatten())
-				meta := r.CollectMeta()
-				if meta.LastSuccessSeq == 0 {
-					b.Fatal("expected committed snapshot")
-				}
 			}
 		})
 	}
@@ -112,18 +92,18 @@ func BenchmarkRuntimeOverlayValueLookup(b *testing.B) {
 	}
 }
 
-func benchmarkCommittedScalarStore(b *testing.B, totalSeries int) CollectorStore {
-	b.Helper()
+func benchmarkCommittedScalarStore(tb testing.TB, totalSeries int) CollectorStore {
+	tb.Helper()
 
 	s := NewCollectorStore()
-	cc := benchmarkCycleController(b, s)
+	cc := benchmarkCycleController(tb, s)
 	gv := s.Write().SnapshotMeter("reader.scalar").Vec("id").Gauge("value")
 	handles := make([]SnapshotGauge, totalSeries)
 
 	for i := range totalSeries {
 		h, err := gv.GetWithLabelValues(strconv.Itoa(i))
 		if err != nil {
-			b.Fatalf("create gauge handle: %v", err)
+			tb.Fatalf("create gauge handle: %v", err)
 		}
 		handles[i] = h
 	}
@@ -133,17 +113,17 @@ func benchmarkCommittedScalarStore(b *testing.B, totalSeries int) CollectorStore
 		h.Observe(SampleValue(i))
 	}
 	if err := cc.CommitCycleSuccess(); err != nil {
-		b.Fatalf("commit scalar store: %v", err)
+		tb.Fatalf("commit scalar store: %v", err)
 	}
 
 	return s
 }
 
-func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore {
-	b.Helper()
+func benchmarkCommittedMixedStore(tb testing.TB, totalSeries int) CollectorStore {
+	tb.Helper()
 
 	s := NewCollectorStore()
-	cc := benchmarkCycleController(b, s)
+	cc := benchmarkCycleController(tb, s)
 	m := s.Write().SnapshotMeter("reader.flatten")
 	hv := m.Vec("id").Histogram("latency", WithHistogramBounds(1, 2, 5))
 	sv := m.Vec("id").Summary("request_time", WithSummaryQuantiles(0.5, 0.9, 0.99))
@@ -163,25 +143,25 @@ func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore 
 
 		h, err := hv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create histogram handle: %v", err)
+			tb.Fatalf("create histogram handle: %v", err)
 		}
 		hists[i] = h
 
 		sum, err := sv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create summary handle: %v", err)
+			tb.Fatalf("create summary handle: %v", err)
 		}
 		summaries[i] = sum
 
 		state, err := ssv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create stateset handle: %v", err)
+			tb.Fatalf("create stateset handle: %v", err)
 		}
 		states[i] = state
 
 		measureSet, err := msv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create measureset handle: %v", err)
+			tb.Fatalf("create measureset handle: %v", err)
 		}
 		measureSets[i] = measureSet
 	}
@@ -219,7 +199,7 @@ func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore 
 		})
 	}
 	if err := cc.CommitCycleSuccess(); err != nil {
-		b.Fatalf("commit mixed store: %v", err)
+		tb.Fatalf("commit mixed store: %v", err)
 	}
 
 	return s

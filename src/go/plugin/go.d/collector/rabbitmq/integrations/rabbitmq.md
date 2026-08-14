@@ -224,11 +224,13 @@ The following alerts are available:
 | [ rabbitmq_queue_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -245,14 +247,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.messages_count | ready, unacknowledged | messages |
-| rabbitmq.messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_empty, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
-| rabbitmq.objects_count | channels, consumers, connections, queues, exchanges | messages |
-| rabbitmq.connection_churn_rate | created, closed | operations/s |
-| rabbitmq.channel_churn_rate | created, closed | operations/s |
-| rabbitmq.queue_churn_rate | created, deleted, declared | operations/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rabbitmq.messages_count | Messages | ready, unacknowledged | messages |
+| rabbitmq.messages_rate | Messages | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_empty, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
+| rabbitmq.objects_count | Objects | channels, consumers, connections, queues, exchanges | messages |
+| rabbitmq.connection_churn_rate | Connection churn | created, closed | operations/s |
+| rabbitmq.channel_churn_rate | Channel churn | created, closed | operations/s |
+| rabbitmq.queue_churn_rate | Queue churn | created, deleted, declared | operations/s |
+
 
 ### Per node
 
@@ -268,19 +271,20 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.node_avail_status | running, down | status |
-| rabbitmq.node_network_partition_status | clear, detected | status |
-| rabbitmq.node_mem_alarm_status | clear, triggered | status |
-| rabbitmq.node_disk_free_alarm_status | clear, triggered | status |
-| rabbitmq.node_file_descriptors_usage | used | fd |
-| rabbitmq.node_sockets_usage | used | sockets |
-| rabbitmq.node_erlang_processes_usage | used | processes |
-| rabbitmq.node_erlang_run_queue_processes_count | length | processes |
-| rabbitmq.node_memory_usage | used | bytes |
-| rabbitmq.node_disk_space_free_size | free | bytes |
-| rabbitmq.node_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rabbitmq.node_avail_status | Node Availability Status | running, down | status |
+| rabbitmq.node_network_partition_status | Node Network Partitioning Status | clear, detected | status |
+| rabbitmq.node_mem_alarm_status | Node Memory Alarm Status | clear, triggered | status |
+| rabbitmq.node_disk_free_alarm_status | Node Disk Free Alarm Status | clear, triggered | status |
+| rabbitmq.node_file_descriptors_usage | Node File Descriptors Usage | used | fd |
+| rabbitmq.node_sockets_usage | Node Sockets Usage | used | sockets |
+| rabbitmq.node_erlang_processes_usage | Node Erlang Processes Usage | used | processes |
+| rabbitmq.node_erlang_run_queue_processes_count | Node Erlang Run Queue | length | processes |
+| rabbitmq.node_memory_usage | Node Memory Usage | used | bytes |
+| rabbitmq.node_disk_space_free_size | Node Disk Free Space | free | bytes |
+| rabbitmq.node_uptime | Node Uptime | uptime | seconds |
+
 
 ### Per cluster peer
 
@@ -297,9 +301,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.node_peer_cluster_link_traffic | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rabbitmq.node_peer_cluster_link_traffic | Node Cluster Link Peer Traffic | received, sent | bytes/s |
+
 
 ### Per vhost
 
@@ -315,11 +320,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.vhost_status | running, stopped, partial | status |
-| rabbitmq.vhost_messages_count | ready, unacknowledged | messages |
-| rabbitmq.vhost_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rabbitmq.vhost_status | Vhost Status | running, stopped, partial | status |
+| rabbitmq.vhost_messages_count | Vhost messages | ready, unacknowledged | messages |
+| rabbitmq.vhost_messages_rate | Vhost messages rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
+
 
 ### Per queue
 
@@ -337,11 +343,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.queue_status | running, down, idle, crashed, stopped, minority, terminated | status |
-| rabbitmq.queue_messages_count | ready, unacknowledged, paged_out, persistent | messages |
-| rabbitmq.queue_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rabbitmq.queue_status | Queue status | running, down, idle, crashed, stopped, minority, terminated | status |
+| rabbitmq.queue_messages_count | Queue messages | ready, unacknowledged, paged_out, persistent | messages |
+| rabbitmq.queue_messages_rate | Queue messages rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
 
 
 

@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,20 +126,21 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| iis.website_traffic | received, sent | bytes/s |
-| iis.website_requests_rate | requests | requests/s |
-| iis.website_requests_by_type_rate | options, get, post, head, put, delete, trace, move, copy, mkcol, propfind, proppatch, search, lock, unlock, other | requests/s |
-| iis.website_active_connections_count | active | connections |
-| iis.website_users_count | anonymous, non_anonymous | users |
-| iis.website_connection_attempts_rate | connection | attempts/s |
-| iis.website_isapi_extension_requests_count | isapi | requests |
-| iis.website_isapi_extension_requests_rate | isapi | requests/s |
-| iis.website_ftp_file_transfer_rate | received, sent | files/s |
-| iis.website_logon_attempts_rate | logon | attempts/s |
-| iis.website_errors_rate | document_locked, document_not_found | errors/s |
-| iis.website_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| iis.website_traffic | Website traffic | received, sent | bytes/s |
+| iis.website_requests_rate | Website requests rate | requests | requests/s |
+| iis.website_requests_by_type_rate | Website requests rate | options, get, post, head, put, delete, trace, move, copy, mkcol, propfind, proppatch, search, lock, unlock, other | requests/s |
+| iis.website_active_connections_count | Website active connections | active | connections |
+| iis.website_users_count | Website users with pending requests | anonymous, non_anonymous | users |
+| iis.website_connection_attempts_rate | Website connections attempts | connection | attempts/s |
+| iis.website_isapi_extension_requests_count | ISAPI extension requests | isapi | requests |
+| iis.website_isapi_extension_requests_rate | Website extensions request | isapi | requests/s |
+| iis.website_ftp_file_transfer_rate | Website FTP file transfer rate | received, sent | files/s |
+| iis.website_logon_attempts_rate | Website logon attempts | logon | attempts/s |
+| iis.website_errors_rate | Website errors | document_locked, document_not_found | errors/s |
+| iis.website_uptime | Website uptime | uptime | seconds |
+
 
 ### Per IIS Application Pool
 
@@ -151,16 +154,17 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| iis.application_pool_current_status | uninitialized, initialized, running, disabling, disabled, shutdown_pending, delete_pending | status |
-| iis.application_pool_current_worker_processes | running | processes |
-| iis.application_pool_worker_processes_created | created | processes/s |
-| iis.application_pool_maximum_worker_processes | created | processes |
-| iis.application_pool_recent_worker_process_failures | failures | failures/s |
-| iis.application_pool_worker_process_failures | crash, ping, startup, shutdown | failures/s |
-| iis.application_pool_recycles | recycles | recycles/s |
-| iis.application_pool_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| iis.application_pool_current_status | IIS App Pool current status | uninitialized, initialized, running, disabling, disabled, shutdown_pending, delete_pending | status |
+| iis.application_pool_current_worker_processes | IIS App Pool worker processes currently running | running | processes |
+| iis.application_pool_worker_processes_created | IIS App Pool worker processes created | created | processes/s |
+| iis.application_pool_maximum_worker_processes | IIS App Pool maximum created worker processes | created | processes |
+| iis.application_pool_recent_worker_process_failures | IIS App Pool worker process failures during the rapid-fail protection interval | failures | failures/s |
+| iis.application_pool_worker_process_failures | IIS App Pool worker process crashes | crash, ping, startup, shutdown | failures/s |
+| iis.application_pool_recycles | IIS App Pool recycles | recycles | recycles/s |
+| iis.application_pool_uptime | IIS App Pool uptime | uptime | seconds |
+
 
 ### Per IIS W3SCV W3MP
 
@@ -174,18 +178,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| iis.w3svc_w3wp_active_threads | threads | threads |
-| iis.w3svc_w3wp_requests_total | requests | requests/s |
-| iis.w3svc_w3wp_requests_active | requests | requests |
-| iis.w3svc_w3wp_file_cache_mem_usage | used | bytes |
-| iis.w3svc_w3wp_files_cache_total | cached_files | files/s |
-| iis.w3svc_w3wp_files_flushed_total | file_handles | flushes/s |
-| iis.w3svc_w3wp_uri_cache_flushed | cached_uris | flushes/s |
-| iis.w3svc_w3wp_total_uri_cached | uri_cache_blocks | blocks/s |
-| iis.w3svc_w3wp_total_metadata_cached | metadata_blocks | blocks/s |
-| iis.w3svc_w3wp_total_metadata_flushed | metadata_blocks | flushes/s |
-| iis.w3svc_w3wp_output_cache_active_flushed_items | used | items |
-| iis.w3svc_w3wp_output_cache_memory_usage | used | bytes |
-| iis.w3svc_w3wp_output_cache_flushed_total | output_cache_entries | flushes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| iis.w3svc_w3wp_active_threads | Threads actively processing requests in the worker process | threads | threads |
+| iis.w3svc_w3wp_requests_total | HTTP requests served by the worker process | requests | requests/s |
+| iis.w3svc_w3wp_requests_active | Current number of requests being processed by the worker process | requests | requests |
+| iis.w3svc_w3wp_file_cache_mem_usage | Current memory usage by the worker process | used | bytes |
+| iis.w3svc_w3wp_files_cache_total | Files whose contents were ever added to the cache | cached_files | files/s |
+| iis.w3svc_w3wp_files_flushed_total | File handles that have been removed from the cache | file_handles | flushes/s |
+| iis.w3svc_w3wp_uri_cache_flushed | URI cache flushes | cached_uris | flushes/s |
+| iis.w3svc_w3wp_total_uri_cached | URI information blocks added to the cache | uri_cache_blocks | blocks/s |
+| iis.w3svc_w3wp_total_metadata_cached | Metadata information blocks added to the user-mode cache | metadata_blocks | blocks/s |
+| iis.w3svc_w3wp_total_metadata_flushed | User-mode metadata cache flushes | metadata_blocks | flushes/s |
+| iis.w3svc_w3wp_output_cache_active_flushed_items | Items flushed but still in memory for active responses | used | items |
+| iis.w3svc_w3wp_output_cache_memory_usage | Current number of bytes used by output cache | used | bytes |
+| iis.w3svc_w3wp_output_cache_flushed_total | Flushes of output cache | output_cache_entries | flushes |

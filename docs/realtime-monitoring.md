@@ -145,7 +145,7 @@ The shaded boxes show the slices where an event may fall. Because both collectio
 ### Why One Second is the Ideal Standard
 
 - **The Universal Baseline:** 1-second is the native rhythm of universal console tools (`top`, `vmstat`, `iostat`).
-- **The Performance Sweet Spot:** Moving to sub-second intervals (e.g., 500ms) often doubles overhead for diminishing returns. One second is highly efficient and universally safe.
+- **The Performance Sweet Spot:** Smaller intervals often doubles overhead for diminishing returns. One second is highly efficient and universally safe.
 - **Sufficient Resolution:** The vast majority of operational anomalies last multiple seconds; 1-second granularity captures them without loss of fidelity.
 - **Negligible Overhead:** Modern systems handle per-second sampling with ease; collecting a few thousand metrics per second consumes a trivial fraction of a single CPU core's billions of cycles.
 

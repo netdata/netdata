@@ -1,5 +1,7 @@
 use super::*;
 
+static DECODER_STATE_QUARANTINE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
 impl IngestService {
     pub(super) fn persist_decoder_state_if_due(&mut self, now_usec: u64) {
         if now_usec.saturating_sub(self.last_decoder_state_persist_usec)
@@ -14,6 +16,14 @@ impl IngestService {
     pub(crate) fn persist_decoder_state(&mut self) {
         for key in self.decoders.dirty_decoder_state_namespaces() {
             let path = self.decoder_state_namespace_path(&key);
+            if self.protected_decoder_state_namespaces.contains(&key) {
+                tracing::warn!(
+                    "preserving unreadable netflow decoder state {}; updates for this stream will remain memory-only until restart",
+                    path.display()
+                );
+                self.decoders.mark_decoder_state_namespace_persisted(&key);
+                continue;
+            }
             let data = match self.decoders.export_decoder_state_namespace(&key) {
                 Ok(Some(data)) => data,
                 Ok(None) => {
@@ -99,11 +109,34 @@ impl IngestService {
             .decoders
             .is_decoder_state_namespace_loaded(&context.key)
         {
-            self.decoders
-                .mark_decoder_state_namespace_absent_for_normalized_source(
-                    context.key.clone(),
-                    context.parser_source,
-                );
+            let path = self.decoder_state_namespace_path(&context.key);
+            match read_decoder_state_namespace(&path) {
+                Ok(None) => self.mark_decoder_state_namespace_absent(&context),
+                Ok(Some(data)) if data.len() > crate::decoder::MAX_DECODER_STATE_FILE_LEN => {
+                    let reason = format!(
+                        "decoder state exceeds the {} byte limit",
+                        crate::decoder::MAX_DECODER_STATE_FILE_LEN
+                    );
+                    self.handle_invalid_decoder_state(&context, &path, &data, &reason);
+                }
+                Ok(Some(data)) => {
+                    if let Err(err) = self.decoders.import_decoder_state_namespace(
+                        context.key.clone(),
+                        context.parser_source,
+                        &data,
+                    ) {
+                        self.handle_invalid_decoder_state(&context, &path, &data, &err);
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "preserving unreadable netflow decoder state namespace {}: {}",
+                        path.display(),
+                        err
+                    );
+                    self.protect_decoder_state_namespace(&context);
+                }
+            }
             return Some(context);
         }
 
@@ -128,10 +161,65 @@ impl IngestService {
         Some(context)
     }
 
-    pub(super) fn preload_decoder_state_namespaces(
-        decoders: &mut FlowDecoders,
-        decoder_state_dir: &Path,
+    fn handle_invalid_decoder_state(
+        &mut self,
+        context: &DecoderPacketContext,
+        path: &Path,
+        data: &[u8],
+        reason: &str,
     ) {
+        if crate::decoder::decoder_state_schema_version(data)
+            != Some(crate::decoder::DECODER_STATE_SCHEMA_VERSION)
+        {
+            tracing::warn!(
+                "preserving unsupported netflow decoder state namespace {}: {}",
+                path.display(),
+                reason
+            );
+            self.protect_decoder_state_namespace(context);
+            return;
+        }
+
+        match quarantine_decoder_state_namespace(path) {
+            Ok(quarantine_path) => {
+                tracing::warn!(
+                    "moved invalid netflow decoder state namespace {} to {}: {}",
+                    path.display(),
+                    quarantine_path.display(),
+                    reason
+                );
+                self.mark_decoder_state_namespace_absent(context);
+            }
+            Err(err) => {
+                self.metrics
+                    .decoder_state_move_errors
+                    .fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(
+                    "failed to quarantine invalid netflow decoder state namespace {}: {}; original error: {}",
+                    path.display(),
+                    err,
+                    reason
+                );
+                self.protect_decoder_state_namespace(context);
+            }
+        }
+    }
+
+    fn mark_decoder_state_namespace_absent(&mut self, context: &DecoderPacketContext) {
+        self.decoders
+            .mark_decoder_state_namespace_absent_for_normalized_source(
+                context.key.clone(),
+                context.parser_source,
+            );
+    }
+
+    fn protect_decoder_state_namespace(&mut self, context: &DecoderPacketContext) {
+        self.protected_decoder_state_namespaces
+            .insert(context.key.clone());
+        self.mark_decoder_state_namespace_absent(context);
+    }
+
+    pub(super) fn cleanup_obsolete_decoder_state_namespaces(decoder_state_dir: &Path) {
         let read_dir = match fs::read_dir(decoder_state_dir) {
             Ok(entries) => entries,
             Err(err) => {
@@ -144,52 +232,104 @@ impl IngestService {
             }
         };
 
-        let mut paths = read_dir
-            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| path.is_file())
-            .collect::<Vec<_>>();
-        paths.sort();
-
-        for path in paths {
-            let file_len = match fs::metadata(&path) {
-                Ok(metadata) => metadata.len(),
-                Err(err) => {
-                    tracing::warn!(
-                        "failed to stat netflow decoder state namespace {}: {}",
-                        path.display(),
-                        err
-                    );
-                    continue;
-                }
+        for entry in read_dir {
+            let Ok(entry) = entry else {
+                continue;
             };
-            if file_len > crate::decoder::MAX_DECODER_STATE_FILE_LEN as u64 {
-                tracing::warn!(
-                    "skipping oversized netflow decoder state namespace {} (max {} bytes, got {})",
-                    path.display(),
-                    crate::decoder::MAX_DECODER_STATE_FILE_LEN,
-                    file_len
-                );
+            let path = entry.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("bin") {
                 continue;
             }
-
-            match fs::read(&path) {
-                Ok(data) => {
-                    if let Err(err) = decoders.preload_decoder_state_namespace(&data) {
-                        tracing::warn!(
-                            "failed to preload netflow decoder state namespace {}: {}",
-                            path.display(),
-                            err
-                        );
-                    }
-                }
-                Err(err) => {
-                    tracing::warn!(
-                        "failed to read netflow decoder state namespace {}: {}",
-                        path.display(),
-                        err
-                    );
-                }
+            let Ok(metadata) = fs::symlink_metadata(&path) else {
+                continue;
+            };
+            if !metadata.file_type().is_file() {
+                continue;
+            }
+            let mut header = [0_u8; 8];
+            let Ok(mut file) = fs::File::open(&path) else {
+                continue;
+            };
+            if file.read_exact(&mut header).is_err() {
+                continue;
+            }
+            if matches!(
+                crate::decoder::decoder_state_schema_version(&header),
+                Some(2..=4)
+            ) && let Err(err) = fs::remove_file(&path)
+            {
+                tracing::warn!(
+                    "failed to remove obsolete netflow decoder state namespace {}: {}",
+                    path.display(),
+                    err
+                );
             }
         }
     }
+}
+
+fn read_decoder_state_namespace(path: &Path) -> std::io::Result<Option<Vec<u8>>> {
+    let path_metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(err),
+    };
+    if !path_metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "decoder state path is not a regular file",
+        ));
+    }
+
+    let mut file = fs::File::open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "opened decoder state is not a regular file",
+        ));
+    }
+
+    let read_limit = crate::decoder::MAX_DECODER_STATE_FILE_LEN + 1;
+    let initial_capacity = usize::try_from(metadata.len())
+        .unwrap_or(read_limit)
+        .min(read_limit);
+    let mut data = Vec::with_capacity(initial_capacity);
+    file.by_ref()
+        .take(read_limit as u64)
+        .read_to_end(&mut data)?;
+    Ok(Some(data))
+}
+
+fn quarantine_decoder_state_namespace(path: &Path) -> std::io::Result<PathBuf> {
+    let file_name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "decoder state path has no file name",
+        )
+    })?;
+
+    for _ in 0..16 {
+        let sequence = DECODER_STATE_QUARANTINE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let mut quarantine_name = file_name.to_os_string();
+        quarantine_name.push(format!(
+            ".quarantine-{}-{}-{sequence}",
+            now_usec(),
+            std::process::id()
+        ));
+        let quarantine_path = path.with_file_name(quarantine_name);
+        match fs::symlink_metadata(&quarantine_path) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                fs::rename(path, &quarantine_path)?;
+                return Ok(quarantine_path);
+            }
+            Ok(_) => continue,
+            Err(err) => return Err(err),
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "could not allocate a unique decoder state quarantine path",
+    ))
 }

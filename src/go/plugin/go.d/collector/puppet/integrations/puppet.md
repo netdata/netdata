@@ -190,11 +190,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -206,12 +208,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| puppet.jvm_heap | committed, used | MiB |
-| puppet.jvm_nonheap | committed, used | MiB |
-| puppet.cpu | execution, GC | percentage |
-| puppet.fdopen | used | descriptors |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| puppet.jvm_heap | JVM Heap | committed, used | MiB |
+| puppet.jvm_nonheap | JVM Non-Heap | committed, used | MiB |
+| puppet.cpu | CPU usage | execution, GC | percentage |
+| puppet.fdopen | File Descriptors | used | descriptors |
 
 
 

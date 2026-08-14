@@ -39,7 +39,7 @@ that specific provider.
 
 For the full network-identity concept (merge order vs GeoIP and static, what
 fields you can populate, why TLS verification cannot be disabled), see
-[Network Identity](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Network Identity](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 The plugin issues a periodic HTTP request (GET by default, POST optionally) to

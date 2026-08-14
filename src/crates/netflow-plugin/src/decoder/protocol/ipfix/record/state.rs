@@ -2,6 +2,10 @@ use super::*;
 
 #[derive(Default)]
 pub(crate) struct IPFixRecordBuildState {
+    pub(crate) ordinary_counters: OrdinaryCounterSelector,
+    pub(crate) session_counters_present: bool,
+    pub(crate) session_reverse_bytes: Option<String>,
+    pub(crate) session_reverse_packets: Option<String>,
     pub(crate) reverse_overrides: FlowFields,
     pub(crate) reverse_present: bool,
     pub(crate) decap_required: bool,
@@ -30,6 +34,22 @@ pub(crate) struct IPFixRecordBuildState {
 }
 
 impl IPFixRecordBuildState {
+    pub(crate) fn apply_session_reverse_counters(&mut self) {
+        if !self.session_counters_present {
+            return;
+        }
+
+        // Keep one coherent counter model while retaining RFC reverse metadata.
+        self.reverse_overrides.remove("BYTES");
+        self.reverse_overrides.remove("PACKETS");
+        if let Some(bytes) = self.session_reverse_bytes.take() {
+            self.reverse_overrides.insert("BYTES", bytes);
+        }
+        if let Some(packets) = self.session_reverse_packets.take() {
+            self.reverse_overrides.insert("PACKETS", packets);
+        }
+    }
+
     pub(crate) fn apply_sampling_packet_ratio(&mut self) {
         if let (Some(interval), Some(space)) =
             (self.sampling_packet_interval, self.sampling_packet_space)

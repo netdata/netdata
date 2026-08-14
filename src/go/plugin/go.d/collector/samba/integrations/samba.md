@@ -173,11 +173,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -193,10 +195,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| samba.syscall_calls | syscalls | calls/s |
-| samba.syscall_transferred_data | transferred | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| samba.syscall_calls | Syscalls Count | syscalls | calls/s |
+| samba.syscall_transferred_data | Syscalls Transferred Data | transferred | bytes/s |
+
 
 ### Per smb2call
 
@@ -210,10 +213,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| samba.smb2_call_calls | smb2 | calls/s |
-| samba.smb2_call_transferred_data | in, out | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| samba.smb2_call_calls | SMB2 Calls Count | smb2 | calls/s |
+| samba.smb2_call_transferred_data | SMB2 Call Transferred Data | in, out | bytes/s |
 
 
 

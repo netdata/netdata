@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -95,22 +97,22 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| usergroup.cpu_utilization | user, system | percentage |
-| usergroup.cpu_guest_utilization | guest | percentage |
-| usergroup.cpu_context_switches | voluntary, involuntary | switches/s |
-| usergroup.estimated_mem_usage | mem | MiB |
-| usergroup.mem_usage | rss | MiB |
-| usergroup.mem_private_usage | mem | MiB |
-| usergroup.vmem_usage | vmem | MiB |
-| usergroup.mem_page_faults | minor, major | pgfaults/s |
-| usergroup.swap_usage | swap | MiB |
-| usergroup.disk_physical_io | reads, writes | KiB/s |
-| usergroup.disk_logical_io | reads, writes | KiB/s |
-| usergroup.processes | processes | processes |
-| usergroup.threads | threads | threads |
-| usergroup.fds_open_limit | limit | percentage |
-| usergroup.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
-| usergroup.uptime | uptime | seconds |
-| usergroup.uptime_summary | min, avg, max | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| usergroup.cpu_utilization | User Groups CPU utilization (100% = 1 core) | user, system | percentage |
+| usergroup.cpu_guest_utilization | User Groups CPU guest utilization (100% = 1 core) | guest | percentage |
+| usergroup.cpu_context_switches | User Groups CPU context switches | voluntary, involuntary | switches/s |
+| usergroup.estimated_mem_usage | User Groups estimated memory usage (RSS with shared scaling). Requires kernel 4.14+. Enabled by default, disable with --pss 0. | mem | MiB |
+| usergroup.mem_usage | User Groups memory RSS usage | rss | MiB |
+| usergroup.mem_private_usage | User Groups memory usage without shared | mem | MiB |
+| usergroup.vmem_usage | User Groups virtual memory size | vmem | MiB |
+| usergroup.mem_page_faults | User Groups memory page faults | minor, major | pgfaults/s |
+| usergroup.swap_usage | User Groups swap usage | swap | MiB |
+| usergroup.disk_physical_io | User Groups disk physical IO | reads, writes | KiB/s |
+| usergroup.disk_logical_io | User Groups disk logical IO | reads, writes | KiB/s |
+| usergroup.processes | User Groups processes | processes | processes |
+| usergroup.threads | User Groups threads | threads | threads |
+| usergroup.fds_open_limit | User Groups open file descriptors limit | limit | percentage |
+| usergroup.fds_open | User Groups open file descriptors | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| usergroup.uptime | User Groups uptime | uptime | seconds |
+| usergroup.uptime_summary | User Groups uptime summary | min, avg, max | seconds |

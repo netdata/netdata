@@ -427,8 +427,6 @@ bool apps_os_read_pid_stat_macos(struct pid_stat *p, void *ptr) {
 }
 
 bool apps_os_collect_all_pids_macos(void) {
-    // Mark all processes as unread before collecting new data
-    struct pid_stat *p;
     static pid_t *pids = NULL;
     static int allocatedProcessCount = 0;
 
@@ -473,6 +471,12 @@ bool apps_os_collect_all_pids_macos(void) {
             continue;
         }
         if(procSize == 0) // no such process
+            continue;
+
+        // zombies have no Mach task and proc_pidinfo() resolves pids via proc_find(),
+        // which skips SZOMB entries - so every proc_pidinfo() flavor below returns
+        // ESRCH for them, for as long as the parent does not reap them.
+        if(pi.proc.kp_proc.p_stat == SZOMB)
             continue;
 
         int st = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &pi.taskinfo, sizeof(pi.taskinfo));

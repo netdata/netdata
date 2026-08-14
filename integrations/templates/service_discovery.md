@@ -36,6 +36,14 @@
 [% endfor %]
 
 
+[[ page.testing.heading ]]
+
+[% for paragraph in page.testing.body %]
+[[ paragraph ]]
+
+[% endfor %]
+
+
 [[ page.rule_eval.heading ]]
 
 [% for paragraph in page.rule_eval.intro %]

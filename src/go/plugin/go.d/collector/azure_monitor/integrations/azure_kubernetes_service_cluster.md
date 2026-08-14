@@ -643,11 +643,13 @@ The following alerts are available:
 | [ am_aks_node_disk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_disk_percentage | AKS node disk usage on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -669,31 +671,31 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.aks.apiserver_cpu | average, maximum | percentage |
-| azure_monitor.aks.apiserver_memory | average, maximum | percentage |
-| azure_monitor.aks.apiserver_inflight_requests | average | requests |
-| azure_monitor.aks.etcd_cpu | average, maximum | percentage |
-| azure_monitor.aks.etcd_memory | average, maximum | percentage |
-| azure_monitor.aks.etcd_database | average, maximum | percentage |
-| azure_monitor.aks.pod_status_phase | average | pods |
-| azure_monitor.aks.pod_status_ready | average | pods |
-| azure_monitor.aks.allocatable_cpu | average | cores |
-| azure_monitor.aks.allocatable_memory | average | bytes |
-| azure_monitor.aks.node_conditions | average | nodes |
-| azure_monitor.aks.autoscaler_health | safe_to_autoscale, cooldown | state |
-| azure_monitor.aks.autoscaler_unschedulable_pods | average | pods |
-| azure_monitor.aks.autoscaler_unneeded_nodes | average | nodes |
-| azure_monitor.aks.node_cpu_millicores | average, maximum | millicores |
-| azure_monitor.aks.node_cpu_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_memory_working_set | average, maximum | bytes |
-| azure_monitor.aks.node_memory_working_set_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_memory_rss | average, maximum | bytes |
-| azure_monitor.aks.node_memory_rss_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_disk_usage | average, maximum | bytes |
-| azure_monitor.aks.node_disk_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_network | in, out | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.aks.apiserver_cpu | AKS API Server CPU Utilization | average, maximum | percentage |
+| azure_monitor.aks.apiserver_memory | AKS API Server Memory Utilization | average, maximum | percentage |
+| azure_monitor.aks.apiserver_inflight_requests | AKS API Server Inflight Requests | average | requests |
+| azure_monitor.aks.etcd_cpu | AKS etcd CPU Utilization | average, maximum | percentage |
+| azure_monitor.aks.etcd_memory | AKS etcd Memory Utilization | average, maximum | percentage |
+| azure_monitor.aks.etcd_database | AKS etcd Database Utilization | average, maximum | percentage |
+| azure_monitor.aks.pod_status_phase | AKS Pods by Phase | average | pods |
+| azure_monitor.aks.pod_status_ready | AKS Pods in Ready State | average | pods |
+| azure_monitor.aks.allocatable_cpu | AKS Allocatable CPU Cores | average | cores |
+| azure_monitor.aks.allocatable_memory | AKS Allocatable Memory | average | bytes |
+| azure_monitor.aks.node_conditions | AKS Node Conditions | average | nodes |
+| azure_monitor.aks.autoscaler_health | AKS Cluster Autoscaler Health | safe_to_autoscale, cooldown | state |
+| azure_monitor.aks.autoscaler_unschedulable_pods | AKS Autoscaler Unschedulable Pods | average | pods |
+| azure_monitor.aks.autoscaler_unneeded_nodes | AKS Autoscaler Unneeded Nodes | average | nodes |
+| azure_monitor.aks.node_cpu_millicores | AKS Node CPU Usage | average, maximum | millicores |
+| azure_monitor.aks.node_cpu_percentage | AKS Node CPU Percentage | average, maximum | percentage |
+| azure_monitor.aks.node_memory_working_set | AKS Node Memory Working Set | average, maximum | bytes |
+| azure_monitor.aks.node_memory_working_set_percentage | AKS Node Memory Working Set Percentage | average, maximum | percentage |
+| azure_monitor.aks.node_memory_rss | AKS Node Memory RSS | average, maximum | bytes |
+| azure_monitor.aks.node_memory_rss_percentage | AKS Node Memory RSS Percentage | average, maximum | percentage |
+| azure_monitor.aks.node_disk_usage | AKS Node Disk Usage | average, maximum | bytes |
+| azure_monitor.aks.node_disk_percentage | AKS Node Disk Usage Percentage | average, maximum | percentage |
+| azure_monitor.aks.node_network | AKS Node Network Traffic | in, out | bytes |
 
 
 

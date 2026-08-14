@@ -196,9 +196,9 @@ static void rrddim_metric_free_handle(struct mem_metric_handle *mh) {
 
 STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
     while(true) {
-        struct mem_metric_handle *mh;
+        struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get_by_id(si, rd->uuid);
 
-        while((mh = (struct mem_metric_handle *)rrddim_metric_get_by_id(si, rd->uuid)) == NULL) {
+        if(!mh) {
             netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
             JudyAllocThreadPulseReset();
             Pvoid_t *PValue = JudyLIns(&rrddim_Judy_array, rd->uuid, PJE0);
@@ -219,6 +219,14 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
                     mh = NULL;
             }
             netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+
+            // The indexed handle is being deleted concurrently (acquire failed);
+            // retry the lookup. Do NOT re-run get_by_id here: mh already carries
+            // this caller's single reference (either refcount = 1 from the create
+            // branch, or the +1 from refcount_acquire in the else branch), and
+            // re-fetching would acquire a second reference that nothing releases.
+            if(!mh)
+                continue;
         }
 
         if(unlikely(rrddim_metric_handle_rrddim_load(mh) != rd)) {

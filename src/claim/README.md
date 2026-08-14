@@ -25,6 +25,14 @@ You can find this command in three places in the UI:
 3. Click the "Connect" button
 4. Follow the on-screen instructions to connect your Agent
 
+:::note
+
+**Verifying node ownership:** As part of the connection flow, your Agent's local dashboard displays a command to run directly on the machine whose Agent you are connecting — not on your local workstation or any other machine. The command reads a random session ID (a UUID) that the Agent generates at startup and writes to its library directory (`/var/lib/netdata/` by default, following the `lib` option under the `[directories]` section of `netdata.conf`). Copy the output and paste it back into the dialog. This proves you have administrative access to the node and prevents unauthorized claiming of machines you do not control.
+
+If your pasted UUID is rejected with `invalid key`, it is single-use: every claim attempt (including failed ones) regenerates a new one. See [Pasted verification UUID rejected as invalid key](#pasted-verification-uuid-rejected-as-invalid-key).
+
+:::
+
 ### Method 2: Via Configuration File
 
 **Best for:** Automated deployments, multiple Agents
@@ -40,7 +48,7 @@ Create `/INSTALL_PREFIX/etc/netdata/claim.conf`:
    insecure = no
 ```
 
-:::info 
+:::info
 
 **File Permissions and Ownership:**
 
@@ -150,6 +158,7 @@ The proxy only sees encrypted TLS traffic flowing through the tunnel it establis
 Netdata uses **two connection libraries**: **libcurl for claiming and MQTToWSoHTTPS for the actual Cloud connection**. While libcurl supports encrypted proxy connections, MQTToWSoHTTPS does not - so encrypted proxy connections will fail during the Cloud connection phase. The proxy configuration patterns above work for both libraries and provide end-to-end encryption for Netdata Cloud communication.
 
 For SOCKS proxies:
+
 - `socks5://` resolves target hostnames locally on the Agent and sends IP to the proxy.
 - `socks5h://` sends hostname to the proxy and resolves DNS remotely on the proxy side.
 
@@ -202,20 +211,24 @@ To remove a node from your Space and connect it to another, follow these steps:
 3. **Stop and remove the container**
 
    **Docker CLI:**
+
     ```bash
     docker stop CONTAINER_NAME
     docker rm CONTAINER_NAME
     ```
+
    Replace `CONTAINER_NAME` with either the container's name or ID.
 
    **Docker Compose:**  
    Inside the directory that has the `docker-compose.yml` file, run:
+
     ```bash
     docker compose down
     ```
 
    **Docker Swarm:**  
    Run the following, and replace `STACK` with your Stack's name:
+
     ```bash
     docker stack rm STACK
     ```
@@ -230,12 +243,12 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK). The directory typically includes the following core files:
 
-| File | Description |
-|------|-------------|
-| `cloud.conf` | Primary Cloud configuration file, including the canonical `claimed_id` and other ACLK settings |
-| `private.pem` | RSA private key for ACLK authentication |
-| `public.pem` | RSA public key for ACLK authentication |
-| `claimed_id` | Legacy file duplicating the `claimed_id` from `cloud.conf`, kept mainly for backwards compatibility and fallback |
+| File          | Description                                                                                                      |
+|---------------|------------------------------------------------------------------------------------------------------------------|
+| `cloud.conf`  | Primary Cloud configuration file, including the canonical `claimed_id` and other ACLK settings                   |
+| `private.pem` | RSA private key for ACLK authentication                                                                          |
+| `public.pem`  | RSA public key for ACLK authentication                                                                           |
+| `claimed_id`  | Legacy file duplicating the `claimed_id` from `cloud.conf`, kept mainly for backwards compatibility and fallback |
 
 In addition to these, depending on your configuration and features in use, you may also see the following optional files:
 
@@ -292,6 +305,28 @@ Used Cloud Protocol: New
 Use these keys and the information below to troubleshoot the ACLK.
 
 ### Common Issues
+
+#### Pasted verification UUID rejected as invalid key
+
+**Applies to:** [Method 1: Via UI](#method-1-via-ui-recommended).
+
+**Problem:** The claiming dialog verifies server ownership by asking you to run a command on the Agent and paste back the UUID it prints. The prefix depends on the install — `sudo cat` for service installs, `docker exec netdata cat` for Docker, and `more` on Windows — over the `netdata_random_session_id` file:
+
+```bash
+sudo cat /var/lib/netdata/netdata_random_session_id                  # service installs (default path)
+docker exec netdata cat /var/lib/netdata/netdata_random_session_id   # Docker (default container name)
+more <VARLIB>\netdata_random_session_id                              # Windows (Command Prompt)
+```
+
+Use the exact command the dialog shows — it fills in the correct path for your install. The `docker exec netdata` form assumes the default container name (`--name=netdata`); adjust it if your container uses a different name. After pasting the UUID, the claim is rejected with `invalid key`, even though the value was copied exactly.
+
+**Why this happens:** The UUID in `netdata_random_session_id` is **single-use**. The Agent generates a new UUID and overwrites the file on **every** claim attempt — including failed ones — as a brute-force defense. The UUID is regenerated on the `invalid key` response, the `invalid parameters` response, and on every attempt that passes those checks (whether the claiming call to Cloud then succeeds or fails). So if any claim attempt occurred after you read the file (an earlier submit with a wrong or missing Space token/Rooms, a retry from another browser tab, or a concurrent claiming script), the value you copied is already stale.
+
+**Solution:** Read the file **again** to get the current UUID and submit once, in the same pass, with a valid Space token and Rooms — making sure no other claim attempt regenerates the UUID first:
+
+1. Re-run the command from the dialog (the value is different each time).
+2. Copy the new UUID.
+3. Paste it with the correct Space token and Rooms, then submit once. Do not re-submit the old value or retry from a second tab — each failed attempt invalidates the current UUID again.
 
 #### kickstart: unsupported Netdata installation
 

@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -91,10 +93,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| sctp.established | established | associations |
-| sctp.transitions | active, passive, aborted, shutdown | transitions/s |
-| sctp.packets | received, sent | packets/s |
-| sctp.packet_errors | invalid, checksum | packets/s |
-| sctp.fragmentation | reassembled, fragmented | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| sctp.established | SCTP current total number of established associations | established | associations |
+| sctp.transitions | SCTP Association Transitions | active, passive, aborted, shutdown | transitions/s |
+| sctp.packets | SCTP Packets | received, sent | packets/s |
+| sctp.packet_errors | SCTP Packet Errors | invalid, checksum | packets/s |
+| sctp.fragmentation | SCTP Fragmentation | reassembled, fragmented | packets/s |

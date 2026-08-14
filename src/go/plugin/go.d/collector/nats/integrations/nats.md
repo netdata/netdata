@@ -219,11 +219,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -241,25 +243,26 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nats.server_traffic | received, sent | bytes/s |
-| nats.server_messages | received, sent | messages/s |
-| nats.server_connections | active | connections |
-| nats.server_connections_rate | connections | connections/s |
-| nats.server_health_probe_status | ok, error | status |
-| nats.server_cpu_usage | used | percent |
-| nats.server_mem_usage | used | bytes |
-| nats.server_uptime | uptime | seconds |
-| nats.jetstream_streams | active | streams |
-| nats.jetstream_streams_storage_bytes | used | bytes |
-| nats.jetstream_streams_storage_messages | stored | messaged |
-| nats.jetstream_consumers | active | consumers |
-| nats.jetstream_api_requests | requests | requests/s |
-| nats.jetstream_api_errors | errors | errors/s |
-| nats.jetstream_api_inflight | inflight | requests |
-| nats.jetstream_memory_used | used | bytes |
-| nats.jetstream_storage_used | used | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nats.server_traffic | Server Traffic | received, sent | bytes/s |
+| nats.server_messages | Server Messages | received, sent | messages/s |
+| nats.server_connections | Server Active Connections | active | connections |
+| nats.server_connections_rate | Server Connections | connections | connections/s |
+| nats.server_health_probe_status | Server Health Probe Status | ok, error | status |
+| nats.server_cpu_usage | Server CPU Usage | used | percent |
+| nats.server_mem_usage | Server Memory Usage | used | bytes |
+| nats.server_uptime | Server Uptime | uptime | seconds |
+| nats.jetstream_streams | JetStream Streams | active | streams |
+| nats.jetstream_streams_storage_bytes | JetStream Bytes | used | bytes |
+| nats.jetstream_streams_storage_messages | JetStream Messages | stored | messaged |
+| nats.jetstream_consumers | JetStream Consumers | active | consumers |
+| nats.jetstream_api_requests | JetStream API Requests | requests | requests/s |
+| nats.jetstream_api_errors | JetStream API Errors | errors | errors/s |
+| nats.jetstream_api_inflight | JetStream API Inflight | inflight | requests |
+| nats.jetstream_memory_used | JetStream Used Memory | used | bytes |
+| nats.jetstream_storage_used | JetStream Used Storage | used | bytes |
+
 
 ### Per http endpoint
 
@@ -276,9 +279,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nats.http_endpoint_requests | requests | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nats.http_endpoint_requests | HTTP Endpoint Requests | requests | requests/s |
+
 
 ### Per account
 
@@ -295,15 +299,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nats.account_traffic | received, sent | bytes/s |
-| nats.account_messages | received, sent | messages/s |
-| nats.account_connections | active | connections |
-| nats.account_connections_rate | connections | connections/s |
-| nats.account_subscriptions | active | subscriptions |
-| nats.account_slow_consumers | slow | consumers/s |
-| nats.account_leaf_nodes | leafnode | servers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nats.account_traffic | Account Traffic | received, sent | bytes/s |
+| nats.account_messages | Account Messages | received, sent | messages/s |
+| nats.account_connections | Account Active Connections | active | connections |
+| nats.account_connections_rate | Account Connections | connections | connections/s |
+| nats.account_subscriptions | Account Active Subscriptions | active | subscriptions |
+| nats.account_slow_consumers | Account Slow Consumers | slow | consumers/s |
+| nats.account_leaf_nodes | Account Leaf Nodes | leafnode | servers |
+
 
 ### Per route
 
@@ -321,11 +326,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nats.route_traffic | in, out | bytes/s |
-| nats.route_messages | in, out | messages/s |
-| nats.route_subscriptions | active | subscriptions |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nats.route_traffic | Route Traffic | in, out | bytes/s |
+| nats.route_messages | Route Messages | in, out | messages/s |
+| nats.route_subscriptions | Route Active Subscriptions | active | subscriptions |
+
 
 ### Per inbound gateway connection
 
@@ -344,12 +350,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nats.inbound_gateway_conn_traffic | in, out | bytes/s |
-| nats.inbound_gateway_conn_messages | in, out | messages/s |
-| nats.inbound_gateway_conn_subscriptions | active | subscriptions |
-| nats.inbound_gateway_conn_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nats.inbound_gateway_conn_traffic | Inbound Gateway Traffic | in, out | bytes/s |
+| nats.inbound_gateway_conn_messages | Inbound Gateway Messages | in, out | messages/s |
+| nats.inbound_gateway_conn_subscriptions | Inbound Gateway Active Subscriptions | active | subscriptions |
+| nats.inbound_gateway_conn_uptime | Inbound Gateway Connection Uptime | uptime | seconds |
+
 
 ### Per outbound gateway connection
 
@@ -368,12 +375,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nats.outbound_gateway_conn_traffic | in, out | bytes/s |
-| nats.outbound_gateway_conn_messages | in, out | messages/s |
-| nats.outbound_gateway_conn_subscriptions | active | subscriptions |
-| nats.outbound_gateway_conn_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nats.outbound_gateway_conn_traffic | Outbound Gateway Traffic | in, out | bytes/s |
+| nats.outbound_gateway_conn_messages | Outbound Gateway Messages | in, out | messages/s |
+| nats.outbound_gateway_conn_subscriptions | Outbound Gateway Active Subscriptions | active | subscriptions |
+| nats.outbound_gateway_conn_uptime | Outbound Gateway Connection Uptime | uptime | seconds |
+
 
 ### Per leaf node connection
 
@@ -393,12 +401,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nats.leaf_node_conn_traffic | in, out | bytes/s |
-| nats.leaf_node_conn_messages | in, out | messages/s |
-| nats.leaf_node_conn_subscriptions | active | subscriptions |
-| nats.leaf_node_conn_rtt | rtt | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nats.leaf_node_conn_traffic | Leaf Node Connection Traffic | in, out | bytes/s |
+| nats.leaf_node_conn_messages | Leaf Node Connection Messages | in, out | messages/s |
+| nats.leaf_node_conn_subscriptions | Leaf Node Connection Active Subscriptions | active | subscriptions |
+| nats.leaf_node_conn_rtt | Leaf Node Connection RTT | rtt | microseconds |
 
 
 

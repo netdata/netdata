@@ -183,11 +183,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -199,17 +201,18 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ntpd.sys_offset | offset | milliseconds |
-| ntpd.sys_jitter | system, clock | milliseconds |
-| ntpd.sys_frequency | frequency | ppm |
-| ntpd.sys_wander | clock | ppm |
-| ntpd.sys_rootdelay | delay | milliseconds |
-| ntpd.sys_rootdisp | dispersion | milliseconds |
-| ntpd.sys_stratum | stratum | stratum |
-| ntpd.sys_tc | current, minimum | log2 |
-| ntpd.sys_precision | precision | log2 |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ntpd.sys_offset | Combined offset of server relative to this host | offset | milliseconds |
+| ntpd.sys_jitter | Combined system jitter and clock jitter | system, clock | milliseconds |
+| ntpd.sys_frequency | Frequency offset relative to hardware clock | frequency | ppm |
+| ntpd.sys_wander | Clock frequency wander | clock | ppm |
+| ntpd.sys_rootdelay | Total roundtrip delay to the primary reference clock | delay | milliseconds |
+| ntpd.sys_rootdisp | Total root dispersion to the primary reference clock | dispersion | milliseconds |
+| ntpd.sys_stratum | Stratum | stratum | stratum |
+| ntpd.sys_tc | Time constant and poll exponent | current, minimum | log2 |
+| ntpd.sys_precision | Precision | precision | log2 |
+
 
 ### Per peer
 
@@ -223,21 +226,21 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ntpd.peer_offset | offset | milliseconds |
-| ntpd.peer_delay | delay | milliseconds |
-| ntpd.peer_dispersion | dispersion | milliseconds |
-| ntpd.peer_jitter | jitter | milliseconds |
-| ntpd.peer_xleave | xleave | milliseconds |
-| ntpd.peer_rootdelay | rootdelay | milliseconds |
-| ntpd.peer_rootdisp | dispersion | milliseconds |
-| ntpd.peer_stratum | stratum | stratum |
-| ntpd.peer_hmode | hmode | hmode |
-| ntpd.peer_pmode | pmode | pmode |
-| ntpd.peer_hpoll | hpoll | log2 |
-| ntpd.peer_ppoll | ppoll | log2 |
-| ntpd.peer_precision | precision | log2 |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ntpd.peer_offset | Peer offset | offset | milliseconds |
+| ntpd.peer_delay | Peer delay | delay | milliseconds |
+| ntpd.peer_dispersion | Peer dispersion | dispersion | milliseconds |
+| ntpd.peer_jitter | Peer jitter | jitter | milliseconds |
+| ntpd.peer_xleave | Peer interleave delay | xleave | milliseconds |
+| ntpd.peer_rootdelay | Peer roundtrip delay to the primary reference clock | rootdelay | milliseconds |
+| ntpd.peer_rootdisp | Peer root dispersion to the primary reference clock | dispersion | milliseconds |
+| ntpd.peer_stratum | Peer stratum | stratum | stratum |
+| ntpd.peer_hmode | Peer host mode | hmode | hmode |
+| ntpd.peer_pmode | Peer mode | pmode | pmode |
+| ntpd.peer_hpoll | Peer host poll exponent | hpoll | log2 |
+| ntpd.peer_ppoll | Peer poll exponent | ppoll | log2 |
+| ntpd.peer_precision | Peer precision | precision | log2 |
 
 
 

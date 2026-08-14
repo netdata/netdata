@@ -288,11 +288,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -304,20 +306,21 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.cluster_space_usage | used, total | bytes |
-| powerstore.cluster_space_logical | provisioned, used, data_physical, shared | bytes |
-| powerstore.cluster_space_efficiency | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
-| powerstore.hardware_health_fan | ok, degraded, failed, unknown | fans |
-| powerstore.hardware_health_psu | ok, degraded, failed, unknown | PSUs |
-| powerstore.hardware_health_drive | ok, degraded, failed, unknown | drives |
-| powerstore.hardware_health_battery | ok, degraded, failed, unknown | batteries |
-| powerstore.hardware_health_node | ok, degraded, failed, unknown | nodes |
-| powerstore.alerts_active | critical, major, minor, info | alerts |
-| powerstore.nas_server_status | started, stopped, degraded, unknown | servers |
-| powerstore.copy_data | remaining, transferred | bytes |
-| powerstore.copy_transfer_rate | rate | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.cluster_space_usage | Cluster Space Usage | used, total | bytes |
+| powerstore.cluster_space_logical | Cluster Logical Space | provisioned, used, data_physical, shared | bytes |
+| powerstore.cluster_space_efficiency | Cluster Space Efficiency Ratios | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
+| powerstore.hardware_health_fan | Fan Health Status | ok, degraded, failed, unknown | fans |
+| powerstore.hardware_health_psu | Power Supply Health Status | ok, degraded, failed, unknown | PSUs |
+| powerstore.hardware_health_drive | Drive Health Status | ok, degraded, failed, unknown | drives |
+| powerstore.hardware_health_battery | Battery Health Status | ok, degraded, failed, unknown | batteries |
+| powerstore.hardware_health_node | Node Health Status | ok, degraded, failed, unknown | nodes |
+| powerstore.alerts_active | Active Alerts by Severity | critical, major, minor, info | alerts |
+| powerstore.nas_server_status | NAS Server Status | started, stopped, degraded, unknown | servers |
+| powerstore.copy_data | Replication Data | remaining, transferred | bytes |
+| powerstore.copy_transfer_rate | Replication Transfer Rate | rate | bytes/s |
+
 
 ### Per appliance
 
@@ -331,15 +334,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.appliance_iops | read, write | ops/s |
-| powerstore.appliance_bandwidth | read, write | bytes/s |
-| powerstore.appliance_latency | read, write, avg | microseconds |
-| powerstore.appliance_cpu | utilization | percentage |
-| powerstore.appliance_space | used, total | bytes |
-| powerstore.appliance_space_logical | provisioned, used, data_physical, shared | bytes |
-| powerstore.appliance_space_efficiency | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.appliance_iops | Appliance IOPS | read, write | ops/s |
+| powerstore.appliance_bandwidth | Appliance Bandwidth | read, write | bytes/s |
+| powerstore.appliance_latency | Appliance Latency | read, write, avg | microseconds |
+| powerstore.appliance_cpu | Appliance IO Workload CPU Utilization | utilization | percentage |
+| powerstore.appliance_space | Appliance Space Usage | used, total | bytes |
+| powerstore.appliance_space_logical | Appliance Logical Space | provisioned, used, data_physical, shared | bytes |
+| powerstore.appliance_space_efficiency | Appliance Space Efficiency Ratios | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
+
 
 ### Per volume
 
@@ -353,13 +357,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.volume_iops | read, write | ops/s |
-| powerstore.volume_bandwidth | read, write | bytes/s |
-| powerstore.volume_latency | read, write, avg | microseconds |
-| powerstore.volume_space | provisioned, used | bytes |
-| powerstore.volume_space_savings | thin_savings | ratio |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.volume_iops | Volume IOPS | read, write | ops/s |
+| powerstore.volume_bandwidth | Volume Bandwidth | read, write | bytes/s |
+| powerstore.volume_latency | Volume Latency | read, write, avg | microseconds |
+| powerstore.volume_space | Volume Space Usage | provisioned, used | bytes |
+| powerstore.volume_space_savings | Volume Thin Savings | thin_savings | ratio |
+
 
 ### Per node
 
@@ -373,12 +378,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.node_iops | read, write | ops/s |
-| powerstore.node_bandwidth | read, write | bytes/s |
-| powerstore.node_latency | read, write, avg | microseconds |
-| powerstore.node_logins | logins | logins |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.node_iops | Node IOPS | read, write | ops/s |
+| powerstore.node_bandwidth | Node Bandwidth | read, write | bytes/s |
+| powerstore.node_latency | Node Latency | read, write, avg | microseconds |
+| powerstore.node_logins | Node Current Logins | logins | logins |
+
 
 ### Per fc port
 
@@ -392,12 +398,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.fc_port_iops | read, write | ops/s |
-| powerstore.fc_port_bandwidth | read, write | bytes/s |
-| powerstore.fc_port_latency | read, write, avg | microseconds |
-| powerstore.fc_port_link_status | up | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.fc_port_iops | FC Port IOPS | read, write | ops/s |
+| powerstore.fc_port_bandwidth | FC Port Bandwidth | read, write | bytes/s |
+| powerstore.fc_port_latency | FC Port Latency | read, write, avg | microseconds |
+| powerstore.fc_port_link_status | FC Port Link Status | up | status |
+
 
 ### Per ethernet port
 
@@ -411,12 +418,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.eth_port_bytes | received, sent | bytes/s |
-| powerstore.eth_port_packets | received, sent | packets/s |
-| powerstore.eth_port_errors | rx_crc, rx_no_buffer, tx_error | errors/s |
-| powerstore.eth_port_link_status | up | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.eth_port_bytes | Ethernet Port Bytes Rate | received, sent | bytes/s |
+| powerstore.eth_port_packets | Ethernet Port Packets Rate | received, sent | packets/s |
+| powerstore.eth_port_errors | Ethernet Port Errors Rate | rx_crc, rx_no_buffer, tx_error | errors/s |
+| powerstore.eth_port_link_status | Ethernet Port Link Status | up | status |
+
 
 ### Per file system
 
@@ -430,11 +438,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.filesystem_iops | read, write | ops/s |
-| powerstore.filesystem_bandwidth | read, write | bytes/s |
-| powerstore.filesystem_latency | read, write, avg | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.filesystem_iops | File System IOPS | read, write | ops/s |
+| powerstore.filesystem_bandwidth | File System Bandwidth | read, write | bytes/s |
+| powerstore.filesystem_latency | File System Latency | read, write, avg | microseconds |
+
 
 ### Per drive
 
@@ -448,9 +457,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.drive_endurance | remaining | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerstore.drive_endurance | Drive Endurance Remaining | remaining | percentage |
 
 
 

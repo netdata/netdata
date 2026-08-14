@@ -40,6 +40,9 @@ For `ModuleV2` collectors, the runtime integration expects:
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
 | `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
 | `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.         |
+| `WithPlanRouteDiagnosticObserver(...)`              | Stream complete, synchronous route facts for one plan attempt; intended for validation and tests                                                                        |
+| `ChartTemplateIDAt(...)`                            | Correlate an authored chart position with the compiler-assigned template identity used by route facts                                                                   |
+| `ResolveInstanceLabelPolicy(...)`                   | Inspect `instances.by_labels` through the same parsing and exclusion-precedence rules used by the planner                                                               |
 
 ## End-to-End Example (Single Flow)
 
@@ -111,6 +114,26 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 | Expiry          | Emit removals for stale charts/dimensions                                                      |
 | Sort            | Deterministically sort inferred dimension output                                               |
 
+## Route Diagnostics and Policy Inspection
+
+`WithPlanRouteDiagnosticObserver` is an opt-in validation/test surface. When enabled, the planner synchronously streams
+attempt-local facts for filtering, candidate rejection, chart-identity rejection, resolved routes, accepted routes,
+autogen displacement, collisions, lifecycle rejection, and unmatched series.
+
+- Diagnostic planning bypasses route-cache lookup and storage so every scanned series produces complete facts.
+- The default path is unchanged when no observer is configured; it continues to use the route cache.
+- The callback MUST NOT call back into the same `Engine` and SHOULD aggregate bounded facts rather than retain every event.
+- Resolved facts include the compiler template identity, series identity, rendered chart/dimension names, raw instance
+  identity, ordered instance-label keys, and the label key used for a dynamic dimension name. Accepted facts additionally
+  expose the effective context, family, units, algorithm, aggregation, presentation, series kind, scale, and label-promotion
+  policy. They do not include the full input label set; a rendered chart or dynamic dimension name can itself be derived
+  from label values and must be handled accordingly by consumers.
+- `ChartTemplateIDAt` correlates compiler facts with a decoded template's group/chart position.
+
+`ResolveInstanceLabelPolicy` is the corresponding read-only inspection helper for `instances.by_labels` and
+`instances.optional_by_labels`. It returns the runtime-normalized required keys, optional keys, exclusions, and include-all
+flag, so validation tooling does not reproduce compiler or planner precedence rules.
+
 ## Reader Requirements
 
 | Scenario                                                                       | Required reader mode                                                       |
@@ -147,10 +170,65 @@ The following rules apply when routing conflicts arise:
 |-----------------------------------------------|------------------------------------------------------------------------------------------------|
 | Template vs autogen chart ID collision        | Template wins; autogen chart is replaced                                                       |
 | Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **silently ignored** (see warning below) |
-| Duplicate dimension observations within build | First observed dimension metadata wins; values are reduced (summed)                            |
+| Duplicate dimension observations within build | First observed dimension metadata wins; values use the chart's configured reducer            |
 
 > [!WARNING]
 > Cross-template chart ID collisions cause silent data loss — conflicting series are dropped with no error and no log entry. If metrics are missing, check for duplicate rendered chart IDs across template groups.
+
+Authored charts can set one reducer for all their dimensions. Supported values are `sum` (default), `min`, `max`, and
+`avg`. Reduction is scoped to one successful plan build and happens before multiplier/divisor and
+`absolute`/`incremental` chart processing. Autogen routes retain their existing sum behavior. See the chart-template
+format's [aggregation section](../charttpl/README.md#aggregation) for semantics and metric-type constraints.
+
+### Chart Label Intersection
+
+- Promoted non-identity labels are common metadata: a key/value survives only when it is present with the same value on
+  every routed contributor to the chart.
+- An unlabeled contributor participates as an empty label set. If it shares a chart with labeled contributors, no
+  promoted non-identity label can describe the entire chart.
+- A changed intersection emits a complete replacement label set through `UpdateChartLabelsAction`; chart identity and
+  dimensions are not recreated.
+
+Authored chart-label promotion is presence-aware. Omitted `label_promotion` uses automatic intersection, a non-empty list
+uses explicit intersection over that allowlist, and an explicit empty list retains only instance identity labels. Group
+defaults preserve the same three states through inheritance.
+
+### Instance Identity Resolution
+
+- `instances.by_labels` defines required identity. A missing explicit label rejects that series from the chart.
+- `instances.optional_by_labels` defines declaration-ordered explicit keys that participate only when their value is
+  present and nonblank. Missing or blank optional values retain the base/required chart identity.
+- Required values render before optional key/value pairs in the chart-ID suffix. For example, present `pid="1234"`
+  contributes `_pid_1234`. Every participating key is emitted as an identity chart label.
+- Optional identity is resolved independently for each series. Present and absent source shapes can therefore materialize
+  refined and base chart instances in the same plan; a series is routed once, never copied into an aggregate view.
+- Presence/value changes are ordinary identity changes. Existing lifecycle policy expires the old chart; the engine keeps
+  no migration or alias state.
+- Explicit required/optional resolution reuses one compiled per-template plan and uses binary search over canonical
+  sorted source labels on a route-cache miss. The existing `by_labels: ["*"]` path scans and sorts visible labels;
+  wildcard identity cannot be combined with optional keys.
+
+### Algorithm Resolution
+
+- An omitted authored `algorithm` remains `AlgorithmAuto` in the immutable program, route cache, and chart-level action
+  metadata.
+- After route lookup, the planner resolves the local route's dimension algorithm from the current `SeriesMeta.Kind`:
+  counters use `incremental`; gauges and every other or unknown kind use `absolute`.
+- An explicit authored `absolute` or `incremental` value overrides the runtime kind for every dimension in that chart.
+- Authored and autogen routes use the same runtime resolver. Metric-name suffixes do not determine chart algorithms.
+- Flattened structured families use their emitted scalar `Kind`. `SourceKind` and `FlattenRole` still control chart shape
+  and identity: histogram buckets/count/sum and summary count/sum are counters; summary quantiles and StateSet states are
+  gauges; MeasureSet fields follow their declared semantics.
+- Different kinds may coexist in distinct rendered dimensions. Series aggregated into one rendered dimension must have
+  the same kind when the chart omits `algorithm`; use an explicit chart algorithm for an intentional mixed-kind collapse.
+  Chartengine does not diagnose a violation at runtime, so authoring validation and real-path tests must enforce this rule;
+  the resulting dimension metadata is otherwise unspecified.
+- A live metric identity must keep the same kind while its dimension is materialized. Kind changes are resolved for route
+  planning, but an existing Netdata dimension keeps its creation-time wire algorithm until it expires and is recreated.
+
+Route-cache entries are immutable discovery results. Algorithm resolution happens after cache lookup, so a cached route
+cannot retain the effective algorithm from an earlier series kind. Only concrete algorithms reach accumulated dimension
+state and dimension actions; chart-level metadata retains the configured policy.
 
 ## Lifecycle Defaults and Policy
 
@@ -168,11 +246,17 @@ Default lifecycle policy when template omits lifecycle:
 | Topic                 | Behavior                                                                                                                                       |
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
+| Authored precedence   | All authored routes are resolved first; conditional rules and fallback apply only when none matched                                             |
+| Conditional rules     | `AutogenPolicy.Rules` scope fallback selectors by source family; all applicable selectors must accept, so any rejection suppresses fallback     |
 | Context namespace     | Autogen context = top-level `context_namespace` + the full metric name (which includes any `SnapshotMeter` prefix); empty namespace leaves the bare name. A non-empty meter prefix stacks after `context_namespace`, so pair `context_namespace` with `SnapshotMeter("")` to avoid a doubled prefix |
-| Structured families   | Autogen has dedicated source builders for flattened `Histogram`, `Summary`, `StateSet`, and `MeasureSet` families                              |
+| Structured families   | Histogram/summary components use the base family and retain structural labels; StateSet keeps its name; MeasureSet fields use the source before `_<field>` |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |
 | Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` + effective emit type-id prefix (`WithEmitTypeIDBudgetPrefix(...)`)                                  |
 | Lifecycle             | Autogen applies `ExpireAfterSuccessCycles` to **both** chart and dimension expiry (unlike template lifecycle where they default independently) |
+
+Rejected fallback series continue through collection and remain accounted as unmatched routing; no separate runtime
+counter is emitted. Use an upstream selector or relabeling/filtering mechanism when data, rather than only fallback
+charts, must be removed.
 
 Histogram bucket charts use non-overlapping range bucket totals from
 `metrix.ReadFlatten()` and are emitted as `heatmap` charts in both autogen and

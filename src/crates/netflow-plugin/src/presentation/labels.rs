@@ -15,7 +15,7 @@ use protocol::{
 };
 use tcp::{TCP_FLAGS_LABELS, tcp_flags_name};
 
-pub(crate) use icmp::icmp_virtual_value;
+pub(crate) use icmp::{icmp_virtual_value, icmp_virtual_value_from_parts};
 
 pub(crate) fn field_value_name(field: &str, value: &str) -> Option<String> {
     match field.to_ascii_uppercase().as_str() {

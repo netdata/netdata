@@ -191,7 +191,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
-cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
@@ -485,7 +485,7 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
+if(OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
     set(NEED_NDSUDO TRUE)
 else()
     set(NEED_NDSUDO FALSE)
@@ -651,7 +651,6 @@ check_symbol_exists(strerror_r "string.h" HAVE_STRERROR_R)
 check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
-check_symbol_exists(clearenv "stdlib.h" HAVE_CLEARENV)
 
 check_function_exists(setresuid HAVE_SETRESUID)
 check_function_exists(setresgid HAVE_SETRESGID)
@@ -1590,6 +1589,8 @@ set(API_PLUGIN_FILES
         src/web/api/queries/trimmed_mean/trimmed_mean.h
         src/web/api/queries/extremes/extremes.c
         src/web/api/queries/extremes/extremes.h
+        src/web/api/queries/latest/latest.c
+        src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
@@ -1815,6 +1816,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-inflight.h
         src/database/rrdfunctions-exporters.c
         src/database/rrdfunctions-exporters.h
+        src/database/rrdfunctions-unittest.c
         src/database/rrdfunctions-internals.h
         src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
@@ -2021,6 +2023,7 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-list-metadata.h
         src/web/mcp/mcp-tools-execute-function.c
         src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-execute-function-unittest.c
         src/web/mcp/mcp-tools-execute-function-internal.h
         src/web/mcp/mcp-tools-execute-function-registry.c
         src/web/mcp/mcp-tools-execute-function-registry.h
@@ -2134,6 +2137,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.c
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_shared_memory.c
@@ -2370,6 +2374,7 @@ set(ACLK_PROTO_DEFS
         src/aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         src/aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         src/aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/manifest/v1/manifest.proto
         src/aclk/aclk-schemas/proto/context/v1/context.proto
         src/aclk/aclk-schemas/proto/context/v1/stream.proto
         src/aclk/aclk-schemas/proto/agent/v1/cmds.proto
@@ -2402,6 +2407,8 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/alarm_config.h
         src/aclk/schema-wrappers/node_info.cc
         src/aclk/schema-wrappers/node_info.h
+        src/aclk/schema-wrappers/node_manifest.cc
+        src/aclk/schema-wrappers/node_manifest.h
         src/aclk/schema-wrappers/capability.cc
         src/aclk/schema-wrappers/capability.h
         src/aclk/schema-wrappers/proto_2_json.cc
@@ -3154,6 +3161,18 @@ add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-handshake-hops-test.c)
 target_link_libraries(stream-receiver-hops-test libnetdata)
 
+add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-replay-endpoints-test.c)
+target_link_libraries(stream-replay-endpoints-test libnetdata)
+
+if(OS_LINUX)
+        add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
+                src/web/api/tests/http-auth-bearer-test.c)
+        target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(http-auth-bearer-test libnetdata)
+endif()
+
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
@@ -3255,10 +3274,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_process.h
             src/collectors/ebpf.plugin/ebpf_shm.c
             src/collectors/ebpf.plugin/ebpf_shm.h
-            src/collectors/ebpf.plugin/ebpf_socket.c
-            src/collectors/ebpf.plugin/ebpf_socket.h
-            src/collectors/ebpf.plugin/ebpf_socket_ipc.c
-            src/collectors/ebpf.plugin/ebpf_socket_ipc.h
             src/collectors/ebpf.plugin/ebpf_softirq.c
             src/collectors/ebpf.plugin/ebpf_softirq.h
             src/collectors/ebpf.plugin/ebpf_sync.c
@@ -3273,8 +3288,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_cgroup.h
             src/collectors/ebpf.plugin/ebpf_unittest.c
             src/collectors/ebpf.plugin/ebpf_unittest.h
-            src/collectors/ebpf.plugin/ebpf_functions.c
-            src/collectors/ebpf.plugin/ebpf_functions.h
              src/collectors/ebpf.plugin/libbpf_api/ebpf.c
              src/collectors/ebpf.plugin/libbpf_api/ebpf.h
              src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
@@ -3371,12 +3384,13 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.d/fd.conf
             src/collectors/ebpf.plugin/ebpf.d/filesystem.conf
             src/collectors/ebpf.plugin/ebpf.d/hardirq.conf
+            src/collectors/ebpf.plugin/ebpf.d/dns.conf
             src/collectors/ebpf.plugin/ebpf.d/mdflush.conf
             src/collectors/ebpf.plugin/ebpf.d/mount.conf
-            src/collectors/ebpf.plugin/ebpf.d/network.conf
             src/collectors/ebpf.plugin/ebpf.d/oomkill.conf
             src/collectors/ebpf.plugin/ebpf.d/process.conf
             src/collectors/ebpf.plugin/ebpf.d/shm.conf
+            src/collectors/ebpf.plugin/ebpf.d/socket.conf
             src/collectors/ebpf.plugin/ebpf.d/softirq.conf
             src/collectors/ebpf.plugin/ebpf.d/swap.conf
             src/collectors/ebpf.plugin/ebpf.d/sync.conf
@@ -3447,6 +3461,14 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.c
+                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.h
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.c
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.h
+                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.c
+                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.h
                         ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
@@ -4299,6 +4321,12 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION usr/libexec/netdata)
 
+  # user-facing support-bundle tool: on PATH as `netdata-support-bundle`, like netdatacli
+  install(PROGRAMS
+          packaging/installer/netdata-support-bundle
+          COMPONENT netdata
+          DESTINATION "${BINDIR}")
+
   install(FILES
           system/netdata.conf
           system/netdata-updater.conf
@@ -4407,15 +4435,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
         configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
         configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
-        configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
-
         install(FILES
                 ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
                 ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
                 ${CMAKE_BINARY_DIR}/tests/urls/request.sh
                 ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
                 ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
-                ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -4738,6 +4763,11 @@ if(OS_WINDOWS)
                       /usr/bin/msys-yaml-0-2.dll
                       /usr/bin/msys-uv-1.dll
                       DESTINATION "${BINDIR}")
+
+        # user-facing support-bundle tool (Windows PowerShell implementation)
+        install(PROGRAMS packaging/installer/netdata-support-bundle.ps1
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata)
 
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)

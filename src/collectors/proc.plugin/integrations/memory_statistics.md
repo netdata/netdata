@@ -104,11 +104,13 @@ The following alerts are available:
 | [ oom_kill ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.oom_kill | number of out of memory kills in the last 30 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,20 +122,20 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.swapio | in, out | KiB/s |
-| system.pgpgio | in, out | KiB/s |
-| system.pgfaults | minor, major | faults/s |
-| mem.balloon | inflate, deflate, migrate | KiB/s |
-| mem.zswapio | in, out | KiB/s |
-| mem.ksm_cow | swapin, write | KiB/s |
-| mem.thp_faults | alloc, fallback, fallback_charge | events/s |
-| mem.thp_file | alloc, fallback, mapped, fallback_charge | events/s |
-| mem.thp_zero | alloc, failed | events/s |
-| mem.thp_collapse | alloc, failed | events/s |
-| mem.thp_split | split, failed, split_pmd, split_deferred | events/s |
-| mem.thp_swapout | swapout, fallback | events/s |
-| mem.thp_compact | success, fail, stall | events/s |
-| mem.oom_kill | kills | kills/s |
-| mem.numa | local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.swapio | Swap I/O | in, out | KiB/s |
+| system.pgpgio | Memory Paged from/to disk | in, out | KiB/s |
+| system.pgfaults | Memory Page Faults | minor, major | faults/s |
+| mem.balloon | Memory Ballooning Operations | inflate, deflate, migrate | KiB/s |
+| mem.zswapio | ZSwap I/O | in, out | KiB/s |
+| mem.ksm_cow | KSM Copy On Write Operations | swapin, write | KiB/s |
+| mem.thp_faults | Transparent Huge Page Fault Allocations | alloc, fallback, fallback_charge | events/s |
+| mem.thp_file | Transparent Huge Page File Allocations | alloc, fallback, mapped, fallback_charge | events/s |
+| mem.thp_zero | Transparent Huge Zero Page Allocations | alloc, failed | events/s |
+| mem.thp_collapse | Transparent Huge Pages Collapsed by khugepaged | alloc, failed | events/s |
+| mem.thp_split | Transparent Huge Page Splits | split, failed, split_pmd, split_deferred | events/s |
+| mem.thp_swapout | Transparent Huge Pages Swap Out | swapout, fallback | events/s |
+| mem.thp_compact | Transparent Huge Pages Compaction | success, fail, stall | events/s |
+| mem.oom_kill | Out of Memory Kills | kills | kills/s |
+| mem.numa | NUMA events | local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated | events/s |

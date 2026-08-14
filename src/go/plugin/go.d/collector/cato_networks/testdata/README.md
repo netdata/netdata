@@ -14,3 +14,7 @@ https://github.com/centreon/centreon-plugins/blob/a4f99c7763517778099681d873609e
 
 The source repository is Apache-2.0 licensed. The fixture provides raw Mockoon
 GraphQL responses for `entityLookup`, `accountSnapshot`, and `accountMetrics`.
+
+`cato-account-snapshot.schema-shaped.json` is a synthetic account snapshot
+response aligned with the current Cato schema. It complements the historical
+Centreon fixture, whose `Degraded` connectivity enum is not part of that schema.

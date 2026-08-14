@@ -81,11 +81,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -97,8 +99,8 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.ksm | shared, unshared, sharing, volatile | MiB |
-| mem.ksm_savings | savings, offered | MiB |
-| mem.ksm_ratios | savings | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.ksm | Kernel Same Page Merging | shared, unshared, sharing, volatile | MiB |
+| mem.ksm_savings | Kernel Same Page Merging Savings | savings, offered | MiB |
+| mem.ksm_ratios | Kernel Same Page Merging Effectiveness | savings | percentage |

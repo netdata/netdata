@@ -23,7 +23,7 @@ func withTestCacheDir(t testing.TB) string {
 	buildinfo.CacheDir = dir
 	logDir := filepath.Join(dir, "log")
 	buildinfo.LogDir = logDir
-	t.Setenv(netdataLogDirEnv, logDir)
+	t.Setenv("NETDATA_LOG_DIR", logDir)
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		t.Fatalf("create test Netdata log dir: %v", err)
 	}
@@ -41,7 +41,7 @@ func withNetdataLogDir(t testing.TB, root string) {
 
 	oldLogDir := buildinfo.LogDir
 	buildinfo.LogDir = root
-	t.Setenv(netdataLogDirEnv, root)
+	t.Setenv("NETDATA_LOG_DIR", root)
 	t.Cleanup(func() {
 		buildinfo.LogDir = oldLogDir
 	})

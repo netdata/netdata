@@ -366,6 +366,12 @@ If a tier is omitted, it uses the built-in tier default (`10GB` with no
 time-based age limit). There are no top-level journal retention knobs; set
 retention on each tier you want to tune.
 
+`size_of_journal_files` budgets journal data plus finalized
+per-journal facet sidecars. The active journal counts but is protected from
+deletion, so usage can temporarily exceed the budget until rotation. Shared
+`facet-state.bin`, temporary sidecars, and unrelated files are outside the
+per-tier budget.
+
 To make a tier time-only, set `size_of_journal_files: null`.
 To make a tier size-only, set `duration_of_journal_files: null`.
 

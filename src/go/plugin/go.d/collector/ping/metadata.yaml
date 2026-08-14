@@ -73,7 +73,8 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection interval (seconds).
+              description: |
+                Data collection interval (seconds). The ping collector has no separate timeout option: the per-host ping timeout is derived from this value (approximately 90% of it when `update_every` is `1`, otherwise ~95%). Increasing `update_every` gives each host more time to reply and reduces ping timeouts. See **Troubleshooting** for details.
               default_value: 5
               required: false
               group: Collection
@@ -172,7 +173,15 @@ modules:
                       - 192.0.2.4
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Frequent ping timeouts
+            description: |
+              The ping collector has no dedicated timeout setting. The per-host ping timeout is derived from `update_every` (approximately 90% of it when `update_every` is `1`, otherwise ~95%), and every host must complete all of its `packets` within that window.
+
+              If you see frequent ping timeouts, try one or more of the following:
+                - Raise `update_every` (for example from `1` to `2` or `5`). This widens the window each host has to reply and helps with slow or temporarily unreachable hosts.
+                - Reduce `packets`. Each host must fit all of its packets within the window, so fewer packets means it finishes sooner and is less likely to exceed the timeout.
+                - Reduce the number of `hosts` per job, or split them across multiple jobs, so fewer hosts are probed concurrently. This lowers local network and CPU pressure when a large host list is saturating the probe cycle.
     alerts:
       - name: ping_host_reachable
         metric: ping.host_packet_loss

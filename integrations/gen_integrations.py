@@ -9,6 +9,7 @@ from jsonschema import ValidationError
 
 from _common import (
     AGENT_REPO,
+    FLOWS_SOURCES,
     INTEGRATIONS_PATH,
     METADATA_PATTERN,
     REPO_PATH,
@@ -26,10 +27,6 @@ OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
 JSON_PATH = INTEGRATIONS_PATH / 'integrations.json'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
 DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
-
-FLOWS_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'metadata.yaml', False),
-]
 
 DEVICE_SOURCES = [
     (AGENT_REPO,

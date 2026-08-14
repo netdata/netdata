@@ -226,10 +226,9 @@ Supported applications include databases (MySQL, PostgreSQL, Redis, MongoDB), we
 **Installation**: Windows requires the MSI installer instead of kickstart.sh:
 ```powershell
 # Silent installation for fleet deployment
-msiexec /i netdata-installer.msi /qn /norestart `
-        CLAIMING_TOKEN="YOUR_TOKEN" `
-        CLAIMING_ROOMS="YOUR_ROOM_ID" `
-        CLAIMING_URL="https://app.netdata.cloud"
+msiexec /i netdata-x64.msi /qn /norestart `
+        TOKEN="<YOUR_TOKEN>" `
+        ROOMS="<YOUR_ROOMS>"
 
 # Via Group Policy or SCCM
 # Deploy MSI with TRANSFORMS for site-specific configuration

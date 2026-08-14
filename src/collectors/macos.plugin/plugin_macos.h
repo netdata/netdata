@@ -23,6 +23,7 @@ bool macos_sensors_fan_available(void);
 void macos_powermetrics_release_gpu_power_fallback(void);
 void macos_powermetrics_release_gpu_temperature_fallback(void);
 void macos_gpu_cleanup(void);
+void macos_iokit_cleanup(void);
 void macos_sensors_cleanup(void);
 void macos_powermetrics_cleanup(void);
 void macos_nvme_smart_cleanup(void);

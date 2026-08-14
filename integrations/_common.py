@@ -18,6 +18,7 @@ METADATA_PATTERN = '*/metadata.yaml'
 COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'metadata.yaml', False),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
@@ -26,6 +27,19 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'otel-plugin' / 'metadata.yaml', False),
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'otel-plugin' / 'taxonomy.yaml', False),
+]
+
+FLOWS_SOURCES = [
+    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'metadata.yaml', False),
+]
+
+TAXONOMY_SOURCES = [
+    *COLLECTOR_SOURCES,
+    *FLOWS_SOURCES,
+    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'taxonomy.yaml', False),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'taxonomy.yaml', False),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'dns' / 'taxonomy.yaml', False),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'socket' / 'taxonomy.yaml', False),
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
@@ -83,10 +97,10 @@ def make_validator(schema_ref):
 COLLECTOR_VALIDATOR = make_validator('./collector.json#')
 
 
-def get_collector_metadata_entries():
+def get_metadata_entries(sources):
     ret = []
 
-    for r, d, m in COLLECTOR_SOURCES:
+    for r, d, m in sources:
         if d.exists() and d.is_dir() and m:
             for item in d.glob(METADATA_PATTERN):
                 ret.append((r, item))
@@ -95,6 +109,10 @@ def get_collector_metadata_entries():
                 ret.append((r, d))
 
     return ret
+
+
+def get_collector_metadata_entries():
+    return get_metadata_entries(COLLECTOR_SOURCES)
 
 
 def load_yaml(src):
@@ -119,10 +137,10 @@ def load_yaml(src):
     return data
 
 
-def load_collectors():
+def load_collectors(sources=None):
     ret = []
 
-    entries = get_collector_metadata_entries()
+    entries = get_metadata_entries(COLLECTOR_SOURCES if sources is None else sources)
 
     for repo, path in entries:
         debug(f'Loading {path}.')

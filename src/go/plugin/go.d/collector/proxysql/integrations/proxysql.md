@@ -191,11 +191,13 @@ The following alerts are available:
 | [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -207,36 +209,37 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.client_connections_count | connected, non_idle, hostgroup_locked | connections |
-| proxysql.client_connections_rate | created, aborted | connections/s |
-| proxysql.server_connections_count | connected | connections |
-| proxysql.server_connections_rate | created, aborted, delayed | connections/s |
-| proxysql.backends_traffic | recv, sent | B/s |
-| proxysql.clients_traffic | recv, sent | B/s |
-| proxysql.active_transactions_count | client | connections |
-| proxysql.questions_rate | questions | questions/s |
-| proxysql.slow_queries_rate | slow | queries/s |
-| proxysql.queries_rate | autocommit, autocommit_filtered, commit_filtered, rollback, rollback_filtered, backend_change_user, backend_init_db, backend_set_names, frontend_init_db, frontend_set_names, frontend_use_db | queries/s |
-| proxysql.backend_statements_count | total, unique | statements |
-| proxysql.backend_statements_rate | prepare, execute, close | statements/s |
-| proxysql.client_statements_count | total, unique | statements |
-| proxysql.client_statements_rate | prepare, execute, close | statements/s |
-| proxysql.cached_statements_count | cached | statements |
-| proxysql.query_cache_entries_count | entries | entries |
-| proxysql.query_cache_memory_used | used | B |
-| proxysql.query_cache_io | in, out | B/s |
-| proxysql.query_cache_requests_rate | read, write, read_success | requests/s |
-| proxysql.mysql_monitor_workers_count | workers, auxiliary | threads |
-| proxysql.mysql_monitor_workers_rate | started | workers/s |
-| proxysql.mysql_monitor_connect_checks_rate | succeed, failed | checks/s |
-| proxysql.mysql_monitor_ping_checks_rate | succeed, failed | checks/s |
-| proxysql.mysql_monitor_read_only_checks_rate | succeed, failed | checks/s |
-| proxysql.mysql_monitor_replication_lag_checks_rate | succeed, failed | checks/s |
-| proxysql.jemalloc_memory_used | active, allocated, mapped, metadata, resident, retained | B |
-| proxysql.memory_used | auth, sqlite3, query_digest, query_rules, firewall_users_table, firewall_users_config, firewall_rules_table, firewall_rules_config, mysql_threads, admin_threads, cluster_threads | B |
-| proxysql.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| proxysql.client_connections_count | Client connections | connected, non_idle, hostgroup_locked | connections |
+| proxysql.client_connections_rate | Client connections rate | created, aborted | connections/s |
+| proxysql.server_connections_count | Server connections | connected | connections |
+| proxysql.server_connections_rate | Server connections rate | created, aborted, delayed | connections/s |
+| proxysql.backends_traffic | Backends traffic | recv, sent | B/s |
+| proxysql.clients_traffic | Clients traffic | recv, sent | B/s |
+| proxysql.active_transactions_count | Client connections that are currently processing a transaction | client | connections |
+| proxysql.questions_rate | Client requests / statements executed | questions | questions/s |
+| proxysql.slow_queries_rate | Slow queries | slow | queries/s |
+| proxysql.queries_rate | Queries rate | autocommit, autocommit_filtered, commit_filtered, rollback, rollback_filtered, backend_change_user, backend_init_db, backend_set_names, frontend_init_db, frontend_set_names, frontend_use_db | queries/s |
+| proxysql.backend_statements_count | Statements available across all backend connections | total, unique | statements |
+| proxysql.backend_statements_rate | Statements executed against the backends | prepare, execute, close | statements/s |
+| proxysql.client_statements_count | Statements that are in use by clients | total, unique | statements |
+| proxysql.client_statements_rate | Statements executed by clients | prepare, execute, close | statements/s |
+| proxysql.cached_statements_count | Global prepared statements | cached | statements |
+| proxysql.query_cache_entries_count | Query Cache entries | entries | entries |
+| proxysql.query_cache_memory_used | Query Cache memory used | used | B |
+| proxysql.query_cache_io | Query Cache I/O | in, out | B/s |
+| proxysql.query_cache_requests_rate | Query Cache requests | read, write, read_success | requests/s |
+| proxysql.mysql_monitor_workers_count | MySQL monitor workers | workers, auxiliary | threads |
+| proxysql.mysql_monitor_workers_rate | MySQL monitor workers rate | started | workers/s |
+| proxysql.mysql_monitor_connect_checks_rate | MySQL monitor connect checks | succeed, failed | checks/s |
+| proxysql.mysql_monitor_ping_checks_rate | MySQL monitor ping checks | succeed, failed | checks/s |
+| proxysql.mysql_monitor_read_only_checks_rate | MySQL monitor read only checks | succeed, failed | checks/s |
+| proxysql.mysql_monitor_replication_lag_checks_rate | MySQL monitor replication lag checks | succeed, failed | checks/s |
+| proxysql.jemalloc_memory_used | Jemalloc used memory | active, allocated, mapped, metadata, resident, retained | B |
+| proxysql.memory_used | Memory used | auth, sqlite3, query_digest, query_rules, firewall_users_table, firewall_users_config, firewall_rules_table, firewall_rules_config, mysql_threads, admin_threads, cluster_threads | B |
+| proxysql.uptime | Uptime | uptime | seconds |
+
 
 ### Per command
 
@@ -250,11 +253,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.mysql_command_execution_rate | uptime | seconds |
-| proxysql.mysql_command_execution_time | time | microseconds |
-| proxysql.mysql_command_execution_duration | 100us, 500us, 1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1s, 5s, 10s, +Inf | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| proxysql.mysql_command_execution_rate | MySQL command execution | uptime | seconds |
+| proxysql.mysql_command_execution_time | MySQL command execution time | time | microseconds |
+| proxysql.mysql_command_execution_duration | MySQL command execution duration histogram | 100us, 500us, 1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1s, 5s, 10s, +Inf | microseconds |
+
 
 ### Per user
 
@@ -268,10 +272,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.mysql_user_connections_utilization | used | percentage |
-| proxysql.mysql_user_connections_count | used | connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| proxysql.mysql_user_connections_utilization | MySQL user connections utilization | used | percentage |
+| proxysql.mysql_user_connections_count | MySQL user connections used | used | connections |
+
 
 ### Per hostgroup
 
@@ -285,9 +290,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.hostgroup_backends_status | online, shunned, offline_soft, offline_hard | backends |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| proxysql.hostgroup_backends_status | Hostgroup backends count in each status | online, shunned, offline_soft, offline_hard | backends |
+
 
 ### Per backend
 
@@ -303,14 +309,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.backend_status | online, shunned, offline_soft, offline_hard | status |
-| proxysql.backend_connections_usage | free, used | connections |
-| proxysql.backend_connections_rate | succeed, failed | connections/s |
-| proxysql.backend_queries_rate | queries | queries/s |
-| proxysql.backend_traffic | recv, send | B/s |
-| proxysql.backend_latency | latency | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| proxysql.backend_status | Backend status | online, shunned, offline_soft, offline_hard | status |
+| proxysql.backend_connections_usage | Backend connections usage | free, used | connections |
+| proxysql.backend_connections_rate | Backend connections established | succeed, failed | connections/s |
+| proxysql.backend_queries_rate | Backend queries | queries | queries/s |
+| proxysql.backend_traffic | Backend traffic | recv, send | B/s |
+| proxysql.backend_latency | Backend latency | latency | microseconds |
 
 
 

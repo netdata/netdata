@@ -8,7 +8,7 @@ type FunctionConfig struct {
 	// FunctionName overrides the public Function name.
 	// Empty uses the default "<module>:<method>" name.
 	FunctionName string
-	// FIXME: funcctl currently honors aliases only for module/static Functions.
+	// FIXME: aliases are currently honored only for module/static Functions.
 	// Job method registration still publishes only the canonical module:method name.
 	Aliases      []string // Additional function names to register for this method
 	Name         string   // Display name (e.g., "Top Queries")
@@ -18,7 +18,7 @@ type FunctionConfig struct {
 	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
 	// Available gates publication of agent/process-backed Functions. Nil means available.
-	// funcctl may recheck unavailable agent Functions while jobs are running.
+	// Availability may be rechecked while jobs are running.
 	// Once a Function is published, later false results do not withdraw it.
 	Available func() bool
 	// RawRequest routes the complete Function request to a RawMethodHandler.

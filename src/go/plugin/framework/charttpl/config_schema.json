@@ -47,12 +47,76 @@
         }
       }
     },
+    "autogen_selector_expr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["allow"],
+          "properties": {
+            "allow": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["deny"],
+          "properties": {
+            "deny": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "engine_autogen_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "selector"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "selector": {
+          "$ref": "#/$defs/autogen_selector_expr"
+        }
+      }
+    },
     "engine_autogen": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "rules": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/engine_autogen_rule"
+          }
         },
         "max_type_id_len": {
           "oneOf": [
@@ -155,6 +219,15 @@
             "incremental"
           ]
         },
+        "aggregation": {
+          "type": "string",
+          "enum": [
+            "sum",
+            "min",
+            "max",
+            "avg"
+          ]
+        },
         "type": {
           "type": "string",
           "enum": [
@@ -208,13 +281,37 @@
     "instances": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "by_labels"
+      "anyOf": [
+        {
+          "required": [
+            "by_labels"
+          ],
+          "properties": {
+            "by_labels": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "optional_by_labels"
+          ],
+          "properties": {
+            "optional_by_labels": {
+              "minItems": 1
+            }
+          }
+        }
       ],
       "properties": {
         "by_labels": {
           "type": "array",
-          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "optional_by_labels": {
+          "type": "array",
           "items": {
             "type": "string"
           }

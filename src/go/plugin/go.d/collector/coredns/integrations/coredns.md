@@ -246,11 +246,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -262,17 +264,18 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| coredns.dns_request_count_total | requests | requests/s |
-| coredns.dns_responses_count_total | responses | responses/s |
-| coredns.dns_request_count_total_per_status | processed, dropped | requests/s |
-| coredns.dns_no_matching_zone_dropped_total | dropped | requests/s |
-| coredns.dns_panic_count_total | panics | panics/s |
-| coredns.dns_requests_count_total_per_proto | udp, tcp | requests/s |
-| coredns.dns_requests_count_total_per_ip_family | v4, v6 | requests/s |
-| coredns.dns_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
-| coredns.dns_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| coredns.dns_request_count_total | Number Of DNS Requests | requests | requests/s |
+| coredns.dns_responses_count_total | Number Of DNS Responses | responses | responses/s |
+| coredns.dns_request_count_total_per_status | Number Of Processed And Dropped DNS Requests | processed, dropped | requests/s |
+| coredns.dns_no_matching_zone_dropped_total | Number Of Dropped DNS Requests Because Of No Matching Zone | dropped | requests/s |
+| coredns.dns_panic_count_total | Number Of Panics | panics | panics/s |
+| coredns.dns_requests_count_total_per_proto | Number Of DNS Requests Per Transport Protocol | udp, tcp | requests/s |
+| coredns.dns_requests_count_total_per_ip_family | Number Of DNS Requests Per IP Family | v4, v6 | requests/s |
+| coredns.dns_requests_count_total_per_per_type | Number Of DNS Requests Per Type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
+| coredns.dns_responses_count_total_per_rcode | Number Of DNS Responses Per Rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
+
 
 ### Per server
 
@@ -286,15 +289,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| coredns.server_dns_request_count_total | requests | requests/s |
-| coredns.server_dns_responses_count_total | responses | responses/s |
-| coredns.server_request_count_total_per_status | processed, dropped | requests/s |
-| coredns.server_requests_count_total_per_proto | udp, tcp | requests/s |
-| coredns.server_requests_count_total_per_ip_family | v4, v6 | requests/s |
-| coredns.server_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
-| coredns.server_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| coredns.server_dns_request_count_total | Number Of DNS Requests | requests | requests/s |
+| coredns.server_dns_responses_count_total | Number Of DNS Responses | responses | responses/s |
+| coredns.server_request_count_total_per_status | Number Of Processed And Dropped DNS Requests | processed, dropped | requests/s |
+| coredns.server_requests_count_total_per_proto | Number Of DNS Requests Per Transport Protocol | udp, tcp | requests/s |
+| coredns.server_requests_count_total_per_ip_family | Number Of DNS Requests Per IP Family | v4, v6 | requests/s |
+| coredns.server_requests_count_total_per_per_type | Number Of DNS Requests Per Type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
+| coredns.server_responses_count_total_per_rcode | Number Of DNS Responses Per Rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
+
 
 ### Per zone
 
@@ -308,14 +312,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| coredns.zone_dns_request_count_total | requests | requests/s |
-| coredns.zone_dns_responses_count_total | responses | responses/s |
-| coredns.zone_requests_count_total_per_proto | udp, tcp | requests/s |
-| coredns.zone_requests_count_total_per_ip_family | v4, v6 | requests/s |
-| coredns.zone_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
-| coredns.zone_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| coredns.zone_dns_request_count_total | Number Of DNS Requests | requests | requests/s |
+| coredns.zone_dns_responses_count_total | Number Of DNS Responses | responses | responses/s |
+| coredns.zone_requests_count_total_per_proto | Number Of DNS Requests Per Transport Protocol | udp, tcp | requests/s |
+| coredns.zone_requests_count_total_per_ip_family | Number Of DNS Requests Per IP Family | v4, v6 | requests/s |
+| coredns.zone_requests_count_total_per_per_type | Number Of DNS Requests Per Type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
+| coredns.zone_responses_count_total_per_rcode | Number Of DNS Responses Per Rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
 
 
 

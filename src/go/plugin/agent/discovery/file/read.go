@@ -36,14 +36,6 @@ type Reader struct {
 	paths []string
 }
 
-func (r *Reader) String() string {
-	return r.Name()
-}
-
-func (r *Reader) Name() string {
-	return "file reader"
-}
-
 func (r *Reader) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	r.Info("instance is started")
 	defer func() { r.Info("instance is stopped") }()

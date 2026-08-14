@@ -50,7 +50,8 @@ func (c *Collector) unpublishTrapTopologyEnrichment() {
 // EnrichmentForSource returns topology enrichment data for a trap received
 // from the given source IP and, when available, the trap subject ifIndex.
 // Interface and neighbor enrichment only use the trap ifIndex after the source
-// IP matches exactly one local topology cache.
+// IP matches exactly one local topology cache. The caller owns the returned
+// value and its Neighbors slice.
 func (h *TrapEnrichmentHandle) EnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
 	if h == nil {
 		return nil

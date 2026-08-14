@@ -107,7 +107,13 @@ func TestBuildTopology(t *testing.T) {
 						},
 					},
 				}
-				return mustBuildTopology(t, "12345", map[string]*siteState{site.ID: site}, []string{site.ID}, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC))
+				return mustBuildTopology(
+					t,
+					"12345",
+					map[string]*siteState{site.ID: site},
+					[]string{site.ID},
+					time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+				)
 			},
 			check: func(t *testing.T, data *topologyv1.Data) {
 				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
@@ -131,7 +137,13 @@ func TestBuildTopology(t *testing.T) {
 						{RemoteIP: "192.0.2.10", RemoteASN: "64512", BGPSession: "established"},
 					},
 				}
-				return mustBuildTopology(t, "12345", map[string]*siteState{site.ID: site}, []string{site.ID}, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC))
+				return mustBuildTopology(
+					t,
+					"12345",
+					map[string]*siteState{site.ID: site},
+					[]string{site.ID},
+					time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+				)
 			},
 			check: func(t *testing.T, data *topologyv1.Data) {
 				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
@@ -151,15 +163,25 @@ func TestBuildTopology(t *testing.T) {
 						"a": {Name: "WAN 1", DeviceID: "socket-a"},
 					},
 					Devices: []deviceState{
-						{ID: "socket-z", Name: "Socket 2", Connected: true, LastPopName: "POP-Paris"},
-						{ID: "socket-a", Name: "Socket 1", Connected: true, LastPopName: "POP-Paris"},
+						{ID: "socket-z", Name: "Socket 2", Connected: new(true), LastPopName: "POP-Paris"},
+						{ID: "socket-a", Name: "Socket 1", Connected: new(true), LastPopName: "POP-Paris"},
 					},
 				}
-				return mustBuildTopology(t, "12345", map[string]*siteState{site.ID: site}, []string{site.ID}, time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC))
+				return mustBuildTopology(
+					t,
+					"12345",
+					map[string]*siteState{site.ID: site},
+					[]string{site.ID},
+					time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+				)
 			},
 			check: func(t *testing.T, data *topologyv1.Data) {
 				require.NotNil(t, data.Tables)
-				interfaces := topologyTableRows(t, data.Tables.Actor[catofunc.ActorTableInterfaces].Table, data.Dictionaries)
+				interfaces := topologyTableRows(
+					t,
+					data.Tables.Actor[catofunc.ActorTableInterfaces].Table,
+					data.Dictionaries,
+				)
 				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
 				device1 := requireTopologyRow(t, actors, "display_name", "Socket 1")
 				device2 := requireTopologyRow(t, actors, "display_name", "Socket 2")
@@ -188,7 +210,13 @@ func TestBuildTopology(t *testing.T) {
 	}
 }
 
-func mustBuildTopology(t *testing.T, accountID string, sites map[string]*siteState, order []string, collectedAt time.Time) *topologyv1.Data {
+func mustBuildTopology(
+	t *testing.T,
+	accountID string,
+	sites map[string]*siteState,
+	order []string,
+	collectedAt time.Time,
+) *topologyv1.Data {
 	t.Helper()
 
 	data, err := buildTopology(accountID, sites, order, collectedAt)
@@ -206,7 +234,9 @@ func validateCatoTopologyV1Data(t *testing.T, data *topologyv1.Data) {
 	require.NoError(t, json.Unmarshal(payload, &decodedData))
 	require.NoError(t, topologyv1.ValidateDecodedData(decodedData))
 
-	schemaBytes, err := os.ReadFile(filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json")))
+	schemaBytes, err := os.ReadFile(
+		filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json")),
+	)
 	require.NoError(t, err)
 
 	var schemaDoc any

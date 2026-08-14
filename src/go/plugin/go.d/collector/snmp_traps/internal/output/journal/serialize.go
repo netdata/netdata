@@ -1,0 +1,675 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package journal
+
+import (
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"strconv"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/output"
+)
+
+var severityToPriority = map[model.Severity]string{
+	"emerg":   "0",
+	"alert":   "1",
+	"crit":    "2",
+	"err":     "3",
+	"warning": "4",
+	"notice":  "5",
+	"info":    "6",
+	"debug":   "7",
+}
+
+const (
+	trapJSONPacketSequenceKey = "netdata_packet_sequence"
+	trapVarJournalFieldPrefix = "TRAP_VAR_"
+	trapTagJournalFieldPrefix = "TRAP_TAG_"
+	maxJournalFieldNameLen    = 64
+	trapVarFieldHashLen       = 8
+)
+
+func severityPriority(sev model.Severity) string {
+	if p, ok := severityToPriority[sev]; ok {
+		return p
+	}
+	return "5"
+}
+
+func isValidTrapTagKey(upperKey string) bool {
+	if upperKey == "" {
+		return false
+	}
+	for i, r := range upperKey {
+		if i == 0 {
+			if r < 'A' || r > 'Z' {
+				return false
+			}
+		} else {
+			if (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func trapVarbindJournalFieldNames(vb model.VarbindValue, state *trapVarbindFieldState) (string, string) {
+	if state == nil || shouldSkipTrapVarbindJournalField(vb) {
+		return "", ""
+	}
+
+	base := trapVarbindJournalFieldBase(vb)
+	if base == "" {
+		return "", ""
+	}
+
+	return state.nextFieldNames(base, vb.Enum != "")
+}
+
+func shouldSkipTrapVarbindJournalField(vb model.VarbindValue) bool {
+	if model.IsSensitiveVarbind(vb) {
+		return true
+	}
+
+	oid := model.NormalizeOID(vb.OID)
+	if oidMatchesScalar(oid, model.SysUpTimeOID) ||
+		oidMatchesScalar(oid, model.SNMPTrapOID) ||
+		oidMatchesScalar(oid, model.SNMPTrapAddressOID) ||
+		oidMatchesScalar(oid, model.SNMPTrapEnterpriseOID) {
+		return true
+	}
+
+	if oid == "" {
+		switch strings.TrimSuffix(vb.Name, ".0") {
+		case "sysUpTime", "snmpTrapOID", "snmpTrapAddress", "snmpTrapEnterprise", "snmpTrapCommunity":
+			return true
+		}
+	}
+	return false
+}
+
+func oidMatchesScalar(oid, scalar string) bool {
+	return oid == scalar || oid == strings.TrimSuffix(scalar, ".0")
+}
+
+func trapVarbindJournalFieldBase(vb model.VarbindValue) string {
+	source := vb.Name
+	if source == "" {
+		oid := model.NormalizeOID(vb.OID)
+		if oid == "" {
+			return ""
+		}
+		source = "OID_" + oid
+	}
+
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range source {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r - ('a' - 'A'))
+			lastUnderscore = false
+		case r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastUnderscore = false
+		default:
+			if b.Len() > 0 && !lastUnderscore {
+				b.WriteByte('_')
+				lastUnderscore = true
+			}
+		}
+	}
+
+	return strings.Trim(b.String(), "_")
+}
+
+func trapVarbindJournalValue(vb model.VarbindValue, raw bool) string {
+	if !raw && vb.Enum != "" {
+		return vb.Enum
+	}
+	return model.VarbindRawValue(vb)
+}
+
+type trapVarbindFieldState struct {
+	used map[string]struct{}
+}
+
+func newTrapVarbindFieldState(size int) *trapVarbindFieldState {
+	return &trapVarbindFieldState{used: make(map[string]struct{}, size*2)}
+}
+
+func (s *trapVarbindFieldState) nextFieldNames(base string, includeRaw bool) (string, string) {
+	for suffix := 1; ; suffix++ {
+		duplicateSuffix := ""
+		if suffix > 1 {
+			duplicateSuffix = "_" + strconv.Itoa(suffix)
+		}
+
+		name := trapVarbindJournalFieldNameFor(base, duplicateSuffix, "")
+		rawName := ""
+		if includeRaw {
+			rawName = trapVarbindJournalFieldNameFor(base, duplicateSuffix, "_RAW")
+		}
+		if name == "" {
+			return "", ""
+		}
+		if s.has(name) || (rawName != "" && s.has(rawName)) {
+			continue
+		}
+
+		s.used[name] = struct{}{}
+		if rawName != "" {
+			s.used[rawName] = struct{}{}
+		}
+		return name, rawName
+	}
+}
+
+func (s *trapVarbindFieldState) has(name string) bool {
+	_, ok := s.used[name]
+	return ok
+}
+
+// trapVarbindJournalFieldNameFor keeps generated TRAP_VAR_* names inside
+// journald's 64-byte field-name limit while preserving a readable prefix.
+// The full varbind name and OID remain available in TRAP_JSON.
+func trapVarbindJournalFieldNameFor(base, duplicateSuffix, valueSuffix string) string {
+	maxBaseLen := maxJournalFieldNameLen - len(trapVarJournalFieldPrefix) - len(duplicateSuffix) - len(valueSuffix)
+	if maxBaseLen <= 0 {
+		return ""
+	}
+	if len(base) <= maxBaseLen {
+		return trapVarJournalFieldPrefix + base + duplicateSuffix + valueSuffix
+	}
+
+	hash := trapVarbindFieldHash(base)
+	keepLen := maxBaseLen - 1 - len(hash)
+	if keepLen <= 0 {
+		if len(hash) > maxBaseLen {
+			hash = hash[:maxBaseLen]
+		}
+		return trapVarJournalFieldPrefix + hash + duplicateSuffix + valueSuffix
+	}
+	return trapVarJournalFieldPrefix + base[:keepLen] + "_" + hash + duplicateSuffix + valueSuffix
+}
+
+func trapVarbindFieldHash(value string) string {
+	const (
+		offset32 = uint32(2166136261)
+		prime32  = uint32(16777619)
+	)
+
+	hash := offset32
+	for i := 0; i < len(value); i++ {
+		hash ^= uint32(value[i])
+		hash *= prime32
+	}
+	return fmt.Sprintf("%0*X", trapVarFieldHashLen, hash)
+}
+
+func trapTagJournalFieldNameFor(upperKey string) string {
+	return prefixedHashedJournalFieldName(trapTagJournalFieldPrefix, upperKey)
+}
+
+func prefixedHashedJournalFieldName(prefix, base string) string {
+	maxBaseLen := maxJournalFieldNameLen - len(prefix)
+	if maxBaseLen <= 0 {
+		return ""
+	}
+	if len(base) <= maxBaseLen {
+		return prefix + base
+	}
+
+	hash := trapVarbindFieldHash(base)
+	keepLen := maxBaseLen - 1 - len(hash)
+	if keepLen <= 0 {
+		if len(hash) > maxBaseLen {
+			hash = hash[:maxBaseLen]
+		}
+		return prefix + hash
+	}
+	return prefix + base[:keepLen] + "_" + hash
+}
+
+func buildTrapJSON(entry *model.TrapEntry) ([]byte, error) {
+	if entry.DecodeError != nil {
+		return json.Marshal(decodeErrorJSON{
+			DecodeErrorInfo: entry.DecodeError,
+			PacketSequence:  entry.PacketSequence,
+		})
+	}
+
+	if entry.SummaryCounts != nil {
+		obj2 := make(map[string]any)
+		obj2["total_suppressed"] = entry.SummaryCounts.TotalSuppressed
+		obj2["period_sec"] = entry.SummaryCounts.PeriodSec
+		obj2["fingerprints"] = entry.SummaryCounts.Fingerprints
+		if entry.SummaryCounts.ByTrap != nil {
+			obj2["by_trap"] = entry.SummaryCounts.ByTrap
+		}
+		result, err := json.Marshal(obj2)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	return []byte("{}"), nil
+}
+
+type decodeErrorJSON struct {
+	*model.DecodeErrorInfo
+	PacketSequence uint64 `json:"netdata_packet_sequence,omitempty"`
+}
+
+func buildTrapEnrichmentJSON(entry *model.TrapEntry) ([]byte, error) {
+	if entry == nil || entry.Enrichment == nil {
+		return nil, nil
+	}
+	return json.Marshal(entry.Enrichment)
+}
+
+type hotSerializer struct {
+	payloads            [][]byte
+	buf                 []byte
+	labelKeys           []string
+	trapVarFieldNames   map[string]struct{}
+	jsonEntries         []output.ProjectedVarbind
+	varbindProjector    output.VarbindProjector
+	binaryEncodedFields int
+}
+
+func (s *hotSerializer) serialize(entry *model.TrapEntry) ([][]byte, int, error) {
+	s.reset()
+
+	if entry == nil {
+		return nil, 0, errNilEntry
+	}
+	if entry.JobName == "" {
+		return nil, 0, errMissingJobName
+	}
+	if entry.ReceivedRealtimeUsec < 0 || entry.ReceivedMonotonicUsec < 0 {
+		return nil, 0, errNegativeTimestamp
+	}
+
+	isDedupSummary := entry.ReportType == model.ReportTypeDedupSummary
+	isDecodeError := entry.ReportType == model.ReportTypeDecodeError
+
+	if !isDedupSummary && !isDecodeError {
+		if entry.TrapOID == "" {
+			return nil, 0, errMissingTrapOID
+		}
+	}
+	if !isDedupSummary {
+		if entry.SourceIP == "" && entry.SourceUDPPeer == "" && entry.DeviceHostname == "" {
+			return nil, 0, errMissingSourceIP
+		}
+	}
+
+	hostname := entry.DeviceHostname
+	if hostname == "" {
+		if entry.SourceIP != "" {
+			hostname = entry.SourceIP
+		} else if entry.SourceUDPPeer != "" {
+			hostname = entry.SourceUDPPeer
+		}
+	}
+
+	s.addStringField("MESSAGE", entry.Message)
+	s.addStringField("PRIORITY", severityPriority(entry.Severity))
+	s.addStringField("SYSLOG_IDENTIFIER", entry.JobName)
+	s.addStringField("TRAP_JOB", entry.JobName)
+
+	if !isDedupSummary && hostname != "" {
+		s.addStringField("_HOSTNAME", hostname)
+	}
+
+	s.addStringField("ND_LOG_SOURCE", "snmp-trap")
+
+	if !isDedupSummary && entry.SourceVnodeID != "" {
+		s.addStringField("ND_NIDL_NODE", entry.SourceVnodeID)
+	}
+
+	reportType := string(entry.ReportType)
+	if reportType == "" {
+		reportType = "trap"
+	}
+	s.addStringField("TRAP_REPORT_TYPE", reportType)
+
+	if !isDedupSummary && !isDecodeError {
+		s.addStringField("TRAP_OID", entry.TrapOID)
+		if entry.TrapName != "" {
+			s.addStringField("TRAP_NAME", entry.TrapName)
+		}
+	}
+	if !isDedupSummary {
+		if entry.Category != "" {
+			s.addStringField("TRAP_CATEGORY", string(entry.Category))
+		}
+		if entry.Severity != "" {
+			s.addStringField("TRAP_SEVERITY", string(entry.Severity))
+		}
+		if entry.PduType != "" {
+			s.addStringField("TRAP_PDU_TYPE", string(entry.PduType))
+		}
+		if entry.SnmpVersion != "" {
+			s.addStringField("TRAP_VERSION", string(entry.SnmpVersion))
+		}
+		if entry.SourceIP != "" {
+			s.addStringField("TRAP_SOURCE_IP", entry.SourceIP)
+		}
+		if entry.SourceUDPPeer != "" {
+			s.addStringField("TRAP_SOURCE_UDP_PEER", entry.SourceUDPPeer)
+		}
+		if entry.ReverseDNS != "" {
+			s.addStringField("TRAP_REVERSE_DNS", entry.ReverseDNS)
+		}
+		if entry.DeviceVendor != "" {
+			s.addStringField("TRAP_DEVICE_VENDOR", entry.DeviceVendor)
+		}
+		if entry.TopologyInterface != "" {
+			s.addStringField("TRAP_INTERFACE", entry.TopologyInterface)
+		}
+		if entry.TopologyNeighbors != "" {
+			s.addStringField("TRAP_NEIGHBORS", entry.TopologyNeighbors)
+		}
+	}
+
+	if isDedupSummary && entry.SummaryCounts != nil {
+		sc := entry.SummaryCounts
+		s.addIntField("TRAP_SUPPRESSED_COUNT", sc.TotalSuppressed)
+		s.addIntField("TRAP_SUPPRESSED_FINGERPRINTS", sc.Fingerprints)
+		s.addIntField("TRAP_REPORT_PERIOD_SEC", sc.PeriodSec)
+	}
+	if isDecodeError && entry.DecodeError != nil {
+		s.addDecodeErrorFields(entry.DecodeError)
+	}
+
+	for _, key := range s.sortedLabelKeys(entry.Labels) {
+		val := entry.Labels[key]
+		upperKey := strings.ToUpper(key)
+		if !isValidTrapTagKey(upperKey) {
+			return nil, 0, fmt.Errorf("invalid label key for TRAP_TAG: %q", key)
+		}
+		s.addStringField(trapTagJournalFieldNameFor(upperKey), val)
+	}
+
+	if !isDedupSummary && !isDecodeError {
+		s.addTrapVarbindFields(entry)
+	}
+
+	if entry.Enrichment != nil {
+		if err := s.addTrapEnrichmentField(entry); err != nil {
+			return nil, 0, fmt.Errorf("TRAP_ENRICHMENT: %w", err)
+		}
+	}
+
+	if err := s.addTrapJSONField(entry); err != nil {
+		return nil, 0, fmt.Errorf("TRAP_JSON: %w", err)
+	}
+
+	return s.payloads, s.binaryEncodedFields, nil
+}
+
+func (s *hotSerializer) reset() {
+	s.payloads = s.payloads[:0]
+	s.buf = s.buf[:0]
+	s.labelKeys = s.labelKeys[:0]
+	s.binaryEncodedFields = 0
+}
+
+func (s *hotSerializer) addStringField(name, value string) {
+	start := len(s.buf)
+	s.buf = append(s.buf, name...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+	s.buf = append(s.buf, value...)
+	s.addPayload(start, valueStart, name != "MESSAGE")
+}
+
+func (s *hotSerializer) addIntField(name string, value int64) {
+	start := len(s.buf)
+	s.buf = append(s.buf, name...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+	s.buf = strconv.AppendInt(s.buf, value, 10)
+	s.addPayload(start, valueStart, true)
+}
+
+func (s *hotSerializer) addDecodeErrorFields(info *model.DecodeErrorInfo) {
+	if info.Kind != "" {
+		s.addStringField("TRAP_DECODE_ERROR_KIND", info.Kind)
+	}
+	if info.Error != "" {
+		s.addStringField("TRAP_DECODE_ERROR", info.Error)
+	}
+	s.addIntField("TRAP_PACKET_SIZE", int64(info.PacketSize))
+	if info.PacketSHA256 != "" {
+		s.addStringField("TRAP_PACKET_SHA256", info.PacketSHA256)
+	}
+	if info.SourceUDPPort > 0 {
+		s.addIntField("TRAP_SOURCE_UDP_PORT", int64(info.SourceUDPPort))
+	}
+	if info.Listener != "" {
+		s.addStringField("TRAP_LISTENER", info.Listener)
+	}
+	if info.EngineID != "" {
+		s.addStringField("TRAP_ENGINE_ID", info.EngineID)
+	}
+}
+
+func (s *hotSerializer) addPayload(start, valueStart int, countBinary bool) {
+	if countBinary && journalFieldNeedsBinary(s.buf[valueStart:]) {
+		s.binaryEncodedFields++
+	}
+	s.payloads = append(s.payloads, s.buf[start:])
+}
+
+func (s *hotSerializer) sortedLabelKeys(labels map[string]string) []string {
+	s.labelKeys = output.SortedLabelKeys(s.labelKeys, labels)
+	return s.labelKeys
+}
+
+func (s *hotSerializer) addTrapVarbindFields(entry *model.TrapEntry) {
+	state := s.trapVarbindFieldState(len(entry.Varbinds))
+	for _, vb := range entry.Varbinds {
+		name, rawName := trapVarbindJournalFieldNames(vb, state)
+		if name == "" {
+			continue
+		}
+
+		s.addStringField(name, trapVarbindJournalValue(vb, false))
+		if rawName != "" {
+			s.addStringField(rawName, trapVarbindJournalValue(vb, true))
+		}
+	}
+}
+
+func (s *hotSerializer) trapVarbindFieldState(size int) *trapVarbindFieldState {
+	if s.trapVarFieldNames == nil {
+		s.trapVarFieldNames = make(map[string]struct{}, size*2)
+	} else {
+		for key := range s.trapVarFieldNames {
+			delete(s.trapVarFieldNames, key)
+		}
+	}
+	return &trapVarbindFieldState{used: s.trapVarFieldNames}
+}
+
+func (s *hotSerializer) addTrapJSONField(entry *model.TrapEntry) error {
+	start := len(s.buf)
+	s.buf = append(s.buf, "TRAP_JSON"...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+
+	if entry.SummaryCounts != nil || entry.DecodeError != nil {
+		trapJSON, err := buildTrapJSON(entry)
+		if err != nil {
+			return err
+		}
+		s.buf = append(s.buf, trapJSON...)
+		s.addPayload(start, valueStart, true)
+		return nil
+	}
+
+	if err := s.appendTrapJSONObject(entry); err != nil {
+		return err
+	}
+	s.addPayload(start, valueStart, true)
+	return nil
+}
+
+func (s *hotSerializer) addTrapEnrichmentField(entry *model.TrapEntry) error {
+	enrichmentJSON, err := buildTrapEnrichmentJSON(entry)
+	if err != nil {
+		return err
+	}
+
+	start := len(s.buf)
+	s.buf = append(s.buf, "TRAP_ENRICHMENT"...)
+	s.buf = append(s.buf, '=')
+	valueStart := len(s.buf)
+	s.buf = append(s.buf, enrichmentJSON...)
+	s.addPayload(start, valueStart, true)
+	return nil
+}
+
+func (s *hotSerializer) appendTrapJSONObject(entry *model.TrapEntry) error {
+	s.jsonEntries = s.jsonEntries[:0]
+	s.varbindProjector.Reset(len(entry.Varbinds))
+	if entry.PacketSequence > 0 {
+		s.varbindProjector.Reserve(trapJSONPacketSequenceKey)
+	}
+
+	for _, vb := range entry.Varbinds {
+		projected, ok := s.varbindProjector.Project(vb)
+		if !ok {
+			continue
+		}
+		s.jsonEntries = append(s.jsonEntries, projected)
+	}
+
+	slices.SortFunc(s.jsonEntries, func(a, b output.ProjectedVarbind) int {
+		return strings.Compare(a.Key, b.Key)
+	})
+
+	s.buf = append(s.buf, '{')
+	wrote := false
+	if entry.PacketSequence > 0 {
+		s.appendJSONString(trapJSONPacketSequenceKey)
+		s.buf = append(s.buf, ':')
+		s.buf = strconv.AppendUint(s.buf, entry.PacketSequence, 10)
+		wrote = true
+	}
+	for i, entry := range s.jsonEntries {
+		if wrote || i > 0 {
+			s.buf = append(s.buf, ',')
+		}
+		s.appendJSONString(entry.Key)
+		s.buf = append(s.buf, ':')
+		s.appendJSONVarbind(entry)
+		wrote = true
+	}
+	s.buf = append(s.buf, '}')
+	return nil
+}
+
+func (s *hotSerializer) appendJSONVarbind(vb output.ProjectedVarbind) {
+	s.buf = append(s.buf, `{"oid":`...)
+	s.appendJSONString(vb.OID)
+	s.buf = append(s.buf, `,"type":`...)
+	s.appendJSONString(string(vb.Type))
+	s.buf = append(s.buf, `,"value":`...)
+	s.appendJSONVarbindValue(vb.Value)
+	if vb.Enum != "" {
+		s.buf = append(s.buf, `,"enum":`...)
+		s.appendJSONString(vb.Enum)
+	}
+	s.buf = append(s.buf, '}')
+}
+
+func (s *hotSerializer) appendJSONVarbindValue(value output.CanonicalValue) {
+	switch value.Kind {
+	case output.ValueNull:
+		s.buf = append(s.buf, "null"...)
+	case output.ValueString:
+		s.appendJSONString(value.String)
+	case output.ValueInt64:
+		s.buf = strconv.AppendInt(s.buf, value.Int64, 10)
+	case output.ValueUint64:
+		s.buf = strconv.AppendUint(s.buf, value.Uint64, 10)
+	case output.ValueFloat64:
+		s.buf = strconv.AppendFloat(s.buf, value.Float64, 'f', -1, 64)
+	case output.ValueBool:
+		s.buf = strconv.AppendBool(s.buf, value.Bool)
+	case output.ValueBytes:
+		s.buf = append(s.buf, '"')
+		dstLen := hex.EncodedLen(len(value.Bytes))
+		oldLen := len(s.buf)
+		for range dstLen {
+			s.buf = append(s.buf, 0)
+		}
+		hex.Encode(s.buf[oldLen:oldLen+dstLen], value.Bytes)
+		s.buf = append(s.buf, '"')
+	}
+}
+
+func (s *hotSerializer) appendJSONString(value string) {
+	const hexDigits = "0123456789abcdef"
+
+	s.buf = append(s.buf, '"')
+	start := 0
+	for i := 0; i < len(value); {
+		if c := value[i]; c < utf8.RuneSelf {
+			if c >= 0x20 && c != '\\' && c != '"' && c != '<' && c != '>' && c != '&' {
+				i++
+				continue
+			}
+			s.buf = append(s.buf, value[start:i]...)
+			switch c {
+			case '\\', '"':
+				s.buf = append(s.buf, '\\', c)
+			case '\b':
+				s.buf = append(s.buf, '\\', 'b')
+			case '\f':
+				s.buf = append(s.buf, '\\', 'f')
+			case '\n':
+				s.buf = append(s.buf, '\\', 'n')
+			case '\r':
+				s.buf = append(s.buf, '\\', 'r')
+			case '\t':
+				s.buf = append(s.buf, '\\', 't')
+			default:
+				s.buf = append(s.buf, '\\', 'u', '0', '0', hexDigits[c>>4], hexDigits[c&0xf])
+			}
+			i++
+			start = i
+			continue
+		}
+
+		r, size := utf8.DecodeRuneInString(value[i:])
+		if r == utf8.RuneError && size == 1 {
+			s.buf = append(s.buf, value[start:i]...)
+			s.buf = append(s.buf, `\ufffd`...)
+			i++
+			start = i
+			continue
+		}
+		if r == '\u2028' || r == '\u2029' {
+			s.buf = append(s.buf, value[start:i]...)
+			s.buf = append(s.buf, '\\', 'u', '2', '0', '2', hexDigits[r&0xf])
+			i += size
+			start = i
+			continue
+		}
+		i += size
+	}
+	s.buf = append(s.buf, value[start:]...)
+	s.buf = append(s.buf, '"')
+}

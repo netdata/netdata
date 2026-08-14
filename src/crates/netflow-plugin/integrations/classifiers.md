@@ -24,7 +24,7 @@ Module: classifiers
 ## Overview
 
 Annotate network flows with exporter and interface labels derived from reusable
-classification rules. Where [static metadata](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
+classification rules. Where [static metadata](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md)
 forces you to enumerate every exporter and every ifIndex by hand, classifiers
 let you express the network design once -- "anything matching `^edge-` is the
 edge tier", "any interface with `BACKBONE-LUMEN` in its description is on
@@ -61,7 +61,7 @@ normalisation.
 
 For the cross-cutting Enrichment concept (where classifiers sit in the merge
 order vs static metadata, GeoIP, IPAM, BGP routing), see
-[Enrichment](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[Enrichment](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 Each rule is a single boolean expression; an action with no condition (e.g.
@@ -132,7 +132,7 @@ Classifiers shine when there is a pattern to match -- exporter naming
 conventions (`edge-...`, `core-...`), management-IP subnets per site,
 SNMP interface descriptions that follow a template (`BACKBONE-<carrier>`,
 `TRANSIT-...`, `IX-...`), or 100Gbps-equals-core conventions. If your
-fleet has no such pattern, [static metadata](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
+fleet has no such pattern, [static metadata](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md)
 is the better fit -- it lets you list each exporter and ifIndex by hand.
 
 

@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,10 +122,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipfw.mem | dynamic, static | bytes |
-| ipfw.packets | a dimension per static rule | packets/s |
-| ipfw.bytes | a dimension per static rule | bytes/s |
-| ipfw.active | a dimension per dynamic rule | rules |
-| ipfw.expired | a dimension per dynamic rule | rules |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipfw.mem | Memory allocated by rules | dynamic, static | bytes |
+| ipfw.packets | Packets | a dimension per static rule | packets/s |
+| ipfw.bytes | Bytes | a dimension per static rule | bytes/s |
+| ipfw.active | Active rules | a dimension per dynamic rule | rules |
+| ipfw.expired | Expired rules | a dimension per dynamic rule | rules |

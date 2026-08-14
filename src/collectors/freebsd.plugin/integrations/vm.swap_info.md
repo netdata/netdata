@@ -107,11 +107,13 @@ The following alerts are available:
 | [ used_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swap | swap memory utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -123,6 +125,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.swap | free, used | MiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.swap | System Swap | free, used | MiB |

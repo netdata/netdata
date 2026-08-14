@@ -18,7 +18,8 @@ const (
 )
 
 // Config defines optional CloudWatch query defaults. Callers compose profile,
-// metric, job-default, and rule values field by field through Resolve.
+// metric, job-default, rule, and job-selection values field by field through
+// Resolve.
 type Config struct {
 	Period           *confopt.LongDuration `yaml:"period,omitempty" json:"period,omitempty"`
 	Lookback         *confopt.LongDuration `yaml:"lookback,omitempty" json:"lookback,omitempty"`
@@ -38,6 +39,8 @@ type Resolution struct {
 	Metric       Source
 	RuleDefaults Source
 	Rule         Source
+	Group        Source
+	Item         Source
 }
 
 // Policy is the fully resolved timing contract for one exported series.
@@ -89,14 +92,14 @@ func ValidateProfile(path string, cfg Config) error {
 	return Validate(path, &cfg)
 }
 
-// Resolve applies field precedence rule > rule defaults > metric > profile,
-// then validates the effective policy. Lookback falls back to the resolved
-// period and publication delay to the collector-wide default.
+// Resolve applies field precedence item > group > rule > rule defaults > metric
+// > profile, then validates the effective policy. Lookback falls back to the
+// resolved period and publication delay to the collector-wide default.
 func Resolve(input Resolution) (Policy, error) {
 	if input.Profile.Config == nil || input.Profile.Config.Period == nil {
 		return Policy{}, fmt.Errorf("%s.period is required", sourcePath(input.Profile, "profile query"))
 	}
-	sources := []Source{input.Profile, input.Metric, input.RuleDefaults, input.Rule}
+	sources := []Source{input.Profile, input.Metric, input.RuleDefaults, input.Rule, input.Group, input.Item}
 	period, periodPath, _ := resolveDuration(sources, "period", func(cfg *Config) *confopt.LongDuration { return cfg.Period })
 
 	lookback, lookbackPath := period, periodPath

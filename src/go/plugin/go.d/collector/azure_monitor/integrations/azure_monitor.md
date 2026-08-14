@@ -623,6 +623,7 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 The metrics collected depend on which Azure Monitor profiles are active. Each profile corresponds to an Azure service (e.g., SQL Database, Virtual Machines) and defines the specific charts and metrics for that service.

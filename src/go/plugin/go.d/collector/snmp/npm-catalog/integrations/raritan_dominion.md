@@ -122,6 +122,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this Raritan Dominion profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.

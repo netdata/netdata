@@ -173,11 +173,13 @@ The following alerts are available:
 | [ cato_networks_bgp_session_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf) | cato_networks.bgp_session_status | Cato BGP session to peer ${label:peer_ip} (${label:peer_asn}) is down |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -195,17 +197,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cato_networks.site_connectivity_status | connected, disconnected, degraded, unknown | status |
-| cato_networks.site_operational_status | active, disabled, locked, unknown | status |
-| cato_networks.site_hosts | hosts | hosts |
-| cato_networks.site_traffic | upstream, downstream | bytes |
-| cato_networks.site_packet_loss | upstream, downstream | percentage |
-| cato_networks.site_discarded_packets | upstream, downstream | packets |
-| cato_networks.site_jitter | upstream, downstream | milliseconds |
-| cato_networks.site_latency | rtt, last_mile | milliseconds |
-| cato_networks.site_last_mile_packet_loss | loss | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cato_networks.site_connectivity_status | Site connectivity status. | connected, disconnected, degraded, unknown | status |
+| cato_networks.site_operational_status | Site operational status. | active, disabled, locked, unknown | status |
+| cato_networks.site_hosts | Site hosts. | hosts | hosts |
+| cato_networks.site_traffic | Site traffic. | upstream, downstream | bytes |
+| cato_networks.site_packet_loss | Site packet loss. | upstream, downstream | percentage |
+| cato_networks.site_discarded_packets | Site discarded packets. | upstream, downstream | packets |
+| cato_networks.site_jitter | Site jitter. | upstream, downstream | milliseconds |
+| cato_networks.site_latency | Site latency. | rtt, last_mile | milliseconds |
+| cato_networks.site_last_mile_packet_loss | Site last mile packet loss. | loss | percentage |
+
 
 ### Per device
 
@@ -222,9 +225,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cato_networks.device_connection_status | connected, disconnected | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cato_networks.device_connection_status | Device connection status. | connected, disconnected | status |
+
 
 ### Per interface
 
@@ -243,15 +247,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cato_networks.interface_connection_status | connected, disconnected | status |
-| cato_networks.interface_tunnel_uptime | uptime | seconds |
-| cato_networks.interface_traffic | upstream, downstream | bytes |
-| cato_networks.interface_packet_loss | upstream, downstream | percentage |
-| cato_networks.interface_discarded_packets | upstream, downstream | packets |
-| cato_networks.interface_jitter | upstream, downstream | milliseconds |
-| cato_networks.interface_latency | rtt | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cato_networks.interface_connection_status | Interface connection status. | connected, disconnected | status |
+| cato_networks.interface_tunnel_uptime | Interface tunnel uptime. | uptime | seconds |
+| cato_networks.interface_traffic | Interface traffic. | upstream, downstream | bytes |
+| cato_networks.interface_packet_loss | Interface packet loss. | upstream, downstream | percentage |
+| cato_networks.interface_discarded_packets | Interface discarded packets. | upstream, downstream | packets |
+| cato_networks.interface_jitter | Interface jitter. | upstream, downstream | milliseconds |
+| cato_networks.interface_latency | Interface latency. | rtt | milliseconds |
+
 
 ### Per bgp peer
 
@@ -268,11 +273,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cato_networks.bgp_session_status | up, down, unknown | status |
-| cato_networks.bgp_routes | accepted, limit, rib_out | routes |
-| cato_networks.bgp_routes_limit_status | ok, exceeded | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cato_networks.bgp_session_status | BGP session status. | up, down, unknown | status |
+| cato_networks.bgp_routes | BGP route counts. | accepted, limit, rib_out | routes |
+| cato_networks.bgp_routes_limit_status | BGP route limit exceeded status. | ok, exceeded | status |
 
 
 

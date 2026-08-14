@@ -154,11 +154,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -175,14 +177,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hpssa.controller_status | ok, nok | status |
-| hpssa.controller_temperature | temperature | Celsius |
-| hpssa.controller_cache_module_presence_status | present, not_present | status |
-| hpssa.controller_cache_module_status | ok, nok | status |
-| hpssa.controller_cache_module_temperature | temperature | Celsius |
-| hpssa.controller_cache_module_battery_status | ok, nok | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hpssa.controller_status | Controller status | ok, nok | status |
+| hpssa.controller_temperature | Controller temperature | temperature | Celsius |
+| hpssa.controller_cache_module_presence_status | Controller cache module presence | present, not_present | status |
+| hpssa.controller_cache_module_status | Controller cache module status | ok, nok | status |
+| hpssa.controller_cache_module_temperature | Controller cache module temperature | temperature | Celsius |
+| hpssa.controller_cache_module_battery_status | Controller cache module battery status | ok, nok | status |
+
 
 ### Per array
 
@@ -199,9 +202,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hpssa.array_status | ok, nok | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hpssa.array_status | Array status | ok, nok | status |
+
 
 ### Per logical drive
 
@@ -219,9 +223,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hpssa.logical_drive_status | ok, nok | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hpssa.logical_drive_status | Logical Drive status | ok, nok | status |
+
 
 ### Per physical drive
 
@@ -241,10 +246,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hpssa.physical_drive_status | ok, nok | status |
-| hpssa.physical_drive_temperature | temperature | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hpssa.physical_drive_status | Physical Drive status | ok, nok | status |
+| hpssa.physical_drive_temperature | Physical Drive temperature | temperature | status |
 
 
 

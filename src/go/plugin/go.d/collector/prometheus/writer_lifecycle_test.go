@@ -127,6 +127,51 @@ func TestMetricFamilyWriterHandleLifecycle(t *testing.T) {
 		require.Equal(t, []float64{0.5, 0.9}, w.handles["app_lat"].summaryQuantiles, "the handle now carries the new quantile set")
 	})
 
+	for name, test := range map[string]struct {
+		initial       string
+		drift         string
+		wantQuantiles []float64
+	}{
+		"a quantile-free summary re-adopts quantiles after descriptor expiry": {
+			initial:       "# TYPE app_lat summary\napp_lat_sum 1\napp_lat_count 1\n",
+			drift:         "# TYPE app_lat summary\napp_lat{quantile=\"0.5\"} 1\napp_lat_sum 1\napp_lat_count 1\n",
+			wantQuantiles: []float64{0.5},
+		},
+		"a summary with quantiles re-adopts a quantile-free schema after descriptor expiry": {
+			initial: "# TYPE app_lat summary\napp_lat{quantile=\"0.5\"} 1\napp_lat_sum 1\napp_lat_count 1\n",
+			drift:   "# TYPE app_lat summary\napp_lat_sum 1\napp_lat_count 1\n",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := metrix.NewCollectorStore()
+			w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
+			cc := cycle(t, store)
+			window := int(store.(metrix.DescriptorRetention).DescriptorRetentionWindow())
+
+			cc.BeginCycle()
+			require.Equal(t, 1, w.writeMetricFamilies(scrape(t, test.initial)))
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			cc.BeginCycle()
+			require.Equal(t, 0, w.writeMetricFamilies(scrape(t, test.drift)),
+				"empty and non-empty quantile sets must remain distinct while the descriptor is live")
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			reAdopted := false
+			for range window * 2 {
+				cc.BeginCycle()
+				if w.writeMetricFamilies(scrape(t, test.drift)) > 0 {
+					reAdopted = true
+				}
+				require.NoError(t, cc.CommitCycleSuccess())
+			}
+
+			require.True(t, reAdopted, "a fully-drifting summary must re-adopt its empty/non-empty quantile schema")
+			require.Contains(t, w.handles, "app_lat")
+			require.Equal(t, test.wantQuantiles, w.handles["app_lat"].summaryQuantiles)
+		})
+	}
+
 	t.Run("a histogram whose series all drift is not refreshed forever and re-adopts the new bounds", func(t *testing.T) {
 		store := metrix.NewCollectorStore()
 		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())

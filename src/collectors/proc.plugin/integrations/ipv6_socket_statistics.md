@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -91,10 +93,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv6.sockstat6_tcp_sockets | inuse | sockets |
-| ipv6.sockstat6_udp_sockets | inuse | sockets |
-| ipv6.sockstat6_udplite_sockets | inuse | sockets |
-| ipv6.sockstat6_raw_sockets | inuse | sockets |
-| ipv6.sockstat6_frag_sockets | inuse | fragments |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv6.sockstat6_tcp_sockets | IPv6 TCP Sockets | inuse | sockets |
+| ipv6.sockstat6_udp_sockets | IPv6 UDP Sockets | inuse | sockets |
+| ipv6.sockstat6_udplite_sockets | IPv6 UDPLITE Sockets | inuse | sockets |
+| ipv6.sockstat6_raw_sockets | IPv6 RAW Sockets | inuse | sockets |
+| ipv6.sockstat6_frag_sockets | IPv6 FRAG Sockets | inuse | fragments |

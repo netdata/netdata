@@ -213,11 +213,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -229,15 +231,15 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerdns_recursor.questions_in | total, tcp, ipv6 | questions/s |
-| powerdns_recursor.questions_out | udp, tcp, ipv6, throttled | questions/s |
-| powerdns_recursor.answer_time | 0-1ms, 1-10ms, 10-100ms, 100-1000ms, slow | queries/s |
-| powerdns_recursor.timeouts | total, ipv4, ipv6 | timeouts/s |
-| powerdns_recursor.drops | over-capacity-drops, query-pipe-full-drops, too-old-drops, truncated-drops, empty-queries | drops/s |
-| powerdns_recursor.cache_usage | cache-hits, cache-misses, packet-cache-hits, packet-cache-misses | events/s |
-| powerdns_recursor.cache_size | cache, packet-cache, negative-cache | entries |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powerdns_recursor.questions_in | Incoming questions | total, tcp, ipv6 | questions/s |
+| powerdns_recursor.questions_out | Outgoing questions | udp, tcp, ipv6, throttled | questions/s |
+| powerdns_recursor.answer_time | Queries answered within a time range | 0-1ms, 1-10ms, 10-100ms, 100-1000ms, slow | queries/s |
+| powerdns_recursor.timeouts | Timeouts on outgoing UDP queries | total, ipv4, ipv6 | timeouts/s |
+| powerdns_recursor.drops | Drops | over-capacity-drops, query-pipe-full-drops, too-old-drops, truncated-drops, empty-queries | drops/s |
+| powerdns_recursor.cache_usage | Cache Usage | cache-hits, cache-misses, packet-cache-hits, packet-cache-misses | events/s |
+| powerdns_recursor.cache_size | Cache Size | cache, packet-cache, negative-cache | entries |
 
 
 

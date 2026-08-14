@@ -134,11 +134,13 @@ opensips_cmd=/opt/opensips/bin/opensipsctl
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -150,27 +152,27 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| opensips.dialogs_active | active, early | dialogs |
-| opensips.users | registered, location, contacts, expires | users |
-| opensips.registrar | accepted, rejected | registrations/s |
-| opensips.transactions | UAS, UAC | transactions/s |
-| opensips.core_rcv | requests, replies | queries/s |
-| opensips.core_fwd | requests, replies | queries/s |
-| opensips.core_drop | requests, replies | queries/s |
-| opensips.core_err | requests, replies | queries/s |
-| opensips.core_bad | bad_URIs_rcvd, unsupported_methods, bad_msg_hdr | queries/s |
-| opensips.tm_replies | received, relayed, local | replies/s |
-| opensips.transactions_status | 2xx, 3xx, 4xx, 5xx, 6xx | transactions/s |
-| opensips.transactions_inuse | inuse | transactions |
-| opensips.sl_replies | 1xx, 2xx, 3xx, 4xx, 5xx, 6xx, sent, error, ACKed | replies/s |
-| opensips.dialogs | processed, expire, failed | dialogs/s |
-| opensips.net_waiting | UDP, TCP | kilobytes |
-| opensips.uri_checks | positive, negative | checks / sec |
-| opensips.traces | requests, replies | traces / sec |
-| opensips.shmem | total, used, real_used, max_used, free | kilobytes |
-| opensips.shmem_fragment | fragments | fragments |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| opensips.dialogs_active | OpenSIPS Active Dialogs | active, early | dialogs |
+| opensips.users | OpenSIPS Users | registered, location, contacts, expires | users |
+| opensips.registrar | OpenSIPS Registrar | accepted, rejected | registrations/s |
+| opensips.transactions | OpenSIPS Transactions | UAS, UAC | transactions/s |
+| opensips.core_rcv | OpenSIPS Core Receives | requests, replies | queries/s |
+| opensips.core_fwd | OpenSIPS Core Forwards | requests, replies | queries/s |
+| opensips.core_drop | OpenSIPS Core Drops | requests, replies | queries/s |
+| opensips.core_err | OpenSIPS Core Errors | requests, replies | queries/s |
+| opensips.core_bad | OpenSIPS Core Bad | bad_URIs_rcvd, unsupported_methods, bad_msg_hdr | queries/s |
+| opensips.tm_replies | OpenSIPS TM Replies | received, relayed, local | replies/s |
+| opensips.transactions_status | OpenSIPS Transactions Status | 2xx, 3xx, 4xx, 5xx, 6xx | transactions/s |
+| opensips.transactions_inuse | OpenSIPS InUse Transactions | inuse | transactions |
+| opensips.sl_replies | OpenSIPS SL Replies | 1xx, 2xx, 3xx, 4xx, 5xx, 6xx, sent, error, ACKed | replies/s |
+| opensips.dialogs | OpenSIPS Dialogs | processed, expire, failed | dialogs/s |
+| opensips.net_waiting | OpenSIPS Network Waiting | UDP, TCP | kilobytes |
+| opensips.uri_checks | OpenSIPS URI Checks | positive, negative | checks / sec |
+| opensips.traces | OpenSIPS Traces | requests, replies | traces / sec |
+| opensips.shmem | OpenSIPS Shared Memory | total, used, real_used, max_used, free | kilobytes |
+| opensips.shmem_fragment | OpenSIPS Shared Memory Fragmentation | fragments | fragments |
 
 
 

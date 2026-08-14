@@ -131,7 +131,7 @@ When neither `asn_database` nor `geo_database` is configured, the plugin searche
 1. **`<cache_dir>/topology-ip-intel/`** — where `cache_dir` is the parent of `journal.journal_dir` if that path is absolute, otherwise `NETDATA_CACHE_DIR`. Typically `/var/cache/netdata/topology-ip-intel/`.
 2. **`<stock_data_dir>/topology-ip-intel/`** — typically `/usr/share/netdata/topology-ip-intel/`.
 
-The canonical filenames are `topology-ip-asn.mmdb` and `topology-ip-geo.mmdb`. Native packages ship stock DB-IP files under the stock data directory. The [Intel Downloader](/docs/npm/network-flows/intel-downloader.md) writes fresher copies to the cache directory, which takes precedence over stock files. Netdata does not install a downloader timer; schedule one if freshness matters.
+The canonical filenames are `topology-ip-asn.mmdb` and `topology-ip-geo.mmdb`. Native packages and static builds that include the NetFlow plugin (x86_64, ARMv7, and AArch64) ship stock DB-IP files under the stock data directory. The [Intel Downloader](/docs/npm/network-flows/intel-downloader.md) writes fresher copies to the cache directory, which takes precedence over stock files. Netdata does not install a downloader timer; schedule one if freshness matters.
 
 ### Composition: last non-empty wins, per field
 
@@ -354,6 +354,12 @@ See [Retention and querying](/docs/npm/network-flows/retention-querying.md) and 
 ### Geographic accuracy is best-effort
 
 City-level GeoIP is accurate for many public IPs but wrong for VPNs, mobile carriers, and cloud-provider egress IPs (which often resolve to the cloud region's central city, not the actual user). Use country and state for trends; use city only after validating it for the prefix you care about. ASN ownership data also drifts — companies merge, prefixes get reassigned. A database older than a quarter or two starts labelling reassigned prefixes with the previous owner.
+
+### Private and non-routable IPs
+
+CIDR-based enrichment is IP-agnostic. Both static `enrichment.networks` and dynamic `network_sources` match prefixes for any address — RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), RFC 6598 carrier-grade NAT (`100.64.0.0/10`), and link-local (`169.254.0.0/16`) are matched the same way as public ranges. GeoIP databases carry no reliable country, city, or coordinate data for these addresses, and the ASN MMDB may render them as `AS0 Private IP Address Space` (see [AS numbers vs AS names](#as-numbers-vs-as-names)).
+
+To label private-IP traffic, declare those ranges as `enrichment.networks` entries. The merge step overlays non-empty static fields (`name`, `role`, `site`, `region`, `tenant`, `country`, `city`, `latitude`, `longitude`) on top of the GeoIP base layer, so your operator-defined values replace whatever GeoIP produced — or nothing at all. The `network_sources` jq schema earlier on this page applies the same pattern with `10.0.0.0/8` tagged `name: internal, role: lan`; static `networks` accepts those fields plus `latitude` and `longitude`. See the [Static Metadata](/src/crates/netflow-plugin/integrations/static_metadata.md) integration card for configuration examples and the merge-order details.
 
 ### Sampling-rate knobs
 

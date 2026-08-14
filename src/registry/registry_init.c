@@ -46,22 +46,6 @@ void registry_db_stats(void) {
                      machines, machines_urls, max_urls_per_machine);
 }
 
-void registry_generate_curl_urls(void) {
-    FILE *fp = fopen("/tmp/registry.curl", "w+");
-    if (unlikely(!fp))
-        return;
-
-    REGISTRY_PERSON *p;
-    dfe_start_read(registry.persons, p) {
-        for(REGISTRY_PERSON_URL *pu = p->person_urls ; pu ;pu = pu->next) {
-            fprintf(fp, "do_curl '%s' '%s' '%s'\n", p->guid, pu->machine->guid, string2str(pu->url));
-        }
-    }
-    dfe_done(p);
-
-    fclose(fp);
-}
-
 void netdata_conf_section_registry(void) {
     FUNCTION_RUN_ONCE();
 
@@ -189,7 +173,6 @@ bool registry_load(void) {
             registry_db_save();
 
         //        registry_db_stats();
-        //        registry_generate_curl_urls();
         //        exit(0);
 
         return true;

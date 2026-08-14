@@ -22,6 +22,11 @@ const struct ebpf_pid_stat *cgroup_ebpfgo_shared_memory_lookup(pid_t pid)
     return netdata_ebpfgo_shared_pid_memory_lookup(&cgroup_ebpfgo_shared_memory_ctx, pid);
 }
 
+uint32_t cgroup_ebpfgo_shared_memory_flags(void)
+{
+    return netdata_ebpfgo_shared_pid_memory_flags(&cgroup_ebpfgo_shared_memory_ctx);
+}
+
 void cgroup_ebpfgo_shared_memory_close(void)
 {
     netdata_ebpfgo_shared_pid_memory_close(&cgroup_ebpfgo_shared_memory_ctx);

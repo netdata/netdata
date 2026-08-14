@@ -102,6 +102,7 @@ pub(crate) fn canonical_flow_field_names() -> impl Iterator<Item = &'static str>
     CANONICAL_FLOW_DEFAULTS.iter().map(|&(name, _)| name)
 }
 
+#[cfg(test)]
 pub(crate) fn field_tracks_presence(field: &str) -> bool {
     matches!(
         field,
@@ -130,6 +131,7 @@ pub(crate) fn field_present_in_map(fields: &FlowFields, field: &'static str) -> 
     })
 }
 
+#[cfg(test)]
 pub(crate) fn scalar_field_present_in_map(fields: &FlowFields, field: &'static str) -> bool {
     fields.get(field).is_some_and(|value| !value.is_empty())
 }

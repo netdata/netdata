@@ -107,11 +107,13 @@ The following alerts are available:
 | [ 30min_ram_swapped_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swapio | percentage of the system RAM swapped in the last 30 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -123,6 +125,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.swapio | io, out | KiB/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.swapio | Swap I/O | io, out | KiB/s |

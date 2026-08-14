@@ -82,6 +82,113 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 	}
 }
 
+func TestChartLabelAccumulatorIntersectsEmptyLabelSet(t *testing.T) {
+	tests := map[string]struct {
+		mode     program.PromotionMode
+		promoted []string
+		observed []map[string]string
+	}{
+		"automatic labeled then empty": {
+			mode: program.PromotionModeAutoIntersection,
+			observed: []map[string]string{
+				{"region": "eu"},
+				{},
+			},
+		},
+		"automatic empty then labeled": {
+			mode: program.PromotionModeAutoIntersection,
+			observed: []map[string]string{
+				{},
+				{"region": "eu"},
+			},
+		},
+		"explicit labeled then empty": {
+			mode:     program.PromotionModeExplicitIntersection,
+			promoted: []string{"region"},
+			observed: []map[string]string{
+				{"region": "eu"},
+				{},
+			},
+		},
+		"explicit empty then labeled": {
+			mode:     program.PromotionModeExplicitIntersection,
+			promoted: []string{"region"},
+			observed: []map[string]string{
+				{},
+				{"region": "eu"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			chart := program.Chart{
+				Labels: program.LabelPolicy{
+					Mode:        tc.mode,
+					PromoteKeys: tc.promoted,
+				},
+			}
+			acc := newChartLabelAccumulator(compileChartLabelPolicy(chart))
+
+			for _, labels := range tc.observed {
+				require.NoError(t, acc.observe(sortedLabelView(labels), ""))
+			}
+
+			assert.Empty(t, acc.materialize())
+		})
+	}
+}
+
+func TestChartLabelAccumulatorOptionalIdentityLabels(t *testing.T) {
+	tests := map[string]struct {
+		labels map[string]string
+		want   map[string]string
+	}{
+		"absent optional label": {
+			labels: map[string]string{"region": "eu"},
+			want:   map[string]string{"region": "eu"},
+		},
+		"blank optional label is omitted": {
+			labels: map[string]string{"pid": "  ", "region": "eu"},
+			want:   map[string]string{"region": "eu"},
+		},
+		"present optional label is identity": {
+			labels: map[string]string{"pid": "1234", "region": "eu"},
+			want:   map[string]string{"pid": "1234", "region": "eu"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			chart := program.Chart{
+				Identity: program.ChartIdentity{OptionalByLabels: []string{"pid"}},
+				Labels:   program.LabelPolicy{Mode: program.PromotionModeAutoIntersection},
+			}
+			acc := newChartLabelAccumulator(compileChartLabelPolicy(chart))
+			require.NoError(t, acc.observe(sortedLabelView(tc.labels), ""))
+			assert.Equal(t, tc.want, acc.materialize())
+		})
+	}
+}
+
+func TestChartLabelAccumulatorExplicitEmptyKeepsIdentityOnly(t *testing.T) {
+	chart := program.Chart{
+		Identity: program.ChartIdentity{
+			InstanceByLabels: []program.InstanceLabelSelector{{Key: "instance"}},
+		},
+		Labels: program.LabelPolicy{Mode: program.PromotionModeExplicitIntersection},
+	}
+	acc := newChartLabelAccumulator(compileChartLabelPolicy(chart))
+	require.NoError(t, acc.observe(sortedLabelView(map[string]string{
+		collectJobLabel: "service-local",
+		"instance":      "node-1",
+		"owner":         "owner-a",
+		"region":        "region-a",
+	}), ""))
+
+	assert.Equal(t, map[string]string{"instance": "node-1"}, acc.materialize())
+}
+
 func TestCompileInstanceLabelPlanExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
 	tests := map[string]struct {
 		selectors []program.InstanceLabelSelector

@@ -658,11 +658,13 @@ The following alerts are available:
 | [ am_data_explorer_follower_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.follower_latency | Data Explorer follower latency on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -684,52 +686,52 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.data_explorer.cpu_utilization | average | percentage |
-| azure_monitor.data_explorer.utilization | ingestion, cache | percentage |
-| azure_monitor.data_explorer.keep_alive | average | count |
-| azure_monitor.data_explorer.instance_count | average, maximum, minimum | instances |
-| azure_monitor.data_explorer.extents | average | extents |
-| azure_monitor.data_explorer.throttled_commands | total | commands/s |
-| azure_monitor.data_explorer.follower_latency | average | milliseconds |
-| azure_monitor.data_explorer.query_duration | average | milliseconds |
-| azure_monitor.data_explorer.query_count | count | queries/s |
-| azure_monitor.data_explorer.concurrent_queries | average, maximum | queries |
-| azure_monitor.data_explorer.throttled_queries | total | queries/s |
-| azure_monitor.data_explorer.weak_consistency_latency | average | seconds |
-| azure_monitor.data_explorer.ingestion_result | total | sources/s |
-| azure_monitor.data_explorer.ingestion_volume | total | bytes/s |
-| azure_monitor.data_explorer.ingestion_latency | average | seconds |
-| azure_monitor.data_explorer.events | received, processed, dropped | events/s |
-| azure_monitor.data_explorer.blobs | received, processed, dropped | blobs/s |
-| azure_monitor.data_explorer.discovery_latency | average | seconds |
-| azure_monitor.data_explorer.stage_latency | average | seconds |
-| azure_monitor.data_explorer.ingestion_queue | length | messages |
-| azure_monitor.data_explorer.queue_oldest_message | age | seconds |
-| azure_monitor.data_explorer.received_data_size | total | bytes/s |
-| azure_monitor.data_explorer.batches_processed | total | batches/s |
-| azure_monitor.data_explorer.batch_blob_count | average | blobs |
-| azure_monitor.data_explorer.batch_size | average | bytes |
-| azure_monitor.data_explorer.batch_duration | average | seconds |
-| azure_monitor.data_explorer.export_utilization | maximum | percentage |
-| azure_monitor.data_explorer.continuous_export_records | total | records/s |
-| azure_monitor.data_explorer.continuous_export_result | count | results/s |
-| azure_monitor.data_explorer.continuous_export_pending | maximum | jobs |
-| azure_monitor.data_explorer.continuous_export_lateness | maximum | minutes |
-| azure_monitor.data_explorer.streaming_ingest_data_rate | average | bytes/s |
-| azure_monitor.data_explorer.streaming_ingest_duration | average | milliseconds |
-| azure_monitor.data_explorer.streaming_ingest_result | count | results/s |
-| azure_monitor.data_explorer.streaming_ingest_utilization | average | percentage |
-| azure_monitor.data_explorer.materialized_view_health | health | status |
-| azure_monitor.data_explorer.materialized_view_age | minutes | minutes |
-| azure_monitor.data_explorer.materialized_view_age_seconds | average | seconds |
-| azure_monitor.data_explorer.materialized_view_records_in_delta | average | records |
-| azure_monitor.data_explorer.materialized_view_extents_rebuild | average | extents |
-| azure_monitor.data_explorer.materialized_view_data_loss | maximum | status |
-| azure_monitor.data_explorer.materialized_view_result | average | status |
-| azure_monitor.data_explorer.partitioning_percentage | total, hot | percentage |
-| azure_monitor.data_explorer.partitioned_records | average | records |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.data_explorer.cpu_utilization | Azure Data Explorer CPU Utilization | average | percentage |
+| azure_monitor.data_explorer.utilization | Azure Data Explorer Utilization | ingestion, cache | percentage |
+| azure_monitor.data_explorer.keep_alive | Azure Data Explorer Keep Alive | average | count |
+| azure_monitor.data_explorer.instance_count | Azure Data Explorer Instance Count | average, maximum, minimum | instances |
+| azure_monitor.data_explorer.extents | Azure Data Explorer Total Extents | average | extents |
+| azure_monitor.data_explorer.throttled_commands | Azure Data Explorer Throttled Commands | total | commands/s |
+| azure_monitor.data_explorer.follower_latency | Azure Data Explorer Follower Latency | average | milliseconds |
+| azure_monitor.data_explorer.query_duration | Azure Data Explorer Query Duration | average | milliseconds |
+| azure_monitor.data_explorer.query_count | Azure Data Explorer Query Count | count | queries/s |
+| azure_monitor.data_explorer.concurrent_queries | Azure Data Explorer Concurrent Queries | average, maximum | queries |
+| azure_monitor.data_explorer.throttled_queries | Azure Data Explorer Throttled Queries | total | queries/s |
+| azure_monitor.data_explorer.weak_consistency_latency | Azure Data Explorer Weak Consistency Latency | average | seconds |
+| azure_monitor.data_explorer.ingestion_result | Azure Data Explorer Ingestion Result | total | sources/s |
+| azure_monitor.data_explorer.ingestion_volume | Azure Data Explorer Ingestion Volume | total | bytes/s |
+| azure_monitor.data_explorer.ingestion_latency | Azure Data Explorer Ingestion Latency | average | seconds |
+| azure_monitor.data_explorer.events | Azure Data Explorer Events | received, processed, dropped | events/s |
+| azure_monitor.data_explorer.blobs | Azure Data Explorer Blobs | received, processed, dropped | blobs/s |
+| azure_monitor.data_explorer.discovery_latency | Azure Data Explorer Discovery Latency | average | seconds |
+| azure_monitor.data_explorer.stage_latency | Azure Data Explorer Stage Latency | average | seconds |
+| azure_monitor.data_explorer.ingestion_queue | Azure Data Explorer Ingestion Queue | length | messages |
+| azure_monitor.data_explorer.queue_oldest_message | Azure Data Explorer Queue Oldest Message Age | age | seconds |
+| azure_monitor.data_explorer.received_data_size | Azure Data Explorer Received Data Size | total | bytes/s |
+| azure_monitor.data_explorer.batches_processed | Azure Data Explorer Batches Processed | total | batches/s |
+| azure_monitor.data_explorer.batch_blob_count | Azure Data Explorer Batch Blob Count | average | blobs |
+| azure_monitor.data_explorer.batch_size | Azure Data Explorer Batch Size | average | bytes |
+| azure_monitor.data_explorer.batch_duration | Azure Data Explorer Batch Duration | average | seconds |
+| azure_monitor.data_explorer.export_utilization | Azure Data Explorer Export Utilization | maximum | percentage |
+| azure_monitor.data_explorer.continuous_export_records | Azure Data Explorer Continuous Export Records | total | records/s |
+| azure_monitor.data_explorer.continuous_export_result | Azure Data Explorer Continuous Export Result | count | results/s |
+| azure_monitor.data_explorer.continuous_export_pending | Azure Data Explorer Continuous Export Pending Jobs | maximum | jobs |
+| azure_monitor.data_explorer.continuous_export_lateness | Azure Data Explorer Continuous Export Lateness | maximum | minutes |
+| azure_monitor.data_explorer.streaming_ingest_data_rate | Azure Data Explorer Streaming Ingest Data Rate | average | bytes/s |
+| azure_monitor.data_explorer.streaming_ingest_duration | Azure Data Explorer Streaming Ingest Duration | average | milliseconds |
+| azure_monitor.data_explorer.streaming_ingest_result | Azure Data Explorer Streaming Ingest Result | count | results/s |
+| azure_monitor.data_explorer.streaming_ingest_utilization | Azure Data Explorer Streaming Ingest Utilization | average | percentage |
+| azure_monitor.data_explorer.materialized_view_health | Azure Data Explorer Materialized View Health | health | status |
+| azure_monitor.data_explorer.materialized_view_age | Azure Data Explorer Materialized View Age | minutes | minutes |
+| azure_monitor.data_explorer.materialized_view_age_seconds | Azure Data Explorer Materialized View Age (Seconds) | average | seconds |
+| azure_monitor.data_explorer.materialized_view_records_in_delta | Azure Data Explorer Materialized View Records in Delta | average | records |
+| azure_monitor.data_explorer.materialized_view_extents_rebuild | Azure Data Explorer Materialized View Extents Rebuild | average | extents |
+| azure_monitor.data_explorer.materialized_view_data_loss | Azure Data Explorer Materialized View Data Loss | maximum | status |
+| azure_monitor.data_explorer.materialized_view_result | Azure Data Explorer Materialized View Result | average | status |
+| azure_monitor.data_explorer.partitioning_percentage | Azure Data Explorer Partitioning Percentage | total, hot | percentage |
+| azure_monitor.data_explorer.partitioned_records | Azure Data Explorer Processed Partitioned Records | average | records |
 
 
 

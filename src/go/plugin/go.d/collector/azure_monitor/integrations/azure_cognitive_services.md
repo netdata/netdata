@@ -656,11 +656,13 @@ The following alerts are available:
 | [ am_cognitive_services_abusive_users ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_abusive_users | Abusive users detected on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -682,81 +684,81 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.cognitive_services.availability | availability | percentage |
-| azure_monitor.cognitive_services.calls | total, successful, blocked, token | calls/s |
-| azure_monitor.cognitive_services.errors | total, client, server | errors/s |
-| azure_monitor.cognitive_services.latency | average | milliseconds |
-| azure_monitor.cognitive_services.data_transfer | in, out | bytes/s |
-| azure_monitor.cognitive_services.rate_limit | rate_limit | requests/s |
-| azure_monitor.cognitive_services.openai_availability | availability | percentage |
-| azure_monitor.cognitive_services.openai_requests | requests | requests/s |
-| azure_monitor.cognitive_services.openai_latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
-| azure_monitor.cognitive_services.openai_generation_speed | tokens_per_second | tokens/s |
-| azure_monitor.cognitive_services.openai_token_usage | total, prompt, generated, active | tokens/s |
-| azure_monitor.cognitive_services.openai_audio_tokens | prompt, completion | tokens/s |
-| azure_monitor.cognitive_services.openai_cache_match_rate | cache_match_rate | percentage |
-| azure_monitor.cognitive_services.openai_provisioned_utilization | utilization | percentage |
-| azure_monitor.cognitive_services.openai_finetuning | training_hours | hours/s |
-| azure_monitor.cognitive_services.openai_realtime_usage | seconds_used | seconds/s |
-| azure_monitor.cognitive_services.model_availability | availability | percentage |
-| azure_monitor.cognitive_services.model_requests | requests | requests/s |
-| azure_monitor.cognitive_services.model_latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
-| azure_monitor.cognitive_services.model_generation_speed | tokens_per_second | tokens/s |
-| azure_monitor.cognitive_services.model_token_usage | total, input, output | tokens/s |
-| azure_monitor.cognitive_services.model_audio_tokens | input, output | tokens/s |
-| azure_monitor.cognitive_services.model_cache_tokens | cache_read, cache_write_1h, cache_write_5m | tokens/s |
-| azure_monitor.cognitive_services.model_provisioned_utilization | utilization | percentage |
-| azure_monitor.cognitive_services.model_pages | total, annotated | pages/s |
-| azure_monitor.cognitive_services.model_generated_images | generated | images/s |
-| azure_monitor.cognitive_services.content_safety_requests | total, harmful, blocked | requests/s |
-| azure_monitor.cognitive_services.content_safety_abusive_users | abusive_users | users/s |
-| azure_monitor.cognitive_services.content_safety_system_events | events | events |
-| azure_monitor.cognitive_services.content_safety_moderation | text, image | requests/s |
-| azure_monitor.cognitive_services.job_duration | average | milliseconds |
-| azure_monitor.cognitive_services.personalizer_actions | occurrences | occurrences/s |
-| azure_monitor.cognitive_services.personalizer_actions_per_event | average | actions |
-| azure_monitor.cognitive_services.personalizer_feature_occurrences | action, context, slot | occurrences/s |
-| azure_monitor.cognitive_services.personalizer_feature_cardinality | action, context, slot | features |
-| azure_monitor.cognitive_services.personalizer_features_per_event | action, context, slot | features |
-| azure_monitor.cognitive_services.personalizer_namespaces_per_event | action, context, slot | namespaces |
-| azure_monitor.cognitive_services.personalizer_rewards | average, slot | reward |
-| azure_monitor.cognitive_services.personalizer_estimator_rewards | online, baseline, baseline_random | reward |
-| azure_monitor.cognitive_services.personalizer_estimator_slot_rewards | online, baseline, baseline_random | reward |
-| azure_monitor.cognitive_services.personalizer_slots | average | slots |
-| azure_monitor.cognitive_services.personalizer_slot_occurrences | occurrences | occurrences/s |
-| azure_monitor.cognitive_services.personalizer_event_counts | online, baseline_random, user_baseline | events/s |
-| azure_monitor.cognitive_services.personalizer_estimated_rewards | online, baseline_random, user_baseline | reward/s |
-| azure_monitor.cognitive_services.speech_transcription | realtime, batch, batch_whisper, fast, fast_whisper | seconds/s |
-| azure_monitor.cognitive_services.speech_translation | translated | seconds/s |
-| azure_monitor.cognitive_services.speech_synthesis | synthesized | characters/s |
-| azure_monitor.cognitive_services.speech_video_synthesis | synthesized | seconds/s |
-| azure_monitor.cognitive_services.speech_avatar | hosting, training | seconds/s |
-| azure_monitor.cognitive_services.speech_speaker_recognition | transactions | transactions/s |
-| azure_monitor.cognitive_services.speech_speaker_profiles | profiles | profiles/s |
-| azure_monitor.cognitive_services.speech_model_hosting | hosting | hours/s |
-| azure_monitor.cognitive_services.speech_voice_live_tokens | audio_input, audio_output, cached_audio_input, text_input, text_output, cached_text_input | tokens/s |
-| azure_monitor.cognitive_services.speech_voice_model | hosting | hours/s |
-| azure_monitor.cognitive_services.speech_voice_training | training | minutes/s |
-| azure_monitor.cognitive_services.translator_text | standard, custom, trained | characters/s |
-| azure_monitor.cognitive_services.translator_document | standard, custom | characters/s |
-| azure_monitor.cognitive_services.translator_document_sync | standard, custom | characters/s |
-| azure_monitor.cognitive_services.translator_pro_app | seconds | seconds/s |
-| azure_monitor.cognitive_services.vision_transactions | computer_vision, custom_vision | transactions/s |
-| azure_monitor.cognitive_services.vision_training | training_time | seconds/s |
-| azure_monitor.cognitive_services.vision_images_stored | stored | images/s |
-| azure_monitor.cognitive_services.face_transactions | transactions | transactions/s |
-| azure_monitor.cognitive_services.face_images_trained | trained | images/s |
-| azure_monitor.cognitive_services.faces_stored | stored | faces/s |
-| azure_monitor.cognitive_services.luis_requests | speech, text | requests/s |
-| azure_monitor.cognitive_services.text_processing | text, health_text, question_answering | records/s |
-| azure_monitor.cognitive_services.processed_characters | characters | characters/s |
-| azure_monitor.cognitive_services.processed_images | images | images/s |
-| azure_monitor.cognitive_services.processed_pages | pages | pages/s |
-| azure_monitor.cognitive_services.carnegie_inference | inferences | inferences/s |
-| azure_monitor.cognitive_services.personalizer_events | total, learned, non_activated | events/s |
-| azure_monitor.cognitive_services.personalizer_reward_tracking | matched, observed | rewards/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.cognitive_services.availability | Azure Cognitive Services Availability | availability | percentage |
+| azure_monitor.cognitive_services.calls | Azure Cognitive Services Calls | total, successful, blocked, token | calls/s |
+| azure_monitor.cognitive_services.errors | Azure Cognitive Services Errors | total, client, server | errors/s |
+| azure_monitor.cognitive_services.latency | Azure Cognitive Services Latency | average | milliseconds |
+| azure_monitor.cognitive_services.data_transfer | Azure Cognitive Services Data Transfer | in, out | bytes/s |
+| azure_monitor.cognitive_services.rate_limit | Azure Cognitive Services Rate Limit | rate_limit | requests/s |
+| azure_monitor.cognitive_services.openai_availability | Azure OpenAI Availability | availability | percentage |
+| azure_monitor.cognitive_services.openai_requests | Azure OpenAI Requests | requests | requests/s |
+| azure_monitor.cognitive_services.openai_latency | Azure OpenAI Latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
+| azure_monitor.cognitive_services.openai_generation_speed | Azure OpenAI Token Generation Speed | tokens_per_second | tokens/s |
+| azure_monitor.cognitive_services.openai_token_usage | Azure OpenAI Token Usage | total, prompt, generated, active | tokens/s |
+| azure_monitor.cognitive_services.openai_audio_tokens | Azure OpenAI Audio Tokens | prompt, completion | tokens/s |
+| azure_monitor.cognitive_services.openai_cache_match_rate | Azure OpenAI Prompt Token Cache Match Rate | cache_match_rate | percentage |
+| azure_monitor.cognitive_services.openai_provisioned_utilization | Azure OpenAI Provisioned-managed Utilization | utilization | percentage |
+| azure_monitor.cognitive_services.openai_finetuning | Azure OpenAI Fine-Tuning Training Hours | training_hours | hours/s |
+| azure_monitor.cognitive_services.openai_realtime_usage | Azure OpenAI Realtime API Usage | seconds_used | seconds/s |
+| azure_monitor.cognitive_services.model_availability | Azure Cognitive Services Model Availability | availability | percentage |
+| azure_monitor.cognitive_services.model_requests | Azure Cognitive Services Model Requests | requests | requests/s |
+| azure_monitor.cognitive_services.model_latency | Azure Cognitive Services Model Latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
+| azure_monitor.cognitive_services.model_generation_speed | Azure Cognitive Services Model Token Generation Speed | tokens_per_second | tokens/s |
+| azure_monitor.cognitive_services.model_token_usage | Azure Cognitive Services Model Token Usage | total, input, output | tokens/s |
+| azure_monitor.cognitive_services.model_audio_tokens | Azure Cognitive Services Model Audio Tokens | input, output | tokens/s |
+| azure_monitor.cognitive_services.model_cache_tokens | Azure Cognitive Services Model Cache Tokens | cache_read, cache_write_1h, cache_write_5m | tokens/s |
+| azure_monitor.cognitive_services.model_provisioned_utilization | Azure Cognitive Services Model Provisioned Utilization | utilization | percentage |
+| azure_monitor.cognitive_services.model_pages | Azure Cognitive Services Model Pages Processed | total, annotated | pages/s |
+| azure_monitor.cognitive_services.model_generated_images | Azure Cognitive Services Generated Images | generated | images/s |
+| azure_monitor.cognitive_services.content_safety_requests | Azure Cognitive Services Content Safety Requests | total, harmful, blocked | requests/s |
+| azure_monitor.cognitive_services.content_safety_abusive_users | Azure Cognitive Services Potentially Abusive Users | abusive_users | users/s |
+| azure_monitor.cognitive_services.content_safety_system_events | Azure Cognitive Services Safety System Events | events | events |
+| azure_monitor.cognitive_services.content_safety_moderation | Azure Cognitive Services Content Moderation Calls | text, image | requests/s |
+| azure_monitor.cognitive_services.job_duration | Azure Cognitive Services Job Duration | average | milliseconds |
+| azure_monitor.cognitive_services.personalizer_actions | Azure Cognitive Services Personalizer Action Occurrences | occurrences | occurrences/s |
+| azure_monitor.cognitive_services.personalizer_actions_per_event | Azure Cognitive Services Personalizer Actions Per Event | average | actions |
+| azure_monitor.cognitive_services.personalizer_feature_occurrences | Azure Cognitive Services Personalizer Feature Occurrences | action, context, slot | occurrences/s |
+| azure_monitor.cognitive_services.personalizer_feature_cardinality | Azure Cognitive Services Personalizer Feature Cardinality | action, context, slot | features |
+| azure_monitor.cognitive_services.personalizer_features_per_event | Azure Cognitive Services Personalizer Features Per Event | action, context, slot | features |
+| azure_monitor.cognitive_services.personalizer_namespaces_per_event | Azure Cognitive Services Personalizer Namespaces Per Event | action, context, slot | namespaces |
+| azure_monitor.cognitive_services.personalizer_rewards | Azure Cognitive Services Personalizer Rewards | average, slot | reward |
+| azure_monitor.cognitive_services.personalizer_estimator_rewards | Azure Cognitive Services Personalizer Estimator Rewards | online, baseline, baseline_random | reward |
+| azure_monitor.cognitive_services.personalizer_estimator_slot_rewards | Azure Cognitive Services Personalizer Estimator Slot Rewards | online, baseline, baseline_random | reward |
+| azure_monitor.cognitive_services.personalizer_slots | Azure Cognitive Services Personalizer Slots | average | slots |
+| azure_monitor.cognitive_services.personalizer_slot_occurrences | Azure Cognitive Services Personalizer Slot Occurrences | occurrences | occurrences/s |
+| azure_monitor.cognitive_services.personalizer_event_counts | Azure Cognitive Services Personalizer Event Counts | online, baseline_random, user_baseline | events/s |
+| azure_monitor.cognitive_services.personalizer_estimated_rewards | Azure Cognitive Services Personalizer Estimated Rewards | online, baseline_random, user_baseline | reward/s |
+| azure_monitor.cognitive_services.speech_transcription | Azure Cognitive Services Speech Transcription | realtime, batch, batch_whisper, fast, fast_whisper | seconds/s |
+| azure_monitor.cognitive_services.speech_translation | Azure Cognitive Services Speech Translation | translated | seconds/s |
+| azure_monitor.cognitive_services.speech_synthesis | Azure Cognitive Services Speech Synthesis | synthesized | characters/s |
+| azure_monitor.cognitive_services.speech_video_synthesis | Azure Cognitive Services Video Synthesis | synthesized | seconds/s |
+| azure_monitor.cognitive_services.speech_avatar | Azure Cognitive Services Avatar Usage | hosting, training | seconds/s |
+| azure_monitor.cognitive_services.speech_speaker_recognition | Azure Cognitive Services Speaker Recognition | transactions | transactions/s |
+| azure_monitor.cognitive_services.speech_speaker_profiles | Azure Cognitive Services Speaker Profiles | profiles | profiles/s |
+| azure_monitor.cognitive_services.speech_model_hosting | Azure Cognitive Services Speech Model Hosting | hosting | hours/s |
+| azure_monitor.cognitive_services.speech_voice_live_tokens | Azure Cognitive Services Voice Live Tokens | audio_input, audio_output, cached_audio_input, text_input, text_output, cached_text_input | tokens/s |
+| azure_monitor.cognitive_services.speech_voice_model | Azure Cognitive Services Voice Model Usage | hosting | hours/s |
+| azure_monitor.cognitive_services.speech_voice_training | Azure Cognitive Services Voice Model Training | training | minutes/s |
+| azure_monitor.cognitive_services.translator_text | Azure Cognitive Services Translator Text Characters | standard, custom, trained | characters/s |
+| azure_monitor.cognitive_services.translator_document | Azure Cognitive Services Translator Document Characters | standard, custom | characters/s |
+| azure_monitor.cognitive_services.translator_document_sync | Azure Cognitive Services Translator Document Sync Characters | standard, custom | characters/s |
+| azure_monitor.cognitive_services.translator_pro_app | Azure Cognitive Services Translator Pro App Usage | seconds | seconds/s |
+| azure_monitor.cognitive_services.vision_transactions | Azure Cognitive Services Vision Transactions | computer_vision, custom_vision | transactions/s |
+| azure_monitor.cognitive_services.vision_training | Azure Cognitive Services Custom Vision Training | training_time | seconds/s |
+| azure_monitor.cognitive_services.vision_images_stored | Azure Cognitive Services Images Stored | stored | images/s |
+| azure_monitor.cognitive_services.face_transactions | Azure Cognitive Services Face Transactions | transactions | transactions/s |
+| azure_monitor.cognitive_services.face_images_trained | Azure Cognitive Services Face Images Trained | trained | images/s |
+| azure_monitor.cognitive_services.faces_stored | Azure Cognitive Services Faces Stored | stored | faces/s |
+| azure_monitor.cognitive_services.luis_requests | Azure Cognitive Services LUIS Requests | speech, text | requests/s |
+| azure_monitor.cognitive_services.text_processing | Azure Cognitive Services Text Processing | text, health_text, question_answering | records/s |
+| azure_monitor.cognitive_services.processed_characters | Azure Cognitive Services Processed Characters | characters | characters/s |
+| azure_monitor.cognitive_services.processed_images | Azure Cognitive Services Processed Images | images | images/s |
+| azure_monitor.cognitive_services.processed_pages | Azure Cognitive Services Processed Pages | pages | pages/s |
+| azure_monitor.cognitive_services.carnegie_inference | Azure Cognitive Services Carnegie Inference | inferences | inferences/s |
+| azure_monitor.cognitive_services.personalizer_events | Azure Cognitive Services Personalizer Events | total, learned, non_activated | events/s |
+| azure_monitor.cognitive_services.personalizer_reward_tracking | Azure Cognitive Services Personalizer Reward Tracking | matched, observed | rewards/s |
 
 
 

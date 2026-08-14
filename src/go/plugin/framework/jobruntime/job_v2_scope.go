@@ -62,11 +62,10 @@ func (j *JobV2) newScopeEngine() (*chartengine.Engine, error) {
 
 func (j *JobV2) liveScopeSet() map[string]metrix.HostScope {
 	scopes := make(map[string]metrix.HostScope)
-	reader := j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
-	for _, scope := range reader.HostScopes() {
-		if j.scopeHasVisibleSeries(scope.ScopeKey) {
-			scopes[scope.ScopeKey] = scope
-		}
+	reader := j.store.Read(metrix.ReadFlatten())
+	visibleScopes := reader.(metrix.FreshVisibleHostScopesReader)
+	for _, scope := range visibleScopes.FreshVisibleHostScopes() {
+		scopes[scope.ScopeKey] = scope
 	}
 	return scopes
 }
@@ -83,15 +82,6 @@ func (j *JobV2) scopeWorkSet(liveScopes map[string]metrix.HostScope) map[string]
 		scopes[key] = state.scope
 	}
 	return scopes
-}
-
-func (j *JobV2) scopeHasVisibleSeries(scopeKey string) bool {
-	reader := j.store.Read(metrix.ReadFlatten(), metrix.ReadHostScope(scopeKey))
-	found := false
-	reader.ForEachSeries(func(string, metrix.LabelView, metrix.SampleValue) {
-		found = true
-	})
-	return found
 }
 
 func sortedScopeKeys(scopes map[string]metrix.HostScope) []string {

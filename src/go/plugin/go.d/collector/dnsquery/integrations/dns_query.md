@@ -185,11 +185,13 @@ The following alerts are available:
 | [ dns_query_query_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dns_query.conf) | dns_query.query_status | DNS request type ${label:record_type} to server ${label:server} is unsuccessful |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -207,10 +209,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dns_query.query_status | success, network_error, dns_error | status |
-| dns_query.query_time | query_time | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dns_query.query_status | DNS Query Status | success, network_error, dns_error | status |
+| dns_query.query_time | DNS Query Time | query_time | seconds |
 
 
 

@@ -5,9 +5,30 @@ package tlscfg
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
-	"os"
+
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
+
+// ErrTLSFile identifies TLS file read and parse failures.
+var ErrTLSFile = errors.New("TLS file is invalid")
+
+type fileError struct {
+	err error
+}
+
+func (e *fileError) Error() string {
+	return e.err.Error()
+}
+
+func (e *fileError) Unwrap() error {
+	return e.err
+}
+
+func (e *fileError) Is(target error) bool {
+	return target == ErrTLSFile || errors.Is(e.err, target)
+}
 
 // TLSConfig represents the standard client TLS configuration.
 type TLSConfig struct {
@@ -57,21 +78,34 @@ func NewTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 func loadCertPool(certFiles []string) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
 	for _, certFile := range certFiles {
-		pem, err := os.ReadFile(certFile)
+		pem, err := safefile.Read(certFile)
 		if err != nil {
-			return nil, fmt.Errorf("could not read certificate %q: %v", certFile, err)
+			return nil, newFileError(fmt.Errorf("could not read certificate %q: %w", certFile, err))
 		}
 		if !pool.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("could not parse any PEM certificates %q: %v", certFile, err)
+			return nil, newFileError(fmt.Errorf("could not parse any PEM certificates %q", certFile))
 		}
 	}
 	return pool, nil
 }
 
 func loadCertificate(certFile, keyFile string) (tls.Certificate, error) {
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	certPEM, err := safefile.Read(certFile)
 	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("could not load keypair %s:%s: %v", certFile, keyFile, err)
+		return tls.Certificate{}, newFileError(fmt.Errorf("could not read certificate %q: %w", certFile, err))
+	}
+	keyPEM, err := safefile.Read(keyFile)
+	if err != nil {
+		return tls.Certificate{}, newFileError(fmt.Errorf("could not read key %q: %w", keyFile, err))
+	}
+
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return tls.Certificate{}, newFileError(fmt.Errorf("could not load keypair %s:%s: %w", certFile, keyFile, err))
 	}
 	return cert, nil
+}
+
+func newFileError(err error) error {
+	return &fileError{err: err}
 }

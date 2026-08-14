@@ -645,11 +645,13 @@ The following alerts are available:
 | [ am_log_analytics_legacy_network_tx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_network_errors | Legacy agent network TX errors on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -671,45 +673,45 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.log_analytics.query_availability | availability | percentage |
-| azure_monitor.log_analytics.ingestion_latency | average, maximum, minimum | seconds |
-| azure_monitor.log_analytics.ingestion_volume | records | records/s |
-| azure_monitor.log_analytics.queries | total, failed | queries/s |
-| azure_monitor.log_analytics.export_data | exported | bytes/s |
-| azure_monitor.log_analytics.export_records | exported | records/s |
-| azure_monitor.log_analytics.export_failures | failed | exports/s |
-| azure_monitor.log_analytics.legacy_cpu_utilization | processor, privileged, user, idle | percentage |
-| azure_monitor.log_analytics.legacy_cpu_detailed | dpc, interrupt, io_wait, nice | percentage |
-| azure_monitor.log_analytics.legacy_cpu_pct | privileged, user | percentage |
-| azure_monitor.log_analytics.legacy_memory_utilization | available, used, committed | percentage |
-| azure_monitor.log_analytics.legacy_memory_available | available_mbytes, available_mbytes_memory | megabytes |
-| azure_monitor.log_analytics.legacy_memory_used_kbytes | used | kilobytes |
-| azure_monitor.log_analytics.legacy_memory_used_mbytes | used | megabytes |
-| azure_monitor.log_analytics.legacy_memory_free | physical, virtual, shared | megabytes |
-| azure_monitor.log_analytics.legacy_swap_utilization | available, used | percentage |
-| azure_monitor.log_analytics.legacy_swap_size | available, used | megabytes |
-| azure_monitor.log_analytics.legacy_disk_space_utilization | free, used | percentage |
-| azure_monitor.log_analytics.legacy_disk_inodes | free, used | percentage |
-| azure_monitor.log_analytics.legacy_disk_free | free | megabytes |
-| azure_monitor.log_analytics.legacy_disk_io_throughput | read, write, logical, physical | bytes/s |
-| azure_monitor.log_analytics.legacy_disk_io_operations | reads, writes, transfers | operations/s |
-| azure_monitor.log_analytics.legacy_disk_io_latency | read, write, transfer | seconds |
-| azure_monitor.log_analytics.legacy_disk_queue | queue_length | operations |
-| azure_monitor.log_analytics.legacy_paging | reads, writes, total | pages/s |
-| azure_monitor.log_analytics.legacy_paging_files | free, stored | megabytes |
-| azure_monitor.log_analytics.legacy_network_throughput_win | received, sent, total | bytes/s |
-| azure_monitor.log_analytics.legacy_network_traffic | total, received, transmitted | bytes |
-| azure_monitor.log_analytics.legacy_network_packets | received, transmitted | packets |
-| azure_monitor.log_analytics.legacy_network_errors | rx, tx, collisions | errors |
-| azure_monitor.log_analytics.legacy_system | processes | processes |
-| azure_monitor.log_analytics.legacy_processor_queue | queue_length | threads |
-| azure_monitor.log_analytics.legacy_uptime | uptime | seconds |
-| azure_monitor.log_analytics.legacy_users | users | users |
-| azure_monitor.log_analytics.legacy_events | events | events/s |
-| azure_monitor.log_analytics.legacy_heartbeat | heartbeats | heartbeats/s |
-| azure_monitor.log_analytics.legacy_updates | updates | updates |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.log_analytics.query_availability | Azure Log Analytics Query Availability | availability | percentage |
+| azure_monitor.log_analytics.ingestion_latency | Azure Log Analytics Ingestion Latency | average, maximum, minimum | seconds |
+| azure_monitor.log_analytics.ingestion_volume | Azure Log Analytics Ingestion Volume | records | records/s |
+| azure_monitor.log_analytics.queries | Azure Log Analytics Queries | total, failed | queries/s |
+| azure_monitor.log_analytics.export_data | Azure Log Analytics Exported Data | exported | bytes/s |
+| azure_monitor.log_analytics.export_records | Azure Log Analytics Exported Records | exported | records/s |
+| azure_monitor.log_analytics.export_failures | Azure Log Analytics Export Failures | failed | exports/s |
+| azure_monitor.log_analytics.legacy_cpu_utilization | Azure Log Analytics Legacy CPU Utilization | processor, privileged, user, idle | percentage |
+| azure_monitor.log_analytics.legacy_cpu_detailed | Azure Log Analytics Legacy CPU Detailed | dpc, interrupt, io_wait, nice | percentage |
+| azure_monitor.log_analytics.legacy_cpu_pct | Azure Log Analytics Legacy CPU Pct Time | privileged, user | percentage |
+| azure_monitor.log_analytics.legacy_memory_utilization | Azure Log Analytics Legacy Memory Utilization | available, used, committed | percentage |
+| azure_monitor.log_analytics.legacy_memory_available | Azure Log Analytics Legacy Available Memory | available_mbytes, available_mbytes_memory | megabytes |
+| azure_monitor.log_analytics.legacy_memory_used_kbytes | Azure Log Analytics Legacy Used Memory (kBytes) | used | kilobytes |
+| azure_monitor.log_analytics.legacy_memory_used_mbytes | Azure Log Analytics Legacy Used Memory (MBytes) | used | megabytes |
+| azure_monitor.log_analytics.legacy_memory_free | Azure Log Analytics Legacy Free Memory | physical, virtual, shared | megabytes |
+| azure_monitor.log_analytics.legacy_swap_utilization | Azure Log Analytics Legacy Swap Utilization | available, used | percentage |
+| azure_monitor.log_analytics.legacy_swap_size | Azure Log Analytics Legacy Swap Size | available, used | megabytes |
+| azure_monitor.log_analytics.legacy_disk_space_utilization | Azure Log Analytics Legacy Disk Space Utilization | free, used | percentage |
+| azure_monitor.log_analytics.legacy_disk_inodes | Azure Log Analytics Legacy Disk Inodes | free, used | percentage |
+| azure_monitor.log_analytics.legacy_disk_free | Azure Log Analytics Legacy Disk Free Space | free | megabytes |
+| azure_monitor.log_analytics.legacy_disk_io_throughput | Azure Log Analytics Legacy Disk I/O Throughput | read, write, logical, physical | bytes/s |
+| azure_monitor.log_analytics.legacy_disk_io_operations | Azure Log Analytics Legacy Disk I/O Operations | reads, writes, transfers | operations/s |
+| azure_monitor.log_analytics.legacy_disk_io_latency | Azure Log Analytics Legacy Disk I/O Latency | read, write, transfer | seconds |
+| azure_monitor.log_analytics.legacy_disk_queue | Azure Log Analytics Legacy Disk Queue Length | queue_length | operations |
+| azure_monitor.log_analytics.legacy_paging | Azure Log Analytics Legacy Paging Activity | reads, writes, total | pages/s |
+| azure_monitor.log_analytics.legacy_paging_files | Azure Log Analytics Legacy Paging Files | free, stored | megabytes |
+| azure_monitor.log_analytics.legacy_network_throughput_win | Azure Log Analytics Legacy Network Throughput (Windows) | received, sent, total | bytes/s |
+| azure_monitor.log_analytics.legacy_network_traffic | Azure Log Analytics Legacy Network Traffic | total, received, transmitted | bytes |
+| azure_monitor.log_analytics.legacy_network_packets | Azure Log Analytics Legacy Network Packets | received, transmitted | packets |
+| azure_monitor.log_analytics.legacy_network_errors | Azure Log Analytics Legacy Network Errors | rx, tx, collisions | errors |
+| azure_monitor.log_analytics.legacy_system | Azure Log Analytics Legacy System | processes | processes |
+| azure_monitor.log_analytics.legacy_processor_queue | Azure Log Analytics Legacy Processor Queue | queue_length | threads |
+| azure_monitor.log_analytics.legacy_uptime | Azure Log Analytics Legacy Uptime | uptime | seconds |
+| azure_monitor.log_analytics.legacy_users | Azure Log Analytics Legacy Users | users | users |
+| azure_monitor.log_analytics.legacy_events | Azure Log Analytics Legacy Events | events | events/s |
+| azure_monitor.log_analytics.legacy_heartbeat | Azure Log Analytics Legacy Heartbeat | heartbeats | heartbeats/s |
+| azure_monitor.log_analytics.legacy_updates | Azure Log Analytics Legacy Updates | updates | updates |
 
 
 
