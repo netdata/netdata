@@ -48,25 +48,17 @@ python3 integrations/gen_integrations.py      # metadata.yaml    -> integrations
 python3 integrations/gen_docs_integrations.py # integrations.js  -> per-entry .md pages
 ```
 
-**The order is mandatory, and getting it wrong is destructive.**
+**The order is mandatory.**
 `gen_docs_integrations.py` renders from `integrations/integrations.js`, not from
 `metadata.yaml`, and that file is gitignored — it does not exist in a fresh
 checkout.
 
-Run `gen_docs_integrations.py` without generating it first and the script does
-this, exiting 0 the whole way:
-
-1. `read_integrations_js()` catches `FileNotFoundError` and returns `([], [])`
-   (it only prints `Exception ...`).
-2. `main()` then calls the unscoped `cleanup()`, which `shutil.rmtree`s every
-   `**/integrations` directory under twelve base paths — `src/collectors`,
-   `src/go/plugin/go.d/collector`, `src/exporting`, `src/crates/*-plugin`, and
-   the rest.
-3. It iterates the empty list and writes nothing back.
-
-The result is that every committed generated integration page in the repository
-is deleted, with a zero exit status. Always run `gen_integrations.py` first, and
-check `git status` before staging.
+Run `gen_docs_integrations.py` without generating that input first and
+`read_integrations_js()` raises a `RuntimeError`. `main()` reports the missing
+input and exits nonzero before description preflight or `cleanup()` runs. The
+existing committed generated pages therefore remain intact, although they are
+still stale relative to any metadata change. Generate `integrations.js` first
+and check `git status` before staging.
 
 If `integrations.js` is stale rather than missing, the failure is quieter: the
 pages regenerate from the old data, so a `metadata.yaml` change appears to have
