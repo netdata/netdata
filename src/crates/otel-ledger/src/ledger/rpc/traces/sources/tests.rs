@@ -89,17 +89,19 @@ async fn copies_are_structurally_identical() {
 #[tokio::test]
 async fn window_pruning_is_file_granular() {
     let supplier = make_supplier();
-    install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
+    let in_window = install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
     install_sfst(&supplier.registries, "default", 2, 5000, 5005).await;
 
     let mut sets = supplier
         .capture(&TenantId::from("default"), 900..2000, 1, &CancellationToken::new())
         .await;
     let sources = sets.pop().unwrap();
+    // Pin WHICH file survives, not just the count — an inverted pruning
+    // predicate keeping the wrong file must fail here.
     assert_eq!(
-        sources.len(),
-        1,
-        "only the file overlapping the window is captured"
+        source_ids(&sources),
+        [in_window.display().to_string()],
+        "exactly the file overlapping the window is captured"
     );
 }
 
