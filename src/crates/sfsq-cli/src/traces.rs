@@ -278,6 +278,11 @@ fn key_word(key: &AttributeKey) -> String {
 /// verbatim; the Builtin owner takes one of the kebab-case words.
 fn parse_key(owner: AttributeOwner, key: &str) -> Result<AttributeKey> {
     if owner != AttributeOwner::Builtin {
+        // Same always-a-typo class as the `--where` guards: an empty
+        // key enumerates nothing, silently.
+        if key.is_empty() {
+            bail!("--key must not be empty");
+        }
         return Ok(AttributeKey::Attribute(key.to_string()));
     }
     BUILTIN_WORDS
@@ -543,9 +548,10 @@ fn parse_condition(spec: &str) -> Result<Condition> {
 fn parse_target(word: &str) -> Result<PredicateTarget> {
     // An empty key after the owner strip (a bare `.` or a trailing
     // `owner.`) is a structurally valid predicate that matches no
-    // dictionary entry — the same always-a-typo class as an empty
-    // value, so fail loudly instead of returning a silent empty result
-    // (worse under negation, where `!=` on nothing matches everything).
+    // dictionary entry — positive or negated (the pinned rule is
+    // presence ∩ complement, so absence never satisfies `!=` either).
+    // The same always-a-typo class as an empty value: fail loudly
+    // instead of returning a silent empty result.
     let non_empty = |key: &str| -> Result<String> {
         if key.is_empty() {
             bail!("--where target {word:?} has an empty attribute key");
@@ -664,6 +670,24 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The empty-key guard fires on every owner spelling, and
+    /// dot-prefixed keys stay spellable (`..foo` = Any-owner key `.foo`).
+    #[test]
+    fn where_targets_reject_empty_keys_but_keep_dotted_ones() {
+        for bad in [".", "span.", "resource.", "event."] {
+            let err = parse_target(bad).expect_err(bad);
+            assert!(err.to_string().contains("empty attribute key"), "{bad}: {err}");
+        }
+        assert!(matches!(
+            parse_target("..foo"),
+            Ok(PredicateTarget::Attribute(AttributeOwner::Any, k)) if k == ".foo"
+        ));
+        assert!(matches!(
+            parse_target("span.http.method"),
+            Ok(PredicateTarget::Attribute(AttributeOwner::Span, k)) if k == "http.method"
+        ));
+    }
 
     /// The torn-tail clamp: a WAL truncated mid-frame serves only the
     /// intact prefix, and a header-only file yields an empty range —
