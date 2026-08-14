@@ -408,19 +408,51 @@ fn work_counts_one_shared_stream_batch_pass() {
     );
     assert_eq!(two.rows_visited, N as u64, "shared pass counted once");
 
-    // A narrow exact high term visits only its masked batches.
-    let mut narrow = ScanWork::default();
-    compile(&idx, &plan(vec![tokens("h", &["w005"], &[])]), &mut narrow);
-    let batch_size = crate::stream_batch_size(N as u32);
-    let rows_of_batch = |b: u32| -> u64 {
-        let start = b * batch_size;
-        u64::from((N as u32 - start).min(batch_size))
-    };
-    // Value w005 lives on rows 5 and 133 — the union of their batches.
-    let mut batches: Vec<u32> = vec![5 / batch_size, 133 / batch_size];
-    batches.dedup();
-    let expected: u64 = batches.into_iter().map(rows_of_batch).sum();
-    assert_eq!(narrow.rows_visited, expected, "masked batches only");
+    // Batch masking itself is proven by
+    // `narrow_high_terms_visit_only_their_masked_batches` — this 256-row
+    // fixture seals into a single stream batch (num_stream_batches(256)
+    // == 1), so any per-batch expectation here would equal a full scan.
+}
+
+/// Batch masking with a REAL multi-batch file: a value confined to one
+/// batch visits only that batch's rows. Needs both (a) enough rows for
+/// two stream batches (≥ 2·MIN_LOGS_PER_BATCH) and (b) needle values
+/// living in exactly one batch — the main fixture satisfies neither
+/// (256 rows, and its `h = w{i%128}` recurs in every batch at any N).
+#[test]
+fn narrow_high_terms_visit_only_their_masked_batches() {
+    const ROWS: usize = 2048;
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    for i in 0..ROWS {
+        // High-card field: a unique filler per row, except two needles —
+        // "front" only in batch 0, "back" only in batch 1.
+        let h = match i {
+            5 | 133 => "front".to_string(),
+            1500 | 1600 => "back".to_string(),
+            _ => format!("w{i:04}"),
+        };
+        let kv = format!("h={h}");
+        let slots = vec![ri.intern(None, &kv)];
+        ri.row(1_000 + i as i64, &slots);
+    }
+    let (buf, _s, _m) =
+        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let bytes = buf.into_inner();
+    let idx = IndexReader::open(&bytes).unwrap();
+
+    let batch_size = crate::stream_batch_size(ROWS as u32);
+    assert_eq!(batch_size, 1024, "the fixture must seal into two batches");
+
+    // Each needle's visit count is ONE batch — half the file. A masking
+    // regression that scans every batch reports 2048 and fails.
+    let mut front = ScanWork::default();
+    compile(&idx, &plan(vec![tokens("h", &["front"], &[])]), &mut front);
+    assert_eq!(front.rows_visited, u64::from(batch_size), "batch 0 only");
+
+    let mut back = ScanWork::default();
+    compile(&idx, &plan(vec![tokens("h", &["back"], &[])]), &mut back);
+    assert_eq!(back.rows_visited, u64::from(batch_size), "batch 1 only");
 }
 
 /// The rank-bounded proof (pin R3-1): with EVERY stream batch corrupted,
