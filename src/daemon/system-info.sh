@@ -300,7 +300,7 @@ else
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      load_lsb_release /etc/lsb-release
+      load_lsb_release /host/etc/lsb-release
       if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
       if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
       if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
