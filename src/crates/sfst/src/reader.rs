@@ -504,6 +504,13 @@ impl<'a> ChunkReader<'a> {
     /// struct-of-arrays field must be index-parallel (the corrupt-file
     /// guard — a length mismatch is a decode error, not a panic later).
     pub fn trace_rollup(&self) -> Result<crate::TraceRollup, Error> {
+        // The rollup summarizes the `TRCE` column — the writer guarantees
+        // TRSU ⟹ trace_id at seal; this is the symmetric read-side guard for
+        // a file produced out-of-band (the same guard TIDX and TBLM carry).
+        // Without it, a missing rollup row on such a file would let the
+        // trace-level gate prove "trace absent" where assembly would have
+        // surfaced the corruption.
+        self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let rollup: crate::TraceRollup =
             unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
         // Structural validation lives on the type (unit-tested there):
