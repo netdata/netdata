@@ -541,9 +541,20 @@ fn parse_condition(spec: &str) -> Result<Condition> {
 /// A `--where` target: `OWNER.KEY` for the attribute owners, a bare
 /// builtin-field word otherwise.
 fn parse_target(word: &str) -> Result<PredicateTarget> {
+    // An empty key after the owner strip (a bare `.` or a trailing
+    // `owner.`) is a structurally valid predicate that matches no
+    // dictionary entry — the same always-a-typo class as an empty
+    // value, so fail loudly instead of returning a silent empty result
+    // (worse under negation, where `!=` on nothing matches everything).
+    let non_empty = |key: &str| -> Result<String> {
+        if key.is_empty() {
+            bail!("--where target {word:?} has an empty attribute key");
+        }
+        Ok(key.to_string())
+    };
     // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
     if let Some(key) = word.strip_prefix('.') {
-        return Ok(PredicateTarget::Attribute(AttributeOwner::Any, key.to_string()));
+        return Ok(PredicateTarget::Attribute(AttributeOwner::Any, non_empty(key)?));
     }
     for (owner_name, owner) in [
         ("resource", AttributeOwner::Resource),
@@ -553,7 +564,7 @@ fn parse_target(word: &str) -> Result<PredicateTarget> {
         ("link", AttributeOwner::Link),
     ] {
         if let Some(key) = word.strip_prefix(owner_name).and_then(|r| r.strip_prefix('.')) {
-            return Ok(PredicateTarget::Attribute(owner, key.to_string()));
+            return Ok(PredicateTarget::Attribute(owner, non_empty(key)?));
         }
     }
     BUILTIN_WORDS
