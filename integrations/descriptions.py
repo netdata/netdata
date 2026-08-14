@@ -249,6 +249,8 @@ def validate_description(description: str, integration_id: str) -> None:
         errors.append("contains a URL")
     if _MARKDOWN_SPECIAL_CHARACTER_RE.search(description):
         errors.append("contains a Markdown-special character")
+    if description.startswith("-"):
+        errors.append("starts with a character that Learn's frontmatter parser strips")
     if (
         _COMMONMARK_LIST_START_RE.search(description)
         or _COMMONMARK_THEMATIC_BREAK_RE.search(description)

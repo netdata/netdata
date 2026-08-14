@@ -2,7 +2,9 @@
 
 import ast
 import copy
+import importlib.util
 import json
+import os
 import random
 import re
 # Tests execute only a fixed repository-local generator.
@@ -147,9 +149,6 @@ COMMONMARK_PLAIN_TEXT_DESCRIPTIONS = {
     "ordinary internal hyphens, pluses, and digits": (
         "Monitor end-to-end C++ service health for 3 production tiers with reliable metrics."
     ),
-    "leading hyphen without list space": (
-        "-Monitor service latency and availability across production systems safely."
-    ),
     "leading plus without list space": (
         "+Monitor service latency and availability across production systems safely."
     ),
@@ -161,9 +160,6 @@ COMMONMARK_PLAIN_TEXT_DESCRIPTIONS = {
     ),
     "Devanagari digits are not a CommonMark list": (
         "१२३४५६७८९. Monitor service latency and availability across production systems safely."
-    ),
-    "hyphen prose that is not a thematic break": (
-        "--- Monitor service latency and availability across production systems safely."
     ),
 }
 
@@ -224,6 +220,12 @@ INVALID_EXPLICIT_DESCRIPTIONS = {
     "other URL scheme": "Monitor PostgreSQL queries at ftp://example.com/metrics across every database server.",
     "double quote": 'Monitor PostgreSQL queries and the "ready" state across every production database server.',
     "backslash": r"Monitor PostgreSQL queries under C:\metrics across every production database server.",
+    "leading hyphen without list space": (
+        "-Monitor service latency and availability across production systems safely."
+    ),
+    "hyphen prose that is not a thematic break": (
+        "--- Monitor service latency and availability across production systems safely."
+    ),
     "Unicode emphasis boundary": (
         "Monitor service behavior around é*word*é boundaries with reliable production health metrics."
     ),
@@ -508,6 +510,29 @@ def parse_description_with_learn_legacy_parser(description_line):
     except (SyntaxError, ValueError):
         pass
     return value.strip('"')
+
+
+def load_learn_read_metadata():
+    """Load Learn's real parser when the cross-repository CI checkout is available."""
+    ingest_value = os.environ.get("LEARN_INGEST_PATH")
+    if not ingest_value:
+        return None
+
+    ingest_path = Path(ingest_value).resolve()
+    if not ingest_path.is_file():
+        raise AssertionError(f"LEARN_INGEST_PATH is not a file: {ingest_path}")
+
+    spec = importlib.util.spec_from_file_location("netdata_learn_ingest_contract", ingest_path)
+    if spec is None or spec.loader is None:
+        raise AssertionError(f"Cannot load Learn ingest parser: {ingest_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(ingest_path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+    return module.read_metadata
 
 
 class DescriptionNormalizationTest(unittest.TestCase):
@@ -938,6 +963,10 @@ class DescriptionSchemaTest(unittest.TestCase):
 class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        learn_read_metadata = load_learn_read_metadata()
+        cls.learn_read_metadata = (
+            staticmethod(learn_read_metadata) if learn_read_metadata is not None else None
+        )
         cls.categories, integrations = read_integrations_js("integrations/integrations.js")
         cls.integrations = {
             integration_type: copy.deepcopy(
@@ -1041,6 +1070,9 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
                     serialized = description_line.split(": ", 1)[1]
                     self.assertEqual(json.loads(serialized), value)
                     self.assertEqual(parse_description_with_learn_legacy_parser(description_line), value)
+                    if self.learn_read_metadata is not None:
+                        metadata = self.learn_read_metadata(f"---\n{description_line}\n---")
+                        self.assertEqual(metadata["description"], value)
 
     def test_all_ten_schema_and_generator_paths_accept_the_same_boundary_values(self):
         for label, value in VALID_EXPLICIT_DESCRIPTIONS.items():
@@ -1279,6 +1311,18 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                 self.assertIn("python3 integrations/gen_npm_catalog.py", source_metadata)
                 self.assertIn("go generate ./plugin/ibm.d/modules/...", source_metadata)
                 self.assertLess(names.index("Generate Source Metadata"), names.index("Generate Integrations"))
+                runtime_gate = by_name["Verify generated runtime outputs"]["run"]
+                self.assertIn("git diff --exit-code", runtime_gate)
+                self.assertIn("git ls-files --error-unmatch", runtime_gate)
+                self.assertIn("find src/go/plugin/ibm.d/modules -name module.yaml", runtime_gate)
+                self.assertLess(
+                    names.index("Generate Source Metadata"),
+                    names.index("Verify generated runtime outputs"),
+                )
+                self.assertLess(
+                    names.index("Verify generated runtime outputs"),
+                    names.index("Generate Integrations"),
+                )
                 self.assertLess(
                     names.index("Generate Integrations"),
                     names.index("Generate Integrations Documentation"),
@@ -1307,21 +1351,13 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                     )
                     self.assertIn(command, run, step_name)
 
+                if workflow.name == "check-markdown.yml":
+                    description_test = by_name["Test Integration Descriptions"]["run"]
+                    self.assertIn("LEARN_INGEST_PATH=../learn/ingest/ingest.py", description_test)
+
         post_merge_data = yaml.load(workflows[1].read_text(encoding="utf-8"))
         post_merge_steps = next(iter(post_merge_data["jobs"].values()))["steps"]
         post_merge_by_name = {step["name"]: step for step in post_merge_steps}
-        post_merge_names = [step["name"] for step in post_merge_steps]
-        runtime_gate = post_merge_by_name["Verify generated runtime outputs"]["run"]
-        self.assertIn("config_schema.json", runtime_gate)
-        self.assertIn("contexts/zz_generated_contexts.go", runtime_gate)
-        self.assertLess(
-            post_merge_names.index("Generate Source Metadata"),
-            post_merge_names.index("Verify generated runtime outputs"),
-        )
-        self.assertLess(
-            post_merge_names.index("Verify generated runtime outputs"),
-            post_merge_names.index("Generate Integrations"),
-        )
         cleanup = post_merge_by_name["Clean Up Temporary Data"]["run"]
         self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", cleanup)
         self.assertEqual(post_merge_by_name["Create PR"]["uses"], "peter-evans/create-pull-request@v8")

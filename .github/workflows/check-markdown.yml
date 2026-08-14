@@ -66,6 +66,24 @@ jobs:
           cd src/go
           go generate ./plugin/ibm.d/modules/...
 
+      - name: Verify generated runtime outputs
+        run: |
+          cd netdata
+          git diff --exit-code -- \
+            ':(glob)src/go/plugin/ibm.d/modules/**/config_schema.json' \
+            ':(glob)src/go/plugin/ibm.d/modules/**/contexts/zz_generated_contexts.go'
+          while IFS= read -r module_file; do
+            module_dir="${module_file%/module.yaml}"
+            for output in \
+              "$module_dir/config_schema.json" \
+              "$module_dir/contexts/zz_generated_contexts.go"; do
+              if ! git ls-files --error-unmatch -- "$output" >/dev/null 2>&1; then
+                echo "Generated runtime output must be committed: $output" >&2
+                exit 1
+              fi
+            done
+          done < <(find src/go/plugin/ibm.d/modules -name module.yaml -print | sort)
+
       - name: Generate Integrations
         run: |
           source ./venv/bin/activate
@@ -84,7 +102,9 @@ jobs:
       - name: Test Integration Descriptions
         run: |
           source ./venv/bin/activate
-          cd netdata && python3 -m unittest integrations.tests.test_descriptions
+          cd netdata
+          LEARN_INGEST_PATH=../learn/ingest/ingest.py \
+            python3 -m unittest integrations.tests.test_descriptions
 
       - name: Generate Integrations Documentation
         run: |

@@ -82,6 +82,17 @@ jobs:
           git diff --exit-code -- \
             ':(glob)src/go/plugin/ibm.d/modules/**/config_schema.json' \
             ':(glob)src/go/plugin/ibm.d/modules/**/contexts/zz_generated_contexts.go'
+          while IFS= read -r module_file; do
+            module_dir="${module_file%/module.yaml}"
+            for output in \
+              "$module_dir/config_schema.json" \
+              "$module_dir/contexts/zz_generated_contexts.go"; do
+              if ! git ls-files --error-unmatch -- "$output" >/dev/null 2>&1; then
+                echo "Generated runtime output must be committed: $output" >&2
+                exit 1
+              fi
+            done
+          done < <(find src/go/plugin/ibm.d/modules -name module.yaml -print | sort)
       - name: Generate Integrations
         id: generate
         run: |
