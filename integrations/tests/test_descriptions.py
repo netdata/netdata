@@ -155,6 +155,12 @@ COMMONMARK_PLAIN_TEXT_DESCRIPTIONS = {
     "ten-digit non-list prefix": (
         "1234567890. Monitor service latency and availability across production systems safely."
     ),
+    "Arabic-Indic digits are not a CommonMark list": (
+        "١٢٣٤٥٦٧٨٩. Monitor service latency and availability across production systems safely."
+    ),
+    "Devanagari digits are not a CommonMark list": (
+        "१२३४५६७८९. Monitor service latency and availability across production systems safely."
+    ),
     "hyphen prose that is not a thematic break": (
         "--- Monitor service latency and availability across production systems safely."
     ),
