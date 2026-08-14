@@ -14,7 +14,7 @@ Edit `contexts.yaml`, `config.go`, or `module.yaml`, then run
 ## Layout per module
 
 ```
-src/go/plugin/ibm.d/modules/<m>/
+src/go/plugin/ibm.d/modules/<module-dir>/
 ├── module.yaml                # display name, descriptions, icon, categories, link
 ├── config.go                  # Config struct -- parsed via Go AST
 ├── contexts/
@@ -34,6 +34,19 @@ src/go/plugin/ibm.d/modules/<m>/
 adds `src/go/plugin/ibm.d/modules/websphere` separately to
 `COLLECTOR_SOURCES` so these one-level-deeper paths get picked
 up.
+
+The guide uses two distinct identifiers:
+
+- `<module-dir>` is the path relative to
+  `src/go/plugin/ibm.d/modules/`, such as `db2` or
+  `websphere/pmi`. Use it in filesystem paths and `go generate`.
+- `<module-name>` is the exact `name` value in that directory's
+  `module.yaml`, such as `db2` or `websphere_pmi`. Use it for
+  docgen's `-module` argument and the integrations selector
+  `ibm.d.plugin/<module-name>`.
+
+The values happen to match for top-level modules. They differ for
+all three nested WebSphere modules.
 
 ## The two generators
 
@@ -69,7 +82,7 @@ Triggered by:
 //go:generate go run ../../../metricgen/main.go ...
 ```
 
-at `src/go/plugin/ibm.d/modules/<m>/contexts/doc.go:5`.
+at `src/go/plugin/ibm.d/modules/<module-dir>/contexts/doc.go:5`.
 
 ### `docgen` -- contexts.yaml + config.go + module.yaml -> metadata.yaml + README.md + config_schema.json
 
@@ -113,10 +126,12 @@ Outputs (per module):
 Triggered by:
 
 ```go
-//go:generate go run ../../docgen -module=<m> -contexts=contexts/contexts.yaml -config=config.go -module-info=module.yaml
+//go:generate go run <relative-path-to-docgen> -module=<module-name> -contexts=contexts/contexts.yaml -config=config.go -module-info=module.yaml
 ```
 
-at `src/go/plugin/ibm.d/modules/<m>/generate.go:3`.
+at `src/go/plugin/ibm.d/modules/<module-dir>/generate.go:3`. The
+relative path to docgen is `../../docgen` for top-level modules and
+`../../../docgen` for nested WebSphere modules.
 
 ## End-to-end edit recipe (ibm.d module)
 
@@ -128,7 +143,7 @@ at `src/go/plugin/ibm.d/modules/<m>/generate.go:3`.
      description, categories, icon, etc.
 2. Run from the repo root:
    ```bash
-   go generate ./src/go/plugin/ibm.d/modules/<m>/...
+   go generate ./src/go/plugin/ibm.d/modules/<module-dir>/...
    ```
    This invokes BOTH `metricgen` (on `contexts.yaml`) and
    `docgen` (on the module).
@@ -142,7 +157,7 @@ at `src/go/plugin/ibm.d/modules/<m>/generate.go:3`.
    ```bash
    ./integrations/pip.sh
    python3 integrations/gen_integrations.py
-   python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<m>
+   python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>
    python3 integrations/gen_doc_collector_page.py
    python3 integrations/gen_doc_secrets_page.py
    ```

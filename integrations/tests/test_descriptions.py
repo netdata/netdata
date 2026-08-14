@@ -954,15 +954,46 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
     def setUpClass(cls):
         cls.categories, cls.integrations = read_integrations_js("integrations/integrations.js")
 
-    def test_ibm_d_guide_uses_actual_scoped_collector_key(self):
+    def test_ibm_d_guide_maps_all_module_directories_to_real_selectors(self):
         guide = (REPO_ROOT / ".agents/skills/integrations-lifecycle/ibm-d.md").read_text(encoding="utf-8")
-        expected = "python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<m>"
-        stale = "python3 integrations/gen_docs_integrations.py -c ibm.d/<m>"
-        self.assertIn(expected, guide)
-        self.assertNotIn(stale, guide)
-        selected = _select_integrations(self.integrations, "ibm.d.plugin/db2")
-        self.assertTrue(selected)
-        self.assertEqual({item["meta"]["module_name"] for item in selected}, {"db2"})
+        self.assertIn("`<module-dir>` is the path relative to", guide)
+        self.assertIn("`<module-name>` is the exact `name` value", guide)
+        self.assertIn(
+            "python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>",
+            guide,
+        )
+        self.assertNotIn("ibm.d.plugin/<m>", guide)
+        self.assertNotIn("ibm.d/<m>", guide)
+
+        modules = {
+            "as400": "as400",
+            "db2": "db2",
+            "mq": "mq",
+            "websphere/jmx": "websphere_jmx",
+            "websphere/mp": "websphere_mp",
+            "websphere/pmi": "websphere_pmi",
+        }
+        actual_names = {
+            item["meta"]["module_name"]
+            for item in self.integrations
+            if item.get("meta", {}).get("plugin_name") == "ibm.d.plugin"
+        }
+        self.assertEqual(actual_names, set(modules.values()))
+
+        for module_dir, module_name in modules.items():
+            with self.subTest(module_dir=module_dir, module_name=module_name):
+                source = yaml.load(
+                    (
+                        REPO_ROOT / "src/go/plugin/ibm.d/modules" / module_dir / "module.yaml"
+                    ).read_text(encoding="utf-8")
+                )
+                self.assertEqual(source["name"], module_name)
+                selected = _select_integrations(self.integrations, f"ibm.d.plugin/{module_name}")
+                self.assertTrue(selected)
+                self.assertEqual(
+                    {item["meta"]["module_name"] for item in selected},
+                    {module_name},
+                )
 
     def test_map_descriptions_are_present_valid_and_unique(self):
         map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))
