@@ -208,25 +208,25 @@ func (s *ebpfSharedMemoryStore) rebuildEntriesLocked() {
 	}
 
 	// Two-way merge of the ascending cachestat and dcstat PID lists.
+	// Each iteration emits the smaller-or-equal PID and advances whichever
+	// cursor(s) hold it; equality advances both because PIDs are unique within
+	// each list.
 	i, j := 0, 0
 	for i < len(s.cachestatPIDs) || j < len(s.dcstatPIDs) {
 		var pid uint32
-		switch {
-		case j >= len(s.dcstatPIDs):
+		// Take from cachestat when it still has elements and (dcstat is empty or
+		// cachestat's current PID is smaller-or-equal).  Explicit length checks
+		// keep the indexed reads inside the loop invariant.  On equality the
+		// pid already came from cachestat, so the inner `if` advances j too.
+		if i < len(s.cachestatPIDs) && (j >= len(s.dcstatPIDs) || s.cachestatPIDs[i] <= s.dcstatPIDs[j]) {
 			pid = s.cachestatPIDs[i]
 			i++
-		case i >= len(s.cachestatPIDs):
+			if j < len(s.dcstatPIDs) && pid == s.dcstatPIDs[j] {
+				j++
+			}
+		} else {
+			// dcstat holds the smaller-or-only PID.
 			pid = s.dcstatPIDs[j]
-			j++
-		case s.cachestatPIDs[i] < s.dcstatPIDs[j]:
-			pid = s.cachestatPIDs[i]
-			i++
-		case s.cachestatPIDs[i] > s.dcstatPIDs[j]:
-			pid = s.dcstatPIDs[j]
-			j++
-		default:
-			pid = s.cachestatPIDs[i]
-			i++
 			j++
 		}
 		nextEntries = append(nextEntries, s.buildRowLocked(pid))
@@ -259,18 +259,21 @@ func (s *ebpfSharedMemoryStore) rebuildEntriesLocked() {
 func (s *ebpfSharedMemoryStore) buildRowLocked(pid uint32) ebpfPidStat {
 	row := ebpfPidStat{pid: pid}
 
-	if ident, ok := s.cachestatIdent[pid]; ok && !ident.isEmpty() {
-		row.comm = ident.comm
-		row.ppid = ident.ppid
-	} else if ident, ok := s.dcstatIdent[pid]; ok && !ident.isEmpty() {
-		row.comm = ident.comm
-		row.ppid = ident.ppid
-	} else if ident, ok := s.cachestatIdent[pid]; ok {
-		// Both empty (or only cachestat present): keep whatever cachestat had so
-		// the row is unchanged from the single-module behaviour.
-		row.comm = ident.comm
-		row.ppid = ident.ppid
+	// Pick the identity to publish: cachestat always wins when present, even
+	// with an empty identity (preserves the single-module behaviour recorded in
+	// the cache).  dcstat only contributes when its identity is populated; an
+	// empty dcstat identity with no cachestat entry leaves the row at zero.
+	csIdent, csOK := s.cachestatIdent[pid]
+	dcIdent, dcOK := s.dcstatIdent[pid]
+	var ident ebpfModuleIdentity
+	switch {
+	case csOK:
+		ident = csIdent
+	case dcOK && !dcIdent.isEmpty():
+		ident = dcIdent
 	}
+	row.comm = ident.comm
+	row.ppid = ident.ppid
 
 	row.cachestat = s.cachestatData[pid]
 	row.dc = s.dcstatData[pid]
