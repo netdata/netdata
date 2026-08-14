@@ -97,6 +97,17 @@ async fn main() -> anyhow::Result<()> {
             "--count x --events-per-span must not exceed {MAX_COUNT} total events"
         );
     }
+    // span_id packs the position into 20 bits and the trace index into
+    // bits 20..63: beyond either range, distinct spans silently collide
+    // (colliding ids read as resends and corrupt the intended tree).
+    const MAX_SPANS_PER_TRACE: usize = (1 << 20) - 1;
+    if args.spans_per_trace > MAX_SPANS_PER_TRACE {
+        anyhow::bail!("--spans-per-trace must not exceed {MAX_SPANS_PER_TRACE}");
+    }
+    let max_trace_index = (args.count as u64) / (args.spans_per_trace.max(1) as u64);
+    if args.seed.saturating_add(max_trace_index) >= 1u64 << 43 {
+        anyhow::bail!("--seed + trace count must stay below 2^43 (id bit budget)");
+    }
     args::init_tls_and_logging(&args.common.log_level);
 
     let spread = (args.count as u64).saturating_mul(args.spacing_nanos);
