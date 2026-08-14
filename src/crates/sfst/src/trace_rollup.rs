@@ -158,6 +158,19 @@ impl TraceRollup {
                     "trace rollup envelope is inverted".into(),
                 ));
             }
+            // Counter contradictions the writer cannot emit: every row
+            // exists because record_span ran at least once, and the
+            // error counter increments alongside the span counter.
+            if self.span_counts[i] == 0 {
+                return Err(crate::Error::CorruptIndex(
+                    "trace rollup row carries zero spans".into(),
+                ));
+            }
+            if self.error_counts[i] > self.span_counts[i] {
+                return Err(crate::Error::CorruptIndex(
+                    "trace rollup error count exceeds span count".into(),
+                ));
+            }
         }
         Ok(())
     }
@@ -585,6 +598,15 @@ mod tests {
         let mut broken = good.clone();
         broken.min_start_ns[0] = broken.max_end_ns[0] + 1;
         assert!(broken.validate(0).is_err(), "inverted envelope");
+
+        let mut broken = good.clone();
+        broken.span_counts[0] = 0;
+        broken.error_counts[0] = 0;
+        assert!(broken.validate(0).is_err(), "zero-span row");
+
+        let mut broken = good.clone();
+        broken.error_counts[0] = broken.span_counts[0] + 1;
+        assert!(broken.validate(0).is_err(), "error count exceeds spans");
 
         // An id arena with trailing bytes: len() floors to the right
         // count, so only the well_formed() check catches it — the ids
