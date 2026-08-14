@@ -75,6 +75,12 @@ jobs:
           python3 integrations/gen_npm_catalog.py
           cd src/go
           go generate ./plugin/ibm.d/modules/...
+      - name: Verify generated runtime outputs
+        id: verify-generated-runtime
+        run: |
+          git diff --exit-code -- \
+            ':(glob)src/go/plugin/ibm.d/modules/**/config_schema.json' \
+            ':(glob)src/go/plugin/ibm.d/modules/**/contexts/zz_generated_contexts.go'
       - name: Generate Integrations
         id: generate
         run: |
@@ -146,6 +152,7 @@ jobs:
               Checkout Agent: ${{ steps.checkout-agent.outcome }}
               Prep python env and deps: ${{ steps.prep-deps.outcome }}
               Generate Source Metadata: ${{ steps.generate-source-metadata.outcome }}
+              Verify Generated Runtime Outputs: ${{ steps.verify-generated-runtime.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
               Generate Collector Taxonomy: ${{ steps.generate-taxonomy.outcome }}
               Test Collector Taxonomy Tooling: ${{ steps.test-taxonomy.outcome }}

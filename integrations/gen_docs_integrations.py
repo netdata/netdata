@@ -707,7 +707,11 @@ def main():
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
-    _validate_complete_description_corpus(integrations)
+    try:
+        _validate_complete_description_corpus(integrations)
+    except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
     selected_integrations = _select_integrations(integrations, args.collector)
 
     if args.collector and not selected_integrations:

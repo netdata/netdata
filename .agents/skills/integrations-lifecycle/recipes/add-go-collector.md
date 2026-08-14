@@ -160,7 +160,7 @@ validator will warn (fatal). Either pick an existing category
 or add a new one under the appropriate parent (typically
 `data-collection`).
 
-## 4. Taxonomy, stock `.conf`, `config_schema.json`, alerts, README
+## 4. Taxonomy, stock `.conf`, `config_schema.json`, and alerts
 
 These files are the rest of the collector consistency rule and MUST stay
 synchronized with the collector code:
@@ -193,9 +193,11 @@ synchronized with the collector code:
 - `src/health/health.d/<name>.conf` -- alerts on the metrics
   declared in `metadata.yaml`. Each alert in this file SHOULD
   have a matching entry under `metadata.yaml.modules[0].alerts[]`.
-- `src/go/plugin/go.d/collector/<name>/README.md` -- generated as a symlink to
-  `integrations/<slug>.md`. Do not create, hand-write, or stage it in the
-  source PR.
+
+The generated `src/go/plugin/go.d/collector/<name>/README.md` symlink is not an
+authoritative source artifact. Do not create, hand-write, or stage it in the
+source PR; inspect it during local generation and let the post-merge generated-
+artifact PR commit it.
 
 ## 5. Run the pipeline locally
 
@@ -299,8 +301,9 @@ separate generated-artifact PR.
 
 ## 9. Surface arrival timing
 
-- `src/collectors/COLLECTORS.md` is live in the repo
-  immediately after merge.
+- Generated integration and umbrella pages, including
+  `src/collectors/COLLECTORS.md`, become live after the post-merge generated-
+  artifact PR is reviewed and merged.
 - The cloud-frontend dashboard's Integrations page rebuilds
   on its own schedule (when the cloud-frontend CI re-runs
   `gen_integrations.py` against master). Coordinate with

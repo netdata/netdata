@@ -1178,6 +1178,38 @@ class GeneratorInputFailureTest(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("no matching collector found", result.stderr)
 
+    def test_description_validation_failure_is_concise(self):
+        description = (
+            "Monitor duplicate service latency and availability across reliable production systems."
+        )
+        integrations = [
+            {
+                "id": f"go.d.plugin-{module}-{module.title()}",
+                "integration_type": "collector",
+                "meta": {
+                    "plugin_name": "go.d.plugin",
+                    "module_name": module,
+                    "monitored_instance": {"description": description},
+                },
+            }
+            for module in ("one", "two")
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            integrations_dir = Path(directory) / "integrations"
+            integrations_dir.mkdir()
+            (integrations_dir / "integrations.js").write_text(
+                "export const categories = "
+                + json.dumps([{"id": "data-collection"}])
+                + "\nexport const integrations = "
+                + json.dumps(integrations),
+                encoding="utf-8",
+            )
+            result = self.run_generator(directory, "--check", "--collector", "go.d.plugin/one")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Error: Duplicate generated descriptions", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
 
 class DocumentationSourceRegressionTest(unittest.TestCase):
     @classmethod
@@ -1232,37 +1264,61 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
         )
         for workflow in workflows:
             with self.subTest(workflow=workflow.name):
-                text = workflow.read_text(encoding="utf-8")
-                npm = text.index("python3 integrations/gen_npm_catalog.py")
-                ibm = text.index("go generate ./plugin/ibm.d/modules/...")
-                shared = text.index("python3 integrations/gen_integrations.py")
-                docs = text.index("python3 integrations/gen_docs_integrations.py")
-                service_discovery = text.index("python3 integrations/gen_doc_service_discovery_page.py")
-                self.assertLess(npm, shared)
-                self.assertLess(ibm, shared)
-                self.assertLess(shared, docs)
-                self.assertLess(shared, service_discovery)
-                self.assertIn("actions/setup-go@v7", text)
+                data = yaml.load(workflow.read_text(encoding="utf-8"))
+                self.assertEqual(len(data["jobs"]), 1)
+                steps = next(iter(data["jobs"].values()))["steps"]
+                by_name = {step["name"]: step for step in steps}
+                names = [step["name"] for step in steps]
+                source_metadata = by_name["Generate Source Metadata"]["run"]
+                self.assertIn("python3 integrations/gen_npm_catalog.py", source_metadata)
+                self.assertIn("go generate ./plugin/ibm.d/modules/...", source_metadata)
+                self.assertLess(names.index("Generate Source Metadata"), names.index("Generate Integrations"))
+                self.assertLess(
+                    names.index("Generate Integrations"),
+                    names.index("Generate Integrations Documentation"),
+                )
+                self.assertLess(
+                    names.index("Generate Integrations"),
+                    names.index("Generate src/collectors/SERVICE-DISCOVERY.md"),
+                )
+                self.assertTrue(any(step.get("uses") == "actions/setup-go@v7" for step in steps))
 
                 environment = "virtualenv" if workflow.name == "generate-integrations.yml" else "venv"
-                for command in (
-                    "python3 integrations/gen_docs_integrations.py",
-                    "python3 integrations/gen_doc_collector_page.py",
-                    "python3 integrations/gen_doc_secrets_page.py",
-                    "python3 integrations/gen_doc_service_discovery_page.py",
-                ):
-                    command_offset = text.index(command)
-                    run_block = text.rfind("run: |", 0, command_offset)
+                documentation_steps = {
+                    "Generate Integrations Documentation": "python3 integrations/gen_docs_integrations.py",
+                    "Generate src/collectors/COLLECTORS.md": "python3 integrations/gen_doc_collector_page.py",
+                    "Generate src/collectors/SECRETS.md": "python3 integrations/gen_doc_secrets_page.py",
+                    "Generate src/collectors/SERVICE-DISCOVERY.md": (
+                        "python3 integrations/gen_doc_service_discovery_page.py"
+                    ),
+                }
+                for step_name, command in documentation_steps.items():
+                    run = by_name[step_name]["run"]
                     self.assertIn(
                         f"source ./{environment}/bin/activate",
-                        text[run_block:command_offset],
-                        command,
+                        run,
+                        step_name,
                     )
+                    self.assertIn(command, run, step_name)
 
-        post_merge = workflows[1].read_text(encoding="utf-8")
-        self.assertIn("python3 integrations/gen_npm_catalog.py", post_merge)
-        self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", post_merge)
-        self.assertIn("peter-evans/create-pull-request@v8", post_merge)
+        post_merge_data = yaml.load(workflows[1].read_text(encoding="utf-8"))
+        post_merge_steps = next(iter(post_merge_data["jobs"].values()))["steps"]
+        post_merge_by_name = {step["name"]: step for step in post_merge_steps}
+        post_merge_names = [step["name"] for step in post_merge_steps]
+        runtime_gate = post_merge_by_name["Verify generated runtime outputs"]["run"]
+        self.assertIn("config_schema.json", runtime_gate)
+        self.assertIn("contexts/zz_generated_contexts.go", runtime_gate)
+        self.assertLess(
+            post_merge_names.index("Generate Source Metadata"),
+            post_merge_names.index("Verify generated runtime outputs"),
+        )
+        self.assertLess(
+            post_merge_names.index("Verify generated runtime outputs"),
+            post_merge_names.index("Generate Integrations"),
+        )
+        cleanup = post_merge_by_name["Clean Up Temporary Data"]["run"]
+        self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", cleanup)
+        self.assertEqual(post_merge_by_name["Create PR"]["uses"], "peter-evans/create-pull-request@v8")
 
     def test_map_descriptions_are_present_valid_and_unique(self):
         map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))

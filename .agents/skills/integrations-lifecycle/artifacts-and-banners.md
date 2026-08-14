@@ -18,8 +18,8 @@ banner conventions and edit rules.
 | `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml` | `integrations/gen_npm_catalog.py` | **YES** | `generate-integrations.yml` generated-artifact PR; verified in `check-markdown.yml` |
 | `src/go/plugin/ibm.d/modules/<m>/metadata.yaml` | ibm.d `docgen` | **YES** | `generate-integrations.yml` generated-artifact PR; verified in `check-markdown.yml` |
 | `src/go/plugin/ibm.d/modules/<m>/README.md` | ibm.d `docgen` | **YES** | as above |
-| `src/go/plugin/ibm.d/modules/<m>/config_schema.json` | ibm.d `docgen` | **YES** | as above |
-| `src/go/plugin/ibm.d/modules/<m>/contexts/zz_generated_contexts.go` | ibm.d `metricgen` | **YES** | as above |
+| `src/go/plugin/ibm.d/modules/<m>/config_schema.json` | ibm.d `docgen` | **YES** | Source PR with its `config.go` change; post-merge workflow fails on drift |
+| `src/go/plugin/ibm.d/modules/<m>/contexts/zz_generated_contexts.go` | ibm.d `metricgen` | **YES** | Source PR with its `contexts.yaml` change; post-merge workflow fails on drift |
 | Hand-written `metadata.yaml` (non-ibm.d), `config_schema.json`, stock `.conf`, `health.d/<...>.conf`, hand-written `README.md` | collector author | **YES** | none -- author edits + commits manually |
 | `<collector-dir>/taxonomy.yaml` | collector author / `gen_taxonomy_seed.py` starter output | **YES** | validated by `check-markdown.yml`; not auto-authored |
 | `integrations/taxonomy/sections.yaml` | taxonomy framework author | **YES** | validated by `gen_taxonomy.py` |

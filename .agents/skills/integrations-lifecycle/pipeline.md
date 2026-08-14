@@ -344,8 +344,9 @@ python3 integrations/gen_docs_integrations.py --check
 ```
 
 The command prints deterministic counts by documentation mode plus the mechanical and explicit-override totals. With
-`--collector`, it validates only that selected collector, matching scoped-generation behavior. An unknown collector is an
-error in both write and check modes; it never succeeds with an empty selection.
+`--collector`, the printed counts and generated files are scoped to that collector, but the description preflight still validates
+the full corpus and fails on any missing, invalid, or duplicate record. An unknown collector is an error in both write and check
+modes; it never succeeds with an empty selection.
 
 ### Outputs
 
@@ -501,22 +502,24 @@ Repo path: `.github/workflows/generate-integrations.yml`.
    install Python deps.
 3. Set up the Go version from `src/go/go.mod`, run
    `gen_npm_catalog.py`, and run `go generate` across all ibm.d modules.
-4. `python3 integrations/gen_integrations.py`.
-5. `python3 integrations/gen_taxonomy.py` -- writes and validates
+4. Fail if ibm.d generated runtime outputs (`config_schema.json` or
+   `contexts/zz_generated_contexts.go`) differ from the source PR.
+5. `python3 integrations/gen_integrations.py`.
+6. `python3 integrations/gen_taxonomy.py` -- writes and validates
    the runtime taxonomy artifact.
-6. `python3 -m unittest integrations.tests.test_taxonomy`.
-7. `python3 -m unittest integrations.tests.test_descriptions`.
-8. Run `gen_docs_integrations.py`, `gen_doc_collector_page.py`,
+7. `python3 -m unittest integrations.tests.test_taxonomy`.
+8. `python3 -m unittest integrations.tests.test_descriptions`.
+9. Run `gen_docs_integrations.py`, `gen_doc_collector_page.py`,
    `gen_doc_secrets_page.py`, and `gen_doc_service_discovery_page.py`.
-9. Remove `go.d.plugin`, the virtual environment,
+10. Remove `go.d.plugin`, the virtual environment,
    `integrations.js`, `integrations.json`, `taxonomy.json`, and the
    NPM diagnostic report so
    the auto-PR cannot commit runtime artifacts.
-10. `peter-evans/create-pull-request@v8` -- branch
+11. `peter-evans/create-pull-request@v8` -- branch
    `integrations-regen`, label `integrations-update`, title
    `Regenerate integrations docs`, token
    `NETDATABOT_GITHUB_TOKEN`. Reviewed and merged manually.
-11. Slack failure notification on master failures.
+12. Slack failure notification on master failures.
 
 ## CI workflow 2 -- `check-markdown.yml`
 
