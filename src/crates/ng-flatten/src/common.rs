@@ -458,7 +458,15 @@ impl Flattener {
         // passes through here, so rewrite '=' to '_' at this single choke
         // point — counted, so ingest can surface the rename.
         let sanitized;
-        let name: &str = if kv.key.contains('=') {
+        let name: &str = if kv.key.is_empty() {
+            // Proto3 accepts an empty key (OTLP only SHOULDs non-empty).
+            // Stored bare it becomes a prefix-only field ("attributes.")
+            // that enumerates as an empty attribute name and cannot
+            // round-trip through selections — degrade it the same way
+            // as the '=' rewrite, at the same choke point.
+            self.sanitized_keys += 1;
+            "_"
+        } else if kv.key.contains('=') {
             self.sanitized_keys += 1;
             sanitized = kv.key.replace('=', "_");
             &sanitized

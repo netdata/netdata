@@ -170,6 +170,20 @@ mod tests {
     }
 
     #[test]
+    fn empty_attribute_keys_are_sanitized_and_counted() {
+        // Proto3 accepts an empty key; stored bare it would become a
+        // prefix-only field ("attributes.") that enumerates as an empty
+        // attribute name and cannot round-trip through selections.
+        let span = Span {
+            attributes: vec![kv("", Av::StringValue("v".into()))],
+            ..Default::default()
+        };
+        let (flat, sanitized) = flatten_trace_request(trace_req(span, None, None));
+        assert_eq!(sanitized, 1);
+        node_for_path(&flat.tree, "attributes._");
+    }
+
+    #[test]
     fn span_facets_carry_dual_enum_and_attributes() {
         let span = Span {
             name: "GET /x".into(),
