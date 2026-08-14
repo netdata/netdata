@@ -601,6 +601,27 @@ print("the rest of this overview is code")
 """
         self.assertIsNone(extract_description_from_overview(overview, for_meta=True))
 
+    def test_overview_heading_must_be_a_top_level_markdown_heading(self):
+        false_heading_contexts = {
+            "fenced code": "```markdown\n## Overview\nFenced example text.\n```",
+            "indented code": "    ## Overview\n    Indented example text.",
+            "blockquote": "> ## Overview\n> Quoted example text.",
+            "HTML code block": "<pre>\n## Overview\nHTML example text.\n</pre>",
+        }
+        expected = (
+            "Monitor service latency, request rates, and availability across reliable production systems."
+        )
+
+        for label, false_heading in false_heading_contexts.items():
+            overview = (
+                f"# Example\n\n{false_heading}\n\n## Overview\n\n{expected}\n"
+            )
+            with self.subTest(context=label):
+                self.assertEqual(
+                    extract_description_from_overview(overview, for_meta=True),
+                    expected,
+                )
+
     def test_catalog_extraction_retains_legacy_first_sentence_behavior(self):
         overview = """## Overview
 

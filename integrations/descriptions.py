@@ -118,11 +118,18 @@ def _first_prose_paragraph(markdown: str) -> Optional[str]:
         return None
 
     text = _remove_admonition_blocks(markdown)
-    if _OVERVIEW_HEADING in text:
-        text = text.split(_OVERVIEW_HEADING, 1)[1]
-
     tokens = _COMMONMARK.parse(text)
+    content_start = 0
     for index, token in enumerate(tokens[:-1]):
+        if token.type != "heading_open" or token.tag != "h2" or token.level != 0:
+            continue
+        inline = tokens[index + 1]
+        if inline.type == "inline" and inline.content.strip() == "Overview":
+            content_start = index + 3
+            break
+
+    for index in range(content_start, len(tokens) - 1):
+        token = tokens[index]
         if token.type != "paragraph_open" or token.level != 0:
             continue
 
