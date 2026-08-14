@@ -9,6 +9,8 @@ import unicodedata
 from collections import Counter
 from typing import Any, Dict, Iterable, Optional
 
+from markdown_it import MarkdownIt
+
 
 MIN_DESCRIPTION_LENGTH = 50
 MAX_DESCRIPTION_LENGTH = 160
@@ -45,6 +47,7 @@ _RELATED_RESOURCE_RE = re.compile(
 )
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])(?:\s+|$)")
 _CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]")
+_COMMONMARK = MarkdownIt("commonmark")
 
 
 def parentheses_are_balanced(text: str) -> bool:
@@ -114,17 +117,21 @@ def _first_prose_paragraph(markdown: str) -> Optional[str]:
     if not markdown or not markdown.strip():
         return None
 
-    text = _remove_admonition_blocks(_remove_fenced_blocks(markdown))
+    text = _remove_admonition_blocks(markdown)
     if _OVERVIEW_HEADING in text:
         text = text.split(_OVERVIEW_HEADING, 1)[1]
-    else:
-        text = re.sub(r"^# [^\n]+\n", "", text, count=1)
 
-    for paragraph in re.split(r"\n\s*\n", text):
-        lines = [line.strip() for line in paragraph.splitlines() if line.strip()]
-        if not lines:
+    tokens = _COMMONMARK.parse(text)
+    for index, token in enumerate(tokens[:-1]):
+        if token.type != "paragraph_open" or token.level != 0:
             continue
 
+        inline = tokens[index + 1]
+        if inline.type != "inline":
+            continue
+        lines = [line.strip() for line in inline.content.splitlines() if line.strip()]
+        if not lines:
+            continue
         first = lines[0]
         if first.startswith(("#", "Plugin:", "Module:", "Kind:", "<img", "|", "- ", "* ")):
             continue

@@ -3,8 +3,8 @@
 Use this when a collector's metrics, chart contexts, configuration,
 alerts, or generated docs change. The goal is to keep runtime behavior,
 metadata, taxonomy, source documentation, and CI validation coherent. Generated
-integration pages may ship in the source PR or through the automatic post-merge
-regeneration PR.
+integration pages ship through the automatic post-merge regeneration PR, not
+the source PR.
 
 ## 0. Read first
 
@@ -77,7 +77,7 @@ Keep these synchronized when the corresponding behavior changes:
 - `config_schema.json` for dynamic configuration;
 - stock `.conf` for user-visible defaults;
 - `health.d/*.conf` and `metadata.yaml.modules[].alerts[]`;
-- generated docs through the explicitly selected same-PR or post-merge route.
+- generated docs through the automatic post-merge regeneration PR.
 
 Do not hand-edit generated `integrations/<slug>.md` files.
 

@@ -510,6 +510,34 @@ Monitor short metrics. Collect request rates and latency for every service insta
             "Monitor short metrics. Collect request rates and latency for every service instance.",
         )
 
+    def test_overview_skips_complete_and_indented_code_blocks(self):
+        overview = """# Example
+
+## Overview
+
+```python
+print("not prose")
+```
+
+    indented_code_is_not_prose()
+
+Monitor service latency, request rates, and availability across reliable production systems.
+"""
+        self.assertEqual(
+            extract_description_from_overview(overview, for_meta=True),
+            "Monitor service latency, request rates, and availability across reliable production systems.",
+        )
+
+    def test_overview_rejects_an_unterminated_fence_without_prose(self):
+        overview = """# Example
+
+## Overview
+
+```python
+print("the rest of this overview is code")
+"""
+        self.assertIsNone(extract_description_from_overview(overview, for_meta=True))
+
     def test_catalog_extraction_retains_legacy_first_sentence_behavior(self):
         overview = """## Overview
 
