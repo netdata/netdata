@@ -15,6 +15,7 @@ on:
       - 'src/go/plugin/ibm.d/metricgen/**'
       - 'src/go/plugin/ibm.d/modules/**/module.yaml'
       - 'src/go/plugin/ibm.d/modules/**/config.go'
+      - 'src/go/plugin/ibm.d/modules/**/init.go'
       - 'src/go/plugin/ibm.d/modules/**/generate.go'
       - 'src/go/plugin/ibm.d/modules/**/contexts/contexts.yaml'
       - 'src/go/plugin/ibm.d/modules/**/contexts/doc.go'

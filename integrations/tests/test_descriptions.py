@@ -873,7 +873,8 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             cloud_notification["meta"]["icon_filename"],
             "",
         )
-        self.assertIn(f'alt="{cloud_notification["meta"]["name"]}"', logo_only)
+        cloud_notification_name = cloud_notification["meta"]["name"]
+        self.assertIn(f'alt="{cloud_notification_name}"', logo_only)
 
         _, _, _, _, netdata_badge = build_readme_from_integration(
             integration, self.categories, mode="collector"
@@ -1266,6 +1267,11 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
             with self.subTest(workflow=workflow.name):
                 data = yaml.load(workflow.read_text(encoding="utf-8"))
                 self.assertEqual(len(data["jobs"]), 1)
+                trigger = "push" if workflow.name == "generate-integrations.yml" else "pull_request"
+                self.assertIn(
+                    "src/go/plugin/ibm.d/modules/**/init.go",
+                    data["on"][trigger]["paths"],
+                )
                 steps = next(iter(data["jobs"].values()))["steps"]
                 by_name = {step["name"]: step for step in steps}
                 names = [step["name"] for step in steps]
