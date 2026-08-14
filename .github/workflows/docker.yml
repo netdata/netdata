@@ -457,11 +457,13 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
-        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.docker_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
+        run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.docker_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -617,11 +619,13 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
-        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.quay_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
+        run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.quay_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -777,11 +781,13 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
-        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.ghcr_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
+        run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.ghcr_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
