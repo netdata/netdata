@@ -4,7 +4,8 @@
 //!
 //! - **Sealed files / chunks** carry the `TRSU` rollup chunk
 //!   ([`sfst::TraceRollup`]); [`sealed_trace_aggregates`] resolves its
-//!   interner refs to strings through the file's own string table.
+//!   interner refs through the validating [`sfst::RollupRootResolver`]
+//!   (a corrupt ref fails the source, never renders a wrong root).
 //! - **WAL tails** have no interner; [`tail_trace_aggregates`] folds the
 //!   scan's decoded spans directly, with the SAME pinned semantics the
 //!   seal accumulator applies:
@@ -168,39 +169,58 @@ pub fn sealed_trace_envelopes(rollup: &sfst::TraceRollup) -> Vec<TraceAggregate>
         .collect()
 }
 
-/// Resolve a sealed file's `TRSU` rows into the neutral shape. `strings`
-/// is the file's `KvId → key=value` table
-/// ([`sfst::IndexReader::build_string_table`]); refs resolve to the
-/// VALUE half (the `kv_value` convention: split on the first `=`).
+/// Resolve a sealed file's `TRSU` rows into the neutral shape. Root refs
+/// resolve through [`sfst::RollupRootResolver`] — the same validating,
+/// closed-partition seam the trace-level gate uses: a ref is either the
+/// target field's proven value or corruption evidence for the whole
+/// file. A `Corrupt` outcome escalates as [`sfst::Error::CorruptIndex`]
+/// so the caller marks the source failed (never a silently wrong or
+/// absent root — a bare string-table lookup here would render another
+/// field's value as the root on a corrupted in-range ref).
 ///
 /// Precondition: `rollup` comes from `IndexReader::trace_rollup()` (the
 /// validating accessor) — the struct-of-arrays fields are indexed in
 /// parallel here on that guarantee.
 pub fn sealed_trace_aggregates(
     rollup: &sfst::TraceRollup,
-    strings: &[String],
-) -> Vec<TraceAggregate> {
-    let value_of = |r: u32| -> Option<String> {
+    reader: &sfst::IndexReader<'_>,
+) -> Result<Vec<TraceAggregate>, sfst::Error> {
+    let service_field = resource_service_field();
+    let name_field = BuiltinField::Name
+        .dictionary_field()
+        .expect("Name is dictionary-backed");
+    let mut resolver = sfst::RollupRootResolver::new(reader);
+    let mut value_of = |field_name: &str, r: u32| -> Result<Option<String>, sfst::Error> {
         if r == sfst::ROLLUP_NO_REF {
-            return None;
+            return Ok(None);
         }
-        strings
-            .get(r as usize)
-            .and_then(|s| s.split_once('=').map(|(_, v)| v.to_string()))
+        match resolver.resolve(field_name, r) {
+            sfst::RollupRefOutcome::Value(v) => Ok(Some(v.to_string())),
+            sfst::RollupRefOutcome::Corrupt => Err(sfst::Error::CorruptIndex(format!(
+                "trace rollup root ref {r} does not resolve in `{field_name}`"
+            ))),
+        }
     };
-    (0..rollup.len())
-        .map(|i| TraceAggregate {
+    let mut out = Vec::with_capacity(rollup.len());
+    for i in 0..rollup.len() {
+        let root = if rollup.root_is_true_root[i] == sfst::ROOT_CLAIM_TRUE {
+            Some(TraceRootInfo {
+                span_id: rollup.root_span_ids.get(i),
+                kind: rollup.root_kinds[i],
+                service: value_of(&service_field, rollup.root_service_refs[i])?,
+                name: value_of(name_field, rollup.root_name_refs[i])?,
+            })
+        } else {
+            None
+        };
+        out.push(TraceAggregate {
             trace_id: rollup.trace_ids.get(i),
             min_start_ns: rollup.min_start_ns[i],
             max_end_ns: rollup.max_end_ns[i],
             span_count: u64::from(rollup.span_counts[i]),
             error_count: u64::from(rollup.error_counts[i]),
-            root: (rollup.root_is_true_root[i] == sfst::ROOT_CLAIM_TRUE).then(|| TraceRootInfo {
-                span_id: rollup.root_span_ids.get(i),
-                kind: rollup.root_kinds[i],
-                service: value_of(rollup.root_service_refs[i]),
-                name: value_of(rollup.root_name_refs[i]),
-            }),
-        })
-        .collect()
+            root,
+        });
+    }
+    Ok(out)
 }

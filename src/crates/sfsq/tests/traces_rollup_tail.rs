@@ -81,8 +81,7 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
     let reader = sfst::IndexReader::open(&bytes).unwrap();
-    let strings = reader.build_string_table(reader.field_table()).unwrap();
-    let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &strings);
+    let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &reader).unwrap();
 
     assert_eq!(tail, sealed, "the parity contract");
 
@@ -149,8 +148,7 @@ fn sealed_root_without_service_resolves_the_sentinel_to_none() {
     ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
     let reader = sfst::IndexReader::open(&bytes).unwrap();
-    let strings = reader.build_string_table(reader.field_table()).unwrap();
-    let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &strings);
+    let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &reader).unwrap();
 
     let root = sealed[0].root.as_ref().expect("a true root");
     assert_eq!(root.service, None, "the sentinel resolves to honest None");

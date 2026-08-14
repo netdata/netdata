@@ -189,8 +189,7 @@ pub(crate) fn merge_trace_sources(
                 }
                 let aggs = match reader.trace_rollup().and_then(|r| {
                     if spec.resolve_roots {
-                        let strings = reader.build_string_table(reader.field_table())?;
-                        Ok(sealed_trace_aggregates(&r, &strings))
+                        sealed_trace_aggregates(&r, &reader)
                     } else {
                         Ok(sealed_trace_envelopes(&r))
                     }
