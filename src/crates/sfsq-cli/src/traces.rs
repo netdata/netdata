@@ -70,14 +70,14 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
     // Source identity is the path STRING (SourceId, wal_id), so the same
     // file through two aliases (symlink, relative vs absolute) would pass
     // the engine's DuplicateSource check and be scanned twice, inflating
-    // UNSET-span counts. Canonicalize once so aliases collide and the
-    // duplicate is rejected instead.
-    let canonical = |path: &PathBuf| -> Result<PathBuf> {
-        path.canonicalize()
-            .with_context(|| format!("cannot resolve {}", path.display()))
-    };
-    let sfsts = sfsts.iter().map(&canonical).collect::<Result<Vec<_>>>()?;
-    let wals = wals.iter().map(&canonical).collect::<Result<Vec<_>>>()?;
+    // UNSET-span counts. Canonicalize so aliases collide and the duplicate
+    // is rejected — BEST-EFFORT: a path canonicalize cannot resolve keeps
+    // its user-supplied identity, so deleted-but-open files through
+    // `/proc/<pid>/fd/N` (a forensic staple) still open, and nonexistent
+    // paths surface the per-kind errors below instead of a generic one.
+    let canonical = |path: &PathBuf| path.canonicalize().unwrap_or_else(|_| path.clone());
+    let sfsts: Vec<PathBuf> = sfsts.iter().map(&canonical).collect();
+    let wals: Vec<PathBuf> = wals.iter().map(&canonical).collect();
     let mut sources: Vec<TraceSource> = Vec::new();
     for path in &sfsts {
         let summary = sfst::read_summary_path(path)
