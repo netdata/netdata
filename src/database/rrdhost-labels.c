@@ -421,7 +421,6 @@ static int streamed_windows_system_info_unittest(void) {
     int err = !strstr(buffer_tostring(wb), "Microsoft Windows");
     fprintf(stderr, "  streamed Windows public OS name: %s\n", err ? "FAILED" : "OK");
 
-    buffer_free(wb);
     rrdhost_system_info_free(system_info);
     rrdlabels_destroy(labels);
     return err;

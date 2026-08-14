@@ -122,9 +122,33 @@ CONTAINER_VERSION_CODENAME=""
 CONTAINER_VARIANT=""
 CONTAINER_BUILD_ID=""
 
+# os-release(5) requires backslashes, quotes and other shell metacharacters inside
+# double-quoted values to be escaped. Decode them, since we parse instead of sourcing.
+os_release_unescape() {
+  os_release_unescaped=""
+  os_release_rest="$1"
+
+  while :; do
+    case "${os_release_rest}" in
+      *\\*) ;;
+      *) os_release_unescaped="${os_release_unescaped}${os_release_rest}"; break ;;
+    esac
+    os_release_unescaped="${os_release_unescaped}${os_release_rest%%\\*}"
+    os_release_rest="${os_release_rest#*\\}"
+    # keep the escaped character verbatim; a trailing lone backslash consumes nothing
+    os_release_unescaped="${os_release_unescaped}${os_release_rest%"${os_release_rest#?}"}"
+    os_release_rest="${os_release_rest#?}"
+  done
+}
+
 load_os_release() {
   os_release_scope="$1"
   os_release_file="$2"
+
+  # an existing but unreadable file must not shadow the next candidate path
+  if [ -z "${os_release_file}" ] || [ ! -f "${os_release_file}" ] || [ ! -r "${os_release_file}" ]; then
+    return 1
+  fi
 
   while IFS= read -r os_release_line || [ -n "${os_release_line}" ]; do
     case "${os_release_line}" in
@@ -132,7 +156,12 @@ load_os_release() {
         os_release_key="${os_release_line%%=*}"
         os_release_value="${os_release_line#*=}"
         case "${os_release_value}" in
-          \"*\") os_release_value="${os_release_value#\"}"; os_release_value="${os_release_value%\"}" ;;
+          \"*\")
+            os_release_value="${os_release_value#\"}"
+            os_release_value="${os_release_value%\"}"
+            os_release_unescape "${os_release_value}"
+            os_release_value="${os_release_unescaped}"
+            ;;
           \'*\') os_release_value="${os_release_value#\'}"; os_release_value="${os_release_value%\'}" ;;
         esac
         case "${os_release_scope}:${os_release_key}" in
@@ -156,6 +185,8 @@ load_os_release() {
         ;;
     esac
   done < "${os_release_file}"
+
+  return 0
 }
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
@@ -172,11 +203,9 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
   CONTAINER_VERSION=$(uname -r)
   KERNEL_VERSION=$(uname -K)
 else
-  if [ -f "/etc/os-release" ]; then
-    load_os_release CONTAINER /etc/os-release
+  if load_os_release CONTAINER /etc/os-release; then
     CONTAINER_OS_DETECTION="/etc/os-release"
-  elif [ -f "/usr/lib/os-release" ]; then
-    load_os_release CONTAINER /usr/lib/os-release
+  elif load_os_release CONTAINER /usr/lib/os-release; then
     CONTAINER_OS_DETECTION="/usr/lib/os-release"
   fi
 
@@ -227,11 +256,9 @@ if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
   done
 else
   # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
-  if [ -f "/host/etc/os-release" ] && [ -r "/host/etc/os-release" ]; then
-    load_os_release HOST /host/etc/os-release
+  if load_os_release HOST /host/etc/os-release; then
     HOST_OS_DETECTION="/host/etc/os-release"
-  elif [ -f "/host/usr/lib/os-release" ] && [ -r "/host/usr/lib/os-release" ]; then
-    load_os_release HOST /host/usr/lib/os-release
+  elif load_os_release HOST /host/usr/lib/os-release; then
     HOST_OS_DETECTION="/host/usr/lib/os-release"
   fi
   if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
