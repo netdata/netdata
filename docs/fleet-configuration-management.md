@@ -36,6 +36,7 @@ As infrastructures grow from a handful of servers to thousands of nodes across m
 **Legend**: ✅ Full support | ⚠️ Partial support | ❌ Not available
 
 **Footnotes**:
+
 1. **kickstart.sh**: [Universal installer script](https://learn.netdata.cloud/docs/netdata-agent/installation/linux) that auto-detects the best installation method
 2. **MSI**: Microsoft Software Installer package for Windows deployment
 3. **Manual**: Auto-updates coming Q3 2025; currently requires PowerShell/SCCM/GPO automation
@@ -160,6 +161,7 @@ On Linux, Netdata autodetect all kernel modules and technologies which have been
 Similarly for Windows, Netdata will autodetect everything exposed via Perflib.
 
 ### [Process and Application Monitoring](https://learn.netdata.cloud/docs/collecting-metrics/collectors/operating-systems/applications) (apps.plugin)
+
 The apps.plugin provides intelligent process tree aggregation and monitoring on all platforms (Linux, FreeBSD, macOS, Windows):
 
 **Intelligent Process Tree Aggregation**:

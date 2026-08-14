@@ -5,7 +5,8 @@ import copy
 import json
 import random
 import re
-import subprocess
+# Tests execute only a fixed repository-local generator.
+import subprocess  # nosec B404
 import sys
 import tempfile
 import unicodedata
@@ -962,7 +963,8 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
             "categories": ["data-collection.test"],
             "icon_filename": "test.svg",
         }
-        rng = random.Random(0x4E455444415441)
+        # A fixed seed makes these non-security property fixtures reproducible.
+        rng = random.Random(0x4E455444415441)  # nosec B311
         ascii_word = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
         non_ascii = "éΩЖ中Kİıſ"
         punctuation = ".,:;!?-+"
@@ -1024,7 +1026,8 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
 
 class GeneratorInputFailureTest(unittest.TestCase):
     def run_generator(self, cwd, *args):
-        return subprocess.run(
+        # The command is a fixed local script plus controlled test fixtures.
+        return subprocess.run(  # nosec B603
             [sys.executable, str(INTEGRATIONS_DIR / "gen_docs_integrations.py"), *args],
             cwd=cwd,
             capture_output=True,

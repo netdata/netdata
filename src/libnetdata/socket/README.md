@@ -7,6 +7,8 @@ learn_topic_type: "References"
 learn_rel_path: "Developers/libnetdata"
 -->
 
+<!-- markdownlint-disable MD043 -->
+
 # Socket
 
 The libnetdata socket utilities provide portable building blocks for outgoing connections, configured listeners, event polling,

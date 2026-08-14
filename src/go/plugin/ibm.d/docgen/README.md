@@ -225,6 +225,7 @@ The tool handles various Go types:
 ### 1. Keep module.yaml Updated
 
 Always maintain module.yaml with:
+
 - Accurate overview `description`
 - A unique, single-line `page_description` of 50-160 characters for generated page metadata
 - Proper categorization
