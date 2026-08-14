@@ -251,8 +251,10 @@ static const char *netdata_windows_client_version_from_build(DWORD build)
 
 static const char *netdata_windows_without_microsoft_prefix(const char *product_name)
 {
-    if (product_name && !strncasecmp(product_name, "Microsoft ", strlen("Microsoft ")))
-        return product_name + strlen("Microsoft ");
+    if (product_name && !strncasecmp(product_name,
+                                     NETDATA_WINDOWS_MICROSOFT_PREFIX,
+                                     sizeof(NETDATA_WINDOWS_MICROSOFT_PREFIX) - 1))
+        return product_name + (sizeof(NETDATA_WINDOWS_MICROSOFT_PREFIX) - 1);
 
     return product_name;
 }
@@ -263,8 +265,12 @@ static void netdata_windows_product_edition(char *edition, size_t length, const 
         return;
 
     const char *name = netdata_windows_without_microsoft_prefix(product_name);
-    const char *prefix = is_server ? "Windows Server" : "Windows";
-    size_t prefix_length = strlen(prefix);
+    const char *prefix = is_server
+                              ? NETDATA_WINDOWS_OS_PREFIX_SERVER
+                              : NETDATA_WINDOWS_OS_PREFIX_CLIENT;
+    size_t prefix_length = is_server
+                               ? sizeof(NETDATA_WINDOWS_OS_PREFIX_SERVER) - 1
+                               : sizeof(NETDATA_WINDOWS_OS_PREFIX_CLIENT) - 1;
     if (strncasecmp(name, prefix, prefix_length) ||
         (name[prefix_length] && name[prefix_length] != ' '))
         return;
@@ -288,22 +294,27 @@ void netdata_windows_parse_os_labels(NETDATA_WINDOWS_OS_LABELS *labels, const ch
 {
     memset(labels, 0, sizeof(*labels));
 
-    snprintf(labels->name, sizeof(labels->name), "%s", is_server ? "Windows Server" : "Windows");
+    snprintf(labels->name, sizeof(labels->name), "%s",
+             is_server ? NETDATA_WINDOWS_OS_PREFIX_SERVER : NETDATA_WINDOWS_OS_PREFIX_CLIENT);
+
+    const char *version_source = is_server ? netdata_windows_server_version_from_build(build)
+                                           : netdata_windows_client_version_from_build(build);
     if (is_server) {
         const char *name = netdata_windows_without_microsoft_prefix(product_name);
-        const char *prefix = "Windows Server ";
-        if (name && !strncasecmp(name, prefix, strlen(prefix))) {
-            name += strlen(prefix);
-            size_t version_length = strspn(name, "0123456789");
-            if (version_length)
-                snprintf(labels->version, sizeof(labels->version), "%.*s", (int)version_length, name);
+        if (name && !strncasecmp(name,
+                                 NETDATA_WINDOWS_OS_PREFIX_SERVER_NAME,
+                                 sizeof(NETDATA_WINDOWS_OS_PREFIX_SERVER_NAME) - 1)) {
+            const char *digits = name + (sizeof(NETDATA_WINDOWS_OS_PREFIX_SERVER_NAME) - 1);
+            size_t version_length = strspn(digits, "0123456789");
+            if (version_length) {
+                snprintf(labels->version, sizeof(labels->version), "%.*s", (int)version_length, digits);
+                version_source = NULL; // override the build-derived fallback below
+            }
         }
-
-        if (!labels->version[0])
-            snprintf(labels->version, sizeof(labels->version), "%s", netdata_windows_server_version_from_build(build));
     }
-    else
-        snprintf(labels->version, sizeof(labels->version), "%s", netdata_windows_client_version_from_build(build));
+
+    if (!labels->version[0] && version_source)
+        snprintf(labels->version, sizeof(labels->version), "%s", version_source);
 
     if (display_version && *display_version)
         snprintf(labels->release, sizeof(labels->release), "%s", display_version);
@@ -327,10 +338,12 @@ void netdata_windows_format_os_version(char *out, size_t length, const char *pro
     }
 
     const char *name = product_name;
-    if (!strncasecmp(name, "Microsoft ", strlen("Microsoft ")))
-        name += strlen("Microsoft ");
+    if (!strncasecmp(name,
+                     NETDATA_WINDOWS_MICROSOFT_PREFIX,
+                     sizeof(NETDATA_WINDOWS_MICROSOFT_PREFIX) - 1))
+        name += (sizeof(NETDATA_WINDOWS_MICROSOFT_PREFIX) - 1);
 
-    size_t windows_version_length = strlen("Windows 10");
+    size_t windows_version_length = sizeof("Windows 10") - 1;
     if (!is_server && build >= 10240 &&
         (!strncasecmp(name, "Windows 10", windows_version_length) ||
          !strncasecmp(name, "Windows 11", windows_version_length)) &&
@@ -564,15 +577,20 @@ static void netdata_windows_set_host_os_info(struct rrdhost_system_info *systemI
                                   info->version_id,
                                   info->detection);
 
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_NAME", info->labels.name);
-    if (info->labels.version[0])
-        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_VERSION", info->labels.version);
-    if (info->labels.release[0])
-        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_RELEASE", info->labels.release);
-    if (info->labels.edition[0])
-        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_EDITION", info->labels.edition);
-    if (info->labels.build[0])
-        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_LABEL_BUILD", info->labels.build);
+    const struct {
+        const char *key;
+        const char *value;
+    } label_fields[] = {
+        { "NETDATA_HOST_OS_LABEL_NAME",    info->labels.name    },
+        { "NETDATA_HOST_OS_LABEL_VERSION", info->labels.version },
+        { "NETDATA_HOST_OS_LABEL_RELEASE", info->labels.release },
+        { "NETDATA_HOST_OS_LABEL_EDITION", info->labels.edition },
+        { "NETDATA_HOST_OS_LABEL_BUILD",   info->labels.build   },
+    };
+    for (size_t i = 0; i < sizeof(label_fields) / sizeof(label_fields[0]); i++) {
+        if (label_fields[i].value[0])
+            (void)rrdhost_system_info_set_by_name(systemInfo, label_fields[i].key, label_fields[i].value);
+    }
 }
 
 static void netdata_windows_set_host_os_unknown(struct rrdhost_system_info *systemInfo)

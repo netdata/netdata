@@ -22,6 +22,13 @@
 #define NETDATA_WIN_VIRT_DIGITALOCEAN     "digitalocean"
 #define NETDATA_WIN_VIRT_BARE_METAL       "none"
 
+// OS label prefixes. Centralised so the strlen()-of-literal pattern (which
+// SonarCloud flags as S5837 / S5996) collapses to sizeof()-1 below.
+#define NETDATA_WINDOWS_MICROSOFT_PREFIX       "Microsoft "
+#define NETDATA_WINDOWS_OS_PREFIX_SERVER       "Windows Server"
+#define NETDATA_WINDOWS_OS_PREFIX_CLIENT       "Windows"
+#define NETDATA_WINDOWS_OS_PREFIX_SERVER_NAME  "Windows Server "
+
 #define NETDATA_WIN_CONTAINER_NONE                "none"
 #define NETDATA_WIN_CONTAINER_KUBERNETES          "container"
 #define NETDATA_WIN_CONTAINER_KUBERNETES_DETECT   "kubernetes"
