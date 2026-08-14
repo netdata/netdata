@@ -625,4 +625,72 @@ mod tests {
             .0;
         assert!(broken.validate(0).is_err(), "trailing arena bytes");
     }
+
+    /// The dependency guard: a TRSU chunk in a file whose manifest lacks
+    /// the TRCE column — the reader must reject the rollup
+    /// (require_column), not let a missing row prove "trace absent".
+    /// Same shape as `reader_rejects_bloom_without_trace_column`.
+    #[test]
+    fn reader_rejects_rollup_without_trace_column() {
+        use crate::{ColumnsTable, Histogram, IdRanges, Metadata, SchemaTree, Summary};
+
+        let lvl = crate::ZSTD_LEVEL_DEFAULT;
+        let summary = Summary {
+            min_timestamp_s: 1,
+            max_timestamp_s: 1,
+            record_count: 1,
+            content_meta: Vec::new(),
+        };
+        let metadata = Metadata {
+            histogram: Histogram {
+                timestamps: vec![1],
+                counts: vec![1],
+            },
+            id_ranges: IdRanges {
+                low_end: crate::KvId(0),
+                mid_end: crate::KvId(0),
+                high_end: crate::KvId(0),
+            },
+            tree: SchemaTree::flat(&Vec::new().into()),
+            columns: ColumnsTable::default(), // no TRCE in the manifest
+        };
+        let prim = crate::PrefixMap::<crate::BitmapValue>::build(
+            Vec::<(&str, crate::BitmapValue)>::new(),
+        )
+        .unwrap();
+
+        let mut w = chunk_file::container::StreamingWriter::new(
+            std::io::Cursor::new(Vec::new()),
+            *crate::MAGIC,
+            crate::VERSION,
+            6,
+        )
+        .unwrap();
+        w.write_chunk(crate::CHUNK_SUMMARY, &crate::writer::pack(&summary, lvl).unwrap())
+            .unwrap();
+        w.write_chunk(crate::CHUNK_META, &crate::writer::pack(&metadata, lvl).unwrap())
+            .unwrap();
+        w.write_chunk(crate::CHUNK_TIMS, &crate::writer::pack(&[1i64][..], lvl).unwrap())
+            .unwrap();
+        w.write_chunk(crate::CHUNK_PRIMARY, &crate::writer::pack(&prim, lvl).unwrap())
+            .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TRACE_ROLLUP,
+            &crate::writer::pack(&TraceRollup::default(), lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::stream_batch_id(0),
+            &crate::writer::pack(&crate::StreamBatch::for_write(&[]), lvl).unwrap(),
+        )
+        .unwrap();
+        let buf = w.finish().unwrap().into_inner();
+
+        let reader = crate::reader::ChunkReader::open(&buf).unwrap();
+        assert!(reader.has_trace_rollup());
+        assert!(
+            matches!(reader.trace_rollup(), Err(crate::Error::ColumnMismatch(_))),
+            "missing TRCE column rejected"
+        );
+    }
 }
