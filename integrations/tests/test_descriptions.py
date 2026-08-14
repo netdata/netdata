@@ -21,7 +21,7 @@ INTEGRATIONS_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = INTEGRATIONS_DIR.parent
 sys.path.insert(0, str(INTEGRATIONS_DIR))
 
-from descriptions import (
+from descriptions import (  # noqa: E402
     DOCUMENTATION_TYPES,
     MAX_DESCRIPTION_LENGTH,
     MIN_DESCRIPTION_LENGTH,
@@ -34,15 +34,15 @@ from descriptions import (
     parentheses_are_balanced,
     validate_description,
 )
-from _common import make_validator
-from gen_docs_integrations import (
+from _common import make_validator  # noqa: E402
+from gen_docs_integrations import (  # noqa: E402
     _select_integrations,
     build_readme_from_integration,
     create_overview,
     read_integrations_js,
 )
-from gen_doc_collector_page import get_integration_description
-from gen_npm_catalog import PAGE_DESCRIPTIONS
+from gen_doc_collector_page import get_integration_description  # noqa: E402
+from gen_npm_catalog import PAGE_DESCRIPTIONS  # noqa: E402
 
 
 MODE_BY_TYPE = {
@@ -178,10 +178,18 @@ VALID_EXPLICIT_DESCRIPTIONS = {
     "parser-safe Unicode": "Monitor service behavior and operational health with Netdata’s real-time metrics.",
     "Unicode prose": "Monitor Κατάσταση, 数据, and café service health across reliable production systems.",
     "Unicode joiners": "Monitor Persian می‌شود text and 👩‍💻 operator workflows across reliable production systems.",
-    "non-ASCII URL lookalike": "Monitor K://example identifiers as plain Unicode text across reliable production systems.",
-    "balanced nested parentheses": "Monitor service health (including nested (optional) detail) across reliable production systems.",
-    "internal colon": "Monitor service health by state: ready, degraded, and failed across reliable production systems.",
-    "non-terminal ellipsis": "Monitor service health across ready… degraded, and failed states with reliable production metrics.",
+    "non-ASCII URL lookalike": (
+        "Monitor K://example identifiers as plain Unicode text across reliable production systems."
+    ),
+    "balanced nested parentheses": (
+        "Monitor service health (including nested (optional) detail) across reliable production systems."
+    ),
+    "internal colon": (
+        "Monitor service health by state: ready, degraded, and failed across reliable production systems."
+    ),
+    "non-terminal ellipsis": (
+        "Monitor service health across ready… degraded, and failed states with reliable production metrics."
+    ),
 }
 VALID_EXPLICIT_DESCRIPTIONS.update(COMMONMARK_PLAIN_TEXT_DESCRIPTIONS)
 
@@ -208,17 +216,29 @@ INVALID_EXPLICIT_DESCRIPTIONS = {
     "other URL scheme": "Monitor PostgreSQL queries at ftp://example.com/metrics across every database server.",
     "double quote": 'Monitor PostgreSQL queries and the "ready" state across every production database server.',
     "backslash": r"Monitor PostgreSQL queries under C:\metrics across every production database server.",
-    "Unicode emphasis boundary": "Monitor service behavior around é*word*é boundaries with reliable production health metrics.",
-    "Unicode line separator": "Monitor service behavior and health across production systems.\u2028Track reliable operations.",
-    "Unicode paragraph separator": "Monitor service behavior and health across production systems.\u2029Track reliable operations.",
+    "Unicode emphasis boundary": (
+        "Monitor service behavior around é*word*é boundaries with reliable production health metrics."
+    ),
+    "Unicode line separator": (
+        "Monitor service behavior and health across production systems.\u2028Track reliable operations."
+    ),
+    "Unicode paragraph separator": (
+        "Monitor service behavior and health across production systems.\u2029Track reliable operations."
+    ),
     "high surrogate": "Monitor service behavior and health across production \ud800 systems reliably.",
     "low surrogate": "Monitor service behavior and health across production \udfff systems reliably.",
     "terminal colon": "Monitor service health and behavior across reliable production systems safely:",
     "terminal ellipsis": "Monitor service health and behavior across reliable production systems safely…",
     "terminal ASCII ellipsis": "Monitor service health and behavior across reliable production systems safely...",
-    "missing closing parenthesis": "Monitor service health (including optional detail across reliable production systems safely.",
-    "unexpected closing parenthesis": "Monitor service health including optional detail) across reliable production systems safely.",
-    "misordered parentheses": "Monitor service health )(with optional detail across reliable production systems safely.",
+    "missing closing parenthesis": (
+        "Monitor service health (including optional detail across reliable production systems safely."
+    ),
+    "unexpected closing parenthesis": (
+        "Monitor service health including optional detail) across reliable production systems safely."
+    ),
+    "misordered parentheses": (
+        "Monitor service health )(with optional detail across reliable production systems safely."
+    ),
 }
 INVALID_EXPLICIT_DESCRIPTIONS.update(
     {
@@ -245,7 +265,10 @@ MAP_DESCRIPTION_TARGETS = {
     "docs/learn.netdata.cloud/installation.md",
     "docs/netdata-agent/configuration/dynamic-configuration.md",
     "docs/netdata-enterprise-evaluation.md",
-    "docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md",
+    (
+        "docs/observability-centralization-points/metrics-centralization-points/"
+        "clustering-and-high-availability-of-netdata-parents.md"
+    ),
     "docs/observability-centralization-points/metrics-centralization-points/configuration.md",
     "docs/observability-centralization-points/metrics-centralization-points/faq.md",
     "docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md",
@@ -535,8 +558,13 @@ Monitor **short** metrics. Collect enough detail to pass meta-description valida
     def test_explicit_description_overrides_overview(self):
         integration = {
             "id": "test",
-            "meta": {"description": "Use the explicit integration description because the overview is deliberately generic."},
-            "overview": "# Test\n\n## Overview\n\nThis generic overview is long enough to be selected without the override.",
+            "meta": {
+                "description": "Use the explicit integration description because the overview is deliberately generic."
+            },
+            "overview": (
+                "# Test\n\n## Overview\n\n"
+                "This generic overview is long enough to be selected without the override."
+            ),
         }
         self.assertEqual(
             get_integration_meta_description(integration),
@@ -564,7 +592,10 @@ Monitor **short** metrics. Collect enough detail to pass meta-description valida
                     "categories": ["logs"],
                     "icon_filename": "test.svg",
                 },
-                "overview": "# Invalid test\n\n## Overview\n\nMonitor a valid fallback that must not hide an invalid override.",
+                "overview": (
+                    "# Invalid test\n\n## Overview\n\n"
+                    "Monitor a valid fallback that must not hide an invalid override."
+                ),
             }
             with self.subTest(label=label):
                 with self.assertRaises(RuntimeError) as caught:
@@ -832,7 +863,8 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
         ]
         if len(matching) != 1:
             raise AssertionError(
-                f"Expected one source record for {integration['integration_type']} {expected_name!r}, got {len(matching)}"
+                f"Expected one source record for {integration['integration_type']} "
+                f"{expected_name!r}, got {len(matching)}"
             )
 
         if isinstance(source, dict) and "modules" in source:
@@ -953,7 +985,8 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
             scheme_start = rng.choice(ascii_word.replace("0123456789_", "") + non_ascii)
             scheme_tail = "".join(rng.choice(ascii_word + "+.-" + non_ascii) for _ in range(4))
             value = (
-                f"Monitor {scheme_start}{scheme_tail}://example identifiers as plain text across reliable production systems."
+                f"Monitor {scheme_start}{scheme_tail}://example identifiers as plain text "
+                "across reliable production systems."
             )
             scheme = scheme_start + scheme_tail
             scheme_allowed = ascii_word.replace("_", "") + "+.-"
@@ -972,14 +1005,18 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
             right = rng.choice(boundary_chars)
             marker = rng.choice(MARKDOWN_SPECIAL_CHARACTERS)
             value = (
-                f"Monitor service behavior around {left}{marker}{right} metadata with reliable production health metrics."
+                f"Monitor service behavior around {left}{marker}{right} metadata with reliable "
+                "production health metrics."
             )
             self.assertFalse(accepts(value), value)
             if iteration < 16:
                 self._assert_contract(value, False, f"seeded Markdown special character {iteration}")
 
             separator = rng.choice(("\u2028", "\u2029"))
-            value = f"Monitor service behavior across production systems.{separator}Track reliable health and performance."
+            value = (
+                f"Monitor service behavior across production systems.{separator}"
+                "Track reliable health and performance."
+            )
             self.assertFalse(accepts(value), repr(value))
             if iteration < 16:
                 self._assert_contract(value, False, f"seeded Unicode separator {iteration}")
