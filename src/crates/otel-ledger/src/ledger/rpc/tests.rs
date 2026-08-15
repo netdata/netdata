@@ -32,6 +32,17 @@ fn info_token_synthesizes_info_true() {
 }
 
 #[test]
+fn out_of_range_window_tokens_are_skipped_like_non_numeric_ones() {
+    // The request fields are u32: a wider parse would synthesize a
+    // number the deserializer rejects, failing the whole payload for
+    // one bad token.
+    assert_eq!(
+        patched(&["after:5000000000", "before:200"]),
+        json!({"info": false, "before": 200})
+    );
+}
+
+#[test]
 fn no_synthesis_without_args_or_over_an_existing_payload() {
     // No args: nothing to synthesize. Existing payload (a POST body,
     // or the upstream rt shim's output): must pass through untouched.

@@ -48,12 +48,16 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
     map.insert("info".into(), serde_json::json!(info));
 
     for arg in args {
+        // u32, matching the request fields: an out-of-range token is
+        // SKIPPED like a non-numeric one — parsing wider would synthesize
+        // a number the deserializer rejects, failing the whole payload
+        // for one bad token.
         if let Some(rest) = arg.strip_prefix("after:") {
-            if let Ok(v) = rest.parse::<u64>() {
+            if let Ok(v) = rest.parse::<u32>() {
                 map.insert("after".into(), serde_json::json!(v));
             }
         } else if let Some(rest) = arg.strip_prefix("before:") {
-            if let Ok(v) = rest.parse::<u64>() {
+            if let Ok(v) = rest.parse::<u32>() {
                 map.insert("before".into(), serde_json::json!(v));
             }
         }
