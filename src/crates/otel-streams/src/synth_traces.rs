@@ -306,6 +306,34 @@ mod tests {
         }
     }
 
+    /// The clamp's invariant: every event stays within its span's
+    /// [start, end] at an events_per_span past the clamp threshold
+    /// (offsets exceed the extent on leaf spans from k >= 3 at the
+    /// default duration) — including the flat shape, where every span
+    /// is a leaf.
+    #[test]
+    fn events_stay_span_contained_past_the_clamp_threshold() {
+        for per_trace in [1, 8] {
+            let spans = generate(&SynthTraceParams {
+                spans_per_trace: per_trace,
+                events_per_span: 5,
+                ..params(64)
+            });
+            for s in &spans {
+                for e in &s.events {
+                    assert!(
+                        e.time_unix_nano >= s.start_time_unix_nano
+                            && e.time_unix_nano <= s.end_time_unix_nano,
+                        "event at {} outside span [{}, {}] (per_trace={per_trace})",
+                        e.time_unix_nano,
+                        s.start_time_unix_nano,
+                        s.end_time_unix_nano
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn count_ids_and_monotonic_times() {
         let spans = generate(&params(5));
