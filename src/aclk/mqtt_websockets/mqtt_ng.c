@@ -2336,7 +2336,13 @@ static int send_fragment(struct mqtt_ng_client *client) {
     else
         nd_log(NDLS_DAEMON, NDLP_WARNING, "This fragment was fully sent already. This should not happen!");
 
-    frag->sent_monotonic_ut = now_monotonic_usec();
+    // only a write that moved bytes is a transmission. Stamping every attempt, including
+    // the zero-byte ones a full send buffer produces, would make this timestamp read as
+    // "recently sent" for a packet that is in fact stalled - and it is what the PUBACK
+    // timeout, the ack latency and max_puback_wait_us all measure from.
+    if (processed)
+        frag->sent_monotonic_ut = now_monotonic_usec();
+
     frag->sent += processed;
     if (frag->sent != frag->len)
         return -1;
@@ -3016,221 +3022,244 @@ static int mqtt_ng_unittest_malformed_ack_properties_length(void)
     return errors;
 }
 
-// A QoS1 publish whose PUBACK never arrives must be reported as a timeout, not folded
-// into the acknowledgement statistics. The cleanup is expected to be identical to the
-// ack path - the message is dropped and leaves the monitor list - because this client
-// does not retransmit.
+// ----------------------------------------------------------------------------
+// PUBACK timeout accounting
+//
+// Shared scaffolding: a client with a single QoS1 publish queued, plus the head fragment of
+// that publish, which is the fragment the timeout path inspects.
+
+struct mqtt_ng_unittest_puback_ctx {
+    rbuf_t input;
+    struct mqtt_ng_client *client;
+    struct buffer_fragment *frag;
+    uint16_t packet_id;
+};
+
+static bool mqtt_ng_unittest_puback_setup(struct mqtt_ng_unittest_puback_ctx *ctx, mqtt_ng_send_fnc_t send_fnc)
+{
+    memset(ctx, 0, sizeof(*ctx));
+    ctx->input = rbuf_create(128, 128);
+
+    struct mqtt_ng_init settings = {
+        .data_in = ctx->input,
+        .data_out_fnc = send_fnc,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = NULL,
+    };
+
+    ctx->client = mqtt_ng_init(&settings);
+    if (!ctx->client)
+        return false;
+
+    char topic[] = "/unit-test";
+    char payload[] = "payload";
+
+    // msg_free NULL means MEMCPY: the client takes its own copy of the payload
+    if (mqtt_ng_publish(ctx->client, topic, NULL, payload, NULL, sizeof(payload) - 1,
+                        1 << 1 /* QoS1 */, &ctx->packet_id) != MQTT_NG_MSGGEN_OK)
+        return false;
+
+    ctx->frag = BUFFER_FIRST_FRAG(&ctx->client->main_buffer.hdr_buffer);
+    while (ctx->frag &&
+           !((ctx->frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && ctx->frag->packet_id == ctx->packet_id))
+        ctx->frag = ctx->frag->next;
+
+    return ctx->packet_id != 0 && ctx->frag != NULL;
+}
+
+static void mqtt_ng_unittest_puback_teardown(struct mqtt_ng_unittest_puback_ctx *ctx)
+{
+    if (ctx->client)
+        mqtt_ng_destroy(ctx->client);
+    rbuf_free(ctx->input);
+}
+
+static uint32_t *mqtt_ng_unittest_deadline_of(struct mqtt_ng_unittest_puback_ctx *ctx)
+{
+    return (uint32_t *)JudyLGet(ctx->client->pending_packets.JudyL, (Word_t)ctx->packet_id, PJE0);
+}
+
+// expire the deadline instead of waiting PACKET_ACK_TIMEOUT_SECS for it: a delta of 0 puts the
+// deadline at PACKET_TIMEOUT_EPOCH, which is always in the past
+static bool mqtt_ng_unittest_expire_deadline(struct mqtt_ng_unittest_puback_ctx *ctx)
+{
+    uint32_t *deadline = mqtt_ng_unittest_deadline_of(ctx);
+    if (!deadline)
+        return false;
+
+    *deadline = 0;
+    return true;
+}
+
+static bool mqtt_ng_unittest_deadline_is_in_the_future(struct mqtt_ng_unittest_puback_ctx *ctx)
+{
+    uint32_t *deadline = mqtt_ng_unittest_deadline_of(ctx);
+    return deadline && now_realtime_sec() < (PACKET_TIMEOUT_EPOCH + (time_t)*deadline);
+}
+
+static ssize_t mqtt_ng_unittest_send_nothing(void *user_ctx __maybe_unused, const void *buf __maybe_unused,
+                                             size_t len __maybe_unused)
+{
+    return 0;
+}
+
+// A QoS1 publish whose PUBACK never arrives must be reported as a timeout, not folded into the
+// acknowledgement statistics. The cleanup is expected to be identical to the ack path - the
+// message is dropped and leaves the monitor list - because this client does not retransmit.
 static int mqtt_ng_unittest_puback_timeout_is_not_an_ack(void)
 {
     int errors = 0;
-    rbuf_t input = rbuf_create(128, 128);
-    struct mqtt_ng_init settings = {
-        .data_in = input,
-        .data_out_fnc = NULL,
-        .user_ctx = NULL,
-        .connack_callback = NULL,
-        .puback_callback = NULL,
-        .msg_callback = NULL,
-    };
-    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+    struct mqtt_ng_unittest_puback_ctx ctx;
 
-    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds");
-    if (!client) {
-        rbuf_free(input);
+    MQTT_NG_TEST(mqtt_ng_unittest_puback_setup(&ctx, NULL), "QoS1 publish is queued");
+    if (!ctx.frag) {
+        mqtt_ng_unittest_puback_teardown(&ctx);
         return errors;
     }
 
-    char topic[] = "/unit-test";
-    char payload[] = "payload";
-    uint16_t packet_id = 0;
-
-    // msg_free NULL means MEMCPY: the client takes its own copy of the payload
-    int rc = mqtt_ng_publish(client, topic, NULL, payload, NULL, sizeof(payload) - 1,
-                             1 << 1 /* QoS1 */, &packet_id);
-    MQTT_NG_TEST(rc == MQTT_NG_MSGGEN_OK, "QoS1 publish is generated");
-    MQTT_NG_TEST(packet_id != 0, "QoS1 publish gets a packet id");
-    MQTT_NG_TEST(__atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
                  "QoS1 publish is waiting for its PUBACK");
-
-    // pretend the packet reached the socket, which is what makes it eligible for
-    // acknowledgement (and therefore for timing out)
-    struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
-    while (frag && !((frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->packet_id == packet_id))
-        frag = frag->next;
-
-    MQTT_NG_TEST(frag != NULL, "publish head fragment is in the transaction buffer");
-    if (!frag) {
-        mqtt_ng_destroy(client);
-        rbuf_free(input);
-        return errors;
-    }
 
     // backdate the transmission past the ack timeout: it is frag->sent_monotonic_ut, not the
     // monitor-list deadline, that decides whether the packet really ran out of time
-    frag->sent = frag->len;
-    frag->sent_monotonic_ut = now_monotonic_usec() - ((usec_t)PACKET_ACK_TIMEOUT_SECS + 1) * USEC_PER_SEC;
+    ctx.frag->sent = ctx.frag->len;
+    ctx.frag->sent_monotonic_ut = now_monotonic_usec() - ((usec_t)PACKET_ACK_TIMEOUT_SECS + 1) * USEC_PER_SEC;
 
-    // expire the deadline instead of waiting PACKET_ACK_TIMEOUT_SECS for it: a delta of 0
-    // puts the deadline at PACKET_TIMEOUT_EPOCH, which is always in the past
-    uint32_t *deadline = (uint32_t *)JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0);
-    MQTT_NG_TEST(deadline != NULL, "publish is registered in the timeout monitor list");
-    if (deadline)
-        *deadline = 0;
+    MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is registered in the timeout monitor list");
 
     usec_t latency_before = __atomic_load_n(&publish_latency, __ATOMIC_ACQUIRE);
 
-    check_packet_monitor_list_for_timeouts(client);
+    check_packet_monitor_list_for_timeouts(ctx.client);
 
-    MQTT_NG_TEST(__atomic_load_n(&client->stats.packets_timed_out, __ATOMIC_RELAXED) == 1,
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 1,
                  "timeout is counted as a timeout");
     MQTT_NG_TEST(__atomic_load_n(&publish_latency, __ATOMIC_ACQUIRE) == latency_before,
                  "timeout does not report a publish latency");
-    MQTT_NG_TEST(__atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 0,
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 0,
                  "timed out packet leaves the in-flight count");
-    MQTT_NG_TEST(JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0) == NULL,
-                 "timed out packet leaves the monitor list");
+    MQTT_NG_TEST(mqtt_ng_unittest_deadline_of(&ctx) == NULL, "timed out packet leaves the monitor list");
 
-    // the counter has to survive the public accessor: mqtt_ng_get_stats() is what
-    // aclk_status and the pulse chart actually read, so a missing copy there would
-    // leave both reporting zero forever
+    // the counter has to survive the public accessor: mqtt_ng_get_stats() is what aclk_status
+    // and the pulse chart actually read, so a missing copy there would leave both reporting
+    // zero forever
     struct mqtt_ng_stats stats;
     memset(&stats, 0, sizeof(stats));
-    mqtt_ng_get_stats(client, &stats);
+    mqtt_ng_get_stats(ctx.client, &stats);
     MQTT_NG_TEST(stats.packets_timed_out == 1, "mqtt_ng_get_stats() reports the timeout");
     MQTT_NG_TEST(stats.packets_waiting_puback == 0, "mqtt_ng_get_stats() reports the drained in-flight count");
 
-    // resolve_packet() only compacts the buffer when it walked past reclaimable fragments
-    // on the way to this one, and this is the only message in it, so the fragment is still
-    // addressable and must show the same cleanup an ack performs
-    MQTT_NG_TEST(frag->packet_id == 0, "timed out packet is not reprocessed");
-    MQTT_NG_TEST((frag->flags & BUFFER_FRAG_GARBAGE_COLLECT) != 0, "timed out message is dropped");
+    // resolve_packet() only compacts the buffer when it walked past reclaimable fragments on the
+    // way to this one, and this is the only message in it, so the fragment is still addressable
+    // and must show the same cleanup an ack performs
+    MQTT_NG_TEST(ctx.frag->packet_id == 0, "timed out packet is not reprocessed");
+    MQTT_NG_TEST((ctx.frag->flags & BUFFER_FRAG_GARBAGE_COLLECT) != 0, "timed out message is dropped");
 
-    mqtt_ng_destroy(client);
-    rbuf_free(input);
+    mqtt_ng_unittest_puback_teardown(&ctx);
     return errors;
 }
 
-// A packet that reaches its deadline while still queued was never on the wire, so it is
-// not waiting for a PUBACK. It must be deferred, not resolved - and its monitor entry must
-// not be left expired, or the sweep re-fires on it every 60s for as long as it stays queued.
+// A packet that reaches its deadline while still queued was never on the wire, so it is not
+// waiting for a PUBACK. It must be deferred, not resolved - and its monitor entry must not be
+// left expired, or the sweep re-fires on it every 60s for as long as it stays queued.
 static int mqtt_ng_unittest_unsent_packet_defers_its_deadline(void)
 {
     int errors = 0;
-    rbuf_t input = rbuf_create(128, 128);
-    struct mqtt_ng_init settings = {
-        .data_in = input,
-        .data_out_fnc = NULL,
-        .user_ctx = NULL,
-        .connack_callback = NULL,
-        .puback_callback = NULL,
-        .msg_callback = NULL,
-    };
-    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+    struct mqtt_ng_unittest_puback_ctx ctx;
 
-    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds");
-    if (!client) {
-        rbuf_free(input);
+    MQTT_NG_TEST(mqtt_ng_unittest_puback_setup(&ctx, NULL), "QoS1 publish is queued");
+    if (!ctx.frag) {
+        mqtt_ng_unittest_puback_teardown(&ctx);
         return errors;
     }
 
-    char topic[] = "/unit-test";
-    char payload[] = "payload";
-    uint16_t packet_id = 0;
-
-    int rc = mqtt_ng_publish(client, topic, NULL, payload, NULL, sizeof(payload) - 1,
-                             1 << 1 /* QoS1 */, &packet_id);
-    MQTT_NG_TEST(rc == MQTT_NG_MSGGEN_OK, "QoS1 publish is generated");
-
     // deliberately leave the packet unsent, then expire its deadline
-    uint32_t *deadline = (uint32_t *)JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0);
-    MQTT_NG_TEST(deadline != NULL, "publish is registered in the timeout monitor list");
-    if (deadline)
-        *deadline = 0;
+    MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is registered in the timeout monitor list");
 
-    check_packet_monitor_list_for_timeouts(client);
+    check_packet_monitor_list_for_timeouts(ctx.client);
 
-    MQTT_NG_TEST(__atomic_load_n(&client->stats.packets_timed_out, __ATOMIC_RELAXED) == 0,
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 0,
                  "a packet that was never sent is not counted as timed out");
-    MQTT_NG_TEST(__atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
                  "a packet that was never sent stays in the in-flight count");
+    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_in_the_future(&ctx),
+                 "deferred packet stays in the monitor list with a future deadline");
 
-    deadline = (uint32_t *)JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0);
-    MQTT_NG_TEST(deadline != NULL, "deferred packet stays in the monitor list");
-    MQTT_NG_TEST(deadline && now_realtime_sec() < (PACKET_TIMEOUT_EPOCH + (time_t)*deadline),
-                 "deferred packet gets a deadline in the future");
-
-    mqtt_ng_destroy(client);
-    rbuf_free(input);
+    mqtt_ng_unittest_puback_teardown(&ctx);
     return errors;
 }
 
-// A packet transmitted shortly before the sweep still carries the deadline it was armed
-// with at generate time, which can already be due. It has barely waited for its PUBACK, so
-// it must get the rest of the window measured from transmission instead of being dropped.
+// A packet transmitted shortly before the sweep still carries the deadline it was armed with at
+// generate time, which can already be due. It has barely waited for its PUBACK, so it must get
+// the rest of the window measured from transmission instead of being dropped.
 static int mqtt_ng_unittest_recently_sent_packet_keeps_its_window(void)
 {
     int errors = 0;
-    rbuf_t input = rbuf_create(128, 128);
-    struct mqtt_ng_init settings = {
-        .data_in = input,
-        .data_out_fnc = NULL,
-        .user_ctx = NULL,
-        .connack_callback = NULL,
-        .puback_callback = NULL,
-        .msg_callback = NULL,
-    };
-    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+    struct mqtt_ng_unittest_puback_ctx ctx;
 
-    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds");
-    if (!client) {
-        rbuf_free(input);
-        return errors;
-    }
-
-    char topic[] = "/unit-test";
-    char payload[] = "payload";
-    uint16_t packet_id = 0;
-
-    int rc = mqtt_ng_publish(client, topic, NULL, payload, NULL, sizeof(payload) - 1,
-                             1 << 1 /* QoS1 */, &packet_id);
-    MQTT_NG_TEST(rc == MQTT_NG_MSGGEN_OK, "QoS1 publish is generated");
-
-    struct buffer_fragment *frag = BUFFER_FIRST_FRAG(&client->main_buffer.hdr_buffer);
-    while (frag && !((frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->packet_id == packet_id))
-        frag = frag->next;
-
-    MQTT_NG_TEST(frag != NULL, "publish head fragment is in the transaction buffer");
-    if (!frag) {
-        mqtt_ng_destroy(client);
-        rbuf_free(input);
+    MQTT_NG_TEST(mqtt_ng_unittest_puback_setup(&ctx, NULL), "QoS1 publish is queued");
+    if (!ctx.frag) {
+        mqtt_ng_unittest_puback_teardown(&ctx);
         return errors;
     }
 
     // sent just now, but with the deadline it was armed with at generate time already due -
     // what happens when transmission lands just before a sweep
-    frag->sent = frag->len;
-    frag->sent_monotonic_ut = now_monotonic_usec();
+    ctx.frag->sent = ctx.frag->len;
+    ctx.frag->sent_monotonic_ut = now_monotonic_usec();
 
-    uint32_t *deadline = (uint32_t *)JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0);
-    MQTT_NG_TEST(deadline != NULL, "publish is registered in the timeout monitor list");
-    if (deadline)
-        *deadline = 0;
+    MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is registered in the timeout monitor list");
 
-    check_packet_monitor_list_for_timeouts(client);
+    check_packet_monitor_list_for_timeouts(ctx.client);
 
-    MQTT_NG_TEST(__atomic_load_n(&client->stats.packets_timed_out, __ATOMIC_RELAXED) == 0,
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 0,
                  "a just-sent packet is not counted as timed out");
-    MQTT_NG_TEST(__atomic_load_n(&client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
                  "a just-sent packet stays in the in-flight count");
-    MQTT_NG_TEST(frag->packet_id == packet_id, "a just-sent packet is not resolved");
+    MQTT_NG_TEST(ctx.frag->packet_id == ctx.packet_id, "a just-sent packet is not resolved");
+    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_in_the_future(&ctx),
+                 "deferred packet stays in the monitor list with a future deadline");
 
-    deadline = (uint32_t *)JudyLGet(client->pending_packets.JudyL, (Word_t)packet_id, PJE0);
-    MQTT_NG_TEST(deadline != NULL, "deferred packet stays in the monitor list");
-    MQTT_NG_TEST(deadline && now_realtime_sec() < (PACKET_TIMEOUT_EPOCH + (time_t)*deadline),
-                 "deferred packet gets a deadline in the future");
+    mqtt_ng_unittest_puback_teardown(&ctx);
+    return errors;
+}
 
-    mqtt_ng_destroy(client);
-    rbuf_free(input);
+// A send attempt that moves no bytes is not a transmission. If it refreshed
+// frag->sent_monotonic_ut, a packet stalled behind a full send buffer would look "recently sent"
+// to every sweep, be deferred forever, and never leave the queue.
+static int mqtt_ng_unittest_stalled_send_does_not_refresh_progress(void)
+{
+    int errors = 0;
+    struct mqtt_ng_unittest_puback_ctx ctx;
+
+    MQTT_NG_TEST(mqtt_ng_unittest_puback_setup(&ctx, mqtt_ng_unittest_send_nothing), "QoS1 publish is queued");
+    if (!ctx.frag) {
+        mqtt_ng_unittest_puback_teardown(&ctx);
+        return errors;
+    }
+
+    // partially written, and its last real progress is older than the ack timeout
+    usec_t stalled_since_ut = now_monotonic_usec() - ((usec_t)PACKET_ACK_TIMEOUT_SECS + 1) * USEC_PER_SEC;
+    ctx.frag->sent = 1;
+    ctx.frag->sent_monotonic_ut = stalled_since_ut;
+    ctx.client->main_buffer.sending_frag = ctx.frag;
+
+    MQTT_NG_TEST(send_fragment(ctx.client) == -1, "a send that moves no bytes reports a partial write");
+    MQTT_NG_TEST(ctx.frag->sent == 1, "a send that moves no bytes does not advance the fragment");
+    MQTT_NG_TEST(ctx.frag->sent_monotonic_ut == stalled_since_ut,
+                 "a send that moves no bytes does not count as transmission progress");
+
+    MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is registered in the timeout monitor list");
+
+    check_packet_monitor_list_for_timeouts(ctx.client);
+
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 1,
+                 "a stalled packet still times out instead of being deferred forever");
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 0,
+                 "a stalled packet leaves the in-flight count");
+
+    mqtt_ng_unittest_puback_teardown(&ctx);
     return errors;
 }
 
@@ -3249,6 +3278,7 @@ int mqtt_ng_unittest(void)
     errors += mqtt_ng_unittest_puback_timeout_is_not_an_ack();
     errors += mqtt_ng_unittest_unsent_packet_defers_its_deadline();
     errors += mqtt_ng_unittest_recently_sent_packet_keeps_its_window();
+    errors += mqtt_ng_unittest_stalled_send_does_not_refresh_progress();
 
     if (errors)
         fprintf(stderr, "mqtt_ng unittest: %d ERROR(S)\n", errors);
