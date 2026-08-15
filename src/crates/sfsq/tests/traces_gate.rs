@@ -362,10 +362,16 @@ fn absent_chunks_block_pruning_without_a_partial() {
 
 /// True-root filter semantics (decision 1D): a trace whose root span
 /// was never exported matches NO root condition — either polarity —
-/// and the gate PROVES it from `ROOT_CLAIM_NONE` rows without
-/// assembling. The trace stays findable by span-level conditions.
+/// with gate on and off agreeing, and the trace stays findable by
+/// span-level conditions. (That the gate reaches this verdict WITHOUT
+/// assembling — the `ROOT_CLAIM_NONE` prune — has no public observable
+/// yet: `GateStats` is crate-internal. Mutation-checked 2026-08-15:
+/// removing the no-root prune leaves this test green because assembly
+/// evaluates the same predicate to the same emptiness. The prune-proof
+/// assertion lands when gate stats surface for the tail-aggregates /
+/// work-ceiling follow-ups.)
 #[test]
-fn rootless_traces_never_match_root_filters_and_prune_provably() {
+fn rootless_traces_never_match_root_filters_either_polarity() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
     // Parent 0xEE never exported: no unset-parent span exists.
