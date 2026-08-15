@@ -1244,16 +1244,48 @@ static bool epdl_populate_pages_from_extent_data(
         else
             stats_data_from_extent++;
 
-        struct page_details *pd = pd_list;
-        do {
-            if(pd != pd_list)
-                pgc_page_dup(main_cache, page);
+        // One reference per pd. pgc_page_add_and_acquire() above returned the page with a
+        // single reference held; take the remaining ones here, BEFORE publishing any pd.
+        //
+        // Publishing a pd (assigning pd->page and setting PDC_PAGE_READY) makes the page
+        // consumable by that pd's own query, and the pds in this list belong to DIFFERENT
+        // queries - epdl_get_pd_load_link_list_from_metric_start_time() walks ep->query.next
+        // and collects one pd per EPDL, each with its own pdc.
+        //
+        // The consumer does not wait for us: pg_cache_lookup_next() reads pd->page directly
+        // (pagecache.c, "page = pd->page" before any completion check) and only falls back to
+        // completion_wait_for_a_job() when it is still NULL. Having taken it, it sets
+        // PDC_PAGE_RELEASED to take ownership of our reference (pdc_destroy() then skips it),
+        // and releases it from rrdeng_load_page_next() when it moves to the next page.
+        //
+        // That release is NOT gated by the pdc refcount this worker holds - that only blocks
+        // pdc_destroy().
+        //
+        // The dip to refcount 0 is not itself the problem: refcount_acquire_advanced() only
+        // rejects negative values, so 0 -> 1 is a valid acquire. The problem is that 0 is
+        // exactly the state an evictor claims from - refcount_acquire_for_deletion() CASes
+        // 0 -> REFCOUNT_DELETED.
+        //
+        // Which evictor: main_cache is created with PGC_OPTIONS_EVICT_PAGES_NO_INLINE
+        // (pagecache.c), so the releasing thread does NOT turn into an evictor here. It is
+        // pgc_evict_thread that has to win the window, and it only runs while usage is above
+        // healthy_size_per1000 - which is why this is rare rather than impossible, and why it
+        // needs cache pressure to reproduce.
+        //
+        // If it does win, our later pgc_page_dup() sees a negative refcount and fatals. That is
+        // the lucky outcome: if eviction gets as far as free() first, we touch freed memory and
+        // every pd we already published is left with a dangling pd->page for its own consumer.
+        //
+        // Taking all the references first keeps the count above 0 for the whole loop, so the
+        // page never becomes evictable while we still need it.
+        for(struct page_details *pd = pd_list->load.next; pd ; pd = pd->load.next)
+            pgc_page_dup(main_cache, page);
 
+        PDC_PAGE_STATUS status = PDC_PAGE_READY | tags | (pgd_is_empty(pgd) ? PDC_PAGE_EMPTY : 0);
+        for(struct page_details *pd = pd_list; pd ; pd = pd->load.next) {
             pd->page = page;
-            pdc_page_status_set(pd, PDC_PAGE_READY | tags | (pgd_is_empty(pgd) ? PDC_PAGE_EMPTY : 0));
-
-            pd = pd->load.next;
-        } while(pd);
+            pdc_page_status_set(pd, status);
+        }
 
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP);
