@@ -13,6 +13,10 @@ void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len);
 #include "aclk_mqtt_workers.h"
 #include "daemon/config/netdata-conf-profile.h"
 
+// How long a QoS1/2 packet may wait for its acknowledgement, measured from the moment it was
+// transmitted (frag->sent_monotonic_ut), not from when it was generated. Past this the packet is
+// dropped and counted in stats.packets_timed_out - this client does not retransmit. A packet that
+// has not finished going out on the wire is never counted against this; see resolve_packet().
 #define PACKET_ACK_TIMEOUT_SECS (60)
 #define SMALL_STRING_DONT_FRAGMENT_LIMIT 128
 
@@ -1274,21 +1278,33 @@ static int resolve_packet(struct mqtt_ng_client *client, uint16_t packet_id, boo
             // hint about when to look; frag->sent_monotonic_ut is the authority on how long
             // this packet has actually been waiting for its PUBACK - the same timestamp the
             // ack path below measures latency from.
-            if (!frag->sent || !frag->sent_monotonic_ut) {
+            // A message that is still being written MUST NOT be resolved. Resolving calls
+            // mark_message_for_gc(), which frees the payload, and try_send_all() would then
+            // continue with the next message straight after the truncated prefix already on
+            // the socket. MQTT over TCP has no frame delimiters, so the session would be
+            // corrupted from that point on with no way to resync. A message spans several
+            // fragments, so the head being fully sent is not enough - sending_frag_in_message()
+            // is what answers "is any part of this message still on the wire".
+            //
+            // The only safe way out of a stuck transmission is to drop the connection, which
+            // the ping timeout and the no-progress watchdog already do; a reconnect purges the
+            // buffer and the monitor list together.
+            if (!frag->sent || !frag->sent_monotonic_ut ||
+                sending_frag_in_message(&client->main_buffer, frag)) {
                 if (!acked) {
-                    // Still queued behind back-pressure, so it is not waiting for a PUBACK at
-                    // all. Resolving it would drop a message that is still going out, and
-                    // returning without re-arming would leave an already-expired entry that
-                    // re-fires on every sweep for as long as the packet stays queued. Time
-                    // spent waiting to be sent is reported separately, by
-                    // max_send_queue_wait_us / max_unsent_wait_us.
+                    // Not waiting for a PUBACK yet, so there is nothing to time out. Returning
+                    // without re-arming would leave an already-expired entry that re-fires on
+                    // every sweep for as long as the transmission is stuck. Time spent waiting
+                    // to be sent is reported separately, by max_send_queue_wait_us /
+                    // max_unsent_wait_us.
                     rearm_packet_timeout_unsafe(client, packet_id, PACKET_ACK_TIMEOUT_SECS);
 
                     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                           "MQTT packet_id (%" PRIu16 ") reached its PUBACK deadline before being sent, deferring it",
+                           "MQTT packet_id (%" PRIu16 ") reached its PUBACK deadline while still being sent, deferring it",
                            packet_id);
                 }
                 else
+                    // the broker cannot acknowledge a packet it has not fully received
                     nd_log(NDLS_DAEMON, NDLP_ERR,
                            "Received packet_id (%" PRIu16 ") belongs to MQTT packet which was not yet sent!",
                            packet_id);
@@ -3093,10 +3109,17 @@ static bool mqtt_ng_unittest_expire_deadline(struct mqtt_ng_unittest_puback_ctx 
     return true;
 }
 
-static bool mqtt_ng_unittest_deadline_is_in_the_future(struct mqtt_ng_unittest_puback_ctx *ctx)
+// a re-arm must land inside the ack window, not merely somewhere in the future - a wildly
+// wrong deadline would otherwise pass unnoticed
+static bool mqtt_ng_unittest_deadline_is_within_the_ack_window(struct mqtt_ng_unittest_puback_ctx *ctx)
 {
     uint32_t *deadline = mqtt_ng_unittest_deadline_of(ctx);
-    return deadline && now_realtime_sec() < (PACKET_TIMEOUT_EPOCH + (time_t)*deadline);
+    if (!deadline)
+        return false;
+
+    time_t now = now_realtime_sec();
+    time_t expires_at = PACKET_TIMEOUT_EPOCH + (time_t)*deadline;
+    return expires_at > now && expires_at <= now + PACKET_ACK_TIMEOUT_SECS;
 }
 
 static ssize_t mqtt_ng_unittest_send_nothing(void *user_ctx __maybe_unused, const void *buf __maybe_unused,
@@ -3183,8 +3206,8 @@ static int mqtt_ng_unittest_unsent_packet_defers_its_deadline(void)
                  "a packet that was never sent is not counted as timed out");
     MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
                  "a packet that was never sent stays in the in-flight count");
-    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_in_the_future(&ctx),
-                 "deferred packet stays in the monitor list with a future deadline");
+    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_within_the_ack_window(&ctx),
+                 "deferred packet keeps a deadline inside the ack window");
 
     mqtt_ng_unittest_puback_teardown(&ctx);
     return errors;
@@ -3218,17 +3241,18 @@ static int mqtt_ng_unittest_recently_sent_packet_keeps_its_window(void)
     MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
                  "a just-sent packet stays in the in-flight count");
     MQTT_NG_TEST(ctx.frag->packet_id == ctx.packet_id, "a just-sent packet is not resolved");
-    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_in_the_future(&ctx),
-                 "deferred packet stays in the monitor list with a future deadline");
+    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_within_the_ack_window(&ctx),
+                 "deferred packet keeps a deadline inside the ack window");
 
     mqtt_ng_unittest_puback_teardown(&ctx);
     return errors;
 }
 
-// A send attempt that moves no bytes is not a transmission. If it refreshed
-// frag->sent_monotonic_ut, a packet stalled behind a full send buffer would look "recently sent"
-// to every sweep, be deferred forever, and never leave the queue.
-static int mqtt_ng_unittest_stalled_send_does_not_refresh_progress(void)
+// A message that is still on the wire must never be resolved: garbage collecting it would
+// leave a truncated packet on the socket and the next message's bytes would follow it,
+// desyncing the MQTT stream for good. Also checks that a send attempt which moved no bytes is
+// not recorded as transmission progress.
+static int mqtt_ng_unittest_packet_on_the_wire_is_never_dropped(void)
 {
     int errors = 0;
     struct mqtt_ng_unittest_puback_ctx ctx;
@@ -3239,7 +3263,8 @@ static int mqtt_ng_unittest_stalled_send_does_not_refresh_progress(void)
         return errors;
     }
 
-    // partially written, and its last real progress is older than the ack timeout
+    // mid-write and stalled: partially sent, still the send cursor, and its last real progress
+    // is older than the ack timeout
     usec_t stalled_since_ut = now_monotonic_usec() - ((usec_t)PACKET_ACK_TIMEOUT_SECS + 1) * USEC_PER_SEC;
     ctx.frag->sent = 1;
     ctx.frag->sent_monotonic_ut = stalled_since_ut;
@@ -3254,10 +3279,15 @@ static int mqtt_ng_unittest_stalled_send_does_not_refresh_progress(void)
 
     check_packet_monitor_list_for_timeouts(ctx.client);
 
-    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 1,
-                 "a stalled packet still times out instead of being deferred forever");
-    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 0,
-                 "a stalled packet leaves the in-flight count");
+    MQTT_NG_TEST((ctx.frag->flags & BUFFER_FRAG_GARBAGE_COLLECT) == 0,
+                 "a message still on the wire is not garbage collected");
+    MQTT_NG_TEST(ctx.frag->packet_id == ctx.packet_id, "a message still on the wire is not resolved");
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 0,
+                 "a message still on the wire is not counted as timed out");
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
+                 "a message still on the wire stays in the in-flight count");
+    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_within_the_ack_window(&ctx),
+                 "deferred packet keeps a deadline inside the ack window");
 
     mqtt_ng_unittest_puback_teardown(&ctx);
     return errors;
@@ -3278,7 +3308,7 @@ int mqtt_ng_unittest(void)
     errors += mqtt_ng_unittest_puback_timeout_is_not_an_ack();
     errors += mqtt_ng_unittest_unsent_packet_defers_its_deadline();
     errors += mqtt_ng_unittest_recently_sent_packet_keeps_its_window();
-    errors += mqtt_ng_unittest_stalled_send_does_not_refresh_progress();
+    errors += mqtt_ng_unittest_packet_on_the_wire_is_never_dropped();
 
     if (errors)
         fprintf(stderr, "mqtt_ng unittest: %d ERROR(S)\n", errors);
