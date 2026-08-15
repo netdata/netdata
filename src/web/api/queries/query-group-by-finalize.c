@@ -23,6 +23,11 @@ static bool group_by_pass_propagates_raw_contributor_counts(const QUERY_TARGET *
     return true;
 }
 
+static bool group_by_pass_calculates_percentage(const QUERY_TARGET *qt, size_t pass) {
+    return qt->request.group_by[pass].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE ||
+           (qt->request.group_by[pass].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
+}
+
 static ALWAYS_INLINE void rrd2rrdr_group_by_add_metric_internal(
     RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
     RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
@@ -59,6 +64,7 @@ static ALWAYS_INLINE void rrd2rrdr_group_by_add_metric_internal(
         RRDR_VALUE_FLAGS *co = &r_dst->o[ idx_dst ];
         NETDATA_DOUBLE *ar = &r_dst->ar[ idx_dst ];
         uint32_t *gbc = &r_dst->gbc[ idx_dst ];
+        uint32_t *arc = r_dst->arc ? &r_dst->arc[idx_dst] : NULL;
 
         switch(group_by_aggregate_function) {
             default:
@@ -93,6 +99,8 @@ static ALWAYS_INLINE void rrd2rrdr_group_by_add_metric_internal(
             *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
             *ar += ar_tmp;
             *gbc += propagate_raw_contributor_counts ? r_tmp->gbc[idx_tmp] : 1;
+            if(arc)
+                *arc += r_tmp->arc ? r_tmp->arc[idx_tmp] : 1;
         }
         else if(r_dst->hgbc) {
             // count the hidden (denominator) contributions too, so that
@@ -145,6 +153,39 @@ static void rrd2rrdr_group_by_stamp_partial(RRDR *r, const uint32_t *expected_gb
                (hgbc & HGBC_PARTIAL_FLAG))
                 r->o[idx] |= RRDR_VALUE_PARTIAL;
         }
+    }
+}
+
+void rrdr2rrdr_group_by_partial_trimming(RRDR *r) {
+    time_t trimmable_after = r->partial_data_trimming.expected_after;
+
+    // find the point just before the trimmable ones
+    ssize_t i = (ssize_t)r->n - 1;
+    for( ; i >= 0 ;i--) {
+        if (r->t[i] < trimmable_after)
+            break;
+    }
+
+    if(unlikely(i < 0))
+        return;
+
+    size_t last_row_gbc = 0;
+    for (; i < (ssize_t)r->n; i++) {
+        size_t row_gbc = 0;
+        for (size_t d = 0; d < r->d; d++) {
+            if (unlikely(!(r->od[d] & RRDR_DIMENSION_QUERIED)))
+                continue;
+
+            row_gbc += r->gbc[i * r->d + d];
+        }
+
+        if (unlikely(r->t[i] >= trimmable_after && (row_gbc < last_row_gbc || !row_gbc))) {
+            r->partial_data_trimming.trimmed_after = r->t[i];
+            r->rows = i;
+            break;
+        }
+        else
+            last_row_gbc = row_gbc;
     }
 }
 
@@ -311,7 +352,8 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     }
     rrd2rrdr_group_by_stamp_partial(last_r, expected_gbc, expected_hgbc);
 
-    rrdr2rrdr_group_by_calculate_percentage_of_group(last_r);
+    if(group_by_pass_calculates_percentage(qt, 0))
+        rrdr2rrdr_group_by_calculate_percentage_of_group(last_r);
 
     RRDR *r = last_r->group_by.r;
     size_t pass = 0;
@@ -339,7 +381,8 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                     qt->request.group_by[pass].aggregation, &last_r->dqp[d], pass);
         }
         rrd2rrdr_group_by_stamp_partial(r, expected_gbc, expected_hgbc);
-        rrdr2rrdr_group_by_calculate_percentage_of_group(r);
+        if(group_by_pass_calculates_percentage(qt, pass))
+            rrdr2rrdr_group_by_calculate_percentage_of_group(r);
 
         last_r = r;
         r = last_r->group_by.r;
@@ -364,9 +407,17 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
 
     // find the final aggregation
     RRDR_GROUP_BY_FUNCTION aggregation = qt->request.group_by[0].aggregation;
+    size_t final_pass = 0;
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
-        if(qt->request.group_by[g].group_by != RRDR_GROUP_BY_NONE)
+        if(qt->request.group_by[g].group_by != RRDR_GROUP_BY_NONE) {
             aggregation = qt->request.group_by[g].aggregation;
+            final_pass = g;
+        }
+
+    bool final_percentage = group_by_pass_calculates_percentage(qt, final_pass);
+
+    if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
+        rrdr2rrdr_group_by_partial_trimming(r);
 
     // for every aggregation except AVERAGE the plotted value is already the
     // final group aggregate (the percentage, the sum, the min, the max), so
@@ -397,6 +448,9 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
             RRDR_VALUE_FLAGS *co = &r->o[ idx ];
             NETDATA_DOUBLE *ar = &r->ar[ idx ];
             uint32_t gbc = r->gbc[ idx ];
+            uint32_t arc = r->arc ? r->arc[idx] : gbc;
+            uint32_t anomaly_contributors =
+                aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE || final_percentage ? arc : gbc;
 
             if(likely(gbc)) {
                 *co &= ~RRDR_VALUE_EMPTY;
@@ -407,7 +461,7 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
 
                 // when the sts pair is per-row, the anomaly rate must also be
                 // accumulated per-row (the row mean), not per-contribution
-                ars += stats_by_rows ? (*ar / (NETDATA_DOUBLE)gbc) : *ar;
+                ars += stats_by_rows ? (*ar / (NETDATA_DOUBLE)anomaly_contributors) : *ar;
 
                 if(aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt))
                     n = (*cn /= gbc);
@@ -415,7 +469,7 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                     n = *cn;
 
                 if(!query_target_aggregatable(qt))
-                    *ar /= gbc;
+                    *ar /= anomaly_contributors;
 
                 if(islessgreater(n, 0.0))
                     points_nonzero++;
@@ -457,6 +511,11 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
             .anomaly_count = (size_t)(ars * RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER / 100.0),
         };
     }
+
+
+    // Anomaly contributor counts are only needed while finalizing group-by.
+    onewayalloc_freez(owa, r->arc);
+    r->arc = NULL;
 
     r->view.min = global_min;
     r->view.max = global_max;

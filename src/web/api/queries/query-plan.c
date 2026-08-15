@@ -285,7 +285,10 @@ static bool query_planer_plan_can_be_activated(QUERY_ENGINE_OPS *ops, size_t pla
 
 static void query_planer_set_expire_time(QUERY_ENGINE_OPS *ops, time_t expire_time) {
     ops->current_plan_expire_time = expire_time;
-    ops->result_plan_expire_time = nd_time_t_add_saturating(expire_time, ops->plan_switch_time_offset);
+    ops->result_plan_expire_time_overflow = __builtin_add_overflow(
+        expire_time, ops->plan_switch_time_offset, &ops->result_plan_expire_time);
+    if(unlikely(ops->result_plan_expire_time_overflow))
+        ops->result_plan_expire_time = nd_time_t_max();
 }
 
 static void query_planer_set_active_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, time_t overwrite_after __maybe_unused) {
@@ -775,6 +778,61 @@ static int query_plan_unittest_expect_ops_cache_is_local(void) {
     return 1;
 }
 
+static int query_plan_unittest_expect_result_expiry(void) {
+    QUERY_ENGINE_OPS ops = {
+        .plan_switch_time_offset = 60,
+    };
+
+    query_planer_set_expire_time(&ops, 100);
+    if(ops.current_plan_expire_time != 100 || ops.result_plan_expire_time != 160 ||
+       ops.result_plan_expire_time_overflow ||
+       query_result_plan_should_switch_plan(&ops, 159) ||
+       !query_result_plan_should_switch_plan(&ops, 160) ||
+       !query_result_plan_should_switch_plan(&ops, 161)) {
+        fprintf(stderr,
+                "FAILED query plan result expiry: expected 100/160/non-overflow with switch from 160 onward, "
+                "got %" PRIdMAX "/%" PRIdMAX "/%d and switches %d/%d/%d at 159/160/161\n",
+                (intmax_t)ops.current_plan_expire_time, (intmax_t)ops.result_plan_expire_time,
+                ops.result_plan_expire_time_overflow,
+                query_result_plan_should_switch_plan(&ops, 159),
+                query_result_plan_should_switch_plan(&ops, 160),
+                query_result_plan_should_switch_plan(&ops, 161));
+        return 1;
+    }
+
+    time_t maximum = nd_time_t_max();
+    query_planer_set_expire_time(&ops, maximum - 30);
+    if(ops.current_plan_expire_time != maximum - 30 || ops.result_plan_expire_time != maximum ||
+       !ops.result_plan_expire_time_overflow ||
+       query_result_plan_should_switch_plan(&ops, maximum)) {
+        fprintf(stderr,
+                "FAILED query plan unreachable result expiry: expected %" PRIdMAX "/%" PRIdMAX
+                "/overflow without switch, got %" PRIdMAX "/%" PRIdMAX "/%d with switch=%d\n",
+                (intmax_t)(maximum - 30), (intmax_t)maximum,
+                (intmax_t)ops.current_plan_expire_time, (intmax_t)ops.result_plan_expire_time,
+                ops.result_plan_expire_time_overflow,
+                query_result_plan_should_switch_plan(&ops, maximum));
+        return 1;
+    }
+
+    query_planer_set_expire_time(&ops, maximum - ops.plan_switch_time_offset);
+    if(ops.current_plan_expire_time != maximum - ops.plan_switch_time_offset ||
+       ops.result_plan_expire_time != maximum || ops.result_plan_expire_time_overflow ||
+       !query_result_plan_should_switch_plan(&ops, maximum)) {
+        fprintf(stderr,
+                "FAILED query plan exact-maximum result expiry: expected %" PRIdMAX "/%" PRIdMAX
+                "/non-overflow with switch, got %" PRIdMAX "/%" PRIdMAX "/%d with switch=%d\n",
+                (intmax_t)(maximum - ops.plan_switch_time_offset), (intmax_t)maximum,
+                (intmax_t)ops.current_plan_expire_time, (intmax_t)ops.result_plan_expire_time,
+                ops.result_plan_expire_time_overflow,
+                query_result_plan_should_switch_plan(&ops, maximum));
+        return 1;
+    }
+
+    fprintf(stderr, "OK query plan result expiry\n");
+    return 0;
+}
+
 int query_plan_unittest(void) {
     size_t old_storage_tiers = nd_profile.storage_tiers;
     time_t old_update_every = nd_profile.update_every;
@@ -1037,6 +1095,7 @@ int query_plan_unittest(void) {
     }
 
     errors += query_plan_unittest_expect_ops_cache_is_local();
+    errors += query_plan_unittest_expect_result_expiry();
 
     nd_profile.storage_tiers = old_storage_tiers;
     nd_profile.update_every = old_update_every;

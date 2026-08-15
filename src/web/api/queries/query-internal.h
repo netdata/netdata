@@ -80,6 +80,8 @@ typedef struct query_engine_ops {
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
 
+    bool result_plan_expire_time_overflow;
+
     // the LATEST grouping with a single output point covering the metric's
     // last stored sample is answered from the collector's cached value,
     // without querying the storage engine (no query plan is built)
@@ -104,7 +106,8 @@ typedef struct query_engine_ops_cache {
 
 // query planner
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
-#define query_result_plan_should_switch_plan(ops, now) ((now) >= (ops)->result_plan_expire_time)
+#define query_result_plan_should_switch_plan(ops, now) \
+    ((now) >= (ops)->result_plan_expire_time && !(ops)->result_plan_expire_time_overflow)
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time);
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
 QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id);
@@ -131,6 +134,7 @@ void group_by_label_key_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
 int rrdlabels_traversal_cb_to_group_by_label_key(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data);
 void rrd2rrdr_set_timestamps(RRDR *r);
 RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt);
+void rrdr2rrdr_group_by_partial_trimming(RRDR *r);
 void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r);
 void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
                                   RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,

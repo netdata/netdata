@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "unit_test_bridge.h"
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/queries/query-internal.h"
 #include "database/contexts/rrdcontext-internal.h"
@@ -587,19 +588,19 @@ static size_t test_rrddim_storage_point_contract_mode(RRD_DB_MODE mode, const ch
     STORAGE_POINT_EXPECT(rd->tiers[0].seb == STORAGE_ENGINE_BACKEND_RRDDIM);
 
     const time_t t = 1700000000;
-    storage_engine_store_metric(rd->tiers[0].sch, (usec_t)t * USEC_PER_SEC,
-                                10, 10, 10, 1, 0, SN_DEFAULT_FLAGS);
-    storage_engine_store_metric(rd->tiers[0].sch, (usec_t)(t + 1) * USEC_PER_SEC,
-                                NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
-    storage_engine_store_metric(rd->tiers[0].sch, (usec_t)(t + 2) * USEC_PER_SEC,
-                                -20, -20, -20, 1, 1, SN_FLAG_RESET);
+    unittest_storage_engine_store_metric(rd->tiers[0].sch, (usec_t)t * USEC_PER_SEC,
+                                         10, 10, 10, 1, 0, SN_DEFAULT_FLAGS);
+    unittest_storage_engine_store_metric(rd->tiers[0].sch, (usec_t)(t + 1) * USEC_PER_SEC,
+                                         NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
+    unittest_storage_engine_store_metric(rd->tiers[0].sch, (usec_t)(t + 2) * USEC_PER_SEC,
+                                         -20, -20, -20, 1, 1, SN_FLAG_RESET);
 
     struct storage_engine_query_handle seqh = { 0 };
-    storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &seqh,
-                              t - 1, t + 3, STORAGE_PRIORITY_SYNCHRONOUS);
+    unittest_storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &seqh,
+                                       t - 1, t + 3, STORAGE_PRIORITY_SYNCHRONOUS);
 
     for(time_t end_time_s = t - 1; end_time_s <= t + 3; end_time_s++) {
-        STORAGE_POINT sp = storage_engine_query_next_metric(&seqh);
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
         STORAGE_POINT_EXPECT(sp.start_time_s == end_time_s - 1);
         STORAGE_POINT_EXPECT(sp.end_time_s == end_time_s);
 
@@ -624,8 +625,8 @@ static size_t test_rrddim_storage_point_contract_mode(RRD_DB_MODE mode, const ch
         }
     }
 
-    STORAGE_POINT_EXPECT(storage_engine_query_is_finished(&seqh));
-    storage_engine_query_finalize(&seqh);
+    STORAGE_POINT_EXPECT(unittest_storage_engine_query_is_finished(&seqh));
+    unittest_storage_engine_query_finalize(&seqh);
     rrdset_free(st);
     return errors;
 }
@@ -826,6 +827,56 @@ static int test_jsonwrap_v2_partial_data_trimming_raw_metadata(void) {
     qt.window.options = 0;
     if(query_target_aggregatable(&qt)) {
         fprintf(stderr, "query_target_aggregatable() unexpectedly true without RRDR_OPTION_RETURN_RAW\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int test_rrdr_group_by_partial_data_trimming(void) {
+    time_t timestamps[] = { 10, 20, 30, 40, 50, 60 };
+    RRDR_DIMENSION_FLAGS dimensions[] = { RRDR_DIMENSION_QUERIED, RRDR_DIMENSION_QUERIED };
+    uint32_t complete_gbc[] = {
+        1, 1,
+        1, 1,
+        1, 1,
+        1, 1,
+        1, 1,
+        1, 1,
+    };
+    uint32_t partial_gbc[] = {
+        1, 1,
+        1, 1,
+        1, 1,
+        1, 1,
+        1, 0,
+        1, 0,
+    };
+    RRDR r = {
+        .d = 2,
+        .n = 6,
+        .rows = 6,
+        .od = dimensions,
+        .t = timestamps,
+        .gbc = complete_gbc,
+        .partial_data_trimming = {
+            .expected_after = 40,
+            .trimmed_after = 60,
+        },
+    };
+
+    rrdr2rrdr_group_by_partial_trimming(&r);
+    if(r.rows != 6 || r.partial_data_trimming.trimmed_after != 60) {
+        fprintf(stderr, "complete contributor rows were unexpectedly trimmed to %zu at %jd\n",
+                r.rows, (intmax_t)r.partial_data_trimming.trimmed_after);
+        return 1;
+    }
+
+    r.gbc = partial_gbc;
+    rrdr2rrdr_group_by_partial_trimming(&r);
+    if(r.rows != 4 || r.partial_data_trimming.trimmed_after != 50) {
+        fprintf(stderr, "partial contributor suffix was trimmed to %zu at %jd, expected 4 at 50\n",
+                r.rows, (intmax_t)r.partial_data_trimming.trimmed_after);
         return 1;
     }
 
@@ -2178,7 +2229,7 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         }
     }
 
-    const time_t valid_update_every = 7;
+    const time_t valid_update_every = INT32_MAX;
     previous = rrdset_set_update_every_s(st, valid_update_every);
     if(previous != original_update_every || st->update_every != valid_update_every) {
         fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
@@ -2489,6 +2540,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_jsonwrap_v2_partial_data_trimming_raw_metadata())
+        return 1;
+
+    if(test_rrdr_group_by_partial_data_trimming())
         return 1;
 
     if(check_rrdcalc_comparisons())

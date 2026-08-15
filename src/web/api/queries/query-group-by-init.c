@@ -510,6 +510,10 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 r->gbc = onewayalloc_callocz(
                     owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR group-by counts"), sizeof(*r->gbc));
 
+                if(!query_target_aggregatable(qt))
+                    r->arc = onewayalloc_callocz(
+                        owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR anomaly-rate contributors"), sizeof(*r->arc));
+
                 if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE))) {
                     // this is where we are going to group the hidden dimensions
                     r->vh = onewayalloc_mallocz(

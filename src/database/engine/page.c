@@ -1090,15 +1090,22 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             storage_number_tier1_t *array = (storage_number_tier1_t *) pgdc->pgd->raw.data;
             storage_number_tier1_t n = array[pgdc->position++];
 
-            if(likely(n.count && netdata_double_isnumber(n.sum_value))) {
+            // V1 stores count in 16 bits. A complete 65536-slot numeric rollup
+            // wraps to zero; finite payload distinguishes it from an empty slot.
+            uint32_t count = n.count;
+            if(unlikely(!count && pgdc->slots_per_point == (uint32_t)UINT16_MAX + 1 &&
+                        netdata_double_isnumber(n.sum_value)))
+                count = pgdc->slots_per_point;
+
+            if(likely(count && netdata_double_isnumber(n.sum_value))) {
                 sp->flags = n.anomaly_count ? SN_FLAG_NONE : SN_FLAG_NOT_ANOMALOUS;
-                sp->count = n.count;
+                sp->count = count;
                 sp->anomaly_count = n.anomaly_count;
                 sp->min = n.min_value;
                 sp->max = n.max_value;
                 sp->sum = n.sum_value;
                 // V1 records omit gaps; the active grouping is the best available estimate.
-                sp->gap_count = pgdc->slots_per_point > n.count ? pgdc->slots_per_point - n.count : 0;
+                sp->gap_count = pgdc->slots_per_point > count ? pgdc->slots_per_point - count : 0;
             }
             else
                 storage_point_empty_slots(*sp, sp->start_time_s, sp->end_time_s, pgdc->slots_per_point);
