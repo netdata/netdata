@@ -33,6 +33,7 @@
 #include "mcp-tools-query-metrics.h"
 #include "mcp-tools.h"
 #include "mcp-params.h"
+#include "../api/queries/tg-expression.h"
 #include "web/api/formatters/rrd2json.h"
 
 
@@ -178,7 +179,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "synonyms - which is what makes uncollected time participate for 'percentage-of-samples', 'number-of-flaps' and 'number-of-times' ('percentage-of-time' always counts it)), or the "
             "previous collected sample ('<previous' - 'last' is a synonym, so '<last' is the "
             "same condition - which counts counter resets such as reboots). There are no "
-            "and/or compounds.\n"
+            "and/or compounds. If the condition is omitted or blank it means '=0'; an operator "
+            "without a value applies to zero, so '>' means '>0'.\n"
             "Over a window long enough to read lower-resolution data 'percentage-of-time', "
             "'number-of-flaps' and 'number-of-times' return an estimate, and the counting ones "
             "report at most one event per stored interval; 'percentage-of-samples' does not "
@@ -379,7 +381,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     if (json_object_is_type(time_group_obj, json_type_string)) {
         time_group_str = json_object_get_string(time_group_obj);
         
-        // Check if time_group_options is required based on time_group
+        // Validate time_group_options according to the selected grouping.
         if (time_group_str && (
             strcmp(time_group_str, "percentile") == 0 ||
             strcmp(time_group_str, "countif") == 0 ||
@@ -389,13 +391,31 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
             strcmp(time_group_str, "number-of-times") == 0)) {
             
             struct json_object *time_group_options_obj = NULL;
-            if (!json_object_object_get_ex(params, "time_group_options", &time_group_options_obj) || !time_group_options_obj) {
+            bool has_time_group_options =
+                json_object_object_get_ex(params, "time_group_options", &time_group_options_obj);
+            if (!has_time_group_options || !time_group_options_obj) {
                 if (strcmp(time_group_str, "percentile") == 0) {
                     buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='percentile'. You must specify a percentage value between 0-100 (e.g., '95' for 95th percentile).");
-                } else {
-                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='%s'. You must specify a comparison operator and a value (e.g., '>0', '=0', '!=0', '<=10'), a gap token ('==gap'), or the previous sample ('<previous').", time_group_str);
+                    return MCP_RC_BAD_REQUEST;
                 }
-                return MCP_RC_BAD_REQUEST;
+            }
+
+            if(strcmp(time_group_str, "percentile") != 0 && has_time_group_options) {
+                if(!time_group_options_obj || !json_object_is_type(time_group_options_obj, json_type_string)) {
+                    buffer_sprintf(mcpc->error,
+                                   "Parameter 'time_group_options' must be a valid condition string when using time_group='%s'.",
+                                   time_group_str);
+                    return MCP_RC_INVALID_PARAMS;
+                }
+
+                const char *expression = json_object_get_string(time_group_options_obj);
+                TG_EXPRESSION parsed;
+                if(!expression || !tg_expression_parse(&parsed, expression)) {
+                    buffer_sprintf(mcpc->error,
+                                   "Invalid condition in parameter 'time_group_options' when using time_group='%s'.",
+                                   time_group_str);
+                    return MCP_RC_INVALID_PARAMS;
+                }
             }
         }
     }

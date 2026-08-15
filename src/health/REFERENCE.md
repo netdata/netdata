@@ -648,6 +648,9 @@ or `<>`); with no operator the value compares equal. The value is one of:
   skipped, so a drop across a gap still counts, and the first sample of the
   window never matches.
 
+An omitted, empty or whitespace-only condition means `==0`. An operator
+without a value applies to zero, so `>` is shorthand for `>0`.
+
 There are no `and`/`or` compounds.
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions. The timestamps of the timeframe evaluated by the database lookup are available as variables `$after` and `$before` (both are unix timestamps).

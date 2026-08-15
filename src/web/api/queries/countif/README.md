@@ -31,12 +31,13 @@ The value is one of:
   counter resets. Gaps are skipped, so a drop across a gap still counts, and
   the first sample of a query never matches.
 
-There are no `and`/`or` compounds. An unreadable condition compares equal to
-zero rather than failing the query, so check the condition when a result
-looks wrong. The same grammar is used by `percentage-of-time`,
+An omitted, empty or whitespace-only condition means `==0`. An operator
+without a value applies to zero, so `>` is shorthand for `>0`.
+
+There are no `and`/`or` compounds. An unreadable condition fails the query
+with HTTP 400 rather than silently changing what was asked. The same grammar is used by `percentage-of-time`,
 `number-of-flaps` and `number-of-times`, and by the `lookup` line of an
-[alert](/src/health/REFERENCE.md), which rejects an unreadable condition
-instead of accepting it.
+[alert](/src/health/REFERENCE.md).
 
 Over a window long enough to be served from lower-resolution data this
 grouping evaluates each STORED point as one sample, rather than reasoning
@@ -48,8 +49,8 @@ across a stored window; see
 
 This query is available in alerts, e.g. `lookup: percentage-of-samples(>10) -5m`.
 
-`countif` is an alias of `percentage-of-samples`, which is the canonical name; both behave identically. It changes the units of charts. The result of the calculation is always from 0 to 100, expressing the percentage of database points that matched the condition.
+`countif` is an alias of `percentage-of-samples`, which is the canonical name; both behave identically. It changes
+the units of charts. The result of the calculation is always from 0 to 100, expressing the percentage of database
+points that matched the condition.
 
 In APIs and badges can be used like this: `&group=countif&group_options=>10` in the URL.
-
-

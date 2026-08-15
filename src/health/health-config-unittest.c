@@ -492,10 +492,9 @@ static int test_db_lookup_condition_is_trimmed(int *passed) {
 }
 
 // A condition the parser cannot read must leave the DEFAULT behind, never
-// the part of itself it managed to read. Health refuses such an alert, but
-// the query API has always accepted one and answered `==0` - and a half-read
-// `>=gap junk` that kept its gap token would silently answer a different
-// question from the one `==0` answers.
+// the part of itself it managed to read. All public callers reject it, and
+// keeping a half-read `>=gap junk` would still be unsafe for an internal
+// caller that uses the parser defensively.
 static int test_expression_rejects_leave_the_default(int *passed) {
     static const struct {
         const char *condition;
@@ -536,6 +535,45 @@ static int test_expression_rejects_leave_the_default(int *passed) {
         }
 
         (*passed)++;
+    }
+
+    return failed;
+}
+
+// Missing expression text is the historical ==0 default. When the operator
+// is present but its operand is omitted, the operator itself is preserved and
+// still compares against numeric zero.
+static int test_expression_omitted_operand_defaults_to_zero(int *passed) {
+    static const struct {
+        const char *condition;
+        TG_EXPRESSION_CMP expected_cmp;
+        const char *description;
+    } tests[] = {
+        { NULL, TG_EXPRESSION_EQUAL, "an absent condition" },
+        { "", TG_EXPRESSION_EQUAL, "an empty condition" },
+        { "   ", TG_EXPRESSION_EQUAL, "a whitespace-only condition" },
+        { ">", TG_EXPRESSION_GREATER, "greater than with no operand" },
+        { "<=   ", TG_EXPRESSION_LESSEQUAL, "less-or-equal with no operand" },
+        { "!", TG_EXPRESSION_NOTEQUAL, "not-equal with no operand" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        TG_EXPRESSION e;
+        bool ok = tg_expression_parse(&e, tests[i].condition);
+
+        if(!ok || e.cmp != tests[i].expected_cmp ||
+           e.operand != TG_EXPRESSION_OPERAND_NUMBER || e.target != 0.0 ||
+           tg_expression_wants_gaps(&e)) {
+            fprintf(stderr,
+                    "FAILED [%s]: parsed=%s cmp=%d operand=%d target=%f wants_gaps=%s\n",
+                    tests[i].description, ok ? "true" : "false", (int)e.cmp,
+                    (int)e.operand, (double)e.target,
+                    tg_expression_wants_gaps(&e) ? "true" : "false");
+            failed++;
+        }
+        else
+            (*passed)++;
     }
 
     return failed;
@@ -1060,6 +1098,11 @@ static int test_dyncfg_time_group_round_trip(int *passed) {
           ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, NAN,
           "the predecessor keyword survives the round trip" },
 
+        { "percentage-of-samples", "\"time_group_options\":\">\"",
+          "percentage-of-samples(>) -1m", RRDR_GROUPING_COUNTIF, ">",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0,
+          "an omitted operand keeps its operator and zero target" },
+
         // the legacy shape: alerts written before the expression existed
         // carry only the condition/value pair. The export normalises the
         // name to the canonical one and writes the pair out as the
@@ -1249,6 +1292,7 @@ int health_config_unittest(void) {
     failed += test_dyncfg_time_group_round_trip(&passed);
     failed += test_dyncfg_long_condition_is_not_truncated(&passed);
     failed += test_expression_rejects_leave_the_default(&passed);
+    failed += test_expression_omitted_operand_defaults_to_zero(&passed);
 
     // the same alert configuration, taken through the metadata database
     // instead of the parser - counted BEFORE the summary, or a failure here

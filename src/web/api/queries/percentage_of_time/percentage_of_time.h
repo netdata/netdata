@@ -25,7 +25,7 @@ struct tg_percentage_of_time {
 static inline void tg_percentage_of_time_create(RRDR *r, const char *options) {
     struct tg_percentage_of_time *g =
         onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_percentage_of_time));
-    // the API has never rejected a malformed condition here
+    // Malformed input falls back defensively; omitted operands are valid zero comparisons.
     (void)tg_expression_parse(&g->expr, options);
     r->time_grouping.data = g;
 

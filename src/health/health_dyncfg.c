@@ -123,10 +123,9 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
             JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "time_group_options", config->time_group_options, error, 0);
 
             // and it has to parse, exactly as it does when the same alert
-            // arrives in a .conf file. The query API is lenient - an
-            // unreadable condition there silently compares equal to zero -
-            // but an alert that runs a condition its author did not write
-            // fires, or stays silent, for the wrong reason.
+            // arrives in a .conf file and when the query API validates it.
+            // An alert that runs a condition its author did not write fires,
+            // or stays silent, for the wrong reason.
             if(config->time_group_options) {
                 // trimmed to the same canonical form the .conf reader
                 // produces (health_parse_db_lookup): the condition is

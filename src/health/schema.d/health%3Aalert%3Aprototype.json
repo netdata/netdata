@@ -452,7 +452,7 @@
                     "time_group_options": {
                       "type": "string",
                       "title": "Condition",
-                      "description": "The condition, written as an operator and a value: a number (>10), a gap token (==gap, !=nan, ==null, ==empty) or the previous collected sample (<previous, <last). When set, this is authoritative and the condition/value pair above is derived from it."
+                      "description": "The condition, written as an operator and a value: a number (>10), a gap token (==gap, !=nan, ==null, ==empty) or the previous collected sample (<previous, <last). An omitted or blank condition means ==0; an operator without a value applies to zero. When set, this is authoritative and the condition/value pair above is derived from it."
                     }
                   },
                   "required": [
