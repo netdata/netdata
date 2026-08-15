@@ -1,6 +1,6 @@
 # Query Corpus Manifest
 
-Human mirror of `manifest.go`. Every case records what it proves and, once a
+Human mirror of `manifest.json`. Every case records what it proves and, once a
 fix has landed, which PR delivered it.
 
 Nothing here records an expected outcome. A contract either holds or it does

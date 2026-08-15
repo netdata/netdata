@@ -120,15 +120,16 @@ acceptable.
   valid and carry the required annotations.
 - `*_test.go` — `layer*.go` ladder tests, cross-cutting surface tests, and
   per-bug `caseNNN_test.go` files.
-- `manifest.go` + `MANIFEST.md` — the ledger (below). Keep both in sync in
-  the same commit.
+- `manifest.json` + `MANIFEST.md` — the ledger data and its human-readable
+  mirror (below). `manifest.go` embeds and validates the data. Keep all three
+  in sync in the same commit.
 - `reference-python/` — local-only cross-check implementation. It is NOT
   tracked and MUST NOT be committed.
 
 ## The manifest
 
-Every contract case has an entry in `manifest.go`; its `Proves`, `Cloud`, and
-optional `FixedBy` fields are mirrored as a row in `MANIFEST.md`.
+Every contract case has an entry in `manifest.json`; its `proves`, `cloud`, and
+optional `fixed_by` fields are mirrored as a row in `MANIFEST.md`.
 
 - **One contract key MUST represent one independently actionable semantic
   invariant.** Multiple fixtures or inputs MAY share a key when they all prove

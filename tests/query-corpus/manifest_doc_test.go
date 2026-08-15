@@ -127,7 +127,7 @@ func manifestDocumentProblems(body string, cases map[string]ManifestCase) []stri
 			"contract will disagree: %s", len(dupes), strings.Join(dupes, ", ")))
 	}
 	if len(mismatched) > 0 {
-		problems = append(problems, fmt.Sprintf("MANIFEST.md disagrees with manifest.go in %d field(s): %s",
+		problems = append(problems, fmt.Sprintf("MANIFEST.md disagrees with manifest.json in %d field(s): %s",
 			len(mismatched), strings.Join(mismatched, ", ")))
 	}
 	return problems

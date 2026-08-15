@@ -3,9 +3,50 @@
 package corpus
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestManifestLoaderPreservesFields(t *testing.T) {
+	const data = `[{"name":"case","proves":"contract","cloud":"green","fixed_by":"#1","components":["a","b"]}]`
+	cases, err := loadManifest([]byte(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := ManifestCase{
+		Proves:     "contract",
+		Cloud:      "green",
+		FixedBy:    "#1",
+		Components: []string{"a", "b"},
+	}
+	if got := cases["case"]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("decoded manifest case = %#v, want %#v", got, want)
+	}
+}
+
+func TestManifestLoaderRejectsInvalidData(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want string
+	}{
+		{name: "invalid JSON", data: `{`, want: "decode query corpus manifest"},
+		{name: "no contracts", data: `[]`, want: "has no contracts"},
+		{name: "empty name", data: `[{"name":""}]`, want: "empty contract name"},
+		{name: "duplicate name", data: `[{"name":"same"},{"name":"same"}]`, want: "repeats contract"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := loadManifest([]byte(tc.data))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("loadManifest() error = %v, want text %q", err, tc.want)
+			}
+		})
+	}
+}
 
 func TestContractLedgerDeduplicatesAndKeepsFailuresSticky(t *testing.T) {
 	cases := map[string]ManifestCase{

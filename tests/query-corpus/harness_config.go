@@ -42,6 +42,8 @@ var daemonFreeTests = map[string]struct{}{
 	"TestManifestComponentsAreValid":                              {},
 	"TestManifestDocumentGuardDetectsDrift":                       {},
 	"TestManifestDocumentMatchesContracts":                        {},
+	"TestManifestLoaderPreservesFields":                           {},
+	"TestManifestLoaderRejectsInvalidData":                        {},
 	"TestOptionsAllDimensionsMetadataGuards":                      {},
 	"TestQueryAssertionGuardsDetectMutations":                     {},
 	"TestQueryStructuredResponseGuards":                           {},
