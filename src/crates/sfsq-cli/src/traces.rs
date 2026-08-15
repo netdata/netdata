@@ -105,9 +105,21 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
         // truncated tail is SURFACED and only complete frames are read
         // (the `discover` module's convention; corrupt data never drops
         // silently under a `complete` status).
-        let boundaries =
-            wal::scan_frame_boundaries(path, wal::FrameRange::new(wal::HEADER_SIZE as u64, len))
-                .with_context(|| format!("scanning frames of {}", path.display()))?;
+        // Content corruption is a PER-SOURCE failure (warn + skip, the
+        // discover convention) — one corrupt WAL must not abort a
+        // multi-source query. Path-level problems (nonexistent, shorter
+        // than a header) stay hard errors above: those are argument
+        // typos, not data problems.
+        let boundaries = match wal::scan_frame_boundaries(
+            path,
+            wal::FrameRange::new(wal::HEADER_SIZE as u64, len),
+        ) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!("skipping WAL {}: {e}", path.display());
+                continue;
+            }
+        };
         let valid_end = boundaries
             .last()
             .map_or(wal::HEADER_SIZE as u64, |b| b.end_offset);
@@ -688,6 +700,55 @@ mod tests {
         assert!(matches!(
             parse_target("span.http.method"),
             Ok(PredicateTarget::Attribute(AttributeOwner::Span, k)) if k == "http.method"
+        ));
+    }
+
+    /// Content corruption is per-source: a WAL with a garbage header is
+    /// skipped with a warning, and the remaining sources still build.
+    #[test]
+    fn corrupt_wal_is_skipped_per_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let bad = dir.path().join("garbage.wal");
+        std::fs::write(&bad, vec![0xFFu8; wal::HEADER_SIZE * 2]).unwrap();
+        let good = dir.path().join("good");
+        std::fs::create_dir_all(&good).unwrap();
+        let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+        let mut writer = wal::Writer::new(
+            &good,
+            wal::Config::default(),
+            seq,
+            wal::FileStamp {
+                pipeline_id: 1,
+                payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+            },
+            wal::test_identity(),
+        )
+        .unwrap();
+        writer
+            .write_frame(
+                0,
+                b"",
+                &[7u8; 64],
+                wal::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: file_registry::TimestampNs(1),
+                    log_ts_range: None,
+                },
+            )
+            .unwrap();
+        writer.shutdown_all().unwrap();
+        let good_wal = std::fs::read_dir(&good)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| p.extension().is_some_and(|x| x == "wal"))
+            .expect("one WAL");
+
+        let sources = build_sources(&[], &[bad, good_wal.clone()]).unwrap();
+        assert_eq!(sources.len(), 1, "the corrupt WAL is skipped, not fatal");
+        assert!(matches!(
+            &sources[0],
+            TraceSource::Tail(t) if t.path == good_wal.canonicalize().unwrap()
         ));
     }
 
