@@ -156,7 +156,7 @@ static size_t pgd_unittest_tier1(void) {
     pgd_unittest_cursor_reset(&cursor, wrapped_count_pg, 0, 65536);
     sp.start_time_s = 0;
     sp.end_time_s = 65536;
-    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 2, &sp));
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 0, &sp));
     PGD_EXPECT(storage_point_is_complete(sp));
     PGD_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 65536);
     PGD_EXPECT(sp.min == 1 && sp.max == 1 && sp.sum == 65536);
