@@ -27,7 +27,10 @@ pub(crate) use traces::OtelTracesHandler;
 /// Replicate the rt-level GET shim (`netdata-plugin/rt/src/lib.rs`):
 /// when args carry `after:N` / `before:N` tokens, synthesize a JSON
 /// payload with the parsed window plus an `info` flag determined by
-/// whether the literal `info` token is in the args. Returns `None`
+/// whether the literal `info` token is in the args. One deliberate
+/// divergence: tokens parse as u32 (the request fields' width), so an
+/// out-of-range token skips instead of synthesizing a number the
+/// deserializer rejects — the rt shim still parses u64. Returns `None`
 /// when no synthesis happened (no args, or the upstream rt shim
 /// already produced a payload), in which case the caller falls back
 /// to the original payload.
