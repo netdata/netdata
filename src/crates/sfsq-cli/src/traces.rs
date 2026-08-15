@@ -115,6 +115,11 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
             wal::FrameRange::new(wal::HEADER_SIZE as u64, len),
         ) {
             Ok(b) => b,
+            // I/O errors (permissions, a directory, deleted mid-run) are
+            // path-level like the stat above — fatal.
+            Err(e @ wal::Error::Io(_)) => {
+                return Err(e).with_context(|| format!("reading {}", path.display()));
+            }
             Err(e) => {
                 tracing::warn!("skipping WAL {}: {e}", path.display());
                 continue;
