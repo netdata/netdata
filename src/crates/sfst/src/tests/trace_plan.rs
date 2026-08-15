@@ -668,7 +668,12 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
     let mut events = crate::EventRows::new();
     for i in 0..ROWS {
         let h = ri.intern(None, &format!("h=w{i:03}"));
-        let name = ri.intern(None, "events.name=click");
+        // events.name must be HIGH-TIER too: a low/mid-tier field's
+        // prefilter parts are all Ready, and their AND-to-empty arm of
+        // group_ready_empty short-circuits on its own — only a
+        // probe-based (non-Ready) prefilter leaves the empty-KvId
+        // disjunct as the load-bearing check.
+        let name = ri.intern(None, &format!("events.name=e{i:03}"));
         ri.row(1_000 + i as i64, &[h, name]);
         events.push_event(1_000 + i as u64, 0, name, &[]);
         events.end_row(0);
@@ -706,7 +711,7 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
         conditions: vec![crate::GroupCondition::Field {
             field: "events.name".to_string(),
             matcher: crate::PlanMatcher::Tokens {
-                exact: vec!["click".to_string()],
+                exact: vec!["e005".to_string()],
                 patterns: vec![],
             },
         }],
@@ -716,5 +721,5 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
         .compile_trace_plan(&p, (0, ROWS as u32), u64::MAX, &mut work)
         .unwrap()
         .expect("within budget");
-    assert_eq!(compiled.count_in_range(0, ROWS as u32), ROWS as u64);
+    assert_eq!(compiled.count_in_range(0, ROWS as u32), 1, "only row 5 carries e005");
 }
