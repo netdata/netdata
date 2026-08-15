@@ -595,7 +595,7 @@ int ws_client_process_rx_ws(ws_client *client)
                 char *insert = rbuf_get_linear_insert_range(client->buf_to_mqtt, &size);
                 if (!insert) {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "ACLK: inbound WebSocket MQTT buffer full! Cannot process payload of %"PRIu64" bytes "
+                           "ACLK: inbound WebSocket MQTT buffer full! Cannot process payload of %zu bytes "
                            "(processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes, max capacity: %zu bytes",
                            remaining, client->rx.payload_processed, client->rx.payload_length,
                            rbuf_get_capacity(client->buf_to_mqtt), rbuf_get_max_capacity(client->buf_to_mqtt));
