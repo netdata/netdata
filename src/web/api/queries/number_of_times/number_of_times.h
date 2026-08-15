@@ -24,7 +24,7 @@ struct tg_number_of_times {
 static inline void tg_number_of_times_create(RRDR *r, const char *options) {
     struct tg_number_of_times *g =
         onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_number_of_times));
-    // the API has never rejected a malformed condition here
+    // Malformed input falls back defensively; omitted operands are valid zero comparisons.
     (void)tg_expression_parse(&g->expr, options);
     r->time_grouping.data = g;
     r->time_grouping.wants_gaps = tg_expression_wants_gaps(&g->expr);

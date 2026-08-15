@@ -1070,45 +1070,16 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
                     // summing a rate integrates it into a volume, so the
                     // trailing "/s" no longer describes the number shown.
                     // The badge picks its units before the query runs and
-                    // never sees the query target, so it asks the chart -
-                    // through the SAME dimension filter the query will
-                    // apply, or a rate-only selection on a chart that also
-                    // carries a gauge would keep a "/s" the query already
-                    // integrated away. A selection that is not all rates
-                    // keeps the chart's units untouched, which is the same
-                    // "all contributing metrics or nothing" rule the API
-                    // follows.
+                    // never sees the query target, so it asks the RRDSET.
+                    // Units belong to the whole RRDSET, not to a filtered
+                    // dimension: only a rate-only RRDSET has volume units
+                    // after SUM. A mixed-algorithm RRDSET keeps its common
+                    // units regardless of the dimension filter.
                     static __thread char units_volume_buf[64];
                     if(group == RRDR_GROUPING_SUM && units && *units) {
-                        SIMPLE_PATTERN *filter = dimensions ?
-                            string_to_simple_pattern(buffer_tostring(dimensions)) : NULL;
-
-                        // ids and names both, unless the request narrowed it
-                        bool match_ids = options & RRDR_OPTION_MATCH_IDS;
-                        bool match_names = options & RRDR_OPTION_MATCH_NAMES;
-                        if(!match_ids && !match_names)
-                            match_ids = match_names = true;
-
                         bool all_rates = true, any = false;
                         RRDDIM *rd;
                         rrddim_foreach_read(rd, st) {
-                            if(filter) {
-                                SIMPLE_PATTERN_RESULT m = SP_NOT_MATCHED;
-
-                                if(match_ids)
-                                    m = simple_pattern_matches_string_extract(filter, rd->id, NULL, 0);
-
-                                if(m == SP_NOT_MATCHED && match_names && (rd->name != rd->id || !match_ids))
-                                    m = simple_pattern_matches_string_extract(filter, rd->name, NULL, 0);
-
-                                if(m != SP_MATCHED_POSITIVE)
-                                    continue;
-                            }
-                            else if(rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN))
-                                // with no pattern the query takes every dimension
-                                // that is not hidden, so neither does this
-                                continue;
-
                             any = true;
                             // through the RRDMETRIC, which is where the query
                             // reads the algorithm from (query_target.c) - the
@@ -1122,7 +1093,6 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
                             }
                         }
                         rrddim_foreach_done(rd);
-                        simple_pattern_free(filter);
 
                         size_t ulen = strlen(units);
                         // a units string too long to hold the volume form is
