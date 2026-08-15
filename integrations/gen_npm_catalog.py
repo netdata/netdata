@@ -103,6 +103,91 @@ FALLBACK_ICON = 'SNMP.png'
 # plugin (network-viewer.plugin, otel.plugin, netdata).
 PLUGIN_GO_D = 'go.d.plugin'
 
+# Page descriptions that cannot be mechanically shortened without losing a
+# complete, profile-specific statement. Keys are the rendered page names.
+PAGE_DESCRIPTIONS = {
+    'A10 Thunder': (
+        'Monitor A10 Thunder ADC metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'APC PDU': (
+        'Monitor APC PDU power distribution metrics over SNMP with automatic profile '
+        'recognition and no manual OID configuration.'
+    ),
+    'APC UPS': (
+        'Monitor APC UPS power and battery metrics over SNMP with automatic profile '
+        'recognition and no manual OID configuration.'
+    ),
+    'BGP Peering Topology': (
+        'Map BGP peer relationships between routers, including remote autonomous system '
+        'numbers and session state from standard and vendor MIBs.'
+    ),
+    'Cisco ICM': (
+        'Monitor Cisco ICM device metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'Cisco SB': (
+        'Monitor Cisco SB device metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'Cisco UCS': (
+        'Monitor Cisco UCS server metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'Eaton Epdu': (
+        'Monitor Eaton ePDU power distribution metrics over SNMP with automatic profile '
+        'recognition and no manual OID configuration.'
+    ),
+    'Eaton UPS': (
+        'Monitor Eaton UPS power and battery metrics over SNMP with automatic profile '
+        'recognition and no manual OID configuration.'
+    ),
+    'Exagrid': (
+        'Monitor ExaGrid storage metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'HP ILO': (
+        'Monitor HP iLO server hardware metrics over SNMP with automatic profile '
+        'recognition and no manual OID configuration.'
+    ),
+    'HP Ilo4': (
+        'Monitor HP iLO 4 server hardware metrics over SNMP with automatic profile '
+        'recognition and no manual OID configuration.'
+    ),
+    'HPE MSA': (
+        'Monitor HPE MSA storage metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'IDRAC': (
+        'Monitor Dell iDRAC server hardware metrics over SNMP with automatic profile '
+        'recognition and no manual OID configuration.'
+    ),
+    'Isilon': (
+        'Monitor Dell Isilon storage metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'Live Network Connections': (
+        'Map live application dependencies from host socket tables, including local '
+        'processes, remote endpoints, and Linux workload ownership.'
+    ),
+    'Peplink': (
+        'Monitor Peplink router metrics over SNMP with automatic profile recognition '
+        'and no manual OID configuration.'
+    ),
+    'SNMP Trap Reverse DNS Enrichment': (
+        'Add reverse DNS hostnames to SNMP traps through cached PTR lookups of their '
+        'source addresses.'
+    ),
+    'SNMP Trap Node Attribution': (
+        'Attribute each SNMP trap to an unambiguous Netdata node when possible, '
+        'otherwise retaining it under a bounded source label.'
+    ),
+    'vSphere Topology': (
+        'Map VMware vSphere clusters, hosts, virtual machines, datastores, networks, '
+        'and port groups with placement and utilization overlays.'
+    ),
+}
+
 
 def load_profiles():
     """Return {filename: {'extends': [...], 'data': dict, 'text': str}} for every profile/module."""
@@ -470,11 +555,15 @@ METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '',
 
 def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO_D, module_name='snmp', metrics=None,
                setup=None):
+    monitored_instance = {'name': name, 'link': link, 'categories': categories, 'icon_filename': icon}
+    if name in PAGE_DESCRIPTIONS:
+        monitored_instance['description'] = PAGE_DESCRIPTIONS[name]
+
     return {
         'meta': {
             'plugin_name': plugin_name,
             'module_name': module_name,
-            'monitored_instance': {'name': name, 'link': link, 'categories': categories, 'icon_filename': icon},
+            'monitored_instance': monitored_instance,
             'keywords': keywords,
             'related_resources': {'integrations': {'list': []}},
             'info_provided_to_referring_integrations': {'description': ''},

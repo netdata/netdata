@@ -9,6 +9,16 @@ on:
       - '**/metadata.yaml'
       - '**/taxonomy.yaml'
       - 'integrations/**'
+      - 'src/go/plugin/go.d/config/go.d/snmp.profiles/default/**'
+      - 'src/go/plugin/go.d/config/go.d/snmp.trap-profiles/**'
+      - 'src/go/plugin/ibm.d/docgen/**'
+      - 'src/go/plugin/ibm.d/metricgen/**'
+      - 'src/go/plugin/ibm.d/modules/**/module.yaml'
+      - 'src/go/plugin/ibm.d/modules/**/config.go'
+      - 'src/go/plugin/ibm.d/modules/**/init.go'
+      - 'src/go/plugin/ibm.d/modules/**/generate.go'
+      - 'src/go/plugin/ibm.d/modules/**/contexts/contexts.yaml'
+      - 'src/go/plugin/ibm.d/modules/**/contexts/doc.go'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,12 +45,44 @@ jobs:
         with:
           python-version: "3.10"
 
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: netdata/src/go/go.mod
+          cache-dependency-path: netdata/src/go/go.sum
+
       - name: Setup python dependencies
         run: |
           python3 -m venv ./venv
           source ./venv/bin/activate
           pip install -r learn/.learn_environment/ingest-requirements.txt
           cd netdata && ./integrations/pip.sh
+
+      - name: Generate Source Metadata
+        run: |
+          source ./venv/bin/activate
+          cd netdata
+          python3 integrations/gen_npm_catalog.py
+          cd src/go
+          go generate ./plugin/ibm.d/modules/...
+
+      - name: Verify generated runtime outputs
+        run: |
+          cd netdata
+          git diff --exit-code -- \
+            ':(glob)src/go/plugin/ibm.d/modules/**/config_schema.json' \
+            ':(glob)src/go/plugin/ibm.d/modules/**/contexts/zz_generated_contexts.go'
+          while IFS= read -r module_file; do
+            module_dir="${module_file%/module.yaml}"
+            for output in \
+              "$module_dir/config_schema.json" \
+              "$module_dir/contexts/zz_generated_contexts.go"; do
+              if ! git ls-files --error-unmatch -- "$output" >/dev/null 2>&1; then
+                echo "Generated runtime output must be committed: $output" >&2
+                exit 1
+              fi
+            done
+          done < <(find src/go/plugin/ibm.d/modules -name module.yaml -print | sort)
 
       - name: Generate Integrations
         run: |
@@ -57,6 +99,13 @@ jobs:
           source ./venv/bin/activate
           cd netdata && python3 -m unittest integrations.tests.test_taxonomy
 
+      - name: Test Integration Descriptions
+        run: |
+          source ./venv/bin/activate
+          cd netdata
+          LEARN_INGEST_PATH=../learn/ingest/ingest.py \
+            python3 -m unittest integrations.tests.test_descriptions
+
       - name: Generate Integrations Documentation
         run: |
           source ./venv/bin/activate
@@ -71,6 +120,11 @@ jobs:
         run: |
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_doc_secrets_page.py
+
+      - name: Generate src/collectors/SERVICE-DISCOVERY.md
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 integrations/gen_doc_service_discovery_page.py
 
       - name: Run Ingest
         working-directory: learn

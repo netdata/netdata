@@ -3,8 +3,8 @@
 Use this when a collector's metrics, chart contexts, configuration,
 alerts, or generated docs change. The goal is to keep runtime behavior,
 metadata, taxonomy, source documentation, and CI validation coherent. Generated
-integration pages may ship in the source PR or through the automatic post-merge
-regeneration PR.
+integration pages ship through the automatic post-merge regeneration PR, not
+the source PR.
 
 ## 0. Read first
 
@@ -77,7 +77,7 @@ Keep these synchronized when the corresponding behavior changes:
 - `config_schema.json` for dynamic configuration;
 - stock `.conf` for user-visible defaults;
 - `health.d/*.conf` and `metadata.yaml.modules[].alerts[]`;
-- generated docs through the explicitly selected same-PR or post-merge route.
+- generated docs through the automatic post-merge regeneration PR.
 
 Do not hand-edit generated `integrations/<slug>.md` files.
 
@@ -90,7 +90,7 @@ python3 integrations/gen_integrations.py
 python3 integrations/gen_taxonomy.py --check-only
 python3 integrations/check_collector_taxonomy.py --pr-diff master...HEAD
 python3 -m unittest integrations.tests.test_taxonomy
-# When committing generated docs in this PR:
+# Validate the generated docs locally; do not stage them in the source PR:
 python3 integrations/gen_docs_integrations.py -c go.d.plugin/<module>
 python3 integrations/gen_doc_collector_page.py
 python3 integrations/gen_doc_secrets_page.py
@@ -98,17 +98,19 @@ python3 integrations/gen_doc_secrets_page.py
 python3 integrations/gen_doc_service_discovery_page.py
 ```
 
-Skip the three generated-doc commands when the source PR explicitly selects the
-automatic post-merge regeneration route. `check-markdown.yml` and
-`generate-integrations.yml` run them in CI.
+Do not skip the three generated-doc commands: they validate the source locally.
+`check-markdown.yml` repeats them in the PR, and
+`generate-integrations.yml` commits their final output to the separate
+post-merge regeneration PR.
 
 Use the repo-local `.venv/bin/python` when one exists for the current
 worktree. If your local base branch is not `master`, adjust the `--pr-diff`
 range to the PR base.
 
 If service-discovery rules or `sdext` metadata changed, run
-`python3 integrations/gen_doc_service_discovery_page.py` and commit
-`src/collectors/SERVICE-DISCOVERY.md`; this is not handled by CI for you.
+`python3 integrations/gen_doc_service_discovery_page.py` and inspect the
+result. Leave `src/collectors/SERVICE-DISCOVERY.md` to the post-merge
+generated-artifact PR with the other derived documentation.
 
 ## 6. Before opening the PR
 
@@ -120,9 +122,9 @@ git status --porcelain |
   rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true
 ```
 
-Commit source and taxonomy changes together. Either commit regenerated docs in
-the same PR or state that `generate-integrations.yml` will open the post-merge
-regeneration PR; do not leave the delivery route implicit.
+Commit source and taxonomy changes together, without generated documentation.
+`generate-integrations.yml` opens the separate post-merge regeneration PR; name
+that delivery route in the source PR description.
 Do not commit gitignored runtime artifacts such as
 `integrations/integrations.js`, `integrations/integrations.json`, or
 `integrations/taxonomy.json`.

@@ -27,6 +27,7 @@ violation.
 |---|---|---|
 | Preview a documentation PR locally | `preview-documentation-pr-locally.md` | Isolated Learn ingest/build/browser inspection from PR source content before merge. |
 | Do integration card description links follow the repo-relative rule? | `integration-card-description-links.md` | Yes -- integration `.md` files join the same publish tree at ingest step 6 and get the same link-rewrite/anchor-validation as docs/ pages; absolute `learn.netdata.cloud` URLs bypass that validation. |
+| Repair an empty mapped Learn page | `repairing-empty-mapped-pages.md` | Trace the route to its source owner, distinguish generated from hand-authored content, repair source and map metadata, then validate through a disposable ingest. |
 
 ## How to add a how-to
 

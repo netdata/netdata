@@ -32,7 +32,7 @@ src/go/plugin/go.d/collector/<name>/
 |-- config_schema.json # DYNCFG schema
 |-- metadata.yaml      # Integration metadata (this skill's territory)
 |-- taxonomy.yaml      # Dashboard TOC placement
-|-- README.md          # Will become a symlink to integrations/<slug>.md once gen runs
+|-- README.md          # Generated later as a symlink; do not create it in the source PR
 |-- testdata/          # Fixtures
 `-- ...other .go files
 ```
@@ -160,7 +160,7 @@ validator will warn (fatal). Either pick an existing category
 or add a new one under the appropriate parent (typically
 `data-collection`).
 
-## 4. Taxonomy, stock `.conf`, `config_schema.json`, alerts, README
+## 4. Taxonomy, stock `.conf`, `config_schema.json`, and alerts
 
 These files are the rest of the collector consistency rule and MUST stay
 synchronized with the collector code:
@@ -193,11 +193,11 @@ synchronized with the collector code:
 - `src/health/health.d/<name>.conf` -- alerts on the metrics
   declared in `metadata.yaml`. Each alert in this file SHOULD
   have a matching entry under `metadata.yaml.modules[0].alerts[]`.
-- `src/go/plugin/go.d/collector/<name>/README.md` -- this is the
-  USER-FACING documentation. After step 5, this file will be
-  REPLACED with a symlink to
-  `integrations/<slug>.md`. You MUST NOT hand-write the
-  README; the generator does. Stub it as empty initially.
+
+The generated `src/go/plugin/go.d/collector/<name>/README.md` symlink is not an
+authoritative source artifact. Do not create, hand-write, or stage it in the
+source PR; inspect it during local generation and let the post-merge generated-
+artifact PR commit it.
 
 ## 5. Run the pipeline locally
 
@@ -233,7 +233,8 @@ Expected outputs:
   troubleshooting sections.
 - `src/go/plugin/go.d/collector/<name>/README.md` becomes a
   symlink to `integrations/<slug>.md` (because there is
-  exactly one integration in this directory).
+  exactly one integration in this directory). Inspect it locally; the
+  post-merge generated-artifact PR commits it.
 - `src/collectors/COLLECTORS.md` updated to include your new
   collector in its category section.
 - If service-discovery rules or `sdext` metadata changed,
@@ -259,7 +260,8 @@ re-run.
   module`, `no jobs started`, config-load errors, or immediate exit are
   failures. Use `-c <config-dir>` when testing a non-standard config path.
 - If service-discovery rules or `sdext` metadata changed, run
-  `python3 integrations/gen_doc_service_discovery_page.py` and commit
+  `python3 integrations/gen_doc_service_discovery_page.py` and inspect its
+  output. The post-merge generated-artifact PR commits
   `src/collectors/SERVICE-DISCOVERY.md`.
 - Run
   `git status --porcelain | rg '^(\?\?|!!| M|M |A |AM) integrations/(integrations\.(js|json)|taxonomy\.json)$' || true`
@@ -272,13 +274,9 @@ re-run.
   - `src/go/plugin/go.d/config/go.d.conf` (module toggle).
   - `src/go/plugin/go.d/config/go.d/<name>.conf` (stock config).
   - `src/go/plugin/go.d/README.md` (collector list).
-  - `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md`
-    (the generated integration page).
-  - `src/go/plugin/go.d/collector/<name>/README.md` (now a
-    symlink).
-  - `src/collectors/COLLECTORS.md` (umbrella page updated).
   - `src/health/health.d/<name>.conf` (alerts file).
-  - `src/collectors/SERVICE-DISCOVERY.md` if service-discovery changed.
+  - No generated integration or umbrella documentation; those files ship in
+    the post-merge generated-artifact PR.
   - Possibly `integrations/categories.yaml` if you added a
     category.
   - NOT `integrations/integrations.js` or
@@ -287,27 +285,25 @@ re-run.
 
 ## 7. Commit and push
 
-Single PR, single commit (or a few logical commits) covering
-the collector consistency rule plus the generated integration
-page and umbrella update. Reviewers will check that affected
-artifacts were updated together.
+The source PR contains authoritative collector sources, generator changes,
+contracts, workflows, and tests. Inspect generated integration and umbrella
+documentation locally, but do not stage it; the post-merge workflow opens a
+separate generated-artifact PR.
 
 ## 8. CI
 
-- `check-markdown.yml` will run on the PR. It runs the same
-  pipeline scripts, validates taxonomy, and validates Learn ingest. If your
-  committed integration page diverges from CI's regen, the
-  workflow fails -- fix locally and re-push.
+- `check-markdown.yml` will run on the PR. It runs the same pipeline scripts,
+  validates taxonomy, and validates Learn ingest without requiring generated
+  documentation in the source PR.
 - After merge, `generate-integrations.yml` triggers on master.
-  Since you already committed the regen, this SHOULD NOT
-  produce changes. If it does, the auto-PR
-  (`Regenerate integrations docs`) catches the drift -- merge
-  it.
+  Its auto-PR (`Regenerate integrations docs`) contains the final generated
+  integration and umbrella documentation for review and merge.
 
 ## 9. Surface arrival timing
 
-- `src/collectors/COLLECTORS.md` is live in the repo
-  immediately after merge.
+- Generated integration and umbrella pages, including
+  `src/collectors/COLLECTORS.md`, become live after the post-merge generated-
+  artifact PR is reviewed and merged.
 - The cloud-frontend dashboard's Integrations page rebuilds
   on its own schedule (when the cloud-frontend CI re-runs
   `gen_integrations.py` against master). Coordinate with
@@ -320,8 +316,8 @@ artifacts were updated together.
 ## Common mistakes
 
 - **Forgetting one collector-consistency artifact.** The most common
-  cause of review feedback. Use `git status` after step 5 to
-  confirm every affected source/generated artifact is staged.
+  cause of review feedback. Confirm every affected authoritative source is
+  staged and every generated documentation artifact is excluded.
 - **Hand-editing `integrations/<slug>.md` after generation.**
   Never. It is regenerated each time. Edit `metadata.yaml`
   and re-run.

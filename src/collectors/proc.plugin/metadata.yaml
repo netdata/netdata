@@ -230,7 +230,7 @@ modules:
           The `/dev/random` device in Linux is one such source of entropy, and it provides an interface for programs
           to access the pool of entropy. When a program requests random numbers, it reads from the `/dev/random` device,
           which blocks until enough entropy is available to generate the requested numbers. This ensures that the
-          generated numbers are truly random and not predictable. 
+          generated numbers are truly random and not predictable.
 
           However, if the pool of entropy gets depleted, the `/dev/random` device may block indefinitely, causing
           programs that rely on random numbers to slow down or even freeze. This is especially problematic for
@@ -393,6 +393,7 @@ modules:
       module_name: /proc/vmstat
       monitored_instance:
         name: Memory Statistics
+        description: "Monitor Linux virtual memory allocation, paging, swapping, writeback, and page fault activity."
         link: ""
         categories:
           - data-collection.operating-systems
@@ -1133,6 +1134,7 @@ modules:
       module_name: /proc/net/softnet_stat
       monitored_instance:
         name: Softnet Statistics
+        description: "Monitor Linux softnet packet processing, including drops, quota exhaustion, RPS, flow-limit, and GRO activity."
         link: ""
         categories:
           - data-collection.networking
@@ -1588,6 +1590,7 @@ modules:
         categories:
           - data-collection.hardware-and-sensors
         icon_filename: "microchip.svg"
+        description: 'Monitor correctable and uncorrectable ECC memory errors reported by Linux EDAC for each memory controller and DIMM.'
       related_resources:
         integrations:
           list: []
@@ -1822,6 +1825,7 @@ modules:
         categories:
           - data-collection.operating-systems
         icon_filename: "microchip.svg"
+        description: 'Monitor Linux Kernel Samepage Merging activity and effectiveness, including shared pages, savings, ratios, and memory deduplication behavior.'
       related_resources:
         integrations:
           list: []
@@ -1928,7 +1932,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          zRAM, or compressed RAM, is a block device that uses a portion of your system's RAM as a block device.
+          Monitor zRAM device capacity, compression, memory use, and I/O activity on Linux systems.
           The data written to this block device is compressed and stored in memory.
 
           The collectors provides information about the operation and the effectiveness of zRAM on your system.
@@ -2637,6 +2641,7 @@ modules:
       module_name: /proc/net/dev
       monitored_instance:
         name: Network interfaces
+        description: "Monitor Linux network interface bandwidth, packet activity, errors, drops, and operational state."
         link: ""
         categories:
           - data-collection.networking
@@ -2978,7 +2983,7 @@ modules:
         - rdma
     overview:
       data_collection:
-        metrics_description: "This integration monitors InfiniBand network inteface statistics."
+        metrics_description: "Monitor InfiniBand network interface traffic and errors."
         method_description: ""
       supported_platforms:
         include: []
@@ -3688,6 +3693,7 @@ modules:
       module_name: /proc/net/sockstat
       monitored_instance:
         name: Socket statistics
+        description: "Monitor Linux socket usage across address families plus IPv4 protocol memory statistics reported through procfs."
         link: ""
         categories:
           - data-collection.networking
@@ -3821,6 +3827,7 @@ modules:
       module_name: /proc/net/sockstat6
       monitored_instance:
         name: IPv6 Socket Statistics
+        description: "Monitor Linux IPv6 socket usage and protocol statistics reported through procfs."
         link: ""
         categories:
           - data-collection.networking
@@ -4561,7 +4568,7 @@ modules:
         - filesystem
     overview:
       data_collection:
-        metrics_description: "This integration monitors  ZFS Adadptive Replacement Cache (ARC) statistics."
+        metrics_description: "Monitor ZFS Adaptive Replacement Cache (ARC) performance and memory statistics."
         method_description: ""
       supported_platforms:
         include: []

@@ -9,6 +9,16 @@ on:
       - 'src/collectors/**/metadata.yaml'
       - 'src/crates/**/metadata.yaml'
       - 'src/go/plugin/**/metadata.yaml'
+      - 'src/go/plugin/go.d/config/go.d/snmp.profiles/default/**'
+      - 'src/go/plugin/go.d/config/go.d/snmp.trap-profiles/**'
+      - 'src/go/plugin/ibm.d/docgen/**'
+      - 'src/go/plugin/ibm.d/metricgen/**'
+      - 'src/go/plugin/ibm.d/modules/**/module.yaml'
+      - 'src/go/plugin/ibm.d/modules/**/config.go'
+      - 'src/go/plugin/ibm.d/modules/**/init.go'
+      - 'src/go/plugin/ibm.d/modules/**/generate.go'
+      - 'src/go/plugin/ibm.d/modules/**/contexts/contexts.yaml'
+      - 'src/go/plugin/ibm.d/modules/**/contexts/doc.go'
       - '**/taxonomy.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
@@ -20,6 +30,8 @@ on:
       - 'integrations/cloud-notifications/metadata.yaml'
       - 'integrations/cloud-authentication/metadata.yaml'
       - 'integrations/_common.py'
+      - 'integrations/descriptions.py'
+      - 'integrations/gen_npm_catalog.py'
       - 'integrations/gen_integrations.py'
       - 'integrations/gen_taxonomy.py'
       - 'integrations/gen_taxonomy_seed.py'
@@ -28,6 +40,7 @@ on:
       - 'integrations/gen_docs_integrations.py'
       - 'integrations/gen_doc_collector_page.py'
       - 'integrations/gen_doc_secrets_page.py'
+      - 'integrations/gen_doc_service_discovery_page.py'
   workflow_dispatch: null
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref.
   group: integrations-${{ github.ref }}
@@ -51,6 +64,35 @@ jobs:
           python3 -m venv ./virtualenv
           source ./virtualenv/bin/activate
           ./integrations/pip.sh
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+          cache-dependency-path: src/go/go.sum
+      - name: Generate Source Metadata
+        id: generate-source-metadata
+        run: |
+          source ./virtualenv/bin/activate
+          python3 integrations/gen_npm_catalog.py
+          cd src/go
+          go generate ./plugin/ibm.d/modules/...
+      - name: Verify generated runtime outputs
+        id: verify-generated-runtime
+        run: |
+          git diff --exit-code -- \
+            ':(glob)src/go/plugin/ibm.d/modules/**/config_schema.json' \
+            ':(glob)src/go/plugin/ibm.d/modules/**/contexts/zz_generated_contexts.go'
+          while IFS= read -r module_file; do
+            module_dir="${module_file%/module.yaml}"
+            for output in \
+              "$module_dir/config_schema.json" \
+              "$module_dir/contexts/zz_generated_contexts.go"; do
+              if ! git ls-files --error-unmatch -- "$output" >/dev/null 2>&1; then
+                echo "Generated runtime output must be committed: $output" >&2
+                exit 1
+              fi
+            done
+          done < <(find src/go/plugin/ibm.d/modules -name module.yaml -print | sort)
       - name: Generate Integrations
         id: generate
         run: |
@@ -66,21 +108,34 @@ jobs:
         run: |
           source ./virtualenv/bin/activate
           python3 -m unittest integrations.tests.test_taxonomy
+      - name: Test Integration Descriptions
+        id: test-descriptions
+        run: |
+          source ./virtualenv/bin/activate
+          python3 -m unittest integrations.tests.test_descriptions
       - name: Generate Integrations Documentation
         id: generate-integrations-documentation
         run: |
+          source ./virtualenv/bin/activate
           python3 integrations/gen_docs_integrations.py
       - name: Generate src/collectors/COLLECTORS.md
         id: generate-collectors-md
         run: |
+          source ./virtualenv/bin/activate
           python3 integrations/gen_doc_collector_page.py
       - name: Generate src/collectors/SECRETS.md
         id: generate-secrets-md
         run: |
+          source ./virtualenv/bin/activate
           python3 integrations/gen_doc_secrets_page.py
+      - name: Generate src/collectors/SERVICE-DISCOVERY.md
+        id: generate-service-discovery-md
+        run: |
+          source ./virtualenv/bin/activate
+          python3 integrations/gen_doc_service_discovery_page.py
       - name: Clean Up Temporary Data
         id: clean
-        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json integrations/taxonomy.json
+        run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json integrations/taxonomy.json src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
       - name: Create PR
         id: create-pr
         uses: peter-evans/create-pull-request@v8
@@ -108,12 +163,16 @@ jobs:
               ${{ github.repository }}: Failed to create PR rebuilding integrations.js
               Checkout Agent: ${{ steps.checkout-agent.outcome }}
               Prep python env and deps: ${{ steps.prep-deps.outcome }}
+              Generate Source Metadata: ${{ steps.generate-source-metadata.outcome }}
+              Verify Generated Runtime Outputs: ${{ steps.verify-generated-runtime.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
               Generate Collector Taxonomy: ${{ steps.generate-taxonomy.outcome }}
               Test Collector Taxonomy Tooling: ${{ steps.test-taxonomy.outcome }}
+              Test Integration Descriptions: ${{ steps.test-descriptions.outcome }}
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
               Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
               Generate src/collectors/SECRETS.md: ${{ steps.generate-secrets-md.outcome }}
+              Generate src/collectors/SERVICE-DISCOVERY.md: ${{ steps.generate-service-discovery-md.outcome }}
               Clean Up Temporary Data: ${{ steps.clean.outcome }}
               Create PR: ${{ steps.create-pr.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

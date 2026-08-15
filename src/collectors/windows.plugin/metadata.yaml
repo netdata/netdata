@@ -22,7 +22,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors processors statistics on host.
+          Monitor processor performance statistics on Windows hosts through Perflib.
         method_description: |
           It queries Processor object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -561,6 +561,7 @@ modules:
       module_name: PerflibNetwork
       monitored_instance:
         name: Network Subsystem
+        description: "Monitor Windows network interface traffic, errors, drops, queue length, and offload activity through Perflib."
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
           - data-collection.networking
@@ -1902,6 +1903,7 @@ modules:
       module_name: PerflibHyperV
       monitored_instance:
         name: Hyper-V
+        description: Monitor Hyper-V virtual machine health, compute, memory, storage, network, and virtual switch performance on Windows hosts.
         link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
         categories:
           - data-collection.containers-and-vms
@@ -2288,7 +2290,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors application built with .NET
+          Monitor runtime and performance statistics for applications built with .NET Framework through Perflib.
         method_description: |
           It queries different NET Framework objects per process from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2540,6 +2542,7 @@ modules:
         categories:
           - data-collection.applications
         icon_filename: "windows.svg"
+        description: 'Monitor Active Directory operations, replication, LDAP activity, binds, queues, database work, cleanup, security descriptors, and SAM metrics.'
       related_resources:
         integrations:
           list: []
@@ -3767,6 +3770,7 @@ modules:
       module_name: PerflibExchange
       monitored_instance:
         name: MS Exchange
+        description: "Monitor Microsoft Exchange performance counters for mail flow, databases, clients, and server health through Perflib."
         link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
         categories:
           - data-collection.applications
@@ -4116,6 +4120,7 @@ modules:
       module_name: PerflibASP
       monitored_instance:
         name: ASP.NET
+        description: "Monitor ASP.NET application requests, errors, sessions, queues, and runtime performance through Perflib."
         link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
         categories:
           - data-collection.web-servers-and-proxies

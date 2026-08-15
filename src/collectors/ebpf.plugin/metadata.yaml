@@ -250,7 +250,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
+        metrics_description: "Monitor Linux process and thread creation by tracing kernel task-creation functions with eBPF."
         method_description: "Attach tracing (kprobe or tracepoint, and trampoline) to internal kernel functions."
       supported_platforms:
         include:
@@ -274,7 +274,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -484,6 +484,7 @@ modules:
       module_name: disk
       monitored_instance:
         name: eBPF Disk
+        description: "Measure Linux disk I/O latency by attaching eBPF programs to kernel tracepoints."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -524,7 +525,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -591,6 +592,7 @@ modules:
       module_name: hardirq
       monitored_instance:
         name: eBPF Hardirq
+        description: "Measure the latency of available Linux hardware interrupts through eBPF kernel tracepoints."
         link: "https://kernel.org/"
         categories:
           - data-collection.operating-systems
@@ -629,7 +631,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -736,7 +738,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -877,6 +879,7 @@ modules:
       module_name: mdflush
       monitored_instance:
         name: eBPF MDflush
+        description: "Monitor Linux software RAID flush events by tracing kernel functions with eBPF."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -1001,7 +1004,7 @@ modules:
         - Hard Disk
     overview:
       data_collection:
-        metrics_description: "Monitors when swap has I/O events and applications executing events."
+        metrics_description: "Monitor Linux swap reads and writes by tracing kernel swap I/O functions with eBPF."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include:
@@ -1160,6 +1163,7 @@ modules:
       module_name: oomkill
       monitored_instance:
         name: eBPF OOMkill
+        description: "Track Linux applications terminated by the out-of-memory killer through an eBPF kernel tracepoint."
         link: "https://kernel.org/"
         categories:
           - data-collection.operating-systems
@@ -1203,7 +1207,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -1715,7 +1719,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -1907,6 +1911,7 @@ modules:
       module_name: softirq
       monitored_instance:
         name: eBPF SoftIRQ
+        description: "Measure the latency of available Linux software interrupts through eBPF kernel tracing."
         link: "https://kernel.org/"
         categories:
           - data-collection.operating-systems
@@ -1945,7 +1950,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -2012,6 +2017,7 @@ modules:
       module_name: mount
       monitored_instance:
         name: eBPF Mount
+        description: "Track Linux mount and unmount system calls by tracing kernel functions with eBPF."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -2052,7 +2058,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -2135,6 +2141,7 @@ modules:
       module_name: vfs
       monitored_instance:
         name: eBPF VFS
+        description: "Monitor Linux virtual filesystem read, write, open, and unlink activity through eBPF kernel tracing."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -2570,6 +2577,7 @@ modules:
       module_name: process
       monitored_instance:
         name: eBPF Process
+        description: "Monitor the eBPF plugin's internal memory allocation and management statistics."
         link: "https://github.com/netdata/netdata/"
         categories:
           - data-collection.operating-systems

@@ -966,7 +966,9 @@ All existing project-specific instructions in this file remain active. The SOW f
 ## Collector Consistency Requirements
 
 When working on collectors, runtime behavior, metrics, charts, configuration,
-alerts, taxonomy, and generated documentation MUST stay consistent in one PR.
+alerts, taxonomy, and authoritative documentation sources MUST stay consistent
+in the source PR. Generated integration and umbrella documentation is validated
+locally, then committed by the post-merge generated-artifact PR.
 The detailed collector consistency checklist and CI enforcement notes live in
 `.agents/skills/integrations-lifecycle/consistency.md`.
 

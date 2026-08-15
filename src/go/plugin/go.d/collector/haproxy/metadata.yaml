@@ -6,6 +6,7 @@ modules:
       module_name: haproxy
       monitored_instance:
         name: HAProxy
+        description: "Monitor HAProxy sessions, connections, queues, response times, HTTP responses, and network traffic."
         link: https://www.haproxy.org/
         icon_filename: haproxy.svg
         categories:
@@ -184,13 +185,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8404/metrics
-                
+
                   - name: remote
                     url: http://192.0.2.1:8404/metrics
     troubleshooting:
