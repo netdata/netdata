@@ -3,7 +3,11 @@
 package prometheus
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -990,14 +994,712 @@ func TestCollector_CephProfile(t *testing.T) {
 	const input = `
 # TYPE ceph_health_status gauge
 ceph_health_status 0
+# TYPE ceph_health_detail gauge
+ceph_health_detail{name="RECENT_CRASH",severity="HEALTH_WARN"} 1
+# TYPE ceph_daemon_health_metrics gauge
+ceph_daemon_health_metrics{ceph_daemon="osd.0",type="SLOW_OPS"} 1
+# TYPE ceph_healthcheck_slow_ops gauge
+ceph_healthcheck_slow_ops 1
 `
 	testCollectorStockProfileModes(
 		t,
 		"ceph",
 		input,
-		map[string][]string{"prometheus.ceph.health.cluster_status.state": {"value"}},
-		map[string][]string{"prometheus.ceph_health_status": {"ceph_health_status"}},
+		map[string][]string{
+			"prometheus.ceph.health.cluster_status.state":               {"value"},
+			"prometheus.ceph.health.health_checks.state":                {"value"},
+			"prometheus.ceph.health.daemon_health.item_count":           {"value"},
+			"prometheus.ceph.health.slow_operations.current_operations": {"value"},
+		},
+		map[string][]string{
+			"prometheus.ceph_health_status":         {"ceph_health_status"},
+			"prometheus.ceph_health_detail":         {"ceph_health_detail"},
+			"prometheus.ceph_daemon_health_metrics": {"ceph_daemon_health_metrics"},
+			"prometheus.ceph_healthcheck_slow_ops":  {"ceph_healthcheck_slow_ops"},
+		},
 	)
+}
+
+func TestCollector_CephMGRReleaseFixturesMaterializeM01AlertIdentities(t *testing.T) {
+	const (
+		healthChecksContext = "prometheus.ceph.health.health_checks.state"
+		daemonHealthContext = "prometheus.ceph.health.daemon_health.item_count"
+	)
+	wantHealthCheckNames := []string{
+		"RECENT_CRASH",
+		"RECENT_MGR_MODULE_CRASH",
+		"CEPHADM_FAILED_DAEMON",
+		"CEPHADM_PAUSED",
+		"UPGRADE_EXCEPTION",
+	}
+	fixtures := []string{
+		"prometheus/profiles/ceph/fixtures/ceph_reef_mgr_limit11.prom",
+		"prometheus/profiles/ceph/fixtures/ceph_squid_mgr_limit11.prom",
+		"prometheus/profiles/ceph/fixtures/ceph_tentacle_mgr_limit11.prom",
+	}
+
+	for _, fixture := range fixtures {
+		t.Run(filepath.Base(fixture), func(t *testing.T) {
+			input, err := os.ReadFile(promtestutil.Require(t, fixture))
+			require.NoError(t, err)
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write(input)
+			}))
+			defer srv.Close()
+
+			collr := New()
+			collr.URL = srv.URL
+			collr.Profiles = ProfilesConfig{Mode: "auto"}
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+			defer collr.Cleanup(context.Background())
+
+			cc := cycle(t, collr.MetricStore())
+			cc.BeginCycle()
+			require.NoError(t, collr.Collect(context.Background()))
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			eng, err := chartengine.New()
+			require.NoError(t, err)
+			require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+			attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+			require.NoError(t, err)
+			defer attempt.Abort()
+			plan := attempt.Plan()
+			require.NoError(t, attempt.Commit())
+
+			var healthCheckNames, daemonHealthTypes []string
+			for _, item := range plan.Actions {
+				create, ok := item.(chartengine.CreateChartAction)
+				if !ok {
+					continue
+				}
+				switch create.Meta.Context {
+				case healthChecksContext:
+					healthCheckNames = append(healthCheckNames, create.Labels["name"])
+				case daemonHealthContext:
+					daemonHealthTypes = append(daemonHealthTypes, create.Labels["type"])
+				}
+			}
+
+			assert.ElementsMatch(t, wantHealthCheckNames, healthCheckNames)
+			assert.Equal(t, []string{"SLOW_OPS"}, daemonHealthTypes)
+		})
+	}
+}
+
+func TestCollector_CephMGRAlertContract(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
+	templates := cephHealthAlertTemplates(t)
+
+	require.Equal(t, "v1", manifest.Version)
+	require.Equal(t, "source-alert-map", manifest.Kind)
+	require.Equal(t, "ceph", manifest.Profile)
+	require.Equal(t, "10s", manifest.NetdataAlertCadence)
+	require.Equal(t, "SHA-256 of the UTF-8 canonical JSON for the complete parsed source alert rule, with object keys sorted "+
+		"lexicographically, no insignificant whitespace, and non-ASCII characters preserved", manifest.DefinitionSHA256Contract)
+	require.Equal(t, map[string]cephAlertSource{
+		"reef": {
+			Tag: "v18.2.8", Commit: "efac5a54607c13fa50d4822e50242b86e6e446df",
+			Path:   "monitoring/ceph-mixin/prometheus_alerts.yml",
+			SHA256: "0325e5c481d00c674f7faf759e00f6c5c22028dbcc8bb95491404d600c6f3efd",
+		},
+		"squid": {
+			Tag: "v19.2.5", Commit: "abc7aa7f2701e5d46878fd5e6bb7e2955f1a395a",
+			Path:   "monitoring/ceph-mixin/prometheus_alerts.yml",
+			SHA256: "259ee363694d174f46427a443ba0a8952b28df0c17af2bb65a2378511bc321ba",
+		},
+		"tentacle": {
+			Tag: "v20.2.3", Commit: "06c2f9c35b67055a8a6fb99d1be236b3c4832ace",
+			Path:   "monitoring/ceph-mixin/prometheus_alerts.yml",
+			SHA256: "09308346d3d143ff128813f1142f1499142799174da4e0505ddad7144b8d8716",
+		},
+	}, manifest.Sources)
+	require.ElementsMatch(t, []string{
+		"CEPH-001", "CEPH-002", "CEPH-013", "CEPH-014", "CEPH-015", "CEPH-016", "CEPH-059", "CEPH-060",
+		"CEPH-061", "CEPH-062",
+	}, cephManifestSOWIDs(manifest.Alerts))
+	require.ElementsMatch(t, []string{"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02"},
+		cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
+	for name, extension := range manifest.NetdataExtensions {
+		require.NotEmptyf(t, extension.Reason, "%s has no extension rationale", name)
+		require.NotEmptyf(t, extension.Fidelity, "%s has no extension fidelity", name)
+		require.NotEmptyf(t, extension.Owner, "%s has no extension owner", name)
+		if extension.Adaptation != "" {
+			_, ok := manifest.AdaptationContracts[extension.Adaptation]
+			require.Truef(t, ok, "%s references unknown adaptation %q", name, extension.Adaptation)
+		}
+	}
+
+	for name, mapping := range manifest.Alerts {
+		require.NotEmpty(t, mapping.SourceAlert)
+		require.NotEmpty(t, mapping.Source.Expression)
+		require.NotEmpty(t, mapping.Source.Persistence)
+		require.NotEmpty(t, mapping.Source.Severity)
+		require.Positive(t, mapping.Source.Lines["reef"])
+		require.Positive(t, mapping.Source.Lines["squid"])
+		require.Positive(t, mapping.Source.Lines["tentacle"])
+		for _, release := range []string{"reef", "squid", "tentacle"} {
+			digest := mapping.Source.DefinitionSHA256[release]
+			require.NotEmptyf(t, digest, "%s has no source-definition pin for %s", name, release)
+		}
+		adaptation, ok := manifest.AdaptationContracts[mapping.Netdata.Adaptation]
+		require.Truef(t, ok, "%s references unknown adaptation %q", name, mapping.Netdata.Adaptation)
+		require.NotEmpty(t, adaptation.Preserved)
+		require.NotEmpty(t, adaptation.Differences)
+
+		if mapping.Netdata.Disposition == "reuse" {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			block, ok := templates[name]
+			require.True(t, ok, "missing alert template")
+			assert.Equal(t, mapping.Netdata.Context, block["on"])
+			assert.Equal(t, mapping.Netdata.Labels, block["chart labels"])
+			assert.Equal(t, mapping.Netdata.Lookup, block["lookup"])
+			assert.Equal(t, mapping.Netdata.Units, block["units"])
+			assert.Equal(t, manifest.NetdataAlertCadence, block["every"])
+			assert.Empty(t, block["delay"], "observation-window adaptation must not use notification delay")
+			assert.Equal(t, mapping.Netdata.Condition, block["condition"])
+			assert.Equal(t, mapping.Netdata.Recipient, block["to"])
+			assert.Equal(t, "NETDATA-ADAPTED", mapping.Netdata.Fidelity)
+			assert.True(t, strings.HasPrefix(block["on"], "prometheus.ceph."))
+			assert.Contains(t, block["info"], "available")
+			assert.NotContains(t, block["info"], "continuously")
+		})
+	}
+
+	reuse := manifest.Alerts["plugin_data_collection_status"].Netdata
+	generic := healthAlertTemplatesFromFile(t, "../../../../../health/health.d/go.d.plugin.conf")["plugin_data_collection_status"]
+	assert.Equal(t, reuse.Context, generic["on"])
+	assert.Equal(t, reuse.Lookup, generic["lookup"])
+	assert.Equal(t, reuse.Units, generic["units"])
+	assert.Equal(t, reuse.Condition, generic["condition"])
+	assert.Equal(t, reuse.Recipient, generic["to"])
+	assert.Equal(t, "CORRECTED-INTENT", reuse.Fidelity)
+
+	// The Dashboard API collector owns this separate native collection-integrity alert.
+	assert.Equal(t, manifest.NetdataExtensions["ceph_component_collection_failed"].Context,
+		templates["ceph_component_collection_failed"]["on"])
+	assert.NotContains(t, templates, "ceph_mgr_prometheus_module_inactive")
+}
+
+func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
+
+	for release, source := range manifest.Sources {
+		t.Run(release, func(t *testing.T) {
+			path := filepath.Join("testdata", "ceph_source_alerts", release+".yaml")
+			content, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			fileDigest := sha256.Sum256(content)
+			require.Equal(t, source.SHA256, hex.EncodeToString(fileDigest[:]), "pinned source file digest")
+
+			rules := parseCephSourceAlertRules(t, content)
+			for name, mapping := range manifest.Alerts {
+				t.Run(name, func(t *testing.T) {
+					rule, ok := rules[mapping.SourceAlert]
+					require.Truef(t, ok, "source alert %q is absent", mapping.SourceAlert)
+
+					assert.Equal(t, mapping.Source.Expression, rule.Expression)
+					assert.Equal(t, mapping.Source.Persistence, rule.Persistence)
+					assert.Equal(t, mapping.Source.Severity, rule.Severity)
+					assert.Equal(t, mapping.Source.Lines[release], rule.Line)
+					assert.Equal(t, mapping.Source.DefinitionSHA256[release], rule.DefinitionSHA256)
+				})
+			}
+		})
+	}
+}
+
+type cephSourceAlertRule struct {
+	Expression       string
+	Persistence      string
+	Severity         string
+	Line             int
+	DefinitionSHA256 string
+}
+
+func parseCephSourceAlertRules(t *testing.T, content []byte) map[string]cephSourceAlertRule {
+	t.Helper()
+
+	var source struct {
+		Groups []struct {
+			Rules []yaml.Node `yaml:"rules"`
+		} `yaml:"groups"`
+	}
+	require.NoError(t, yaml.Unmarshal(content, &source))
+
+	rules := make(map[string]cephSourceAlertRule)
+	for _, group := range source.Groups {
+		for _, node := range group.Rules {
+			var definition map[string]any
+			require.NoError(t, node.Decode(&definition))
+
+			name, ok := definition["alert"].(string)
+			if !ok {
+				continue
+			}
+			_, exists := rules[name]
+			require.Falsef(t, exists, "duplicate source alert %q", name)
+
+			labels, ok := definition["labels"].(map[string]any)
+			require.Truef(t, ok, "source alert %q has no labels mapping", name)
+			severity, ok := labels["severity"].(string)
+			require.Truef(t, ok, "source alert %q has no severity label", name)
+
+			rules[name] = cephSourceAlertRule{
+				Expression:       cephSourceString(t, name, definition, "expr"),
+				Persistence:      cephSourceOptionalString(t, name, definition, "for"),
+				Severity:         severity,
+				Line:             node.Line,
+				DefinitionSHA256: cephCanonicalDefinitionSHA256(t, name, definition),
+			}
+		}
+	}
+	return rules
+}
+
+func cephSourceString(t *testing.T, alertName string, definition map[string]any, field string) string {
+	t.Helper()
+
+	value, ok := definition[field].(string)
+	require.Truef(t, ok, "source alert %q has no string %q field", alertName, field)
+	return value
+}
+
+func cephSourceOptionalString(t *testing.T, alertName string, definition map[string]any, field string) string {
+	t.Helper()
+
+	value, exists := definition[field]
+	if !exists {
+		return ""
+	}
+	text, ok := value.(string)
+	require.Truef(t, ok, "source alert %q has non-string %q field", alertName, field)
+	return text
+}
+
+func cephCanonicalDefinitionSHA256(t *testing.T, alertName string, definition map[string]any) string {
+	t.Helper()
+
+	var canonical bytes.Buffer
+	encoder := json.NewEncoder(&canonical)
+	encoder.SetEscapeHTML(false)
+	require.NoErrorf(t, encoder.Encode(definition), "canonicalize source alert %q", alertName)
+
+	digest := sha256.Sum256(bytes.TrimSuffix(canonical.Bytes(), []byte{'\n'}))
+	return hex.EncodeToString(digest[:])
+}
+
+func TestCollector_CephMGRObservationWindowAdaptation(t *testing.T) {
+	active, healthy, warning, critical := 1, 0, 1, 2
+	const window, updateEvery = 30, 15
+
+	tests := []struct {
+		name             string
+		now, first, last int
+		obsolete         bool
+		points           []cephObservedPoint
+		matches          func(int) bool
+		want             string
+	}{
+		{
+			name: "new chart can raise with one update interval less history",
+			now:  15, first: 0, last: 15,
+			points:  []cephObservedPoint{{0, &active}, {15, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "active",
+		},
+		{
+			name: "prior healthy value remains in the observation window",
+			now:  30, first: 0, last: 30,
+			points:  []cephObservedPoint{{0, &healthy}, {15, &active}, {30, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "clear",
+		},
+		{
+			name: "active observed values fill the window after the healthy value expires",
+			now:  45, first: 0, last: 45,
+			points:  []cephObservedPoint{{0, &healthy}, {15, &active}, {30, &active}, {45, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "active",
+		},
+		{
+			name: "partial gap does not reset observed active values",
+			now:  45, first: 0, last: 45,
+			points:  []cephObservedPoint{{0, &healthy}, {15, &active}, {45, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "active",
+		},
+		{
+			name: "relative window remains anchored to evaluation time during a gap",
+			now:  45, first: 0, last: 30,
+			points:  []cephObservedPoint{{0, &healthy}, {15, &active}, {30, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "active",
+		},
+		{
+			name: "runnable all-null lookup is undefined",
+			now:  15, first: 0, last: 15,
+			points:  []cephObservedPoint{{0, nil}, {15, nil}},
+			matches: func(v int) bool { return v > 0 }, want: "undefined",
+		},
+		{
+			name: "gap becomes undefined when stored values leave a still-runnable window",
+			now:  60, first: 0, last: 15,
+			points:  []cephObservedPoint{{0, &active}, {15, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "undefined",
+		},
+		{
+			name: "stale lookup stops evaluating",
+			now:  61, first: 0, last: 15,
+			points:  []cephObservedPoint{{0, &active}, {15, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "not-run",
+		},
+		{
+			name: "collection resumption evaluates the new stored window",
+			now:  75, first: 0, last: 75,
+			points:  []cephObservedPoint{{0, &active}, {15, &active}, {75, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "active",
+		},
+		{
+			name: "ordinary zero recovery clears",
+			now:  45, first: 0, last: 45,
+			points:  []cephObservedPoint{{15, &active}, {30, &active}, {45, &healthy}},
+			matches: func(v int) bool { return v > 0 }, want: "clear",
+		},
+		{
+			name: "other enumerated state clears warning predicate",
+			now:  45, first: 0, last: 45,
+			points:  []cephObservedPoint{{15, &warning}, {30, &warning}, {45, &critical}},
+			matches: func(v int) bool { return v == 1 }, want: "clear",
+		},
+		{
+			name: "obsolete chart removes instance alert",
+			now:  45, first: 0, last: 45, obsolete: true,
+			points:  []cephObservedPoint{{15, &active}, {30, &active}, {45, &active}},
+			matches: func(v int) bool { return v > 0 }, want: "removed",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, cephObservationWindowState(
+				tc.now, tc.first, tc.last, window, updateEvery, tc.obsolete, tc.points, tc.matches))
+		})
+	}
+}
+
+type cephObservedPoint struct {
+	at    int
+	value *int
+}
+
+// cephObservationWindowState mirrors the relevant gates in rrdcalc_isrunnable()
+// and the numeric-point selection of a relative unaligned health lookup. The
+// query window remains relative to the evaluation time, not the latest stored
+// sample. Tests pass timestamps; there is deliberately no synthetic "window
+// complete" or Prometheus-style pending state.
+func cephObservationWindowState(
+	now, first, last, window, updateEvery int,
+	obsolete bool,
+	points []cephObservedPoint,
+	matches func(int) bool,
+) string {
+	if obsolete {
+		return "removed"
+	}
+	if now-window+updateEvery < first || now-window-updateEvery > last {
+		return "not-run"
+	}
+
+	start := now - window
+	hasValue := false
+	for _, point := range points {
+		if point.at < start || point.at > now || point.value == nil {
+			continue
+		}
+		hasValue = true
+		if !matches(*point.value) {
+			return "clear"
+		}
+	}
+	if !hasValue {
+		return "undefined"
+	}
+	return "active"
+}
+
+func TestCollector_CephUnknownHealthCheckFallbackContract(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
+	extension := manifest.NetdataExtensions["ceph_unknown_health_check"]
+	block := cephHealthAlertTemplates(t)["ceph_unknown_health_check"]
+	require.Equal(t, "NETDATA-ADAPTED", extension.Fidelity)
+	require.NotEmpty(t, extension.LabelsPolicy)
+	assert.Equal(t, extension.Context, block["on"])
+	assert.Equal(t, extension.Lookup, block["lookup"])
+	assert.Equal(t, extension.Units, block["units"])
+	assert.Equal(t, manifest.NetdataAlertCadence, block["every"])
+	assert.Empty(t, block["delay"])
+	assert.Equal(t, extension.Condition, block["condition"])
+	assert.Equal(t, extension.Recipient, block["to"])
+	labels, ok := strings.CutPrefix(block["chart labels"], "name=")
+	require.True(t, ok, "fallback must filter the health-check name label")
+	fields := strings.Fields(labels)
+	require.NotEmpty(t, fields)
+	require.Equal(t, "*", fields[len(fields)-1], "negative label matches require a final positive match")
+
+	got := make([]string, 0, len(fields)-1)
+	for _, field := range fields[:len(fields)-1] {
+		require.Truef(t, strings.HasPrefix(field, "!"), "fallback matcher %q is not a name exclusion", field)
+		got = append(got, strings.TrimPrefix(field, "!"))
+	}
+	assert.ElementsMatch(t, []string{
+		"BLUESTORE_DISK_SIZE_MISMATCH", "BLUESTORE_SPURIOUS_READ_ERRORS", "CEPHADM_CERT_ERROR",
+		"CEPHADM_CERT_WARNING", "CEPHADM_FAILED_DAEMON", "CEPHADM_PAUSED", "DEVICE_HEALTH",
+		"DEVICE_HEALTH_IN_USE", "DEVICE_HEALTH_TOOMANY", "FS_DEGRADED", "FS_WITH_FAILED_MDS",
+		"HARDWARE_FANS", "HARDWARE_MEMORY", "HARDWARE_NETWORK", "HARDWARE_POWER", "HARDWARE_PROCESSOR",
+		"HARDWARE_STORAGE", "MDS_ALL_DOWN", "MDS_DAMAGE", "MDS_HEALTH_READ_ONLY", "MDS_INSUFFICIENT_STANDBY",
+		"MDS_UP_LESS_THAN_MAX", "MON_CLOCK_SKEW", "MON_DISK_CRIT", "MON_DISK_LOW", "MON_DOWN",
+		"OBJECT_UNFOUND", "OSD_BACKFILLFULL", "OSD_DOWN", "OSD_FULL", "OSD_HOST_DOWN", "OSD_NEARFULL",
+		"OSD_SCRUB_ERRORS", "OSD_SLOW_PING_TIME_BACK", "OSD_SLOW_PING_TIME_FRONT", "OSD_TOO_MANY_REPAIRS",
+		"PG_AVAILABILITY", "PG_BACKFILL_FULL", "PG_DAMAGED", "PG_NOT_DEEP_SCRUBBED", "PG_NOT_SCRUBBED",
+		"PG_RECOVERY_FULL", "POOL_BACKFILLFULL", "POOL_FULL", "POOL_NEAR_FULL", "RECENT_CRASH",
+		"RECENT_MGR_MODULE_CRASH", "SLOW_OPS", "TOO_MANY_PGS", "UPGRADE_EXCEPTION",
+	}, got)
+}
+
+func TestCollector_CephMetadataModelsProducerScopes(t *testing.T) {
+	mgr := New()
+	configureProfileJobFromMetadata(t, mgr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr")
+	assert.Empty(t, mgr.Vnode)
+	assert.Equal(t, 15, mgr.UpdateEvery)
+
+	mgrVNode := New()
+	configureProfileJobFromMetadata(t, mgrVNode, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr-vnode")
+	assert.Equal(t, "ceph-cluster", mgrVNode.Vnode)
+	assert.Equal(t, 15, mgrVNode.UpdateEvery)
+
+	exporter := New()
+	configureProfileJobFromMetadata(t, exporter, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-exporter")
+	assert.Empty(t, exporter.Vnode)
+	assert.Equal(t, 5, exporter.UpdateEvery)
+}
+
+func TestCollector_CephMetadataVNodeExampleDeclaresPrerequisite(t *testing.T) {
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				ID string `yaml:"id"`
+			} `yaml:"meta"`
+			Setup struct {
+				Configuration struct {
+					Examples struct {
+						List []struct {
+							Name        string `yaml:"name"`
+							Description string `yaml:"description"`
+							Config      string `yaml:"config"`
+						} `yaml:"list"`
+					} `yaml:"examples"`
+				} `yaml:"configuration"`
+			} `yaml:"setup"`
+		} `yaml:"modules"`
+	}
+	content, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(content, &metadata))
+
+	for _, module := range metadata.Modules {
+		if module.Meta.ID != "collector-go.d.plugin-prometheus-ceph" {
+			continue
+		}
+		for _, example := range module.Setup.Configuration.Examples.List {
+			if example.Name != "Ceph MGR with virtual node" {
+				continue
+			}
+			require.Contains(t, example.Description, "/etc/netdata/vnodes/vnodes.conf")
+			require.Contains(t, example.Description, "hostname: ceph-cluster")
+			require.Contains(t, example.Description, "undefined vnode makes the job fail to start")
+			require.Contains(t, example.Config, "vnode: ceph-cluster")
+			return
+		}
+	}
+	t.Fatal("Ceph metadata has no self-contained virtual-node example")
+}
+
+func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				ID string `yaml:"id"`
+			} `yaml:"meta"`
+			Alerts []struct {
+				Name   string `yaml:"name"`
+				Metric string `yaml:"metric"`
+				Info   string `yaml:"info"`
+			} `yaml:"alerts"`
+		} `yaml:"modules"`
+	}
+	content, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(content, &metadata))
+
+	actual := make(map[string]string)
+	info := make(map[string]string)
+	for _, module := range metadata.Modules {
+		if module.Meta.ID != "collector-go.d.plugin-prometheus-ceph" {
+			continue
+		}
+		for _, alert := range module.Alerts {
+			actual[alert.Name] = alert.Metric
+			info[alert.Name] = alert.Info
+		}
+		break
+	}
+	assert.Equal(t, map[string]string{
+		"ceph_health_error":         "prometheus.ceph.health.cluster_status.state",
+		"ceph_health_warning":       "prometheus.ceph.health.cluster_status.state",
+		"ceph_daemon_crash":         "prometheus.ceph.health.health_checks.state",
+		"ceph_mgr_module_crash":     "prometheus.ceph.health.health_checks.state",
+		"ceph_daemon_slow_ops":      "prometheus.ceph.health.daemon_health.item_count",
+		"ceph_slow_ops":             "prometheus.ceph.health.slow_operations.current_operations",
+		"cephadm_daemon_failed":     "prometheus.ceph.health.health_checks.state",
+		"cephadm_paused":            "prometheus.ceph.health.health_checks.state",
+		"cephadm_upgrade_failed":    "prometheus.ceph.health.health_checks.state",
+		"ceph_unknown_health_check": "prometheus.ceph.health.health_checks.state",
+	}, actual)
+	for name, metadataInfo := range info {
+		if name == "ceph_unknown_health_check" {
+			assert.Contains(t, metadataInfo, "available sample")
+			assert.Contains(t, cephHealthAlertTemplates(t)[name]["info"], "available sample")
+			continue
+		}
+		assert.Truef(t, strings.HasPrefix(cephHealthAlertTemplates(t)[name]["info"], metadataInfo),
+			"metadata alert %q does not match its shipped health-template info", name)
+	}
+}
+
+type cephAlertManifest struct {
+	Version                  string                            `yaml:"version"`
+	Kind                     string                            `yaml:"kind"`
+	Profile                  string                            `yaml:"profile"`
+	NetdataAlertCadence      string                            `yaml:"netdata_alert_cadence"`
+	DefinitionSHA256Contract string                            `yaml:"definition_sha256_contract"`
+	Sources                  map[string]cephAlertSource        `yaml:"sources"`
+	AdaptationContracts      map[string]cephAdaptationContract `yaml:"adaptation_contracts"`
+	Alerts                   map[string]cephAlertMapping       `yaml:"alerts"`
+	NetdataExtensions        map[string]cephNetdataExtension   `yaml:"netdata_extensions"`
+}
+
+type cephAlertSource struct {
+	Tag    string `yaml:"tag"`
+	Commit string `yaml:"commit"`
+	Path   string `yaml:"path"`
+	SHA256 string `yaml:"sha256"`
+}
+
+type cephAdaptationContract struct {
+	Preserved   []string `yaml:"preserved"`
+	Differences []string `yaml:"differences"`
+}
+
+type cephNetdataExtension struct {
+	SOWID        string `yaml:"sow_id"`
+	Reason       string `yaml:"reason"`
+	Fidelity     string `yaml:"fidelity"`
+	Owner        string `yaml:"owner"`
+	Context      string `yaml:"context"`
+	LabelsPolicy string `yaml:"labels_policy"`
+	Lookup       string `yaml:"lookup"`
+	Units        string `yaml:"units"`
+	Condition    string `yaml:"condition"`
+	Recipient    string `yaml:"recipient"`
+	Adaptation   string `yaml:"adaptation"`
+}
+
+type cephAlertMapping struct {
+	SOWID       string `yaml:"sow_id"`
+	SourceAlert string `yaml:"source_alert"`
+	Source      struct {
+		Expression       string            `yaml:"expression"`
+		Persistence      string            `yaml:"persistence"`
+		Severity         string            `yaml:"severity"`
+		Lines            map[string]int    `yaml:"lines"`
+		DefinitionSHA256 map[string]string `yaml:"definition_sha256"`
+	} `yaml:"source"`
+	Netdata struct {
+		Disposition string `yaml:"disposition"`
+		Fidelity    string `yaml:"fidelity"`
+		Owner       string `yaml:"owner"`
+		Context     string `yaml:"context"`
+		Labels      string `yaml:"labels"`
+		Lookup      string `yaml:"lookup"`
+		Units       string `yaml:"units"`
+		Condition   string `yaml:"condition"`
+		Recipient   string `yaml:"recipient"`
+		Adaptation  string `yaml:"adaptation"`
+	} `yaml:"netdata"`
+}
+
+func loadCephAlertManifest(t *testing.T) cephAlertManifest {
+	t.Helper()
+
+	content, err := os.ReadFile("testdata/ceph_alerts.yaml")
+	require.NoError(t, err)
+	var manifest cephAlertManifest
+	require.NoError(t, yaml.Unmarshal(content, &manifest))
+	return manifest
+}
+
+func cephManifestSOWIDs(alerts map[string]cephAlertMapping) []string {
+	ids := make([]string, 0, len(alerts))
+	for _, alert := range alerts {
+		ids = append(ids, alert.SOWID)
+	}
+	return ids
+}
+
+func cephManifestExtensionSOWIDs(extensions map[string]cephNetdataExtension) []string {
+	ids := make([]string, 0, len(extensions))
+	for _, extension := range extensions {
+		ids = append(ids, extension.SOWID)
+	}
+	return ids
+}
+
+func cephHealthAlertTemplates(t *testing.T) map[string]map[string]string {
+	t.Helper()
+	return healthAlertTemplatesFromFile(t, "../../../../../health/health.d/ceph.conf")
+}
+
+func healthAlertTemplatesFromFile(t *testing.T, path string) map[string]map[string]string {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	templates := make(map[string]map[string]string)
+	var current map[string]string
+	for _, source := range strings.Split(string(content), "\n") {
+		line := strings.TrimSpace(source)
+		if name, ok := strings.CutPrefix(line, "template:"); ok {
+			current = make(map[string]string)
+			templates[strings.TrimSpace(name)] = current
+			continue
+		}
+		if current == nil {
+			continue
+		}
+		for _, field := range []string{"on", "chart labels", "lookup", "units", "every", "delay", "warn", "crit", "info", "to"} {
+			if value, ok := strings.CutPrefix(line, field+":"); ok {
+				key := field
+				if field == "warn" || field == "crit" {
+					key = "condition"
+					value = field + ":" + value
+				}
+				current[key] = strings.TrimSpace(value)
+			}
+		}
+	}
+	return templates
 }
 
 func configureProfileJobFromMetadata(

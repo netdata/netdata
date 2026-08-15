@@ -1,0 +1,320 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+kind: source-alert-map
+profile: ceph
+netdata_alert_cadence: 10s
+definition_sha256_contract: >-
+  SHA-256 of the UTF-8 canonical JSON for the complete parsed source alert rule, with object keys sorted
+  lexicographically, no insignificant whitespace, and non-ASCII characters preserved
+
+sources:
+  reef:
+    tag: v18.2.8
+    commit: efac5a54607c13fa50d4822e50242b86e6e446df
+    path: monitoring/ceph-mixin/prometheus_alerts.yml
+    sha256: 0325e5c481d00c674f7faf759e00f6c5c22028dbcc8bb95491404d600c6f3efd
+  squid:
+    tag: v19.2.5
+    commit: abc7aa7f2701e5d46878fd5e6bb7e2955f1a395a
+    path: monitoring/ceph-mixin/prometheus_alerts.yml
+    sha256: 259ee363694d174f46427a443ba0a8952b28df0c17af2bb65a2378511bc321ba
+  tentacle:
+    tag: v20.2.3
+    commit: 06c2f9c35b67055a8a6fb99d1be236b3c4832ace
+    path: monitoring/ceph-mixin/prometheus_alerts.yml
+    sha256: 09308346d3d143ff128813f1142f1499142799174da4e0505ddad7144b8d8716
+
+adaptation_contracts:
+  observed_binary_window:
+    preserved:
+      - source incident and predicate
+      - source severity and Netdata notification policy
+      - source persistence duration as the Netdata lookup-window length
+      - ordinary numeric recovery
+    differences:
+      - the lookup requires every observed numeric sample, not every scheduled evaluation, to remain active
+      - partial collection gaps do not reset the window
+      - a new chart may be evaluated with up to one chart update interval less history
+      - a sufficiently stale lookup stops evaluating until collection resumes
+      - chart obsoletion removes the instance alert
+  observed_enumerated_window:
+    preserved:
+      - source incident and exact enumerated predicate
+      - source severity and Netdata notification policy
+      - source persistence duration as the Netdata lookup-window length
+      - ordinary numeric recovery and transitions to other states
+    differences:
+      - the lookup requires every observed numeric sample, not every scheduled evaluation, to match the target state
+      - partial collection gaps do not reset the window
+      - a new chart may be evaluated with up to one chart update interval less history
+      - a sufficiently stale lookup stops evaluating until collection resumes
+      - chart obsoletion removes the instance alert
+  generic_collection_reuse:
+    preserved:
+      - configured Prometheus job collection failure remains visible
+    differences:
+      - Netdata uses its generic per-job collection-failure owner instead of a Ceph-named duplicate
+      - the stock generic alert is warning-level and silent rather than the source rule's critical routing
+
+alerts:
+  ceph_health_error:
+    sow_id: CEPH-013
+    source_alert: CephHealthError
+    source:
+      expression: ceph_health_status == 2
+      persistence: 5m
+      severity: critical
+      lines: {reef: 4, squid: 4, tentacle: 4}
+      definition_sha256:
+        reef: ae390eeeca1b5b10d85ae2492cc3f2ba2adea54815c616c490b3fd1698c695d3
+        squid: ae390eeeca1b5b10d85ae2492cc3f2ba2adea54815c616c490b3fd1698c695d3
+        tentacle: 9257578f534e068764d19aab1262aafee949586a6c307b3d22269634c3403895
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.cluster_status.state
+      labels: ''
+      lookup: min -5m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 2)'
+      recipient: sysadmin
+      adaptation: observed_enumerated_window
+  ceph_health_warning:
+    sow_id: CEPH-014
+    source_alert: CephHealthWarning
+    source:
+      expression: ceph_health_status == 1
+      persistence: 15m
+      severity: warning
+      lines: {reef: 14, squid: 14, tentacle: 14}
+      definition_sha256:
+        reef: a01aa6d1a5f8a2447dacda41cc52915afc8cc54d99d69ed7ecd83eea5a6f4bd0
+        squid: a01aa6d1a5f8a2447dacda41cc52915afc8cc54d99d69ed7ecd83eea5a6f4bd0
+        tentacle: 1c114f8acb1d6e00b267e0285560b44eade5583e242cbf63256b4ec3679699d0
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.cluster_status.state
+      labels: ''
+      lookup: countif(!=1) -15m unaligned of value
+      units: '%'
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 0)'
+      recipient: silent
+      adaptation: observed_enumerated_window
+  ceph_daemon_crash:
+    sow_id: CEPH-001
+    source_alert: CephDaemonCrash
+    source:
+      expression: 'ceph_health_detail{name="RECENT_CRASH"} == 1'
+      persistence: 1m
+      severity: critical
+      lines: {reef: 730, squid: 742, tentacle: 830}
+      definition_sha256:
+        reef: 7c3ac6a0ed76c16b526e310ae132387e26ce3614670b05da1422eb2ce75ca8c7
+        squid: 7c3ac6a0ed76c16b526e310ae132387e26ce3614670b05da1422eb2ce75ca8c7
+        tentacle: 7babe1141b56b27744e65eb7b66d772410c1d19888e9165b2df6d267b9f19514
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=RECENT_CRASH
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_mgr_module_crash:
+    sow_id: CEPH-015
+    source_alert: CephMgrModuleCrash
+    source:
+      expression: 'ceph_health_detail{name="RECENT_MGR_MODULE_CRASH"} == 1'
+      persistence: 5m
+      severity: critical
+      lines: {reef: 331, squid: 343, tentacle: 341}
+      definition_sha256:
+        reef: 8142cbb18ce8e6d13bb64eee2bf081f84f4e87fe6673cf4175bfb064ba3c36f6
+        squid: 8142cbb18ce8e6d13bb64eee2bf081f84f4e87fe6673cf4175bfb064ba3c36f6
+        tentacle: 7415113121e04fc74a4faf660762f6ef110fc6025d6ae8e4ab1e001c13b11461
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=RECENT_MGR_MODULE_CRASH
+      lookup: min -5m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_daemon_slow_ops:
+    sow_id: CEPH-002
+    source_alert: CephDaemonSlowOps
+    source:
+      expression: 'ceph_daemon_health_metrics{type="SLOW_OPS"} > 0'
+      persistence: 30s
+      severity: warning
+      lines: {reef: 599, squid: 611, tentacle: 609}
+      definition_sha256:
+        reef: 37b301daeab704a018729c61d1a14be8fb38ad25acbd5aaf2be5a418fdccb062
+        squid: 37b301daeab704a018729c61d1a14be8fb38ad25acbd5aaf2be5a418fdccb062
+        tentacle: 441f7e00682791eaa49d3b0f51d6a14ad156bbb4b36eb20d787925f798f55bbc
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.daemon_health.item_count
+      labels: type=SLOW_OPS
+      lookup: min -30s unaligned of value
+      units: operations
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: observed_binary_window
+  ceph_slow_ops:
+    sow_id: CEPH-059
+    source_alert: CephSlowOps
+    source:
+      expression: ceph_healthcheck_slow_ops > 0
+      persistence: 30s
+      severity: warning
+      lines: {reef: 589, squid: 601, tentacle: 599}
+      definition_sha256:
+        reef: ef6e804fd44b4f4d872b80c26563d847e7536afcd6e00844ca07da2de79efe91
+        squid: ef6e804fd44b4f4d872b80c26563d847e7536afcd6e00844ca07da2de79efe91
+        tentacle: 653e7582f85edea931f24cea11b80b673ae2f44b99335ddbbdc4d66d0ce6f47b
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.slow_operations.current_operations
+      labels: ''
+      lookup: min -30s unaligned of value
+      units: operations
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: observed_binary_window
+  cephadm_daemon_failed:
+    sow_id: CEPH-060
+    source_alert: CephadmDaemonFailed
+    source:
+      expression: 'ceph_health_detail{name="CEPHADM_FAILED_DAEMON"} > 0'
+      persistence: 30s
+      severity: critical
+      lines: {reef: 621, squid: 633, tentacle: 631}
+      definition_sha256:
+        reef: a0ee1de7560b1b6ef8ce0f94c56bea910826544b017bb2d890e3b7203a8428da
+        squid: 6d871d38ccec822a7f3f34fcf9892c8900f418525a98f0d80f29b1dc02c47b59
+        tentacle: ba91fc7eb3a2b8564288683532056a2c23287f004d33e62a2d92cdfd61353484
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=CEPHADM_FAILED_DAEMON
+      lookup: min -30s unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  cephadm_paused:
+    sow_id: CEPH-061
+    source_alert: CephadmPaused
+    source:
+      expression: 'ceph_health_detail{name="CEPHADM_PAUSED"} > 0'
+      persistence: 1m
+      severity: warning
+      lines: {reef: 631, squid: 643, tentacle: 641}
+      definition_sha256:
+        reef: aec4f34a24695b538f1f69ce7f8aba74ecc77185283ca56f5cca31826e6e8156
+        squid: aec4f34a24695b538f1f69ce7f8aba74ecc77185283ca56f5cca31826e6e8156
+        tentacle: 396b18624fba7df528640527667b766d8f38431b870fc9e7297f4f81920ed11d
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=CEPHADM_PAUSED
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: observed_binary_window
+  cephadm_upgrade_failed:
+    sow_id: CEPH-062
+    source_alert: CephadmUpgradeFailed
+    source:
+      expression: 'ceph_health_detail{name="UPGRADE_EXCEPTION"} > 0'
+      persistence: 30s
+      severity: critical
+      lines: {reef: 611, squid: 623, tentacle: 621}
+      definition_sha256:
+        reef: 5fcdb2df81632b4655b73d9b3e306afd711a85f1a7695c9520a93ce06a186880
+        squid: 5fcdb2df81632b4655b73d9b3e306afd711a85f1a7695c9520a93ce06a186880
+        tentacle: 4d65f6b0f5d9d2f1cc7a79094b5cf86b04a9bc2901cd72b69cfc61abcb9a71b3
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=UPGRADE_EXCEPTION
+      lookup: min -30s unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  plugin_data_collection_status:
+    sow_id: CEPH-016
+    source_alert: CephMgrPrometheusModuleInactive
+    source:
+      expression: 'up{job="ceph"} == 0'
+      persistence: 1m
+      severity: critical
+      lines: {reef: 342, squid: 354, tentacle: 352}
+      definition_sha256:
+        reef: 6b8e4f6dd58e74045f0ad4cb3e0f45a92329d09519362b6d1458239bb32d6710
+        squid: 6b8e4f6dd58e74045f0ad4cb3e0f45a92329d09519362b6d1458239bb32d6710
+        tentacle: 6b8e4f6dd58e74045f0ad4cb3e0f45a92329d09519362b6d1458239bb32d6710
+    netdata:
+      disposition: reuse
+      fidelity: CORRECTED-INTENT
+      owner: generic_go_d_collection
+      context: netdata.plugin_data_collection_status
+      labels: ''
+      lookup: average -30s unaligned of failed
+      units: status
+      condition: 'warn: $this == 1'
+      recipient: silent
+      adaptation: generic_collection_reuse
+
+netdata_extensions:
+  ceph_unknown_health_check:
+    sow_id: CEPH-ND-001
+    reason: forward-compatible warning for ordinary Ceph health-detail names without a dedicated rule
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.health.health_checks.state
+    labels_policy: exclude every supported named health code and main-only certificate code, then match all remaining names
+    lookup: min -1m unaligned of value
+    units: status
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: observed_binary_window
+  ceph_component_collection_failed:
+    sow_id: CEPH-ND-002
+    reason: native Dashboard API component-integrity owner retained without an MGR duplicate
+    fidelity: NETDATA-ADAPTED
+    owner: native_ceph_dashboard
+    context: ceph.component_collection_status
+  rgw_daemon_failed:
+    sow_id: RGW-M-01
+    reason: existing Cephadm and recent-crash health checks already identify failed RGW daemons
+    fidelity: CORRECTED-INTENT
+    owner: mgr_prometheus
+  rgw_telemetry_missing:
+    sow_id: RGW-M-02
+    reason: generic configured-job collection health owns missing metric telemetry
+    fidelity: CORRECTED-INTENT
+    owner: generic_go_d_collection

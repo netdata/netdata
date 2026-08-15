@@ -320,9 +320,11 @@ modules:
           - name: More preconfigured Ceph alerts are expected
             description: |
               This integration ships alerts for collection failures and native capacity utilization.
-              Health Function rows are on-demand tables and do not create alerts. Keep Ceph mixin/Alertmanager rules for
-              PG states, OSD down/out, MON quorum, slow operations, scrub errors, and RGW conditions unless equivalent
-              Netdata alerts are explicitly implemented and tested. Slack, webhook, and PagerDuty are notification
+              Health Function rows are on-demand tables and do not create alerts. When the Ceph Prometheus profile is
+              configured, its MGR-owned alert layer supplies tested cluster health, crash, slow-operation, and cephadm
+              conditions; this native collector remains the owner of Dashboard API component-collection failures. Keep Ceph
+              mixin/Alertmanager rules for conditions without an explicitly implemented and tested Netdata equivalent,
+              including any required PG, OSD, MON, scrub, or RGW policy. Slack, webhook, and PagerDuty are notification
               transports, not Ceph threshold definitions.
     alerts:
       - name: ceph_component_collection_failed

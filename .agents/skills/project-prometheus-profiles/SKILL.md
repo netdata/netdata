@@ -30,8 +30,9 @@ Repository architecture and runtime documents are the final authority when the s
 - `src/go/plugin/go.d/collector/prometheus/relabel/README.md`
 - `src/go/plugin/framework/charttpl/README.md`
 
-Do not require the generic NIDL guide as an authoring prerequisite. Prometheus chart templates have a narrower identity,
-label, aggregation, and hierarchy contract described in the chart-template reference.
+Read `docs/NIDL-Framework.md` when choosing or reviewing a monitored component, instance grain, dimension set, or label
+role. Then use the chart-template reference for the Prometheus-specific identity, label-promotion, aggregation, and
+hierarchy contract that realizes that NIDL model.
 
 ## Authoring workflow
 

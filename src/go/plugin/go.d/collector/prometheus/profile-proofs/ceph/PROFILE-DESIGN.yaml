@@ -596,16 +596,6 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_name_and_severity:
-    grain: Ceph name and severity
-    identity:
-      required:
-      - name
-      - severity
-      optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
   by_netbiosname_and_share_and_smb_version_and_subvolume_and_subvolume_group_and_volume:
     grain: Ceph netbiosname and share and smb version and subvolume and subvolume group and volume
     identity:
@@ -992,7 +982,70 @@ normalizations:
       - label_throttle_key
     evidence:
     - normalization_throttle_identity
-exclusions: {}
+# `hardware_firmware_info` is a source-declared info family. The writer rejects it as
+# `writer_ineligible/info_family` before authored or autogen output, so it has no
+# exclusion. P1-M03 owns any future presentation after a deliberate writer-policy decision.
+exclusions:
+  hardware_cpu_cores_deferred_to_p1_m03:
+    source: {signal: hardware_cpu_cores, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
+    evidence: [delegation_hardware_metrics]
+    outcome: retain_writable_unrendered
+  hardware_fan_rpm_deferred_to_p1_m03:
+    source: {signal: hardware_fan_rpm, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
+    evidence: [delegation_hardware_metrics]
+    outcome: retain_writable_unrendered
+  hardware_health_deferred_to_p1_m03:
+    source: {signal: hardware_health, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
+    evidence: [delegation_hardware_metrics]
+    outcome: retain_writable_unrendered
+  hardware_memory_capacity_bytes_deferred_to_p1_m03:
+    source: {signal: hardware_memory_capacity_bytes, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
+    evidence: [delegation_hardware_metrics]
+    outcome: retain_writable_unrendered
+  hardware_storage_capacity_bytes_deferred_to_p1_m03:
+    source: {signal: hardware_storage_capacity_bytes, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
+    evidence: [delegation_hardware_metrics]
+    outcome: retain_writable_unrendered
+  hardware_temperature_celsius_deferred_to_p1_m03:
+    source: {signal: hardware_temperature_celsius, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
+    evidence: [delegation_hardware_metrics]
+    outcome: retain_writable_unrendered
+  recoverystate_perf_pg_rebuild_duration_count_deferred_to_p1_m04:
+    source: {signal: recoverystate_perf_pg_rebuild_duration_count, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
+    evidence: [delegation_pg_rebuild]
+    outcome: retain_writable_unrendered
+  recoverystate_perf_pg_rebuild_duration_sum_deferred_to_p1_m04:
+    source: {signal: recoverystate_perf_pg_rebuild_duration_sum, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
+    evidence: [delegation_pg_rebuild]
+    outcome: retain_writable_unrendered
+  recoverystate_perf_pg_rebuild_max_secs_deferred_to_p1_m04:
+    source: {signal: recoverystate_perf_pg_rebuild_max_secs, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
+    evidence: [delegation_pg_rebuild]
+    outcome: retain_writable_unrendered
+  recoverystate_perf_pg_rebuild_min_secs_deferred_to_p1_m04:
+    source: {signal: recoverystate_perf_pg_rebuild_min_secs, components: [value]}
+    reason: scope_delegation
+    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
+    evidence: [delegation_pg_rebuild]
+    outcome: retain_writable_unrendered
 limitations:
   objecter.accumulated_latency#value:
     contributor_variant: objecter_handles
@@ -5556,9 +5609,9 @@ views:
       dimensions: {}
       promote: []
       omit: {}
-  health.daemon_health.state:
+  health.daemon_health.item_count:
     family: Ceph/Health/Daemon Health
-    question: What is the state and metadata for each ceph daemon and type?
+    question: How many items does each Ceph daemon health metric currently report?
     entity: by_ceph_daemon_and_type
     inputs:
       value:
@@ -5571,8 +5624,8 @@ views:
       omit: {}
   health.health_checks.state:
     family: Ceph/Health/Health Checks
-    question: What is the state and metadata for each name and severity?
-    entity: by_name_and_severity
+    question: What are the state and source-recorded severity of each health check?
+    entity: by_name
     inputs:
       value:
         signal: health_detail
@@ -5580,11 +5633,12 @@ views:
         - value
     labels:
       dimensions: {}
-      promote: []
+      promote:
+      - severity
       omit: {}
-  health.slow_operations.state:
+  health.slow_operations.current_operations:
     family: Ceph/Health/Slow Operations
-    question: What is the state and metadata?
+    question: How many slow operations does the cluster currently report?
     entity: cluster
     inputs:
       value:
