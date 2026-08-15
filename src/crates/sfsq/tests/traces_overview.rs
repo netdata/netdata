@@ -1,4 +1,7 @@
-//! Integration suite for the TRACE-level overview: exact
+    assert!(matches!(
+        err,
+        sfsq::traces::OverviewRequestError::GridOverflow
+    ));
 //! trace-density grids over known multi-trace corpora, the cross-source
 //! straddle (one trace across sources counts once, envelope merged),
 //! the stored-row resend divergence from canonical assembly, the
