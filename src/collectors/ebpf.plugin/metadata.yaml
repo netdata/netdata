@@ -2141,7 +2141,7 @@ modules:
       module_name: vfs
       monitored_instance:
         name: eBPF VFS
-        description: "Monitor Linux virtual filesystem read, write, open, and unlink activity through eBPF kernel tracing."
+        description: "Monitor Linux virtual filesystem read, write, open, create, unlink, and fsync activity through eBPF kernel tracing."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
