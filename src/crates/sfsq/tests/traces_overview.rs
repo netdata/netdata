@@ -1,7 +1,4 @@
-    assert!(matches!(
-        err,
-        sfsq::traces::OverviewRequestError::GridOverflow
-    ));
+//! Integration suite for the TRACE-level overview: exact
 //! trace-density grids over known multi-trace corpora, the cross-source
 //! straddle (one trace across sources counts once, envelope merged),
 //! the stored-row resend divergence from canonical assembly, the
@@ -39,6 +36,10 @@ fn grid_overflow_is_rejected_with_a_distinct_reason() {
         Arc::new(AtomicUsize::new(0)),
     )
     .unwrap_err();
+    assert!(matches!(
+        err,
+        sfsq::traces::OverviewRequestError::GridOverflow
+    ));
     assert!(err.to_string().contains("overflows"), "{err}");
 }
 
