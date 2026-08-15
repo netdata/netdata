@@ -13,10 +13,11 @@ void pulse_aclk_sent_message_acked(usec_t publish_latency, size_t len);
 #include "aclk_mqtt_workers.h"
 #include "daemon/config/netdata-conf-profile.h"
 
-// How long a QoS1/2 packet may wait for its acknowledgement, measured from the moment it was
-// transmitted (frag->sent_monotonic_ut), not from when it was generated. Past this the packet is
-// dropped and counted in stats.packets_timed_out - this client does not retransmit. A packet that
-// has not finished going out on the wire is never counted against this; see resolve_packet().
+// How long a QoS1/2 packet may wait for its acknowledgement, measured from the moment its last
+// byte went out (message_sent_monotonic_ut()), not from when it was generated. Past this the
+// packet is dropped and counted in stats.packets_timed_out - this client does not retransmit. A
+// packet that has not finished going out on the wire is never counted against this; see
+// resolve_packet().
 #define PACKET_ACK_TIMEOUT_SECS (60)
 #define SMALL_STRING_DONT_FRAGMENT_LIMIT 128
 
@@ -1246,6 +1247,29 @@ static bool sending_frag_in_message(struct transaction_buffer *buf, struct buffe
     return false;
 }
 
+// Whether every byte of this message reached the socket.
+//
+// This is the actual transmission state, and it is what must gate anything that frees the
+// message. Do NOT infer it from sending_frag: transaction_buffer_garbage_collect() and
+// transaction_buffer_grow() null that pointer out from under a mid-write message (:536, :551,
+// exempting only stable_frag, which is the ping fragment), so a stalled message can stop being
+// "the sending fragment" without a single extra byte having gone out.
+static bool message_fully_sent(struct buffer_fragment *msg_head)
+{
+    struct buffer_fragment *frag = msg_head;
+
+    while (frag) {
+        if (frag->sent != frag->len)
+            return false;
+        if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL)
+            return true;
+        frag = frag->next;
+    }
+
+    // ran off the end without finding the tail: the message is not complete in the buffer
+    return false;
+}
+
 // When the last byte of this message went out. The broker cannot acknowledge a packet before
 // it has received all of it, so this - not the head fragment's own timestamp - is when the
 // PUBACK clock starts. They differ whenever a message stalls between its fragments: the head
@@ -1305,15 +1329,17 @@ static int resolve_packet(struct mqtt_ng_client *client, uint16_t packet_id, boo
             // mark_message_for_gc(), which frees the payload, and try_send_all() would then
             // continue with the next message straight after the truncated prefix already on
             // the socket. MQTT over TCP has no frame delimiters, so the session would be
-            // corrupted from that point on with no way to resync. A message spans several
-            // fragments, so the head being fully sent is not enough - sending_frag_in_message()
-            // is what answers "is any part of this message still on the wire".
+            // corrupted from that point on with no way to resync.
+            //
+            // message_fully_sent() is the authority: it reads the fragments' own sent counters,
+            // so it holds even when a garbage collection has nulled sending_frag out from under
+            // a mid-write message - which resolve_packet() itself can trigger below, while
+            // another packet in the same timeout sweep is still transmitting.
             //
             // The only safe way out of a stuck transmission is to drop the connection, which
             // the ping timeout and the no-progress watchdog already do; a reconnect purges the
             // buffer and the monitor list together.
-            if (!frag->sent || !frag->sent_monotonic_ut ||
-                sending_frag_in_message(&client->main_buffer, frag)) {
+            if (sending_frag_in_message(&client->main_buffer, frag) || !message_fully_sent(frag)) {
                 if (!acked) {
                     // Not waiting for a PUBACK yet, so there is nothing to time out. Returning
                     // without re-arming would leave an already-expired entry that re-fires on
@@ -1337,8 +1363,8 @@ static int resolve_packet(struct mqtt_ng_client *client, uint16_t packet_id, boo
                 return 1;
             }
 
-            // the whole message is on the wire by now (the checks above guarantee it), so this
-            // is when the broker could first have acknowledged it
+            // message_fully_sent() above has established that the whole message is on the wire,
+            // so this is when the broker could first have acknowledged it
             usec_t sent_ut = message_sent_monotonic_ut(frag);
             usec_t waiting_ut = now_monotonic_usec() - sent_ut;
 
@@ -2381,10 +2407,11 @@ static int send_fragment(struct mqtt_ng_client *client) {
     else
         nd_log(NDLS_DAEMON, NDLP_WARNING, "This fragment was fully sent already. This should not happen!");
 
-    // only a write that moved bytes is a transmission. Stamping every attempt, including
-    // the zero-byte ones a full send buffer produces, would make this timestamp read as
-    // "recently sent" for a packet that is in fact stalled - and it is what the PUBACK
-    // timeout, the ack latency and max_puback_wait_us all measure from.
+    // only a write that moved bytes is a transmission. Stamping every attempt, including the
+    // zero-byte ones a full send buffer produces, would make this fragment read as "recently
+    // sent" while it is in fact stalled. The PUBACK timeout, the ack latency and
+    // max_puback_wait_us all derive their clock from these per-fragment stamps, via
+    // message_sent_monotonic_ut().
     if (processed)
         frag->sent_monotonic_ut = now_monotonic_usec();
 
@@ -3385,6 +3412,22 @@ static int mqtt_ng_unittest_packet_on_the_wire_is_never_dropped(void)
     MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_within_the_ack_window(&ctx),
                  "deferred packet keeps a deadline inside the ack window");
 
+    // sending_frag is not a reliable signal: a garbage collection nulls it out from under a
+    // mid-write message, and resolve_packet() itself can trigger one while resolving an earlier
+    // packet in the same sweep. The transmission state must still hold the message back.
+    ctx.client->main_buffer.sending_frag = NULL;
+
+    MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is still in the timeout monitor list");
+
+    check_packet_monitor_list_for_timeouts(ctx.client);
+
+    MQTT_NG_TEST((ctx.frag->flags & BUFFER_FRAG_GARBAGE_COLLECT) == 0,
+                 "losing sending_frag does not make a mid-write message collectable");
+    MQTT_NG_TEST(ctx.frag->packet_id == ctx.packet_id,
+                 "losing sending_frag does not make a mid-write message resolvable");
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 0,
+                 "losing sending_frag does not make a mid-write message time out");
+
     mqtt_ng_unittest_puback_teardown(&ctx);
     return errors;
 }
@@ -3453,9 +3496,12 @@ void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stat
         if (frag_is_marked_for_gc(frag))
             stats->tx_buffer_reclaimable += FRAG_SIZE_IN_BUFFER(frag);
 
-        // For HEAD fragments that are not fully sent yet (unsent or partially sent),
-        // track max send-queue wait time. Prefer the enqueue timestamp; if missing, fall back to first-send.
-        if ((frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->sent < frag->len) {
+        // For messages that are not fully sent yet (unsent or partially sent), track max
+        // send-queue wait time. Prefer the enqueue timestamp; if missing, fall back to first-send.
+        // The test is on the whole message, not just its head: a message whose head drained but
+        // whose payload is still going out is still waiting on the socket, and would otherwise be
+        // reported by nothing.
+        if ((frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && !message_fully_sent(frag)) {
             usec_t base = frag->enqueued_monotonic_ut ? frag->enqueued_monotonic_ut : frag->sent_monotonic_ut;
             if (base) {
                 usec_t waited = now_ut - base;
@@ -3491,9 +3537,14 @@ void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stat
         if ((frag->flags & BUFFER_FRAG_MQTT_PACKET_HEAD) && frag->packet_id) {
             Pvoid_t *Pvalue = JudyLGet(client->pending_packets.JudyL, (Word_t)frag->packet_id, PJE0);
             if (Pvalue) {
-                // message is still pending PUBACK
-                if (frag->sent_monotonic_ut) {
-                    usec_t waited = now_ut - frag->sent_monotonic_ut;
+                // message is still pending PUBACK - but only once it is fully on the wire, and
+                // measured from the same instant resolve_packet() uses, so this metric, the ack
+                // latency and the timeout all answer to one clock. A message still going out is
+                // not waiting for a PUBACK; that time is reported by max_unsent_wait_us /
+                // max_partial_wait_us above.
+                usec_t sent_ut = message_fully_sent(frag) ? message_sent_monotonic_ut(frag) : 0;
+                if (sent_ut) {
+                    usec_t waited = now_ut - sent_ut;
                     if ((uint64_t)waited > stats->max_puback_wait_us)
                         stats->max_puback_wait_us = (uint64_t)waited;
                 }
