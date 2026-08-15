@@ -28,6 +28,19 @@ fallback_type:
   - ceph_rbd_mirror_metadata
   - ceph_rgw_metadata
   - ceph_smb_metadata
+autogen:
+  selector:
+    deny:
+    - ceph_hardware_cpu_cores
+    - ceph_hardware_fan_rpm
+    - ceph_hardware_health
+    - ceph_hardware_memory_capacity_bytes
+    - ceph_hardware_storage_capacity_bytes
+    - ceph_hardware_temperature_celsius
+    - ceph_recoverystate_perf_pg_rebuild_duration_count
+    - ceph_recoverystate_perf_pg_rebuild_duration_sum
+    - ceph_recoverystate_perf_pg_rebuild_max_secs
+    - ceph_recoverystate_perf_pg_rebuild_min_secs
 relabeling:
 - match: ceph_*
   metric_relabel_configs:
@@ -778,9 +791,9 @@ template:
       metrics:
       - ceph_daemon_health_metrics
       charts:
-      - title: State and Metadata
-        context: state
-        units: '{status}'
+      - title: Health Metric Count
+        context: item_count
+        units: items
         label_promotion: []
         dimensions:
         - selector: ceph_daemon_health_metrics
@@ -798,23 +811,23 @@ template:
       - title: State and Metadata
         context: state
         units: '{status}'
-        label_promotion: []
+        label_promotion:
+        - severity
         dimensions:
         - selector: ceph_health_detail
           name: value
         instances:
           by_labels:
           - name
-          - severity
           optional_by_labels: []
     - family: Slow Operations
       context_namespace: slow_operations
       metrics:
       - ceph_healthcheck_slow_ops
       charts:
-      - title: State and Metadata
-        context: state
-        units: '{status}'
+      - title: Slow Operations
+        context: current_operations
+        units: operations
         label_promotion: []
         dimensions:
         - selector: ceph_healthcheck_slow_ops

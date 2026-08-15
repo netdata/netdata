@@ -399,7 +399,11 @@ modules:
         list:
           - name: "Disappearing or sparse metrics not clearing alerts"
             description: |
-              When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
+              The Prometheus collector detects metrics that disappear from a successful scrape response and profile-authored
+              charts expire after their configured successful-cycle lifetime. An expired chart makes its alerts `REMOVED`; it
+              is not a normal `CLEAR` transition and does not send a recovery notification. Export an explicit normal value
+              (for example `0`) whenever an alert needs a reliable recovery transition. A failed scrape does not advance the
+              expiry lifetime; use the generic collector collection-failure alert to detect that separate condition.
     alerts: []
     metrics:
       folding:
@@ -4538,9 +4542,17 @@ modules:
           The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
           `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
           NVMe-oF gateway's Python process runtime surface.
+
+          Alert ownership is deliberately layered. Configure one logical MGR scrape scope per Ceph cluster for cluster-health
+          alerts and use the native Ceph collector for its complementary Dashboard API collection-integrity alerts. Netdata's
+          generic Prometheus collection alert covers a configured MGR job that cannot scrape; it is distinct from native API
+          component failures and does not report an unconfigured job.
         method_description: |
           Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
-          built-in `ceph` profile.
+          built-in `ceph` profile. The MGR module refreshes its enabled metric cache every 15 seconds by default, and standalone
+          `ceph-exporter` refreshes daemon metrics every 5 seconds by default. Scrapes read those producer caches; choosing a
+          5-, 10-, 15-, or 60-second Netdata interval does not schedule Ceph producer refresh. Match the interval to the
+          configured producer cache period to avoid redundant samples, unless the MGR cache is deliberately disabled.
     setup:
       <<: *setup
       prerequisites:
@@ -4564,22 +4576,88 @@ modules:
               folding:
                 enabled: false
               description: |
-                Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the automatically
-                matched Ceph and process-runtime profiles. Repeat the exporter job for every exporter endpoint. The Ceph
-                profile preserves source labels that collide with Netdata's Prometheus re-export labels under a `ceph_`
-                prefix, retains opaque dynamic group keys, and normalizes only source families whose suffix grammar is
-                unambiguous.
+                Collect one logical MGR endpoint per Ceph cluster and each local official ceph-exporter endpoint with the
+                automatically matched Ceph and process-runtime profiles. Configure one MGR job per cluster and do not scrape
+                multiple active MGR endpoints into the same job. Repeat the exporter job for every exporter endpoint, using
+                each host's own scope. The Ceph profile preserves source labels that collide with Netdata's Prometheus
+                re-export labels under a `ceph_` prefix, retains opaque dynamic group keys, and normalizes only source families
+                whose suffix grammar is unambiguous.
               config: |
                 jobs:
-                  - &ceph_job
-                    name: ceph-mgr
+                  - name: ceph-mgr
                     url: http://127.0.0.1:9283/metrics
+                    update_every: 15
                     expected_prefix: ceph_
                     max_time_series: 20000
                     max_time_series_per_metric: 4000
-                  - <<: *ceph_job
-                    name: ceph-exporter
+                  - name: ceph-exporter
                     url: http://127.0.0.1:9926/metrics
+                    update_every: 5
+                    expected_prefix: ceph_
+                    max_time_series: 20000
+                    max_time_series_per_metric: 4000
+            - name: Ceph MGR with virtual node
+              description: |
+                Use a virtual node when the cluster identity should remain independent of the Agent currently scraping its
+                active MGR. First define the vnode in `/etc/netdata/vnodes/vnodes.conf`:
+
+                ```yaml
+                - hostname: ceph-cluster
+                  guid: <your-uuid-here>
+                ```
+
+                Then reference that exact hostname in the MGR job. An undefined vnode makes the job fail to start. Keep one
+                logical MGR job and one stable vnode identity per Ceph cluster.
+              config: |
+                jobs:
+                  - name: ceph-mgr-vnode
+                    vnode: ceph-cluster
+                    url: http://127.0.0.1:9283/metrics
+                    update_every: 15
+                    expected_prefix: ceph_
+                    max_time_series: 20000
+                    max_time_series_per_metric: 4000
+    alerts:
+      - name: ceph_health_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.cluster_status.state
+        info: 'Every available Ceph MGR health sample in the 5-minute observation window is HEALTH_ERR.'
+      - name: ceph_health_warning
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.cluster_status.state
+        info: 'Every available Ceph MGR health sample in the 15-minute observation window is HEALTH_WARN.'
+      - name: ceph_daemon_crash
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a recent daemon crash.'
+      - name: ceph_mgr_module_crash
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports a recent manager-module crash.'
+      - name: ceph_daemon_slow_ops
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.daemon_health.item_count
+        info: 'Every available sample in the 30-second observation window reports one or more slow operations for this daemon.'
+      - name: ceph_slow_ops
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.slow_operations.current_operations
+        info: 'Every available sample in the 30-second observation window reports one or more cluster slow operations.'
+      - name: cephadm_daemon_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a failed cephadm daemon.'
+      - name: cephadm_paused
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports that cephadm is paused.'
+      - name: cephadm_upgrade_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a cephadm upgrade exception.'
+      - name: ceph_unknown_health_check
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports an unclassified ordinary health check.'
 
   - <<: *module
     meta:
