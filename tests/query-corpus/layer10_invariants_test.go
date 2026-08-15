@@ -534,6 +534,19 @@ func l10NumericPoints(column []canon.Pt) int {
 	return count
 }
 
+func l10InvalidEmptyBuckets(column []canon.Pt, firstBucketMayBeEmpty bool) (count, first int) {
+	for i, point := range column {
+		if point.Value != nil || (i == 0 && firstBucketMayBeEmpty) {
+			continue
+		}
+		if count == 0 {
+			first = i + 1
+		}
+		count++
+	}
+	return count, first
+}
+
 func l10SourceBuckets(
 	t *testing.T,
 	query l10QueryResult,
@@ -790,11 +803,12 @@ func TestLayer10RosterIsComplete(t *testing.T) {
 
 // INV-1: a bucket inside collected data carries a value.
 //
-// Every grouping, no exceptions. A bucket whose whole width was collected has
-// something to say about it; answering EMPTY says "there is no data here",
-// which is what an outage looks like. This is the rule `number-of-flaps` and
-// `number-of-times` broke for every bucket a re-delivered point covered on
-// its own.
+// A bucket whose whole width was collected has something to say about it;
+// answering EMPTY says "there is no data here", which is what an outage looks
+// like. The sole exception is the opening incremental-sum bucket: without a
+// predecessor its delta is undefined, but it must seed every later bucket.
+// This is the rule `number-of-flaps` and `number-of-times` broke for every
+// bucket a re-delivered point covered on its own.
 //
 // The buckets below are wide enough to hold several samples, so a grouping
 // that genuinely needs two of them (an increment, a dispersion) is not being
@@ -842,16 +856,11 @@ func TestLayer10NoHolesInsideData(t *testing.T) {
 					ok = false
 					continue
 				}
-				empty := 0
-				for _, pt := range col {
-					if pt.Value == nil {
-						empty++
-					}
-				}
+				empty, firstEmpty := l10InvalidEmptyBuckets(col, groupingRules[c].firstBucketMayBeEmpty)
 				if empty > 0 {
-					t.Logf("invariant not met: %s (%s) left %d of %d buckets EMPTY for %q, "+
-						"inside a span that was collected end to end",
-						group, probe.what, empty, len(col), dim)
+					t.Logf("invariant not met: %s (%s) left %d of %d invalid buckets EMPTY for %q "+
+						"inside a span that was collected end to end (first at bucket %d)",
+						group, probe.what, empty, len(col), dim, firstEmpty)
 					ok = false
 				}
 			}
@@ -866,7 +875,8 @@ func TestLayer10NoHolesInsideData(t *testing.T) {
 // The zoomed-in regime, and the one that matters most: above tier 0 a stored
 // point covers many seconds, so a dashboard drawn finer than that gives the
 // engine buckets that a single re-delivered point covers on its own. Every
-// grouping must still answer in them.
+// grouping must still answer in them, apart from the same opening
+// incremental-sum bucket whose predecessor is outside the query.
 //
 // This is where `number-of-flaps` and `number-of-times` punched holes - they
 // dropped the repeat entirely, sample count and all, so the buckets between
@@ -911,17 +921,12 @@ func TestLayer10BucketsFinerThanStoredDataAnswer(t *testing.T) {
 					ok = false
 					continue
 				}
-				empty := 0
-				for _, pt := range col {
-					if pt.Value == nil {
-						empty++
-					}
-				}
+				empty, firstEmpty := l10InvalidEmptyBuckets(col, groupingRules[c].firstBucketMayBeEmpty)
 				if empty > 0 {
-					t.Logf("invariant not met: %s left %d of %d buckets EMPTY for %q at %d buckets per "+
+					t.Logf("invariant not met: %s left %d of %d invalid buckets EMPTY for %q at %d buckets per "+
 						"stored window - the buckets a re-delivered point covers on its own report "+
-						"'no data here' instead of what the point says",
-						group, empty, len(col), dim, perWindow)
+						"'no data here' instead of what the point says (first at bucket %d)",
+						group, empty, len(col), dim, perWindow, firstEmpty)
 					ok = false
 				}
 			}
@@ -1267,18 +1272,8 @@ func TestLayer10SinglePointBucketsAnswer(t *testing.T) {
 				ok = false
 				continue
 			}
-			invalidEmpty := 0
-			firstInvalidEmpty := 0
-			for i, pt := range col {
-				if pt.Value == nil {
-					if i != 0 || !groupingRules[c].firstBucketMayBeEmpty {
-						if invalidEmpty == 0 {
-							firstInvalidEmpty = i + 1
-						}
-						invalidEmpty++
-					}
-				}
-			}
+			invalidEmpty, firstInvalidEmpty := l10InvalidEmptyBuckets(
+				col, groupingRules[c].firstBucketMayBeEmpty)
 			if invalidEmpty != 0 {
 				t.Logf("invariant not met: %s left %d/%d buckets EMPTY for %q at one bucket "+
 					"per sample (first at bucket %d)", group, invalidEmpty, len(col), dim,

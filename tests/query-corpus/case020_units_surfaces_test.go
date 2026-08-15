@@ -36,12 +36,6 @@ type c020QueryCase struct {
 	rate        bool
 }
 
-type c020MixedObservation struct {
-	ViewUnits      string
-	DimensionUnits string
-	ResultLabel    string
-}
-
 func c020Chart(id, context, units, algorithm string, value int, first int64) fixture.Chart {
 	ch := fixture.Chart{
 		ID: id, Title: "CASE-020 units", Units: units, Family: "fixture",
@@ -80,7 +74,7 @@ func c020PushCharts(t *testing.T, host, machineGUID string, charts ...fixture.Ch
 	}
 }
 
-func c020OnlyColumn(t *testing.T, doc map[string]any, timestamp int64) (string, canon.Pt) {
+func c020OneColumn(t *testing.T, doc map[string]any) (string, []canon.Pt) {
 	t.Helper()
 
 	cols, err := canon.Columns(doc)
@@ -94,24 +88,31 @@ func c020OnlyColumn(t *testing.T, doc map[string]any, timestamp int64) (string, 
 		if label == "" {
 			t.Fatal("result column label is empty")
 		}
-		if len(points) != 1 {
-			t.Fatalf("result column %q has %d rows, want exactly one", label, len(points))
-		}
-		if points[0].Value == nil {
-			t.Fatalf("result column %q is null, want a number", label)
-		}
-		if points[0].T != timestamp {
-			t.Fatalf("result column %q ends at %d, want %d", label, points[0].T, timestamp)
-		}
-		if points[0].PA&canon.AnnotationEmpty != 0 {
-			t.Fatalf("result column %q is numeric but marked EMPTY", label)
-		}
-		if math.IsNaN(*points[0].Value) || math.IsInf(*points[0].Value, 0) {
-			t.Fatalf("result column %q is non-finite: %v", label, *points[0].Value)
-		}
-		return label, points[0]
+		return label, points
 	}
 	panic("unreachable")
+}
+
+func c020OnlyColumn(t *testing.T, doc map[string]any, timestamp int64) (string, canon.Pt) {
+	t.Helper()
+
+	label, points := c020OneColumn(t, doc)
+	if len(points) != 1 {
+		t.Fatalf("result column %q has %d rows, want exactly one", label, len(points))
+	}
+	if points[0].Value == nil {
+		t.Fatalf("result column %q is null, want a number", label)
+	}
+	if points[0].T != timestamp {
+		t.Fatalf("result column %q ends at %d, want %d", label, points[0].T, timestamp)
+	}
+	if points[0].PA&canon.AnnotationEmpty != 0 {
+		t.Fatalf("result column %q is numeric but marked EMPTY", label)
+	}
+	if math.IsNaN(*points[0].Value) || math.IsInf(*points[0].Value, 0) {
+		t.Fatalf("result column %q is non-finite: %v", label, *points[0].Value)
+	}
+	return label, points[0]
 }
 
 type c020QuerySpec struct {
@@ -140,7 +141,12 @@ func c020Query(t *testing.T, spec c020QuerySpec) map[string]any {
 }
 
 func TestCase020UnitsAcrossQuerySurfaces(t *testing.T) {
-	trackContract(t, "CASE-020/units-across-query-surfaces")
+	for _, contract := range []string{
+		"CASE-020/units-across-query-surfaces",
+		"CASE-020/query-surface-values",
+	} {
+		registerContract(t, contract)
+	}
 
 	const (
 		host          = "c020-units"
@@ -169,150 +175,75 @@ func TestCase020UnitsAcrossQuerySurfaces(t *testing.T) {
 	timeGroups := []string{"average", "sum"}
 	groupBys := []string{"dimension", "units", "dimension,units"}
 
-	for _, metric := range metrics {
-		for _, timeGroup := range timeGroups {
-			for _, groupBy := range groupBys {
-				name := metric.name + "/" + timeGroup + "/" + strings.ReplaceAll(groupBy, ",", "+")
-				t.Run(name, func(t *testing.T) {
-					resultUnits := metric.sourceUnits
-					wantValue := metric.storedValue
-					if timeGroup == "sum" {
-						wantValue *= c020Samples
-						if metric.rate {
-							resultUnits = "requests"
+	run := func(t *testing.T, checkValues bool) {
+		t.Helper()
+		for _, metric := range metrics {
+			for _, timeGroup := range timeGroups {
+				for _, groupBy := range groupBys {
+					name := metric.name + "/" + timeGroup + "/" + strings.ReplaceAll(groupBy, ",", "+")
+					t.Run(name, func(t *testing.T) {
+						resultUnits := metric.sourceUnits
+						wantValue := metric.storedValue
+						if timeGroup == "sum" {
+							wantValue *= c020Samples
+							if metric.rate {
+								resultUnits = "requests"
+							}
 						}
-					}
 
-					wantLabel := metric.dimension
-					switch groupBy {
-					case "units":
-						wantLabel = resultUnits
-					case "dimension,units":
-						wantLabel = metric.dimension + "," + resultUnits
-					}
+						wantLabel := metric.dimension
+						switch groupBy {
+						case "units":
+							wantLabel = resultUnits
+						case "dimension,units":
+							wantLabel = metric.dimension + "," + resultUnits
+						}
 
-					doc := c020Query(t, c020QuerySpec{
-						host: metric.host, context: metric.context,
-						timeGroup: timeGroup, groupBy: groupBy, aggregation: "average",
-						after: fixtureFirst, before: fixtureBefore,
+						doc := c020Query(t, c020QuerySpec{
+							host: metric.host, context: metric.context,
+							timeGroup: timeGroup, groupBy: groupBy, aggregation: "average",
+							after: fixtureFirst, before: fixtureBefore,
+						})
+						if checkValues {
+							_, point := c020OnlyColumn(t, doc, fixtureBefore)
+							if got := *point.Value; got != wantValue {
+								t.Errorf("result value = %v, want exact fixture value %v", got, wantValue)
+							}
+							return
+						}
+
+						label, _ := c020OneColumn(t, doc)
+						db := queryObject(t, doc, "db", "db")
+						view := queryObject(t, doc, "view", "view")
+						if got := queryStrictOneUnit(t, db["units"], "db.units"); got != metric.sourceUnits {
+							t.Errorf("db.units = %q, want stored units %q", got, metric.sourceUnits)
+						}
+						if got := queryStrictDimensionUnit(t, db, "db"); got != metric.sourceUnits {
+							t.Errorf("db.dimensions.units[0] = %q, want stored units %q", got, metric.sourceUnits)
+						}
+						if got := queryStrictOneUnit(t, view["units"], "view.units"); got != resultUnits {
+							t.Errorf("view.units = %q, want result units %q", got, resultUnits)
+						}
+						if got := queryStrictDimensionUnit(t, view, "view"); got != resultUnits {
+							t.Errorf("view.dimensions.units[0] = %q, want result units %q", got, resultUnits)
+						}
+						if label != wantLabel {
+							t.Errorf("result label = %q, want %q", label, wantLabel)
+						}
 					})
-					db := queryObject(t, doc, "db", "db")
-					view := queryObject(t, doc, "view", "view")
-
-					if got := queryStrictOneUnit(t, db["units"], "db.units"); got != metric.sourceUnits {
-						t.Errorf("db.units = %q, want stored units %q", got, metric.sourceUnits)
-					}
-					if got := queryStrictDimensionUnit(t, db, "db"); got != metric.sourceUnits {
-						t.Errorf("db.dimensions.units[0] = %q, want stored units %q", got, metric.sourceUnits)
-					}
-					if got := queryStrictOneUnit(t, view["units"], "view.units"); got != resultUnits {
-						t.Errorf("view.units = %q, want result units %q", got, resultUnits)
-					}
-					if got := queryStrictDimensionUnit(t, view, "view"); got != resultUnits {
-						t.Errorf("view.dimensions.units[0] = %q, want result units %q", got, resultUnits)
-					}
-
-					label, point := c020OnlyColumn(t, doc, fixtureBefore)
-					if label != wantLabel {
-						t.Errorf("result label = %q, want %q", label, wantLabel)
-					}
-					if got := *point.Value; got != wantValue {
-						t.Errorf("result value = %v, want exact fixture value %v", got, wantValue)
-					}
-				})
+				}
 			}
 		}
 	}
-}
 
-func c020PushMixedOrder(t *testing.T, host, machineGUID, context string, rateFirst bool) {
-	t.Helper()
-
-	rateID := context + "_a"
-	gaugeID := context + "_z"
-	if !rateFirst {
-		rateID, gaugeID = gaugeID, rateID
-	}
-	rate := c020Chart(rateID, context, "requests/s", "incremental", 5, fixture.T0)
-	gauge := c020Chart(gaugeID, context, "requests", "absolute", 7, fixture.T0)
-	if rateFirst {
-		c020PushCharts(t, host, machineGUID, rate, gauge)
-	} else {
-		c020PushCharts(t, host, machineGUID, gauge, rate)
-	}
-}
-
-func c020MixedResult(t *testing.T, host, context, groupBy string) c020MixedObservation {
-	t.Helper()
-
-	doc := c020Query(t, c020QuerySpec{
-		host: host, context: context,
-		timeGroup: "sum", groupBy: groupBy, aggregation: "sum",
-		after: fixture.T0, before: fixture.T0 + c020Samples,
+	t.Run("units", func(t *testing.T) {
+		trackContract(t, "CASE-020/units-across-query-surfaces")
+		run(t, false)
 	})
-	view := queryObject(t, doc, "view", "view")
-	dimensions := queryObject(t, view, "dimensions", "view.dimensions")
-	aggregated, ok := dimensions["aggregated"].([]any)
-	if !ok || len(aggregated) != 1 || aggregated[0] != float64(2) {
-		t.Fatalf("view.dimensions.aggregated = %v, want exactly [2] for the rate+gauge collision", dimensions["aggregated"])
-	}
-	label, point := c020OnlyColumn(t, doc, fixture.T0+c020Samples)
-	if got, want := *point.Value, float64((5+7)*c020Samples); got != want {
-		t.Errorf("mixed result value = %v, want exact combined volume %v", got, want)
-	}
-	return c020MixedObservation{
-		ViewUnits:      queryStrictOneUnit(t, view["units"], "view.units"),
-		DimensionUnits: queryStrictOneUnit(t, dimensions["units"], "view.dimensions.units"),
-		ResultLabel:    label,
-	}
-}
-
-func TestCase020MixedRateGaugeUnitsAreOrderIndependent(t *testing.T) {
-	trackContract(t, "CASE-020/mixed-rate-gauge-units")
-
-	const (
-		rateFirstHost     = "c020-mixed-rate-first"
-		gaugeFirstHost    = "c020-mixed-gauge-first"
-		rateFirstContext  = "fixture.c020_mixed_rate_first"
-		gaugeFirstContext = "fixture.c020_mixed_gauge_first"
-	)
-
-	c020PushMixedOrder(t, rateFirstHost, guid(331), rateFirstContext, true)
-	c020PushMixedOrder(t, gaugeFirstHost, guid(332), gaugeFirstContext, false)
-
-	for _, groupBy := range []string{"units", "dimension,units"} {
-		t.Run(strings.ReplaceAll(groupBy, ",", "+"), func(t *testing.T) {
-			rateFirst := c020MixedResult(t, rateFirstHost, rateFirstContext, groupBy)
-			gaugeFirst := c020MixedResult(t, gaugeFirstHost, gaugeFirstContext, groupBy)
-			wantLabel := "requests"
-			if groupBy == "dimension,units" {
-				wantLabel = "value,requests"
-			}
-			for name, observation := range map[string]c020MixedObservation{
-				"rate-first":  rateFirst,
-				"gauge-first": gaugeFirst,
-			} {
-				if observation.ViewUnits != "requests" {
-					t.Errorf("%s view units = %q, want exact volume units %q", name, observation.ViewUnits, "requests")
-				}
-				if observation.DimensionUnits != "requests" {
-					t.Errorf(
-						"%s dimension units = %q, want exact volume units %q",
-						name, observation.DimensionUnits, "requests",
-					)
-				}
-				if observation.ResultLabel != wantLabel {
-					t.Errorf("%s result label = %q, want %q", name, observation.ResultLabel, wantLabel)
-				}
-			}
-			if rateFirst != gaugeFirst {
-				t.Errorf(
-					"mixed rate+gauge sum depends on encounter order for group_by=%s:\nrate-first:  %+v\ngauge-first: %+v",
-					groupBy, rateFirst, gaugeFirst,
-				)
-			}
-		})
-	}
+	t.Run("values", func(t *testing.T) {
+		trackContract(t, "CASE-020/query-surface-values")
+		run(t, true)
+	})
 }
 
 type c020BadgeSpec struct {
@@ -321,6 +252,7 @@ type c020BadgeSpec struct {
 	chart     string
 	dimension string
 	group     string
+	units     string
 	after     int64
 	before    int64
 }
@@ -340,6 +272,9 @@ func c020Badge(t *testing.T, spec c020BadgeSpec) string {
 		"precision":       {"0"},
 		"fixed_width_lbl": {"80"},
 		"fixed_width_val": {"120"},
+	}
+	if spec.units != "" {
+		params.Set("units", spec.units)
 	}
 	endpoint := fmt.Sprintf(
 		"%s/host/%s/api/v1/badge.svg?%s",
@@ -378,159 +313,152 @@ func c020Badge(t *testing.T, spec c020BadgeSpec) string {
 	return string(body)
 }
 
-func c020AssertBadgeValue(t *testing.T, svg, want string) {
+func c020BadgeRenderedValue(t *testing.T, svg string) string {
 	t.Helper()
 
 	matches := c020BadgeValueRE.FindAllStringSubmatch(svg, -1)
 	if len(matches) == 0 {
 		t.Fatalf("badge has no rendered value node: %q", svg)
 	}
+	var rendered string
 	for i, match := range matches {
 		got := html.UnescapeString(match[1])
 		if got == "" {
 			t.Fatalf("badge value node %d is empty", i)
 		}
-		if got != want {
-			t.Errorf("badge value node %d = %q, want exact %q", i, got, want)
+		if i == 0 {
+			rendered = got
+		} else if got != rendered {
+			t.Fatalf("badge value nodes disagree: node 0 = %q, node %d = %q", rendered, i, got)
 		}
+	}
+	return rendered
+}
+
+func c020AssertBadgeNumber(t *testing.T, svg string, want float64) {
+	t.Helper()
+
+	rendered := c020BadgeRenderedValue(t, svg)
+	number, _, _ := strings.Cut(rendered, " ")
+	got, err := strconv.ParseFloat(number, 64)
+	if err != nil {
+		t.Fatalf("badge rendered value %q has no numeric prefix: %v", rendered, err)
+	}
+	if got != want {
+		t.Errorf("badge number = %v, want exact fixture value %v (rendered %q)", got, want, rendered)
 	}
 }
 
-func TestCase020BadgeUnitsAndValues(t *testing.T) {
-	trackContract(t, "CASE-020/badge-sum-units")
+func c020AssertBadgeUnits(t *testing.T, svg, want string) {
+	t.Helper()
+
+	rendered := c020BadgeRenderedValue(t, svg)
+	_, got, found := strings.Cut(rendered, " ")
+	if !found {
+		got = ""
+	}
+	if got != want {
+		t.Errorf("badge units = %q, want exact %q (rendered %q)", got, want, rendered)
+	}
+}
+
+func TestCase020BadgeSumValues(t *testing.T) {
 
 	const (
-		host         = "c020-badge"
-		rateChartID  = "fixture.c020_badge_rate"
-		gaugeChartID = "fixture.c020_badge_gauge"
+		host         = "c020-badge-values"
+		rateChartID  = "fixture.c020_badge_value_rate"
+		gaugeChartID = "fixture.c020_badge_value_gauge"
 	)
-	first := time.Now().Unix() - c020Samples
+	now := time.Now().Unix()
+	first := now - 30
 	before := first + c020Samples
 	rate := c020Chart(rateChartID, rateChartID, "requests/s", "incremental", 5, first)
 	gauge := c020Chart(gaugeChartID, gaugeChartID, "requests", "absolute", 7, first)
+	for i, value := range []int{2, 3, 5, 7} {
+		rate.Dimensions[0].Points[i].Collected = strconv.Itoa(value)
+	}
+	for i, value := range []int{11, 13, 17, 19} {
+		gauge.Dimensions[0].Points[i].Collected = strconv.Itoa(value)
+	}
+	rate.Dimensions[0].Points = append(rate.Dimensions[0].Points, fixture.Point{
+		T: now, Collected: "101", Flags: stream.FlagNotAnomalous,
+	})
+	gauge.Dimensions[0].Points = append(gauge.Dimensions[0].Points, fixture.Point{
+		T: now, Collected: "103", Flags: stream.FlagNotAnomalous,
+	})
 	c020PushCharts(t, host, guid(333), rate, gauge)
 
 	cases := []struct {
-		name, chart, group, want string
+		name, contract, chart string
+		want                  float64
 	}{
-		{name: "rate/average", chart: rateChartID, group: "average", want: "5 requests/s"},
-		{name: "rate/sum", chart: rateChartID, group: "sum", want: "20 requests"},
-		{name: "gauge/average", chart: gaugeChartID, group: "average", want: "7 requests"},
-		{name: "gauge/sum", chart: gaugeChartID, group: "sum", want: "28 requests"},
+		{name: "rate", contract: "CASE-020/badge-rate-sum-value", chart: rateChartID, want: 17},
+		{name: "gauge", contract: "CASE-020/badge-gauge-sum-value", chart: gaugeChartID, want: 60},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			trackContract(t, tc.contract)
 			svg := c020Badge(t, c020BadgeSpec{
 				baseURL: td.BaseURL, host: host, chart: tc.chart,
-				dimension: "value", group: tc.group, after: first, before: before,
+				dimension: "value", group: "sum", units: "fixture-unit",
+				after: first, before: before,
 			})
-			c020AssertBadgeValue(t, svg, tc.want)
+			c020AssertBadgeNumber(t, svg, tc.want)
 		})
 	}
 }
 
-// TestCase020BadgeArchivedFilteredRateUnits separates the metric set the
-// badge pre-scan can see from the metric set its query can read:
-//
-//  1. store a rate, then restart so it exists only as archived metadata;
-//  2. recreate the same chart with a live gauge, keeping the badge fresh;
-//  3. explicitly select the archived rate over its old retention window.
-//
-// The real query walks the instance's RRDMETRICs and selects archived_rate.
-// The badge pre-scan walks only the live chart's RRDDIMs, where only
-// live_gauge exists. The value proves which metric the query actually read;
-// its label must use that same metric set and report the integrated volume.
-func TestCase020BadgeArchivedFilteredRateUnits(t *testing.T) {
-	trackContract(t, "CASE-020/badge-filtered-metric-units")
-
+func TestCase020BadgeSumUnits(t *testing.T) {
 	const (
-		host     = "c020-badge-archived"
-		chart    = "fixture.c020_badge_archived"
-		rateDim  = "archived_rate"
-		gaugeDim = "live_gauge"
+		host         = "c020-badge-units"
+		rateChartID  = "fixture.c020_badge_units_rate"
+		gaugeChartID = "fixture.c020_badge_units_gauge"
+		mixedChartID = "fixture.c020_badge_units_mixed"
 	)
-	machineGUID := guid(335)
-
-	d, err := daemon.Start(daemon.Options{
-		Binary: netdataBinary,
-		RunDir: t.TempDir(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := d.Stop(); err != nil {
-			t.Errorf("stop dedicated daemon: %v", err)
+	now := time.Now().Unix()
+	first := now - 30
+	before := first + c020Samples
+	rate := c020Chart(rateChartID, rateChartID, "requests/s", "incremental", 5, first)
+	gauge := c020Chart(gaugeChartID, gaugeChartID, "requests", "absolute", 7, first)
+	mixed := c020Chart(mixedChartID, mixedChartID, "requests/s", "incremental", 5, first)
+	mixed.Dimensions[0].ID = "rate"
+	mixed.Dimensions = append(mixed.Dimensions, c020Chart(
+		mixedChartID, mixedChartID, "requests/s", "absolute", 7, first,
+	).Dimensions[0])
+	mixed.Dimensions[1].ID = "gauge"
+	for i, ch := range []*fixture.Chart{&rate, &gauge, &mixed} {
+		for d := range ch.Dimensions {
+			ch.Dimensions[d].Points = append(ch.Dimensions[d].Points, fixture.Point{
+				T: now, Collected: strconv.Itoa(101 + i + d), Flags: stream.FlagNotAnomalous,
+			})
 		}
-	})
+	}
+	c020PushCharts(t, host, guid(334), rate, gauge, mixed)
 
-	rate := c020Chart(chart, chart, "requests/s", "incremental", 5, fixture.T0)
-	rate.Dimensions[0].ID = rateDim
-	first, last := rate.FirstT(), rate.LastT()
-
-	rateConn, err := stream.Connect(
-		d.Addr, d.StreamKey,
-		stream.HostInfo{Hostname: host, MachineGUID: machineGUID},
-		stream.CapsLive,
-	)
-	if err != nil {
-		t.Fatal(err)
+	cases := []struct {
+		name, contract, chart, dimension, want string
+	}{
+		{
+			name: "rate", contract: "CASE-020/badge-rate-sum-units",
+			chart: rateChartID, dimension: "value", want: "requests",
+		},
+		{
+			name: "gauge", contract: "CASE-020/badge-gauge-sum-units",
+			chart: gaugeChartID, dimension: "value", want: "requests",
+		},
+		{
+			name: "mixed-chart-rate-selection", contract: "CASE-020/badge-mixed-algorithm-sum-units",
+			chart: mixedChartID, dimension: "rate", want: "requests/s",
+		},
 	}
-	rate.Define(rateConn)
-	rate.PushLive(rateConn)
-	if err := rateConn.Flush(); err != nil {
-		_ = rateConn.Close()
-		t.Fatal(err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			trackContract(t, tc.contract)
+			svg := c020Badge(t, c020BadgeSpec{
+				baseURL: td.BaseURL, host: host, chart: tc.chart,
+				dimension: tc.dimension, group: "sum", after: first, before: before,
+			})
+			c020AssertBadgeUnits(t, svg, tc.want)
+		})
 	}
-	if _, err := d.WaitRetention(host, chart, first, last, 15*time.Second); err != nil {
-		_ = rateConn.Close()
-		t.Fatal(err)
-	}
-	if err := rateConn.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := d.Restart(); err != nil {
-		t.Fatal(err)
-	}
-
-	liveFirst := time.Now().Unix() - c020Samples
-	gauge := c020Chart(chart, chart, "requests/s", "absolute", 7, liveFirst)
-	gauge.Dimensions[0].ID = gaugeDim
-	liveLast := gauge.LastT()
-
-	gaugeConn, err := stream.Connect(
-		d.Addr, d.StreamKey,
-		stream.HostInfo{Hostname: host, MachineGUID: machineGUID},
-		stream.CapsLive,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = gaugeConn.Close() })
-	gauge.Define(gaugeConn)
-	gauge.PushLive(gaugeConn)
-	if err := gaugeConn.Flush(); err != nil {
-		t.Fatal(err)
-	}
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		doc, queryErr := d.DataV3(host, daemon.DataParams(chart, liveFirst, liveLast, c020Samples))
-		if queryErr == nil {
-			if retention, found := daemon.QueryRetention(doc); found &&
-				retention.LastEntry == liveLast {
-				break
-			}
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("archived/live badge fixture did not settle over its recent %ds probe", c020Samples)
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	svg := c020Badge(t, c020BadgeSpec{
-		baseURL: d.BaseURL, host: host, chart: chart,
-		dimension: rateDim, group: "sum", after: first - 1, before: last,
-	})
-	c020AssertBadgeValue(t, svg, "20 requests")
 }

@@ -80,14 +80,39 @@ var manifest = map[string]ManifestCase{
 		Proves:     "the db stores PER-SECOND rates regardless of update_every: a v1 child's raw counters through the parent's rrdset_done yield K*(mul/div)/UE per second (incremental at ue 1/2/5 incl. mul/div scaling; absolute control unscaled)",
 		Components: []string{"rates-ue1-2-5", "rate-ue10"},
 	},
-	"L1/resets-overflows": {
-		Proves: "parent rrdset_done reset/overflow arithmetic over the v1 wire: implausible backward step → zero increment + SN_FLAG_RESET; plausible 32-bit wrap reconstructs cap-relative delta — ONE LESS than the true modulo delta (cap 0xFFFFFFFF, pinned quirk, rulings batch); percentage-of-incremental-row pre-pass absorbs the reset (0% + RESET, survivors split 100%); a silence beyond the gap threshold resets the collection (no spike from the across-gap delta, no RESET, null gap rows); sub-second sample offsets BLEND adjacent sample rates across stored rows with exact mass conservation",
+	"L1/reset-implausible-backward-step": {
+		Proves: "an implausible incremental-counter backward step contributes zero rate mass and stamps exactly one RESET row",
+	},
+	"L1/reset-plausible-32bit-wrap": {
+		Proves: "a plausible 32-bit counter wrap reconstructs the cap-relative delta of 99 (the established one-less-than-modulo quirk) and stamps exactly one RESET row",
+	},
+	"L1/reset-percentage-row": {
+		Proves: "percentage-of-incremental-row absorbs one dimension's reset as a zero contribution with RESET while the surviving dimension takes the remaining 100% without RESET",
+	},
+	"L1/reset-after-gap": {
+		Proves: "a silence beyond the collection-gap threshold restarts an incremental counter cleanly, leaving null gap rows without an across-gap rate spike or RESET annotation",
+	},
+	"L1/subsecond-rate-blending": {
+		Proves:     "a paced special sample is blended into at most two adjacent stored rows within its endpoint range",
+		Components: []string{"implausible-backward-step", "plausible-32bit-wrap", "pcent-over-diff-reset"},
 	},
 	"L1/off-grid-timestamps": {
 		Proves: "samples pushed OFF the absolute ue grid: STORAGE keeps the pushed timestamps exactly (retention proves it), while every VIEW re-grids to absolute ue multiples and serves boundary-INTERPOLATED values (envelope-pinned; the exact virtual-point oracle is layer-9 work)",
 	},
-	"L2/tier1-palette": {
-		Proves: "tier1 rollup identity for the edge-data palette: aligned windows (partial first — T0 unaligned), interior gaps (partial numeric windows carry exactly PARTIAL; stored-empty windows carry exactly EMPTY), fractional anomaly rates, reset annotation LOST at tier1+ (pages store no flags), float32 sum/min/max write-rounding",
+	"L2/tier1-complete": {
+		Proves: "complete tier1 rollups preserve the fixture's aligned numeric values and exact window geometry",
+	},
+	"L2/tier1-interior-gaps": {
+		Proves: "tier1 interior gaps produce PARTIAL numeric windows and EMPTY stored-gap windows at their exact aligned positions",
+	},
+	"L2/tier1-anomaly-rate": {
+		Proves: "tier1 rollups report the exact fractional anomaly rate derived from anomaly_count divided by count",
+	},
+	"L2/tier1-reset-flags": {
+		Proves: "tier1 pages do not retain tier0 RESET annotations because the higher-tier page format stores no point flags",
+	},
+	"L2/tier1-float32-fields": {
+		Proves: "tier1 sum, minimum and maximum fields match the ARRAY_TIER1 float32 write-rounding contract",
 	},
 	"L2/partial-wide-point": {
 		Proves: "one partial higher-tier record projected into six finer result rows marks every numeric derived row exactly PARTIAL while preserving the requested timestamp grid; PARTIAL is evidence state, not a one-time event on the source record",
@@ -95,8 +120,11 @@ var manifest = map[string]ManifestCase{
 	"L2/whole-chart-absence": {
 		Proves: "never-stored tier windows (whole-chart gap) read identically to stored-empty windows: null + EMPTY annotation, with correct partial counts on the flanking windows",
 	},
-	"L2/sn-vs-original": {
-		Proves: "tiers aggregate the ORIGINAL collected doubles, not tier0 storage_number-quantized values: 2^24+1 reads 16777220 at tier0 (decimal mantissa step) but f32(16777216)-derived at tier1",
+	"L2/tier0-storage-number-quantization": {
+		Proves: "tier0 reads the value 2^24+1 through the established storage_number decimal-mantissa quantization path",
+	},
+	"L2/tier-rollup-original-values": {
+		Proves: "higher tiers aggregate the original collected double for 2^24+1 before applying the tier page's float32 field encoding, rather than aggregating the tier0 storage_number value",
 	},
 	"L2/update-every-5": {
 		Proves: "tier grid arithmetic scales with chart update_every: granularity ue×grouping, aligned ends, partial first window",
@@ -112,7 +140,7 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"complete-4-to-8", "partial-8-to-4"},
 	},
 	"L2/v1-rollup-count-65536": {
-		Proves: "a complete higher-tier rollup containing 65,536 source samples remains numeric after persistence and restart: forced tier 1 projects it onto an exact 256-by-256-second request grid with value 256 in every clean row and min/avg/max exactly 1; legacy V1 pages cannot satisfy this because the stored uint16 count wraps to zero",
+		Proves: "complete higher-tier rollups containing 65,536 source samples remain numeric after persistence and restart: two consecutive records isolate the stored uint16 count wrap from the separate singleton-page cadence ambiguity, and forced tier 1 projects one record onto an exact 256-by-256-second request grid with value 256 in every clean row and min/avg/max exactly 1",
 	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves:  "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
@@ -122,8 +150,11 @@ var manifest = map[string]ManifestCase{
 		Proves:  "best-effort graceful-restart regression: a freshly connected child remains queryable after restart. The bounded 10-second attempt prevents unbounded timing drift but exceeds the ordinary 5-second metadata scan, so it does not isolate the final shutdown scan from periodic persistence (was: fresh host forgotten after boot, dbengine data orphaned)",
 		FixedBy: "#23120",
 	},
-	"L3/families": {
-		Proves: "the listed pre-fleet time-grouping families equal their Go oracles over the mixed palette at group 10 (all-gap bucket, anomaly run, reset): average/sum/min/max, extremes, stddev/cv (Welford, sample variance, single-value=0), median + trimmed-median (value-range trim + R-7 quantile), percentile/trimmed-mean (slot-window means with fractional interpolation), ses/des (running state across buckets), incremental-sum (carry), countif (finite-numeric options)",
+	"L3/family-values": {
+		Proves: "the listed pre-fleet time-grouping families equal their independent Go value oracles over complete, gapped, anomalous and reset-bearing buckets",
+	},
+	"L3/family-annotations": {
+		Proves: "every listed pre-fleet time-grouping family preserves the exact EMPTY, PARTIAL and RESET annotation expected from the source palette",
 	},
 	"L3/sign-semantics": {
 		Proves: "percentile/trimmed-mean walk from the top when a bucket has any negative value; extremes champions by |abs|; pinned over all-negative and mixed-sign fixtures",
@@ -134,12 +165,32 @@ var manifest = map[string]ManifestCase{
 	"L3/identity-smoothing": {
 		Proves: "ses/des at group=1 use the requested points (capped 15) as the smoothing window; incremental-sum at identity answers every bucket but the first: one sample per bucket is the shape the carry exists for",
 	},
-	"L3/registry-completeness": {
-		Proves: "the complete pre-fleet time-grouping registry: all 48 accepted name strings (latest included since #23257) answer (21 variants/aliases beyond L3/families, alias==canonical), the documented countif operator aliases (!= <> >: <: : ==), surrounding spaces in otherwise valid finite-numeric expressions and the zero-length default, numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), and unknown names silently parse to average; CASE-023 independently proves the four fleet groupings, bare operands and invalid-expression handling",
+	"L3/registry-variants": {
+		Proves: "every accepted pre-fleet time-grouping registry name answers with its canonical implementation",
 	},
-	"L3/anomaly-bit-option": {
-		Proves:     "options=anomaly-bit replaces fetched values with per-point anomaly rates BEFORE time-grouping: 0/100 at tier0 identity, buckets aggregate the rates (average = bucket anomaly %, max = any-anomaly), group-by consumes them as values (sum adds across members, gaps stamp PARTIAL), and tier>0 feeds FRACTIONAL window rates (100*anomaly_count/count)",
-		Components: []string{"option", "tier-rates"},
+	"L3/registry-aliases": {
+		Proves: "each documented pre-fleet time-grouping alias produces the same answer as its canonical name",
+	},
+	"L3/registry-countif-grammar": {
+		Proves: "countif accepts every documented operator alias plus surrounding spaces and its zero-length default expression",
+	},
+	"L3/registry-option-clamping": {
+		Proves: "numeric grouping options honor overrides and clamp percentile to [0,100] and trimmed mean or median to [0,50]",
+	},
+	"L3/registry-unknown-fallback": {
+		Proves: "an unknown time-grouping name retains the established silent fallback to average",
+	},
+	"L3/anomaly-bit-identity": {
+		Proves: "options=anomaly-bit replaces tier0 identity values with each point's exact 0% or 100% anomaly rate",
+	},
+	"L3/anomaly-bit-buckets": {
+		Proves: "time grouping consumes anomaly-bit rates as values, so average returns the bucket anomaly percentage and max reports whether any point was anomalous",
+	},
+	"L3/anomaly-bit-group-by": {
+		Proves: "group-by consumes anomaly-bit results as values, sums rates across members and marks groups with missing contributors PARTIAL",
+	},
+	"L3/anomaly-bit-tier-rates": {
+		Proves: "above tier0, anomaly-bit exposes each stored window's fractional 100*anomaly_count/count rate as the query value",
 	},
 	"L3/sum-over-time-volume": {
 		Proves:     "time_group=sum has two modes: RATE-stored metrics (incremental) multiply each point by its duration — the sum is the VOLUME at any update_every; non-rate metrics sum plainly",
@@ -151,20 +202,53 @@ var manifest = map[string]ManifestCase{
 	"CASE-020/units-across-query-surfaces": {
 		Proves: "db metadata keeps each metric's stored units, while sum transforms a rate's result units from rate to volume consistently in view metadata, per-dimension result metadata and labels for group_by=dimension, units and dimension,units; gauges and non-sum groupings keep their source units",
 	},
-	"CASE-020/mixed-rate-gauge-units": {
-		Proves: "grouping a rate and gauge with the same resulting volume units is independent of metric encounter order: both orders produce exact volume units and labels, never the first contributor's source units",
+	"CASE-020/query-surface-values": {
+		Proves: "average and sum preserve the exact fixture-derived numeric result across group_by=dimension, units and dimension,units for both rate and gauge metrics, independently of result-unit rendering",
 	},
-	"CASE-020/badge-sum-units": {
-		Proves: "the badge endpoint renders both the exact sum value and its transformed volume units for rates, while average and gauge results keep their correct units",
+	"CASE-020/badge-rate-sum-value": {
+		Proves: "a one-point badge SUM over four complete incremental-rate samples includes all four source intervals and returns their exact integrated volume",
 	},
-	"CASE-020/badge-filtered-metric-units": {
-		Proves: "badge unit detection uses the same archived and dimension-filtered metric set as the query: selecting an archived rate while a live gauge shares the chart reports the rate's integrated volume and units",
+	"CASE-020/badge-gauge-sum-value": {
+		Proves: "a one-point badge SUM over four complete absolute samples includes all four source values and returns their exact total",
 	},
-	"L4/family-tier-matrix": {
-		Proves: "the 17 listed pre-fleet grouping families are served exclusively from forced tier1 and, over 6 windows per bucket, equal the fetch-aware oracle (min/max/sum fetch their tier fields, all else the per-window average — avg-of-averages pinned quantitatively with unequal counts); exact anomaly rates come from tier counts, EMPTY annotations match null placement, numeric annotations are PARTIAL exactly when a contributing stored tier window has gaps, and window alignment rounds `before` up to group multiples",
+	"CASE-020/badge-rate-sum-units": {
+		Proves: "a badge SUM over a rate-only RRDSET renders the integrated volume unit by removing the source unit's trailing '/s'",
 	},
-	"L4/auto-tier-selection": {
-		Proves: "with no tier param the planner picks the COARSEST tier whose density is acceptable (>= HALF the wanted points, wanted floored at QUERY_PLAN_MIN_POINTS=10): 1s buckets from tier0, 60s from tier1, and even 3600s buckets from tier1 while it covers (tier2 needs >= 5h windows — 5 x 3600s — or coverage gaps); db.per_tier points-read is pinned exclusive, and values, anomaly rates, EMPTY, and numeric PARTIAL annotations equal the serving tier's gap-aware oracle",
+	"CASE-020/badge-gauge-sum-units": {
+		Proves: "a badge SUM over an absolute-only RRDSET preserves the RRDSET's common units",
+	},
+	"CASE-020/badge-mixed-algorithm-sum-units": {
+		Proves: "a badge SUM over a mixed incremental-and-absolute RRDSET preserves the RRDSET's common units even when the dimension filter selects only its rate dimension",
+	},
+	"L4/family-tier-source": {
+		Proves: "every forced family-tier query is served exclusively from tier1 and returns only the requested source dimension",
+	},
+	"L4/family-tier-grid": {
+		Proves: "every forced tier1 family query returns the exact aligned six-bucket view grid, including upward rounding of before to grouping boundaries",
+	},
+	"L4/family-tier-values": {
+		Proves: "all 17 pre-fleet grouping families match the fetch-aware tier1 value oracle across complete, partial and empty stored windows",
+	},
+	"L4/family-tier-anomaly-rates": {
+		Proves: "every forced tier1 grouping reports the exact bucket anomaly rate derived from its stored anomaly and contributor counts",
+	},
+	"L4/family-tier-annotations": {
+		Proves: "every forced tier1 grouping marks null stored windows EMPTY and numeric windows with stored gaps PARTIAL",
+	},
+	"L4/auto-tier-choice": {
+		Proves: "without a tier parameter the planner chooses the coarsest tier with acceptable density for the one-second, sixty-second and coarse-bucket fixtures",
+	},
+	"L4/auto-tier-grid": {
+		Proves: "automatic-tier queries return exactly the requested view grid and source dimension at each tested density",
+	},
+	"L4/auto-tier-values": {
+		Proves: "automatic-tier query values equal the gap-aware oracle for the tier selected at each tested density",
+	},
+	"L4/auto-tier-anomaly-rates": {
+		Proves: "automatic-tier query rows retain the exact anomaly rate of the selected tier's contributing points",
+	},
+	"L4/auto-tier-annotations": {
+		Proves: "automatic-tier query rows mark empty results EMPTY and numeric results with stored gap evidence PARTIAL",
 	},
 	"L4/minmax-absolute-semantics": {
 		Proves:     "time_group=min returns the value CLOSEST to zero and max the value FURTHEST from zero (min.h/max.h fabs comparisons) — visible only on negative/mixed data; pinned green in L3 sign-semantics + L4 matrix; RULING PENDING (arithmetic min/max would be a behavior change; extremes already provides champion-by-abs)",
@@ -174,17 +258,55 @@ var manifest = map[string]ManifestCase{
 		Proves:     "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated 11M-sample fixture rotates tier0 at the 25MB quota floor while tier1 keeps the head; the discovered boundary is checked with per-side values, tier1-only controls, exact availability, authoritative fine-tier event/flap rows, and event totals bounded to raw truth plus one crossing coarse representative per seam",
 		Components: []string{"seam", "head-only", "condition-groupings"},
 	},
-	"L4/three-tier-join": {
-		Proves: "three tiers with different retention depths join inside one query: tier0 keeps the newest slice, tier1 outlives it and tier2 outlives both. Five zoom levels pin coverage, default newest-first raw wire order, canonical ascending order, range and outward alignment across both seams; forced tiers pin exact controls, while automatic seams pin exact availability, authoritative finer-tier event/flap rows, and event totals bounded to raw truth plus one crossing coarse representative per seam",
+	"L4/three-tier-join-grid": {
+		Proves: "one query joins three retention depths across both tier seams with exact coverage, outward alignment, newest-first wire order and canonical ascending rows at five zoom levels",
 	},
-	"L5/group-by-matrix": {
-		Proves: "level-1 group-by, BOTH contracts: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette returns the exact unique t0+1..t0+60 grid and equals the member-enumeration oracle — non-raw converts (average divides, ar/gbc), raw defers (sums undivided, ar accumulated, per-point counts on the wire and no hidden schema field); PARTIAL stamping and group naming pinned (instance = id@guid, node = machine guid, label = value)",
+	"L4/three-tier-condition-groupings": {
+		Proves: "condition groupings preserve exact availability and at least one non-vacuous authoritative finer-tier event or flap under a crossing coarse record in forced tier regions and across both automatic three-tier seams",
 	},
-	"L5/percentage": {
-		Proves: "aggregation=percentage with a dimensions selector returns the exact unique t0+1..t0+60 grid: non-raw converts n*100/(n+h) per group; raw defers with a result-wide hidden field whose cell is the finite hidden sum when the group has hidden contributors and null otherwise; group_by=dimension is degenerate (hidden dims group separately — flat 100). percentage-of-instance (the exclusive single-key shorthand) converts EVEN IN RAW mode with no hidden — safe, per-instance groups never span agents",
+	"L5/group-by-grid": {
+		Proves: "every level-1 group-by key and aggregation returns the exact unique t0+1 through t0+60 row grid in raw and non-raw modes",
 	},
-	"L5/statistics": {
-		Proves:  "per-group view statistics (D-B SETTLED, #23097 verified numerically): non-average aggregations average over view ROWS (mean plotted value, row-extreme min/max); AVERAGE keeps the weighted (pre-division sum, contributions) pair; raw keeps (sum, count) untouched for the cloud",
+	"L5/group-by-naming": {
+		Proves: "level-1 group-by returns exactly the fixture-derived groups with canonical selected, dimension, instance, node, label, context and units names",
+	},
+	"L5/group-by-values": {
+		Proves: "level-1 group-by values match the member-enumeration oracle for average, min, max, sum and extremes in raw and non-raw modes",
+	},
+	"L5/group-by-anomaly-metadata": {
+		Proves: "level-1 group-by anomaly rates use exact contributor weighting in non-raw mode and retain their accumulated numerator in raw mode",
+	},
+	"L5/group-by-partial-empty": {
+		Proves: "level-1 group-by preserves null groups and marks a numeric row PARTIAL exactly when fewer than all group members contributed",
+	},
+	"L5/group-by-raw-schema": {
+		Proves: "raw level-1 group-by carries exact per-point contributor counts without a hidden field, while non-raw output carries neither count nor hidden state",
+	},
+	"L5/percentage-grid": {
+		Proves: "percentage aggregation returns the exact unique t0+1 through t0+60 grid for every tested grouping and raw mode",
+	},
+	"L5/percentage-nonraw": {
+		Proves: "non-raw percentage converts each selected and hidden group to n*100/(n+h), preserving null when the selected side has no contributor",
+	},
+	"L5/percentage-raw-hidden": {
+		Proves: "raw percentage defers conversion by carrying the selected sum as value and the finite hidden sum, or null without a hidden contributor, in the hidden field",
+	},
+	"L5/percentage-group-by-dimension": {
+		Proves: "group_by=dimension keeps hidden dimensions in separate filtered groups, so each selected dimension percentage remains exactly 100% in raw and non-raw modes",
+	},
+	"L5/percentage-of-instance": {
+		Proves: "percentage-of-instance converts per-instance percentages even in raw mode and never emits a hidden field because its groups cannot span agents",
+	},
+	"L5/statistics-weighted-average": {
+		Proves:  "AVERAGE view statistics retain the pre-division sum and contributor count so each group's reported average is contributor-weighted",
+		FixedBy: "#23097",
+	},
+	"L5/statistics-row-aggregations": {
+		Proves:  "non-average group view statistics report the mean plotted row value and the exact minimum and maximum plotted rows",
+		FixedBy: "#23097",
+	},
+	"L5/statistics-raw-sum-count": {
+		Proves:  "raw group view statistics preserve the exact accumulated sum and contributor count for Cloud merging",
 		FixedBy: "#23097",
 	},
 	"L5/gap-only-db-average-is-null": {
@@ -196,52 +318,233 @@ var manifest = map[string]ManifestCase{
 	"L5/multi-key-group-by": {
 		Proves: "multi-key group_by: groups are attribute TUPLES, ids join in the FIXED engine order (dimension, instance, label, node, context, units) regardless of request order; instance drops @node when node is in the mask; selected and percentage-of-instance collapse rules; avg alias; unknown aggregation silently parses to average",
 	},
-	"L6/two-pass-matrix": {
-		Proves:     "two-pass oracle over 10 key-chains (including cross-key union partitioning) x 7 aggregation chains with no average boundary x non-raw/raw: pass-2 values, PARTIAL propagation and group_by_label[1]; non-raw point and final view-statistics anomaly metadata is weighted by the raw metric contributors beneath pass-1 groups, while raw keeps the anomaly numerator and the old Agent-Cloud prior-group count because the same field can be a Cloud-rewritten average divisor; the result has no hidden schema field; a live-edge fixture proves that a raw-contributor decline inside one pass-1 group retains the incomplete final row, marks it PARTIAL, and does not shorten the request timestamp grid",
-		Components: []string{"matrix", "live-edge-partial-row"},
+	"L6/two-pass-grouping": {
+		Proves: "two-pass grouping partitions pass 1 by the union of both requested keys and returns exactly the fixture-derived final groups across all tested key chains",
+	},
+	"L6/two-pass-grid": {
+		Proves: "every two-pass matrix query returns all 60 expected rows on the exact t0+1 through t0+60 grid",
+	},
+	"L6/two-pass-values": {
+		Proves: "two-pass values match the pass-chain oracle for seven no-average aggregation chains in raw and non-raw modes",
+	},
+	"L6/two-pass-point-anomaly": {
+		Proves: "non-raw two-pass point anomaly rates are weighted by raw metric contributors while raw points retain the anomaly numerator",
+	},
+	"L6/two-pass-view-anomaly": {
+		Proves: "two-pass view anomaly statistics equal the mean of the finalized per-row anomaly rates for every eligible non-raw chain",
+	},
+	"L6/two-pass-partial-empty": {
+		Proves: "two-pass rows are EMPTY without contributors and PARTIAL exactly when an underlying member or prior-pass group is missing",
+	},
+	"L6/two-pass-raw-schema": {
+		Proves: "raw two-pass output carries the prior-pass group count and no hidden field, while non-raw output omits both",
+	},
+	"L6/two-pass-live-edge-trimming": {
+		Proves: "a near-live contributor decline trims the unstable final two-pass row at the established partial-data cutoff while preserving the complete prefix grid",
+	},
+	"L6/two-pass-live-edge-values": {
+		Proves: "a trimmed live-edge two-pass query preserves the exact values of every complete row before the contributor decline",
+	},
+	"L6/two-pass-live-edge-annotations": {
+		Proves: "the rows surviving live-edge partial-data trimming retain exact EMPTY and complete annotations without exposing the removed PARTIAL suffix",
 	},
 	"L6/two-pass-average-boundary": {
-		Proves:     "sum→average needs separate denominators across two passes: non-raw value divides by contributing pass-1 groups, while anomaly rate remains weighted by the raw metric contributors beneath those groups; raw mode deliberately leaves both numerators undivided and reports the prior-pass group count required by the old Agent-Cloud average merge contract. Class C average→sum stability separately preserves the released prior-group anomaly divisor without ruling on average composition",
-		Components: []string{"sum-to-average", "average-to-sum-held"},
+		Proves:     "sum→average needs separate denominators across two passes: non-raw value divides by contributing pass-1 groups, while anomaly rate remains weighted by the raw metric contributors beneath those groups; raw mode deliberately leaves both numerators undivided and reports the prior-pass group count required by the old Agent-Cloud average merge contract",
+		Components: []string{"sum-to-average"},
+	},
+	"L6/two-pass-average-held-boundary": {
+		Proves: "average→sum preserves the released prior-pass-group anomaly divisor without ruling on the deferred average-composition contract",
 	},
 	"L6/two-pass-percentage": {
-		Proves:     "percentage as the pass-2 aggregation: pass 1 runs in shadow hidden mode, the percentage pass folds hidden sums into each normal group's denominator (v*100/(v+h)), and an incomplete shadow bucket taints PARTIAL; non-raw anomaly metadata remains weighted by visible raw metric contributors, while raw mode defers value conversion, declares a result-wide hidden field with finite sums or null cells, and preserves the visible prior-pass group count. Class C stability controls for percentage→sum and percentage-of-instance→sum separately prove that complete rows remain non-PARTIAL without ruling on percentage pooling or weighting",
-		Components: []string{"sum-to-percentage", "percentage-to-sum-held", "percentage-of-instance-to-sum-held"},
+		Proves:     "percentage as the pass-2 aggregation: pass 1 runs in shadow hidden mode, the percentage pass folds hidden sums into each normal group's denominator (v*100/(v+h)), and an incomplete shadow bucket taints PARTIAL; non-raw anomaly metadata remains weighted by visible raw metric contributors, while raw mode defers value conversion, declares a result-wide hidden field with finite sums or null cells, and preserves the visible prior-pass group count",
+		Components: []string{"sum-to-percentage"},
+	},
+	"L6/two-pass-percentage-held-boundary": {
+		Proves: "percentage→sum preserves the released prior-pass-group anomaly divisor and complete annotation without ruling on percentage pooling or weighting",
+	},
+	"L6/two-pass-percentage-of-instance-held-boundary": {
+		Proves: "percentage-of-instance→sum preserves the released prior-pass-group anomaly divisor and complete annotation without ruling on percentage pooling or weighting",
 	},
 	"CASE-018/multipass-average": {
 		Proves: "with average at pass 1, pass 2 consumes each finalized pass-1 group average: [dimension,average]→[selected,average] equals the mean of those group averages, not the mean of unfinalized group sums",
 	},
-	"L7/formatters": {
-		Proves: "classic v1 formats over a hostile fixture: csv/tsv byte-exact (newest-first default, natural order option, unquoted header cells pinned as current contract), ssv/ssvcomma/array exact row-sum values, csvjsonarray VALID JSON with NUMERIC timestamps (#23115/#23117 pinned), markdown/html structure, and strict JSON/JSONP/datatable row schemas with exact fixture-derived timestamps, values and gaps",
+	"L7/format-csv": {
+		Proves: "v1 CSV is byte-exact for newest-first and natural row order, including the established unquoted header cells",
 	},
-	"CASE-022/time-group-latest": {
-		Proves:  "time_group=latest works end to end: per-bucket last collected value, empty buckets stay empty, sign preserved without options=absolute and erased with it. A one-point explicit window containing the newest stored sample uses the collector cache with zero db reads, the RAW un-quantized double and anomaly rate 0 by design, while its row timestamp remains on the request-derived grid. The API's before=0 database-end sentinel retains its existing newest-sample grid for alert-style queries, including a v1 natural-points update_every=10 fixture whose newest timestamp is off cadence. The storage path (selected-tier) keeps SN quantization and the engine-generic anomaly rate. CASE-034 separately proves across 60-second fixtures that near-now explicit and relative LATEST queries cannot derive their public grids from stored timestamps",
+	"L7/format-tsv": {
+		Proves: "v1 TSV is byte-exact over the formatter fixture's timestamps, values and gaps",
+	},
+	"L7/format-ssv": {
+		Proves: "v1 SSV returns the exact row-reduced values for the formatter fixture",
+	},
+	"L7/format-ssvcomma": {
+		Proves: "v1 SSV-comma returns the exact comma-separated row-reduced values for the formatter fixture",
+	},
+	"L7/format-csvjsonarray": {
+		Proves: "v1 csvjsonarray is valid JSON with numeric timestamps and exact fixture-derived rows",
+	},
+	"L7/format-markdown": {
+		Proves: "v1 Markdown emits the expected table structure and exact fixture-derived cells",
+	},
+	"L7/format-html": {
+		Proves: "v1 HTML emits the expected table structure and exact fixture-derived cells",
+	},
+	"L7/format-array": {
+		Proves: "v1 array format returns the exact row-reduced values and gaps for the formatter fixture",
+	},
+	"L7/format-json": {
+		Proves: "v1 JSON has the strict expected row schema with exact fixture timestamps, values and gaps",
+	},
+	"L7/format-datatable": {
+		Proves: "v1 datatable has the strict expected schema with exact fixture timestamps, values and gaps",
+	},
+	"L7/format-jsonp": {
+		Proves: "v1 JSONP wraps the strict expected JSON rows with exact fixture timestamps, values and gaps",
+	},
+	"CASE-022/latest-name-echo": {
+		Proves:  "time_group=latest is accepted and echoed as the canonical requested grouping",
 		FixedBy: "#23257",
 	},
-	"CASE-023/fleet-time-groupings": {
-		Proves: "the four fleet time-aggregations and their shared expression grammar: percentage-of-samples (canonical, countif alias) / percentage-of-time / number-of-flaps / number-of-times, each echoing its canonical name and transforming the response units (%/%/flaps/events); gap tokens (nan|null|gap|empty) pull gap slots in for percentage-of-samples, number-of-flaps and number-of-times while an expression without one keeps them invisible there (percentage-of-time always counts uncollected time - CASE-023/percentage-of-time-denominator); previous|last compare against the previous COLLECTED sample so a counter reset is a reboot and the first sample never matches; flaps count observed false->true transitions only, carried across buckets; a gap contributes its SLOT width, not the zero span of QUERY_POINT_EMPTY",
+	"CASE-022/latest-bucket-values": {
+		Proves:  "LATEST returns the last collected value in each multi-sample bucket on the exact requested grid",
+		FixedBy: "#23257",
+	},
+	"CASE-022/latest-empty-buckets": {
+		Proves:  "LATEST identity rows preserve numeric values and leave buckets without a collected sample exactly EMPTY",
+		FixedBy: "#23257",
+	},
+	"CASE-022/latest-absolute": {
+		Proves:  "options=absolute applies to collector-cache LATEST values by erasing negative signs without forcing a storage read",
+		FixedBy: "#23257",
+	},
+	"CASE-022/latest-collector-cache": {
+		Proves:  "a one-point explicit LATEST window containing the newest sample uses zero database reads, preserves the raw unquantized value and anomaly rate zero, and stays on the request-derived grid",
+		FixedBy: "#23257",
+	},
+	"CASE-022/latest-before-zero-v3": {
+		Proves:  "v3 LATEST preserves before=0 as the database-end sentinel and returns the newest collector-cache sample on its established newest-sample grid",
+		FixedBy: "#23257",
+	},
+	"CASE-022/latest-before-zero-v1": {
+		Proves:  "v1 natural-points LATEST with before=0 restores an off-cadence newest stored timestamp rather than rounding it away",
+		FixedBy: "#23257",
+	},
+	"CASE-022/latest-selected-tier-storage": {
+		Proves:  "selected-tier LATEST uses storage, preserves tier0 storage_number quantization and negative signs, and reports the engine-derived anomaly rate",
+		FixedBy: "#23257",
+	},
+	"CASE-023/fleet-grouping-echo": {
+		Proves: "all four fleet condition groupings and the countif alias echo their canonical grouping names",
+	},
+	"CASE-023/percentage-of-samples": {
+		Proves: "percentage-of-samples answers exact sample shares for numeric, gap and previous-sample expressions across bucket boundaries",
+	},
+	"CASE-023/percentage-of-time": {
+		Proves: "percentage-of-time answers exact duration shares for numeric, gap and previous-sample expressions across bucket boundaries",
+	},
+	"CASE-023/number-of-times": {
+		Proves: "number-of-times counts exact numeric, gap and previous-sample occurrences while never counting the first sample as previous",
+	},
+	"CASE-023/number-of-flaps": {
+		Proves: "number-of-flaps counts only observed false-to-true condition transitions and carries condition state across buckets and gaps",
+	},
+	"CASE-023/gap-slot-width": {
+		Proves: "a condition-matching gap contributes its stored slot width rather than the zero duration of an EMPTY query point",
+	},
+	"CASE-023/fleet-grouping-units": {
+		Proves: "fleet condition groupings expose their canonical result units: percentages, events or flaps",
 	},
 	"CASE-023/expression-grammar-and-state": {
-		Proves: "the shared expression parser accepts every documented operator spelling, bare operands, gap aliases and previous|last; only an absent option or a zero-length whole expression defaults to ==0 at all four entry points, while whitespace-only, incomplete, malformed and non-finite expressions are rejected; predecessor and flap state survive gaps and bucket flushes",
+		Proves: "the shared expression parser accepts every documented operator spelling, bare operands, gap aliases and previous|last, rejects malformed and non-finite expressions, and preserves predecessor and flap state across gaps and bucket flushes",
 	},
-	"CASE-023/mcp-surface": {
-		Proves: "a protocol-valid MCP lifecycle advertises all four condition groupings, the countif alias and string time_group_options; exact nonzero numeric and gap-operand calls prove option forwarding, canonical echo, percentage-of-samples versus percentage-of-time behavior across a cadence change, units, JSON2 schema, timestamps, anomaly rates and annotations, while missing, blank, non-string, incomplete, malformed and non-finite required expressions return -32602 Invalid Params with structured INVALID_PARAMS details",
+	"CASE-023/expression-default-zero": {
+		Proves: "an absent, empty or whitespace-only condition means ==0 for every condition grouping, while every operator without an operand applies that operator to numeric zero on the V1, V2 and V3 data APIs",
 	},
-	"CASE-023/tier-estimation": {
-		Proves: "ABOVE tier 0 a stored point is min/max/avg over many samples, not a sample: percentage-of-time estimates the share of each stored window that satisfied the condition with the two-point mass model (weight(max) = (avg-min)/(max-min)). For a 0/1 availability signal at a steady collection cadence, the average is exactly the fraction of elapsed time at 1, so up% and down% of a mixed window sum to 100 instead of both answering 'never'. If cadence changes inside one stored interval, the average is sample-weighted instead; that separate contract is pinned by CASE-023/cadence-change-availability. A mixed window counts one flap and at most one occurrence because ordering does not survive the rollup; percentage-of-samples keeps its historical tier behaviour",
+	"CASE-023/mcp-protocol-lifecycle": {
+		Proves: "the MCP initialize response uses the requested protocol version, reports non-empty server identity and tool capability metadata, returns a valid session, and accepts the initialized notification",
 	},
-	"CASE-023/cadence-change-availability": {
-		Proves:     "when collection cadence changes, percentage-of-time keeps exact wall-time availability at tier 0. At tiers 1 and 2, a stored interval containing both cadences exposes only min/max/avg/count, so the approved two-point estimator is necessarily sample-weighted: the test derives that estimate from the fixture ledger and pins it separately from the exact steady-cadence contract",
+	"CASE-023/mcp-query-tool-schema": {
+		Proves: "the MCP query_metrics tool schema advertises all four condition groupings, the countif alias and string-valued time_group_options with each grouping and its zero-default behavior documented",
+	},
+	"CASE-023/mcp-valid-result-schema": {
+		Proves: "valid MCP query_metrics calls return the exact JSON2 labels, point schema, single-row shape and numeric point-field types",
+	},
+	"CASE-023/mcp-valid-query-units": {
+		Proves: "valid MCP condition queries report their canonical percentage, event or flap units consistently at view and dimension scope",
+	},
+	"CASE-023/mcp-valid-query-echo": {
+		Proves: "valid MCP condition queries echo the canonical grouping name and exact expression, including canonicalizing countif to percentage-of-samples",
+	},
+	"CASE-023/mcp-valid-query-timestamps": {
+		Proves: "valid one-point MCP condition queries return the exact requested bucket endpoint as an RFC3339 timestamp",
+	},
+	"CASE-023/mcp-valid-query-values": {
+		Proves: "valid MCP numeric and gap expressions return the exact percentage, occurrence and flap values, including cadence-sensitive sample and time denominators",
+	},
+	"CASE-023/mcp-valid-query-anomaly-rates": {
+		Proves: "valid MCP condition queries preserve the exact anomaly rate of their selected source dimension independently of the grouped value",
+	},
+	"CASE-023/mcp-valid-query-annotations": {
+		Proves: "valid MCP condition queries preserve the exact RESET point-annotation bitmap independently of the grouped value",
+	},
+	"CASE-023/mcp-invalid-options": {
+		Proves: "non-string, malformed and non-finite MCP condition expressions return structured -32602 INVALID_PARAMS errors",
+	},
+	"CASE-023/mcp-default-zero-options": {
+		Proves: "missing, empty and whitespace-only MCP conditions mean ==0, while an operator without an operand applies to zero, for every condition grouping and the countif alias",
+	},
+	"CASE-023/tier-estimation-source": {
+		Proves: "each forced higher-tier condition query reads exclusively from the requested stored tier and returns only the selected dimension",
+	},
+	"CASE-023/tier-estimation-percentage-of-time": {
+		Proves: "higher-tier percentage-of-time uses the approved min/max/average two-point mass estimator for steady-cadence stored windows",
+	},
+	"CASE-023/tier-estimation-number-of-flaps": {
+		Proves: "a mixed higher-tier stored window contributes one flap because its interior ordering is unavailable",
+	},
+	"CASE-023/tier-estimation-number-of-times": {
+		Proves: "a mixed higher-tier stored window contributes at most one condition occurrence because its interior ordering is unavailable",
+	},
+	"CASE-023/tier-estimation-percentage-of-samples": {
+		Proves: "higher-tier percentage-of-samples preserves its stored-window sample-estimation behavior independently of the time-share estimator",
+	},
+	"CASE-023/cadence-change-availability-tier0": {
+		Proves:     "when collection cadence changes, tier-0 percentage-of-time keeps exact wall-time availability across both the old and new sample intervals",
+		Components: []string{"slows-down", "speeds-up"},
+	},
+	"CASE-023/cadence-change-availability-higher-tiers": {
+		Proves:     "at tiers 1 and 2, a stored interval containing both cadences retains the original record duration and exposes the approved sample-weighted min/max/average two-point availability estimate",
 		Components: []string{"slows-down", "speeds-up"},
 	},
 	"CASE-023/historical-gap-slots-after-cadence-change": {
 		Proves: "after a metric speeds up from every 10 seconds to every second, gaps in its old history retain their historical slot weight. One missing old slot counts once, not ten times because the chart's latest cadence is one second. Asserted exactly at forced tiers 0, 1 and 2",
 	},
-	"CASE-023/tier-resolution-matrix": {
-		Proves: "all four condition groupings keep fixture-derived answers across forced tiers 0, 1 and 2 while downsampling, reading at storage resolution and upsampling, including a 10-second metric upsampled from tier0; exact rows cover gaps, changing neighboring rollup averages and interpolation, non-binary estimates, event de-duplication and counter predecessor state, with strict db.per_tier source proof",
+	"CASE-023/tier-resolution-source": {
+		Proves: "the tier-resolution matrix reads exclusively from each forced tier and returns only its selected fixture dimension",
 	},
-	"CASE-023/redelivery": {
-		Proves: "the same stored point handed to several result buckets means different things to different groupings: percentage-of-samples treats a delivery AS a sample and must answer in EVERY bucket (skipping repeats leaves EMPTY holes where a value used to be), while number-of-times and number-of-flaps must count a stored window at most once however many buckets it was delivered into. Counted-once and answered-everywhere are separate contracts and both hold: a bucket a wide point covers on its own carries no occurrence but is still a zero, not EMPTY - skipping the repeat entirely punches holes into a chart wherever the user zooms past the stored resolution",
+	"CASE-023/tier-resolution-percentage-of-time": {
+		Proves: "percentage-of-time matches the fixture-derived duration estimator across forced tiers while downsampling, reading at storage resolution and upsampling",
+	},
+	"CASE-023/tier-resolution-percentage-of-samples": {
+		Proves: "percentage-of-samples matches the fixture-derived sample estimator across forced tiers and repeated delivery resolutions",
+	},
+	"CASE-023/tier-resolution-number-of-times": {
+		Proves: "number-of-times preserves exact gap, numeric and previous-counter occurrence behavior across forced tiers and repeated delivery resolutions",
+	},
+	"CASE-023/tier-resolution-number-of-flaps": {
+		Proves: "number-of-flaps preserves exact transition behavior across forced tiers and repeated delivery resolutions",
+	},
+	"CASE-023/tier-resolution-slow-metric-upsampling": {
+		Proves: "a ten-second tier0 metric upsampled into five-second rows stays numeric in every covered row without inventing flaps, occurrences or counter drops",
+	},
+	"CASE-023/redelivery-samples-everywhere": {
+		Proves: "percentage-of-samples treats every delivery of a wide stored point as a sample and therefore answers every covered result bucket",
+	},
+	"CASE-023/redelivery-counted-once": {
+		Proves: "number-of-times and number-of-flaps count one stored window at most once even when it is delivered into several result buckets",
+	},
+	"CASE-023/redelivery-zero-not-empty": {
+		Proves: "a bucket covered only by a repeated wide point remains a numeric zero when no occurrence or flap belongs there, rather than becoming EMPTY",
 	},
 	"CASE-023/reset-counted-once": {
 		Proves: "one counter reset counts once above tier 0, at any resolution: carrying the PRE-reset peak forward makes the window after the reset look like it dropped too, and re-delivering the reset window compares it against the maximum its own first delivery stored - both turn one reboot into several",
@@ -256,19 +559,34 @@ var manifest = map[string]ManifestCase{
 		Proves: "the condition groupings answer a question ABOUT the samples, so options=nonzero judges them by the ANSWER: a dimension whose condition never holds is dropped even though every source sample is non-zero, while a dimension with a non-zero answer stays",
 	},
 	"CASE-023/percentage-of-time-denominator": {
-		Proves: "the denominator of percentage-of-time is the SELECTED duration, not the collected part of it: one collected second reading 1 followed by 99 seconds with nothing collected is 1% at `==1` and 99% at `==gap`, because uncollected time is time the condition did not hold - answering 100% would turn a node that went silent into a perfectly healthy one. percentage-of-samples keeps the opposite contract and reads 100%, because it answers about the samples it was handed",
+		Proves: "percentage-of-time divides by the full selected duration, so one collected matching second followed by 99 uncollected seconds answers 1% match and 99% gap",
+	},
+	"CASE-023/percentage-of-samples-denominator": {
+		Proves: "percentage-of-samples divides only by delivered samples, so one matching collected sample remains 100% despite 99 seconds without another sample",
 	},
 	"CASE-023/trailing-gaps": {
-		Proves: "a condition that names a gap keeps accounting to the END of the requested window: the query engine stops walking a few buckets after a dimension's storage is exhausted and lets the caller fill the rest with EMPTY, which is the same answer for every other aggregation but silently truncates an outage for `==gap` - a dimension that stops being collected while its chart keeps going must read 100% gap for every remaining bucket, not for eleven of them",
+		Proves: "retention overlap admits a specific RRDSET instance to the query, after which a condition that names a gap keeps accounting to the END of the requested window: an instance with real samples at the start and no samples later reads 100% gap for every remaining bucket, not for only the first eleven; an instance that continues collecting in the same context is the retention control",
+	},
+	"CASE-023/leading-gap-chronology": {
+		Proves: "when an instance starts collecting near the end of an overlapping query, its leading uncollected interval is delivered before its first real sample: number-of-flaps(==gap) stays zero instead of inventing a numeric-to-gap transition by moving the leading gap to the row suffix",
 	},
 	"CASE-023/window-outside-retention": {
-		Proves: "the limit of the trailing-gap contract: a window that does not touch the dimension's retention at all. A node silent for three days, asked what share of the last hour it was unreachable, must answer 100% - the same answer it gives for the tail of a window it partly covers. Metric selection is what stands in the way: a metric whose retention misses the window is dropped because it can only answer 'nothing here', which is true for every other aggregation and exactly backwards for one that accounts for uncollected time - dropping it turns a total outage into an empty chart",
+		Proves: "an RRDSET instance whose retention does not overlap the requested window is omitted even when another instance of the same context does overlap and the grouping names gaps; the mixed-context result contains only the overlapping instance, and explicitly selecting only the expired instance returns no result instead of synthesizing an all-gap series",
 	},
 	"CASE-023/gap-weight": {
 		Proves: "a gap counts in stored SLOTS, not seconds: percentage-of-samples weighs uncollected time against the collection interval, so on a 10s metric a 100s hole is ten missing samples and not a hundred - measuring it against the query grid (1s for an ordinary query) would let one missing slot outweigh ten collected ones",
 	},
-	"CASE-023/tier-wide-point": {
-		Proves: "when the view grid is FINER than the stored data — a dashboard zoomed into a window only tier 1 still covers — a stored point is re-delivered to every bucket it spans, carrying its original start and an interpolated value; the share of time answers the SAME estimate in each of those buckets, and one stored window yields at most ONE occurrence and ONE flap, because a re-delivery is the same window seen again, not a second event (counting the repeats inflates an SLO by exactly the zoom factor)",
+	"CASE-023/tier-wide-point-source": {
+		Proves: "a fine-grid query over tier1 reads the expected wide stored point repeatedly with its original interval and interpolated delivered values",
+	},
+	"CASE-023/tier-wide-point-time-share": {
+		Proves: "percentage-of-time returns the same stored-window estimate in every finer result bucket spanned by one wide tier point",
+	},
+	"CASE-023/tier-wide-point-number-of-times": {
+		Proves: "one wide stored tier point contributes at most one occurrence across all finer result buckets to which it is re-delivered",
+	},
+	"CASE-023/tier-wide-point-number-of-flaps": {
+		Proves: "one wide stored tier point contributes at most one flap across all finer result buckets to which it is re-delivered",
 	},
 	"CASE-023/tier-anomaly-bit": {
 		Proves: "with options=anomaly-bit above tier 0 the value is the stored window's anomaly RATE while min/max still describe the metric, so the condition is answered on the rate itself — a window either satisfied it or it did not (100/0), never a fraction estimated across two unrelated domains; >=N and <N partition every window",
@@ -317,12 +635,15 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"tier0-row", "plan-seam-source"},
 	},
 	"CASE-034/api-timestamp-grid-is-immutable": {
-		Proves:     "an explicit absolute virtual-points query has one immutable public timestamp grid, independent of values, collection cadence, gaps, retention coverage, requested tier option, and time aggregation. The historical matrix pins view.after, view.before, view.update_every, row count, and every wire timestamp for aligned and unaligned points=1/7 plus aligned points=60 across dense update_every=1 and 10, gapped, and partial-retention hosts; automatic and requested tiers 0/1/2; and average, sum, and latest on /api/v3/data. A representative aligned one-point query pins /api/v2/data on every fixture shape. Near-now aligned and unaligned explicit absolute plus unaligned relative LATEST points=1 queries across two Agents with different newest stored timestamps must keep request/clock-derived grids; the unaligned requests additionally prove collector-cache service with zero storage reads. A near-live six-row matrix proves that losing the final collected sample leaves an EMPTY cell on the same complete grid instead of truncating its timestamp. Historical and hot-edge values are deliberately ignored because value fixes must preserve this timestamp contract",
-		Components: []string{"dense-ue1", "dense-ue10", "gapped-ue1", "partial-ue1", "hot-edge-data-independence", "near-live-partial-data"},
+		Proves:     "an explicit absolute virtual-points query has one immutable public timestamp grid, independent of values, collection cadence, gaps, retention coverage, requested tier option, and time aggregation, except for the established near-live partial-contributor trimming contract. The historical matrix pins view.after, view.before, view.update_every, row count, and every wire timestamp for aligned and unaligned points=1/7 plus aligned points=60 across dense update_every=1 and 10, gapped, and partial-retention hosts; automatic and requested tiers 0/1/2; and average, sum, and latest on /api/v3/data. A representative aligned one-point query pins /api/v2/data on every fixture shape. Near-now aligned and unaligned explicit absolute plus unaligned relative LATEST points=1 queries across two Agents with different newest stored timestamps must keep request/clock-derived grids on both /api/v3/data and /api/v1/data; the unaligned requests additionally prove collector-cache service with zero storage reads. Historical and hot-edge values are deliberately ignored because value fixes must preserve this timestamp contract",
+		Components: []string{"dense-ue1", "dense-ue10", "gapped-ue1", "partial-ue1", "hot-edge-data-independence"},
+	},
+	"CASE-034/near-live-partial-data-is-trimmed": {
+		Proves: "within twice the maximum collection interval of the live edge, a decline in contributing dimensions trims the response at the first incomplete row instead of publishing unstable partial aggregates. A complete two-dimension control keeps all six requested rows; when one dimension is delayed by two samples, both columns end after the last four complete rows while view.after/view.before/view.update_every remain request-derived. DEBUG metadata reports max_update_every=20, expected_after=before-20, and the exact data-dependent cutoff",
 	},
 	"CASE-035/completed-rollup-keeps-original-cadence": {
-		Proves:     "when collection cadence changes, a fully completed higher-tier rollup that is still buffered is persisted with its original page cadence. Two complete pre-transition SUM rows at forced tiers 1 and 2 in both the 1-to-10 and 10-to-1 directions preserve exact fixture-measured rate x collection interval volume; the request timestamp grid is unchanged. The separate transition-volume contracts own the active mixed-cadence row that V1 cannot represent exactly",
-		Components: []string{"slows-down-tier1", "slows-down-tier2", "speeds-up-tier1", "speeds-up-tier2"},
+		Proves:     "when collection cadence changes, every fully completed higher-tier rollup is persisted with its original page cadence. Separate fixtures pin both internal states: a completed point already delayed in last_completed_point and a boundary-ending point still held in virtual_point. Two complete pre-transition SUM rows at forced tiers 1 and 2 in both the 1-to-10 and 10-to-1 directions preserve exact fixture-measured rate x collection interval volume; exact-boundary cases also pin two complete rows on the reset new-cadence grid twice, so false gap caching cannot hide the first new page on a repeated query. Every request timestamp is exact and unchanged. The separate transition-volume contracts own the active mixed-cadence row that V1 cannot represent exactly",
+		Components: []string{"buffered-slows-down-tier1", "buffered-slows-down-tier2", "buffered-speeds-up-tier1", "buffered-speeds-up-tier2", "boundary-slows-down-tier1", "boundary-slows-down-tier2", "boundary-speeds-up-tier1", "boundary-speeds-up-tier2"},
 	},
 	"CASE-035/transition-volume-slowing-down": {
 		Proves: "a metric slowing from update_every 1 to 10 preserves exact fixture-measured rate volume in the higher-tier row containing both cadences. The two-row forced-tier 1 and 2 queries retain one independently pinned homogeneous control to avoid one-point boundary policy; CASE-035/completed-rollup-keeps-original-cadence owns that control. This contract keeps the tier2-width raw tier0 control; CASE-035/tier0-page-boundary-keeps-every-sample owns the identical tier1-width raw control. These forced-tier queries do not cover an automatic plan switch during a cadence change",
@@ -354,10 +675,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "the sweep classifies every requestable grouping declared by the explicitly paired source tree: the roster is parsed from RRDR_TIME_GROUPING and its name registry, so a declared grouping without a layer-10 rule fails by name instead of silently falling back to average",
 	},
 	"L10/no-holes-inside-data": {
-		Proves: "every grouping answers every exact bucket across fully collected data at tiers 0 and 1, with 10s, 60s, 300s and 600s buckets; EMPTY says 'no data here', so no single-point defect is accepted as an excuse for these multi-sample buckets",
+		Proves: "every grouping answers every exact bucket across fully collected data at tiers 0 and 1, with 10s, 60s, 300s and 600s buckets; only incremental-sum may leave its opening bucket empty because the query has no predecessor, and every later bucket must answer",
 	},
 	"L10/buckets-finer-than-stored-data-answer": {
-		Proves: "a bucket NARROWER than the stored data still answers, for every grouping: above tier 0 a stored point covers many seconds, so a dashboard drawn finer gives the engine buckets that a single re-delivered point covers on its own. This is where number-of-flaps and number-of-times punched holes — they dropped the repeat entirely, sample count and all. L10/no-holes-inside-data cannot reach it: it deliberately uses buckets wide enough to hold several samples so a grouping needing two of them is not asked for the impossible, and that fairness is exactly what hides this case",
+		Proves: "a bucket NARROWER than stored data still answers for every grouping after the optional opening incremental-sum bucket: above tier 0 a stored point covers many seconds, so a dashboard drawn finer gives the engine buckets that a single re-delivered point covers on its own; dropping those repeats must not create interior holes",
 	},
 	"L10/order-statistics-stay-in-range": {
 		Proves: "at tiers 0 and 1, every numeric average/min/max/median/trimmed-*/percentile*/extremes/latest answer stays inside the exact fixture-derived source envelope of its bucket, while SES stays inside the cumulative source envelope required by its carried state; every grouping/tier/dimension combination must produce numeric coverage",
@@ -394,10 +715,10 @@ var manifest = map[string]ManifestCase{
 	},
 	// Layer 11 — the slicing matrix: the knobs that must not change a total.
 	"L11/slicing-is-additive": {
-		Proves: "cutting a window in two preserves the total across a pairwise matrix of dense/gap/sparse data, 1s/10s cadence, tiers 0/1, 1/3/10 points per record, offsets 0/17/30 and none/natural-points/absolute; ordinary and absolute queries must use the requested resolution, natural-points may declare its own complete grid, every query has nonempty exact wire/canonical coverage, and only the actual fixture content of the one record crossing the midpoint plus wire-print epsilon is allowed",
+		Proves: "when independently normalized subquery grids share at most the one stored record at their cut, slicing the released query window preserves the total modulo that record's exact fixture content across dense/gap/sparse data, 1s/10s cadence, tiers 0/1, zoom, offsets and query options; every shape×cadence×tier has a non-vacuous eligible case",
 	},
 	"L11/randomised-slicing": {
-		Proves: "seeded generated cases materialize window, tier duration and bucket count from their axes, require additivity and conservation coverage for every shape×cadence×tier combination after polling the requested tier's retention prerequisite, and greedily shrink failures to a locally minimal case under the enumerated simplifications; QUERY_CORPUS_SEED replays the sequence",
+		Proves: "seeded generated cases materialize window, tier duration and bucket count from their axes, honor released endpoint and one-point grids, require additivity when subquery normalization shares at most one stored record and conservation for every shape×cadence×tier combination, and greedily shrink failures to a locally minimal case; QUERY_CORPUS_SEED replays the sequence",
 	},
 	"L11/totals-match-what-was-pushed": {
 		Proves: "after polling every shape×cadence×tier retention prerequisite, each combination whose buckets are at least one collection interval wide totals the fixture's exact collected-sample sum; only the deduplicated fixture contents of records crossing the two outer edges plus wire-print epsilon are allowed, with positive fixture content requiring numeric response coverage",
@@ -407,14 +728,17 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"interpolated-buckets", "off-grid-identity", "upsampling"},
 	},
 	"L9/window-normalization": {
-		Proves:     "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW with an exact empty dimension-id array — NOT the full retention (the reason backdated fixtures settle via explicit windows); time_resampling (v1 gtime) forces the bucket size up",
-		Components: []string{"relative-window", "default-relative-window", "time-resampling"},
+		Proves:     "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW with an exact empty dimension-id array — NOT the full retention (the reason backdated fixtures settle via explicit windows); an explicit future window shifts both endpoints to the query-time clock without changing its duration; time_resampling (v1 gtime) forces the bucket size up",
+		Components: []string{"relative-window", "default-relative-window", "future-explicit-window", "time-resampling"},
 	},
-	"L9/natural-points": {
-		Proves: "options=natural-points keeps the db count and spacing with raw sample values while timestamps snap onto the absolute update-every grid; boundary slots are pinned to the raw sample or its phase interpolation toward the next as a bounded two-candidate contract",
+	"L9/natural-points-grid": {
+		Proves: "options=natural-points keeps the database point count and spacing while snapping result timestamps onto the absolute update-every grid",
 	},
-	"L9/live-edge": {
-		Proves: "queries whose explicit `before` lies past NOW first shift both endpoints to the query-time clock, then retain the complete normalized timestamp grid without data-dependent truncation; grid rows wholly before retention remain explicit EMPTY rows",
+	"L9/natural-points-values": {
+		Proves: "natural-points preserves raw sample values and keeps boundary slots within the documented raw-sample or phase-interpolated two-candidate contract",
+	},
+	"L9/live-edge-empty-outside-retention": {
+		Proves: "live-edge grid rows wholly before retention remain explicit EMPTY rows rather than being removed from the response",
 	},
 	"L9/v2-v3-parity": {
 		Proves: "/api/v2/data and /api/v3/data answer identically for identical params (shared api_v23_data_internal) — only the api version field differs",
@@ -428,32 +752,60 @@ var manifest = map[string]ManifestCase{
 		Components: []string{"timestamps", "v1-json-shapes", "google-viz", "format-aliases", "label-quotes", "v2-shapes"},
 	},
 	"API/row-reductions": {
-		Proves: "the single-series formats reduce each row by the requested option: min2max = max-min (0 on single-value rows), min, max, average — exact cells over the formatter fixture (default sum pinned by L7/formatters)",
+		Proves: "the single-series formats reduce each row by the requested option: min2max = max-min (0 on single-value rows), min, max and average, with default sum pinned by the corresponding L7 format contracts",
 	},
-	"API/fallbacks-and-limits": {
-		Proves:     "unknown v1 format silently serves json; unknown weights method silently runs ks2; cardinality_limit at 2 folds five dimensions into the remaining bucket and at >= the dimension count folds nothing",
-		Components: []string{"fallback-pins", "cardinality-limit-sweep"},
+	"API/fallback-unknown-format": {
+		Proves: "an unknown v1 format retains the established silent fallback to JSON",
+	},
+	"API/fallback-unknown-weights-method": {
+		Proves: "an unknown weights method retains the established silent fallback to ks2",
+	},
+	"API/cardinality-limit-sweep": {
+		Proves: "cardinality_limit=2 folds five dimensions into the remaining bucket, while a limit at or above the dimension count folds nothing",
 	},
 	"W/value": {
 		Proves:     "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); strict MULTINODE rows contain exactly one instance, context and node rollup with the mean of their dimensions and the required index/null layout; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
 		Components: []string{"multi-node", "never-spreads"},
 	},
-	"W/anomaly-rate-per-metric": {
-		Proves: "weights method=anomaly-rate on the PER-METRIC path (no context selector) applies the anomaly bit: raw weights are the true window anomaly rates; the NONZERO default (no options= given) drops zero-weight results, any explicit options= keeps them",
+	"W/anomaly-rate-per-metric-values": {
+		Proves: "the per-metric anomaly-rate weights path applies anomaly-bit and returns each metric's true window anomaly rate",
+	},
+	"W/anomaly-rate-per-metric-nonzero-default": {
+		Proves: "the implicit NONZERO weights default drops zero anomaly-rate metrics, while any explicit options value keeps them",
 	},
 	"W/anomaly-rate-multidim": {
 		Proves:  "method=anomaly-rate implies the anomaly bit on EVERY path: the bare method and the explicit options=anomaly-bit are equivalent, both returning true anomaly rates through the multi-dimensional path (was: the bare method ranked by plain value averages there while per-metric and MCP forced the bit)",
 		FixedBy: "#23212",
 	},
-	"W/volume": {
-		Proves: "weights method=volume: weight = (highlight-baseline)/baseline x the fraction of highlight time above/below the baseline average (countif); metrics with EQUAL window averages are skipped entirely",
+	"W/volume-equal-baseline-skip": {
+		Proves: "volume weighting omits a metric whose highlight and baseline window averages are equal",
 	},
-	"W/ks2": {
-		Proves: "weights method=ks2 exact endpoints: identical consecutive-diff distributions weigh exactly 0, fully one-sided diff distributions with n*d^2>=18 weigh exactly 1 (KSfbar special cases); spread_results_evenly rank normalization pinned via the Go port (unique-value slots, ties share a slot); intermediate KS probabilities are a recorded deferral (KSfbar port)",
+	"W/volume-formula": {
+		Proves: "volume weight equals the relative highlight-versus-baseline average change multiplied by the highlight-time share on the matching side of the baseline average",
 	},
-	"L8/post-processing": {
-		Proves:     "options=percentage (v2/v3 FORCE absolute with it — and with any non-dimension group-by: shares computed over |values|), options=absolute (|v| at fetch), nonzero (drops all-zero dims; self-neutralizes when everything is zero), null2zero (gap cells become 0), cardinality_limit (top N-1 by |view sum| + 'remaining X dimensions' fold of per-row sums)",
-		Components: []string{"post-processing", "nonzero-all-zero", "cardinality-limit"},
+	"W/ks2-raw-endpoints": {
+		Proves: "ks2 assigns exact raw weights 0 to identical consecutive-difference distributions and 1 to fully one-sided distributions meeting the endpoint threshold",
+	},
+	"W/ks2-spread-normalization": {
+		Proves: "spread_results_evenly rank-normalizes ks2 weights by unique-value slots while tied raw weights share one slot",
+	},
+	"L8/percentage-post-processing": {
+		Proves: "options=percentage computes per-row shares over absolute values and forces absolute semantics for v2/v3 and non-dimension groupings",
+	},
+	"L8/absolute-post-processing": {
+		Proves: "options=absolute replaces each fetched numeric value with its magnitude before later query processing",
+	},
+	"L8/nonzero-post-processing": {
+		Proves: "options=nonzero removes dimensions whose selected result rows are all numeric zero",
+	},
+	"L8/null2zero-post-processing": {
+		Proves: "options=null2zero converts gap cells to numeric zero without altering non-gap values",
+	},
+	"L8/nonzero-all-zero": {
+		Proves: "nonzero filtering self-neutralizes when every selected dimension is all-zero so the result is not emptied",
+	},
+	"L8/cardinality-limit": {
+		Proves: "cardinality limiting keeps the top N-1 dimensions by absolute view sum and folds every remaining per-row value into one named remainder column",
 	},
 }
 
@@ -519,6 +871,20 @@ func (l *contractLedger) record(name, component string, held, skipped bool) {
 	components[component] = observation
 }
 
+func (l *contractLedger) register(name, component string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	components := l.results[name]
+	if components == nil {
+		components = make(map[string]contractObservation)
+		l.results[name] = components
+	}
+	if _, ok := components[component]; !ok {
+		components[component] = contractObservation{}
+	}
+}
+
 // trackContract records the result of an ordinary Go test as one corpus
 // contract. Register it before any assertion so Fatal and Skip are visible.
 func trackContract(t *testing.T, name string) {
@@ -538,6 +904,24 @@ func trackContractComponent(t *testing.T, name, component string) {
 	t.Cleanup(func() {
 		contractResults.record(name, component, !t.Failed(), t.Skipped())
 	})
+}
+
+// registerContract reserves a computed contract verdict before shared work.
+// The later assertContract call evaluates it; an earlier Fatal or Skip leaves
+// the reservation incomplete instead of allowing a default-true verdict.
+func registerContract(t *testing.T, name string) {
+	t.Helper()
+	registerContractComponent(t, name, defaultContractComponent)
+}
+
+func registerContractComponent(t *testing.T, name, component string) {
+	t.Helper()
+
+	if err := validateContractComponent(name, component); err != nil {
+		t.Fatal(err)
+	}
+
+	contractResults.register(name, component)
 }
 
 // assertContract records the verdict for one corpus case.

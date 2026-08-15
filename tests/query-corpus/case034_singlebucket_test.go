@@ -80,7 +80,7 @@ func c034HotEdgeFixture(t *testing.T, name, context string, machineGUID int, las
 }
 
 func c034NearLiveFixture(
-	t *testing.T, name, context string, machineGUID int, first, last int64,
+	t *testing.T, name, context string, machineGUID int, first, last, delayedLast int64,
 ) string {
 	t.Helper()
 
@@ -88,12 +88,20 @@ func c034NearLiveFixture(
 	ch := fixture.Chart{
 		ID: context, Title: "near-live timestamp grid", Units: "units",
 		Family: "fixture", Context: context, UpdateEvery: 10,
-		Dimensions: []fixture.Dimension{{ID: "value", Algorithm: "absolute"}},
+		Dimensions: []fixture.Dimension{
+			{ID: "always", Algorithm: "absolute"},
+			{ID: "delayed", Algorithm: "absolute"},
+		},
 	}
 	for ts := first; ts <= last; ts += 10 {
 		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points, fixture.Point{
 			T: ts, Collected: "1", Flags: stream.FlagNotAnomalous,
 		})
+		if ts <= delayedLast {
+			ch.Dimensions[1].Points = append(ch.Dimensions[1].Points, fixture.Point{
+				T: ts, Collected: "2", Flags: stream.FlagNotAnomalous,
+			})
+		}
 	}
 	pushLiveBurst(t, host, guid(machineGUID), ch)
 	if _, err := td.WaitRetention(host, context, first, last, 15*time.Second); err != nil {
@@ -188,22 +196,43 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 			{
 				host: c034HotEdgeFixture(
 					t, "hot-edge-newer", "fixture.c034_timestamp_grid.hot_edge_newer",
-					343, boundary-60),
+					343, boundary),
 				context: "fixture.c034_timestamp_grid.hot_edge_newer",
 			},
 			{
 				host: c034HotEdgeFixture(
 					t, "hot-edge-older", "fixture.c034_timestamp_grid.hot_edge_older",
-					344, boundary-120),
+					344, boundary-60),
 				context: "fixture.c034_timestamp_grid.hot_edge_older",
 			},
 		}
 
 		ok := true
+		v1GridExact := func(doc map[string]any, want queryExpectedGrid, label string) bool {
+			t.Helper()
+			gotAfter, afterOK := queryInteger(doc["after"])
+			gotBefore, beforeOK := queryInteger(doc["before"])
+			gotEvery, everyOK := queryInteger(doc["view_update_every"])
+			gotPoints, pointsOK := queryInteger(doc["points"])
+			if !afterOK || !beforeOK || !everyOK || !pointsOK ||
+				gotAfter != want.after || gotBefore != want.before ||
+				gotEvery != want.updateEvery || gotPoints != int64(want.rows) {
+				t.Logf("%s v1 grid = %v/%v/%v/%v, want %d/%d/%d/%d",
+					label, doc["after"], doc["before"], doc["view_update_every"], doc["points"],
+					want.after, want.before, want.updateEvery, want.rows)
+				return false
+			}
+			if err := queryRawTimestampsExact(doc, []int64{want.before}); err != nil {
+				t.Logf("%s v1 wire grid: %v", label, err)
+				return false
+			}
+			return true
+		}
 		for _, aligned := range []bool{true, false} {
-			// Both Agents receive the same request-derived cutoff. Bound the pair
-			// to one update_every so both requests exercise the LATEST hot edge.
-			hotBefore := time.Now().Unix() - 1
+			// Both Agents receive the same request-derived cutoff captured before
+			// fixture setup, so a minute-boundary crossing cannot change whether
+			// either newest point is inside the two-update-every hot edge.
+			hotBefore := sourceNow
 			hotAfter := hotBefore - 3600
 			for _, fixtureHost := range hosts {
 				params := daemon.DataParams(fixtureHost.context, hotAfter, hotBefore, 1)
@@ -217,9 +246,6 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if time.Now().Unix()-1-hotBefore > 60 {
-					t.Fatal("hot-edge request pair exceeded its one-update_every timing bound")
-				}
 				if !queryTimestampGridExact(
 					t, doc, queryExpectedVirtualGrid(t, hotAfter, hotBefore, 1, aligned)) {
 					t.Logf("%s aligned=%v made the LATEST hot-edge grid depend on retention",
@@ -229,6 +255,27 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 				if !aligned && !assertTierPresence(t, doc, []bool{false, false, false}) {
 					t.Logf("%s aligned=%v did not use the collector-cache fast path",
 						fixtureHost.host, aligned)
+					ok = false
+				}
+
+				v1Params := daemon.DataParams(fixtureHost.context, hotAfter, hotBefore, 1)
+				for _, key := range []string{"scope_contexts", "time_group", "group_by", "aggregation"} {
+					v1Params.Del(key)
+				}
+				v1Params.Set("context", fixtureHost.context)
+				v1Params.Set("group", "latest")
+				v1Params.Set("format", "json")
+				v1Params.Set("options", "jsonwrap|seconds|virtual-points")
+				if !aligned {
+					v1Params.Set("options", "jsonwrap|seconds|unaligned|virtual-points")
+				}
+				v1Doc, err := td.HostJSON(fixtureHost.host, "api/v1/data", v1Params)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !v1GridExact(
+					v1Doc, queryExpectedVirtualGrid(t, hotAfter, hotBefore, 1, aligned),
+					fixtureHost.host+" explicit") {
 					ok = false
 				}
 			}
@@ -264,6 +311,32 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 				t.Logf("%s relative query did not use the collector-cache fast path", fixtureHost.host)
 				ok = false
 			}
+
+			v1Relative := daemon.DataParams(fixtureHost.context, -3601, -1, 1)
+			for _, key := range []string{"scope_contexts", "time_group", "group_by", "aggregation"} {
+				v1Relative.Del(key)
+			}
+			v1Relative.Set("context", fixtureHost.context)
+			v1Relative.Set("group", "latest")
+			v1Relative.Set("format", "json")
+			v1Relative.Set("options", "jsonwrap|seconds|unaligned|virtual-points")
+			v1Started := time.Now().Unix()
+			v1Doc, err := td.HostJSON(fixtureHost.host, "api/v1/data", v1Relative)
+			v1Finished := time.Now().Unix()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v1ResolvedBefore, integer := queryInteger(v1Doc["before"])
+			if !integer || v1ResolvedBefore < v1Started-2 || v1ResolvedBefore > v1Finished-2 {
+				t.Logf("%s v1 relative before = %v, want query-time range [%d,%d]",
+					fixtureHost.host, v1Doc["before"], v1Started-2, v1Finished-2)
+				ok = false
+			} else if !v1GridExact(
+				v1Doc,
+				queryExpectedVirtualGrid(t, v1ResolvedBefore-3600, v1ResolvedBefore, 1, false),
+				fixtureHost.host+" relative") {
+				ok = false
+			}
 		}
 		if !ok {
 			t.Errorf("BROKEN %s (hot-edge-data-independence): %s", contract, manifest[contract].Proves)
@@ -271,38 +344,51 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 	})
 
 	t.Run("near-live-partial-data", func(t *testing.T) {
-		trackContractComponent(t, contract, "near-live-partial-data")
+		const trimmingContract = "CASE-034/near-live-partial-data-is-trimmed"
+		trackContract(t, trimmingContract)
 
 		before := time.Now().Unix() - 1
 		before -= before % 10
 		after := before - 60
+		grid := queryExpectedVirtualGrid(t, after, before, 6, false)
 		fixtures := []struct {
 			name, context string
 			machineGUID   int
-			last          int64
+			delayedLast   int64
+			rows          int
+			trimmedAfter  int64
 		}{
 			{
 				name: "near-live-complete", context: "fixture.c034_timestamp_grid.near_live_complete",
-				machineGUID: 346, last: before,
+				machineGUID: 346, delayedLast: before, rows: 6, trimmedAfter: before,
 			},
 			{
 				name: "near-live-missing-last", context: "fixture.c034_timestamp_grid.near_live_missing_last",
-				machineGUID: 347, last: before - 10,
+				machineGUID: 347, delayedLast: before - 20, rows: 4, trimmedAfter: before - 10,
 			},
 		}
 
 		ok := true
 		for _, live := range fixtures {
-			host := c034NearLiveFixture(t, live.name, live.context, live.machineGUID, after+10, live.last)
+			host := c034NearLiveFixture(
+				t, live.name, live.context, live.machineGUID, after+10, before, live.delayedLast)
 			params := daemon.DataParams(live.context, after, before, 6)
-			params.Set("scope_dimensions", "value")
+			params.Set("scope_dimensions", "always|delayed")
 			params.Set("options", "jsonwrap|unaligned|virtual-points")
 			doc, err := td.DataV3(host, params)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, after, before, 6, false)) {
-				t.Logf("%s changed the near-live timestamp grid based on final-row availability", host)
+			if !assertViewFields(t, doc, grid.after, grid.before, grid.updateEvery) {
+				ok = false
+			}
+			wantWire := make([]int64, live.rows)
+			latest := grid.before - int64(grid.rows-live.rows)*grid.updateEvery
+			for i := range wantWire {
+				wantWire[i] = latest - int64(i)*grid.updateEvery
+			}
+			if err := queryRawTimestampsExact(doc, wantWire); err != nil {
+				t.Logf("%s near-live trimmed grid: %v", host, err)
 				ok = false
 			}
 
@@ -310,20 +396,46 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := make([]expectedColumnPoint, 0, 6)
-			for ts := after + 10; ts <= before; ts += 10 {
-				if ts > live.last {
-					want = append(want, wantEmptyAt(ts))
-				} else {
-					want = append(want, wantNumberAt(ts, 1))
-				}
+			always := make([]expectedColumnPoint, 0, live.rows)
+			delayed := make([]expectedColumnPoint, 0, live.rows)
+			for row := 1; row <= live.rows; row++ {
+				ts := after + int64(row)*10
+				always = append(always, wantNumberAt(ts, 1))
+				delayed = append(delayed, wantNumberAt(ts, 2))
 			}
-			if !assertExactColumn(t, cols, "value", want, 0) {
+			if !assertExactColumn(t, cols, "always", always, 0) ||
+				!assertExactColumn(t, cols, "delayed", delayed, 0) {
+				ok = false
+			}
+
+			debugParams := daemon.DataParams(live.context, after, before, 6)
+			debugParams.Set("scope_dimensions", "always|delayed")
+			debugParams.Set("options", "jsonwrap|unaligned|virtual-points|debug")
+			debugDoc, err := td.DataV3(host, debugParams)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !assertViewFields(t, debugDoc, grid.after, grid.before, grid.updateEvery) {
+				ok = false
+			}
+			if err := queryRawTimestampsExact(debugDoc, wantWire); err != nil {
+				t.Logf("%s debug near-live trimmed grid: %v", host, err)
+				ok = false
+			}
+			view := queryObject(t, debugDoc, "view", "debug view")
+			trimming := queryObject(t, view, "partial_data_trimming", "debug partial_data_trimming")
+			maxEvery, maxOK := queryInteger(trimming["max_update_every"])
+			expectedAfter, expectedOK := queryInteger(trimming["expected_after"])
+			trimmedAfter, trimmedOK := queryInteger(trimming["trimmed_after"])
+			if !maxOK || !expectedOK || !trimmedOK ||
+				maxEvery != 20 || expectedAfter != before-20 || trimmedAfter != live.trimmedAfter {
+				t.Logf("%s partial_data_trimming = %v, want max=20 expected_after=%d trimmed_after=%d",
+					host, trimming, before-20, live.trimmedAfter)
 				ok = false
 			}
 		}
 		if !ok {
-			t.Errorf("BROKEN %s (near-live-partial-data): %s", contract, manifest[contract].Proves)
+			t.Errorf("BROKEN %s: %s", trimmingContract, manifest[trimmingContract].Proves)
 		}
 	})
 }

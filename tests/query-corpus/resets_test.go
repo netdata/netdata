@@ -76,22 +76,12 @@ func resetsFetch(t *testing.T, hostname, context string, ret daemon.Retention) m
 	return cols
 }
 
-// assertSteadyWithBlend: interior rows (idx>=2, not last) must equal
-// steady, except the rows touched by the special sample. Samples land
-// at wall-clock sub-second offsets, so rrdset_done's interpolation
-// BLENDS adjacent sample rates into the stored seconds: the special
-// sample's contribution spreads over at most two ADJACENT rows, each
-// between special and steady, conserving the rate mass exactly —
-// the deviation from steady summed over the affected rows equals
-// special - steady. wantResets rows must carry the RESET annotation
-// (the resetting sample's first stored row).
-func assertSteadyWithBlend(t *testing.T, col []canon.Pt, steady, special float64, wantResets int) {
+// assertSpecialSampleOutcome verifies the counter/reset result independently
+// of how the collector distributes the sub-second sample across stored rows.
+func assertSpecialSampleOutcome(t *testing.T, col []canon.Pt, steady, special float64, wantResets int) {
 	t.Helper()
 	resets := 0
-	var deviant []int
 	var devSum float64
-	lo := min(special, steady) - 1e-4
-	hi := max(special, steady) + 1e-4
 	for idx, pt := range col {
 		if idx < 2 || idx == len(col)-1 || pt.Value == nil {
 			continue
@@ -100,15 +90,33 @@ func assertSteadyWithBlend(t *testing.T, col []canon.Pt, steady, special float64
 			resets++
 		}
 		if !tierValueMatch(*pt.Value, steady, 1e-9) {
-			deviant = append(deviant, idx)
 			devSum += *pt.Value - steady
-			if *pt.Value < lo || *pt.Value > hi {
-				t.Errorf("row t=%d: %s outside the blend range [%v, %v]", pt.T, fmtPt(pt), lo, hi)
-			}
 		}
 	}
 	if resets != wantResets {
 		t.Errorf("saw %d RESET rows, want %d", resets, wantResets)
+	}
+	if !tierValueMatch(devSum, special-steady, 1e-4) {
+		t.Errorf("blend mass %v, want %v (special %v - steady %v)", devSum, special-steady, special, steady)
+	}
+}
+
+// assertSubsecondBlend pins only the interpolation geometry shared by the
+// paced reset fixtures: one special sample affects at most two adjacent rows,
+// and remains inside its endpoint range.
+func assertSubsecondBlend(t *testing.T, col []canon.Pt, steady, special float64) {
+	t.Helper()
+	var deviant []int
+	lo := min(special, steady) - 1e-4
+	hi := max(special, steady) + 1e-4
+	for idx, pt := range col {
+		if idx < 2 || idx == len(col)-1 || pt.Value == nil || tierValueMatch(*pt.Value, steady, 1e-9) {
+			continue
+		}
+		deviant = append(deviant, idx)
+		if *pt.Value < lo || *pt.Value > hi {
+			t.Errorf("row t=%d: %s outside the blend range [%v, %v]", pt.T, fmtPt(pt), lo, hi)
+		}
 	}
 	switch {
 	case len(deviant) == 0:
@@ -118,30 +126,28 @@ func assertSteadyWithBlend(t *testing.T, col []canon.Pt, steady, special float64
 	case len(deviant) == 2 && deviant[1] != deviant[0]+1:
 		t.Errorf("deviant rows %v are not adjacent", deviant)
 	}
-	if len(deviant) > 0 && !tierValueMatch(devSum, special-steady, 1e-4) {
-		t.Errorf("blend mass %v, want %v (special %v - steady %v)", devSum, special-steady, special, steady)
-	}
 }
 
 func TestCounterResets(t *testing.T) {
-	trackContract(t, "L1/resets-overflows")
-
 	type sample struct {
 		values map[string]string
 		pause  int // seconds to sleep before this sample (0 = ue)
 	}
 	cases := map[string]struct {
-		guidIdx int
-		ue      int
-		dims    map[string]string // id → algorithm
-		samples []sample
-		verify  func(t *testing.T, cols map[string][]canon.Pt)
+		guidIdx  int
+		ue       int
+		dims     map[string]string // id → algorithm
+		samples  []sample
+		contract string
+		verify   func(t *testing.T, cols map[string][]canon.Pt)
+		blend    func(t *testing.T, cols map[string][]canon.Pt)
 	}{
 		// counter drops 1028 → 100: wrapped delta ~2^32 is implausible
 		// (>10% of the 32-bit cap) → zero increment + RESET
 		"implausible-backward-step": {
 			guidIdx: 141, ue: 1,
-			dims: map[string]string{"c": "incremental"},
+			contract: "L1/reset-implausible-backward-step",
+			dims:     map[string]string{"c": "incremental"},
 			samples: func() []sample {
 				vals := []int64{1000, 1007, 1014, 1021, 1028, 100, 107, 114, 121, 128}
 				out := make([]sample, len(vals))
@@ -151,7 +157,10 @@ func TestCounterResets(t *testing.T) {
 				return out
 			}(),
 			verify: func(t *testing.T, cols map[string][]canon.Pt) {
-				assertSteadyWithBlend(t, cols["c"], 7, 0, 1)
+				assertSpecialSampleOutcome(t, cols["c"], 7, 0, 1)
+			},
+			blend: func(t *testing.T, cols map[string][]canon.Pt) {
+				assertSubsecondBlend(t, cols["c"], 7, 0)
 			},
 		},
 		// counter wraps 4294967200 → 4 over the 32-bit boundary: the
@@ -159,7 +168,8 @@ func TestCounterResets(t *testing.T) {
 		// LESS than the true +100 (cap 0xFFFFFFFF, pinned quirk)
 		"plausible-32bit-wrap": {
 			guidIdx: 142, ue: 1,
-			dims: map[string]string{"c": "incremental"},
+			contract: "L1/reset-plausible-32bit-wrap",
+			dims:     map[string]string{"c": "incremental"},
 			samples: func() []sample {
 				vals := []int64{4294967000, 4294967100, 4294967200, 4, 104, 204, 304, 404}
 				out := make([]sample, len(vals))
@@ -169,7 +179,10 @@ func TestCounterResets(t *testing.T) {
 				return out
 			}(),
 			verify: func(t *testing.T, cols map[string][]canon.Pt) {
-				assertSteadyWithBlend(t, cols["c"], 100, 99, 1)
+				assertSpecialSampleOutcome(t, cols["c"], 100, 99, 1)
+			},
+			blend: func(t *testing.T, cols map[string][]canon.Pt) {
+				assertSubsecondBlend(t, cols["c"], 100, 99)
 			},
 		},
 		// two percentage-of-incremental-row dims (+30/+70 per second =
@@ -177,6 +190,7 @@ func TestCounterResets(t *testing.T) {
 		// it (a contributes 0% and carries RESET, b takes 100%)
 		"pcent-over-diff-reset": {
 			guidIdx: 143, ue: 1,
+			contract: "L1/reset-percentage-row",
 			dims: map[string]string{
 				"a": "percentage-of-incremental-row",
 				"b": "percentage-of-incremental-row",
@@ -194,9 +208,13 @@ func TestCounterResets(t *testing.T) {
 				return out
 			}(),
 			verify: func(t *testing.T, cols map[string][]canon.Pt) {
-				assertSteadyWithBlend(t, cols["a"], 30, 0, 1)
+				assertSpecialSampleOutcome(t, cols["a"], 30, 0, 1)
 				// b takes 100% on the reset sample but does NOT reset
-				assertSteadyWithBlend(t, cols["b"], 70, 100, 0)
+				assertSpecialSampleOutcome(t, cols["b"], 70, 100, 0)
+			},
+			blend: func(t *testing.T, cols map[string][]canon.Pt) {
+				assertSubsecondBlend(t, cols["a"], 30, 0)
+				assertSubsecondBlend(t, cols["b"], 70, 100)
 			},
 		},
 		// a 9s silence (> the 5-iteration gap threshold at ue=1) resets
@@ -204,7 +222,8 @@ func TestCounterResets(t *testing.T) {
 		// delta is NEVER spread as a spike, and nothing carries RESET
 		"gap-collection-reset": {
 			guidIdx: 144, ue: 1,
-			dims: map[string]string{"c": "incremental"},
+			contract: "L1/reset-after-gap",
+			dims:     map[string]string{"c": "incremental"},
 			samples: func() []sample {
 				pre := []int64{1000, 1007, 1014, 1021, 1028}
 				post := []int64{1035, 1042, 1049, 1056, 1063, 1070}
@@ -299,7 +318,17 @@ func TestCounterResets(t *testing.T) {
 			}
 
 			ret := resetsSettle(t, hostname, context, len(tc.samples)-2)
-			tc.verify(t, resetsFetch(t, hostname, context, ret))
+			cols := resetsFetch(t, hostname, context, ret)
+			t.Run("outcome", func(t *testing.T) {
+				trackContract(t, tc.contract)
+				tc.verify(t, cols)
+			})
+			if tc.blend != nil {
+				t.Run("blend", func(t *testing.T) {
+					trackContractComponent(t, "L1/subsecond-rate-blending", name)
+					tc.blend(t, cols)
+				})
+			}
 		})
 	}
 }

@@ -107,8 +107,14 @@ func TestL11SlicingOracleGuards(t *testing.T) {
 	if got := sliceEdgeAllowance(a, aligned+17, aligned+30); got != 420 {
 		t.Fatalf("two cuts through the same record allow %v, want one record content 420", got)
 	}
+	if got := sliceEdgeAllowance(a, aligned); got != 420 {
+		t.Fatalf("released aligned endpoint overlap allows %v, want one record content 420", got)
+	}
 	if !sliceWithinTolerance(420, 420, 0) || sliceWithinTolerance(420.1, 420, 0) {
 		t.Fatal("edge tolerance does not accept its exact bound or rejects a meaningful excess")
+	}
+	if sliceOneCutPartition(2) || !sliceOneCutPartition(1) {
+		t.Fatal("one-cut partition guard accepted multiple shared records or rejected one shared edge record")
 	}
 
 	c := randomSliceCase{
@@ -136,11 +142,19 @@ func TestL11SlicingOracleGuards(t *testing.T) {
 		}
 	}
 
-	for option, want := range map[string]bool{
-		"": false, "absolute": false, "natural-points": true,
+	for _, tc := range []struct {
+		option string
+		points int64
+		want   bool
+	}{
+		{option: "", points: 2},
+		{option: "absolute", points: 2},
+		{option: "natural-points", points: 2, want: true},
+		{option: "", points: 1, want: true},
 	} {
-		if got := sliceResponseDeclaredGrid(option); got != want {
-			t.Errorf("option %q response-declared grid permission = %v, want %v", option, got, want)
+		if got := sliceResponseDeclaredGrid(tc.option, tc.points); got != tc.want {
+			t.Errorf("option %q points %d response-declared grid permission = %v, want %v",
+				tc.option, tc.points, got, tc.want)
 		}
 	}
 
@@ -255,9 +269,14 @@ func sliceCrossingRecord(a sliceAxes, edge int64) (end int64, content float64, c
 func sliceEdgeAllowance(a sliceAxes, edges ...int64) float64 {
 	records := make(map[int64]float64, len(edges))
 	for _, edge := range edges {
-		if end, content, crosses := sliceCrossingRecord(a, edge); crosses {
-			records[end] = content
+		end, content, crosses := sliceCrossingRecord(a, edge)
+		if !crosses {
+			// Released query windows can include an aligned lower endpoint.
+			// Account for the one stored record ending exactly there.
+			end = edge
+			content = sliceRecordContent(a, end)
 		}
+		records[end] = content
 	}
 	total := 0.0
 	for _, content := range records {
@@ -273,13 +292,61 @@ func sliceWithinTolerance(difference, edgeAllowance float64, numericRows int) bo
 	return math.Abs(difference) <= edgeAllowance+printTol*float64(numericRows)
 }
 
+func sliceOneCutPartition(sharedRecords int) bool {
+	return sharedRecords <= 1
+}
+
+func sliceViewBounds(result sliceQueryResult) (after, before int64, ok bool) {
+	view, ok := result.doc["view"].(map[string]any)
+	if !ok {
+		return 0, 0, false
+	}
+	after, afterOK := queryInteger(view["after"])
+	before, beforeOK := queryInteger(view["before"])
+	return after, before, afterOK && beforeOK && before >= after
+}
+
+// sliceSharedRecords returns the exact fixture content of stored records that
+// can contribute to both response-declared grids. More than one shared record
+// means the independently normalized subqueries are not a one-cut partition,
+// so the one-boundary additivity law does not apply to that generated shape.
+func sliceSharedRecords(a sliceAxes, left, right sliceQueryResult) (content float64, records int, ok bool) {
+	leftAfter, leftBefore, leftOK := sliceViewBounds(left)
+	rightAfter, rightBefore, rightOK := sliceViewBounds(right)
+	if !leftOK || !rightOK {
+		return 0, 0, false
+	}
+	after := max(leftAfter, rightAfter)
+	before := min(leftBefore, rightBefore)
+	if before < after {
+		return 0, 0, true
+	}
+
+	duration := sliceRecordDuration(a)
+	firstEnd := after
+	if remainder := firstEnd % duration; remainder != 0 {
+		firstEnd += duration - remainder
+	}
+	lastEnd := before
+	if remainder := lastEnd % duration; remainder != 0 {
+		lastEnd += duration - remainder
+	}
+	for end := firstEnd; end <= lastEnd; end += duration {
+		content += sliceRecordContent(a, end)
+		records++
+	}
+	return content, records, true
+}
+
 var (
 	sliceReady     = map[string]bool{}
 	sliceRetention = map[string][]daemon.Retention{}
 )
 
-func sliceResponseDeclaredGrid(option string) bool {
-	return option == "natural-points"
+func sliceResponseDeclaredGrid(option string, points int64) bool {
+	// The released one-point API geometry includes both endpoint instants and
+	// may therefore widen the sole bucket. Natural mode always owns its grid.
+	return option == "natural-points" || points == 1
 }
 
 func sliceCoverageKey(a sliceAxes) string {
@@ -356,7 +423,7 @@ func sliceQuery(t *testing.T, a sliceAxes, after, before, points int64) sliceQue
 		requestedGroup:       "sum",
 		canonicalGroup:       "sum",
 		extraOptions:         a.Option,
-		responseDeclaredGrid: sliceResponseDeclaredGrid(a.Option),
+		responseDeclaredGrid: sliceResponseDeclaredGrid(a.Option, points),
 		tier:                 a.Tier,
 		after:                after,
 		before:               before,
@@ -458,6 +525,8 @@ func checkAdditive(t *testing.T, a sliceAxes) (ok, exercised bool, detail string
 	mid := after + (before-after)/2
 
 	whole := sliceTotal(t, a, after, before)
+	// The released API can include the split endpoint in both halves. The
+	// exact content of that one shared stored record is the allowed overlap.
 	left := sliceTotal(t, a, after, mid)
 	right := sliceTotal(t, a, mid, before)
 	if !whole.validGrid || !left.validGrid || !right.validGrid {
@@ -471,8 +540,14 @@ func checkAdditive(t *testing.T, a sliceAxes) (ok, exercised bool, detail string
 			"%s: fixture has data but whole/halves numeric coverage is %d/%d+%d",
 			a, whole.numericRows, left.numericRows, right.numericRows)
 	}
+	edgeAllowance, sharedRecords, overlapOK := sliceSharedRecords(a, left, right)
+	if !overlapOK {
+		return false, false, fmt.Sprintf("%s: subquery views are malformed", a)
+	}
+	if !sliceOneCutPartition(sharedRecords) {
+		return true, false, ""
+	}
 	difference := left.total + right.total - whole.total
-	edgeAllowance := sliceEdgeAllowance(a, mid)
 	numericRows := whole.numericRows + left.numericRows + right.numericRows
 	if sliceWithinTolerance(difference, edgeAllowance, numericRows) {
 		return true, true, ""

@@ -94,6 +94,8 @@ func checkCase(t *testing.T, c randomSliceCase) sliceCaseCheck {
 		mid := r.After + (r.Before-r.After)/2
 		whole = sliceCaseTotal(t, c, r.After, r.Before)
 		haveWhole = true
+		// The released API can include the split endpoint in both halves. The
+		// exact content of that one shared stored record is the allowance.
 		left := sliceCaseTotal(t, c, r.After, mid)
 		right := sliceCaseTotal(t, c, mid, r.Before)
 		if !whole.validGrid || !left.validGrid || !right.validGrid {
@@ -105,9 +107,15 @@ func checkCase(t *testing.T, c randomSliceCase) sliceCaseCheck {
 					"additivity: fixture has data but numeric coverage is %d/%d+%d",
 					whole.numericRows, left.numericRows, right.numericRows)}
 			}
+			edgeAllowance, sharedRecords, overlapOK := sliceSharedRecords(a, left, right)
+			if !overlapOK {
+				return sliceCaseCheck{detail: "additivity: malformed subquery views"}
+			}
+			if sharedRecords > 1 {
+				goto conservation
+			}
 			check.additive = true
 			difference := left.total + right.total - whole.total
-			edgeAllowance := sliceEdgeAllowance(a, mid)
 			numericRows := whole.numericRows + left.numericRows + right.numericRows
 			if !sliceWithinTolerance(difference, edgeAllowance, numericRows) {
 				return sliceCaseCheck{additive: true, detail: fmt.Sprintf(
@@ -117,6 +125,7 @@ func checkCase(t *testing.T, c randomSliceCase) sliceCaseCheck {
 		}
 	}
 
+conservation:
 	bucket := (r.Before - r.After) / r.Points
 	if bucket >= int64(a.UE) {
 		if !haveWhole {

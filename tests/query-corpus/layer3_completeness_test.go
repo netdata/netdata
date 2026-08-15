@@ -20,8 +20,6 @@ import (
 )
 
 func TestLayer3RegistryCompleteness(t *testing.T) {
-	trackContract(t, "L3/registry-completeness")
-
 	ch := layer3Canonical("fixture.l3reg")
 	pushLiveBurst(t, "l3-reg", guid(68), ch)
 	if _, err := td.WaitRetention("l3-reg", ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
@@ -31,6 +29,8 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	// every registry variant not exercised by TestLayer3Families, each
 	// against its parameterized oracle
 	t.Run("variants", func(t *testing.T) {
+		trackContract(t, "L3/registry-variants")
+
 		for _, name := range []string{
 			"trimmed-mean2", "trimmed-mean3", "trimmed-mean5",
 			"trimmed-mean10", "trimmed-mean15", "trimmed-mean20",
@@ -48,6 +48,8 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	// registry aliases resolve to the same grouping as a canonical name
 	// that TestLayer3Families already proves against the oracle
 	t.Run("aliases", func(t *testing.T) {
+		trackContract(t, "L3/registry-aliases")
+
 		for _, tc := range []struct{ sent, canonical string }{
 			{"incremental_sum", "incremental-sum"},
 			{"ewma", "ses"},
@@ -65,6 +67,8 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	// options compare EQUAL against 0.0, and a bare number compares EQUAL
 	// against itself (it used to lose its first digit)
 	t.Run("countif-grammar", func(t *testing.T) {
+		trackContract(t, "L3/registry-countif-grammar")
+
 		for _, opts := range []string{
 			">:30", "<:20", "<>1", ":40", "==40",
 			"40", "", "  <>  1",
@@ -79,6 +83,8 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	// percentile to [0,100], trimmed-mean/median to [0,50]; negative
 	// and unparsable values collapse to 0
 	t.Run("options-clamping", func(t *testing.T) {
+		trackContract(t, "L3/registry-option-clamping")
+
 		for _, tc := range []struct{ name, options string }{
 			{"percentile", "10"},
 			{"percentile", "150"}, // clamps to 100 → plain average
@@ -97,6 +103,8 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	// unknown names never error: time_grouping_parse silently falls
 	// back to average — pinned
 	t.Run("unknown-name-fallback", func(t *testing.T) {
+		trackContract(t, "L3/registry-unknown-fallback")
+
 		verifyTimeGroupAs(t, "l3-reg", ch, tgQuery{Name: "no-such-grouping", OracleName: "average"}, 10)
 	})
 }

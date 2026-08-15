@@ -340,8 +340,6 @@ func l7Params(extraOptions string) map[string][]string {
 }
 
 func TestLayer7Formatters(t *testing.T) {
-	trackContract(t, "L7/formatters")
-
 	ch := l7Fixture()
 	pushLiveBurst(t, "l7-fmt", guid(90), ch)
 	if _, err := td.WaitRetention("l7-fmt", ch.Context, fixture.T0+1, fixture.T0+l7Rows, 15*time.Second); err != nil {
@@ -375,6 +373,8 @@ func TestLayer7Formatters(t *testing.T) {
 	}
 
 	t.Run("csv", func(t *testing.T) {
+		trackContract(t, "L7/format-csv")
+
 		// v1 rows come NEWEST FIRST by default; options=flip ascends
 		var b strings.Builder
 		b.WriteString("time,plain,comma,dim\r\n")
@@ -386,21 +386,21 @@ func TestLayer7Formatters(t *testing.T) {
 		if got != b.String() {
 			t.Errorf("csv mismatch:\ngot:\n%s\nwant:\n%s", got, b.String())
 		}
-	})
 
-	t.Run("csv-flip-ascending", func(t *testing.T) {
-		var b strings.Builder
+		b.Reset()
 		b.WriteString("time,plain,comma,dim\r\n")
 		for _, r := range rows {
 			fmt.Fprintf(&b, "%d,%s,%s\r\n", r.t, r.plain, r.quoted)
 		}
-		got := get(t, "csv", "flip")
+		got = get(t, "csv", "flip")
 		if got != b.String() {
 			t.Errorf("csv natural mismatch:\ngot:\n%s\nwant:\n%s", got, b.String())
 		}
 	})
 
 	t.Run("tsv", func(t *testing.T) {
+		trackContract(t, "L7/format-tsv")
+
 		var b strings.Builder
 		b.WriteString("time\tplain\tcomma,dim\r\n")
 		for i := len(rows) - 1; i >= 0; i-- {
@@ -419,6 +419,8 @@ func TestLayer7Formatters(t *testing.T) {
 	ssvWant := []string{"0.5", "0.5", "4.5", "3.5", "0.5", "0.5"}
 
 	t.Run("ssv", func(t *testing.T) {
+		trackContract(t, "L7/format-ssv")
+
 		got := get(t, "ssv", "")
 		cells := strings.Split(strings.TrimSpace(got), " ")
 		if len(cells) != l7Rows {
@@ -432,6 +434,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("ssvcomma", func(t *testing.T) {
+		trackContract(t, "L7/format-ssvcomma")
+
 		got := get(t, "ssvcomma", "")
 		cells := strings.Split(strings.TrimSpace(got), ",")
 		if len(cells) != l7Rows {
@@ -445,6 +449,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("csvjsonarray", func(t *testing.T) {
+		trackContract(t, "L7/format-csvjsonarray")
+
 		got := get(t, "csvjsonarray", "")
 
 		// #23115/#23117: the payload must be VALID JSON…
@@ -475,6 +481,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("markdown", func(t *testing.T) {
+		trackContract(t, "L7/format-markdown")
+
 		got := get(t, "markdown", "")
 		lines := strings.Split(strings.TrimSpace(got), "\n")
 		// header + separator + data rows
@@ -487,6 +495,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("html", func(t *testing.T) {
+		trackContract(t, "L7/format-html")
+
 		got := get(t, "html", "")
 		if !strings.Contains(got, "<table") || strings.Count(got, "<tr") != l7Rows+1 {
 			t.Errorf("html: expected a table with %d rows, got %d <tr:\n%.400s", l7Rows+1, strings.Count(got, "<tr"), got)
@@ -494,6 +504,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("array", func(t *testing.T) {
+		trackContract(t, "L7/format-array")
+
 		got := get(t, "array", "")
 		var arr []float64
 		if err := json.Unmarshal([]byte(got), &arr); err != nil {
@@ -515,6 +527,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("json", func(t *testing.T) {
+		trackContract(t, "L7/format-json")
+
 		// without jsonwrap the v1 json format is UNWRAPPED: labels/data
 		// live at the top level
 		got := get(t, "json", "")
@@ -528,6 +542,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("datatable", func(t *testing.T) {
+		trackContract(t, "L7/format-datatable")
+
 		got := get(t, "datatable", "")
 		var doc map[string]any
 		if err := json.Unmarshal([]byte(got), &doc); err != nil {
@@ -539,6 +555,8 @@ func TestLayer7Formatters(t *testing.T) {
 	})
 
 	t.Run("jsonp", func(t *testing.T) {
+		trackContract(t, "L7/format-jsonp")
+
 		params := l7Params("")
 		params["format"] = []string{"jsonp"}
 		params["callback"] = []string{"corpusCb"}

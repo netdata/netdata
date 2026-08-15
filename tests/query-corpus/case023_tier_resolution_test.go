@@ -809,15 +809,26 @@ func c023ResolutionQuery(
 // the compact tier-estimation fixture, so either contract can fail or abort
 // without silently preventing the other one from running.
 func TestCase023TierResolutionMatrix(t *testing.T) {
-	trackContract(t, "CASE-023/tier-resolution-matrix")
-	assertContract(t, "CASE-023/tier-resolution-matrix", testCase023TierResolutionMatrix(t))
+	testCase023TierResolutionMatrix(t)
 }
 
 // Four tier-2 rows exercise tier0/tier1 downsampling and tier2 identity;
 // 240 rows exercise tier1 identity and tier2 upsampling; 720 rows re-deliver
 // every tier1 record three times.
-func testCase023TierResolutionMatrix(t *testing.T) bool {
+func testCase023TierResolutionMatrix(t *testing.T) {
 	t.Helper()
+	const sourceContract = "CASE-023/tier-resolution-source"
+	contracts := map[string]bool{
+		sourceContract: true,
+		"CASE-023/tier-resolution-percentage-of-time":     true,
+		"CASE-023/tier-resolution-percentage-of-samples":  true,
+		"CASE-023/tier-resolution-number-of-times":        true,
+		"CASE-023/tier-resolution-number-of-flaps":        true,
+		"CASE-023/tier-resolution-slow-metric-upsampling": true,
+	}
+	for contract := range contracts {
+		registerContract(t, contract)
+	}
 
 	ch := c023ResolutionFixture()
 	pushLiveBurst(t, "c023-resolution", guid(321), ch)
@@ -829,8 +840,7 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 	counter := c023ResolutionDimension(ch, "counter")
 	nonbinary := c023ResolutionDimension(ch, "nonbinary")
 
-	ok := true
-	run := func(tier, points int, group, options, dimension string, want []expectedColumnPoint) {
+	run := func(contract string, tier, points int, group, options, dimension string, want []expectedColumnPoint) {
 		t.Helper()
 		doc, cols := c023ResolutionQuery(t, c023ResolutionQuerySpec{
 			context: ch.Context, tier: tier, after: after, before: before, points: points,
@@ -840,11 +850,11 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 			", " + group + "(" + options + "), " + dimension
 		if !assertSelectedTier(t, doc, tier) {
 			t.Logf("%s: selected-tier proof failed", label)
-			ok = false
+			contracts[sourceContract] = false
 		}
 		if !assertOnlyColumn(t, cols, dimension) {
 			t.Logf("%s: result contains the wrong columns", label)
-			ok = false
+			contracts[sourceContract] = false
 		}
 
 		tolerance := 0.0
@@ -857,40 +867,40 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 		}
 		if !assertExactColumn(t, cols, dimension, want, tolerance) {
 			t.Logf("%s: exact fixture oracle failed", label)
-			ok = false
+			contracts[contract] = false
 		}
 	}
 
 	for _, tier := range []int{0, 1, 2} {
 		// Four tier-2 buckets: tier0 and tier1 downsample; tier2 is identity.
 		const points = 4
-		run(tier, points, "percentage-of-time", "==1", "availability",
+		run("CASE-023/tier-resolution-percentage-of-time", tier, points, "percentage-of-time", "==1", "availability",
 			c023PercentageEqual(availability, tier, after, before, points, 1))
-		run(tier, points, "number-of-times", "==gap", "availability",
+		run("CASE-023/tier-resolution-number-of-times", tier, points, "number-of-times", "==gap", "availability",
 			c023NumberTimes(availability, tier, after, before, points, 0, true))
-		run(tier, points, "number-of-times", "==1", "availability",
+		run("CASE-023/tier-resolution-number-of-times", tier, points, "number-of-times", "==1", "availability",
 			c023NumberTimes(availability, tier, after, before, points, 1, false))
-		run(tier, points, "number-of-flaps", "==1", "availability",
+		run("CASE-023/tier-resolution-number-of-flaps", tier, points, "number-of-flaps", "==1", "availability",
 			c023Flaps(availability, tier, after, before, points, 1))
-		run(tier, points, "number-of-times", "<previous", "counter",
+		run("CASE-023/tier-resolution-number-of-times", tier, points, "number-of-times", "<previous", "counter",
 			c023PreviousDrops(counter, tier, after, before, points))
-		run(tier, points, "percentage-of-time", "==5", "nonbinary",
+		run("CASE-023/tier-resolution-percentage-of-time", tier, points, "percentage-of-time", "==5", "nonbinary",
 			c023PercentageEqual(nonbinary, tier, after, before, points, 5))
-		run(tier, points, "percentage-of-samples", ">5", "nonbinary",
+		run("CASE-023/tier-resolution-percentage-of-samples", tier, points, "percentage-of-samples", ">5", "nonbinary",
 			c023PercentageGreater(nonbinary, tier, after, before, points, 5))
 
 		for _, points := range []int{240, 720} {
 			// 240: tier0 downsamples, tier1 is identity, tier2 upsamples.
 			// 720: every tier1 point is re-delivered three times.
-			run(tier, points, "percentage-of-time", "==1", "availability",
+			run("CASE-023/tier-resolution-percentage-of-time", tier, points, "percentage-of-time", "==1", "availability",
 				c023PercentageEqual(availability, tier, after, before, points, 1))
-			run(tier, points, "number-of-flaps", "==1", "availability",
+			run("CASE-023/tier-resolution-number-of-flaps", tier, points, "number-of-flaps", "==1", "availability",
 				c023Flaps(availability, tier, after, before, points, 1))
-			run(tier, points, "number-of-times", "<previous", "counter",
+			run("CASE-023/tier-resolution-number-of-times", tier, points, "number-of-times", "<previous", "counter",
 				c023PreviousDrops(counter, tier, after, before, points))
-			run(tier, points, "percentage-of-time", "==5", "nonbinary",
+			run("CASE-023/tier-resolution-percentage-of-time", tier, points, "percentage-of-time", "==5", "nonbinary",
 				c023PercentageEqual(nonbinary, tier, after, before, points, 5))
-			run(tier, points, "percentage-of-samples", ">5", "nonbinary",
+			run("CASE-023/tier-resolution-percentage-of-samples", tier, points, "percentage-of-samples", ">5", "nonbinary",
 				c023PercentageGreater(nonbinary, tier, after, before, points, 5))
 		}
 	}
@@ -918,6 +928,7 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 		{"number-of-flaps", "==1", "availability", 0},
 		{"number-of-times", "<previous", "counter", 0},
 	} {
+		const contract = "CASE-023/tier-resolution-slow-metric-upsampling"
 		doc, cols := c023ResolutionQuery(t, c023ResolutionQuerySpec{
 			context: ch.Context, tier: 0, after: upsampleAfter, before: upsampleBefore,
 			points: upsamplePoints,
@@ -926,21 +937,30 @@ func testCase023TierResolutionMatrix(t *testing.T) bool {
 		label := "tier 0 upsampling, " + tc.group + "(" + tc.options + "), " + tc.dimension
 		if !assertSelectedTier(t, doc, 0) {
 			t.Logf("%s: selected-tier proof failed", label)
-			ok = false
+			contracts[contract] = false
 		}
 		if !assertExactView(t, doc, upsampleAfter, upsampleBefore, 5) {
 			t.Logf("%s: view grid is wrong", label)
-			ok = false
+			contracts[contract] = false
 		}
 		if !assertOnlyColumn(t, cols, tc.dimension) {
 			t.Logf("%s: result contains the wrong columns", label)
-			ok = false
+			contracts[contract] = false
 		}
 		if !assertExactColumn(t, cols, tc.dimension, upsampleWant(tc.value), 0) {
 			t.Logf("%s: exact covered-row oracle failed", label)
-			ok = false
+			contracts[contract] = false
 		}
 	}
 
-	return ok
+	for _, contract := range []string{
+		sourceContract,
+		"CASE-023/tier-resolution-percentage-of-time",
+		"CASE-023/tier-resolution-percentage-of-samples",
+		"CASE-023/tier-resolution-number-of-times",
+		"CASE-023/tier-resolution-number-of-flaps",
+		"CASE-023/tier-resolution-slow-metric-upsampling",
+	} {
+		assertContract(t, contract, contracts[contract])
+	}
 }

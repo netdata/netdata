@@ -130,12 +130,20 @@ acceptable.
 Every contract case has an entry in `manifest.go`; its `Proves`, `Cloud`, and
 optional `FixedBy` fields are mirrored as a row in `MANIFEST.md`.
 
+- **One contract key MUST represent one independently actionable semantic
+  invariant.** Multiple fixtures or inputs MAY share a key when they all prove
+  that same invariant. Independent claims, such as numeric value correctness
+  and unit rendering, MUST use separate keys and separately registered test or
+  subtest scopes. A shared green/red verdict is prohibited because an existing
+  failure in one claim can hide a new regression in another while the broken
+  contract roster remains unchanged.
 - Register ordinary Go assertions with `trackContract(t, name)` before any
   operation that may fail or skip. Its cleanup records `Error`, `Fatal`, and
   `Skip`.
 - Use `assertContract(t, name, held)` when the test computes an explicit
-  contract verdict. Register the test up front as well, so an earlier
-  `Fatal` cannot make the contract disappear from the summary.
+  contract verdict. Call `registerContract(t, name)` before shared work, so
+  an earlier `Fatal` or `Skip` leaves the verdict visibly incomplete instead
+  of letting a default-true accumulator report it green.
 - When independent test scopes jointly prove one contract, declare their
   names in `ManifestCase.Components` and register each with
   `trackContractComponent`. One component passing never substitutes for
@@ -235,8 +243,10 @@ its test as the regression guard and records `FixedBy: "#PR"`.
    the ingestion path is the thing under test), settle, query.
 3. Compute expectations in Go from the fixture definition. Never paste a
    number you got from the engine.
-4. Add the manifest entry and the `MANIFEST.md` row, then register the
-   contract at the narrowest test/subtest scope that proves it.
+4. Add one manifest entry and `MANIFEST.md` row per independently actionable
+   semantic invariant, then register each contract at the narrowest
+   test/subtest scope that proves it. Do not put independent value, units,
+   metadata, or formatting claims behind one green/red verdict.
 5. Run the full suite; a new case MUST NOT destabilize existing cases
    (watch for GUID collisions and shared-host mutations).
 

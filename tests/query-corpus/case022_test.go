@@ -29,8 +29,6 @@ import (
 )
 
 func TestCase022TimeGroupLatest(t *testing.T) {
-	trackContract(t, "CASE-022/time-group-latest")
-
 	const chart = "fixture.c022"
 	const big = 16777217 // 2^24+1: NOT representable in storage_number
 
@@ -85,7 +83,7 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	get := func(extra map[string]string) map[string]any {
+	get := func(t *testing.T, extra map[string]string) map[string]any {
 		t.Helper()
 		params := map[string][]string{
 			"scope_contexts": {chart},
@@ -103,223 +101,191 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		return resp
 	}
 
-	ok := true
-	check := func(cond bool, what string, args ...any) {
-		t.Helper()
-		if !cond {
-			t.Logf("latest contract not met: "+what, args...)
-			ok = false
-		}
-	}
-
-	decode := func(resp map[string]any, dimensions ...string) map[string][]canon.Pt {
+	decode := func(t *testing.T, resp map[string]any, dimensions ...string) (map[string][]canon.Pt, bool) {
 		t.Helper()
 		cols, err := canon.Columns(resp)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !assertExactColumnSet(t, cols, dimensions) {
-			ok = false
-		}
-		return cols
-	}
-	exact := func(cols map[string][]canon.Pt, dimension string, want []expectedColumnPoint, tolerance float64) {
-		t.Helper()
-		if !assertExactColumn(t, cols, dimension, want, tolerance) {
-			ok = false
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// the name is accepted and echoed
-	resp := get(map[string]string{
-		"after":   strconv.FormatInt(fixture.T0, 10),
-		"before":  strconv.FormatInt(fixture.T0+8, 10),
-		"points":  "4",
-		"options": "debug", // the request echo is emitted only with debug
-	})
-	request, requestOK := resp["request"].(map[string]any)
-	aggregations, aggregationsOK := request["aggregations"].(map[string]any)
-	timeAggregation, timeOK := aggregations["time"].(map[string]any)
-	echo, echoOK := timeAggregation["time_group"].(string)
-	check(requestOK && aggregationsOK && timeOK && echoOK && echo == "latest",
-		"time_group echo is %v, want latest", timeAggregation["time_group"])
-
-	// per-bucket semantics: buckets of 2 keep the LAST value of each pair
-	cols := decode(resp, "plain", "big", "neg")
-	exact(cols, "plain", []expectedColumnPoint{
-		wantNumberAt(fixture.T0+2, 2),
-		wantNumberAt(fixture.T0+4, 4),
-		wantNumberAt(fixture.T0+6, 6),
-		wantNumberAt(fixture.T0+8, 8),
-	}, 0)
-	check(assertExactView(t, resp, fixture.T0, fixture.T0+8, 2),
-		"four-bucket response view is not the exact requested grid")
-
-	// identity sweep: one bucket per sample - buckets covering the gap
-	// samples stay EMPTY (null), every other bucket is its own sample
-	respID := get(map[string]string{
-		"after":  strconv.FormatInt(fixture.T0, 10),
-		"before": strconv.FormatInt(fixture.T0+12, 10),
-		"points": "12",
-	})
-	colsID := decode(respID, "plain", "big", "neg")
-	plainWant := make([]expectedColumnPoint, 0, 12)
-	bigWant := make([]expectedColumnPoint, 0, 12)
-	negWant := make([]expectedColumnPoint, 0, 12)
-	for i := 1; i <= 12; i++ {
-		ts := fixture.T0 + int64(i)
-		switch {
-		case i <= 8:
-			plainWant = append(plainWant, wantNumberAt(ts, float64(i)))
-		case i <= 10:
-			plainWant = append(plainWant, wantEmptyAt(ts))
-		default:
-			plainWant = append(plainWant, wantNumberAt(ts, float64(i-2)))
-		}
-		bigWant = append(bigWant, wantNumberAt(ts, fixture.SNRoundTrip(float64(big))))
-		negWant = append(negWant, wantNumberAt(ts, -5))
-	}
-	exact(colsID, "plain", plainWant, 0)
-	exact(colsID, "big", bigWant, 0)
-	exact(colsID, "neg", negWant, 0)
-	check(assertExactView(t, respID, fixture.T0, fixture.T0+12, 1),
-		"identity response view is not the exact requested grid")
-
-	// ------------------------------------------------------------------
-	// One output point whose requested window contains the newest sample is
-	// served from the collector cache: zero storage reads, the RAW
-	// un-quantized value, anomaly rate 0. Its row stays on the requested
-	// grid rather than moving to the source sample timestamp.
-	fastAfter := int64(fixture.T0)
-	fastBefore := int64(fixture.T0 + 20)
-	fastGrid := queryExpectedVirtualGrid(t, fastAfter, fastBefore, 1, false)
-	respFast := get(map[string]string{
-		"after":   strconv.FormatInt(fastAfter, 10),
-		"before":  strconv.FormatInt(fastBefore, 10),
-		"points":  "1",
-		"options": "unaligned",
-	})
-	check(assertTierPresence(t, respFast, []bool{false, false, false}),
-		"fast path read storage points")
-	check(queryTimestampGridExact(t, respFast, fastGrid),
-		"collector-cache response changed the requested timestamp grid")
-	colsFast := decode(respFast, "plain", "big", "neg")
-	exact(colsFast, "big", []expectedColumnPoint{
-		wantNumberAt(fastBefore, float64(big)),
-	}, 0)
-	exact(colsFast, "plain", []expectedColumnPoint{
-		wantNumberWithARPAt(fastBefore, 10, 0),
-	}, 0)
-	exact(colsFast, "neg", []expectedColumnPoint{
-		wantNumberAt(fastBefore, -5),
-	}, 0)
-
-	// options=absolute keeps the fast path AND erases the sign, exactly
-	// like the storage path does at fetch
-	respAbs := get(map[string]string{
-		"after":   strconv.FormatInt(fastAfter, 10),
-		"before":  strconv.FormatInt(fastBefore, 10),
-		"points":  "1",
-		"options": "absolute|unaligned",
-	})
-	check(assertTierPresence(t, respAbs, []bool{false, false, false}),
-		"absolute fast path read storage points")
-	colsAbs := decode(respAbs, "plain", "big", "neg")
-	exact(colsAbs, "plain", []expectedColumnPoint{wantNumberAt(fastBefore, 10)}, 0)
-	exact(colsAbs, "big", []expectedColumnPoint{wantNumberAt(fastBefore, float64(big))}, 0)
-	exact(colsAbs, "neg", []expectedColumnPoint{wantNumberAt(fastBefore, 5)}, 0)
-
-	// before=0 is the API's explicit database-end sentinel, not an absolute
-	// timestamp. Preserve that existing contract for alert-style queries while
-	// keeping explicit and relative windows independent of stored timestamps.
-	respDatabaseEnd := get(map[string]string{
-		"after":  strconv.FormatInt(fixture.T0, 10),
-		"before": "0",
-		"points": "1",
-	})
-	check(assertTierPresence(t, respDatabaseEnd, []bool{false, false, false}),
-		"database-end sentinel fast path read storage points")
-	// One-point LATEST treats before=0 as a hot-edge sentinel: it restores the
-	// newest stored timestamp and deliberately suppresses normal view alignment.
-	check(queryTimestampGridExact(t, respDatabaseEnd, queryExpectedGrid{
-		after: fixture.T0, before: fixture.T0 + 12, updateEvery: 13, rows: 1,
-	}), "database-end sentinel changed its existing newest-sample grid")
-	colsDatabaseEnd := decode(respDatabaseEnd, "plain", "big", "neg")
-	exact(colsDatabaseEnd, "big", []expectedColumnPoint{
-		wantNumberAt(fixture.T0+12, float64(big)),
-	}, 0)
-	exact(colsDatabaseEnd, "plain", []expectedColumnPoint{
-		wantNumberWithARPAt(fixture.T0+12, 10, 0),
-	}, 0)
-	exact(colsDatabaseEnd, "neg", []expectedColumnPoint{
-		wantNumberAt(fixture.T0+12, -5),
-	}, 0)
-
-	// The established sentinel restores the exact newest stored timestamp after
-	// natural update-every rounding. Merely skipping the final alignment would
-	// return T0+60 here and silently move alert-style results off T0+63.
-	v1Body, err := td.DataV1Raw("c022-database-end", map[string][]string{
-		"context": {databaseEndChart},
-		"after":   {strconv.FormatInt(fixture.T0+3, 10)},
-		"before":  {"0"},
-		"points":  {"1"},
-		"group":   {"latest"},
-		"format":  {"json"},
-		"options": {"jsonwrap|seconds|natural-points"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var v1 map[string]any
-	if err := json.Unmarshal([]byte(v1Body), &v1); err != nil {
-		t.Fatalf("parse v1 database-end response: %v (body %.300q)", err, v1Body)
+		return cols, assertExactColumnSet(t, cols, dimensions)
 	}
 	exactInteger := func(value any, want int64) bool {
 		got, integer := queryInteger(value)
 		return integer && got == want
 	}
-	check(exactInteger(v1["after"], fixture.T0+13) &&
-		exactInteger(v1["before"], fixture.T0+63) &&
-		exactInteger(v1["view_update_every"], 60) &&
-		exactInteger(v1["points"], 1),
-		"natural database-end view = after %v before %v update_every %v points %v, want %d/%d/60/1",
-		v1["after"], v1["before"], v1["view_update_every"], v1["points"], fixture.T0+13, fixture.T0+63)
-	v1Result, v1ResultOK := v1["result"].(map[string]any)
-	v1Data, v1DataOK := v1Result["data"].([]any)
-	var v1Row []any
-	v1RowOK := false
-	if v1DataOK && len(v1Data) == 1 {
-		v1Row, v1RowOK = v1Data[0].([]any)
-	}
-	check(v1ResultOK && v1DataOK && len(v1Data) == 1 && v1RowOK && len(v1Row) >= 1 &&
-		exactInteger(v1Row[0], fixture.T0+63),
-		"natural database-end data = %v, want one row timestamped %d", v1Result["data"], fixture.T0+63)
 
-	// the storage path (selected-tier disables the fast path) returns the
-	// SN-quantized value and the engine-generic bucket anomaly rate
-	respSlow := get(map[string]string{
-		"after":   strconv.FormatInt(fixture.T0, 10),
-		"before":  strconv.FormatInt(fixture.T0+12, 10),
-		"points":  "1",
-		"options": "selected-tier",
-		"tier":    "0",
+	t.Run("name-echo", func(t *testing.T) {
+		const contract = "CASE-022/latest-name-echo"
+		trackContract(t, contract)
+		resp := get(t, map[string]string{
+			"after":   strconv.FormatInt(fixture.T0, 10),
+			"before":  strconv.FormatInt(fixture.T0+8, 10),
+			"points":  "4",
+			"options": "debug",
+		})
+		request, requestOK := resp["request"].(map[string]any)
+		aggregations, aggregationsOK := request["aggregations"].(map[string]any)
+		timeAggregation, timeOK := aggregations["time"].(map[string]any)
+		echo, echoOK := timeAggregation["time_group"].(string)
+		if !requestOK || !aggregationsOK || !timeOK || !echoOK || echo != "latest" {
+			t.Errorf("BROKEN %s: time_group echo is %v, want latest", contract, timeAggregation["time_group"])
+		}
 	})
-	check(assertSelectedTier(t, respSlow, 0), "storage path did not select only tier 0")
-	colsSlow := decode(respSlow, "plain", "big", "neg")
-	// Without unaligned, the 12-second single bucket ends on the next
-	// absolute 12-second boundary.
-	slowEnd := int64((fixture.T0 + 12 + 11) / 12 * 12)
-	exact(colsSlow, "big", []expectedColumnPoint{
-		wantNumberAt(slowEnd, fixture.SNRoundTrip(float64(big))),
-	}, 0)
-	exact(colsSlow, "neg", []expectedColumnPoint{wantNumberAt(slowEnd, -5)}, 0)
-	plainSlow := colsSlow["plain"]
-	check(len(plainSlow) == 1 && plainSlow[0].T == slowEnd &&
-		plainSlow[0].Value != nil && *plainSlow[0].Value == 10 &&
-		plainSlow[0].ARP > 0 && plainSlow[0].PA&canon.AnnotationEmpty == 0,
-		"slow plain = %v, want one numeric value 10 at %d with positive engine-generic anomaly rate",
-		plainSlow, slowEnd)
 
-	assertContract(t, "CASE-022/time-group-latest", ok)
+	t.Run("bucket-values", func(t *testing.T) {
+		const contract = "CASE-022/latest-bucket-values"
+		trackContract(t, contract)
+		resp := get(t, map[string]string{
+			"after": strconv.FormatInt(fixture.T0, 10), "before": strconv.FormatInt(fixture.T0+8, 10), "points": "4",
+		})
+		cols, ok := decode(t, resp, "plain", "big", "neg")
+		ok = assertExactColumn(t, cols, "plain", []expectedColumnPoint{
+			wantNumberAt(fixture.T0+2, 2), wantNumberAt(fixture.T0+4, 4),
+			wantNumberAt(fixture.T0+6, 6), wantNumberAt(fixture.T0+8, 8),
+		}, 0) && ok
+		ok = assertExactView(t, resp, fixture.T0, fixture.T0+8, 2) && ok
+		assertContract(t, contract, ok)
+	})
+
+	t.Run("empty-buckets", func(t *testing.T) {
+		const contract = "CASE-022/latest-empty-buckets"
+		trackContract(t, contract)
+		resp := get(t, map[string]string{
+			"after": strconv.FormatInt(fixture.T0, 10), "before": strconv.FormatInt(fixture.T0+12, 10), "points": "12",
+		})
+		cols, ok := decode(t, resp, "plain", "big", "neg")
+		plainWant := make([]expectedColumnPoint, 0, 12)
+		bigWant := make([]expectedColumnPoint, 0, 12)
+		negWant := make([]expectedColumnPoint, 0, 12)
+		for i := 1; i <= 12; i++ {
+			ts := fixture.T0 + int64(i)
+			switch {
+			case i <= 8:
+				plainWant = append(plainWant, wantNumberAt(ts, float64(i)))
+			case i <= 10:
+				plainWant = append(plainWant, wantEmptyAt(ts))
+			default:
+				plainWant = append(plainWant, wantNumberAt(ts, float64(i-2)))
+			}
+			bigWant = append(bigWant, wantNumberAt(ts, fixture.SNRoundTrip(float64(big))))
+			negWant = append(negWant, wantNumberAt(ts, -5))
+		}
+		ok = assertExactColumn(t, cols, "plain", plainWant, 0) && ok
+		ok = assertExactColumn(t, cols, "big", bigWant, 0) && ok
+		ok = assertExactColumn(t, cols, "neg", negWant, 0) && ok
+		ok = assertExactView(t, resp, fixture.T0, fixture.T0+12, 1) && ok
+		assertContract(t, contract, ok)
+	})
+
+	fastAfter := int64(fixture.T0)
+	fastBefore := int64(fixture.T0 + 20)
+	t.Run("collector-cache", func(t *testing.T) {
+		const contract = "CASE-022/latest-collector-cache"
+		trackContract(t, contract)
+		resp := get(t, map[string]string{
+			"after": strconv.FormatInt(fastAfter, 10), "before": strconv.FormatInt(fastBefore, 10),
+			"points": "1", "options": "unaligned",
+		})
+		ok := assertTierPresence(t, resp, []bool{false, false, false})
+		ok = queryTimestampGridExact(t, resp, queryExpectedVirtualGrid(t, fastAfter, fastBefore, 1, false)) && ok
+		cols, columnsOK := decode(t, resp, "plain", "big", "neg")
+		ok = columnsOK && ok
+		ok = assertExactColumn(t, cols, "big", []expectedColumnPoint{wantNumberAt(fastBefore, float64(big))}, 0) && ok
+		ok = assertExactColumn(t, cols, "plain", []expectedColumnPoint{wantNumberWithARPAt(fastBefore, 10, 0)}, 0) && ok
+		ok = assertExactColumn(t, cols, "neg", []expectedColumnPoint{wantNumberAt(fastBefore, -5)}, 0) && ok
+		assertContract(t, contract, ok)
+	})
+
+	t.Run("absolute", func(t *testing.T) {
+		const contract = "CASE-022/latest-absolute"
+		trackContract(t, contract)
+		resp := get(t, map[string]string{
+			"after": strconv.FormatInt(fastAfter, 10), "before": strconv.FormatInt(fastBefore, 10),
+			"points": "1", "options": "absolute|unaligned",
+		})
+		ok := assertTierPresence(t, resp, []bool{false, false, false})
+		cols, columnsOK := decode(t, resp, "plain", "big", "neg")
+		ok = columnsOK && ok
+		ok = assertExactColumn(t, cols, "plain", []expectedColumnPoint{wantNumberAt(fastBefore, 10)}, 0) && ok
+		ok = assertExactColumn(t, cols, "big", []expectedColumnPoint{wantNumberAt(fastBefore, float64(big))}, 0) && ok
+		ok = assertExactColumn(t, cols, "neg", []expectedColumnPoint{wantNumberAt(fastBefore, 5)}, 0) && ok
+		assertContract(t, contract, ok)
+	})
+
+	t.Run("before-zero-v3", func(t *testing.T) {
+		const contract = "CASE-022/latest-before-zero-v3"
+		trackContract(t, contract)
+		resp := get(t, map[string]string{
+			"after": strconv.FormatInt(fixture.T0, 10), "before": "0", "points": "1",
+		})
+		ok := assertTierPresence(t, resp, []bool{false, false, false})
+		ok = queryTimestampGridExact(t, resp, queryExpectedGrid{
+			after: fixture.T0, before: fixture.T0 + 12, updateEvery: 13, rows: 1,
+		}) && ok
+		cols, columnsOK := decode(t, resp, "plain", "big", "neg")
+		ok = columnsOK && ok
+		ok = assertExactColumn(t, cols, "big", []expectedColumnPoint{wantNumberAt(fixture.T0+12, float64(big))}, 0) && ok
+		ok = assertExactColumn(t, cols, "plain", []expectedColumnPoint{wantNumberWithARPAt(fixture.T0+12, 10, 0)}, 0) && ok
+		ok = assertExactColumn(t, cols, "neg", []expectedColumnPoint{wantNumberAt(fixture.T0+12, -5)}, 0) && ok
+		assertContract(t, contract, ok)
+	})
+
+	t.Run("before-zero-v1", func(t *testing.T) {
+		const contract = "CASE-022/latest-before-zero-v1"
+		trackContract(t, contract)
+		body, err := td.DataV1Raw("c022-database-end", map[string][]string{
+			"context": {databaseEndChart}, "after": {strconv.FormatInt(fixture.T0+3, 10)},
+			"before": {"0"}, "points": {"1"}, "group": {"latest"}, "format": {"json"},
+			"options": {"jsonwrap|seconds|natural-points"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc map[string]any
+		if err := json.Unmarshal([]byte(body), &doc); err != nil {
+			t.Fatalf("parse v1 database-end response: %v (body %.300q)", err, body)
+		}
+		ok := exactInteger(doc["after"], fixture.T0+13) && exactInteger(doc["before"], fixture.T0+63) &&
+			exactInteger(doc["view_update_every"], 60) && exactInteger(doc["points"], 1)
+		if !ok {
+			t.Logf("natural database-end view = after %v before %v update_every %v points %v, want %d/%d/60/1",
+				doc["after"], doc["before"], doc["view_update_every"], doc["points"], fixture.T0+13, fixture.T0+63)
+		}
+		result, resultOK := doc["result"].(map[string]any)
+		data, dataOK := result["data"].([]any)
+		var row []any
+		rowOK := false
+		if dataOK && len(data) == 1 {
+			row, rowOK = data[0].([]any)
+		}
+		rowHeld := resultOK && dataOK && len(data) == 1 && rowOK && len(row) >= 1 && exactInteger(row[0], fixture.T0+63)
+		if !rowHeld {
+			t.Logf("natural database-end data = %v, want one row timestamped %d", result["data"], fixture.T0+63)
+		}
+		assertContract(t, contract, ok && rowHeld)
+	})
+
+	t.Run("selected-tier-storage", func(t *testing.T) {
+		const contract = "CASE-022/latest-selected-tier-storage"
+		trackContract(t, contract)
+		resp := get(t, map[string]string{
+			"after": strconv.FormatInt(fixture.T0, 10), "before": strconv.FormatInt(fixture.T0+12, 10),
+			"points": "1", "options": "selected-tier", "tier": "0",
+		})
+		ok := assertSelectedTier(t, resp, 0)
+		cols, columnsOK := decode(t, resp, "plain", "big", "neg")
+		ok = columnsOK && ok
+		slowEnd := int64((fixture.T0 + 12 + 11) / 12 * 12)
+		ok = assertExactColumn(t, cols, "big", []expectedColumnPoint{
+			wantNumberAt(slowEnd, fixture.SNRoundTrip(float64(big))),
+		}, 0) && ok
+		ok = assertExactColumn(t, cols, "neg", []expectedColumnPoint{wantNumberAt(slowEnd, -5)}, 0) && ok
+		plain := cols["plain"]
+		plainOK := len(plain) == 1 && plain[0].T == slowEnd && plain[0].Value != nil && *plain[0].Value == 10 &&
+			plain[0].ARP > 0 && plain[0].PA&canon.AnnotationEmpty == 0
+		if !plainOK {
+			t.Logf("slow plain = %v, want one numeric value 10 at %d with positive engine-generic anomaly rate", plain, slowEnd)
+		}
+		assertContract(t, contract, ok && plainOK)
+	})
 }

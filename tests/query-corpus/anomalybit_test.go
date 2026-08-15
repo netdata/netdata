@@ -73,8 +73,6 @@ func bbAnom(i int) bool { return i >= 21 && i <= 40 }
 func aaGap(i int) bool  { return i >= 51 && i <= 55 }
 
 func TestAnomalyBitOption(t *testing.T) {
-	trackContractComponent(t, "L3/anomaly-bit-option", "option")
-
 	ch := abFixture()
 	pushLiveBurst(t, "anom-bit", guid(69), ch)
 	if _, err := td.WaitRetention("anom-bit", abContext, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
@@ -100,6 +98,8 @@ func TestAnomalyBitOption(t *testing.T) {
 	}
 
 	t.Run("identity", func(t *testing.T) {
+		trackContract(t, "L3/anomaly-bit-identity")
+
 		cols := query(nil)
 		if !assertExactColumnSet(t, cols, []string{"aa", "bb"}) {
 			t.Fail()
@@ -141,32 +141,38 @@ func TestAnomalyBitOption(t *testing.T) {
 		return sum / float64(n)
 	}
 
-	for _, tg := range []string{"average", "max"} {
-		t.Run("bucket-"+tg, func(t *testing.T) {
-			cols := query(func(p map[string][]string) {
-				p["points"] = []string{"6"}
-				p["time_group"] = []string{tg}
+	t.Run("buckets", func(t *testing.T) {
+		trackContract(t, "L3/anomaly-bit-buckets")
+
+		for _, tg := range []string{"average", "max"} {
+			t.Run(tg, func(t *testing.T) {
+				cols := query(func(p map[string][]string) {
+					p["points"] = []string{"6"}
+					p["time_group"] = []string{tg}
+				})
+				if !assertExactColumnSet(t, cols, []string{"aa", "bb"}) {
+					t.Fail()
+				}
+				aaWant := make([]expectedColumnPoint, 0, 6)
+				bbWant := make([]expectedColumnPoint, 0, 6)
+				for bucket := 1; bucket <= 6; bucket++ {
+					ts := fixture.T0 + int64(bucket*10)
+					aaWant = append(aaWant, wantNumberAt(
+						ts, bucketWant(aaAnom, aaGap, bucket, tg == "max")))
+					bbWant = append(bbWant, wantNumberAt(
+						ts, bucketWant(bbAnom, nil, bucket, tg == "max")))
+				}
+				if !assertExactColumn(t, cols, "aa", aaWant, printTol) ||
+					!assertExactColumn(t, cols, "bb", bbWant, printTol) {
+					t.Fail()
+				}
 			})
-			if !assertExactColumnSet(t, cols, []string{"aa", "bb"}) {
-				t.Fail()
-			}
-			aaWant := make([]expectedColumnPoint, 0, 6)
-			bbWant := make([]expectedColumnPoint, 0, 6)
-			for bucket := 1; bucket <= 6; bucket++ {
-				ts := fixture.T0 + int64(bucket*10)
-				aaWant = append(aaWant, wantNumberAt(
-					ts, bucketWant(aaAnom, aaGap, bucket, tg == "max")))
-				bbWant = append(bbWant, wantNumberAt(
-					ts, bucketWant(bbAnom, nil, bucket, tg == "max")))
-			}
-			if !assertExactColumn(t, cols, "aa", aaWant, printTol) ||
-				!assertExactColumn(t, cols, "bb", bbWant, printTol) {
-				t.Fail()
-			}
-		})
-	}
+		}
+	})
 
 	t.Run("group-by-sum", func(t *testing.T) {
+		trackContract(t, "L3/anomaly-bit-group-by")
+
 		cols := query(func(p map[string][]string) {
 			p["group_by"] = []string{"selected"}
 			p["aggregation"] = []string{"sum"}
@@ -258,7 +264,7 @@ func TestAnomalyStsArrays(t *testing.T) {
 // options=anomaly-bit over a forced tier1 query, every view point is
 // the tier window's 100*anomaly_count/count.
 func TestAnomalyBitTierRates(t *testing.T) {
-	trackContractComponent(t, "L3/anomaly-bit-option", "tier-rates")
+	trackContract(t, "L3/anomaly-bit-tier-rates")
 
 	ch := fixture.Series("fixture.anomtier", "fixture.anomtier", fixture.T0, 600, 1, strconv.Itoa, func(i int) string {
 		if i >= 100 && i <= 159 {

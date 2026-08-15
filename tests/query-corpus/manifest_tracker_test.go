@@ -89,6 +89,29 @@ func TestContractLedgerKeepsFailureBeforeSkip(t *testing.T) {
 	}
 }
 
+func TestContractLedgerRegistrationRemainsIncompleteUntilVerdict(t *testing.T) {
+	cases := map[string]ManifestCase{
+		"registered": {},
+	}
+	ledger := newContractLedger()
+	ledger.register("registered", defaultContractComponent)
+
+	summary := ledger.summarize(cases)
+	if summary.evaluated != 0 || len(summary.broken) != 0 {
+		t.Fatalf("before verdict: evaluated=%d broken=%v, want 0/none", summary.evaluated, summary.broken)
+	}
+	if len(summary.incomplete) != 1 || summary.incomplete[0] != "registered" {
+		t.Fatalf("before verdict: incomplete=%v, want [registered]", summary.incomplete)
+	}
+
+	ledger.record("registered", defaultContractComponent, true, false)
+	summary = ledger.summarize(cases)
+	if summary.evaluated != 1 || len(summary.broken) != 0 || len(summary.incomplete) != 0 {
+		t.Fatalf("after verdict: evaluated=%d broken=%v incomplete=%v, want 1/none/none",
+			summary.evaluated, summary.broken, summary.incomplete)
+	}
+}
+
 func TestIncompleteContractSummaryNeverClaimsAllHold(t *testing.T) {
 	summary := contractRunSummary{
 		evaluated:  1,

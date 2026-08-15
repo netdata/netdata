@@ -269,6 +269,17 @@ func c035ExpectedVolume(samples []c035Sample, after, before, step int64) []expec
 	return want
 }
 
+func c035ExpectedCompleteVolume(samples []c035Sample, after, before, step int64) []expectedColumnPoint {
+	points := int((before - after) / step)
+	want := make([]expectedColumnPoint, points)
+	for i := range want {
+		rowStart := after + int64(i)*step
+		rowEnd := rowStart + step
+		want[i] = wantNumberWithMetadataAt(rowEnd, c035Measured(samples, rowStart, rowEnd), 0, 0)
+	}
+	return want
+}
+
 type c035QuerySpec struct {
 	context    string
 	host       string
@@ -318,15 +329,16 @@ func c035QueryExact(t *testing.T, spec c035QuerySpec) bool {
 	return ok
 }
 
-// c035AvailabilityMatrix isolates the cadence-changing record at each higher
-// tier. One preceding row is the control and avoids the independent points=1
-// window defect; zoom behavior is covered by the general CASE-023 matrices.
+// c035AvailabilityMatrix runs the same cadence-changing windows either at
+// tier 0 or at each higher tier. Keeping those verdicts separate prevents a
+// legacy page-format limitation from hiding an exact tier-0 regression.
 func c035AvailabilityMatrix(
 	t *testing.T,
 	context, host string,
 	base int64,
 	tc c035Case,
 	samples []c035Sample,
+	higherTiers bool,
 ) bool {
 	t.Helper()
 	ok := true
@@ -342,22 +354,14 @@ func c035AvailabilityMatrix(
 		after := straddleStart - granularity
 		before := straddleStart + granularity
 
-		records := c035Records(base, tc, target.tier, before, samples)
-		if !c035QueryExact(t, c035QuerySpec{
-			context: context, host: host, dimension: c035AvailabilityDim,
-			tier: target.tier, after: after, before: before, step: granularity,
-			group: "percentage-of-time", expression: "==1",
-			want: c035ExpectedAvailability(records, after, before, granularity),
-		}) {
-			ok = false
+		tier := 0
+		if higherTiers {
+			tier = target.tier
 		}
-
-		// The same window on tier 0 proves the exact elapsed-time answer
-		// independently of the higher-tier sample-weighted estimator.
-		records = c035Records(base, tc, 0, before, samples)
+		records := c035Records(base, tc, tier, before, samples)
 		if !c035QueryExact(t, c035QuerySpec{
 			context: context, host: host, dimension: c035AvailabilityDim,
-			tier: 0, after: after, before: before, step: granularity,
+			tier: tier, after: after, before: before, step: granularity,
 			group: "percentage-of-time", expression: "==1",
 			want: c035ExpectedAvailability(records, after, before, granularity),
 		}) {
@@ -444,7 +448,7 @@ type c035FixtureState struct {
 }
 
 var c035Fixtures = map[string]c035FixtureState{}
-var c035BufferedFixtures = map[string]c035FixtureState{}
+var c035CompletedFixtures = map[string]c035FixtureState{}
 
 func c035Fixture(t *testing.T, name string, tc c035Case) c035FixtureState {
 	t.Helper()
@@ -491,22 +495,24 @@ func c035Fixture(t *testing.T, name string, tc c035Case) c035FixtureState {
 	return state
 }
 
-func c035BufferedFixture(t *testing.T, name string, tc c035Case) c035FixtureState {
+func c035CompletedFixture(
+	t *testing.T,
+	name, stateName string,
+	tc c035Case,
+	firstSamples, guidOffset int,
+) c035FixtureState {
 	t.Helper()
-	if state, ok := c035BufferedFixtures[name]; ok {
+	key := stateName + "/" + name
+	if state, ok := c035CompletedFixtures[key]; ok {
 		return state
 	}
 
 	base := int64(fixture.T0) - int64(fixture.T0)%36000
-	context := "fixture.c035_buffered_" + name
-	host := "c035-buffered-" + name
+	context := "fixture.c035_" + stateName + "_" + name
+	host := "c035-" + stateName + "-" + name
 
-	// The final old-cadence sample starts on a tier2 boundary. It saves the
-	// completed tier1 and tier2 points, then collection changes cadence before
-	// another old-cadence sample can trigger their modulo-based early flush.
-	firstSamples := 4*tier2Gran + 1
 	ch1, samples1 := c035Phase(context, base, base, firstSamples, tc.firstEvery, false, tc)
-	conn := connect(t, host, guid(tc.machineGUID+10), stream.CapsLive)
+	conn := connect(t, host, guid(tc.machineGUID+guidOffset), stream.CapsLive)
 	ch1.Define(conn)
 	ch1.PushLive(conn)
 	if err := conn.Flush(); err != nil {
@@ -517,9 +523,19 @@ func c035BufferedFixture(t *testing.T, name string, tc c035Case) c035FixtureStat
 	}
 
 	boundary := base + 4*int64(tc.firstEvery)*tier2Gran
-	transition := boundary + int64(tc.firstEvery)
-	remainingOldWindow := int64(tc.firstEvery)*tier2Gran - int64(tc.firstEvery)
+	transition := base + int64(firstSamples*tc.firstEvery)
+	remainingOldWindow := boundary + int64(tc.firstEvery)*tier2Gran - transition
 	secondSamples := int((remainingOldWindow+int64(tc.thenEvery)-1)/int64(tc.thenEvery)) + 2
+	newTier2Every := int64(tc.thenEvery) * tier2Gran
+	firstNewSampleEnd := transition + int64(tc.thenEvery)
+	firstNewTier2End := firstNewSampleEnd + newTier2Every -
+		(firstNewSampleEnd+newTier2Every)%newTier2Every
+	// Advance through one additional tier2 row so both queried rows have left
+	// the collector's one-point delayed buffer.
+	newRowsSamples := int((firstNewTier2End+3*newTier2Every-transition)/int64(tc.thenEvery)) + 2
+	if secondSamples < newRowsSamples {
+		secondSamples = newRowsSamples
+	}
 	ch2, samples2 := c035Phase(context, base, transition, secondSamples, tc.thenEvery, true, tc)
 	ch2.Define(conn)
 	ch2.PushLive(conn)
@@ -534,8 +550,26 @@ func c035BufferedFixture(t *testing.T, name string, tc c035Case) c035FixtureStat
 		base: base, context: context, host: host,
 		samples: append(samples1, samples2...),
 	}
-	c035BufferedFixtures[name] = state
+	c035CompletedFixtures[key] = state
 	return state
+}
+
+func c035BufferedFixture(t *testing.T, name string, tc c035Case) c035FixtureState {
+	t.Helper()
+
+	// The final old-cadence sample starts on a tier2 boundary. It promotes the
+	// completed tier1 and tier2 points, then collection changes cadence before
+	// another old-cadence sample can trigger their modulo-based early flush.
+	return c035CompletedFixture(t, name, "buffered", tc, 4*tier2Gran+1, 10)
+}
+
+func c035BoundaryFixture(t *testing.T, name string, tc c035Case) c035FixtureState {
+	t.Helper()
+
+	// The final old-cadence sample ends exactly on a tier2 boundary. The
+	// completed tier1 and tier2 points remain in virtual_point until the first
+	// new-cadence sample arrives.
+	return c035CompletedFixture(t, name, "boundary", tc, 4*tier2Gran, 20)
 }
 
 func c035TransitionWindow(base int64, tc c035Case, grouping int64) (after, before, step int64) {
@@ -551,29 +585,67 @@ func TestCase035CompletedRollupKeepsOriginalCadence(t *testing.T) {
 	for _, item := range c035Cases {
 		item := item
 		t.Run(item.name, func(t *testing.T) {
-			state := c035BufferedFixture(t, item.name, item.spec)
-			boundary := state.base + 4*int64(item.spec.firstEvery)*tier2Gran
-			for _, target := range []struct {
-				tier     int
-				grouping int64
+			states := []struct {
+				name  string
+				state c035FixtureState
 			}{
-				{tier: 1, grouping: tier1Gran},
-				{tier: 2, grouping: tier2Gran},
-			} {
-				target := target
-				t.Run("tier"+strconv.Itoa(target.tier), func(t *testing.T) {
-					trackContractComponent(t, contract,
-						item.name+"-tier"+strconv.Itoa(target.tier))
+				{name: "buffered", state: c035BufferedFixture(t, item.name, item.spec)},
+				{name: "boundary", state: c035BoundaryFixture(t, item.name, item.spec)},
+			}
+			for _, stateCase := range states {
+				stateCase := stateCase
+				t.Run(stateCase.name, func(t *testing.T) {
+					boundary := stateCase.state.base + 4*int64(item.spec.firstEvery)*tier2Gran
+					for _, target := range []struct {
+						tier     int
+						grouping int64
+					}{
+						{tier: 1, grouping: tier1Gran},
+						{tier: 2, grouping: tier2Gran},
+					} {
+						target := target
+						t.Run("tier"+strconv.Itoa(target.tier), func(t *testing.T) {
+							component := stateCase.name + "-" + item.name +
+								"-tier" + strconv.Itoa(target.tier)
+							trackContractComponent(t, contract, component)
 
-					step := int64(item.spec.firstEvery) * target.grouping
-					after, before := boundary-2*step, boundary
-					if !c035QueryExact(t, c035QuerySpec{
-						context: state.context, host: state.host, dimension: c035RateDim,
-						tier: target.tier, after: after, before: before, step: step,
-						group: "sum", want: c035ExpectedVolume(state.samples, after, before, step),
-					}) {
-						t.Errorf("BROKEN %s (%s-tier%d): %s",
-							contract, item.name, target.tier, manifest[contract].Proves)
+							step := int64(item.spec.firstEvery) * target.grouping
+							after, before := boundary-2*step, boundary
+							if !c035QueryExact(t, c035QuerySpec{
+								context: stateCase.state.context, host: stateCase.state.host,
+								dimension: c035RateDim, tier: target.tier,
+								after: after, before: before, step: step, group: "sum",
+								want: c035ExpectedCompleteVolume(stateCase.state.samples, after, before, step),
+							}) {
+								t.Errorf("BROKEN %s (%s): %s",
+									contract, component, manifest[contract].Proves)
+							}
+
+							// Exact-boundary handling resets the rollup grid. Two complete
+							// new-cadence rows prove that no old boundary or empty point leaks
+							// into subsequent storage.
+							if stateCase.name == "boundary" {
+								newStep := int64(item.spec.thenEvery) * target.grouping
+								firstNewSampleEnd := boundary + int64(item.spec.thenEvery)
+								newAfter := firstNewSampleEnd + newStep -
+									(firstNewSampleEnd+newStep)%newStep
+								newBefore := newAfter + 2*newStep
+								// Repeat the identical crossing query. A false gap cached by the
+								// first pass must not hide the first new-cadence page on the second.
+								for attempt := 1; attempt <= 2; attempt++ {
+									if !c035QueryExact(t, c035QuerySpec{
+										context: stateCase.state.context, host: stateCase.state.host,
+										dimension: c035RateDim, tier: target.tier,
+										after: newAfter, before: newBefore, step: newStep, group: "sum",
+										want: c035ExpectedCompleteVolume(
+											stateCase.state.samples, newAfter, newBefore, newStep),
+									}) {
+										t.Errorf("BROKEN %s (%s-new-grid-attempt-%d): %s",
+											contract, component, attempt, manifest[contract].Proves)
+									}
+								}
+							}
+						})
 					}
 				})
 			}
@@ -650,15 +722,26 @@ func TestCase035Tier0PageBoundaryKeepsEverySample(t *testing.T) {
 }
 
 func TestCase023AvailabilityAcrossIntervalChange(t *testing.T) {
-	const contract = "CASE-023/cadence-change-availability"
 	for _, item := range c035Cases {
 		item := item
 		t.Run(item.name, func(t *testing.T) {
-			trackContractComponent(t, contract, item.name)
 			state := c035Fixture(t, item.name, item.spec)
-			if !c035AvailabilityMatrix(t, state.context, state.host,
-				state.base, item.spec, state.samples) {
-				t.Errorf("BROKEN %s (%s): %s", contract, item.name, manifest[contract].Proves)
+			for _, scope := range []struct {
+				name, contract string
+				higher         bool
+			}{
+				{name: "tier0", contract: "CASE-023/cadence-change-availability-tier0"},
+				{name: "higher-tiers", contract: "CASE-023/cadence-change-availability-higher-tiers", higher: true},
+			} {
+				scope := scope
+				t.Run(scope.name, func(t *testing.T) {
+					trackContractComponent(t, scope.contract, item.name)
+					if !c035AvailabilityMatrix(t, state.context, state.host,
+						state.base, item.spec, state.samples, scope.higher) {
+						t.Errorf("BROKEN %s (%s): %s",
+							scope.contract, item.name, manifest[scope.contract].Proves)
+					}
+				})
 			}
 		})
 	}

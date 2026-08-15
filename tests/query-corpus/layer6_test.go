@@ -171,25 +171,54 @@ func l6Groups(key1, key2 string, members []l5Member) map[string][][]l5Member {
 
 type l6AggChain struct{ agg1, agg2 string }
 
+type l6ChainResults struct {
+	grouping, grid, values, pointAnomaly, viewAnomaly, partialEmpty, rawSchema bool
+}
+
+func newL6ChainResults() l6ChainResults {
+	return l6ChainResults{true, true, true, true, true, true, true}
+}
+
+func (r l6ChainResults) all() bool {
+	return r.grouping && r.grid && r.values && r.pointAnomaly &&
+		r.viewAnomaly && r.partialEmpty && r.rawSchema
+}
+
 // TestLayer6TwoPassMatrix covers chains with no average boundary. Their
 // non-raw anomaly metadata can use raw-contributor weights without changing a
 // value divisor; raw output retains its prior-pass group count.
 func TestLayer6TwoPassMatrix(t *testing.T) {
-	trackContractComponent(t, "L6/two-pass-matrix", "matrix")
+	contractNames := []string{
+		"L6/two-pass-grouping", "L6/two-pass-grid", "L6/two-pass-values",
+		"L6/two-pass-point-anomaly", "L6/two-pass-view-anomaly",
+		"L6/two-pass-partial-empty", "L6/two-pass-raw-schema",
+	}
+	for _, contract := range contractNames {
+		registerContract(t, contract)
+	}
 
-	testLayer6TwoPassChains(t, []l6AggChain{
+	result := testLayer6TwoPassChains(t, []l6AggChain{
 		{"sum", "sum"}, {"min", "min"}, {"max", "max"},
 		{"extremes", "extremes"},
 		{"sum", "min"}, {"max", "sum"}, {"min", "extremes"},
 	})
+	for contract, held := range map[string]bool{
+		"L6/two-pass-grouping":      result.grouping,
+		"L6/two-pass-grid":          result.grid,
+		"L6/two-pass-values":        result.values,
+		"L6/two-pass-point-anomaly": result.pointAnomaly,
+		"L6/two-pass-view-anomaly":  result.viewAnomaly,
+		"L6/two-pass-partial-empty": result.partialEmpty,
+		"L6/two-pass-raw-schema":    result.rawSchema,
+	} {
+		assertContract(t, contract, held)
+	}
 }
 
 // TestLayer6TwoPassLiveEdgePartialRow makes the final stored row incomplete
-// inside one pass-1 group. The later pass must retain that row and mark its
-// reduced contributor count PARTIAL without shortening the timestamp grid.
+// inside one pass-1 group. The established near-live tolerance trims that
+// unstable suffix while preserving every preceding complete row.
 func TestLayer6TwoPassLiveEdgePartialRow(t *testing.T) {
-	trackContractComponent(t, "L6/two-pass-matrix", "live-edge-partial-row")
-
 	const (
 		context = "fixture.l6edge"
 		ue      = int64(300)
@@ -231,27 +260,72 @@ func TestLayer6TwoPassLiveEdgePartialRow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, after, before, 6, false)) {
-		t.Fail()
-	}
-
 	cols, err := canon.Columns(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !assertExactColumnSet(t, cols, []string{"selected"}) {
-		t.Fail()
-	}
-	if !assertExactColumn(t, cols, "selected", []expectedColumnPoint{
-		wantEmptyAt(boundary - 5*ue),
-		wantNumberAt(boundary-4*ue, 11),
-		wantNumberAt(boundary-3*ue, 11),
-		wantNumberAt(boundary-2*ue, 11),
-		wantNumberAt(boundary-ue, 11),
-		wantNumberWithMetadataAt(boundary, 1, 0, canon.AnnotationPartial),
-	}, 0) {
-		t.Fail()
-	}
+	col := cols["selected"]
+	wantTimes := []int64{boundary - 5*ue, boundary - 4*ue, boundary - 3*ue, boundary - 2*ue, boundary - ue}
+
+	t.Run("trimming", func(t *testing.T) {
+		trackContract(t, "L6/two-pass-live-edge-trimming")
+		ok := assertViewFields(t, doc, after+1, before, ue)
+		ok = assertExactColumnSet(t, cols, []string{"selected"}) && ok
+		if len(col) != len(wantTimes) {
+			t.Logf("live-edge result has %d rows, want %d after trimming", len(col), len(wantTimes))
+			ok = false
+		}
+		for i, pt := range col {
+			if i >= len(wantTimes) {
+				break
+			}
+			if pt.T != wantTimes[i] {
+				t.Logf("live-edge row %d timestamp %d, want %d", i, pt.T, wantTimes[i])
+				ok = false
+			}
+		}
+		if !ok {
+			t.Errorf("the incomplete near-live suffix was not trimmed at the contributor decline")
+		}
+	})
+
+	t.Run("values", func(t *testing.T) {
+		trackContract(t, "L6/two-pass-live-edge-values")
+		number := func(value float64) *float64 { return &value }
+		want := []*float64{nil, number(11), number(11), number(11), number(11)}
+		if len(col) != len(want) {
+			t.Fatalf("live-edge result has %d rows, want %d surviving rows", len(col), len(want))
+		}
+		for i, pt := range col {
+			if pt.T != wantTimes[i] {
+				t.Errorf("live-edge row %d timestamp %d, want %d before checking its value", i, pt.T, wantTimes[i])
+				continue
+			}
+			switch {
+			case want[i] == nil && pt.Value != nil:
+				t.Errorf("live-edge row %d value %v, want null", i, *pt.Value)
+			case want[i] != nil && (pt.Value == nil || !tierValueMatch(*pt.Value, *want[i], 0)):
+				t.Errorf("live-edge row %d value %v, want %v", i, pt.Value, *want[i])
+			}
+		}
+	})
+
+	t.Run("annotations", func(t *testing.T) {
+		trackContract(t, "L6/two-pass-live-edge-annotations")
+		want := []int64{canon.AnnotationEmpty, 0, 0, 0, 0}
+		if len(col) != len(want) {
+			t.Fatalf("live-edge result has %d rows, want %d surviving rows", len(col), len(want))
+		}
+		for i, pt := range col {
+			if pt.T != wantTimes[i] {
+				t.Errorf("live-edge row %d timestamp %d, want %d before checking its annotation", i, pt.T, wantTimes[i])
+				continue
+			}
+			if pt.PA != want[i] {
+				t.Errorf("live-edge row %d annotation %d, want exactly %d", i, pt.PA, want[i])
+			}
+		}
+	})
 }
 
 // An average at pass 2 needs two denominators: contributing pass-1 groups for
@@ -260,11 +334,14 @@ func TestLayer6TwoPassLiveEdgePartialRow(t *testing.T) {
 func TestLayer6TwoPassAverageBoundary(t *testing.T) {
 	trackContractComponent(t, "L6/two-pass-average-boundary", "sum-to-average")
 
-	testLayer6TwoPassChains(t, []l6AggChain{{"sum", "average"}})
+	if !testLayer6TwoPassChains(t, []l6AggChain{{"sum", "average"}}).all() {
+		t.Error("two-pass sum-to-average contract failed")
+	}
 }
 
-func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
+func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) l6ChainResults {
 	t.Helper()
+	result := newL6ChainResults()
 
 	members := l5Members()
 	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
@@ -290,122 +367,149 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) {
 		for _, kc := range keyCombos {
 			groups := l6Groups(kc.key1, kc.key2, members)
 			for _, ac := range aggCombos {
-				t.Run(mode+"/"+kc.key1+"-"+ac.agg1+"/"+kc.key2+"-"+ac.agg2, func(t *testing.T) {
-					params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
-					params.Set("group_by[0]", kc.key1)
-					params.Set("aggregation[0]", ac.agg1)
-					params.Set("group_by[1]", kc.key2)
-					params.Set("aggregation[1]", ac.agg2)
-					if kc.key1 == "label" {
-						params.Set("group_by_label[0]", "team")
+				label := mode + "/" + kc.key1 + "-" + ac.agg1 + "/" + kc.key2 + "-" + ac.agg2
+				params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
+				params.Set("group_by[0]", kc.key1)
+				params.Set("aggregation[0]", ac.agg1)
+				params.Set("group_by[1]", kc.key2)
+				params.Set("aggregation[1]", ac.agg2)
+				if kc.key1 == "label" {
+					params.Set("group_by_label[0]", "team")
+				}
+				if kc.key2 == "label" {
+					params.Set("group_by_label[1]", "team")
+				}
+				if raw {
+					params.Set("options", "jsonwrap|raw")
+				}
+				doc, err := td.DataV3All(params)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := queryPointSchemaField(doc, "hidden", false); err != nil {
+					t.Logf("%s: %v", label, err)
+					result.rawSchema = false
+				}
+				cols, err := canon.Columns(doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(cols) != len(groups) {
+					t.Logf("%s: got %d final groups %v, want %d %v", label, len(cols), keys2(cols), len(groups), keys2(groups))
+					result.grouping = false
+				}
+				var viewStats map[string]map[string]float64
+				assertViewARP := !raw && ac.agg1 != "average" && ac.agg2 != "average"
+				if assertViewARP {
+					var statsOK bool
+					viewStats, statsOK = strictDimensionStats(
+						t, doc, "view", keys2(groups), []string{"arp"})
+					if !statsOK {
+						t.Logf("%s: view dimension anomaly statistics are malformed", label)
+						result.viewAnomaly = false
 					}
-					if kc.key2 == "label" {
-						params.Set("group_by_label[1]", "team")
+				}
+				for gname, pass1Groups := range groups {
+					col, ok := cols[gname]
+					if !ok {
+						t.Logf("%s: final group %q missing (have %v)", label, gname, keys2(cols))
+						result.grouping = false
+						result.grid, result.values = false, false
+						result.pointAnomaly, result.viewAnomaly = false, false
+						result.partialEmpty, result.rawSchema = false, false
+						continue
 					}
-					if raw {
-						params.Set("options", "jsonwrap|raw")
+					if len(col) != l5Rows {
+						t.Logf("%s: %q got %d rows, want %d", label, gname, len(col), l5Rows)
+						result.grid, result.values = false, false
+						result.pointAnomaly, result.viewAnomaly = false, false
+						result.partialEmpty = false
+						result.rawSchema = false
 					}
-					doc, err := td.DataV3All(params)
-					if err != nil {
-						t.Fatal(err)
+					viewARPTotal := 0.0
+					viewARPRows := 0
+					for rowIndex, pt := range col {
+						if rowIndex >= l5Rows {
+							break
+						}
+						i := rowIndex + 1
+						wantT := fixture.T0 + int64(i)
+						want, wantAR, wantGbc, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i, raw)
+						if pt.T != wantT {
+							t.Logf("%s: %q row %d timestamp %d, want %d", label, gname, i, pt.T, wantT)
+							result.grid = false
+							result.values, result.pointAnomaly = false, false
+							result.viewAnomaly, result.partialEmpty = false, false
+							result.rawSchema = false
+						}
+						switch {
+						case wantEmpty && pt.Value != nil:
+							t.Logf("%s: %q row %d value %v, want null", label, gname, i, *pt.Value)
+							result.partialEmpty = false
+						case !wantEmpty && pt.Value == nil:
+							t.Logf("%s: %q row %d null, want %v", label, gname, i, want)
+							result.values, result.partialEmpty = false, false
+						case !wantEmpty && !tierValueMatch(*pt.Value, want, 1e-9):
+							t.Logf("%s: %q row %d value %v, want %v", label, gname, i, *pt.Value, want)
+							result.values = false
+						}
+						if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
+							t.Logf("%s: %q row %d arp %v, want %v", label, gname, i, pt.ARP, wantAR)
+							result.pointAnomaly = false
+						}
+						if assertViewARP && !wantEmpty {
+							viewARPTotal += wantAR
+							viewARPRows++
+						}
+						if raw && !wantEmpty {
+							if pt.Count == nil {
+								t.Logf("%s: %q row %d raw point has no count", label, gname, i)
+								result.rawSchema = false
+							} else if *pt.Count != int64(wantGbc) {
+								t.Logf("%s: %q row %d count %d, want %d prior-pass groups",
+									label, gname, i, *pt.Count, wantGbc)
+								result.rawSchema = false
+							}
+						} else if pt.Count != nil {
+							t.Logf("%s: %q row %d count %d is present, want absent", label, gname, i, *pt.Count)
+							result.rawSchema = false
+						}
+						wantPA := int64(0)
+						if wantEmpty {
+							wantPA = canon.AnnotationEmpty
+						} else if wantPartial {
+							wantPA = canon.AnnotationPartial
+						}
+						if pt.PA != wantPA {
+							t.Logf("%s: %q row %d pa %d, want exactly %d", label, gname, i, pt.PA, wantPA)
+							result.partialEmpty = false
+						}
 					}
-					if err := queryPointSchemaField(doc, "hidden", false); err != nil {
-						t.Errorf("%s/%s-%s/%s-%s: %v",
-							mode, kc.key1, ac.agg1, kc.key2, ac.agg2, err)
-					}
-					cols, err := canon.Columns(doc)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if len(cols) != len(groups) {
-						t.Fatalf("got %d final groups %v, want %d %v", len(cols), keys2(cols), len(groups), keys2(groups))
-					}
-					var viewStats map[string]map[string]float64
-					assertViewARP := !raw && ac.agg1 != "average" && ac.agg2 != "average"
 					if assertViewARP {
-						var statsOK bool
-						viewStats, statsOK = strictDimensionStats(
-							t, doc, "view", keys2(groups), []string{"arp"})
-						if !statsOK {
-							t.Errorf("view dimension anomaly statistics are malformed")
-						}
-					}
-					for gname, pass1Groups := range groups {
-						col, ok := cols[gname]
+						// Class B — dview truncates sum(row ARP)*10 into anomaly_count, then
+						// jsonwrap-v2 divides by the row count and the 1000x dview multiplier:
+						// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
+						// src/web/api/queries/query-group-by-finalize.c:380-460;
+						// src/web/api/queries/rrdr.h:51;
+						// src/libnetdata/storage-point.h:120-121;
+						// src/web/api/formatters/jsonwrap-v2.c:102-104,176-182.
+						got, ok := viewStats[gname]["arp"]
 						if !ok {
-							t.Errorf("final group %q missing (have %v)", gname, keys2(cols))
-							continue
-						}
-						if len(col) != l5Rows {
-							t.Errorf("%q: got %d rows, want %d", gname, len(col), l5Rows)
-							continue
-						}
-						viewARPTotal := 0.0
-						viewARPRows := 0
-						for rowIndex, pt := range col {
-							i := rowIndex + 1
-							wantT := fixture.T0 + int64(i)
-							want, wantAR, wantGbc, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i, raw)
-							if pt.T != wantT {
-								t.Errorf("%q row %d: timestamp %d, want %d", gname, i, pt.T, wantT)
-							}
-							switch {
-							case wantEmpty && pt.Value != nil:
-								t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
-							case !wantEmpty && pt.Value == nil:
-								t.Errorf("%q row %d: null, want %v", gname, i, want)
-							case !wantEmpty && !tierValueMatch(*pt.Value, want, 1e-9):
-								t.Errorf("%q row %d: value %v, want %v", gname, i, *pt.Value, want)
-							}
-							if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
-								t.Errorf("%q row %d: arp %v, want %v", gname, i, pt.ARP, wantAR)
-							}
-							if assertViewARP && !wantEmpty {
-								viewARPTotal += wantAR
-								viewARPRows++
-							}
-							if raw && !wantEmpty {
-								if pt.Count == nil {
-									t.Errorf("%q row %d: raw point has no count", gname, i)
-								} else if *pt.Count != int64(wantGbc) {
-									t.Errorf("%q row %d: count %d, want %d prior-pass groups",
-										gname, i, *pt.Count, wantGbc)
-								}
-							} else if pt.Count != nil {
-								t.Errorf("%q row %d: count %d is present, want absent", gname, i, *pt.Count)
-							}
-							wantPA := int64(0)
-							if wantEmpty {
-								wantPA = canon.AnnotationEmpty
-							} else if wantPartial {
-								wantPA = canon.AnnotationPartial
-							}
-							if pt.PA != wantPA {
-								t.Errorf("%q row %d: pa %d, want exactly %d", gname, i, pt.PA, wantPA)
-							}
-						}
-						if assertViewARP {
-							// Class B — dview truncates sum(row ARP)*10 into anomaly_count, then
-							// jsonwrap-v2 divides by the row count and the 1000x dview multiplier:
-							// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
-							// src/web/api/queries/query-group-by-finalize.c:380-460;
-							// src/web/api/queries/rrdr.h:51;
-							// src/libnetdata/storage-point.h:120-121;
-							// src/web/api/formatters/jsonwrap-v2.c:102-104,176-182.
-							got, ok := viewStats[gname]["arp"]
-							if !ok {
-								t.Errorf("%q: view sts arp is missing (have %v)", gname, viewStats[gname])
-							} else if viewARPRows == 0 {
-								t.Errorf("%q: fixture oracle found no rows for view sts arp", gname)
-							} else if want := math.Floor(viewARPTotal*10) / float64(viewARPRows*10); !tierValueMatch(got, want, 1e-9) {
-								t.Errorf("%q: view sts arp %v, want mean row anomaly rate %v", gname, got, want)
-							}
+							t.Logf("%s: %q view sts arp is missing (have %v)", label, gname, viewStats[gname])
+							result.viewAnomaly = false
+						} else if viewARPRows == 0 {
+							t.Logf("%s: %q fixture oracle found no rows for view sts arp", label, gname)
+							result.viewAnomaly = false
+						} else if want := math.Floor(viewARPTotal*10) / float64(viewARPRows*10); !tierValueMatch(got, want, 1e-9) {
+							t.Logf("%s: %q view sts arp %v, want mean row anomaly rate %v", label, gname, got, want)
+							result.viewAnomaly = false
 						}
 					}
-				})
+				}
 			}
 		}
 	}
+	return result
 }
 
 // TestCase018MultipassAverage discriminates the correct mean of finalized
@@ -709,7 +813,7 @@ func TestLayer6TwoPassHeldBoundaryPreservation(t *testing.T) {
 		Dimensions: []fixture.Dimension{
 			{ID: "avg_a", Points: point("0", stream.FlagAnomalous)},
 			{ID: "avg_b", Points: point("0", stream.FlagNotAnomalous)},
-			{ID: "pct_a", Points: point("1", stream.FlagNotAnomalous)},
+			{ID: "pct_a", Points: point("1", stream.FlagAnomalous)},
 			{ID: "pct_b", Points: point("1", stream.FlagNotAnomalous)},
 		},
 	}
@@ -784,15 +888,15 @@ func TestLayer6TwoPassHeldBoundaryPreservation(t *testing.T) {
 	// src/web/api/queries/query-group-by-init.c:258-326,492-523;
 	// src/web/api/queries/query-group-by-finalize.c:10-117,158-186,284-421.
 	t.Run("average-to-sum-held", func(t *testing.T) {
-		trackContractComponent(t, "L6/two-pass-average-boundary", "average-to-sum-held")
+		trackContract(t, "L6/two-pass-average-held-boundary")
 		assert(t, "instance", "average", "avg*", "", 0, 100)
 	})
 	t.Run("percentage-to-sum-held", func(t *testing.T) {
-		trackContractComponent(t, "L6/two-pass-percentage", "percentage-to-sum-held")
-		assert(t, "instance", "percentage", "", "pct*", 100, 0)
+		trackContract(t, "L6/two-pass-percentage-held-boundary")
+		assert(t, "instance", "percentage", "", "pct*", 100, 100)
 	})
 	t.Run("percentage-of-instance-to-sum-held", func(t *testing.T) {
-		trackContractComponent(t, "L6/two-pass-percentage", "percentage-of-instance-to-sum-held")
-		assert(t, "percentage-of-instance", "sum", "", "pct*", 100, 0)
+		trackContract(t, "L6/two-pass-percentage-of-instance-held-boundary")
+		assert(t, "percentage-of-instance", "sum", "", "pct*", 100, 100)
 	})
 }

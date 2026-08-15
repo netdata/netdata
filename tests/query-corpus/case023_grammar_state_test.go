@@ -136,7 +136,7 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		expression string
 		want       float64
 	}{
-		{"!=1", 75}, {"<>1", 75},
+		{"!=1", 75}, {"!:1", 75}, {"!1", 75}, {"<>1", 75},
 		{">0", 50}, {">=1", 50}, {">:1", 50},
 		{"<1", 50}, {"<=1", 75}, {"<:1", 75},
 		{"=1", 25}, {"==1", 25}, {":1", 25},
@@ -149,23 +149,99 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		})
 	}
 
-	// An absent option or a zero-length expression retains the documented
-	// =0 default at every entry point.
-	for _, group := range []struct {
-		name string
-		want float64
-	}{
-		{name: "percentage-of-samples", want: 25},
-		{name: "percentage-of-time", want: 25},
-		{name: "number-of-flaps", want: 2},
-		{name: "number-of-times", want: 2},
-	} {
-		group := group
-		t.Run("default/"+group.name, func(t *testing.T) {
-			whole(t, group.name, "", "state", false, group.want)
-			whole(t, group.name, "", "state", true, group.want)
-		})
-	}
+	t.Run("default-zero", func(t *testing.T) {
+		trackContract(t, "CASE-023/expression-default-zero")
+
+		// An absent, empty or whitespace-only expression is ==0 for every
+		// condition grouping.
+		for _, group := range []struct {
+			name string
+			want float64
+		}{
+			{name: "percentage-of-samples", want: 25},
+			{name: "percentage-of-time", want: 25},
+			{name: "number-of-flaps", want: 2},
+			{name: "number-of-times", want: 2},
+		} {
+			group := group
+			t.Run(group.name, func(t *testing.T) {
+				whole(t, group.name, "", "state", false, group.want)
+				whole(t, group.name, "", "state", true, group.want)
+				whole(t, group.name, "   ", "state", true, group.want)
+			})
+		}
+
+		// An omitted operand leaves the parsed operator intact and applies it
+		// to numeric zero. Each comparator class has a fixture-derived result.
+		for _, tc := range []struct {
+			expression string
+			want       float64
+		}{
+			{"!", 75}, {"!=", 75}, {"!:", 75}, {"<>", 75},
+			{">", 50}, {">=", 75}, {">:", 75},
+			{"<", 25}, {"<=", 50}, {"<:", 50},
+			{"=", 25}, {"==", 25}, {":", 25},
+			{">   ", 50},
+		} {
+			tc := tc
+			t.Run("operator-only/"+testName(tc.expression), func(t *testing.T) {
+				whole(t, "percentage-of-samples", tc.expression, "state", true, tc.want)
+			})
+		}
+
+		// V2 has its own request parser and validation call, despite sharing
+		// the query engine with V3.
+		v2Spec := c023GrammarQuery{
+			group: "percentage-of-samples", expression: ">", dimension: "state",
+			after: fixture.T0, before: fixture.T0 + 8, points: 1, sendExpression: true,
+		}
+		v2Params := daemon.DataParams(ch.Context, v2Spec.after, v2Spec.before, v2Spec.points)
+		v2Params.Set("time_group", v2Spec.group)
+		v2Params.Set("time_group_options", v2Spec.expression)
+		v2Params.Set("scope_dimensions", v2Spec.dimension)
+		v2Params.Set("options", "jsonwrap,unaligned")
+		v2Doc, err := td.HostJSON(host, "api/v2/data", v2Params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v2Cols, err := canon.Columns(v2Doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		requireValues(t, v2Spec, v2Cols[v2Spec.dimension], []float64{50})
+
+		// V1 has a separate parameter vocabulary and validator. Its wrapped
+		// JSON result is [timestamp, value] for this one-dimension query.
+		v1Params := daemon.DataParams(ch.Context, fixture.T0, fixture.T0+8, 1)
+		for _, key := range []string{"scope_contexts", "time_group", "time_group_options", "group_by", "aggregation"} {
+			v1Params.Del(key)
+		}
+		v1Params.Set("context", ch.Context)
+		v1Params.Set("dimensions", "state")
+		v1Params.Set("group", "percentage-of-samples")
+		v1Params.Set("group_options", ">")
+		v1Params.Set("format", "json")
+		v1Params.Set("options", "jsonwrap|seconds|unaligned|virtual-points")
+		v1Doc, err := td.HostJSON(host, "api/v1/data", v1Params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, ok := v1Doc["result"].(map[string]any)
+		if !ok {
+			t.Fatalf("V1 default-zero result is missing or malformed: %v", v1Doc["result"])
+		}
+		rows, ok := result["data"].([]any)
+		if !ok || len(rows) != 1 {
+			t.Fatalf("V1 default-zero data = %v, want one row", result["data"])
+		}
+		row, ok := rows[0].([]any)
+		if !ok || len(row) != 2 {
+			t.Fatalf("V1 default-zero row = %v, want [timestamp value]", rows[0])
+		}
+		if value, ok := row[1].(float64); !ok || value != 50 {
+			t.Errorf("V1 percentage-of-samples(>) = %v, want 50", row[1])
+		}
+	})
 
 	for _, token := range []string{"gap", "nan", "null", "empty"} {
 		token := token
@@ -228,28 +304,13 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		requireValues(t, spec, query(t, spec), []float64{0, 1, 0, 1})
 	})
 
-	// Operators always require a complete operand. Only an absent or
-	// zero-length whole expression defaults to =0.
-	operatorOnly := []string{
-		"!", "!=", "!:", ">", ">=", ">:", "<", "<=", "<:", "<>", "=", "==", ":",
-		">   ",
-	}
-	for _, expression := range operatorOnly {
-		expression := expression
-		t.Run("reject/operator-only/"+testName(expression), func(t *testing.T) {
-			requireExpressionRejected(t, host, ch.Context, "percentage-of-samples", expression)
-		})
-	}
-
 	// Every grouping must honor parser failure; otherwise one caller can
 	// silently turn the same malformed condition into ==0.
 	for _, group := range []string{
 		"percentage-of-samples", "percentage-of-time", "number-of-flaps", "number-of-times",
 	} {
 		group := group
-		for _, expression := range []string{
-			"   ", ">", "abc", ">1e309", "NaN", "+Inf", "-Inf",
-		} {
+		for _, expression := range []string{"abc", ">1e309", "+Inf", "-Inf"} {
 			expression := expression
 			t.Run("reject/"+group+"/"+testName(expression), func(t *testing.T) {
 				requireExpressionRejected(t, host, ch.Context, group, expression)
@@ -257,7 +318,7 @@ func TestCase023ExpressionGrammarAndState(t *testing.T) {
 		}
 	}
 
-	for _, expression := range []string{"!1", "!:1", ">.", ">==5", ">0junk", "==previous-junk", "==gap and x"} {
+	for _, expression := range []string{">.", ">==5", ">0junk", "==previous-junk", "==gap and x"} {
 		expression := expression
 		t.Run("reject/malformed/"+testName(expression), func(t *testing.T) {
 			requireExpressionRejected(t, host, ch.Context, "percentage-of-samples", expression)

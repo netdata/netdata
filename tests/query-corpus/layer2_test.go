@@ -56,6 +56,16 @@ func tierValueMatch(got, want, relTol float64) bool {
 	return valuesMatch(got, want, relTol)
 }
 
+type tierWindowAssertion uint8
+
+const (
+	tierWindowAll tierWindowAssertion = iota
+	tierWindowGrid
+	tierWindowValue
+	tierWindowAnomaly
+	tierWindowAnnotation
+)
+
 // verifyTierWindows asserts every tier bucket of every dimension of ch in
 // [firstEnd, lastEnd] (aligned window ends, inclusive) against the fixture
 // tier oracle, through four forced-tier queries (sum, min, max, average) —
@@ -66,6 +76,21 @@ func tierValueMatch(got, want, relTol float64) bool {
 // point ending exactly at `after` is absorbed into the first bucket —
 // CASE-017 pins that bug; the green cases here start before their data.
 func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, granularity, firstEnd, lastEnd int64) {
+	t.Helper()
+	verifyTierWindowsWithReporter(t, host, ch, tier, granularity, firstEnd, lastEnd,
+		func(_ tierWindowAssertion, format string, args ...any) {
+			t.Errorf(format, args...)
+		})
+}
+
+func verifyTierWindowsWithReporter(
+	t *testing.T,
+	host string,
+	ch fixture.Chart,
+	tier int,
+	granularity, firstEnd, lastEnd int64,
+	report func(tierWindowAssertion, string, ...any),
+) {
 	t.Helper()
 
 	after := firstEnd - granularity
@@ -79,36 +104,42 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 	for _, tg := range []string{"sum", "min", "max", "average"} {
 		doc, err := td.DataV3(host, daemon.DataParamsTier(ch.Context, tier, after, lastEnd, points, tg))
 		if err != nil {
-			t.Fatalf("tier%d %s query: %v", tier, tg, err)
+			report(tierWindowAll, "tier%d %s query: %v", tier, tg, err)
+			continue
 		}
 		if !assertSelectedTier(t, doc, tier) {
-			t.Fatalf("tier%d %s query was not served only by the forced tier", tier, tg)
+			report(tierWindowAll, "tier%d %s query was not served only by the forced tier", tier, tg)
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
-			t.Fatalf("tier%d %s decode: %v", tier, tg, err)
+			report(tierWindowAll, "tier%d %s decode: %v", tier, tg, err)
+			continue
 		}
 		dimensions := make([]string, 0, len(ch.Dimensions))
 		for _, dim := range ch.Dimensions {
 			dimensions = append(dimensions, dim.ID)
 		}
 		if !assertExactColumnSet(t, cols, dimensions) {
-			t.Fatalf("tier%d %s returned the wrong dimension set", tier, tg)
+			report(tierWindowAll, "tier%d %s returned the wrong dimension set", tier, tg)
 		}
 
 		for _, dim := range ch.Dimensions {
 			col, ok := cols[dim.ID]
 			if !ok {
-				t.Fatalf("tier%d %s: dimension %q missing from result (have %v)", tier, tg, dim.ID, keys(cols))
+				report(tierWindowAll, "tier%d %s: dimension %q missing from result (have %v)", tier, tg, dim.ID, keys(cols))
+				continue
 			}
 			if len(col) != int(points) {
-				t.Fatalf("tier%d %s dim %q: got %d buckets, want %d (view drifted from the tier grid?)",
+				report(tierWindowGrid, "tier%d %s dim %q: got %d buckets, want %d (view drifted from the tier grid?)",
 					tier, tg, dim.ID, len(col), points)
 			}
 			for i, pt := range col {
+				if i >= int(points) {
+					break
+				}
 				wantEnd := firstEnd + int64(i)*granularity
 				if pt.T != wantEnd {
-					t.Errorf("tier%d %s dim %q bucket %d: time t0%+d, want t0%+d",
+					report(tierWindowGrid, "tier%d %s dim %q bucket %d: time t0%+d, want t0%+d",
 						tier, tg, dim.ID, i, pt.T-fixture.T0, wantEnd-fixture.T0)
 					continue
 				}
@@ -118,16 +149,20 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 					// never-stored and stored-empty windows read identically:
 					// null value, EMPTY annotation
 					if pt.Value != nil {
-						t.Errorf("tier%d %s dim %q t0%+d: value %v, want null (%s window)",
+						report(tierWindowValue, "tier%d %s dim %q t0%+d: value %v, want null (%s window)",
 							tier, tg, dim.ID, pt.T-fixture.T0, *pt.Value, emptyKind(stored))
 					}
 					if pt.PA&canon.AnnotationEmpty == 0 {
-						t.Errorf("tier%d %s dim %q t0%+d: EMPTY annotation missing on %s window (pa %d)",
+						report(tierWindowAnnotation, "tier%d %s dim %q t0%+d: EMPTY annotation missing on %s window (pa %d)",
 							tier, tg, dim.ID, pt.T-fixture.T0, emptyKind(stored), pt.PA)
 					}
-					if pt.ARP != 0 || pt.PA != canon.AnnotationEmpty {
-						t.Errorf("tier%d %s dim %q t0%+d: empty metadata ARP=%v PA=%d, want 0/%d",
-							tier, tg, dim.ID, pt.T-fixture.T0, pt.ARP, pt.PA, canon.AnnotationEmpty)
+					if pt.ARP != 0 {
+						report(tierWindowAnomaly, "tier%d %s dim %q t0%+d: empty anomaly rate %v, want 0",
+							tier, tg, dim.ID, pt.T-fixture.T0, pt.ARP)
+					}
+					if pt.PA != canon.AnnotationEmpty {
+						report(tierWindowAnnotation, "tier%d %s dim %q t0%+d: empty annotations %d, want exactly %d",
+							tier, tg, dim.ID, pt.T-fixture.T0, pt.PA, canon.AnnotationEmpty)
 					}
 					continue
 				}
@@ -145,18 +180,16 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 					exp = want.Sum / float64(want.Count)
 				}
 				if pt.Value == nil {
-					t.Errorf("tier%d %s dim %q t0%+d: null, want %v (count %d)",
+					report(tierWindowValue, "tier%d %s dim %q t0%+d: null, want %v (count %d)",
 						tier, tg, dim.ID, pt.T-fixture.T0, exp, want.Count)
-					continue
-				}
-				if !tierValueMatch(*pt.Value, exp, tol) {
-					t.Errorf("tier%d %s dim %q t0%+d: value %v, want %v (count %d, tolerance %v)",
+				} else if !tierValueMatch(*pt.Value, exp, tol) {
+					report(tierWindowValue, "tier%d %s dim %q t0%+d: value %v, want %v (count %d, tolerance %v)",
 						tier, tg, dim.ID, pt.T-fixture.T0, *pt.Value, exp, want.Count, tol)
 				}
 
 				expARP := 100 * float64(want.AnomalyCount) / float64(want.Count)
 				if !tierValueMatch(pt.ARP, expARP, 0) {
-					t.Errorf("tier%d %s dim %q t0%+d: anomaly rate %v, want %v (%d/%d)",
+					report(tierWindowAnomaly, "tier%d %s dim %q t0%+d: anomaly rate %v, want %v (%d/%d)",
 						tier, tg, dim.ID, pt.T-fixture.T0, pt.ARP, expARP, want.AnomalyCount, want.Count)
 				}
 
@@ -168,7 +201,7 @@ func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, gr
 					wantPA = canon.AnnotationPartial
 				}
 				if pt.PA != wantPA {
-					t.Errorf("tier%d %s dim %q t0%+d: annotations %d, want %d (count %d, gaps %d)",
+					report(tierWindowAnnotation, "tier%d %s dim %q t0%+d: annotations %d, want %d (count %d, gaps %d)",
 						tier, tg, dim.ID, pt.T-fixture.T0, pt.PA, wantPA, want.Count, want.GapCount)
 				}
 			}
@@ -189,11 +222,20 @@ func emptyKind(stored bool) string {
 // T0+1..T0+40; full windows follow every 60s. Every fixture pushes two full
 // windows beyond the last asserted end (the tier write-delay settle rule).
 func TestLayer2Tier1Palette(t *testing.T) {
-	trackContract(t, "L2/tier1-palette")
-
 	const b1 = fixture.T0 + 40 // first aligned tier1 window end after T0
+	contracts := map[string]bool{
+		"L2/tier1-complete":       true,
+		"L2/tier1-interior-gaps":  true,
+		"L2/tier1-anomaly-rate":   true,
+		"L2/tier1-reset-flags":    true,
+		"L2/tier1-float32-fields": true,
+	}
+	for contract := range contracts {
+		registerContract(t, contract)
+	}
 
 	cases := map[string]struct {
+		contract          string
 		hostname          string
 		guid              string
 		chart             fixture.Chart
@@ -201,6 +243,7 @@ func TestLayer2Tier1Palette(t *testing.T) {
 	}{
 		// W1 partial (40 samples), W2..W5 full — plain identity arithmetic
 		"complete": {
+			contract: "L2/tier1-complete",
 			hostname: "l2-complete", guid: guid(41),
 			chart:    fixture.Series("fixture.l2complete", "fixture.l2complete", fixture.T0, 400, 1, modVal, notAnom),
 			firstEnd: b1, lastEnd: b1 + 4*tier1Gran,
@@ -208,6 +251,7 @@ func TestLayer2Tier1Palette(t *testing.T) {
 		// gap run i=90..170: W2 partial (count 49), W3 all-gap (stored-empty
 		// tier point), W4 partial (count 50)
 		"interior-gaps": {
+			contract: "L2/tier1-interior-gaps",
 			hostname: "l2-gaps", guid: guid(42),
 			chart: fixture.Series("fixture.l2gaps", "fixture.l2gaps", fixture.T0, 400, 1, modVal, func(i int) string {
 				if i >= 90 && i <= 170 {
@@ -219,6 +263,7 @@ func TestLayer2Tier1Palette(t *testing.T) {
 		},
 		// anomaly run i=50..75 inside W2: fractional anomaly rate 26/60
 		"anomaly-rate": {
+			contract: "L2/tier1-anomaly-rate",
 			hostname: "l2-anom", guid: guid(44),
 			chart: fixture.Series("fixture.l2anom", "fixture.l2anom", fixture.T0, 280, 1, modVal, func(i int) string {
 				if i >= 50 && i <= 75 {
@@ -232,6 +277,7 @@ func TestLayer2Tier1Palette(t *testing.T) {
 		// annotation is asserted ABSENT on every tier bucket (pages store no
 		// flags); the lone-R contributes 1/60 anomaly rate to W2
 		"reset-lost": {
+			contract: "L2/tier1-reset-flags",
 			hostname: "l2-reset", guid: guid(45),
 			chart: fixture.Series("fixture.l2reset", "fixture.l2reset", fixture.T0, 280, 1, modVal, func(i int) string {
 				switch i {
@@ -247,6 +293,7 @@ func TestLayer2Tier1Palette(t *testing.T) {
 		// mixed-sign fractional values: the float32 write-rounding of
 		// sum/min/max is visible and must match the oracle's single cast
 		"fractional-f32": {
+			contract: "L2/tier1-float32-fields",
 			hostname: "l2-frac", guid: guid(46),
 			chart: func() fixture.Chart {
 				ch := fixture.Series("fixture.l2frac", "fixture.l2frac", fixture.T0, 280, 1, func(i int) string {
@@ -258,15 +305,61 @@ func TestLayer2Tier1Palette(t *testing.T) {
 			firstEnd: b1, lastEnd: b1 + 2*tier1Gran,
 		},
 	}
+	routes := func(caseContract string, assertion tierWindowAssertion) []string {
+		valueContract := caseContract
+		if caseContract == "L2/tier1-anomaly-rate" || caseContract == "L2/tier1-reset-flags" {
+			valueContract = "L2/tier1-complete"
+		}
+		annotationContract := "L2/tier1-reset-flags"
+		if caseContract == "L2/tier1-interior-gaps" {
+			annotationContract = caseContract
+		}
+
+		switch assertion {
+		case tierWindowValue:
+			return []string{valueContract}
+		case tierWindowAnomaly:
+			return []string{"L2/tier1-anomaly-rate"}
+		case tierWindowAnnotation:
+			return []string{annotationContract}
+		default:
+			seen := map[string]bool{}
+			var out []string
+			for _, contract := range []string{valueContract, "L2/tier1-anomaly-rate", annotationContract} {
+				if !seen[contract] {
+					seen[contract] = true
+					out = append(out, contract)
+				}
+			}
+			return out
+		}
+	}
 
 	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
+		if !t.Run(name, func(t *testing.T) {
 			pushLiveBurst(t, tc.hostname, tc.guid, tc.chart)
 			if _, err := td.WaitRetention(tc.hostname, tc.chart.Context, tc.chart.FirstT(), tc.chart.LastT(), 15*time.Second); err != nil {
 				t.Fatal(err)
 			}
-			verifyTierWindows(t, tc.hostname, tc.chart, 1, tier1Gran, tc.firstEnd, tc.lastEnd)
-		})
+			verifyTierWindowsWithReporter(t, tc.hostname, tc.chart, 1, tier1Gran, tc.firstEnd, tc.lastEnd,
+				func(assertion tierWindowAssertion, format string, args ...any) {
+					t.Logf(format, args...)
+					for _, contract := range routes(tc.contract, assertion) {
+						contracts[contract] = false
+					}
+				})
+		}) {
+			for _, contract := range routes(tc.contract, tierWindowAll) {
+				contracts[contract] = false
+			}
+		}
+	}
+
+	for _, contract := range []string{
+		"L2/tier1-complete", "L2/tier1-interior-gaps", "L2/tier1-anomaly-rate",
+		"L2/tier1-reset-flags", "L2/tier1-float32-fields",
+	} {
+		assertContract(t, contract, contracts[contract])
 	}
 }
 
@@ -355,22 +448,27 @@ func TestLayer2WholeChartAbsence(t *testing.T) {
 // read 16777220. The same fixture cross-checks the tier0 identity
 // (SNRoundTrip oracle) so both contracts are asserted on the same data.
 func TestLayer2SNvsOriginal(t *testing.T) {
-	trackContract(t, "L2/sn-vs-original")
-
 	const v = "16777217"
 	ch := fixture.Series("fixture.l2snorig", "fixture.l2snorig", fixture.T0, 280, 1, func(_ int) string {
 		return v
 	}, notAnom)
 
 	pushLiveBurst(t, "l2-snorig", guid(47), ch)
-	settleAndVerify(t, "l2-snorig", ch) // tier0: every value reads SNRoundTrip(16777217) = 16777220
 
-	f, _ := strconv.ParseFloat(v, 64)
-	if q := fixture.SNRoundTrip(f); q == float64(float32(f)) {
-		t.Fatalf("fixture lost its discriminating power: SNRoundTrip(%s)=%v equals float32(%s)=%v",
-			v, q, v, float64(float32(f)))
-	}
-	verifyTierWindows(t, "l2-snorig", ch, 1, tier1Gran, fixture.T0+40, fixture.T0+40+2*tier1Gran)
+	t.Run("tier0-storage-number", func(t *testing.T) {
+		trackContract(t, "L2/tier0-storage-number-quantization")
+		settleAndVerify(t, "l2-snorig", ch)
+	})
+
+	t.Run("tier-rollup-original", func(t *testing.T) {
+		trackContract(t, "L2/tier-rollup-original-values")
+		f, _ := strconv.ParseFloat(v, 64)
+		if q := fixture.SNRoundTrip(f); q == float64(float32(f)) {
+			t.Fatalf("fixture lost its discriminating power: SNRoundTrip(%s)=%v equals float32(%s)=%v",
+				v, q, v, float64(float32(f)))
+		}
+		verifyTierWindows(t, "l2-snorig", ch, 1, tier1Gran, fixture.T0+40, fixture.T0+40+2*tier1Gran)
+	})
 }
 
 // TestLayer2UpdateEvery5 exercises the tier grid arithmetic with a

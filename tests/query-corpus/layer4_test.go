@@ -60,7 +60,16 @@ func tierFetchBuckets(d fixture.Dimension, name string, granularity, updateEvery
 // unaligned head, a gap run) and anomaly runs included, so families see
 // unequal per-window counts.
 func TestLayer4FamilyTierMatrix(t *testing.T) {
-	trackContract(t, "L4/family-tier-matrix")
+	contracts := map[string]bool{
+		"L4/family-tier-source":        true,
+		"L4/family-tier-grid":          true,
+		"L4/family-tier-values":        true,
+		"L4/family-tier-anomaly-rates": true,
+		"L4/family-tier-annotations":   true,
+	}
+	for contract := range contracts {
+		registerContract(t, contract)
+	}
 
 	ch := fixture.Series("fixture.l4matrix", "fixture.l4matrix", fixture.T0, 2400, 1, func(i int) string {
 		return strconv.FormatFloat(float64(i%13-6)+float64(i%7)/10, 'f', 1, 64)
@@ -102,12 +111,28 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 		{"countif", ">0"},
 		{"ses", ""}, {"des", ""}, {"incremental-sum", ""},
 	}
+	fail := func(contract, format string, args ...any) {
+		t.Helper()
+		t.Logf(format, args...)
+		contracts[contract] = false
+	}
 
 	d := ch.Dimensions[0]
 	for _, tg := range groups {
+		completed := false
 		t.Run(tg.name+optSuffix(tg.options), func(t *testing.T) {
+			minmaxComponent := tg.name == "min" || tg.name == "max"
+			minmaxOK := true
 			if tg.name == "min" || tg.name == "max" {
 				trackContractComponent(t, "L4/minmax-absolute-semantics", "tier1-"+tg.name)
+			}
+			mark := func(contract, format string, args ...any) {
+				t.Helper()
+				fail(contract, tg.name+optSuffix(tg.options)+": "+format, args...)
+				if minmaxComponent && (contract == "L4/family-tier-source" ||
+					contract == "L4/family-tier-grid" || contract == "L4/family-tier-values") {
+					minmaxOK = false
+				}
 			}
 			params := daemon.DataParamsTier(ch.Context, 1, after, after+buckets*bucketSpan, buckets, tg.name)
 			if tg.options != "" {
@@ -118,19 +143,27 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !assertSelectedTier(t, doc, 1) {
-				t.Error("forced tier-1 query was not served exclusively from tier 1")
+				mark("L4/family-tier-source", "forced tier-1 query was not served exclusively from tier 1")
 			}
 			cols, err := canon.Columns(doc)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !assertExactView(t, doc, after, after+buckets*bucketSpan, bucketSpan) ||
-				!assertOnlyColumn(t, cols, d.ID) {
-				t.Fail()
+			if !assertExactView(t, doc, after, after+buckets*bucketSpan, bucketSpan) {
+				mark("L4/family-tier-grid", "response view is not the exact requested grid")
+				contracts["L4/family-tier-values"] = false
+				contracts["L4/family-tier-anomaly-rates"] = false
+				contracts["L4/family-tier-annotations"] = false
+			}
+			if !assertOnlyColumn(t, cols, d.ID) {
+				mark("L4/family-tier-source", "response contains the wrong source columns")
 			}
 			col := cols[d.ID]
 			if len(col) != buckets {
-				t.Fatalf("got %d buckets, want %d", len(col), buckets)
+				mark("L4/family-tier-grid", "got %d buckets, want %d", len(col), buckets)
+				contracts["L4/family-tier-values"] = false
+				contracts["L4/family-tier-anomaly-rates"] = false
+				contracts["L4/family-tier-annotations"] = false
 			}
 
 			// view group = bucketSpan query-granularity units (virtual
@@ -139,27 +172,35 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 			exp := fixture.TGOracle(tg.name, tg.options, vals, bucketSpan, buckets)
 
 			for i, pt := range col {
+				if i >= len(exp) || i >= len(stats) {
+					break
+				}
 				want := exp[i]
 				wantT := int64(after) + int64(i+1)*bucketSpan
 				if pt.T != wantT {
-					t.Errorf("bucket %d: time t0%+d, want t0%+d", i, pt.T-fixture.T0, wantT-fixture.T0)
+					mark("L4/family-tier-grid", "bucket %d time t0%+d, want t0%+d", i, pt.T-fixture.T0, wantT-fixture.T0)
+					contracts["L4/family-tier-values"] = false
+					contracts["L4/family-tier-anomaly-rates"] = false
+					contracts["L4/family-tier-annotations"] = false
 					continue
 				}
 				switch {
 				case want.Empty && pt.Value != nil:
-					t.Errorf("bucket t0%+d: value %v, want null", pt.T-fixture.T0, *pt.Value)
+					mark("L4/family-tier-values", "bucket t0%+d value %v, want null", pt.T-fixture.T0, *pt.Value)
 				case !want.Empty && pt.Value == nil:
-					t.Errorf("bucket t0%+d: null, want %v", pt.T-fixture.T0, want.Value)
+					mark("L4/family-tier-values", "bucket t0%+d null, want %v", pt.T-fixture.T0, want.Value)
 				case !want.Empty && !tierValueMatch(*pt.Value, want.Value, 1e-9):
-					t.Errorf("bucket t0%+d: value %v, want %v", pt.T-fixture.T0, *pt.Value, want.Value)
+					mark("L4/family-tier-values", "bucket t0%+d value %v, want %v", pt.T-fixture.T0, *pt.Value, want.Value)
 				}
 				if st := stats[i]; st.Count > 0 {
 					expARP := 100 * float64(st.AC) / float64(st.Count)
 					if !tierValueMatch(pt.ARP, expARP, 0) {
-						t.Errorf("bucket t0%+d: arp %v, want %v (%d/%d)", pt.T-fixture.T0, pt.ARP, expARP, st.AC, st.Count)
+						mark("L4/family-tier-anomaly-rates", "bucket t0%+d arp %v, want %v (%d/%d)",
+							pt.T-fixture.T0, pt.ARP, expARP, st.AC, st.Count)
 					}
 				} else if pt.ARP != 0 {
-					t.Errorf("bucket t0%+d: arp %v, want 0 with no contributors", pt.T-fixture.T0, pt.ARP)
+					mark("L4/family-tier-anomaly-rates", "bucket t0%+d arp %v, want 0 with no contributors",
+						pt.T-fixture.T0, pt.ARP)
 				}
 				wantPA := int64(0)
 				if want.Empty {
@@ -168,10 +209,26 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 					wantPA = canon.AnnotationPartial
 				}
 				if pt.PA != wantPA {
-					t.Errorf("bucket t0%+d: pa %d, want %d", pt.T-fixture.T0, pt.PA, wantPA)
+					mark("L4/family-tier-annotations", "bucket t0%+d pa %d, want %d", pt.T-fixture.T0, pt.PA, wantPA)
 				}
 			}
+			if !minmaxOK {
+				t.Errorf("BROKEN L4/minmax-absolute-semantics (tier1-%s)", tg.name)
+			}
+			completed = true
 		})
+		if !completed {
+			for contract := range contracts {
+				contracts[contract] = false
+			}
+		}
+	}
+
+	for _, contract := range []string{
+		"L4/family-tier-source", "L4/family-tier-grid", "L4/family-tier-values",
+		"L4/family-tier-anomaly-rates", "L4/family-tier-annotations",
+	} {
+		assertContract(t, contract, contracts[contract])
 	}
 }
 
@@ -180,7 +237,16 @@ func TestLayer4FamilyTierMatrix(t *testing.T) {
 // fitting tier — and the values equal that tier's oracle. Reuses the
 // layer-2 tier2 fixture (17200 replicated samples on host l2-tier2).
 func TestLayer4AutoTierSelection(t *testing.T) {
-	trackContract(t, "L4/auto-tier-selection")
+	contracts := map[string]bool{
+		"L4/auto-tier-choice":        true,
+		"L4/auto-tier-grid":          true,
+		"L4/auto-tier-values":        true,
+		"L4/auto-tier-anomaly-rates": true,
+		"L4/auto-tier-annotations":   true,
+	}
+	for contract := range contracts {
+		registerContract(t, contract)
+	}
 
 	const host, context = "l2-tier2", "fixture.l2tier2"
 	value := func(i int) string { return strconv.Itoa(i % 1000) }
@@ -217,90 +283,115 @@ func TestLayer4AutoTierSelection(t *testing.T) {
 		// per-second identity: only tier0 delivers the density
 		"tier0": {tier: 0, after: fixture.T0 + 100, before: fixture.T0 + 160, points: 60},
 	}
+	fail := func(contract, format string, args ...any) {
+		t.Helper()
+		t.Logf(format, args...)
+		contracts[contract] = false
+	}
 
 	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			doc, err := td.DataV3(host, daemon.DataParams(context, tc.after, tc.before, tc.points))
-			if err != nil {
-				t.Fatal(err)
-			}
+		doc, err := td.DataV3(host, daemon.DataParams(context, tc.after, tc.before, tc.points))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			if !assertSelectedTier(t, doc, tc.tier) {
-				t.Errorf("expected only tier %d to serve the automatic-tier query", tc.tier)
-			}
+		if !assertSelectedTier(t, doc, tc.tier) {
+			fail("L4/auto-tier-choice", "%s: expected only tier %d to serve the automatic-tier query", name, tc.tier)
+		}
 
-			cols, err := canon.Columns(doc)
-			if err != nil {
-				t.Fatal(err)
-			}
-			span := (tc.before - tc.after) / tc.points
-			if !assertExactView(t, doc, tc.after, tc.before, span) ||
-				!assertOnlyColumn(t, cols, d.ID) {
-				t.Fail()
-			}
-			col := cols[d.ID]
-			if int64(len(col)) != tc.points {
-				t.Fatalf("got %d buckets, want %d", len(col), tc.points)
-			}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		span := (tc.before - tc.after) / tc.points
+		if !assertExactView(t, doc, tc.after, tc.before, span) {
+			fail("L4/auto-tier-grid", "%s: response view is not the exact requested grid", name)
+			contracts["L4/auto-tier-values"] = false
+			contracts["L4/auto-tier-anomaly-rates"] = false
+			contracts["L4/auto-tier-annotations"] = false
+		}
+		if !assertOnlyColumn(t, cols, d.ID) {
+			fail("L4/auto-tier-grid", "%s: response contains the wrong columns", name)
+		}
+		col := cols[d.ID]
+		if int64(len(col)) != tc.points {
+			fail("L4/auto-tier-grid", "%s: got %d buckets, want %d", name, len(col), tc.points)
+			contracts["L4/auto-tier-values"] = false
+			contracts["L4/auto-tier-anomaly-rates"] = false
+			contracts["L4/auto-tier-annotations"] = false
+		}
 
-			var (
-				exp   []fixture.TGResult
-				stats []tierBucketStats
-			)
-			if tc.tier == 0 {
-				vals := make([][]float64, tc.points)
-				stats = make([]tierBucketStats, tc.points)
-				for _, p := range d.Points {
-					if p.T > tc.after && p.T <= tc.before {
-						bucket := (p.T - tc.after - 1) / span
-						if v, collected := p.CollectedValue(d.ID); collected {
-							vals[bucket] = append(vals[bucket], fixture.SNRoundTrip(v))
-							stats[bucket].Count++
-							if p.Flags == stream.FlagAnomalous {
-								stats[bucket].AC++
-							}
+		var (
+			exp   []fixture.TGResult
+			stats []tierBucketStats
+		)
+		if tc.tier == 0 {
+			vals := make([][]float64, tc.points)
+			stats = make([]tierBucketStats, tc.points)
+			for _, p := range d.Points {
+				if p.T > tc.after && p.T <= tc.before {
+					bucket := (p.T - tc.after - 1) / span
+					if v, collected := p.CollectedValue(d.ID); collected {
+						vals[bucket] = append(vals[bucket], fixture.SNRoundTrip(v))
+						stats[bucket].Count++
+						if p.Flags == stream.FlagAnomalous {
+							stats[bucket].AC++
 						}
 					}
 				}
-				exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
-			} else {
-				var vals [][]float64
-				vals, stats = tierFetchBuckets(d, "average", tier1Gran, int64(ch.UpdateEvery), tc.after, span, int(tc.points))
-				exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
 			}
+			exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
+		} else {
+			var vals [][]float64
+			vals, stats = tierFetchBuckets(d, "average", tier1Gran, int64(ch.UpdateEvery), tc.after, span, int(tc.points))
+			exp = fixture.TGOracle("average", "", vals, int(span), int(tc.points))
+		}
 
-			for i, pt := range col {
-				want := exp[i]
-				wantT := tc.after + int64(i+1)*span
-				if pt.T != wantT {
-					t.Errorf("bucket %d: time %d, want %d", i, pt.T, wantT)
-				}
-				switch {
-				case want.Empty && pt.Value != nil:
-					t.Errorf("bucket t0%+d: value %v, want null", pt.T-fixture.T0, *pt.Value)
-				case !want.Empty && pt.Value == nil:
-					t.Errorf("bucket t0%+d: null, want %v", pt.T-fixture.T0, want.Value)
-				case !want.Empty && !tierValueMatch(*pt.Value, want.Value, 1e-9):
-					t.Errorf("bucket t0%+d: value %v, want %v", pt.T-fixture.T0, *pt.Value, want.Value)
-				}
-				wantARP := 0.0
-				if stats[i].Count > 0 {
-					wantARP = 100 * float64(stats[i].AC) / float64(stats[i].Count)
-				}
-				if !tierValueMatch(pt.ARP, wantARP, 0) {
-					t.Errorf("bucket t0%+d: arp %v, want %v (%d/%d)",
-						pt.T-fixture.T0, pt.ARP, wantARP, stats[i].AC, stats[i].Count)
-				}
-				wantPA := int64(0)
-				if want.Empty {
-					wantPA = canon.AnnotationEmpty
-				} else if stats[i].GapCount > 0 {
-					wantPA = canon.AnnotationPartial
-				}
-				if pt.PA != wantPA {
-					t.Errorf("bucket t0%+d: pa %d, want %d", pt.T-fixture.T0, pt.PA, wantPA)
-				}
+		for i, pt := range col {
+			if i >= len(exp) || i >= len(stats) {
+				break
 			}
-		})
+			want := exp[i]
+			wantT := tc.after + int64(i+1)*span
+			if pt.T != wantT {
+				fail("L4/auto-tier-grid", "%s: bucket %d time %d, want %d", name, i, pt.T, wantT)
+				contracts["L4/auto-tier-values"] = false
+				contracts["L4/auto-tier-anomaly-rates"] = false
+				contracts["L4/auto-tier-annotations"] = false
+				continue
+			}
+			switch {
+			case want.Empty && pt.Value != nil:
+				fail("L4/auto-tier-values", "%s: bucket t0%+d value %v, want null", name, pt.T-fixture.T0, *pt.Value)
+			case !want.Empty && pt.Value == nil:
+				fail("L4/auto-tier-values", "%s: bucket t0%+d null, want %v", name, pt.T-fixture.T0, want.Value)
+			case !want.Empty && !tierValueMatch(*pt.Value, want.Value, 1e-9):
+				fail("L4/auto-tier-values", "%s: bucket t0%+d value %v, want %v", name, pt.T-fixture.T0, *pt.Value, want.Value)
+			}
+			wantARP := 0.0
+			if stats[i].Count > 0 {
+				wantARP = 100 * float64(stats[i].AC) / float64(stats[i].Count)
+			}
+			if !tierValueMatch(pt.ARP, wantARP, 0) {
+				fail("L4/auto-tier-anomaly-rates", "%s: bucket t0%+d arp %v, want %v (%d/%d)",
+					name, pt.T-fixture.T0, pt.ARP, wantARP, stats[i].AC, stats[i].Count)
+			}
+			wantPA := int64(0)
+			if want.Empty {
+				wantPA = canon.AnnotationEmpty
+			} else if stats[i].GapCount > 0 {
+				wantPA = canon.AnnotationPartial
+			}
+			if pt.PA != wantPA {
+				fail("L4/auto-tier-annotations", "%s: bucket t0%+d pa %d, want %d", name, pt.T-fixture.T0, pt.PA, wantPA)
+			}
+		}
+	}
+
+	for _, contract := range []string{
+		"L4/auto-tier-choice", "L4/auto-tier-grid", "L4/auto-tier-values",
+		"L4/auto-tier-anomaly-rates", "L4/auto-tier-annotations",
+	} {
+		assertContract(t, contract, contracts[contract])
 	}
 }

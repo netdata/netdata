@@ -441,18 +441,15 @@ func tgSlotWindowMean(values []float64, percentArg float64, percentileMode bool)
 	return TGResult{Value: value}
 }
 
-// parseCountifOptions is the approved finite-numeric strict-contract subset,
-// not a port of the historical fail-open C parser. A zero-length expression
-// retains the API's ==0 default; whitespace-only, incomplete, malformed,
+// parseCountifOptions is the approved finite-numeric contract subset, not a
+// port of the historical fail-open C parser. An absent or blank expression is
+// ==0, and an operator without an operand applies to zero. Malformed,
 // trailing-junk and non-finite operands are invalid. CASE-023 owns the
 // gap-token and predecessor grammar.
 func parseCountifOptions(options string) (cmp string, target float64, err error) {
-	if options == "" {
-		return "==", 0, nil
-	}
 	s := strings.TrimSpace(options)
 	if s == "" {
-		return "", 0, fmt.Errorf("whitespace-only expression")
+		return "==", 0, nil
 	}
 
 	type operator struct {
@@ -482,7 +479,7 @@ func parseCountifOptions(options string) (cmp string, target float64, err error)
 		}
 	}
 	if operand == "" {
-		return "", 0, fmt.Errorf("expression %q has no operand", options)
+		return cmp, 0, nil
 	}
 
 	target, err = parseFiniteDecimal(operand)

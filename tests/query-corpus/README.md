@@ -69,6 +69,13 @@ layers; each layer declares which entries it consumes:
 
 ## Rules
 
+- **One green/red verdict represents one semantic invariant.** A manifest
+  contract may exercise several inputs that all prove the same claim, but it
+  must not combine independently actionable claims such as numeric values and
+  units. Give independent claims separate contract keys and register them in
+  separate test or subtest scopes. Otherwise a known failure in one claim can
+  hide a new regression in another while the broken-contract set appears
+  unchanged.
 - Class A fixture-derived expectations are the default. Deterministic fixtures
   normally use `fixture.T0`; cases that must touch wall-clock time assert
   bounded envelopes.

@@ -33,8 +33,6 @@ import (
 // delivered to three buckets, so the two groupings that disagree about a
 // repeat are both exercised on the same data.
 func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
-	trackContract(t, "CASE-023/redelivery")
-
 	const samples = 2400 // 40 tier-1 windows
 
 	// a 0/1 signal that varies inside every window, so no window is
@@ -53,15 +51,6 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok := true
-	check := func(cond bool, what string, args ...any) {
-		t.Helper()
-		if !cond {
-			t.Logf("re-delivery contract not met: "+what, args...)
-			ok = false
-		}
-	}
-
 	const (
 		perWindow  = 3
 		windows    = 8
@@ -70,7 +59,7 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	after := int64(fixture.T0 + 40) // the first absolute multiple of tier1Gran
 	before := after + windows*tier1Gran
 
-	query := func(group, options string) []canon.Pt {
+	query := func(t *testing.T, group, options string) []canon.Pt {
 		t.Helper()
 		params := daemon.DataParamsTier(ch.Context, 1, after, before, windows*perWindow, group)
 		params.Set("time_group_options", options)
@@ -79,14 +68,14 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !assertSelectedTier(t, doc, 1) {
-			ok = false
+			t.Fail()
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
-			ok = false
+			t.Fail()
 		}
 		return cols[ch.Dimensions[0].ID]
 	}
@@ -94,17 +83,18 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	// percentage-of-samples answers in EVERY bucket: the engine has always
 	// delivered one point per bucket to this grouping, and a bucket that
 	// used to carry a value must not become EMPTY
-	{
-		col := query("percentage-of-samples", ">=1")
+	t.Run("samples-everywhere", func(t *testing.T) {
+		trackContract(t, "CASE-023/redelivery-samples-everywhere")
+		col := query(t, "percentage-of-samples", ">=1")
 		want := make([]expectedColumnPoint, windows*perWindow)
 		for i := range want {
 			want[i] = wantNumberAt(after+int64(i+1)*bucketSpan, 0)
 		}
 		if !assertExactColumn(t, map[string][]canon.Pt{ch.Dimensions[0].ID: col},
 			ch.Dimensions[0].ID, want, 0) {
-			check(false, "percentage-of-samples did not return an exact numeric verdict in every re-delivery bucket")
+			t.Error("percentage-of-samples did not return an exact numeric verdict in every re-delivery bucket")
 		}
-	}
+	})
 
 	// the counting groupings answer at most once per stored window, however
 	// many buckets that window was delivered into - and they answer in
@@ -115,26 +105,41 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	// occurrence, but it is not EMPTY either: nothing happened there, which
 	// is a zero. Returning EMPTY instead punches holes into a chart wherever
 	// the user zooms past the stored resolution.
-	for _, group := range []string{"number-of-times", "number-of-flaps"} {
-		col := query(group, "==0")
-		want := make([]expectedColumnPoint, windows*perWindow)
-		for i := range want {
-			value := 0.0
-			if i%perWindow == 0 {
-				// Every stored window contains both zero and one. The first
-				// delivery contributes its one inferred event; repeats are
-				// numeric zero, never another event and never null.
-				value = 1
+	t.Run("counted-once", func(t *testing.T) {
+		trackContract(t, "CASE-023/redelivery-counted-once")
+		for _, group := range []string{"number-of-times", "number-of-flaps"} {
+			col := query(t, group, "==0")
+			if len(col) != windows*perWindow {
+				t.Errorf("%s returned %d rows, want %d", group, len(col), windows*perWindow)
+				continue
 			}
-			want[i] = wantNumberAt(after+int64(i+1)*bucketSpan, value)
+			for i := 0; i < len(col); i += perWindow {
+				if col[i].Value == nil || *col[i].Value != 1 {
+					t.Errorf("%s window %d first delivery = %v, want one event", group, i/perWindow, col[i].Value)
+				}
+			}
 		}
-		if !assertExactColumn(t, map[string][]canon.Pt{ch.Dimensions[0].ID: col},
-			ch.Dimensions[0].ID, want, 0) {
-			check(false, "%s did not return exactly one event and two numeric zeros per stored window", group)
-		}
-	}
+	})
 
-	assertContract(t, "CASE-023/redelivery", ok)
+	t.Run("zero-not-empty", func(t *testing.T) {
+		trackContract(t, "CASE-023/redelivery-zero-not-empty")
+		for _, group := range []string{"number-of-times", "number-of-flaps"} {
+			col := query(t, group, "==0")
+			if len(col) != windows*perWindow {
+				t.Errorf("%s returned %d rows, want %d", group, len(col), windows*perWindow)
+				continue
+			}
+			for i := range col {
+				if i%perWindow == 0 {
+					continue
+				}
+				if col[i].Value == nil || *col[i].Value != 0 {
+					t.Errorf("%s window %d repeat %d = %v, want numeric zero",
+						group, i/perWindow, i%perWindow, col[i].Value)
+				}
+			}
+		}
+	})
 }
 
 // One counter reset, counted once — whatever the resolution asked for.

@@ -104,12 +104,49 @@ func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, q tgQuery, g
 		switch {
 		case want.Empty && pt.Value != nil:
 			t.Errorf("%s%s bucket t0%+d: value %v, want null", name, optSuffix(options), pt.T-fixture.T0, *pt.Value)
-		case want.Empty && pt.PA&canon.AnnotationEmpty == 0:
-			t.Errorf("%s%s bucket t0%+d: EMPTY annotation missing (pa %d)", name, optSuffix(options), pt.T-fixture.T0, pt.PA)
 		case !want.Empty && pt.Value == nil:
 			t.Errorf("%s%s bucket t0%+d: null, want %v", name, optSuffix(options), pt.T-fixture.T0, want.Value)
 		case !want.Empty && !tierValueMatch(*pt.Value, want.Value, 1e-9):
 			t.Errorf("%s%s bucket t0%+d: value %v, want %v", name, optSuffix(options), pt.T-fixture.T0, *pt.Value, want.Value)
+		}
+	}
+}
+
+func verifyTimeGroupEmptyAnnotations(t *testing.T, host string, ch fixture.Chart, name, options string, group int) {
+	t.Helper()
+
+	d := ch.Dimensions[0]
+	n := int64(len(d.Points))
+	points := n / int64(group)
+	params := daemon.DataParams(ch.Context, fixture.T0, fixture.T0+n, points)
+	params.Set("time_group", name)
+	if options != "" {
+		params.Set("time_group_options", options)
+	}
+	doc, err := td.DataV3(host, params)
+	if err != nil {
+		t.Fatalf("%s%s annotations: %v", name, optSuffix(options), err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatalf("%s%s annotations: %v", name, optSuffix(options), err)
+	}
+	col := cols[d.ID]
+	if int64(len(col)) != points {
+		t.Fatalf("%s%s annotations: got %d buckets, want %d", name, optSuffix(options), len(col), points)
+	}
+
+	exp := fixture.TGOracle(name, options, tgBuckets(d, group), group, int(points))
+	for i, pt := range col {
+		wantT := fixture.T0 + int64((i+1)*group)
+		if pt.T != wantT {
+			t.Errorf("%s%s annotation bucket %d: time t0%+d, want t0%+d",
+				name, optSuffix(options), i, pt.T-fixture.T0, wantT-fixture.T0)
+			continue
+		}
+		if exp[i].Empty && pt.PA&canon.AnnotationEmpty == 0 {
+			t.Errorf("%s%s bucket t0%+d: EMPTY annotation missing (pa %d)",
+				name, optSuffix(options), pt.T-fixture.T0, pt.PA)
 		}
 	}
 }
@@ -141,8 +178,6 @@ func layer3Canonical(chartID string) fixture.Chart {
 // TestLayer3Families drives every time-grouping family (and the alias/
 // variant spread) over the canonical fixture at group 10.
 func TestLayer3Families(t *testing.T) {
-	trackContract(t, "L3/families")
-
 	ch := layer3Canonical("fixture.l3canon")
 	pushLiveBurst(t, "l3-canon", guid(60), ch)
 	if _, err := td.WaitRetention("l3-canon", ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
@@ -167,15 +202,26 @@ func TestLayer3Families(t *testing.T) {
 		{"countif", ">30"}, {"countif", "<=20"}, {"countif", "!=1"}, {"countif", "=40"},
 	}
 
-	for _, tg := range groups {
-		t.Run(tg.name+optSuffix(tg.options), func(t *testing.T) {
-			verifyTimeGroup(t, "l3-canon", ch, tg.name, tg.options, 10)
-		})
-	}
+	t.Run("values", func(t *testing.T) {
+		trackContract(t, "L3/family-values")
+
+		for _, tg := range groups {
+			t.Run(tg.name+optSuffix(tg.options), func(t *testing.T) {
+				verifyTimeGroup(t, "l3-canon", ch, tg.name, tg.options, 10)
+			})
+		}
+	})
 
 	// bucket-level annotations are family-independent: arp 50 on the
 	// anomaly-run bucket, RESET on the reset bucket
 	t.Run("annotations", func(t *testing.T) {
+		trackContract(t, "L3/family-annotations")
+		for _, tg := range groups {
+			t.Run(tg.name+optSuffix(tg.options), func(t *testing.T) {
+				verifyTimeGroupEmptyAnnotations(t, "l3-canon", ch, tg.name, tg.options, 10)
+			})
+		}
+
 		doc, err := td.DataV3("l3-canon", daemon.DataParams(ch.Context, fixture.T0, fixture.T0+60, 6))
 		if err != nil {
 			t.Fatal(err)
@@ -204,7 +250,9 @@ func TestLayer3Families(t *testing.T) {
 // percentile/trimmed-mean and the extremes champion across all-negative
 // and mixed-sign data (per-bucket sign decides the direction).
 func TestLayer3SignSemantics(t *testing.T) {
-	trackContract(t, "L3/sign-semantics")
+	registerContract(t, "L3/sign-semantics")
+	registerContractComponent(t, "L4/minmax-absolute-semantics", "tier0-min")
+	registerContractComponent(t, "L4/minmax-absolute-semantics", "tier0-max")
 
 	cases := map[string]struct {
 		hostname string
@@ -221,7 +269,7 @@ func TestLayer3SignSemantics(t *testing.T) {
 		},
 	}
 
-	groups := []struct {
+	signGroups := []struct {
 		name    string
 		options string
 	}{
@@ -229,25 +277,40 @@ func TestLayer3SignSemantics(t *testing.T) {
 		{"trimmed-mean", ""}, {"trimmed-mean25", ""},
 		{"trimmed-median25", ""},
 		{"extremes", ""}, {"median", ""},
-		// min/max are by ABSOLUTE value (min.h/max.h) — visible only on
-		// negative/mixed data, pinned here
-		{"min", ""}, {"max", ""},
 	}
 
+	charts := make(map[string]fixture.Chart, len(cases))
 	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			context := "fixture.l3" + tc.hostname[3:]
-			ch := fixture.Series(context, context, fixture.T0, 60, 1, tc.value, notAnom)
-			pushLiveBurst(t, tc.hostname, tc.guid, ch)
-			if _, err := td.WaitRetention(tc.hostname, ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
-				t.Fatal(err)
-			}
-			for _, tg := range groups {
-				t.Run(tg.name, func(t *testing.T) {
-					if tg.name == "min" || tg.name == "max" {
-						trackContractComponent(t, "L4/minmax-absolute-semantics", "tier0-"+tg.name)
-					}
-					verifyTimeGroup(t, tc.hostname, ch, tg.name, tg.options, 10)
+		context := "fixture.l3" + tc.hostname[3:]
+		ch := fixture.Series(context, context, fixture.T0, 60, 1, tc.value, notAnom)
+		pushLiveBurst(t, tc.hostname, tc.guid, ch)
+		if _, err := td.WaitRetention(tc.hostname, ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		charts[name] = ch
+	}
+
+	t.Run("order-statistic-sign-semantics", func(t *testing.T) {
+		trackContract(t, "L3/sign-semantics")
+		for name, tc := range cases {
+			t.Run(name, func(t *testing.T) {
+				for _, tg := range signGroups {
+					t.Run(tg.name, func(t *testing.T) {
+						verifyTimeGroup(t, tc.hostname, charts[name], tg.name, tg.options, 10)
+					})
+				}
+			})
+		}
+	})
+
+	// min/max are by ABSOLUTE value (min.h/max.h). Keep their tier-0
+	// evidence wholly under the L4 contract instead of the L3 sign verdict.
+	for _, group := range []string{"min", "max"} {
+		t.Run("absolute-"+group, func(t *testing.T) {
+			trackContractComponent(t, "L4/minmax-absolute-semantics", "tier0-"+group)
+			for name, tc := range cases {
+				t.Run(name, func(t *testing.T) {
+					verifyTimeGroup(t, tc.hostname, charts[name], group, "", 10)
 				})
 			}
 		})

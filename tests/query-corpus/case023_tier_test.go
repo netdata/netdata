@@ -19,7 +19,8 @@
 // which is EXACT for a 0/1 dimension at a steady collection cadence —
 // the shape of the fixture below — because there the sample-weighted
 // average is also the fraction of elapsed time at 1. A cadence change
-// inside a rollup is pinned separately by CASE-023/cadence-change-availability.
+// inside a rollup is pinned separately by
+// CASE-023/cadence-change-availability-higher-tiers.
 //
 // Expectations below are derived from that definition and from the
 // fixture, never from the engine.
@@ -38,8 +39,6 @@ import (
 )
 
 func TestCase023TierEstimation(t *testing.T) {
-	trackContract(t, "CASE-023/tier-estimation")
-
 	// A 0/1 availability signal changes its down-time pattern every 60
 	// fixture samples. Storage windows sit on the absolute 60-second tier
 	// grid, so the first window is partial and later windows can cross two
@@ -71,15 +70,6 @@ func TestCase023TierEstimation(t *testing.T) {
 	pushLiveBurst(t, "c023tier", guid(211), ch)
 	if _, err := td.WaitRetention("c023tier", ch.Context, ch.FirstT(), ch.LastT(), 20*time.Second); err != nil {
 		t.Fatal(err)
-	}
-
-	ok := true
-	check := func(cond bool, what string, args ...any) {
-		t.Helper()
-		if !cond {
-			t.Logf("tier contract not met: "+what, args...)
-			ok = false
-		}
 	}
 
 	// one view bucket per tier-1 window, so each answer is one window's
@@ -129,7 +119,7 @@ func TestCase023TierEstimation(t *testing.T) {
 		return 0
 	}
 
-	query := func(group, options string) map[string][]canon.Pt {
+	query := func(t *testing.T, group, options string) (map[string]any, map[string][]canon.Pt) {
 		t.Helper()
 		params := daemon.DataParamsTier(ch.Context, 1, after, after+buckets*bucketSpan, buckets, group)
 		if options != "" {
@@ -139,17 +129,11 @@ func TestCase023TierEstimation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !assertSelectedTier(t, doc, 1) {
-			ok = false
-		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !assertOnlyColumn(t, cols, d.ID) {
-			ok = false
-		}
-		return cols
+		return doc, cols
 	}
 
 	near := func(got, want float64) bool { return math.Abs(got-want) < 1e-6 }
@@ -167,29 +151,49 @@ func TestCase023TierEstimation(t *testing.T) {
 		return out
 	}
 
-	// percentage-of-time: the share of each window that satisfied the
-	// condition, weighted by the model above
-	for _, tc := range []struct {
-		options string
-		want    func(fixture.TierPoint) float64
-	}{
-		{">=1", func(w fixture.TierPoint) float64 { return fractionAtLeast(w, 1) * 100 }},
-		{"==0", func(w fixture.TierPoint) float64 { return fractionEqual(w, 0) * 100 }},
-		{"==1", func(w fixture.TierPoint) float64 { return fractionEqual(w, 1) * 100 }},
-	} {
-		cols := query("percentage-of-time", tc.options)
-		// The oracle is exact; printTol only accounts for json2's seven
-		// fractional digits.
-		if !assertExactColumn(t, cols, d.ID, expected(tc.want), printTol) {
-			check(false, "percentage-of-time %s did not return the exact fixture-derived tier windows", tc.options)
+	t.Run("source", func(t *testing.T) {
+		trackContract(t, "CASE-023/tier-estimation-source")
+		for _, tc := range []struct{ group, options string }{
+			{"percentage-of-time", ">=1"},
+			{"number-of-flaps", "==0"},
+			{"number-of-times", "==0"},
+			{"percentage-of-samples", "==0"},
+		} {
+			doc, cols := query(t, tc.group, tc.options)
+			if !assertSelectedTier(t, doc, 1) || !assertOnlyColumn(t, cols, d.ID) {
+				t.Fail()
+			}
 		}
-	}
+	})
+
+	t.Run("percentage-of-time", func(t *testing.T) {
+		trackContract(t, "CASE-023/tier-estimation-percentage-of-time")
+
+		// The share of each window that satisfied the condition is weighted
+		// by the model above.
+		for _, tc := range []struct {
+			options string
+			want    func(fixture.TierPoint) float64
+		}{
+			{">=1", func(w fixture.TierPoint) float64 { return fractionAtLeast(w, 1) * 100 }},
+			{"==0", func(w fixture.TierPoint) float64 { return fractionEqual(w, 0) * 100 }},
+			{"==1", func(w fixture.TierPoint) float64 { return fractionEqual(w, 1) * 100 }},
+		} {
+			_, cols := query(t, "percentage-of-time", tc.options)
+			// The oracle is exact; printTol only accounts for json2's seven
+			// fractional digits.
+			if !assertOnlyColumn(t, cols, d.ID) || !assertExactColumn(t, cols, d.ID, expected(tc.want), printTol) {
+				t.Errorf("percentage-of-time %s did not return the exact fixture-derived tier windows", tc.options)
+			}
+		}
+	})
 
 	// number-of-flaps: a window that is neither wholly true nor wholly
 	// false changed at least once and counts as one; a constant window
 	// only counts when it turns the state on
-	{
-		cols := query("number-of-flaps", "==0")
+	t.Run("number-of-flaps", func(t *testing.T) {
+		trackContract(t, "CASE-023/tier-estimation-number-of-flaps")
+		_, cols := query(t, "number-of-flaps", "==0")
 		state, hasState := false, false
 		want := expected(func(w fixture.TierPoint) float64 {
 			share := fractionEqual(w, 0)
@@ -208,14 +212,15 @@ func TestCase023TierEstimation(t *testing.T) {
 			return flaps
 		})
 		if !assertExactColumn(t, cols, d.ID, want, 0) {
-			check(false, "number-of-flaps ==0 did not return one exact verdict per tier window")
+			t.Error("number-of-flaps ==0 did not return one exact verdict per tier window")
 		}
-	}
+	})
 
 	// number-of-times: occurrences inside one stored window collapse to
 	// one, because the window keeps no ordering
-	{
-		cols := query("number-of-times", "==0")
+	t.Run("number-of-times", func(t *testing.T) {
+		trackContract(t, "CASE-023/tier-estimation-number-of-times")
+		_, cols := query(t, "number-of-times", "==0")
 		want := expected(func(w fixture.TierPoint) float64 {
 			if fractionEqual(w, 0) > 0 {
 				return 1
@@ -223,14 +228,15 @@ func TestCase023TierEstimation(t *testing.T) {
 			return 0
 		})
 		if !assertExactColumn(t, cols, d.ID, want, 0) {
-			check(false, "number-of-times ==0 did not apply count-as-one exactly once per tier window")
+			t.Error("number-of-times ==0 did not apply count-as-one exactly once per tier window")
 		}
-	}
+	})
 
 	// percentage-of-samples keeps its historical tier behaviour (D6): the
 	// stored point IS the sample, so the condition is evaluated on it
-	{
-		cols := query("percentage-of-samples", "==0")
+	t.Run("percentage-of-samples", func(t *testing.T) {
+		trackContract(t, "CASE-023/tier-estimation-percentage-of-samples")
+		_, cols := query(t, "percentage-of-samples", "==0")
 		want := expected(func(w fixture.TierPoint) float64 {
 			avg := w.Sum / float64(w.Count)
 			if near(avg, 0) {
@@ -239,11 +245,9 @@ func TestCase023TierEstimation(t *testing.T) {
 			return 0
 		})
 		if !assertExactColumn(t, cols, d.ID, want, 0) {
-			check(false, "percentage-of-samples ==0 did not evaluate every delivered tier average")
+			t.Error("percentage-of-samples ==0 did not evaluate every delivered tier average")
 		}
-	}
-
-	assertContract(t, "CASE-023/tier-estimation", ok)
+	})
 }
 
 // tierWindowEnd is the stored window a view bucket ending at t belongs to:
@@ -274,8 +278,6 @@ func tierWindowEnd(t, granularity int64) int64 {
 // Counting the repeats would inflate an SLO by exactly the zoom factor,
 // which is the failure this pins.
 func TestCase023TierWidePointRedelivery(t *testing.T) {
-	trackContract(t, "CASE-023/tier-wide-point")
-
 	// the same 0/1 availability shape as the estimation case: every stored
 	// window has min=0, max=1, and an average that IS the fraction of time up
 	down := func(k int) int {
@@ -306,15 +308,6 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok := true
-	check := func(cond bool, what string, args ...any) {
-		t.Helper()
-		if !cond {
-			t.Logf("wide-point contract not met: "+what, args...)
-			ok = false
-		}
-	}
-
 	// the window is a whole number of stored windows, cut into three view
 	// buckets each, so every stored point is re-delivered twice
 	const (
@@ -328,7 +321,7 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 	d := ch.Dimensions[0]
 	stored := d.TierWindows(tier1Gran, int64(ch.UpdateEvery))
 
-	query := func(group, options string) []canon.Pt {
+	query := func(t *testing.T, group, options string) (map[string]any, map[string][]canon.Pt) {
 		t.Helper()
 		params := daemon.DataParamsTier(ch.Context, 1, after, before, windows*perWindow, group)
 		params.Set("time_group_options", options)
@@ -336,18 +329,26 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !assertSelectedTier(t, doc, 1) {
-			ok = false
-		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !assertOnlyColumn(t, cols, d.ID) {
-			ok = false
-		}
-		return cols[d.ID]
+		return doc, cols
 	}
+
+	t.Run("source", func(t *testing.T) {
+		trackContract(t, "CASE-023/tier-wide-point-source")
+		for _, tc := range []struct{ group, options string }{
+			{"percentage-of-time", ">=1"},
+			{"number-of-times", "==0"},
+			{"number-of-flaps", "==0"},
+		} {
+			doc, cols := query(t, tc.group, tc.options)
+			if !assertSelectedTier(t, doc, 1) || !assertOnlyColumn(t, cols, d.ID) {
+				t.Fail()
+			}
+		}
+	})
 
 	// The wide-record duration share and the once-per-record event state below
 	// are Class B ports.
@@ -383,55 +384,60 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 		}
 		wantTime[i] = wantNumberAt(end, shareAtOne*100)
 	}
-	if cols := map[string][]canon.Pt{d.ID: query("percentage-of-time", ">=1")}; !assertExactColumn(t, cols, d.ID, wantTime, printTol) {
-		check(false, "percentage-of-time changed or dropped a tier-window estimate during re-delivery")
-	}
+	t.Run("time-share", func(t *testing.T) {
+		trackContract(t, "CASE-023/tier-wide-point-time-share")
+		_, cols := query(t, "percentage-of-time", ">=1")
+		if !assertOnlyColumn(t, cols, d.ID) || !assertExactColumn(t, cols, d.ID, wantTime, printTol) {
+			t.Error("percentage-of-time changed or dropped a tier-window estimate during re-delivery")
+		}
+	})
 
 	// an occurrence belongs to the window, not to the buckets it was
 	// delivered into
 	for _, tc := range []struct {
-		group   string
-		options string
+		name, contract, group, options string
 	}{
-		{"number-of-times", "==0"},
-		{"number-of-flaps", "==0"},
+		{"number-of-times", "CASE-023/tier-wide-point-number-of-times", "number-of-times", "==0"},
+		{"number-of-flaps", "CASE-023/tier-wide-point-number-of-flaps", "number-of-flaps", "==0"},
 	} {
-		want := make([]expectedColumnPoint, windows*perWindow)
-		state, hasState := false, false
-		for i := range want {
-			end := after + int64(i+1)*bucketSpan
-			value := 0.0
-			if i%perWindow == 0 {
-				w := stored[tierWindowEnd(end, tier1Gran)]
-				share := c023WindowFractionEqual(w, 0)
-				switch tc.group {
-				case "number-of-times":
-					if share > 0 {
-						value = 1
-					}
-				case "number-of-flaps":
-					if share > 0 && share < 1 {
-						value = 1
-						state = true
-					} else {
-						now := share > 0
-						if hasState && !state && now {
+		t.Run(tc.name, func(t *testing.T) {
+			trackContract(t, tc.contract)
+			want := make([]expectedColumnPoint, windows*perWindow)
+			state, hasState := false, false
+			for i := range want {
+				end := after + int64(i+1)*bucketSpan
+				value := 0.0
+				if i%perWindow == 0 {
+					w := stored[tierWindowEnd(end, tier1Gran)]
+					share := c023WindowFractionEqual(w, 0)
+					switch tc.group {
+					case "number-of-times":
+						if share > 0 {
 							value = 1
 						}
-						state = now
+					case "number-of-flaps":
+						if share > 0 && share < 1 {
+							value = 1
+							state = true
+						} else {
+							now := share > 0
+							if hasState && !state && now {
+								value = 1
+							}
+							state = now
+						}
+						hasState = true
 					}
-					hasState = true
 				}
+				want[i] = wantNumberAt(end, value)
 			}
-			want[i] = wantNumberAt(end, value)
-		}
-		if cols := map[string][]canon.Pt{d.ID: query(tc.group, tc.options)}; !assertExactColumn(t, cols, d.ID, want, 0) {
-			check(false, "%s %s did not count each stored window exactly once across its three deliveries",
-				tc.group, tc.options)
-		}
+			_, cols := query(t, tc.group, tc.options)
+			if !assertOnlyColumn(t, cols, d.ID) || !assertExactColumn(t, cols, d.ID, want, 0) {
+				t.Errorf("%s %s did not count each stored window exactly once across its three deliveries",
+					tc.group, tc.options)
+			}
+		})
 	}
-
-	assertContract(t, "CASE-023/tier-wide-point", ok)
 }
 
 // CASE-023 anomaly bit above tier 0 — RED: with options=anomaly-bit the

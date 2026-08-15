@@ -162,13 +162,13 @@ func TestSelectorsMatchModes(t *testing.T) {
 // TestFallbackPins: unknown names never error — the v1 format falls
 // back to json, the weights method to ks2.
 func TestFallbackPins(t *testing.T) {
-	trackContractComponent(t, "API/fallbacks-and-limits", "fallback-pins")
-
 	if _, err := td.WaitRetention("l7-fmt", l7Chart, fixture.T0+1, fixture.T0+6, 15*time.Second); err != nil {
 		t.Skip("layer-7 fixture not available")
 	}
 
 	t.Run("unknown-format-is-json", func(t *testing.T) {
+		trackContract(t, "API/fallback-unknown-format")
+
 		p1 := l7Params("")
 		p1["format"] = []string{"no-such-format"}
 		p2 := l7Params("")
@@ -187,6 +187,8 @@ func TestFallbackPins(t *testing.T) {
 	})
 
 	t.Run("unknown-weights-method-is-ks2", func(t *testing.T) {
+		trackContract(t, "API/fallback-unknown-weights-method")
+
 		weightsSettle(t, "weights-ks2", guid(163), weightsKS2Fixture())
 		p := weightsV1Params("no-such-method", wKS2Context, "null2zero", true)
 		doc, err := td.HostJSON("weights-ks2", "api/v1/weights", p)
@@ -203,7 +205,7 @@ func TestFallbackPins(t *testing.T) {
 // limit 2 keeps the top dimension and folds five; limits at or above
 // the dimension count fold nothing.
 func TestCardinalityLimitSweep(t *testing.T) {
-	trackContractComponent(t, "API/fallbacks-and-limits", "cardinality-limit-sweep")
+	trackContract(t, "API/cardinality-limit-sweep")
 
 	const context = "fixture.l8card"
 	if _, err := td.WaitRetention("l8-card", context, fixture.T0+1, fixture.T0+20, 15*time.Second); err != nil {

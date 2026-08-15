@@ -820,40 +820,46 @@ func TestWeightsValueMultiNode(t *testing.T) {
 }
 
 func TestWeightsPerMetricAnomalyRate(t *testing.T) {
-	trackContract(t, "W/anomaly-rate-per-metric")
-
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
-	// the per-metric path (v1 host route, NO context selector) applies
-	// the anomaly bit: raw weights are the true window anomaly rates
-	doc, err := td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("anomaly-rate", "", "raw", false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := v1ContextsWeights(t, doc, wContext)
-	want := map[string]float64{"flat": 0, "level": 0, "split": 0, "anom": 12000.0 / 121}
-	if len(got) != len(want) {
-		t.Fatalf("got %d dims %v, want %d", len(got), got, len(want))
-	}
-	for id, w := range want {
-		if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
-			t.Errorf("%s: weight %v, want true anomaly rate %v", id, got[id], w)
-		}
-	}
+	t.Run("values", func(t *testing.T) {
+		trackContract(t, "W/anomaly-rate-per-metric-values")
 
-	// the NONZERO default: with no options= given, zero-weight results
-	// are dropped — only the anomalous dimension survives
-	doc, err = td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("anomaly-rate", "", "", false))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got = v1ContextsWeights(t, doc, wContext)
-	if len(got) != 1 {
-		t.Errorf("default options kept %d dims %v, want only the anomalous one", len(got), got)
-	}
-	if _, ok := got["anom"]; !ok {
-		t.Errorf("anom missing from default-options result %v", got)
-	}
+		// the per-metric path (v1 host route, NO context selector) applies
+		// the anomaly bit: raw weights are the true window anomaly rates
+		doc, err := td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("anomaly-rate", "", "raw", false))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := v1ContextsWeights(t, doc, wContext)
+		want := map[string]float64{"flat": 0, "level": 0, "split": 0, "anom": 12000.0 / 121}
+		if len(got) != len(want) {
+			t.Fatalf("got %d dims %v, want %d", len(got), got, len(want))
+		}
+		for id, w := range want {
+			if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
+				t.Errorf("%s: weight %v, want true anomaly rate %v", id, got[id], w)
+			}
+		}
+	})
+
+	t.Run("nonzero-default", func(t *testing.T) {
+		trackContract(t, "W/anomaly-rate-per-metric-nonzero-default")
+
+		// the NONZERO default: with no options= given, zero-weight results
+		// are dropped — only the anomalous dimension survives
+		doc, err := td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("anomaly-rate", "", "", false))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := v1ContextsWeights(t, doc, wContext)
+		if len(got) != 1 {
+			t.Errorf("default options kept %d dims %v, want only the anomalous one", len(got), got)
+		}
+		if _, ok := got["anom"]; !ok {
+			t.Errorf("anom missing from default-options result %v", got)
+		}
+	})
 }
 
 // TestWeightsMultiDimAnomalyRate: the method IMPLIES the anomaly bit
@@ -893,8 +899,6 @@ func TestWeightsMultiDimAnomalyRate(t *testing.T) {
 }
 
 func TestWeightsVolume(t *testing.T) {
-	trackContract(t, "W/volume")
-
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
 	doc, err := td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("volume", wContext, "raw", true))
@@ -912,52 +916,67 @@ func TestWeightsVolume(t *testing.T) {
 		"level": (levelHL - 10.5) / 10.5 * (121.0 * 100 / 121 / 100),
 		"split": (splitHL - 100.5) / 100.5 * (120.0 * 100 / 121 / 100),
 	}
-	if len(got) != len(want) {
-		t.Fatalf("got %d dims %v, want %d (equal-averages metrics must be skipped)", len(got), got, len(want))
-	}
-	for id, w := range want {
-		if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
-			t.Errorf("%s: weight %v, want %v", id, got[id], w)
+	t.Run("equal-baseline-skip", func(t *testing.T) {
+		trackContract(t, "W/volume-equal-baseline-skip")
+		for _, id := range []string{"flat", "anom"} {
+			if _, found := got[id]; found {
+				t.Errorf("equal-baseline metric %q was not skipped: %v", id, got)
+			}
 		}
-	}
+	})
+
+	t.Run("formula", func(t *testing.T) {
+		trackContract(t, "W/volume-formula")
+		for id, w := range want {
+			if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
+				t.Errorf("%s: weight %v, want %v", id, got[id], w)
+			}
+		}
+	})
 }
 
 func TestWeightsKS2(t *testing.T) {
-	trackContract(t, "W/ks2")
-
 	weightsSettle(t, "weights-ks2", guid(163), weightsKS2Fixture())
 
-	// raw: the exact endpoints without normalization
-	doc, err := td.HostJSON("weights-ks2", "api/v1/weights", weightsV1Params("ks2", wKS2Context, "raw", true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := v1ContextsWeights(t, doc, wKS2Context)
 	want := map[string]float64{"flat2": 0, "jump": 1}
-	if len(got) != len(want) {
-		t.Fatalf("got %d dims %v, want %d", len(got), got, len(want))
-	}
-	for id, w := range want {
-		if g, ok := got[id]; !ok || g != w {
-			t.Errorf("%s: weight %v, want exactly %v (KSfbar special case)", id, got[id], w)
-		}
-	}
+	t.Run("raw-endpoints", func(t *testing.T) {
+		trackContract(t, "W/ks2-raw-endpoints")
 
-	// spread: the same endpoints through spread_results_evenly
-	doc, err = td.HostJSON("weights-ks2", "api/v1/weights", weightsV1Params("ks2", wKS2Context, "null2zero", true))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got = v1ContextsWeights(t, doc, wKS2Context)
-	spreadWant := spreadEvenly(want)
-	if len(got) != len(spreadWant) {
-		t.Fatalf("spread got %d dims %v, want %d", len(got), got, len(spreadWant))
-	}
-	for id, w := range spreadWant {
-		if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
-			t.Errorf("%s: spread weight %v, want %v", id, got[id], w)
+		// raw: the exact endpoints without normalization
+		doc, err := td.HostJSON("weights-ks2", "api/v1/weights", weightsV1Params("ks2", wKS2Context, "raw", true))
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
+		got := v1ContextsWeights(t, doc, wKS2Context)
+		if len(got) != len(want) {
+			t.Fatalf("got %d dims %v, want %d", len(got), got, len(want))
+		}
+		for id, w := range want {
+			if g, ok := got[id]; !ok || g != w {
+				t.Errorf("%s: weight %v, want exactly %v (KSfbar special case)", id, got[id], w)
+			}
+		}
+	})
+
+	t.Run("spread-normalization", func(t *testing.T) {
+		trackContract(t, "W/ks2-spread-normalization")
+
+		// spread: the same endpoints through spread_results_evenly
+		doc, err := td.HostJSON("weights-ks2", "api/v1/weights", weightsV1Params("ks2", wKS2Context, "null2zero", true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := v1ContextsWeights(t, doc, wKS2Context)
+		spreadWant := spreadEvenly(want)
+		if len(got) != len(spreadWant) {
+			t.Fatalf("spread got %d dims %v, want %d", len(got), got, len(spreadWant))
+		}
+		for id, w := range spreadWant {
+			if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
+				t.Errorf("%s: spread weight %v, want %v", id, got[id], w)
+			}
+		}
+	})
 }
 
 func TestWeightsValueNeverSpreads(t *testing.T) {

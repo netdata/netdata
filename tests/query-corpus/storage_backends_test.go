@@ -392,11 +392,14 @@ func TestV1RollupCount65536(t *testing.T) {
 		StorageTiers: 2,
 		TierGrouping: [3]int{0, int(grouping), 0},
 	})
-	ch := fixture.Series(context, context, base, int(grouping+1), 1,
+	// Persist two complete rollups so the legacy page can derive its cadence
+	// from consecutive timestamps. This contract isolates the wrapped count;
+	// a singleton legacy page has a separate, unavoidable cadence ambiguity.
+	ch := fixture.Series(context, context, base, int(2*grouping+1), 1,
 		func(int) string { return "1" }, notAnom)
 	ch.Dimensions[0].ID = dimension
 	closeFixture := pushDedicatedChart(t, dd, host, guid(422), ch)
-	if _, err := dd.WaitRetention(host, context, base+1, base+grouping+1, 60*time.Second); err != nil {
+	if _, err := dd.WaitRetention(host, context, base+1, base+2*grouping+1, 60*time.Second); err != nil {
 		t.Fatal(err)
 	}
 	if err := closeFixture(); err != nil {
@@ -406,7 +409,7 @@ func TestV1RollupCount65536(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	params := daemon.DataParamsTier(context, 1, base, base+grouping, rows, "sum")
+	params := daemon.DataParamsTier(context, 1, base+grouping, base+2*grouping, rows, "sum")
 	params.Set("scope_dimensions", dimension)
 	params.Set("options", "jsonwrap|unaligned")
 	doc, err := dd.DataV3(host, params)
@@ -418,7 +421,7 @@ func TestV1RollupCount65536(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := make([]expectedColumnPoint, 0, rows)
-	for end := base + rowWidth; end <= base+grouping; end += rowWidth {
+	for end := base + grouping + rowWidth; end <= base+2*grouping; end += rowWidth {
 		want = append(want, wantNumberWithPAAt(end, float64(rowWidth), 0))
 	}
 	stats, statsOK := strictDimensionStats(t, doc, "db", []string{dimension}, []string{"min", "avg", "max"})
@@ -426,7 +429,7 @@ func TestV1RollupCount65536(t *testing.T) {
 		t.Logf("db statistics = %v, want min/avg/max exactly 1/1/1", got)
 		statsOK = false
 	}
-	held := queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, base, base+grouping, rows, false)) &&
+	held := queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, base+grouping, base+2*grouping, rows, false)) &&
 		assertTierPresence(t, doc, []bool{false, true}) &&
 		assertOnlyColumn(t, cols, dimension) &&
 		assertExactColumn(t, cols, dimension, want, 0) &&

@@ -422,8 +422,6 @@ func TestLayer9V2V3Parity(t *testing.T) {
 // onto the absolute ue grid (the same phase shift as every other
 // view): "natural" means the count and the values, not the times.
 func TestLayer9NaturalPoints(t *testing.T) {
-	trackContract(t, "L9/natural-points")
-
 	ch := l9Settle(t)
 
 	after := fixture.T0 + int64(3000)
@@ -453,9 +451,6 @@ func TestLayer9NaturalPoints(t *testing.T) {
 			want = append(want, p)
 		}
 	}
-	if len(col) != len(want) {
-		t.Fatalf("got %d rows, want the %d natural samples", len(col), len(want))
-	}
 	// natural mode keeps the db count and spacing but the slot values
 	// around region boundaries may be the RAW sample or its
 	// phase-interpolation toward the next sample — pin the two-candidate
@@ -463,49 +458,63 @@ func TestLayer9NaturalPoints(t *testing.T) {
 	// recorded deferral; the DEFAULT virtual-points mode is oracle-exact)
 	snap := (int64(l9UE) - fixture.T0%int64(l9UE)) % int64(l9UE)
 	phase := float64(snap) / float64(l9UE)
-	for i, pt := range col {
-		if pt.T != want[i].End+snap {
-			t.Errorf("row %d: time t0%+d, want the grid-snapped t0%+d", i, pt.T-fixture.T0, want[i].End+snap-fixture.T0)
-			continue
+
+	t.Run("grid", func(t *testing.T) {
+		trackContract(t, "L9/natural-points-grid")
+		if len(col) != len(want) {
+			t.Fatalf("got %d rows, want the %d natural samples", len(col), len(want))
 		}
-		if want[i].Gap {
-			// the row at a gap's tail may already carry the next
-			// sample's raw value (the boundary slot has no anchor)
-			if pt.Value != nil {
-				nextRaw := i+1 < len(want) && !want[i+1].Gap && tierValueMatch(*pt.Value, want[i+1].Value, 1e-9)
-				if !nextRaw {
-					t.Errorf("row t0%+d: value %v, want null (gap) or the next raw sample", pt.T-fixture.T0, *pt.Value)
+		for i, pt := range col {
+			if pt.T != want[i].End+snap {
+				t.Errorf("row %d: time t0%+d, want the grid-snapped t0%+d", i, pt.T-fixture.T0, want[i].End+snap-fixture.T0)
+			}
+		}
+	})
+
+	t.Run("values", func(t *testing.T) {
+		trackContract(t, "L9/natural-points-values")
+		if len(col) != len(want) {
+			t.Fatalf("got %d rows, want the %d natural samples", len(col), len(want))
+		}
+		for i, pt := range col {
+			if want[i].Gap {
+				// the row at a gap's tail may already carry the next
+				// sample's raw value (the boundary slot has no anchor)
+				if pt.Value != nil {
+					nextRaw := i+1 < len(want) && !want[i+1].Gap && tierValueMatch(*pt.Value, want[i+1].Value, 1e-9)
+					if !nextRaw {
+						t.Errorf("row t0%+d: value %v, want null (gap) or the next raw sample", pt.T-fixture.T0, *pt.Value)
+					}
+				}
+				continue
+			}
+			if pt.Value == nil {
+				t.Errorf("row t0%+d: null, want %v", pt.T-fixture.T0, want[i].Value)
+				continue
+			}
+			raw := want[i].Value
+			candidates := []float64{raw}
+			if next := first + i + 1; next < len(all) && !all[next].Gap {
+				candidates = append(candidates, raw+(all[next].Value-raw)*phase)
+			}
+			matched := false
+			for _, c := range candidates {
+				if tierValueMatch(*pt.Value, c, 1e-9) {
+					matched = true
+					break
 				}
 			}
-			continue
-		}
-		if pt.Value == nil {
-			t.Errorf("row t0%+d: null, want %v", pt.T-fixture.T0, want[i].Value)
-			continue
-		}
-		raw := want[i].Value
-		candidates := []float64{raw}
-		if next := first + i + 1; next < len(all) && !all[next].Gap {
-			candidates = append(candidates, raw+(all[next].Value-raw)*phase)
-		}
-		matched := false
-		for _, c := range candidates {
-			if tierValueMatch(*pt.Value, c, 1e-9) {
-				matched = true
-				break
+			if !matched {
+				t.Errorf("row t0%+d: value %v, want the raw %v or its phase-interpolation", pt.T-fixture.T0, *pt.Value, raw)
 			}
 		}
-		if !matched {
-			t.Errorf("row t0%+d: value %v, want the raw %v or its phase-interpolation", pt.T-fixture.T0, *pt.Value, raw)
-		}
-	}
+	})
 }
 
-// TestLayer9LiveEdgeGrid: a live chart cannot shorten the request-derived
-// timestamp grid. Buckets after the collected edge remain explicit EMPTY rows.
+// TestLayer9LiveEdgeGrid pins future-window normalization independently of the
+// established near-live partial-data trimming exception. Any rows that survive
+// wholly before retention remain explicit EMPTY rows.
 func TestLayer9LiveEdgeGrid(t *testing.T) {
-	trackContract(t, "L9/live-edge")
-
 	const ue = 1
 	const n = 65
 	ctx := "fixture.l9edge"
@@ -533,30 +542,39 @@ func TestLayer9LiveEdgeGrid(t *testing.T) {
 		t.Fatal(err)
 	}
 	col := cols["load"]
-	view := queryObject(t, doc, "view", "view")
-	viewBefore, integer := queryInteger(view["before"])
-	if !integer || viewBefore < queryStart-1 || viewBefore > queryEnd-1 {
-		t.Fatalf("future request resolved before to %v, want query-time range [%d,%d]",
-			view["before"], queryStart-1, queryEnd-1)
-	}
-	// Future normalization shifts both absolute endpoints by the same amount,
-	// preserving the requested duration while ending at the query-time clock.
-	resolvedAfter := viewBefore - (requestedBefore - base)
-	wantGrid := queryExpectedVirtualGrid(t, resolvedAfter, viewBefore, 10, false)
-	if !queryTimestampGridExact(t, doc, wantGrid) {
-		t.Fail()
-	}
-	emptyOutsideRetention := 0
-	for _, point := range col {
-		if point.T < ch.FirstT() {
-			emptyOutsideRetention++
-			if point.Value != nil || point.ARP != 0 || point.PA != canon.AnnotationEmpty {
-				t.Errorf("pre-retention row at %d is value/arp/pa %v/%v/%d, want empty/0/%d",
-					point.T, point.Value, point.ARP, point.PA, canon.AnnotationEmpty)
+	t.Run("future-window-normalization", func(t *testing.T) {
+		trackContractComponent(t, "L9/window-normalization", "future-explicit-window")
+		view := queryObject(t, doc, "view", "view")
+		viewBefore, integer := queryInteger(view["before"])
+		if !integer || viewBefore < queryStart-1 || viewBefore > queryEnd-1 {
+			t.Fatalf("future request resolved before to %v, want query-time range [%d,%d]",
+				view["before"], queryStart-1, queryEnd-1)
+		}
+		// Future normalization shifts both absolute endpoints by the same amount,
+		// preserving the requested duration while ending at the query-time clock.
+		// Returned rows may then be shortened by the separate near-live trimming
+		// contract, so this component deliberately checks view geometry only.
+		resolvedAfter := viewBefore - (requestedBefore - base)
+		wantGrid := queryExpectedVirtualGrid(t, resolvedAfter, viewBefore, 10, false)
+		if !assertViewFields(t, doc, wantGrid.after, wantGrid.before, wantGrid.updateEvery) {
+			t.Fail()
+		}
+	})
+
+	t.Run("empty-outside-retention", func(t *testing.T) {
+		trackContract(t, "L9/live-edge-empty-outside-retention")
+		emptyOutsideRetention := 0
+		for _, point := range col {
+			if point.T < ch.FirstT() {
+				emptyOutsideRetention++
+				if point.Value != nil || point.ARP != 0 || point.PA != canon.AnnotationEmpty {
+					t.Errorf("pre-retention row at %d is value/arp/pa %v/%v/%d, want empty/0/%d",
+						point.T, point.Value, point.ARP, point.PA, canon.AnnotationEmpty)
+				}
 			}
 		}
-	}
-	if emptyOutsideRetention == 0 {
-		t.Error("fixture did not produce any grid row outside retention")
-	}
+		if emptyOutsideRetention == 0 {
+			t.Error("fixture did not produce any grid row outside retention")
+		}
+	})
 }

@@ -23,6 +23,15 @@ type c023MCPResponse struct {
 	Session  string
 }
 
+type c023MCPValidCall struct {
+	label, group, expression string
+	metric, dimension        string
+	after, before            int64
+	units                    string
+	value, anomalyRate       float64
+	annotations              int64
+}
+
 func c023MCPDecodeMessage(payload []byte, id int) (map[string]any, bool) {
 	var doc map[string]any
 	if err := json.Unmarshal(payload, &doc); err != nil {
@@ -257,14 +266,7 @@ func c023MCPQueryDocument(t *testing.T, response map[string]any) map[string]any 
 	return doc
 }
 
-func c023MCPExactValue(
-	t *testing.T,
-	doc map[string]any,
-	dimension string,
-	timestamp int64,
-	wantValue, wantAnomalyRate float64,
-	wantAnnotations int64,
-) {
+func c023MCPResultRow(t *testing.T, doc map[string]any) ([]any, []any) {
 	t.Helper()
 
 	result, ok := doc["result"].(map[string]any)
@@ -272,11 +274,33 @@ func c023MCPExactValue(
 		t.Fatalf("MCP query result is missing or malformed: %T", doc["result"])
 	}
 
+	rows, ok := result["data"].([]any)
+	if !ok || len(rows) != 1 {
+		t.Fatalf("MCP query data has type %T and %d rows, want exactly 1",
+			result["data"], len(rows))
+	}
+	row, ok := rows[0].([]any)
+	if !ok || len(row) != 2 {
+		t.Fatalf("MCP query row = %v, want exactly [time point]", rows[0])
+	}
+	point, ok := row[1].([]any)
+	if !ok || len(point) != 3 {
+		t.Fatalf("MCP query point = %v, want exactly [value anomaly_rate point_annotations]", row[1])
+	}
+	return row, point
+}
+
+func c023MCPAssertResultSchema(t *testing.T, doc map[string]any, dimension string) {
+	t.Helper()
+
+	result, ok := doc["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("MCP query result is missing or malformed: %T", doc["result"])
+	}
 	labels, ok := result["labels"].([]any)
 	if !ok || len(labels) != 2 || labels[0] != "time" || labels[1] != dimension {
 		t.Fatalf("MCP query labels = %v, want exactly [time %s]", result["labels"], dimension)
 	}
-
 	pointSchema, ok := result["point_schema"].(map[string]any)
 	if !ok || len(pointSchema) != 3 {
 		t.Fatalf("MCP query point_schema has type %T and %d fields, want exactly 3",
@@ -293,16 +317,21 @@ func c023MCPExactValue(
 				field, pointSchema[field], wantIndex)
 		}
 	}
+	row, point := c023MCPResultRow(t, doc)
+	if _, ok := row[0].(string); !ok {
+		t.Errorf("MCP query row time has type %T, want string", row[0])
+	}
+	for i, field := range []string{"value", "anomaly_rate_percent", "point_annotations_bitmap"} {
+		if _, ok := point[i].(float64); !ok {
+			t.Errorf("MCP query point %s has type %T, want number", field, point[i])
+		}
+	}
+}
 
-	rows, ok := result["data"].([]any)
-	if !ok || len(rows) != 1 {
-		t.Fatalf("MCP query data has type %T and %d rows, want exactly 1",
-			result["data"], len(rows))
-	}
-	row, ok := rows[0].([]any)
-	if !ok || len(row) != 2 {
-		t.Fatalf("MCP query row = %v, want exactly [time point]", rows[0])
-	}
+func c023MCPAssertTimestamp(t *testing.T, doc map[string]any, timestamp int64) {
+	t.Helper()
+
+	row, _ := c023MCPResultRow(t, doc)
 
 	timeString, ok := row[0].(string)
 	if !ok {
@@ -315,25 +344,18 @@ func c023MCPExactValue(
 	if timeString != wantTime {
 		t.Errorf("MCP query row time = %q, want exactly %q", timeString, wantTime)
 	}
+}
 
-	point, ok := row[1].([]any)
-	if !ok || len(point) != 3 {
-		t.Fatalf("MCP query point = %v, want exactly [value anomaly_rate point_annotations]", row[1])
+func c023MCPAssertPointField(t *testing.T, doc map[string]any, index int, field string, want, tolerance float64) {
+	t.Helper()
+
+	_, point := c023MCPResultRow(t, doc)
+	value, ok := point[index].(float64)
+	if !ok {
+		t.Fatalf("MCP query point %s has type %T, want number", field, point[index])
 	}
-	for i, field := range []string{"value", "anomaly_rate_percent", "point_annotations_bitmap"} {
-		value, ok := point[i].(float64)
-		if !ok {
-			t.Errorf("MCP query point %s has type %T, want number", field, point[i])
-			continue
-		}
-		want := []float64{wantValue, wantAnomalyRate, float64(wantAnnotations)}[i]
-		tolerance := printTol
-		if i == 2 {
-			tolerance = 0
-		}
-		if math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value-want) > tolerance {
-			t.Errorf("MCP query point %s = %v, want exactly %v", field, value, want)
-		}
+	if math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value-want) > tolerance {
+		t.Errorf("MCP query point %s = %v, want exactly %v", field, value, want)
 	}
 }
 
@@ -445,8 +467,6 @@ func c023MCPPushCadenceFixture(t *testing.T, host, context string) (int64, int64
 }
 
 func TestCase023MCPQueryMetricsContract(t *testing.T) {
-	trackContract(t, "CASE-023/mcp-surface")
-
 	const (
 		host            = "c023-mcp"
 		cadenceHost     = "c023-mcp-cadence"
@@ -465,61 +485,6 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 	}
 	cadenceAfter, cadenceBefore := c023MCPPushCadenceFixture(t, cadenceHost, cadenceContext)
 
-	initialize := c023MCPPost(t, 1, "initialize", map[string]any{
-		"protocolVersion": "2025-03-26",
-		"capabilities":    map[string]any{},
-		"clientInfo": map[string]any{
-			"name":    "query-corpus",
-			"version": "1",
-		},
-	}, "")
-	initializeResult := c023MCPResult(t, initialize.Document, "initialize")
-	if got := initializeResult["protocolVersion"]; got != "2025-03-26" {
-		t.Errorf("initialize protocolVersion = %v, want 2025-03-26", got)
-	}
-	serverInfo := queryObject(t, initializeResult, "serverInfo", "initialize.result.serverInfo")
-	for _, key := range []string{"name", "version"} {
-		if value, ok := serverInfo[key].(string); !ok || value == "" {
-			t.Errorf("initialize serverInfo.%s is empty or malformed: %v", key, serverInfo[key])
-		}
-	}
-	capabilities := queryObject(t, initializeResult, "capabilities", "initialize.result.capabilities")
-	_ = queryObject(t, capabilities, "tools", "initialize.result.capabilities.tools")
-	c023MCPNotify(t, "notifications/initialized", map[string]any{}, initialize.Session)
-
-	toolsList := c023MCPPost(t, 2, "tools/list", map[string]any{}, initialize.Session)
-	toolsResult := c023MCPResult(t, toolsList.Document, "tools/list")
-	tools, ok := toolsResult["tools"].([]any)
-	if !ok || len(tools) == 0 {
-		t.Fatalf("tools/list returned no tools: %v", toolsResult["tools"])
-	}
-	var queryMetrics map[string]any
-	for _, raw := range tools {
-		tool, ok := raw.(map[string]any)
-		if ok && tool["name"] == "query_metrics" {
-			queryMetrics = tool
-			break
-		}
-	}
-	if queryMetrics == nil {
-		t.Fatal("tools/list does not expose query_metrics")
-	}
-	inputSchema := queryObject(t, queryMetrics, "inputSchema", "query_metrics.inputSchema")
-	properties := queryObject(t, inputSchema, "properties", "query_metrics.inputSchema.properties")
-	timeGroup := queryObject(t, properties, "time_group", "query_metrics.inputSchema.properties.time_group")
-	enum, ok := timeGroup["enum"].([]any)
-	if !ok || len(enum) == 0 {
-		t.Fatalf("query_metrics time_group enum is missing or empty: %v", timeGroup["enum"])
-	}
-	enumSet := make(map[string]bool, len(enum))
-	for _, raw := range enum {
-		value, ok := raw.(string)
-		if !ok || value == "" {
-			t.Fatalf("query_metrics time_group enum contains an empty or non-string value: %v", raw)
-		}
-		enumSet[value] = true
-	}
-
 	groups := []struct {
 		name, units string
 	}{
@@ -529,27 +494,97 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		{name: "number-of-flaps", units: "flaps"},
 		{name: "number-of-times", units: "events"},
 	}
-	for _, group := range groups {
-		if !enumSet[group.name] {
-			t.Errorf("query_metrics time_group enum does not contain %q", group.name)
+
+	var initialize c023MCPResponse
+	t.Run("protocol-lifecycle", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-protocol-lifecycle")
+
+		initialize = c023MCPPost(t, 1, "initialize", map[string]any{
+			"protocolVersion": "2025-03-26",
+			"capabilities":    map[string]any{},
+			"clientInfo": map[string]any{
+				"name":    "query-corpus",
+				"version": "1",
+			},
+		}, "")
+
+		initializeResult := c023MCPResult(t, initialize.Document, "initialize")
+		if got := initializeResult["protocolVersion"]; got != "2025-03-26" {
+			t.Errorf("initialize protocolVersion = %v, want 2025-03-26", got)
 		}
-	}
-	timeGroupOptions := queryObject(
-		t, properties, "time_group_options",
-		"query_metrics.inputSchema.properties.time_group_options",
-	)
-	if got := timeGroupOptions["type"]; got != "string" {
-		t.Errorf("query_metrics time_group_options type = %v, want string", got)
-	}
-	description, ok := timeGroupOptions["description"].(string)
-	if !ok || description == "" {
-		t.Fatalf("query_metrics time_group_options description is empty or malformed: %v", timeGroupOptions["description"])
-	}
-	for _, group := range groups {
-		if !strings.Contains(description, group.name) {
-			t.Errorf("query_metrics time_group_options description does not name %q", group.name)
+		serverInfo := queryObject(t, initializeResult, "serverInfo", "initialize.result.serverInfo")
+		for _, key := range []string{"name", "version"} {
+			if value, ok := serverInfo[key].(string); !ok || value == "" {
+				t.Errorf("initialize serverInfo.%s is empty or malformed: %v", key, serverInfo[key])
+			}
 		}
-	}
+		capabilities := queryObject(t, initializeResult, "capabilities", "initialize.result.capabilities")
+		_ = queryObject(t, capabilities, "tools", "initialize.result.capabilities.tools")
+		c023MCPNotify(t, "notifications/initialized", map[string]any{}, initialize.Session)
+	})
+
+	t.Run("query-tool-schema", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-query-tool-schema")
+
+		toolsList := c023MCPPost(t, 2, "tools/list", map[string]any{}, initialize.Session)
+		toolsResult := c023MCPResult(t, toolsList.Document, "tools/list")
+		tools, ok := toolsResult["tools"].([]any)
+		if !ok || len(tools) == 0 {
+			t.Fatalf("tools/list returned no tools: %v", toolsResult["tools"])
+		}
+		var queryMetrics map[string]any
+		for _, raw := range tools {
+			tool, ok := raw.(map[string]any)
+			if ok && tool["name"] == "query_metrics" {
+				queryMetrics = tool
+				break
+			}
+		}
+		if queryMetrics == nil {
+			t.Fatal("tools/list does not expose query_metrics")
+		}
+		inputSchema := queryObject(t, queryMetrics, "inputSchema", "query_metrics.inputSchema")
+		properties := queryObject(t, inputSchema, "properties", "query_metrics.inputSchema.properties")
+		timeGroup := queryObject(t, properties, "time_group", "query_metrics.inputSchema.properties.time_group")
+		enum, ok := timeGroup["enum"].([]any)
+		if !ok || len(enum) == 0 {
+			t.Fatalf("query_metrics time_group enum is missing or empty: %v", timeGroup["enum"])
+		}
+		enumSet := make(map[string]bool, len(enum))
+		for _, raw := range enum {
+			value, ok := raw.(string)
+			if !ok || value == "" {
+				t.Fatalf("query_metrics time_group enum contains an empty or non-string value: %v", raw)
+			}
+			enumSet[value] = true
+		}
+		for _, group := range groups {
+			if !enumSet[group.name] {
+				t.Errorf("query_metrics time_group enum does not contain %q", group.name)
+			}
+		}
+		timeGroupOptions := queryObject(
+			t, properties, "time_group_options",
+			"query_metrics.inputSchema.properties.time_group_options",
+		)
+		if got := timeGroupOptions["type"]; got != "string" {
+			t.Errorf("query_metrics time_group_options type = %v, want string", got)
+		}
+		description, ok := timeGroupOptions["description"].(string)
+		if !ok || description == "" {
+			t.Fatalf("query_metrics time_group_options description is empty or malformed: %v", timeGroupOptions["description"])
+		}
+		for _, group := range groups {
+			if !strings.Contains(description, group.name) {
+				t.Errorf("query_metrics time_group_options description does not name %q", group.name)
+			}
+		}
+		for _, phrase := range []string{"omitted", "blank", "zero"} {
+			if !strings.Contains(description, phrase) {
+				t.Errorf("query_metrics time_group_options description does not document %q", phrase)
+			}
+		}
+	})
 
 	baseArguments := func(metric, dimension string, after, before int64) map[string]any {
 		return map[string]any{
@@ -566,15 +601,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		}
 	}
 
-	requestID := 10
-	validCalls := []struct {
-		label, group, expression string
-		metric, dimension        string
-		after, before            int64
-		units                    string
-		value, anomalyRate       float64
-		annotations              int64
-	}{
+	validCalls := []c023MCPValidCall{
 		{
 			label: "numeric", group: "percentage-of-samples", expression: "==1",
 			metric: cadenceContext, dimension: "value", after: cadenceAfter, before: cadenceBefore,
@@ -626,58 +653,163 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 			units: "events", value: 4, anomalyRate: 12.5, annotations: fixture.PAReset,
 		},
 	}
-	for _, call := range validCalls {
-		t.Run(call.group+"/"+call.label, func(t *testing.T) {
-			arguments := baseArguments(call.metric, call.dimension, call.after, call.before)
-			arguments["time_group"] = call.group
-			arguments["time_group_options"] = call.expression
-			response := c023MCPCall(t, requestID, initialize.Session, arguments)
-			requestID++
-			doc := c023MCPQueryDocument(t, response.Document)
-			view := queryObject(t, doc, "view", "query view")
-			if got := queryStrictOneUnit(t, view["units"], "query view.units"); got != call.units {
-				t.Errorf("%s view.units = %q, want %q", call.group, got, call.units)
-			}
-			if got := queryStrictDimensionUnit(t, view, "query view"); got != call.units {
-				t.Errorf("%s view.dimensions.units[0] = %q, want %q", call.group, got, call.units)
-			}
-			c023MCPAssertEcho(t, doc, call.group, call.expression)
-			c023MCPExactValue(
-				t, doc, call.dimension, call.before,
-				call.value, call.anomalyRate, call.annotations)
-		})
-	}
 
-	for _, group := range groups {
-		invalidOptions := []struct {
-			name  string
-			value any
-			set   bool
-		}{
-			{name: "missing"},
-			{name: "empty", value: "", set: true},
-			{name: "non-string", value: 0, set: true},
-			{name: "whitespace", value: "   ", set: true},
-			{name: "operator-only", value: ">", set: true},
-			{name: "operator-whitespace", value: ">   ", set: true},
-			{name: "malformed", value: "abc", set: true},
-			{name: "nan", value: "NaN", set: true},
-			{name: "positive-infinity", value: "+Inf", set: true},
-			{name: "negative-infinity", value: "-Inf", set: true},
-			{name: "overflow-to-infinity", value: "1e309", set: true},
-		}
-		for _, invalid := range invalidOptions {
-			t.Run(group.name+"/"+invalid.name+"-options", func(t *testing.T) {
-				arguments := baseArguments(
-					standardContext, "bool", fixture.T0, standard.LastT())
-				arguments["time_group"] = group.name
-				if invalid.set {
-					arguments["time_group_options"] = invalid.value
-				}
+	runValidCalls := func(t *testing.T, requestID int, check func(*testing.T, c023MCPValidCall, map[string]any)) {
+		t.Helper()
+		for _, call := range validCalls {
+			call := call
+			t.Run(call.group+"/"+call.label, func(t *testing.T) {
+				arguments := baseArguments(call.metric, call.dimension, call.after, call.before)
+				arguments["time_group"] = call.group
+				arguments["time_group_options"] = call.expression
 				response := c023MCPCall(t, requestID, initialize.Session, arguments)
 				requestID++
-				c023MCPAssertOptionsError(t, response.Document, group.name)
+				doc := c023MCPQueryDocument(t, response.Document)
+				check(t, call, doc)
 			})
 		}
 	}
+
+	validContracts := []struct {
+		name, contract string
+		requestID      int
+		check          func(*testing.T, c023MCPValidCall, map[string]any)
+	}{
+		{
+			name: "valid-result-schema", contract: "CASE-023/mcp-valid-result-schema", requestID: 10,
+			check: func(t *testing.T, call c023MCPValidCall, doc map[string]any) {
+				c023MCPAssertResultSchema(t, doc, call.dimension)
+			},
+		},
+		{
+			name: "valid-query-units", contract: "CASE-023/mcp-valid-query-units", requestID: 30,
+			check: func(t *testing.T, call c023MCPValidCall, doc map[string]any) {
+				view := queryObject(t, doc, "view", "query view")
+				if got := queryStrictOneUnit(t, view["units"], "query view.units"); got != call.units {
+					t.Errorf("%s view.units = %q, want %q", call.group, got, call.units)
+				}
+				if got := queryStrictDimensionUnit(t, view, "query view"); got != call.units {
+					t.Errorf("%s view.dimensions.units[0] = %q, want %q", call.group, got, call.units)
+				}
+			},
+		},
+		{
+			name: "valid-query-echo", contract: "CASE-023/mcp-valid-query-echo", requestID: 50,
+			check: func(t *testing.T, call c023MCPValidCall, doc map[string]any) {
+				c023MCPAssertEcho(t, doc, call.group, call.expression)
+			},
+		},
+		{
+			name: "valid-query-timestamps", contract: "CASE-023/mcp-valid-query-timestamps", requestID: 70,
+			check: func(t *testing.T, call c023MCPValidCall, doc map[string]any) {
+				c023MCPAssertTimestamp(t, doc, call.before)
+			},
+		},
+		{
+			name: "valid-query-values", contract: "CASE-023/mcp-valid-query-values", requestID: 90,
+			check: func(t *testing.T, call c023MCPValidCall, doc map[string]any) {
+				c023MCPAssertPointField(t, doc, 0, "value", call.value, printTol)
+			},
+		},
+		{
+			name: "valid-query-anomaly-rates", contract: "CASE-023/mcp-valid-query-anomaly-rates", requestID: 110,
+			check: func(t *testing.T, call c023MCPValidCall, doc map[string]any) {
+				c023MCPAssertPointField(t, doc, 1, "anomaly_rate_percent", call.anomalyRate, printTol)
+			},
+		},
+		{
+			name: "valid-query-annotations", contract: "CASE-023/mcp-valid-query-annotations", requestID: 130,
+			check: func(t *testing.T, call c023MCPValidCall, doc map[string]any) {
+				c023MCPAssertPointField(t, doc, 2, "point_annotations_bitmap", float64(call.annotations), 0)
+			},
+		},
+	}
+	for _, contract := range validContracts {
+		contract := contract
+		t.Run(contract.name, func(t *testing.T) {
+			trackContract(t, contract.contract)
+			runValidCalls(t, contract.requestID, contract.check)
+		})
+	}
+
+	t.Run("default-zero-options", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-default-zero-options")
+		requestID := 200
+
+		for _, group := range groups {
+			group := group
+			dimension := "counter"
+			equalZero, greaterZero := 0.0, 100.0
+			switch group.name {
+			case "number-of-times":
+				greaterZero = 12
+			case "number-of-flaps":
+				dimension = "bool"
+				equalZero, greaterZero = 3, 2
+			}
+
+			for _, defaultCase := range []struct {
+				name        string
+				value       string
+				set         bool
+				greaterZero bool
+			}{
+				{name: "missing"},
+				{name: "empty", value: "", set: true},
+				{name: "whitespace", value: "   ", set: true},
+				{name: "operator-only", value: ">", set: true, greaterZero: true},
+				{name: "operator-whitespace", value: ">   ", set: true, greaterZero: true},
+			} {
+				defaultCase := defaultCase
+				t.Run(group.name+"/"+defaultCase.name, func(t *testing.T) {
+					arguments := baseArguments(
+						standardContext, dimension, fixture.T0, standard.LastT())
+					arguments["time_group"] = group.name
+					if defaultCase.set {
+						arguments["time_group_options"] = defaultCase.value
+					}
+					response := c023MCPCall(t, requestID, initialize.Session, arguments)
+					requestID++
+					doc := c023MCPQueryDocument(t, response.Document)
+					want := equalZero
+					if defaultCase.greaterZero {
+						want = greaterZero
+					}
+					c023MCPAssertPointField(t, doc, 0, "value", want, printTol)
+				})
+			}
+		}
+	})
+
+	t.Run("invalid-options", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-invalid-options")
+		requestID := 300
+		for _, group := range groups {
+			invalidOptions := []struct {
+				name  string
+				value any
+				set   bool
+			}{
+				{name: "non-string", value: 0, set: true},
+				{name: "null", value: nil, set: true},
+				{name: "malformed", value: "abc", set: true},
+				{name: "positive-infinity", value: "+Inf", set: true},
+				{name: "negative-infinity", value: "-Inf", set: true},
+				{name: "overflow-to-infinity", value: "1e309", set: true},
+			}
+			for _, invalid := range invalidOptions {
+				t.Run(group.name+"/"+invalid.name+"-options", func(t *testing.T) {
+					arguments := baseArguments(
+						standardContext, "bool", fixture.T0, standard.LastT())
+					arguments["time_group"] = group.name
+					if invalid.set {
+						arguments["time_group_options"] = invalid.value
+					}
+					response := c023MCPCall(t, requestID, initialize.Session, arguments)
+					requestID++
+					c023MCPAssertOptionsError(t, response.Document, group.name)
+				})
+			}
+		}
+	})
 }

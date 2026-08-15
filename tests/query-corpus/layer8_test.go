@@ -92,8 +92,6 @@ func l8Query(t *testing.T, host, context, options string, extra map[string]strin
 }
 
 func TestLayer8PostProcessing(t *testing.T) {
-	trackContractComponent(t, "L8/post-processing", "post-processing")
-
 	ch := l8Fixture()
 	pushLiveBurst(t, "l8-post", guid(92), ch)
 	if _, err := td.WaitRetention("l8-post", ch.Context, fixture.T0+1, fixture.T0+l8Rows, 15*time.Second); err != nil {
@@ -101,6 +99,8 @@ func TestLayer8PostProcessing(t *testing.T) {
 	}
 
 	t.Run("percentage", func(t *testing.T) {
+		trackContract(t, "L8/percentage-post-processing")
+
 		// v2/v3 FORCE options=absolute together with percentage
 		// (api_v2_data.c) — the share is computed over |values|, signs
 		// are erased at fetch time
@@ -137,6 +137,8 @@ func TestLayer8PostProcessing(t *testing.T) {
 	})
 
 	t.Run("absolute", func(t *testing.T) {
+		trackContract(t, "L8/absolute-post-processing")
+
 		cols := l8Query(t, "l8-post", l8Context, "jsonwrap|absolute", nil)
 		if !assertExactColumnSet(t, cols, l8Dims) {
 			t.Fail()
@@ -160,6 +162,8 @@ func TestLayer8PostProcessing(t *testing.T) {
 	})
 
 	t.Run("nonzero", func(t *testing.T) {
+		trackContract(t, "L8/nonzero-post-processing")
+
 		cols := l8Query(t, "l8-post", l8Context, "jsonwrap|nonzero", nil)
 		dimensions := []string{"pos", "neg", "gappy"}
 		if !assertExactColumnSet(t, cols, dimensions) {
@@ -184,6 +188,8 @@ func TestLayer8PostProcessing(t *testing.T) {
 	})
 
 	t.Run("null2zero", func(t *testing.T) {
+		trackContract(t, "L8/null2zero-post-processing")
+
 		cols := l8Query(t, "l8-post", l8Context, "jsonwrap|null2zero", nil)
 		if !assertExactColumnSet(t, cols, l8Dims) {
 			t.Fail()
@@ -211,7 +217,7 @@ func TestLayer8PostProcessing(t *testing.T) {
 // TestLayer8NonzeroAllZero pins the self-neutralizing branch: when every
 // dimension is zero, options=nonzero is dropped and all dimensions return.
 func TestLayer8NonzeroAllZero(t *testing.T) {
-	trackContractComponent(t, "L8/post-processing", "nonzero-all-zero")
+	trackContract(t, "L8/nonzero-all-zero")
 
 	const context = "fixture.l8zero"
 	ch := fixture.Chart{
@@ -260,7 +266,7 @@ func TestLayer8NonzeroAllZero(t *testing.T) {
 // |view sum| survive, the rest fold into "remaining X dimensions" whose
 // per-row value is the SUM of the folded values.
 func TestLayer8CardinalityLimit(t *testing.T) {
-	trackContractComponent(t, "L8/post-processing", "cardinality-limit")
+	trackContract(t, "L8/cardinality-limit")
 
 	const context = "fixture.l8card"
 	const dims = 6
