@@ -27,6 +27,10 @@ struct mqtt_ng_stats {
     int tx_messages_sent;
     int rx_messages_rcvd;
     int packets_waiting_puback;
+    // QoS1/2 packets dropped because their acknowledgement never arrived, since start.
+    // This client does not retransmit, so each one is a message the broker never
+    // confirmed taking responsibility for.
+    int packets_timed_out;
     // MQTT 5.0 server Receive Maximum from CONNACK (max concurrent unacked QoS1/2); 65535 if unset
     uint16_t rx_maximum;
     size_t tx_buffer_used;
