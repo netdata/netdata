@@ -101,8 +101,11 @@ async fn main() -> anyhow::Result<()> {
     // bits 20..63: beyond either range, distinct spans silently collide
     // (colliding ids read as resends and corrupt the intended tree).
     const MAX_SPANS_PER_TRACE: usize = (1 << 20) - 1;
-    if args.spans_per_trace > MAX_SPANS_PER_TRACE {
-        anyhow::bail!("--spans-per-trace must not exceed {MAX_SPANS_PER_TRACE}");
+    // Zero would be silently coerced to 1 by generate()'s max(1) —
+    // the documented flat-mode minimum is 1, so reject the typo instead
+    // of producing a different corpus than asked.
+    if args.spans_per_trace == 0 || args.spans_per_trace > MAX_SPANS_PER_TRACE {
+        anyhow::bail!("--spans-per-trace must be between 1 and {MAX_SPANS_PER_TRACE}");
     }
     let max_trace_index =
         (args.count.saturating_sub(1) as u64) / (args.spans_per_trace.max(1) as u64);
