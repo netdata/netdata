@@ -1246,6 +1246,29 @@ static bool sending_frag_in_message(struct transaction_buffer *buf, struct buffe
     return false;
 }
 
+// When the last byte of this message went out. The broker cannot acknowledge a packet before
+// it has received all of it, so this - not the head fragment's own timestamp - is when the
+// PUBACK clock starts. They differ whenever a message stalls between its fragments: the head
+// can be on the wire long before the payload finishes draining.
+//
+// Fragments are written in order, so the tail carries the latest timestamp, but taking the
+// maximum keeps this correct regardless.
+static usec_t message_sent_monotonic_ut(struct buffer_fragment *msg_head)
+{
+    struct buffer_fragment *frag = msg_head;
+    usec_t sent_ut = 0;
+
+    while (frag) {
+        if (frag->sent_monotonic_ut > sent_ut)
+            sent_ut = frag->sent_monotonic_ut;
+        if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL)
+            break;
+        frag = frag->next;
+    }
+
+    return sent_ut;
+}
+
 // Pushes a packet's PUBACK deadline `seconds` into the future.
 // The caller must hold client->pending_packets.spinlock.
 static void rearm_packet_timeout_unsafe(struct mqtt_ng_client *client, uint16_t packet_id, time_t seconds)
@@ -1314,11 +1337,15 @@ static int resolve_packet(struct mqtt_ng_client *client, uint16_t packet_id, boo
                 return 1;
             }
 
+            // the whole message is on the wire by now (the checks above guarantee it), so this
+            // is when the broker could first have acknowledged it
+            usec_t sent_ut = message_sent_monotonic_ut(frag);
+            usec_t waiting_ut = now_monotonic_usec() - sent_ut;
+
             if (!acked) {
-                // A packet sent shortly before this sweep has a stale deadline that is
-                // already due, but it has barely waited for its PUBACK. Give it the rest of
-                // the window measured from transmission instead of dropping it.
-                usec_t waiting_ut = now_monotonic_usec() - frag->sent_monotonic_ut;
+                // A message that finished going out shortly before this sweep has a stale
+                // deadline that is already due, but it has barely waited for its PUBACK. Give
+                // it the rest of the window measured from transmission instead of dropping it.
                 if (waiting_ut < (usec_t)PACKET_ACK_TIMEOUT_SECS * USEC_PER_SEC) {
                     rearm_packet_timeout_unsafe(
                         client, packet_id, PACKET_ACK_TIMEOUT_SECS - (time_t)(waiting_ut / USEC_PER_SEC));
@@ -1333,9 +1360,11 @@ static int resolve_packet(struct mqtt_ng_client *client, uint16_t packet_id, boo
             frag->packet_id = 0;
 
             if (acked) {
-                usec_t latency = now_monotonic_usec() - frag->sent_monotonic_ut;
-                pulse_aclk_sent_message_acked(latency, frag->len);
-                __atomic_store_n(&publish_latency, latency, __ATOMIC_RELEASE);
+                // measured from the same instant the timeout is: when the message finished
+                // going out, so the figure is the broker's round trip and not our own send
+                // time. For a message that went out in one go the two are identical.
+                pulse_aclk_sent_message_acked(waiting_ut, frag->len);
+                __atomic_store_n(&publish_latency, waiting_ut, __ATOMIC_RELEASE);
             }
             else
                 __atomic_fetch_add(&client->stats.packets_timed_out, 1, __ATOMIC_RELAXED);
@@ -3092,6 +3121,33 @@ static void mqtt_ng_unittest_puback_teardown(struct mqtt_ng_unittest_puback_ctx 
     rbuf_free(ctx->input);
 }
 
+// every publish is at least two fragments: the in-buffer head carrying the MQTT header, and the
+// payload attached as external data, which is the one flagged as the packet tail
+static struct buffer_fragment *mqtt_ng_unittest_tail_of(struct mqtt_ng_unittest_puback_ctx *ctx)
+{
+    struct buffer_fragment *frag = ctx->frag;
+
+    while (frag && !(frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL))
+        frag = frag->next;
+
+    return frag;
+}
+
+// marks the whole message as transmitted `ago_ut` ago
+static void mqtt_ng_unittest_mark_sent(struct mqtt_ng_unittest_puback_ctx *ctx, usec_t ago_ut)
+{
+    usec_t sent_ut = now_monotonic_usec() - ago_ut;
+    struct buffer_fragment *frag = ctx->frag;
+
+    while (frag) {
+        frag->sent = frag->len;
+        frag->sent_monotonic_ut = sent_ut;
+        if (frag->flags & BUFFER_FRAG_MQTT_PACKET_TAIL)
+            break;
+        frag = frag->next;
+    }
+}
+
 static uint32_t *mqtt_ng_unittest_deadline_of(struct mqtt_ng_unittest_puback_ctx *ctx)
 {
     return (uint32_t *)JudyLGet(ctx->client->pending_packets.JudyL, (Word_t)ctx->packet_id, PJE0);
@@ -3145,10 +3201,9 @@ static int mqtt_ng_unittest_puback_timeout_is_not_an_ack(void)
     MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
                  "QoS1 publish is waiting for its PUBACK");
 
-    // backdate the transmission past the ack timeout: it is frag->sent_monotonic_ut, not the
+    // backdate the transmission past the ack timeout: it is when the message went out, not the
     // monitor-list deadline, that decides whether the packet really ran out of time
-    ctx.frag->sent = ctx.frag->len;
-    ctx.frag->sent_monotonic_ut = now_monotonic_usec() - ((usec_t)PACKET_ACK_TIMEOUT_SECS + 1) * USEC_PER_SEC;
+    mqtt_ng_unittest_mark_sent(&ctx, ((usec_t)PACKET_ACK_TIMEOUT_SECS + 1) * USEC_PER_SEC);
 
     MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is registered in the timeout monitor list");
 
@@ -3229,8 +3284,7 @@ static int mqtt_ng_unittest_recently_sent_packet_keeps_its_window(void)
 
     // sent just now, but with the deadline it was armed with at generate time already due -
     // what happens when transmission lands just before a sweep
-    ctx.frag->sent = ctx.frag->len;
-    ctx.frag->sent_monotonic_ut = now_monotonic_usec();
+    mqtt_ng_unittest_mark_sent(&ctx, 0);
 
     MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is registered in the timeout monitor list");
 
@@ -3241,6 +3295,48 @@ static int mqtt_ng_unittest_recently_sent_packet_keeps_its_window(void)
     MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
                  "a just-sent packet stays in the in-flight count");
     MQTT_NG_TEST(ctx.frag->packet_id == ctx.packet_id, "a just-sent packet is not resolved");
+    MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_within_the_ack_window(&ctx),
+                 "deferred packet keeps a deadline inside the ack window");
+
+    mqtt_ng_unittest_puback_teardown(&ctx);
+    return errors;
+}
+
+// A message spans several fragments. If it stalls between them, the head goes out long before
+// the tail, and the PUBACK clock must start at the tail - the broker cannot acknowledge a packet
+// it has not fully received. Measuring from the head would shorten the ack window by however long
+// the tail took to drain, and drop the message early.
+static int mqtt_ng_unittest_timeout_starts_when_the_message_is_fully_sent(void)
+{
+    int errors = 0;
+    struct mqtt_ng_unittest_puback_ctx ctx;
+
+    MQTT_NG_TEST(mqtt_ng_unittest_puback_setup(&ctx, NULL), "QoS1 publish is queued");
+    if (!ctx.frag) {
+        mqtt_ng_unittest_puback_teardown(&ctx);
+        return errors;
+    }
+
+    struct buffer_fragment *tail = mqtt_ng_unittest_tail_of(&ctx);
+    MQTT_NG_TEST(tail != NULL && tail != ctx.frag, "publish spans a head and a payload fragment");
+    if (!tail || tail == ctx.frag) {
+        mqtt_ng_unittest_puback_teardown(&ctx);
+        return errors;
+    }
+
+    // head went out well before the ack timeout, the tail only finished draining just now
+    mqtt_ng_unittest_mark_sent(&ctx, ((usec_t)PACKET_ACK_TIMEOUT_SECS + 1) * USEC_PER_SEC);
+    tail->sent_monotonic_ut = now_monotonic_usec();
+
+    MQTT_NG_TEST(mqtt_ng_unittest_expire_deadline(&ctx), "publish is registered in the timeout monitor list");
+
+    check_packet_monitor_list_for_timeouts(ctx.client);
+
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_timed_out, __ATOMIC_RELAXED) == 0,
+                 "the ack window runs from the tail, not from the head");
+    MQTT_NG_TEST(ctx.frag->packet_id == ctx.packet_id, "a just-completed message is not resolved");
+    MQTT_NG_TEST(__atomic_load_n(&ctx.client->stats.packets_waiting_puback, __ATOMIC_RELAXED) == 1,
+                 "a just-completed message stays in the in-flight count");
     MQTT_NG_TEST(mqtt_ng_unittest_deadline_is_within_the_ack_window(&ctx),
                  "deferred packet keeps a deadline inside the ack window");
 
@@ -3308,6 +3404,7 @@ int mqtt_ng_unittest(void)
     errors += mqtt_ng_unittest_puback_timeout_is_not_an_ack();
     errors += mqtt_ng_unittest_unsent_packet_defers_its_deadline();
     errors += mqtt_ng_unittest_recently_sent_packet_keeps_its_window();
+    errors += mqtt_ng_unittest_timeout_starts_when_the_message_is_fully_sent();
     errors += mqtt_ng_unittest_packet_on_the_wire_is_never_dropped();
 
     if (errors)
