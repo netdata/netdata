@@ -23,9 +23,9 @@ Module: /sys/block/zram
 ## Overview
 
 Monitor zRAM device capacity, compression, memory use, and I/O activity on Linux systems.
-The data written to this block device is compressed and stored in memory.
+zRAM, or compressed RAM, uses a portion of system memory as a block device; data written to it is compressed and stored in memory.
 
-The collectors provides information about the operation and the effectiveness of zRAM on your system.
+The collector provides information about the operation and effectiveness of zRAM on your system.
 
 
 
