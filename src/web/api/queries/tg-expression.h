@@ -123,10 +123,10 @@ static inline bool tg_point_is_window(const TG_POINT *p) {
            netdata_double_isnumber(p->max);
 }
 
-static inline bool tg_expression_token(const char *s, const char *token, size_t len) {
+static inline bool tg_expression_token(const char *s, const char *end, const char *token, size_t len) {
     // a token must be followed by the end of the string or whitespace, so
     // "lasting" is not read as "last"
-    size_t available = strlen(s);
+    size_t available = (size_t)(end - s);
     if(available < len || strncasecmp(s, token, len) != 0)
         return false;
 
@@ -152,25 +152,26 @@ static inline void tg_expression_set_default(TG_EXPRESSION *e) {
 static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *options) {
     tg_expression_set_default(e);
 
-    if(!options || !*options)
+    if(!options)
         return true;
 
     const char *s = options;
-    while(isspace((uint8_t)*s)) s++;
+    const char *input_end = options + strlen(options);
+    while(s < input_end && isspace((uint8_t)*s)) s++;
 
-    if(!*s)
+    if(s == input_end)
         return true;
 
     switch(*s) {
         case '!':
             s++;
-            if(*s == '=' || *s == ':') s++;
+            if(s < input_end && (*s == '=' || *s == ':')) s++;
             e->cmp = TG_EXPRESSION_NOTEQUAL;
             break;
 
         case '>':
             s++;
-            if(*s == '=' || *s == ':') {
+            if(s < input_end && (*s == '=' || *s == ':')) {
                 s++;
                 e->cmp = TG_EXPRESSION_GREATEREQUAL;
             }
@@ -180,11 +181,11 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
 
         case '<':
             s++;
-            if(*s == '>') {
+            if(s < input_end && *s == '>') {
                 s++;
                 e->cmp = TG_EXPRESSION_NOTEQUAL;
             }
-            else if(*s == '=' || *s == ':') {
+            else if(s < input_end && (*s == '=' || *s == ':')) {
                 s++;
                 e->cmp = TG_EXPRESSION_LESSEQUAL;
             }
@@ -194,7 +195,7 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
 
         case '=':
             s++;
-            if(*s == '=') s++;
+            if(s < input_end && *s == '=') s++;
             e->cmp = TG_EXPRESSION_EQUAL;
             break;
 
@@ -213,22 +214,22 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
             break;
     }
 
-    while(isspace((uint8_t)*s)) s++;
+    while(s < input_end && isspace((uint8_t)*s)) s++;
 
     // The operator has already been stored and the numeric target remains
     // zero, preserving `countif(>)` as the historical shorthand for `>0`.
-    if(!*s)
+    if(s == input_end)
         return true;
 
     if(isalpha((uint8_t)*s)) {
-        if(tg_expression_token(s, "gap", 3) ||
-           tg_expression_token(s, "nan", 3) ||
-           tg_expression_token(s, "null", 4) ||
-           tg_expression_token(s, "empty", 5))
+        if(tg_expression_token(s, input_end, "gap", 3) ||
+           tg_expression_token(s, input_end, "nan", 3) ||
+           tg_expression_token(s, input_end, "null", 4) ||
+           tg_expression_token(s, input_end, "empty", 5))
             e->operand = TG_EXPRESSION_OPERAND_GAP;
 
-        else if(tg_expression_token(s, "previous", 8) ||
-                tg_expression_token(s, "last", 4))
+        else if(tg_expression_token(s, input_end, "previous", 8) ||
+                tg_expression_token(s, input_end, "last", 4))
             e->operand = TG_EXPRESSION_OPERAND_PREVIOUS;
 
         else
@@ -236,29 +237,30 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
 
         // nothing may follow it: the grammar has one operand and no
         // and/or compounds, so "gap and something" is not a condition
-        while(*s && !isspace((uint8_t)*s)) s++;
-        while(isspace((uint8_t)*s)) s++;
-        return *s == '\0';
+        while(s < input_end && !isspace((uint8_t)*s)) s++;
+        while(s < input_end && isspace((uint8_t)*s)) s++;
+        return s == input_end;
     }
 
     // the operand must LOOK like a number before we trust str2ndd with it,
     // so a lone '.', a stray operator or trailing junk is rejected instead
     // of silently becoming zero
+    size_t remaining = (size_t)(input_end - s);
     if(!(isdigit((uint8_t)*s) ||
-         (*s == '.' && isdigit((uint8_t)s[1])) ||
-         ((*s == '-' || *s == '+') && s[1] &&
-          (isdigit((uint8_t)s[1]) || (s[1] == '.' && isdigit((uint8_t)s[2]))))))
+         (*s == '.' && remaining > 1 && isdigit((uint8_t)s[1])) ||
+         ((*s == '-' || *s == '+') && remaining > 1 &&
+          (isdigit((uint8_t)s[1]) ||
+           (s[1] == '.' && remaining > 2 && isdigit((uint8_t)s[2]))))))
         return false;
 
-    const char *input_end = s + strlen(s);
-    char *end = NULL;
-    e->target = str2ndd(s, &end);
+    char *number_end = NULL;
+    e->target = str2ndd(s, &number_end);
 
-    if(!end || end == s || end > input_end || !netdata_double_isnumber(e->target))
+    if(!number_end || number_end == s || number_end > input_end || !netdata_double_isnumber(e->target))
         return false;
 
-    while(end < input_end && isspace((uint8_t)*end)) end++;
-    if(end != input_end)
+    while(number_end < input_end && isspace((uint8_t)*number_end)) number_end++;
+    if(number_end != input_end)
         return false;       // trailing junk
 
     return true;
