@@ -650,8 +650,36 @@ fn impossible_subgroup_skips_the_budgeted_scan() {
         .expect("no scan needed");
     assert_eq!(compiled.count_in_range(0, N as u32), 0);
     assert_eq!(work.rows_visited, 0);
-    // Same proof for an event group whose matching-KvId set is empty
-    // (the value exists in no dictionary).
+    // The empty-KvId arm is proven separately by
+    // `empty_event_kvid_set_short_circuits_with_the_chunk_present` —
+    // THIS fixture has no EVNB chunk, so an event-group case here would
+    // pass through the chunk_absent arm, not the empty-set one.
+}
+
+/// The OTHER impossible arm: the EVNB chunk is PRESENT and the events
+/// field has real dictionary entries, but the queried value matches no
+/// KvId — the empty matching set alone must short-circuit the budgeted
+/// scan (a zero budget still compiles).
+#[test]
+fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
+    const ROWS: usize = 128; // enough distinct h values for the high tier
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    let mut events = crate::EventRows::new();
+    for i in 0..ROWS {
+        let h = ri.intern(None, &format!("h=w{i:03}"));
+        let name = ri.intern(None, "events.name=click");
+        ri.row(1_000 + i as i64, &[h, name]);
+        events.push_event(1_000 + i as u64, 0, name, &[]);
+        events.end_row(0);
+    }
+    ri.events = Some(events);
+    let (buf, _s, _m) =
+        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let bytes = buf.into_inner();
+    let idx = IndexReader::open(&bytes).unwrap();
+    assert!(idx.has_event_index(), "the fixture must carry EVNB");
+
     let p = plan(vec![
         tokens("h", &[], &["w.*"]),
         PlanTerm::EventGroup {
@@ -666,9 +694,27 @@ fn impossible_subgroup_skips_the_budgeted_scan() {
     ]);
     let mut work = ScanWork::default();
     let compiled = idx
-        .compile_trace_plan(&p, (0, N as u32), 0, &mut work)
+        .compile_trace_plan(&p, (0, ROWS as u32), 0, &mut work)
         .unwrap()
         .expect("no scan needed");
-    assert_eq!(compiled.count_in_range(0, N as u32), 0);
+    assert_eq!(compiled.count_in_range(0, ROWS as u32), 0);
     assert_eq!(work.rows_visited, 0);
+
+    // Control: the value that DOES exist compiles a real plan (the
+    // group is not impossible merely because it is an event group).
+    let p = plan(vec![PlanTerm::EventGroup {
+        conditions: vec![crate::GroupCondition::Field {
+            field: "events.name".to_string(),
+            matcher: crate::PlanMatcher::Tokens {
+                exact: vec!["click".to_string()],
+                patterns: vec![],
+            },
+        }],
+    }]);
+    let mut work = ScanWork::default();
+    let compiled = idx
+        .compile_trace_plan(&p, (0, ROWS as u32), u64::MAX, &mut work)
+        .unwrap()
+        .expect("within budget");
+    assert_eq!(compiled.count_in_range(0, ROWS as u32), ROWS as u64);
 }
