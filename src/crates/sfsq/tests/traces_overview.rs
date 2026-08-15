@@ -25,6 +25,20 @@ fn grid() -> sfst::Grid {
     sfst::Grid::new(0, 1_000_000_000, 10)
 }
 
+/// An overflowing width x count is rejected with ITS OWN reason — not
+/// the empty-grid message, which would misdiagnose a valid-looking grid.
+#[test]
+fn grid_overflow_is_rejected_with_a_distinct_reason() {
+    let err = overview(
+        Vec::new(),
+        OverviewQuery::new(sfst::Grid::new(0, i64::MAX, 2)),
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("overflows"), "{err}");
+}
+
 fn run(sources: Vec<TraceSource>, query: OverviewQuery) -> OverviewData {
     overview(
         sources,

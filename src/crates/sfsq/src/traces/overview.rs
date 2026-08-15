@@ -125,6 +125,8 @@ impl OverviewQuery {
 pub enum OverviewRequestError {
     #[error("the grid is empty (zero buckets or non-positive width)")]
     EmptyGrid,
+    #[error("the grid's end overflows i64 (width x buckets past the epoch range)")]
+    GridOverflow,
     #[error(transparent)]
     SourceSet(#[from] SourceSetError),
 }
@@ -213,7 +215,7 @@ pub fn overview(
         .checked_mul(query.grid.num_buckets as i64)
         .and_then(|span| query.grid.bucket_start_ns.checked_add(span))
     else {
-        return Err(OverviewRequestError::EmptyGrid);
+        return Err(OverviewRequestError::GridOverflow);
     };
     validate_sources(&sources)?;
 
