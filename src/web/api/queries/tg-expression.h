@@ -126,7 +126,11 @@ static inline bool tg_point_is_window(const TG_POINT *p) {
 static inline bool tg_expression_token(const char *s, const char *token, size_t len) {
     // a token must be followed by the end of the string or whitespace, so
     // "lasting" is not read as "last"
-    return strncasecmp(s, token, len) == 0 && (s[len] == '\0' || isspace((uint8_t)s[len]));
+    size_t available = strlen(s);
+    if(available < len || strncasecmp(s, token, len) != 0)
+        return false;
+
+    return available == len || isspace((uint8_t)s[len]);
 }
 
 // An absent, empty or whitespace-only condition keeps the historical `==0`
@@ -246,14 +250,15 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
           (isdigit((uint8_t)s[1]) || (s[1] == '.' && isdigit((uint8_t)s[2]))))))
         return false;
 
+    const char *input_end = s + strlen(s);
     char *end = NULL;
     e->target = str2ndd(s, &end);
 
-    if(!end || end == s || !netdata_double_isnumber(e->target))
+    if(!end || end == s || end > input_end || !netdata_double_isnumber(e->target))
         return false;
 
-    while(isspace((uint8_t)*end)) end++;
-    if(*end)
+    while(end < input_end && isspace((uint8_t)*end)) end++;
+    if(end != input_end)
         return false;       // trailing junk
 
     return true;
