@@ -24,7 +24,9 @@
 //             predecessor keyword (previous|last)
 //
 // There are deliberately no and/or compounds: a single comparison keeps
-// the feature explainable, and gaps are reachable as a VALUE instead.
+// the feature explainable, and gaps are reachable as a VALUE instead. An
+// omitted condition compares equal to zero; an operator without an operand
+// applies that operator to zero, preserving the historical alert grammar.
 
 // the groupings whose value is derived from a condition, not from the
 // sample values themselves - the only ones that carry an expression.
@@ -127,9 +129,8 @@ static inline bool tg_expression_token(const char *s, const char *token, size_t 
     return strncasecmp(s, token, len) == 0 && (s[len] == '\0' || isspace((uint8_t)s[len]));
 }
 
-// what an absent or unreadable condition compares against: `==0`, which
-// is what the query API has always answered when it could not read the
-// options it was given
+// An absent, empty or whitespace-only condition keeps the historical `==0`
+// default. Malformed conditions are rejected at the API boundary.
 static inline void tg_expression_set_default(TG_EXPRESSION *e) {
     e->cmp = TG_EXPRESSION_EQUAL;
     e->operand = TG_EXPRESSION_OPERAND_NUMBER;
@@ -152,6 +153,9 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
 
     const char *s = options;
     while(isspace((uint8_t)*s)) s++;
+
+    if(!*s)
+        return true;
 
     switch(*s) {
         case '!':
@@ -207,6 +211,8 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
 
     while(isspace((uint8_t)*s)) s++;
 
+    // The operator has already been stored and the numeric target remains
+    // zero, preserving `countif(>)` as the historical shorthand for `>0`.
     if(!*s)
         return true;
 
@@ -243,7 +249,7 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
     char *end = NULL;
     e->target = str2ndd(s, &end);
 
-    if(!end || end == s)
+    if(!end || end == s || !netdata_double_isnumber(e->target))
         return false;
 
     while(isspace((uint8_t)*end)) end++;
@@ -253,12 +259,6 @@ static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *opt
     return true;
 }
 
-// Returns false when the condition is malformed. The query API has always
-// been lenient here (an unreadable condition silently compares equal to
-// zero) and stays that way; health checks the result and refuses to load
-// an alert whose condition it cannot read, which is what it has always
-// done.
-//
 // A rejected condition leaves the DEFAULT behind, never the fragment that
 // parsed: `>=gap junk` reads the gap token before it hits the junk, and
 // keeping that would quietly turn a query the caller wrote wrong into a
@@ -270,6 +270,14 @@ static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
 
     tg_expression_set_default(e);
     return false;
+}
+
+static inline bool time_grouping_expression_options_valid(RRDR_TIME_GROUPING grouping, const char *options) {
+    if(!time_grouping_is_expression(grouping))
+        return true;
+
+    TG_EXPRESSION expression;
+    return tg_expression_parse(&expression, options);
 }
 
 // true when the expression names a gap token, which is the ONLY way gap

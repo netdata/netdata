@@ -31,9 +31,13 @@ The value is one of:
   counter resets. Gaps are skipped, so a drop across a gap still counts, and
   the first sample of a query never matches.
 
-There are no `and`/`or` compounds. An invalid condition is rejected with an API error.
-The same grammar is used by `percentage-of-time`, `number-of-flaps` and `number-of-times`, and by the `lookup` line
-of an [alert](/src/health/REFERENCE.md).
+An omitted, empty or whitespace-only condition means `==0`. An operator
+without a value applies to zero, so `>` is shorthand for `>0`.
+
+There are no `and`/`or` compounds. An unreadable condition fails the query
+with HTTP 400 rather than silently changing what was asked. The same grammar is used by `percentage-of-time`,
+`number-of-flaps` and `number-of-times`, and by the `lookup` line of an
+[alert](/src/health/REFERENCE.md).
 
 Over a window long enough to be served from lower-resolution data this
 grouping evaluates each STORED point as one sample, rather than reasoning

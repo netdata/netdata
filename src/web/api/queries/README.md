@@ -158,6 +158,9 @@ Some grouping methods accept additional parameters via `group_options`:
     before it, which counts counter resets. Gaps are skipped, so a drop across a gap still counts, and the first sample
     of a query never matches.
 
+  If the condition is omitted, empty or whitespace-only, it means `==0`. If the operator is present without a value,
+  the value defaults to zero, so `>` means `>0` and `!=` means `!=0`.
+
   There are no and/or compounds.
 
 ### Accuracy over long windows
@@ -253,5 +256,4 @@ So, the proper way to query the database is to also set at least `after`. The fo
 <http://netdata.firehol.org/api/v1/data?chart=system.cpu&points=1&after=-10&options=seconds>
 
 When you keep calling this URL, you will see that it returns one new value every 10 seconds, and the timestamp always ends with zero. Similarly, if you say `points=1&after=-5` it will always return timestamps ending with 0 or 5.
-
 
