@@ -65,7 +65,7 @@ static size_t pgd_unittest_tier0(uint8_t page_type) {
 static size_t pgd_unittest_tier1(void) {
     size_t errors = 0;
 
-    PGD *gap_pg = pgd_unittest_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 1);
+    PGD *gap_pg = pgd_unittest_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 2);
     pgd_unittest_append_point(gap_pg, 60, NAN, NAN, NAN, 0, 0, SN_FLAG_NONE, 0);
     PGD_EXPECT(pgd_unittest_slots_used(gap_pg) == 1);
     PGD_EXPECT(pgd_unittest_is_empty(gap_pg));
@@ -151,7 +151,7 @@ static size_t pgd_unittest_tier1(void) {
     PGD_EXPECT(sp.count == 0 && sp.gap_count == 64);
     PGD_EXPECT(sp.flags == SN_FLAG_NONE);
 
-    PGD *wrapped_count_pg = pgd_unittest_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 1);
+    PGD *wrapped_count_pg = pgd_unittest_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 2);
     pgd_unittest_append_point(wrapped_count_pg, 65536, 65536, 1, 1, 0, 0, SN_DEFAULT_FLAGS, 0);
     pgd_unittest_cursor_reset(&cursor, wrapped_count_pg, 0, 65536);
     sp.start_time_s = 0;

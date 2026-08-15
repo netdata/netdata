@@ -471,17 +471,126 @@ typedef struct dbengine_expected_point {
     bool is_gap;
 } DBENGINE_EXPECTED_POINT;
 
-static RRDDIM *dbengine_test_create_metric(RRDHOST *host, const char *id, int update_every) {
+static RRDDIM *dbengine_test_create_metric(RRDHOST *host, const char *id_prefix, int update_every) {
+    char id[128];
+    snprintfz(id, sizeof(id) - 1, "%s-%d", id_prefix, getpid());
+
     RRDSET *st = rrdset_create(
         host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
         NULL, 1, update_every, RRDSET_TYPE_LINE);
-    return rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
+       !rd->tiers[0].smh || !rd->tiers[0].sch) {
+        fprintf(stderr, " >>> DBENGINE: %s metric initialization failed\n", id);
+        return NULL;
+    }
+
+    return rd;
 }
 
 static void dbengine_test_store_point(RRDDIM *rd, time_t end_time_s, NETDATA_DOUBLE value) {
     unittest_storage_engine_store_metric(
         rd->tiers[0].sch, (usec_t)end_time_s * USEC_PER_SEC,
         value, value, value, 1, 0, SN_DEFAULT_FLAGS);
+}
+
+static Word_t dbengine_test_metric_id(RRDDIM *rd) {
+    return mrg_metric_id(main_mrg, (METRIC *)rd->tiers[0].smh);
+}
+
+static bool dbengine_test_evict_page(RRDHOST *host, Word_t metric_id, time_t start_time_s, const char *id) {
+    PGC_PAGE *page = pgc_page_get_and_acquire(
+        main_cache, (Word_t)host->db[0].si, metric_id, start_time_s, PGC_SEARCH_EXACT);
+    if(!page) {
+        fprintf(stderr, " >>> DBENGINE: %s page is not cached\n", id);
+        return false;
+    }
+
+    if(!pgc_page_to_clean_evict_or_release(main_cache, page)) {
+        fprintf(stderr, " >>> DBENGINE: %s page could not be evicted\n", id);
+        return false;
+    }
+
+    return true;
+}
+
+static bool dbengine_test_add_empty_page(
+    RRDHOST *host,
+    Word_t metric_id,
+    time_t start_time_s,
+    time_t end_time_s,
+    uint32_t update_every_s,
+    const char *id) {
+    PGC_ENTRY entry = {
+        .section = (Word_t)host->db[0].si,
+        .metric_id = metric_id,
+        .start_time_s = start_time_s,
+        .end_time_s = end_time_s,
+        .size = 0,
+        .data = PGD_EMPTY,
+        .update_every_s = update_every_s,
+        .hot = false,
+    };
+    bool added = false;
+    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, entry, &added);
+    if(!page || !added) {
+        fprintf(stderr, " >>> DBENGINE: failed to insert %s page\n", id);
+        if(page)
+            pgc_page_release(main_cache, page);
+        return false;
+    }
+
+    pgc_page_release(main_cache, page);
+    return true;
+}
+
+typedef struct dbengine_test_cache_stats {
+    size_t open_lookups;
+    size_t journal_lookups;
+    size_t planned_gaps;
+} DBENGINE_TEST_CACHE_STATS;
+
+static DBENGINE_TEST_CACHE_STATS dbengine_test_cache_stats(void) {
+    struct rrdeng_cache_efficiency_stats stats = rrdeng_get_cache_efficiency_stats();
+    return (DBENGINE_TEST_CACHE_STATS){
+        .open_lookups = stats.prep_time_in_open_cache_lookup.count,
+        .journal_lookups = stats.prep_time_in_journal_v2_lookup.count,
+        .planned_gaps = stats.queries_planned_with_gaps,
+    };
+}
+
+#define DBENGINE_TEST_STAT_UNCHECKED SIZE_MAX
+
+static size_t dbengine_test_expect_stat_delta(
+    const char *id,
+    const char *stat,
+    size_t before,
+    size_t after,
+    size_t expected) {
+    if(expected == DBENGINE_TEST_STAT_UNCHECKED || after == before + expected)
+        return 0;
+
+    fprintf(stderr,
+            " >>> DBENGINE: %s used %zu %s, expected %zu\n",
+            id, after - before, stat, expected);
+    return 1;
+}
+
+static size_t dbengine_test_expect_cache_deltas(
+    const char *id,
+    DBENGINE_TEST_CACHE_STATS before,
+    DBENGINE_TEST_CACHE_STATS after,
+    size_t expected_open,
+    size_t expected_journal,
+    size_t expected_planned_gaps) {
+    size_t errors = 0;
+    errors += dbengine_test_expect_stat_delta(
+        id, "open-cache lookups", before.open_lookups, after.open_lookups, expected_open);
+    errors += dbengine_test_expect_stat_delta(
+        id, "journal lookups", before.journal_lookups, after.journal_lookups, expected_journal);
+    errors += dbengine_test_expect_stat_delta(
+        id, "planner gaps", before.planned_gaps, after.planned_gaps, expected_planned_gaps);
+    return errors;
 }
 
 static size_t dbengine_test_query_points(
@@ -573,16 +682,30 @@ static size_t dbengine_test_query_points(
     return errors;
 }
 
+static size_t dbengine_test_query_points_with_cache_deltas(
+    RRDDIM *rd,
+    time_t start_time_s,
+    time_t end_time_s,
+    const DBENGINE_EXPECTED_POINT *expected,
+    size_t expected_points,
+    const char *id,
+    size_t expected_open,
+    size_t expected_journal,
+    size_t expected_planned_gaps) {
+    DBENGINE_TEST_CACHE_STATS before = dbengine_test_cache_stats();
+    size_t errors = dbengine_test_query_points(
+        rd, start_time_s, end_time_s, expected, expected_points, id);
+    DBENGINE_TEST_CACHE_STATS after = dbengine_test_cache_stats();
+    errors += dbengine_test_expect_cache_deltas(
+        id, before, after, expected_open, expected_journal, expected_planned_gaps);
+    return errors;
+}
+
 static size_t test_dbengine_cadence_page_transitions(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 1000000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-cadence-page-transitions-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: cadence page-transition metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-cadence-page-transitions", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -623,19 +746,9 @@ static size_t test_dbengine_cadence_page_transitions(RRDHOST *host) {
         { t + 290, t + 300, 14 },
     };
 
-    size_t errors = 0;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 200, narrow, _countof(narrow), "cadence-page-narrow");
-    size_t journal_after_narrow =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    if(journal_after_narrow != journal_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: continuous cadence query used %zu journal lookups, expected 0\n",
-                journal_after_narrow - journal_before);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 200, narrow, _countof(narrow),
+        "cadence-page-narrow", DBENGINE_TEST_STAT_UNCHECKED, 0, DBENGINE_TEST_STAT_UNCHECKED);
 
     struct storage_engine_query_handle seqh = { 0 };
     unittest_storage_engine_query_init(
@@ -652,60 +765,21 @@ static size_t test_dbengine_cadence_page_transitions(RRDHOST *host) {
     }
     unittest_storage_engine_query_finalize(&seqh);
 
-    struct rrdeng_cache_efficiency_stats stats_before_wide = rrdeng_get_cache_efficiency_stats();
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 300, wide, _countof(wide), "cadence-page-wide");
-    struct rrdeng_cache_efficiency_stats stats_after_wide = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_wide.prep_time_in_journal_v2_lookup.count !=
-       stats_before_wide.prep_time_in_journal_v2_lookup.count + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-page-wide query used %zu journal lookups, expected 1\n",
-                stats_after_wide.prep_time_in_journal_v2_lookup.count -
-                    stats_before_wide.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_wide.queries_planned_with_gaps != stats_before_wide.queries_planned_with_gaps + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-page-wide query reported %zu planner gaps, expected 1\n",
-                stats_after_wide.queries_planned_with_gaps - stats_before_wide.queries_planned_with_gaps);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 300, wide, _countof(wide), "cadence-page-wide-repeat");
-    struct rrdeng_cache_efficiency_stats stats_after_wide_repeat = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_wide_repeat.prep_time_in_journal_v2_lookup.count !=
-       stats_after_wide.prep_time_in_journal_v2_lookup.count) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated cadence-page-wide query used %zu journal lookups, expected 0\n",
-                stats_after_wide_repeat.prep_time_in_journal_v2_lookup.count -
-                    stats_after_wide.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_wide_repeat.queries_planned_with_gaps != stats_after_wide.queries_planned_with_gaps) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated cadence-page-wide query reported %zu planner gaps, expected 0\n",
-                stats_after_wide_repeat.queries_planned_with_gaps - stats_after_wide.queries_planned_with_gaps);
-        errors++;
-    }
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 300, wide, _countof(wide),
+        "cadence-page-wide", DBENGINE_TEST_STAT_UNCHECKED, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 300, wide, _countof(wide),
+        "cadence-page-wide-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_negative_page_reuse_across_cadence(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2000000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-negative-page-cadence-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 1);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: negative-page cadence metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-negative-page-cadence", 1);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 101, 2);
@@ -729,94 +803,29 @@ static size_t test_dbengine_negative_page_reuse_across_cadence(RRDHOST *host) {
         { t + 191, t + 201, 10 },
     };
 
-    size_t errors = 0;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 201, expected, _countof(expected), "negative-page-first");
-    size_t journal_after_first =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_first =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_first != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first negative-page query used %zu journal lookups, expected 1\n",
-                journal_after_first - journal_before);
-        errors++;
-    }
-
-    if(planned_gaps_after_first != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first negative-page query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after_first - planned_gaps_before);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 201, expected, _countof(expected),
+        "negative-page-first", DBENGINE_TEST_STAT_UNCHECKED, 1, 1);
 
     const DBENGINE_EXPECTED_POINT inside_gap[] = {
         { t + 121, t + 131, 3 },
         { t + 131, t + 141, 4 },
     };
-    errors += dbengine_test_query_points(
-        rd, t + 125, t + 141,
-        inside_gap, _countof(inside_gap), "negative-page-inside-gap");
-    size_t journal_after_inside_gap =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_inside_gap =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_inside_gap != journal_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: query inside cached negative range used %zu journal lookups, expected 0\n",
-                journal_after_inside_gap - journal_after_first);
-        errors++;
-    }
-
-
-    if(planned_gaps_after_inside_gap != planned_gaps_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: query inside cached negative range reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_inside_gap - planned_gaps_after_first);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 201, expected, _countof(expected), "negative-page-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after_inside_gap) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated negative-page query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after_inside_gap);
-        errors++;
-    }
-
-
-    if(planned_gaps_after_repeat != planned_gaps_after_inside_gap) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated negative-page query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after_inside_gap);
-        errors++;
-    }
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 125, t + 141, inside_gap, _countof(inside_gap),
+        "negative-page-inside-gap", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 201, expected, _countof(expected),
+        "negative-page-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_continuous_slowdown(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2500000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-continuous-slowdown-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 1);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: continuous-slowdown metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-continuous-slowdown", 1);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 101, 2);
@@ -834,60 +843,21 @@ static size_t test_dbengine_continuous_slowdown(RRDHOST *host) {
         { t + 111, t + 121, 4 },
     };
 
-    struct rrdeng_cache_efficiency_stats stats_before = rrdeng_get_cache_efficiency_stats();
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 121, expected, _countof(expected), "continuous-slowdown");
-    struct rrdeng_cache_efficiency_stats stats_after_first = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_first.prep_time_in_journal_v2_lookup.count !=
-       stats_before.prep_time_in_journal_v2_lookup.count + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first continuous slowdown query used %zu journal lookups, expected 1\n",
-                stats_after_first.prep_time_in_journal_v2_lookup.count -
-                    stats_before.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_first.queries_planned_with_gaps != stats_before.queries_planned_with_gaps + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first continuous slowdown query reported %zu planner gaps, expected 1\n",
-                stats_after_first.queries_planned_with_gaps - stats_before.queries_planned_with_gaps);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 121, expected, _countof(expected), "continuous-slowdown-repeat");
-    struct rrdeng_cache_efficiency_stats stats_after_repeat = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_repeat.prep_time_in_journal_v2_lookup.count !=
-       stats_after_first.prep_time_in_journal_v2_lookup.count) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated continuous slowdown query used %zu journal lookups, expected 0\n",
-                stats_after_repeat.prep_time_in_journal_v2_lookup.count -
-                    stats_after_first.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_repeat.queries_planned_with_gaps != stats_after_first.queries_planned_with_gaps) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated continuous slowdown query reported %zu planner gaps, expected 0\n",
-                stats_after_repeat.queries_planned_with_gaps - stats_after_first.queries_planned_with_gaps);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 121, expected, _countof(expected),
+        "continuous-slowdown", DBENGINE_TEST_STAT_UNCHECKED, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 121, expected, _countof(expected),
+        "continuous-slowdown-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_candidate_coverage_finds_real_gap(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2600000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-candidate-real-gap-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: candidate real-gap metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-candidate-real-gap", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -907,64 +877,21 @@ static size_t test_dbengine_candidate_coverage_finds_real_gap(RRDHOST *host) {
         { t + 210, t + 220, 5 },
     };
 
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 220, expected, _countof(expected), "candidate-real-gap");
-    size_t journal_after_first =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_first =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_first != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first candidate real-gap query used %zu journal lookups, expected 1\n",
-                journal_after_first - journal_before);
-        errors++;
-    }
-
-    if(planned_gaps_after_first != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first candidate real-gap query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after_first - planned_gaps_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 220, expected, _countof(expected), "candidate-real-gap-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated candidate real-gap query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after_first);
-        errors++;
-    }
-    if(planned_gaps_after_repeat != planned_gaps_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated candidate real-gap query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after_first);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 220, expected, _countof(expected),
+        "candidate-real-gap", DBENGINE_TEST_STAT_UNCHECKED, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 220, expected, _countof(expected),
+        "candidate-real-gap-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_candidate_tail_requires_authoritative_lookup(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2606250;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-candidate-tail-gap-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 100);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: candidate tail-gap metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-candidate-tail-gap", 100);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 200, 2);
@@ -982,23 +909,9 @@ static size_t test_dbengine_candidate_tail_requires_authoritative_lookup(RRDHOST
 
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    Word_t metric_id = mrg_metric_id(main_mrg, metric);
-    PGC_PAGE *tail = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        metric_id,
-        t + 210,
-        PGC_SEARCH_EXACT);
-    if(!tail) {
-        fprintf(stderr, " >>> DBENGINE: candidate tail page is not cached\n");
+    Word_t metric_id = dbengine_test_metric_id(rd);
+    if(!dbengine_test_evict_page(host, metric_id, t + 210, "candidate tail"))
         return 1;
-    }
-
-    if(!pgc_page_to_clean_evict_or_release(main_cache, tail)) {
-        fprintf(stderr, " >>> DBENGINE: candidate tail page could not be evicted\n");
-        return 1;
-    }
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t,       t + 100, 1 },
@@ -1008,78 +921,21 @@ static size_t test_dbengine_candidate_tail_requires_authoritative_lookup(RRDHOST
         { t + 240, t + 250, NAN, true },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 250,
-        expected, _countof(expected), "candidate-tail-gap");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after != open_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: candidate tail-gap query used %zu open-cache lookups, expected 1\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(planned_gaps_after != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: candidate tail-gap query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after - planned_gaps_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: candidate tail-gap query used %zu journal lookups, expected 1\n",
-                journal_after - journal_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 250,
-        expected, _countof(expected), "candidate-tail-gap-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated candidate tail-gap query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after);
-        errors++;
-    }
-
-    if(planned_gaps_after_repeat != planned_gaps_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated candidate tail-gap query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 250, expected, _countof(expected),
+        "candidate-tail-gap", 1, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 250, expected, _countof(expected),
+        "candidate-tail-gap-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_candidate_terminal_equality_is_gap(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2607812;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-candidate-terminal-equality-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: candidate terminal-equality metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-candidate-terminal-equality", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1106,62 +962,21 @@ static size_t test_dbengine_candidate_terminal_equality_is_gap(RRDHOST *host) {
         { t + 190, t + 200, NAN, true },
     };
 
-    struct rrdeng_cache_efficiency_stats stats_before = rrdeng_get_cache_efficiency_stats();
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 200,
-        expected, _countof(expected), "candidate-terminal-equality");
-    struct rrdeng_cache_efficiency_stats stats_after_first = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_first.prep_time_in_journal_v2_lookup.count !=
-       stats_before.prep_time_in_journal_v2_lookup.count + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: candidate terminal-equality query used %zu journal lookups, expected 1\n",
-                stats_after_first.prep_time_in_journal_v2_lookup.count -
-                    stats_before.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_first.queries_planned_with_gaps != stats_before.queries_planned_with_gaps + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: candidate terminal-equality query reported %zu planner gaps, expected 1\n",
-                stats_after_first.queries_planned_with_gaps - stats_before.queries_planned_with_gaps);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 200,
-        expected, _countof(expected), "candidate-terminal-equality-repeat");
-    struct rrdeng_cache_efficiency_stats stats_after_repeat = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_repeat.prep_time_in_journal_v2_lookup.count !=
-       stats_after_first.prep_time_in_journal_v2_lookup.count) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated candidate terminal-equality query used %zu journal lookups, expected 0\n",
-                stats_after_repeat.prep_time_in_journal_v2_lookup.count -
-                    stats_after_first.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_repeat.queries_planned_with_gaps != stats_after_first.queries_planned_with_gaps) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated candidate terminal-equality query reported %zu planner gaps, expected 0\n",
-                stats_after_repeat.queries_planned_with_gaps - stats_after_first.queries_planned_with_gaps);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 200, expected, _countof(expected),
+        "candidate-terminal-equality", DBENGINE_TEST_STAT_UNCHECKED, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 200, expected, _countof(expected),
+        "candidate-terminal-equality-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_tail_before_next_sample_is_not_gap(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2609375;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-tail-before-next-sample-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: tail-before-next-sample metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-tail-before-next-sample", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1176,41 +991,18 @@ static size_t test_dbengine_tail_before_next_sample_is_not_gap(RRDHOST *host) {
         { t + 100, t + 160, 2 },
     };
 
-    struct rrdeng_cache_efficiency_stats stats_before = rrdeng_get_cache_efficiency_stats();
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 200,
-        expected, _countof(expected), "tail-before-next-sample");
-    struct rrdeng_cache_efficiency_stats stats_after = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after.prep_time_in_journal_v2_lookup.count !=
-       stats_before.prep_time_in_journal_v2_lookup.count + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: tail-before-next-sample query used %zu journal lookups, expected 1\n",
-                stats_after.prep_time_in_journal_v2_lookup.count -
-                    stats_before.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after.queries_planned_with_gaps != stats_before.queries_planned_with_gaps) {
-        fprintf(stderr,
-                " >>> DBENGINE: tail-before-next-sample query reported %zu planner gaps, expected 0\n",
-                stats_after.queries_planned_with_gaps - stats_before.queries_planned_with_gaps);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 200, expected, _countof(expected),
+        "tail-before-next-sample", DBENGINE_TEST_STAT_UNCHECKED, 1, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_legacy_cursor_includes_equal_page_end(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2612500;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-legacy-equal-end-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: legacy equal-end metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-legacy-equal-end", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1232,44 +1024,18 @@ static size_t test_dbengine_legacy_cursor_includes_equal_page_end(RRDHOST *host)
         { t + 320, t + 420, 5 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 420, expected, _countof(expected), "legacy-equal-end");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-
-    if(open_after != open_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: legacy equal-end query used %zu open-cache lookups, expected 0\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: legacy equal-end query used %zu journal lookups, expected 0\n",
-                journal_after - journal_before);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 420, expected, _countof(expected),
+        "legacy-equal-end", 0, 0, DBENGINE_TEST_STAT_UNCHECKED);
 
     return errors;
 }
 
 static size_t test_dbengine_legacy_completion_equality_requires_authority(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2618750;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-legacy-completion-equality-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: legacy completion-equality metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-legacy-completion-equality", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1290,22 +1056,9 @@ static size_t test_dbengine_legacy_completion_equality_requires_authority(RRDHOS
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    PGC_PAGE *middle = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        mrg_metric_id(main_mrg, metric),
-        t + 180,
-        PGC_SEARCH_EXACT);
-    if(!middle) {
-        fprintf(stderr, " >>> DBENGINE: legacy completion-equality middle page is not cached\n");
+    if(!dbengine_test_evict_page(
+           host, dbengine_test_metric_id(rd), t + 180, "legacy completion-equality middle"))
         return 1;
-    }
-
-    if(!pgc_page_to_clean_evict_or_release(main_cache, middle)) {
-        fprintf(stderr, " >>> DBENGINE: legacy completion-equality middle page could not be evicted\n");
-        return 1;
-    }
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
@@ -1315,71 +1068,21 @@ static size_t test_dbengine_legacy_completion_equality_requires_authority(RRDHOS
         { t + 180, t + 210, 5 },
     };
 
-    struct rrdeng_cache_efficiency_stats stats_before = rrdeng_get_cache_efficiency_stats();
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 220,
-        expected, _countof(expected), "legacy-completion-equality");
-    struct rrdeng_cache_efficiency_stats stats_after_first = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_first.prep_time_in_open_cache_lookup.count !=
-       stats_before.prep_time_in_open_cache_lookup.count + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: legacy completion-equality query used %zu open-cache lookups, expected 1\n",
-                stats_after_first.prep_time_in_open_cache_lookup.count -
-                    stats_before.prep_time_in_open_cache_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_first.prep_time_in_journal_v2_lookup.count !=
-       stats_before.prep_time_in_journal_v2_lookup.count + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: legacy completion-equality query used %zu journal lookups, expected 1\n",
-                stats_after_first.prep_time_in_journal_v2_lookup.count -
-                    stats_before.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_first.queries_planned_with_gaps != stats_before.queries_planned_with_gaps + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: legacy completion-equality query reported %zu planner gaps, expected 1\n",
-                stats_after_first.queries_planned_with_gaps - stats_before.queries_planned_with_gaps);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 220,
-        expected, _countof(expected), "legacy-completion-equality-repeat");
-    struct rrdeng_cache_efficiency_stats stats_after_repeat = rrdeng_get_cache_efficiency_stats();
-
-    if(stats_after_repeat.prep_time_in_journal_v2_lookup.count !=
-       stats_after_first.prep_time_in_journal_v2_lookup.count) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated legacy completion-equality query used %zu journal lookups, expected 0\n",
-                stats_after_repeat.prep_time_in_journal_v2_lookup.count -
-                    stats_after_first.prep_time_in_journal_v2_lookup.count);
-        errors++;
-    }
-
-    if(stats_after_repeat.queries_planned_with_gaps != stats_after_first.queries_planned_with_gaps) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated legacy completion-equality query reported %zu planner gaps, expected 0\n",
-                stats_after_repeat.queries_planned_with_gaps - stats_after_first.queries_planned_with_gaps);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 220, expected, _countof(expected),
+        "legacy-completion-equality", 1, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 220, expected, _countof(expected),
+        "legacy-completion-equality-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_cadence_overlap_does_not_hide_intermediate_page(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2625000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-cadence-overlap-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: cadence-overlap metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-cadence-overlap", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1396,22 +1099,8 @@ static size_t test_dbengine_cadence_overlap_does_not_hide_intermediate_page(RRDH
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    PGC_PAGE *middle = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        mrg_metric_id(main_mrg, metric),
-        t + 170,
-        PGC_SEARCH_EXACT);
-    if(!middle) {
-        fprintf(stderr, " >>> DBENGINE: cadence-overlap middle page is not cached\n");
+    if(!dbengine_test_evict_page(host, dbengine_test_metric_id(rd), t + 170, "cadence-overlap middle"))
         return 1;
-    }
-
-    if(!pgc_page_to_clean_evict_or_release(main_cache, middle)) {
-        fprintf(stderr, " >>> DBENGINE: cadence-overlap middle page could not be evicted\n");
-        return 1;
-    }
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
@@ -1424,78 +1113,21 @@ static size_t test_dbengine_cadence_overlap_does_not_hide_intermediate_page(RRDH
         { t + 260, t + 360, 8 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 360,
-        expected, _countof(expected), "cadence-overlap-hidden-page");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after != open_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-overlap query used %zu open-cache lookups, expected 1\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(planned_gaps_after != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-overlap query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after - planned_gaps_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-overlap query used %zu journal lookups, expected 1\n",
-                journal_after - journal_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 360,
-        expected, _countof(expected), "cadence-overlap-hidden-page-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated cadence-overlap query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after);
-        errors++;
-    }
-
-    if(planned_gaps_after_repeat != planned_gaps_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated cadence-overlap query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 360, expected, _countof(expected),
+        "cadence-overlap-hidden-page", 1, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 360, expected, _countof(expected),
+        "cadence-overlap-hidden-page-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_singleton_bridge_does_not_hide_intermediate_page(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2650000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-singleton-bridge-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: singleton-bridge metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-singleton-bridge", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1516,22 +1148,9 @@ static size_t test_dbengine_singleton_bridge_does_not_hide_intermediate_page(RRD
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    PGC_PAGE *middle = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        mrg_metric_id(main_mrg, metric),
-        t + 180,
-        PGC_SEARCH_EXACT);
-    if(!middle) {
-        fprintf(stderr, " >>> DBENGINE: singleton-bridge intermediate page is not cached\n");
+    if(!dbengine_test_evict_page(
+           host, dbengine_test_metric_id(rd), t + 180, "singleton-bridge intermediate"))
         return 1;
-    }
-
-    if(!pgc_page_to_clean_evict_or_release(main_cache, middle)) {
-        fprintf(stderr, " >>> DBENGINE: singleton-bridge intermediate page could not be evicted\n");
-        return 1;
-    }
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
@@ -1544,78 +1163,21 @@ static size_t test_dbengine_singleton_bridge_does_not_hide_intermediate_page(RRD
         { t + 250, t + 350, 8 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 350,
-        expected, _countof(expected), "singleton-bridge-hidden-page");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after != open_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: singleton-bridge query used %zu open-cache lookups, expected 1\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(planned_gaps_after != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: singleton-bridge query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after - planned_gaps_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: singleton-bridge query used %zu journal lookups, expected 1\n",
-                journal_after - journal_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 350,
-        expected, _countof(expected), "singleton-bridge-hidden-page-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated singleton-bridge query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after);
-        errors++;
-    }
-
-    if(planned_gaps_after_repeat != planned_gaps_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated singleton-bridge query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 350, expected, _countof(expected),
+        "singleton-bridge-hidden-page", 1, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 350, expected, _countof(expected),
+        "singleton-bridge-hidden-page-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_empty_suffix_does_not_hide_intermediate_page(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2675000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-empty-suffix-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: EMPTY-suffix metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-empty-suffix", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1632,43 +1194,12 @@ static size_t test_dbengine_empty_suffix_does_not_hide_intermediate_page(RRDHOST
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    Word_t metric_id = mrg_metric_id(main_mrg, metric);
-    PGC_PAGE *middle = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        metric_id,
-        t + 210,
-        PGC_SEARCH_EXACT);
-    if(!middle) {
-        fprintf(stderr, " >>> DBENGINE: EMPTY-suffix intermediate page is not cached\n");
+    Word_t metric_id = dbengine_test_metric_id(rd);
+    if(!dbengine_test_evict_page(host, metric_id, t + 210, "EMPTY-suffix intermediate"))
         return 1;
-    }
 
-    if(!pgc_page_to_clean_evict_or_release(main_cache, middle)) {
-        fprintf(stderr, " >>> DBENGINE: EMPTY-suffix intermediate page could not be evicted\n");
+    if(!dbengine_test_add_empty_page(host, metric_id, t + 161, t + 200, 0, "EMPTY-suffix"))
         return 1;
-    }
-
-    PGC_ENTRY empty = {
-        .section = (Word_t)host->db[0].si,
-        .metric_id = metric_id,
-        .start_time_s = t + 161,
-        .end_time_s = t + 200,
-        .size = 0,
-        .data = PGD_EMPTY,
-        .update_every_s = 0,
-        .hot = false,
-    };
-    bool added = false;
-    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, empty, &added);
-    if(!page || !added) {
-        fprintf(stderr, " >>> DBENGINE: failed to insert EMPTY-suffix page\n");
-        if(page)
-            pgc_page_release(main_cache, page);
-        return 1;
-    }
-    pgc_page_release(main_cache, page);
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
@@ -1681,78 +1212,21 @@ static size_t test_dbengine_empty_suffix_does_not_hide_intermediate_page(RRDHOST
         { t + 260, t + 360, 8 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 360,
-        expected, _countof(expected), "empty-suffix-hidden-page");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after != open_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: EMPTY-suffix query used %zu open-cache lookups, expected 1\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(planned_gaps_after != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: EMPTY-suffix query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after - planned_gaps_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: EMPTY-suffix query used %zu journal lookups, expected 1\n",
-                journal_after - journal_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 360,
-        expected, _countof(expected), "empty-suffix-hidden-page-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated EMPTY-suffix query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after);
-        errors++;
-    }
-
-    if(planned_gaps_after_repeat != planned_gaps_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated EMPTY-suffix query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 360, expected, _countof(expected),
+        "empty-suffix-hidden-page", 1, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 360, expected, _countof(expected),
+        "empty-suffix-hidden-page-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_empty_cadence_advances_legacy_cursor(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2700000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-empty-cadence-shadow-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: EMPTY-cadence shadow metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-empty-cadence-shadow", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1769,26 +1243,9 @@ static size_t test_dbengine_empty_cadence_advances_legacy_cursor(RRDHOST *host) 
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    PGC_ENTRY empty = {
-        .section = (Word_t)host->db[0].si,
-        .metric_id = mrg_metric_id(main_mrg, metric),
-        .start_time_s = t + 161,
-        .end_time_s = t + 240,
-        .size = 0,
-        .data = PGD_EMPTY,
-        .update_every_s = 10,
-        .hot = false,
-    };
-    bool added = false;
-    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, empty, &added);
-    if(!page || !added) {
-        fprintf(stderr, " >>> DBENGINE: failed to insert EMPTY-cadence shadow page\n");
-        if(page)
-            pgc_page_release(main_cache, page);
+    if(!dbengine_test_add_empty_page(
+           host, dbengine_test_metric_id(rd), t + 161, t + 240, 10, "EMPTY-cadence shadow"))
         return 1;
-    }
-    pgc_page_release(main_cache, page);
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
@@ -1800,44 +1257,18 @@ static size_t test_dbengine_empty_cadence_advances_legacy_cursor(RRDHOST *host) 
         { t + 310, t + 330, 7 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 330, expected, _countof(expected), "empty-cadence-shadow");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-
-    if(open_after != open_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: EMPTY-cadence shadow query used %zu open-cache lookups, expected 0\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: EMPTY-cadence shadow query used %zu journal lookups, expected 0\n",
-                journal_after - journal_before);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 330, expected, _countof(expected),
+        "empty-cadence-shadow", 0, 0, DBENGINE_TEST_STAT_UNCHECKED);
 
     return errors;
 }
 
 static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 2750000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-single-missing-sample-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 1);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: single-missing-sample metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-single-missing-sample", 1);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 101, 2);
@@ -1852,68 +1283,21 @@ static size_t test_dbengine_single_missing_sample_reuse(RRDHOST *host) {
         { t + 102, t + 103, 3 },
     };
 
-    size_t errors = 0;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 103, expected, _countof(expected), "single-missing-sample-first");
-    size_t journal_after_first =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_first =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_first != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first single-missing-sample query used %zu journal lookups, expected 1\n",
-                journal_after_first - journal_before);
-        errors++;
-    }
-
-
-    if(planned_gaps_after_first != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first single-missing-sample query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after_first - planned_gaps_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 103, expected, _countof(expected), "single-missing-sample-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated single-missing-sample query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after_first);
-        errors++;
-    }
-
-
-    if(planned_gaps_after_repeat != planned_gaps_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated single-missing-sample query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after_first);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 103, expected, _countof(expected),
+        "single-missing-sample-first", DBENGINE_TEST_STAT_UNCHECKED, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 103, expected, _countof(expected),
+        "single-missing-sample-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_existing_negative_page_continuity(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 3000000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-existing-negative-page-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: existing negative-page metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-existing-negative-page", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -1923,26 +1307,9 @@ static size_t test_dbengine_existing_negative_page_continuity(RRDHOST *host) {
     dbengine_test_store_point(rd, t + 420, 4);
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    PGC_ENTRY empty = {
-        .section = (Word_t)host->db[0].si,
-        .metric_id = mrg_metric_id(main_mrg, metric),
-        .start_time_s = t + 220,
-        .end_time_s = t + 300,
-        .size = 0,
-        .data = PGD_EMPTY,
-        .update_every_s = 0,
-        .hot = false,
-    };
-    bool added = false;
-    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, empty, &added);
-    if(!page || !added) {
-        fprintf(stderr, " >>> DBENGINE: failed to insert existing negative page\n");
-        if(page)
-            pgc_page_release(main_cache, page);
+    if(!dbengine_test_add_empty_page(
+           host, dbengine_test_metric_id(rd), t + 220, t + 300, 0, "existing negative"))
         return 1;
-    }
-    pgc_page_release(main_cache, page);
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
@@ -1951,65 +1318,21 @@ static size_t test_dbengine_existing_negative_page_continuity(RRDHOST *host) {
         { t + 360, t + 420, 4 },
     };
 
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 420, expected, _countof(expected), "existing-negative-page-first");
-    size_t journal_after_first =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_first =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_first != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first existing negative-page query used %zu journal lookups, expected 1\n",
-                journal_after_first - journal_before);
-        errors++;
-    }
-
-    if(planned_gaps_after_first != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first existing negative-page query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after_first - planned_gaps_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 420, expected, _countof(expected), "existing-negative-page-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated existing negative-page query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after_first);
-        errors++;
-    }
-
-    if(planned_gaps_after_repeat != planned_gaps_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated existing negative-page query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after_first);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 420, expected, _countof(expected),
+        "existing-negative-page-first", DBENGINE_TEST_STAT_UNCHECKED, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 420, expected, _countof(expected),
+        "existing-negative-page-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_negative_page_does_not_hide_fine_page(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 3125000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-negative-before-fine-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: negative-before-fine metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-negative-before-fine", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -2025,23 +1348,9 @@ static size_t test_dbengine_negative_page_does_not_hide_fine_page(RRDHOST *host)
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    Word_t metric_id = mrg_metric_id(main_mrg, metric);
-    PGC_PAGE *fine = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        metric_id,
-        t + 170,
-        PGC_SEARCH_EXACT);
-    if(!fine) {
-        fprintf(stderr, " >>> DBENGINE: negative-before-fine page is not cached\n");
+    Word_t metric_id = dbengine_test_metric_id(rd);
+    if(!dbengine_test_evict_page(host, metric_id, t + 170, "negative-before-fine"))
         return 1;
-    }
-
-    if(!pgc_page_to_clean_evict_or_release(main_cache, fine)) {
-        fprintf(stderr, " >>> DBENGINE: negative-before-fine page could not be evicted\n");
-        return 1;
-    }
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
@@ -2056,104 +1365,25 @@ static size_t test_dbengine_negative_page_does_not_hide_fine_page(RRDHOST *host)
         { t + 250, t + 260, 10 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 260,
-        expected, _countof(expected), "negative-before-fine-first");
-    size_t open_after_first =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after_first =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_first =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 260, expected, _countof(expected),
+        "negative-before-fine-first", 1, 1, 1);
 
-    if(open_after_first != open_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first negative-before-fine query used %zu open-cache lookups, expected 1\n",
-                open_after_first - open_before);
-        errors++;
-    }
-
-    if(journal_after_first != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first negative-before-fine query used %zu journal lookups, expected 1\n",
-                journal_after_first - journal_before);
-        errors++;
-    }
-
-    if(planned_gaps_after_first != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first negative-before-fine query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after_first - planned_gaps_before);
-        errors++;
-    }
-
-    fine = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        metric_id,
-        t + 170,
-        PGC_SEARCH_EXACT);
-    if(!fine) {
-        fprintf(stderr, " >>> DBENGINE: recovered negative-before-fine page is not cached\n");
+    if(!dbengine_test_evict_page(host, metric_id, t + 170, "recovered negative-before-fine"))
         return errors + 1;
-    }
 
-    if(!pgc_page_to_clean_evict_or_release(main_cache, fine)) {
-        fprintf(stderr, " >>> DBENGINE: recovered negative-before-fine page could not be evicted\n");
-        return errors + 1;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 260,
-        expected, _countof(expected), "negative-before-fine-repeat");
-    size_t open_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after_repeat != open_after_first + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated negative-before-fine query used %zu open-cache lookups, expected 1\n",
-                open_after_repeat - open_after_first);
-        errors++;
-    }
-
-
-    if(journal_after_repeat != journal_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated negative-before-fine query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after_first);
-        errors++;
-    }
-
-    if(planned_gaps_after_repeat != planned_gaps_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated negative-before-fine query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after_first);
-        errors++;
-    }
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 260, expected, _countof(expected),
+        "negative-before-fine-repeat", 1, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_cadence_bearing_empty_pages(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 3250000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-cadence-bearing-empty-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: cadence-bearing EMPTY metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-cadence-bearing-empty", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -2169,23 +1399,9 @@ static size_t test_dbengine_cadence_bearing_empty_pages(RRDHOST *host) {
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    Word_t metric_id = mrg_metric_id(main_mrg, metric);
-    PGC_PAGE *middle = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        metric_id,
-        t + 210,
-        PGC_SEARCH_EXACT);
-    if(!middle) {
-        fprintf(stderr, " >>> DBENGINE: cadence-bearing EMPTY middle page is not cached\n");
+    Word_t metric_id = dbengine_test_metric_id(rd);
+    if(!dbengine_test_evict_page(host, metric_id, t + 210, "cadence-bearing EMPTY middle"))
         return 1;
-    }
-
-    if(!pgc_page_to_clean_evict_or_release(main_cache, middle)) {
-        fprintf(stderr, " >>> DBENGINE: cadence-bearing EMPTY middle page could not be evicted\n");
-        return 1;
-    }
 
     const struct {
         time_t first;
@@ -2196,25 +1412,10 @@ static size_t test_dbengine_cadence_bearing_empty_pages(RRDHOST *host) {
     };
 
     for(size_t i = 0; i < _countof(empty_ranges); i++) {
-        PGC_ENTRY empty = {
-            .section = (Word_t)host->db[0].si,
-            .metric_id = metric_id,
-            .start_time_s = empty_ranges[i].first,
-            .end_time_s = empty_ranges[i].last,
-            .size = 0,
-            .data = PGD_EMPTY,
-            .update_every_s = 10,
-            .hot = false,
-        };
-        bool added = false;
-        PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, empty, &added);
-        if(!page || !added) {
-            fprintf(stderr, " >>> DBENGINE: failed to insert cadence-bearing EMPTY page %zu\n", i);
-            if(page)
-                pgc_page_release(main_cache, page);
+        if(!dbengine_test_add_empty_page(
+               host, metric_id, empty_ranges[i].first, empty_ranges[i].last, 10,
+               "cadence-bearing EMPTY"))
             return 1;
-        }
-        pgc_page_release(main_cache, page);
     }
 
     const DBENGINE_EXPECTED_POINT expected[] = {
@@ -2226,79 +1427,21 @@ static size_t test_dbengine_cadence_bearing_empty_pages(RRDHOST *host) {
         { t + 270, t + 280, 6 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_before =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 100, t + 280,
-        expected, _countof(expected), "cadence-bearing-empty-pages");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after != open_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-bearing EMPTY query used %zu open-cache lookups, expected 1\n",
-                open_after - open_before);
-        errors++;
-    }
-
-
-    if(journal_after != journal_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-bearing EMPTY query used %zu journal lookups, expected 1\n",
-                journal_after - journal_before);
-        errors++;
-    }
-
-    if(planned_gaps_after != planned_gaps_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: cadence-bearing EMPTY query reported %zu planner gaps, expected 1\n",
-                planned_gaps_after - planned_gaps_before);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
-        rd, t + 100, t + 280,
-        expected, _countof(expected), "cadence-bearing-empty-pages-repeat");
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(journal_after_repeat != journal_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated cadence-bearing EMPTY query used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after);
-        errors++;
-    }
-
-    if(planned_gaps_after_repeat != planned_gaps_after) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated cadence-bearing EMPTY query reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 280, expected, _countof(expected),
+        "cadence-bearing-empty-pages", 1, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
+        rd, t + 100, t + 280, expected, _countof(expected),
+        "cadence-bearing-empty-pages-repeat", DBENGINE_TEST_STAT_UNCHECKED, 0, 0);
 
     return errors;
 }
 
 static size_t test_dbengine_inclusive_cache_frontier(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 3500000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-inclusive-cache-frontier-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: inclusive cache-frontier metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-inclusive-cache-frontier", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -2310,22 +1453,9 @@ static size_t test_dbengine_inclusive_cache_frontier(RRDHOST *host) {
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
     pgc_flush_dirty_pages(main_cache, (Word_t)host->db[0].si);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    PGC_PAGE *first = pgc_page_get_and_acquire(
-        main_cache,
-        (Word_t)host->db[0].si,
-        mrg_metric_id(main_mrg, metric),
-        t + 100,
-        PGC_SEARCH_EXACT);
-    if(!first) {
-        fprintf(stderr, " >>> DBENGINE: inclusive cache-frontier first page is not cached\n");
+    if(!dbengine_test_evict_page(
+           host, dbengine_test_metric_id(rd), t + 100, "inclusive cache-frontier first"))
         return 1;
-    }
-
-    if(!pgc_page_to_clean_evict_or_release(main_cache, first)) {
-        fprintf(stderr, " >>> DBENGINE: inclusive cache-frontier first page could not be evicted\n");
-        return 1;
-    }
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 100, t + 160, 2 },
@@ -2335,30 +1465,9 @@ static size_t test_dbengine_inclusive_cache_frontier(RRDHOST *host) {
         { t + 190, t + 200, 6 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t errors = dbengine_test_query_points(
-        rd, t + 160, t + 200, expected, _countof(expected), "inclusive-cache-frontier");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-
-    if(open_after != open_before + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: inclusive cache-frontier query used %zu open-cache lookups, expected 1\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: inclusive cache-frontier query used %zu journal lookups, expected 0\n",
-                journal_after - journal_before);
-        errors++;
-    }
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
+        rd, t + 160, t + 200, expected, _countof(expected),
+        "inclusive-cache-frontier", 1, 0, DBENGINE_TEST_STAT_UNCHECKED);
 
     return errors;
 }
@@ -2366,14 +1475,9 @@ static size_t test_dbengine_inclusive_cache_frontier(RRDHOST *host) {
 static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 4000000;
     const uint32_t update_every = 90000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-long-cadence-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, (int)update_every);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: long-cadence metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-long-cadence", (int)update_every);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + update_every, 1);
     dbengine_test_store_point(rd, t + 2 * update_every, 2);
@@ -2404,14 +1508,9 @@ static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
 
 static size_t test_dbengine_zero_page_cadence_is_repaired(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 4250000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-zero-page-cadence-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 10);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: zero-page-cadence metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-zero-page-cadence", 10);
+    if(!rd)
         return 1;
-    }
 
     unittest_storage_engine_store_change_collection_frequency(rd->tiers[0].sch, 0);
     dbengine_test_store_point(rd, t + 100, 1);
@@ -2468,14 +1567,9 @@ static size_t test_dbengine_zero_page_cadence_is_repaired(RRDHOST *host) {
 
 static size_t test_dbengine_finish_skips_negative_page(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 4500000;
-    char id[128];
-    snprintfz(id, sizeof(id) - 1, "dbengine-finish-skips-negative-%d", getpid());
-    RRDDIM *rd = dbengine_test_create_metric(host, id, 60);
-    if(!rd || rd->tiers[0].seb != STORAGE_ENGINE_BACKEND_DBENGINE ||
-       !rd->tiers[0].smh || !rd->tiers[0].sch) {
-        fprintf(stderr, " >>> DBENGINE: finish-skips-negative metric initialization failed\n");
+    RRDDIM *rd = dbengine_test_create_metric(host, "dbengine-finish-skips-negative", 60);
+    if(!rd)
         return 1;
-    }
 
     dbengine_test_store_point(rd, t + 100, 1);
     dbengine_test_store_point(rd, t + 160, 2);
@@ -2485,125 +1579,25 @@ static size_t test_dbengine_finish_skips_negative_page(RRDHOST *host) {
     dbengine_test_store_point(rd, t + 320, 4);
     unittest_storage_engine_store_flush(rd->tiers[0].sch);
 
-    METRIC *metric = (METRIC *)rd->tiers[0].smh;
-    PGC_ENTRY empty = {
-        .section = (Word_t)host->db[0].si,
-        .metric_id = mrg_metric_id(main_mrg, metric),
-        .start_time_s = t + 161,
-        .end_time_s = t + 200,
-        .size = 0,
-        .data = PGD_EMPTY,
-        .update_every_s = 0,
-        .hot = false,
-    };
-    bool added = false;
-    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, empty, &added);
-    if(!page || !added) {
-        fprintf(stderr, " >>> DBENGINE: failed to insert terminal negative page\n");
-        if(page)
-            pgc_page_release(main_cache, page);
+    if(!dbengine_test_add_empty_page(
+           host, dbengine_test_metric_id(rd), t + 161, t + 200, 0, "terminal negative"))
         return 1;
-    }
-    pgc_page_release(main_cache, page);
 
     const DBENGINE_EXPECTED_POINT expected[] = {
         { t + 40,  t + 100, 1 },
         { t + 100, t + 160, 2 },
     };
 
-    size_t open_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_before =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t errors = dbengine_test_query_points(
+    size_t errors = dbengine_test_query_points_with_cache_deltas(
         rd, t + 100, t + 200,
-        expected, _countof(expected), "finish-skips-negative-page");
-    size_t open_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-
-    if(open_after != open_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: terminal negative-page query used %zu open-cache lookups, expected 0\n",
-                open_after - open_before);
-        errors++;
-    }
-
-    if(journal_after != journal_before) {
-        fprintf(stderr,
-                " >>> DBENGINE: terminal negative-page query used %zu journal lookups, expected 0\n",
-                journal_after - journal_before);
-        errors++;
-    }
-
-    size_t open_before_extended = open_after;
-    size_t journal_before_extended = journal_after;
-    size_t planned_gaps_before_extended =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-    errors += dbengine_test_query_points(
+        expected, _countof(expected), "finish-skips-negative-page",
+        0, 0, DBENGINE_TEST_STAT_UNCHECKED);
+    errors += dbengine_test_query_points_with_cache_deltas(
         rd, t + 100, t + 202,
-        expected, _countof(expected), "finish-after-negative-page");
-    size_t open_after_extended =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after_extended =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_extended =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after_extended != open_before_extended + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first query after terminal negative page used %zu open-cache lookups, expected 1\n",
-                open_after_extended - open_before_extended);
-        errors++;
-    }
-
-    if(journal_after_extended != journal_before_extended + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first query after terminal negative page used %zu journal lookups, expected 1\n",
-                journal_after_extended - journal_before_extended);
-        errors++;
-    }
-
-
-    if(planned_gaps_after_extended != planned_gaps_before_extended + 1) {
-        fprintf(stderr,
-                " >>> DBENGINE: first query after terminal negative page reported %zu planner gaps, expected 1\n",
-                planned_gaps_after_extended - planned_gaps_before_extended);
-        errors++;
-    }
-
-    errors += dbengine_test_query_points(
+        expected, _countof(expected), "finish-after-negative-page", 1, 1, 1);
+    errors += dbengine_test_query_points_with_cache_deltas(
         rd, t + 100, t + 202,
-        expected, _countof(expected), "finish-after-negative-page-repeat");
-    size_t open_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_open_cache_lookup.count;
-    size_t journal_after_repeat =
-        rrdeng_get_cache_efficiency_stats().prep_time_in_journal_v2_lookup.count;
-    size_t planned_gaps_after_repeat =
-        rrdeng_get_cache_efficiency_stats().queries_planned_with_gaps;
-
-    if(open_after_repeat != open_after_extended) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated query after terminal negative page used %zu open-cache lookups, expected 0\n",
-                open_after_repeat - open_after_extended);
-        errors++;
-    }
-
-    if(journal_after_repeat != journal_after_extended) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated query after terminal negative page used %zu journal lookups, expected 0\n",
-                journal_after_repeat - journal_after_extended);
-        errors++;
-    }
-
-
-    if(planned_gaps_after_repeat != planned_gaps_after_extended) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated query after terminal negative page reported %zu planner gaps, expected 0\n",
-                planned_gaps_after_repeat - planned_gaps_after_extended);
-        errors++;
-    }
+        expected, _countof(expected), "finish-after-negative-page-repeat", 0, 0, 0);
 
     return errors;
 }
