@@ -24,6 +24,7 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
 2. Load the token-safe Cloud wrapper and run the same Function request. The wrapper emits only the response body:
 
    ```bash
+   mkdir -p .local/audits/query-netdata-agents
    source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
    agents_load_env
    agents_call_function --via cloud --node "$NODE_UUID" \

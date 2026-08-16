@@ -18,6 +18,12 @@
 #define POLLFD_SOCKET  0
 #define POLLFD_PIPE    1
 
+#if defined(OS_WINDOWS)
+typedef SOCKET mqtt_wss_wakeup_fd_t;
+#else
+typedef int mqtt_wss_wakeup_fd_t;
+#endif
+
 #define PING_TIMEOUT    (60)  //Expect a ping response within this time (seconds)
 time_t ping_timeout = 0;
 
@@ -94,7 +100,7 @@ struct mqtt_wss_client_struct {
 
 // nonblock IO related
     int sockfd;
-    int write_notif_pipe[2];
+    mqtt_wss_wakeup_fd_t write_notif_pipe[2];
     struct pollfd poll_fds[2];
 
 // monotonic time of the last forward progress (bytes moved or a clean poll() timeout);
@@ -132,7 +138,7 @@ struct mqtt_wss_client_struct {
 #if defined(OS_WINDOWS)
 // WSAPoll() accepts Winsock sockets, not CRT pipe handles. Create a connected
 // loopback pair so every descriptor in the ACLK poll set is a socket.
-static bool mqtt_wss_create_wakeup_sockets(int fds[2]) {
+static bool mqtt_wss_create_wakeup_sockets(mqtt_wss_wakeup_fd_t fds[2]) {
     SOCKET listener = INVALID_SOCKET;
     SOCKET reader = INVALID_SOCKET;
     SOCKET writer = INVALID_SOCKET;
@@ -164,8 +170,8 @@ static bool mqtt_wss_create_wakeup_sockets(int fds[2]) {
         goto fail;
 
     closesocket(listener);
-    fds[PIPE_READ_END] = (int)reader;
-    fds[PIPE_WRITE_END] = (int)writer;
+    fds[PIPE_READ_END] = reader;
+    fds[PIPE_WRITE_END] = writer;
     return true;
 
 fail:
@@ -693,7 +699,7 @@ static void mqtt_wss_wakeup(mqtt_wss_client client)
 
 #define THROWAWAY_BUF_SIZE 32
 char throwaway[THROWAWAY_BUF_SIZE];
-static void util_clear_pipe(int fd)
+static void util_clear_pipe(mqtt_wss_wakeup_fd_t fd)
 {
 #if defined(OS_WINDOWS)
     (void)recv(fd, throwaway, THROWAWAY_BUF_SIZE, 0);
