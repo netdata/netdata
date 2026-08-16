@@ -106,6 +106,22 @@ func TestFixtureGapDoesNotParseCollectedPlaceholder(t *testing.T) {
 	}
 }
 
+func TestTierFetchValueRejectsEmptyWindows(t *testing.T) {
+	for name, point := range map[string]TierPoint{
+		"explicit-empty": {Empty: true},
+		"zero-count":     {Sum: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("TierFetchValue accepted an empty tier window")
+				}
+			}()
+			TierFetchValue("average", point)
+		})
+	}
+}
+
 func TestNumericCollectedValueIsFinite(t *testing.T) {
 	d := Dimension{ID: "load", Points: []Point{{
 		T: 1, Collected: "1.25", Flags: "A",

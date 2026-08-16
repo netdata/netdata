@@ -111,8 +111,9 @@ func assertGroups(t *testing.T, params url.Values, groups map[string][]l5Member,
 			t.Errorf("group %q missing (have %v)", id, keys2(cols))
 			continue
 		}
-		if len(col) != l5Rows {
-			t.Errorf("%q: got %d rows, want %d", id, len(col), l5Rows)
+		if !l5ExactGrid(col) {
+			t.Errorf("%q: does not contain the exact unique grid t0+1 through t0+%d (got %d rows)",
+				id, l5Rows, len(col))
 			continue
 		}
 		for _, pt := range col {

@@ -618,6 +618,10 @@ func TGOracleIncrementalSum(buckets [][]float64) []TGResult {
 // On tier>=1 data, min/max/sum consume the tier point's min/max/sum and every
 // other family consumes the per-point average (sum/count).
 func TierFetchValue(name string, tp TierPoint) float64 {
+	if tp.Empty || tp.Count == 0 {
+		panic("fixture: TierFetchValue called on an empty tier window")
+	}
+
 	switch name {
 	case "min":
 		return tp.Min

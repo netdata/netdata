@@ -445,7 +445,9 @@ func c4dRateAcrossCadenceAndSeams(
 		params := daemon.DataParams(c4dContext, queryBefore-100, queryBefore, 100)
 		params.Set("scope_dimensions", c4dRateDim)
 		doc, err := dd.DataV3("l4d-child", params)
-		if err == nil {
+		if err != nil {
+			tiers = nil
+		} else {
 			tiers = perTierRetention(t, doc)
 		}
 		settled := len(tiers) >= 3

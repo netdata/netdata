@@ -403,6 +403,8 @@ func TestV1RollupCount65536(t *testing.T) {
 		context   = "fixture.v1_rollup_count_65536"
 		dimension = "value"
 	)
+	trackContract(t, contract)
+
 	base := int64(fixture.T0) - int64(fixture.T0)%grouping
 	dd := startDedicatedStorageDaemon(t, daemon.Options{
 		StorageTiers: 2,

@@ -214,11 +214,13 @@ func TestAnomalyBitOption(t *testing.T) {
 func TestAnomalyStsArrays(t *testing.T) {
 	trackContract(t, "L5/anomaly-statistics")
 
-	if _, err := td.WaitRetention("anom-bit", abContext, fixture.T0+1, fixture.T0+60, 15*time.Second); err != nil {
-		t.Skip("anomaly fixture not available (TestAnomalyBitOption failed?)")
+	ch := abFixture()
+	pushLiveBurst(t, "anom-sts", guid(423), ch)
+	if _, err := td.WaitRetention("anom-sts", abContext, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
+		t.Fatal(err)
 	}
 	params := daemon.DataParams(abContext, fixture.T0, fixture.T0+60, 60)
-	doc, err := td.DataV3("anom-bit", params)
+	doc, err := td.DataV3("anom-sts", params)
 	if err != nil {
 		t.Fatal(err)
 	}

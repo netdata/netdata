@@ -63,7 +63,11 @@ func TestCase017TierBoundaryAbsorption(t *testing.T) {
 	// Clean (after, before] first bucket (T0+160) = window(T0+160) alone;
 	// the bug merges window(T0+100) — 60 pre-window samples — into it.
 	windows := ch.Dimensions[0].TierWindows(tier1Gran, int64(ch.UpdateEvery))
-	w100, w160 := windows[fixture.T0+100], windows[fixture.T0+160]
+	w100, w100OK := windows[fixture.T0+100]
+	w160, w160OK := windows[fixture.T0+160]
+	if !w100OK || !w160OK {
+		t.Fatalf("oracle windows missing: T0+100 present=%v, T0+160 present=%v", w100OK, w160OK)
+	}
 
 	doc, err = td.DataV3("c017", daemon.DataParamsTier(ch.Context, 1, fixture.T0+100, fixture.T0+280, 3, "sum"))
 	if err != nil {
