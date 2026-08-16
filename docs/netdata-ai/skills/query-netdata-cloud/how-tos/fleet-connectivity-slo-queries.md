@@ -147,8 +147,11 @@ is the fraction of 1s**. No `countif` needed (see gotcha 3):
 
    `time_group: average` is immune to the second cause because the
    tier stores exactly that, which is why it looked correct on the
-   same data. The average-of-boolean trick above is exact at every
-   tier and remains the recommended pattern.
+   same data. The average-of-boolean trick above is exact for the
+   selected stored-sample average at every tier, and that average is
+   also the fraction of time only while the collection interval is
+   steady. It remains the recommended pattern for steady-cadence
+   availability metrics.
    (`options: ["percentage"]` separately returned >100%: that option
    expresses each item as a share of the group total, which is
    meaningless applied to values that are already percentages.)
