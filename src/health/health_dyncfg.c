@@ -178,7 +178,7 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
                 has_time_group_expression = true;
                 time_group_value_flags = JSONC_STRICT;
             }
-            // fall through
+            __attribute__((fallthrough));
         }
 
         case RRDR_GROUPING_TRIMMED_MEAN:
