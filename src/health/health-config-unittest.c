@@ -565,7 +565,12 @@ static int test_expression_omitted_operand_defaults_to_zero(int *passed) {
 
     int failed = 0;
     for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
-        TG_EXPRESSION e;
+        TG_EXPRESSION e = {
+            .cmp = TG_EXPRESSION_GREATER,
+            .operand = TG_EXPRESSION_OPERAND_PREVIOUS,
+            .target = 123.0,
+            .has_previous = true,
+        };
         bool ok = tg_expression_parse(&e, tests[i].condition);
 
         if(!ok || e.cmp != tests[i].expected_cmp ||
