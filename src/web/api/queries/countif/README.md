@@ -25,7 +25,10 @@ The value is one of:
 - a **gap token** - `gap`, `nan`, `null` or `empty` are synonyms for "no data
   was collected here". `==gap` matches the uncollected slots and `!=gap` the
   collected ones. Naming a gap token is what makes gaps count at all;
-  without one they are invisible, as they are to every other aggregation.
+  without one they are invisible to `percentage-of-samples`,
+  `number-of-flaps` and `number-of-times`. `percentage-of-time` always
+  includes uncollected time in its denominator, while only a condition naming
+  a gap can match it.
 - the **previous collected sample** - `previous` or `last`, e.g. `<previous`
   matches every sample lower than the one before it, which is what counts
   counter resets. Gaps are skipped, so a drop across a gap still counts, and
