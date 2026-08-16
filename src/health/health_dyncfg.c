@@ -197,6 +197,12 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
         config->time_group_value =
             (time_group_expression.operand == TG_EXPRESSION_OPERAND_NUMBER) ? time_group_expression.target : NAN;
     }
+    else if(time_grouping_is_expression(config->time_group) &&
+            !config->time_group_options && !netdata_double_isnumber(config->time_group_value))
+        // A legacy condition with no operand compares against zero. Without
+        // this normalization, exporting a null value writes `nan`, which the
+        // shared grammar reads back as an explicit gap operand.
+        config->time_group_value = 0;
 
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error, flags);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "dimensions", config->dimensions, error, flags);

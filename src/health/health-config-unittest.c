@@ -1123,6 +1123,11 @@ static int test_dyncfg_time_group_round_trip(int *passed) {
           ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0,
           "a legacy countif alert round trips on its condition pair" },
 
+        { "percentage-of-time", "\"time_group_condition\":\"!=\",\"time_group_value\":null",
+          "percentage-of-time(!=0.00) -1m", RRDR_GROUPING_PERCENTAGE_OF_TIME, "!=0.00",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0,
+          "a null legacy condition value keeps the omitted-operand zero default" },
+
         // untouched by the expression grammar - proves we did not widen it.
         // `percentile95` is the canonical echo of the percentile enum and
         // predates this work
