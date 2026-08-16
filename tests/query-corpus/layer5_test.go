@@ -176,6 +176,37 @@ func pushLayer5(t *testing.T) {
 			t.Fatalf("%s: %v", host, err)
 		}
 	}
+
+	// Host-local retention can settle before the all-node context index sees
+	// both children. Wait on the routing surface the group-by assertions use.
+	wantNodes := map[string]bool{guid(81): true, guid(82): true}
+	deadline := time.Now().Add(15 * time.Second)
+	var seenNodes map[string]bool
+	for {
+		params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
+		params.Set("group_by", "node")
+		doc, err := td.DataV3All(params)
+		seenNodes = map[string]bool{}
+		if err == nil {
+			if columns, err := canon.Columns(doc); err == nil {
+				for node := range columns {
+					seenNodes[node] = true
+				}
+			}
+		}
+
+		allSeen := true
+		for machineGUID := range wantNodes {
+			allSeen = allSeen && seenNodes[machineGUID]
+		}
+		if allSeen {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("all-node context index did not include both layer-5 children: have %v, want %v", seenNodes, wantNodes)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // l5GroupKey returns the group column name for a member under a group_by
