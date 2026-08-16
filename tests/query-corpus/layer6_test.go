@@ -368,7 +368,7 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) l6ChainResult
 			groups := l6Groups(kc.key1, kc.key2, members)
 			for _, ac := range aggCombos {
 				label := mode + "/" + kc.key1 + "-" + ac.agg1 + "/" + kc.key2 + "-" + ac.agg2
-				t.Run(label, func(t *testing.T) {
+				passed := t.Run(label, func(t *testing.T) {
 					params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
 					params.Set("group_by[0]", kc.key1)
 					params.Set("aggregation[0]", ac.agg1)
@@ -508,6 +508,10 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) l6ChainResult
 						}
 					}
 				})
+				if !passed {
+					// A fatal child could not verify any shared contract.
+					result = l6ChainResults{}
+				}
 			}
 		}
 	}
