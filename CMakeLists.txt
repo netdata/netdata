@@ -1386,6 +1386,8 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
+        src/daemon/unit_test_bridge.c
+        src/daemon/unit_test_bridge.h
         src/daemon/dyncfg/dyncfg.c
         src/daemon/dyncfg/dyncfg.h
         src/daemon/dyncfg/dyncfg-files.c
@@ -1874,6 +1876,8 @@ if(ENABLE_DBENGINE)
             src/database/engine/pagecache.c
             src/database/engine/pagecache.h
             src/database/engine/page_test.cc
+            src/database/engine/page_test_bridge.cc
+            src/database/engine/page_test_bridge.h
             src/database/engine/page.c
             src/database/engine/page.h
             src/database/engine/cache.c
@@ -3166,6 +3170,14 @@ add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
 target_link_libraries(stream-replay-endpoints-test libnetdata)
 
 if(OS_LINUX)
+        add_executable(rrddim-collection-test EXCLUDE_FROM_ALL
+                src/database/tests/rrddim-collection-test.c)
+        target_compile_options(rrddim-collection-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(rrddim-collection-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(rrddim-collection-test libnetdata)
+endif()
+
+if(OS_LINUX)
         add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
                 src/web/api/tests/http-auth-bearer-test.c)
         target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
@@ -3585,6 +3597,28 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
         configure_file(src/collectors/windows.plugin/driver/netdata_driver.inf netdata_driver.inf COPYONLY)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" AND
+   NOT CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set_property(
+                SOURCE src/daemon/unit_test_bridge.c
+                APPEND PROPERTY COMPILE_OPTIONS "-fno-lto" "-fvisibility=hidden")
+elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        message(WARNING
+                "Netdata test bridge cannot disable IPO for unsupported C compiler '${CMAKE_C_COMPILER_ID}'")
+endif()
+
+if(ENABLE_DBENGINE)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" AND
+           NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+                set_property(
+                        SOURCE src/database/engine/page_test_bridge.cc
+                        APPEND PROPERTY COMPILE_OPTIONS "-fno-lto" "-fvisibility=hidden")
+        elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+                message(WARNING
+                        "Netdata page-test bridge cannot disable IPO for unsupported C++ compiler '${CMAKE_CXX_COMPILER_ID}'")
+        endif()
 endif()
 
 add_executable(netdata

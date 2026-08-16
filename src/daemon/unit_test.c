@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "unit_test_bridge.h"
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/queries/query-internal.h"
 #include "database/contexts/rrdcontext-internal.h"
@@ -403,8 +404,247 @@ static int check_storage_number_exists() {
     return 0;
 }
 
+#define STORAGE_POINT_EXPECT(condition) do {                                                                           \
+    if(!(condition)) {                                                                                                  \
+        fprintf(stderr, "Storage-point unittest failed at %s:%d: %s\n", __FILE__, __LINE__, #condition);              \
+        errors++;                                                                                                       \
+    }                                                                                                                   \
+} while(0)
+
+static STORAGE_POINT unittest_numeric_storage_point(
+    time_t start_time_s, time_t end_time_s,
+    NETDATA_DOUBLE min, NETDATA_DOUBLE max, NETDATA_DOUBLE sum,
+    uint32_t count, uint32_t gap_count, uint32_t anomaly_count, SN_FLAGS flags) {
+    return (STORAGE_POINT) {
+        .min = min,
+        .max = max,
+        .sum = sum,
+        .start_time_s = start_time_s,
+        .end_time_s = end_time_s,
+        .count = count,
+        .anomaly_count = anomaly_count,
+        .flags = flags,
+        .gap_count = gap_count,
+    };
+}
+
+static size_t test_storage_point_contract(void) {
+    size_t errors = 0;
+
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    STORAGE_POINT_EXPECT(storage_point_is_unset(sp));
+    STORAGE_POINT_EXPECT(!storage_point_has_value(sp));
+    STORAGE_POINT_EXPECT(!storage_point_is_gap(sp));
+    STORAGE_POINT_EXPECT(!storage_point_is_complete(sp));
+    STORAGE_POINT_EXPECT(!storage_point_is_partial(sp));
+    STORAGE_POINT_EXPECT(storage_point_slots(sp) == 0);
+    STORAGE_POINT_EXPECT(storage_point_is_zero(sp));
+    STORAGE_POINT_EXPECT(storage_point_average_value(sp) == 0);
+    STORAGE_POINT_EXPECT(storage_point_anomaly_rate(sp) == 0);
+    STORAGE_POINT_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+                         !netdata_double_isnumber(sp.sum));
+    STORAGE_POINT_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 0);
+    STORAGE_POINT_EXPECT(sp.count == 0 && sp.gap_count == 0 && sp.anomaly_count == 0);
+    STORAGE_POINT_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    sp = unittest_numeric_storage_point(10, 20, 1, 2, 3, 2, 3, 1, SN_FLAG_RESET);
+    storage_point_unset(sp);
+    STORAGE_POINT_EXPECT(storage_point_is_unset(sp));
+    STORAGE_POINT_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+                         !netdata_double_isnumber(sp.sum));
+    STORAGE_POINT_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 0);
+    STORAGE_POINT_EXPECT(sp.count == 0 && sp.gap_count == 0 && sp.anomaly_count == 0);
+    STORAGE_POINT_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    storage_point_empty_slots(sp, 10, 20, 0);
+    STORAGE_POINT_EXPECT(!storage_point_is_unset(sp));
+    STORAGE_POINT_EXPECT(storage_point_is_gap(sp));
+    STORAGE_POINT_EXPECT(!storage_point_has_value(sp));
+    STORAGE_POINT_EXPECT(sp.count == 0 && sp.gap_count == 1);
+    STORAGE_POINT_EXPECT(storage_point_slots(sp) == 1);
+    STORAGE_POINT_EXPECT(!netdata_double_isnumber(storage_point_average_value(sp)));
+    STORAGE_POINT_EXPECT(storage_point_anomaly_rate(sp) == 0);
+
+    storage_point_empty_slots(sp, 20, 30, 65536);
+    STORAGE_POINT_EXPECT(storage_point_is_gap(sp));
+    STORAGE_POINT_EXPECT(sp.count == 0 && sp.gap_count == 65536);
+    STORAGE_POINT_EXPECT(storage_point_slots(sp) == 65536);
+
+    sp.count = UINT32_MAX;
+    sp.gap_count = UINT32_MAX;
+    STORAGE_POINT_EXPECT(storage_point_slots(sp) == 2ULL * UINT32_MAX);
+
+    sp = unittest_numeric_storage_point(10, 20, 1, 2, 3, 2, 0, 1, SN_FLAG_NONE);
+    STORAGE_POINT_EXPECT(storage_point_has_value(sp));
+    STORAGE_POINT_EXPECT(storage_point_is_complete(sp));
+    STORAGE_POINT_EXPECT(!storage_point_is_partial(sp));
+    STORAGE_POINT_EXPECT(storage_point_slots(sp) == 2);
+    STORAGE_POINT_EXPECT(storage_point_average_value(sp) == 1.5);
+    STORAGE_POINT_EXPECT(storage_point_anomaly_rate(sp) == 50);
+
+    sp.gap_count = 3;
+    STORAGE_POINT_EXPECT(storage_point_has_value(sp));
+    STORAGE_POINT_EXPECT(!storage_point_is_complete(sp));
+    STORAGE_POINT_EXPECT(storage_point_is_partial(sp));
+    STORAGE_POINT_EXPECT(storage_point_slots(sp) == 5);
+    STORAGE_POINT_EXPECT(storage_point_average_value(sp) == 1.5);
+
+    sp = unittest_numeric_storage_point(0, 1, 0, 0, 0, 1, 0, 0, SN_DEFAULT_FLAGS);
+    STORAGE_POINT_EXPECT(storage_point_is_zero(sp));
+    sp.anomaly_count = 1;
+    STORAGE_POINT_EXPECT(!storage_point_is_zero(sp));
+
+    STORAGE_POINT numeric = unittest_numeric_storage_point(10, 20, 2, 5, 7, 2, 1, 1, SN_FLAG_RESET);
+    STORAGE_POINT merged = STORAGE_POINT_UNSET;
+    storage_point_merge_to(merged, numeric);
+    STORAGE_POINT_EXPECT(merged.min == 2 && merged.max == 5 && merged.sum == 7);
+    STORAGE_POINT_EXPECT(merged.start_time_s == 10 && merged.end_time_s == 20);
+    STORAGE_POINT_EXPECT(merged.count == 2 && merged.gap_count == 1 && merged.anomaly_count == 1);
+    STORAGE_POINT_EXPECT(merged.flags & SN_FLAG_RESET);
+
+    STORAGE_POINT unset = STORAGE_POINT_UNSET;
+    storage_point_merge_to(merged, unset);
+    STORAGE_POINT_EXPECT(merged.min == 2 && merged.max == 5 && merged.sum == 7);
+    STORAGE_POINT_EXPECT(merged.count == 2 && merged.gap_count == 1 && merged.anomaly_count == 1);
+
+    STORAGE_POINT gap;
+    storage_point_empty(gap, 0, 10);
+    STORAGE_POINT gap_first = gap;
+    storage_point_merge_to(gap_first, numeric);
+    STORAGE_POINT_EXPECT(gap_first.start_time_s == 0 && gap_first.end_time_s == 20);
+    STORAGE_POINT_EXPECT(gap_first.min == 2 && gap_first.max == 5 && gap_first.sum == 7);
+    STORAGE_POINT_EXPECT(gap_first.count == 2 && gap_first.gap_count == 2 && gap_first.anomaly_count == 1);
+    STORAGE_POINT_EXPECT(storage_point_is_partial(gap_first));
+
+    STORAGE_POINT numeric_first = numeric;
+    storage_point_merge_to(numeric_first, gap);
+    STORAGE_POINT_EXPECT(numeric_first.start_time_s == gap_first.start_time_s &&
+                         numeric_first.end_time_s == gap_first.end_time_s);
+    STORAGE_POINT_EXPECT(numeric_first.min == gap_first.min && numeric_first.max == gap_first.max &&
+                         numeric_first.sum == gap_first.sum);
+    STORAGE_POINT_EXPECT(numeric_first.count == gap_first.count &&
+                         numeric_first.gap_count == gap_first.gap_count &&
+                         numeric_first.anomaly_count == gap_first.anomaly_count &&
+                         numeric_first.flags == gap_first.flags);
+
+    STORAGE_POINT second_gap;
+    storage_point_empty(second_gap, 20, 30);
+    storage_point_merge_to(gap, second_gap);
+    STORAGE_POINT_EXPECT(storage_point_is_gap(gap));
+    STORAGE_POINT_EXPECT(gap.start_time_s == 0 && gap.end_time_s == 30 && gap.gap_count == 2);
+
+    STORAGE_POINT second_numeric =
+        unittest_numeric_storage_point(20, 30, 1, 7, 11, 3, 2, 2, SN_FLAG_NONE);
+    storage_point_merge_to(numeric, second_numeric);
+    STORAGE_POINT_EXPECT(numeric.start_time_s == 10 && numeric.end_time_s == 30);
+    STORAGE_POINT_EXPECT(numeric.min == 1 && numeric.max == 7 && numeric.sum == 18);
+    STORAGE_POINT_EXPECT(numeric.count == 5 && numeric.gap_count == 3 && numeric.anomaly_count == 3);
+    STORAGE_POINT_EXPECT(numeric.flags & SN_FLAG_RESET);
+
+    STORAGE_POINT added = unittest_numeric_storage_point(0, 10, 2, 5, 7, 2, 1, 1, SN_FLAG_NONE);
+    second_numeric = unittest_numeric_storage_point(10, 20, 3, 7, 11, 3, 2, 2, SN_FLAG_RESET);
+    storage_point_add_to(added, second_numeric);
+    STORAGE_POINT_EXPECT(added.start_time_s == 0 && added.end_time_s == 20);
+    STORAGE_POINT_EXPECT(added.min == 5 && added.max == 12 && added.sum == 18);
+    STORAGE_POINT_EXPECT(added.count == 5 && added.gap_count == 3 && added.anomaly_count == 3);
+    STORAGE_POINT_EXPECT(added.flags & SN_FLAG_RESET);
+    storage_point_empty(gap, 20, 30);
+    storage_point_add_to(added, gap);
+    STORAGE_POINT_EXPECT(added.sum == 18 && added.count == 5 && added.gap_count == 4);
+
+    storage_point_empty(gap, 0, 10);
+    STORAGE_POINT gap_added = gap;
+    storage_point_add_to(gap_added, added);
+    STORAGE_POINT_EXPECT(gap_added.start_time_s == 0 && gap_added.end_time_s == 30);
+    STORAGE_POINT_EXPECT(gap_added.min == 5 && gap_added.max == 12 && gap_added.sum == 18);
+    STORAGE_POINT_EXPECT(gap_added.count == 5 && gap_added.gap_count == 5 && gap_added.anomaly_count == 3);
+    STORAGE_POINT_EXPECT(gap_added.flags & SN_FLAG_RESET);
+
+    STORAGE_POINT absolute =
+        unittest_numeric_storage_point(10, 20, -5, -2, -7, 2, 1, 1, SN_FLAG_RESET);
+    storage_point_make_positive(absolute);
+    STORAGE_POINT_EXPECT(absolute.min == 2 && absolute.max == 5 && absolute.sum == 7);
+    STORAGE_POINT_EXPECT(absolute.start_time_s == 10 && absolute.end_time_s == 20);
+    STORAGE_POINT_EXPECT(absolute.count == 2 && absolute.gap_count == 1 && absolute.anomaly_count == 1);
+    STORAGE_POINT_EXPECT(absolute.flags & SN_FLAG_RESET);
+    storage_point_empty(gap, 20, 30);
+    storage_point_make_positive(gap);
+    STORAGE_POINT_EXPECT(storage_point_is_gap(gap) && gap.gap_count == 1);
+
+    fprintf(stderr, "Storage-point contract unittests: %s\n", errors ? "FAILED" : "PASSED");
+    return errors;
+}
+
+static size_t test_rrddim_storage_point_contract_mode(RRD_DB_MODE mode, const char *id) {
+    size_t errors = 0;
+
+    RRDSET *st = rrdset_create_custom(
+        localhost, "unittest-storage", id, id, "unittest", "unittest.storage",
+        "Storage Point Unit Testing", "value", "unittest", id,
+        1, 1, RRDSET_TYPE_LINE, mode, 8);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    STORAGE_POINT_EXPECT(rd->rrd_memory_mode == mode);
+    STORAGE_POINT_EXPECT(rd->tiers[0].seb == STORAGE_ENGINE_BACKEND_RRDDIM);
+
+    const time_t t = 1700000000;
+    unittest_storage_engine_store_metric(rd->tiers[0].sch, (usec_t)t * USEC_PER_SEC,
+                                         10, 10, 10, 1, 0, SN_DEFAULT_FLAGS);
+    unittest_storage_engine_store_metric(rd->tiers[0].sch, (usec_t)(t + 1) * USEC_PER_SEC,
+                                         NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT);
+    unittest_storage_engine_store_metric(rd->tiers[0].sch, (usec_t)(t + 2) * USEC_PER_SEC,
+                                         -20, -20, -20, 1, 1, SN_FLAG_RESET);
+
+    struct storage_engine_query_handle seqh = { 0 };
+    unittest_storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &seqh,
+                                       t - 1, t + 3, STORAGE_PRIORITY_SYNCHRONOUS);
+
+    for(time_t end_time_s = t - 1; end_time_s <= t + 3; end_time_s++) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        STORAGE_POINT_EXPECT(sp.start_time_s == end_time_s - 1);
+        STORAGE_POINT_EXPECT(sp.end_time_s == end_time_s);
+
+        if(end_time_s == t) {
+            STORAGE_POINT_EXPECT(storage_point_is_complete(sp));
+            STORAGE_POINT_EXPECT(sp.min == 10 && sp.max == 10 && sp.sum == 10);
+            STORAGE_POINT_EXPECT(sp.count == 1 && sp.gap_count == 0 && sp.anomaly_count == 0);
+            STORAGE_POINT_EXPECT(sp.flags & SN_FLAG_NOT_ANOMALOUS);
+        }
+        else if(end_time_s == t + 2) {
+            STORAGE_POINT_EXPECT(storage_point_is_complete(sp));
+            STORAGE_POINT_EXPECT(sp.min == -20 && sp.max == -20 && sp.sum == -20);
+            STORAGE_POINT_EXPECT(sp.count == 1 && sp.gap_count == 0 && sp.anomaly_count == 1);
+            STORAGE_POINT_EXPECT((sp.flags & SN_FLAG_RESET) && !(sp.flags & SN_FLAG_NOT_ANOMALOUS));
+        }
+        else {
+            STORAGE_POINT_EXPECT(storage_point_is_gap(sp));
+            STORAGE_POINT_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+                                 !netdata_double_isnumber(sp.sum));
+            STORAGE_POINT_EXPECT(sp.count == 0 && sp.gap_count == 1 && sp.anomaly_count == 0);
+            STORAGE_POINT_EXPECT(sp.flags == SN_FLAG_NONE);
+        }
+    }
+
+    STORAGE_POINT_EXPECT(unittest_storage_engine_query_is_finished(&seqh));
+    unittest_storage_engine_query_finalize(&seqh);
+    rrdset_free(st);
+    return errors;
+}
+
+static size_t test_rrddim_storage_point_contract(void) {
+    size_t errors = 0;
+    errors += test_rrddim_storage_point_contract_mode(RRD_DB_MODE_RAM, "storage-point-ram");
+    errors += test_rrddim_storage_point_contract_mode(RRD_DB_MODE_ALLOC, "storage-point-alloc");
+    fprintf(stderr, "RAM/ALLOC storage-point unittests: %s\n", errors ? "FAILED" : "PASSED");
+    return errors;
+}
+
+#undef STORAGE_POINT_EXPECT
+
 int unit_test_storage() {
-    if(check_storage_number_exists()) return 0;
+    if(test_storage_point_contract()) return 1;
+    if(test_rrddim_storage_point_contract()) return 1;
+    if(check_storage_number_exists()) return 1;
 
     NETDATA_DOUBLE storage_number_positive_min = unpack_storage_number(STORAGE_NUMBER_POSITIVE_MIN_RAW);
     NETDATA_DOUBLE storage_number_negative_max = unpack_storage_number(STORAGE_NUMBER_NEGATIVE_MAX_RAW);

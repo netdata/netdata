@@ -19,7 +19,7 @@ void store_metric_at_tier_flush_last_completed(RRDDIM *rd __maybe_unused, size_t
     if(!LAST_COMPLETED_POINT_EXISTS(t)) return;
 
     STORAGE_POINT *sp = &t->last_completed_point;
-    if(likely(!storage_point_is_unset(t->last_completed_point))) {
+    if(likely(storage_point_has_value(t->last_completed_point))) {
         storage_engine_store_metric(
             t->sch,
             sp->end_time_s * USEC_PER_SEC,
@@ -43,9 +43,7 @@ void store_metric_at_tier_flush_last_completed(RRDDIM *rd __maybe_unused, size_t
 
     rrdset_done_statistics_points_stored_per_tier[tier]++;
 
-    // make the point unset
-    t->last_completed_point.count = 0;      // make it unset
-    t->last_completed_point.end_time_s = 0; // make it not saved
+    storage_point_unset(t->last_completed_point);
 }
 
 ALWAYS_INLINE_HOT
@@ -76,35 +74,11 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         else
             store_metric_at_tier_save_last_completed(rd, tier, t, STORAGE_POINT_UNSET);
 
-        t->virtual_point.count = 0; // make the point unset
+        storage_point_unset(t->virtual_point);
         t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
     }
 
-    // merge the dates into our virtual point
-    if (unlikely(sp.start_time_s < t->virtual_point.start_time_s))
-        t->virtual_point.start_time_s = sp.start_time_s;
-
-    if (likely(sp.end_time_s > t->virtual_point.end_time_s))
-        t->virtual_point.end_time_s = sp.end_time_s;
-
-    // merge the values into our virtual point
-    if (likely(!storage_point_is_gap(sp))) {
-        // we aggregate only non NULLs into higher tiers
-
-        if (likely(!storage_point_is_unset(t->virtual_point))) {
-            // merge the collected point to our virtual one
-            t->virtual_point.sum += sp.sum;
-            t->virtual_point.min = MIN(t->virtual_point.min, sp.min);
-            t->virtual_point.max = MAX(t->virtual_point.max, sp.max);
-            t->virtual_point.count += sp.count;
-            t->virtual_point.anomaly_count += sp.anomaly_count;
-            t->virtual_point.flags |= sp.flags;
-        }
-        else {
-            // reset our virtual point to this one
-            t->virtual_point = sp;
-        }
-    }
+    storage_point_merge_to(t->virtual_point, sp);
 }
 
 NOT_INLINE_HOT
@@ -153,31 +127,41 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
-    time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
+    if(likely(nd_profile.storage_tiers > 1)) {
+        time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
-    STORAGE_POINT sp = {
-        .start_time_s = now_s - rd->rrdset->update_every,
-        .end_time_s = now_s,
-        .min = n,
-        .max = n,
-        .sum = n,
-        .count = 1,
-        .anomaly_count = (flags & SN_FLAG_NOT_ANOMALOUS) ? 0 : 1,
-        .flags = flags
-    };
-
-    for(size_t tier = 1; tier < nd_profile.storage_tiers;tier++) {
-        if(unlikely(!rd->tiers[tier].smh)) continue;
-
-        struct rrddim_tier *t = &rd->tiers[tier];
-
-        if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
-            // we have not collected this tier before
-            // let's fill any gap that may exist
-            backfill_tier_from_smaller_tiers(rd, tier, now_s);
+        time_t start_time_s = now_s - rd->rrdset->update_every;
+        STORAGE_POINT sp;
+        if(likely(netdata_double_isnumber(n))) {
+            sp = (STORAGE_POINT){
+                .start_time_s = start_time_s,
+                .end_time_s = now_s,
+                .min = n,
+                .max = n,
+                .sum = n,
+                .count = 1,
+                .anomaly_count = !(flags & SN_FLAG_NOT_ANOMALOUS) ? 1 : 0,
+                .flags = flags,
+                .gap_count = 0,
+            };
         }
+        else
+            storage_point_empty(sp, start_time_s, now_s);
 
-        store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);
+        size_t tier = 1;
+        do {
+            if(unlikely(!rd->tiers[tier].smh)) continue;
+
+            struct rrddim_tier *t = &rd->tiers[tier];
+
+            if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
+                // we have not collected this tier before
+                // let's fill any gap that may exist
+                backfill_tier_from_smaller_tiers(rd, tier, now_s);
+            }
+
+            store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);
+        } while(++tier < nd_profile.storage_tiers);
     }
     rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
 
