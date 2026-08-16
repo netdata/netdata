@@ -1849,6 +1849,8 @@ int sql_alert_config_unittest(void)
     db_meta = NULL;
     if (sqlite3_open(":memory:", &db_meta) != SQLITE_OK) {
         fprintf(stderr, "FAILED [alert config persistence]: cannot open an in-memory database\n");
+        if(db_meta)
+            sqlite3_close(db_meta);
         db_meta = saved_db_meta;
         if (owns_sqlite_lifecycle)
             sqlite_library_shutdown();
