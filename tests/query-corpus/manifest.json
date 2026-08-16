@@ -852,7 +852,7 @@
   },
   {
     "name": "CASE-032/reset-annotation-is-not-redelivered",
-    "proves": "a RESET is annotated exactly once, on the result row containing the reset sample's timestamp. At tier 0 the last healthy reset sample of a 10-second metric is asserted under average and sum on 5-second upsampling, 30-second downsampling, and a nondividing 35-second grid whose owning row ends 20 seconds after retention; every row has exact ARP 0 and no extra annotation bits"
+    "proves": "a RESET is annotated exactly once, on the result row containing the reset sample's timestamp. At tier 0 the last healthy reset sample of a 10-second metric is asserted under average and sum on 5-second upsampling, 30-second downsampling, a 25-second grid that carries already-delivered metadata into its owning row, and a nondividing 35-second grid whose owning row ends 20 seconds after retention; every row has exact ARP 0 and no extra annotation bits"
   },
   {
     "name": "CASE-033/anomaly-rate-counts-samples-in-the-row",

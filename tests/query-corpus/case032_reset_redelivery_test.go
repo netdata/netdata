@@ -48,6 +48,7 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 	}{
 		{name: "upsample", before: base + samples*ue, rowSpan: ue / 2},
 		{name: "downsample", before: base + samples*ue, rowSpan: 30},
+		{name: "metadata-handoff", before: base + 100, rowSpan: 25},
 		{name: "nondividing-tail", before: base + 140, rowSpan: 35},
 	} {
 		resetRows := make(map[int64]bool, 2)
