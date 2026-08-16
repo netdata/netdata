@@ -31,7 +31,8 @@ static bool group_by_pass_calculates_percentage(const QUERY_TARGET *qt, size_t p
 static ALWAYS_INLINE void rrd2rrdr_group_by_add_metric_internal(
     RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
     RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
-    STORAGE_POINT *query_points, bool propagate_raw_contributor_counts) {
+    STORAGE_POINT *query_points, bool propagate_raw_contributor_counts,
+    bool track_raw_anomaly_contributors, const uint32_t *source_anomaly_contributors) {
     if(!r_tmp || r_dst == r_tmp || !(r_tmp->od[d_tmp] & RRDR_DIMENSION_QUERIED))
         return;
 
@@ -64,7 +65,6 @@ static ALWAYS_INLINE void rrd2rrdr_group_by_add_metric_internal(
         RRDR_VALUE_FLAGS *co = &r_dst->o[ idx_dst ];
         NETDATA_DOUBLE *ar = &r_dst->ar[ idx_dst ];
         uint32_t *gbc = &r_dst->gbc[ idx_dst ];
-        uint32_t *arc = r_dst->arc ? &r_dst->arc[idx_dst] : NULL;
 
         switch(group_by_aggregate_function) {
             default:
@@ -99,8 +99,8 @@ static ALWAYS_INLINE void rrd2rrdr_group_by_add_metric_internal(
             *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
             *ar += ar_tmp;
             *gbc += propagate_raw_contributor_counts ? r_tmp->gbc[idx_tmp] : 1;
-            if(arc)
-                *arc += r_tmp->arc ? r_tmp->arc[idx_tmp] : 1;
+            if(track_raw_anomaly_contributors)
+                r_dst->arc[idx_dst] += source_anomaly_contributors[idx_tmp];
         }
         else if(r_dst->hgbc) {
             // count the hidden (denominator) contributions too, so that
@@ -119,7 +119,7 @@ void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t
                                   RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
                                   STORAGE_POINT *query_points, size_t pass __maybe_unused) {
     rrd2rrdr_group_by_add_metric_internal(
-        r_dst, d_dst, r_tmp, d_tmp, group_by_aggregate_function, query_points, false);
+        r_dst, d_dst, r_tmp, d_tmp, group_by_aggregate_function, query_points, false, false, NULL);
 }
 
 NEVER_INLINE
@@ -127,7 +127,16 @@ static void rrd2rrdr_group_by_add_metric_with_raw_contributor_counts(
     RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
     RRDR_GROUP_BY_FUNCTION group_by_aggregate_function, STORAGE_POINT *query_points) {
     rrd2rrdr_group_by_add_metric_internal(
-        r_dst, d_dst, r_tmp, d_tmp, group_by_aggregate_function, query_points, true);
+        r_dst, d_dst, r_tmp, d_tmp, group_by_aggregate_function, query_points, true, false, NULL);
+}
+
+NEVER_INLINE
+static void rrd2rrdr_group_by_add_metric_with_raw_anomaly_contributors(
+    RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
+    RRDR_GROUP_BY_FUNCTION group_by_aggregate_function, STORAGE_POINT *query_points) {
+    rrd2rrdr_group_by_add_metric_internal(
+        r_dst, d_dst, r_tmp, d_tmp, group_by_aggregate_function, query_points,
+        false, true, r_tmp->gbc);
 }
 
 // stamp RRDR_VALUE_PARTIAL on every point that received fewer contributions
@@ -371,7 +380,11 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
             else
                 expected_gbc[last_r->dgbs[d]] += propagate_raw_contributor_counts ? last_r->dgbc[d] : 1;
 
-            if(propagate_raw_contributor_counts)
+            if(r->arc)
+                rrd2rrdr_group_by_add_metric_with_raw_anomaly_contributors(
+                    r, last_r->dgbs[d], last_r, d,
+                    qt->request.group_by[pass].aggregation, &last_r->dqp[d]);
+            else if(propagate_raw_contributor_counts)
                 rrd2rrdr_group_by_add_metric_with_raw_contributor_counts(
                     r, last_r->dgbs[d], last_r, d,
                     qt->request.group_by[pass].aggregation, &last_r->dqp[d]);
@@ -415,6 +428,8 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
         }
 
     bool final_percentage = group_by_pass_calculates_percentage(qt, final_pass);
+    uint32_t *anomaly_contributor_counts =
+        (aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE || final_percentage) && r->arc ? r->arc : r->gbc;
 
     if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
         rrdr2rrdr_group_by_partial_trimming(r);
@@ -448,9 +463,7 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
             RRDR_VALUE_FLAGS *co = &r->o[ idx ];
             NETDATA_DOUBLE *ar = &r->ar[ idx ];
             uint32_t gbc = r->gbc[ idx ];
-            uint32_t arc = r->arc ? r->arc[idx] : gbc;
-            uint32_t anomaly_contributors =
-                aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE || final_percentage ? arc : gbc;
+            uint32_t anomaly_contributors = anomaly_contributor_counts[idx];
 
             if(likely(gbc)) {
                 *co &= ~RRDR_VALUE_EMPTY;
