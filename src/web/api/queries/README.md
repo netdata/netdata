@@ -147,7 +147,7 @@ The following trimmed-median methods are available: `trimmed-median1`, `trimmed-
 Some grouping methods accept additional parameters via `group_options`:
 - `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps`, `number-of-times`: a CONDITION -
   an operator followed by a value. Operators: `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`), `!=` (or
-  `!` or `<>`); with no operator the value compares equal. The value is one of:
+  `!:`, `!` or `<>`); with no operator the value compares equal. The value is one of:
   - a number, e.g. `>100`, `<=50`, `!=0`
   - a gap token - `gap`, `nan`, `null`, `empty` all mean "no data was collected", e.g. `==gap` matches the empty slots
     and `!=gap` the collected ones. For `percentage-of-samples`, `number-of-flaps` and `number-of-times`, naming a gap
