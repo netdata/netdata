@@ -1,0 +1,28 @@
+name: Snap
+on:
+  push:
+    branches:
+      - "snap-build"
+  workflow_dispatch:
+    inputs:
+      retention:
+        description: Retention Days
+        default: 1
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: snapcore/action-build@v1
+        id: snapcraft
+        with:
+          snapcraft-args: --verbosity debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap
+          path: ${{ steps.snapcraft.outputs.snap }}
+          retention-days: ${{ github.event.inputs.retention || 7 }}
