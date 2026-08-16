@@ -463,6 +463,8 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
             RRDR_VALUE_FLAGS *co = &r->o[ idx ];
             NETDATA_DOUBLE *ar = &r->ar[ idx ];
             uint32_t gbc = r->gbc[ idx ];
+            // Keep this load here to preserve the optimized hot-path code shape.
+            // cppcheck-suppress variableScope
             uint32_t anomaly_contributors = anomaly_contributor_counts[idx];
 
             if(likely(gbc)) {
