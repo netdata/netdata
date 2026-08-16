@@ -162,7 +162,7 @@ The `time_group` parameter in `aggregations.time` controls how data points withi
 
 :::important
 
-When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly. `percentage-of-time`, `number-of-flaps` and `number-of-times` do define a tier behaviour, but it is an estimate above tier 0 - request `"tier": 0` when you need the exact answer.
+For exact results from advanced functions such as `median`, `stddev`, `ses`, `des`, `percentile`, `trimmed-mean`, `trimmed-median`, and `extremes`, specify `"tier": 0` in the `window` object and verify in `db.per_tier` that tier 0 actually supplied the data. The four condition groupings can use pre-aggregated tiers: `percentage-of-samples` then treats each stored point as one sample, while `percentage-of-time`, `number-of-flaps`, and `number-of-times` return estimates. Request tier 0 when the raw sample sequence matters.
 
 :::
 

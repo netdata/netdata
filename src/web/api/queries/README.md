@@ -119,10 +119,10 @@ and they group the values every `group points`.
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=ses&after=-60&label=ses&value_color=brown) finds the exponential weighted moving average of the values
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=des&after=-60&label=des&value_color=blue) applies Holt-Winters double exponential smoothing
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=incremental_sum&after=-60&label=incremental_sum&value_color=red) finds the difference of the last vs the first value
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentage-of-samples&after=-60&label=percentage-of-samples&value_color=purple) returns the percentage (0 to 100) of SAMPLES matching a condition set via `group_options` (e.g., `&group=percentage-of-samples&group_options=>10`); `countif` is an alias
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentage-of-time&after=-60&label=percentage-of-time&value_color=purple) returns the percentage (0 to 100) of TIME the condition held — the two differ whenever the samples are not evenly spaced, which is what makes this the one to use for availability
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=number-of-flaps&after=-60&label=number-of-flaps&value_color=purple) counts how many times the condition started holding, so a signal that keeps toggling is separated from one that changed once
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=number-of-times&after=-60&label=number-of-times&value_color=purple) counts the occurrences of the condition; with `<previous` it counts a value going backwards, which is what counts reboots
+-   ![percentage-of-samples badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentage-of-samples&after=-60&label=percentage-of-samples&value_color=purple) returns the percentage (0 to 100) of SAMPLES matching a condition set via `group_options` (e.g., `&group=percentage-of-samples&group_options=>10`); `countif` is an alias
+-   ![percentage-of-time badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentage-of-time&after=-60&label=percentage-of-time&value_color=purple) returns the percentage (0 to 100) of TIME the condition held — the two differ whenever the samples are not evenly spaced, which is what makes this the one to use for availability
+-   ![number-of-flaps badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=number-of-flaps&after=-60&label=number-of-flaps&value_color=purple) counts how many times the condition started holding, so a signal that keeps toggling is separated from one that changed once
+-   ![number-of-times badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=number-of-times&after=-60&label=number-of-times&value_color=purple) counts the occurrences of the condition; with `<previous` it counts a value going backwards, which is what counts reboots
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=ema&after=-60&label=ema&value_color=teal) alias for `ses`; finds the exponential weighted moving average of the values
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=extremes&after=-60&label=extremes&value_color=grey) returns the maximum of positive values and the minimum of negative values; when both are present, returns the one with the greater absolute magnitude
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=latest&after=-60&label=latest&value_color=cyan) returns the latest collected value of the group; groups without any collected value are empty (gaps stay visible); on higher tiers, where individual samples are no longer available, it returns the average of the most recent tier point
@@ -170,13 +170,13 @@ at lower resolution. Over a window long enough to read that older data,
 `percentage-of-time`, `number-of-flaps` and `number-of-times` return an
 **estimate**:
 
-- For a metric that is only ever 0 or 1 - an availability signal - collected
-  at a steady interval, the estimate is exact. If the collection interval
-  changed inside a stored interval, that one is weighted by samples rather
-  than by time.
-- For other metrics it is approximate.
-- `number-of-flaps` and `number-of-times` count at most one event per stored
-  interval, so bursts of events close together are reported as one.
+- For `percentage-of-time`, a metric that is only ever 0 or 1 - an availability
+  signal - is exact when collected at a steady interval. If the collection
+  interval changed inside a stored interval, that one is weighted by samples
+  rather than by time; other signals and conditions are approximate.
+- `number-of-flaps` and `number-of-times` are exact only when each stored
+  interval contains at most one relevant transition or match. They count at
+  most one event per stored interval, so bursts of events are reported as one.
 - `number-of-times` with `previous` still detects a counter going backwards,
   so reboot counting keeps working.
 - A gap inside a stored interval is not visible, so partially collected
@@ -197,7 +197,7 @@ sample and evaluates the condition on it, which is what it has always done.
 Over lower-resolution data that means it answers about stored points rather
 than about the samples behind them.
 
-Add `"tier": 0` to the request for exact answers, and check `db.per_tier` in
+Add `tier=0` to an HTTP request for exact answers, and check `db.per_tier` in
 the response to confirm tier 0 actually served the query. Tier 0 retention is
 short on busy parents, so a long window will not always have it.
 
@@ -256,4 +256,3 @@ So, the proper way to query the database is to also set at least `after`. The fo
 <http://netdata.firehol.org/api/v1/data?chart=system.cpu&points=1&after=-10&options=seconds>
 
 When you keep calling this URL, you will see that it returns one new value every 10 seconds, and the timestamp always ends with zero. Similarly, if you say `points=1&after=-5` it will always return timestamps ending with 0 or 5.
-
