@@ -263,6 +263,13 @@ func TestCase023GapWeightFollowsCollectionInterval(t *testing.T) {
 // the latter answers about the samples it was given and stays blind to
 // gaps unless the condition names one.
 func TestCase023PercentageOfTimeCountsTheWholeWindow(t *testing.T) {
+	for _, contract := range []string{
+		"CASE-023/percentage-of-time-denominator",
+		"CASE-023/percentage-of-samples-denominator",
+	} {
+		registerContract(t, contract)
+	}
+
 	// one collected second, then ninety-nine with nothing pushed at all
 	const (
 		collected = 1

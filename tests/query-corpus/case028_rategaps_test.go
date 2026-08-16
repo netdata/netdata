@@ -95,6 +95,13 @@ func c028Measured(ue int, gapped bool, after, before int64) float64 {
 // c028Fixtures pushes the four shapes once, whichever case asks first.
 var c028Ready = map[string]bool{}
 
+var c028GUIDByFixture = map[string]int{
+	"ue1-nogaps":  256,
+	"ue1-gapped":  257,
+	"ue10-nogaps": 258,
+	"ue10-gapped": 259,
+}
+
 func c028Fixture(t *testing.T, ue int, gapped bool) (ctx, host string) {
 	t.Helper()
 	shape := "nogaps"
@@ -107,9 +114,9 @@ func c028Fixture(t *testing.T, ue int, gapped bool) (ctx, host string) {
 		return ctx, host
 	}
 
-	g := 260 + ue*2
-	if gapped {
-		g++
+	g, ok := c028GUIDByFixture[name]
+	if !ok {
+		t.Fatalf("CASE-028 fixture %q has no machine GUID", name)
 	}
 	ch := c028Chart(ctx, ue, gapped)
 	pushLiveBurst(t, host, guid(g), ch)

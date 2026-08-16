@@ -66,6 +66,17 @@ var c035Cases = []struct {
 	},
 }
 
+func c035CaseNamed(t *testing.T, name string) c035Case {
+	t.Helper()
+	for _, item := range c035Cases {
+		if item.name == name {
+			return item.spec
+		}
+	}
+	t.Fatalf("CASE-035 fixture %q is not defined", name)
+	return c035Case{}
+}
+
 func c035TransitionOffset(tc c035Case) int64 {
 	// Four and a half complete old-cadence tier2 records precede the
 	// transition. The extra 90 seconds is divisible by both fixture
@@ -756,8 +767,9 @@ func TestCase023HistoricalGapSlotsSurviveCadenceChange(t *testing.T) {
 	// Speeding up is the discriminating direction: using the new 1-second
 	// cadence makes each old 10-second gap count ten times. Slowing down
 	// clamps both the correct and wrong one-slot answers to one.
-	item := c035Cases[1]
-	state := c035Fixture(t, item.name, item.spec)
+	const name = "speeds-up"
+	tc := c035CaseNamed(t, name)
+	state := c035Fixture(t, name, tc)
 	assertContract(t, contract,
-		c035GapMatrix(t, state.context, state.host, state.base, item.spec, state.samples))
+		c035GapMatrix(t, state.context, state.host, state.base, tc, state.samples))
 }

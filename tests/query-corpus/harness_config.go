@@ -37,6 +37,7 @@ var daemonFreeTests = map[string]struct{}{
 	"TestL11SlicingOracleGuards":                                  {},
 	"TestL5ExactGridGuard":                                        {},
 	"TestL6ContributorWeightedMetadataOracle":                     {},
+	"TestL6RawCountSchemaGuard":                                   {},
 	"TestL7StructuredResponseGuards":                              {},
 	"TestL9DefaultWindowShapeGuards":                              {},
 	"TestManifestComponentsAreValid":                              {},

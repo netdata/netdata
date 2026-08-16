@@ -106,12 +106,17 @@ func TestCase027IncrementalSumConservesAcrossZoom(t *testing.T) {
 			total += *pt.Value
 		}
 
-		// only the opening bucket has no predecessor to measure against
-		if empties > 1 {
+		// A bucket containing at most one sample cannot measure the first
+		// sample without a predecessor. Coarser buckets contain their own
+		// first-to-last delta and therefore have no empty opening row.
+		wantEmpties := 0
+		if rowSpan <= ue {
+			wantEmpties = 1
+		}
+		if empties != wantEmpties {
 			t.Logf("incremental-sum contract not met: at %d buckets, %d of %d answered "+
-				"nothing - only the first bucket of a window has no earlier reading to "+
-				"measure against",
-				points, empties, len(col))
+				"nothing, want exactly %d for rows spanning %d seconds",
+				points, empties, len(col), wantEmpties, rowSpan)
 			ok = false
 		}
 

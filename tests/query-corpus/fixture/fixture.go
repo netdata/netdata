@@ -189,13 +189,7 @@ func (c Chart) PushLive(conn *stream.Conn) {
 		ue = 1
 	}
 
-	byTime := make([]map[int64]Point, len(c.Dimensions))
-	for di, d := range c.Dimensions {
-		byTime[di] = make(map[int64]Point, len(d.Points))
-		for _, p := range d.Points {
-			byTime[di][p.T] = p
-		}
-	}
+	byTime := c.pointsByTime()
 
 	for _, p := range c.rowTimes() {
 		conn.Begin2(c.ID, ue, p)
@@ -225,6 +219,25 @@ func (c Chart) rowTimes() []int64 {
 	return out
 }
 
+func (d Dimension) pointsByTime() map[int64]Point {
+	byTime := make(map[int64]Point, len(d.Points))
+	for _, p := range d.Points {
+		if _, duplicate := byTime[p.T]; duplicate {
+			panic(fmt.Sprintf("fixture: dimension %q repeats timestamp %d", d.ID, p.T))
+		}
+		byTime[p.T] = p
+	}
+	return byTime
+}
+
+func (c Chart) pointsByTime() []map[int64]Point {
+	byTime := make([]map[int64]Point, len(c.Dimensions))
+	for i, d := range c.Dimensions {
+		byTime[i] = d.pointsByTime()
+	}
+	return byTime
+}
+
 // ReplayWindow returns the chart's rows inside (after, before] in the
 // stream.ReplayHandler contract.
 func (c Chart) ReplayWindow(after, before int64) []stream.ReplayRow {
@@ -234,13 +247,7 @@ func (c Chart) ReplayWindow(after, before int64) []stream.ReplayRow {
 	// shape is deliberately used (a dimension whose storage runs out while
 	// its chart keeps going). Indexing the shorter dimension by the longer
 	// one's position reads the wrong sample, or runs off the end.
-	byTime := make([]map[int64]Point, len(c.Dimensions))
-	for di, d := range c.Dimensions {
-		byTime[di] = make(map[int64]Point, len(d.Points))
-		for _, p := range d.Points {
-			byTime[di][p.T] = p
-		}
-	}
+	byTime := c.pointsByTime()
 
 	var rows []stream.ReplayRow
 	for _, ts := range c.rowTimes() {
@@ -292,6 +299,8 @@ type ExpectedPoint struct {
 // anomalous (ARP 100). Values pass through the storage_number quantization
 // (SNRoundTrip).
 func (d Dimension) Expected() []ExpectedPoint {
+	_ = d.pointsByTime()
+
 	out := make([]ExpectedPoint, 0, len(d.Points))
 	for _, p := range d.Points {
 		ep := ExpectedPoint{T: p.T}

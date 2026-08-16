@@ -177,6 +177,9 @@ func TestServeReplicationPreservesChartCadence(t *testing.T) {
 		r:    bufio.NewReader(childSide),
 		w:    bufio.NewWriter(childSide),
 	}
+	if err := parentSide.SetDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
 
 	result := make(chan error, 1)
 	go func() {
@@ -199,9 +202,6 @@ func TestServeReplicationPreservesChartCadence(t *testing.T) {
 	}()
 
 	if _, err := fmt.Fprintln(parentSide, `REPLAY_CHART "fixture.chart" "true" 100 105`); err != nil {
-		t.Fatal(err)
-	}
-	if err := parentSide.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	reader := bufio.NewReader(parentSide)

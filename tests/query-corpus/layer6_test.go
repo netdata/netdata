@@ -175,6 +175,22 @@ type l6ChainResults struct {
 	grouping, grid, values, pointAnomaly, viewAnomaly, partialEmpty, rawSchema bool
 }
 
+func l6RawCountMatches(count int64, empty bool, contributors int) bool {
+	return empty || count == int64(contributors)
+}
+
+func TestL6RawCountSchemaGuard(t *testing.T) {
+	if !l6RawCountMatches(0, true, 4) {
+		t.Fatal("raw empty row rejected its schema count")
+	}
+	if l6RawCountMatches(3, false, 4) {
+		t.Fatal("raw numeric row accepted the wrong contributor count")
+	}
+	if !l6RawCountMatches(4, false, 4) {
+		t.Fatal("raw numeric row rejected its exact contributor count")
+	}
+}
+
 func newL6ChainResults() l6ChainResults {
 	return l6ChainResults{true, true, true, true, true, true, true}
 }
@@ -462,11 +478,11 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) l6ChainResult
 								viewARPTotal += wantAR
 								viewARPRows++
 							}
-							if raw && !wantEmpty {
+							if raw {
 								if pt.Count == nil {
 									t.Logf("%s: %q row %d raw point has no count", label, gname, i)
 									result.rawSchema = false
-								} else if *pt.Count != int64(wantGbc) {
+								} else if !l6RawCountMatches(*pt.Count, wantEmpty, wantGbc) {
 									t.Logf("%s: %q row %d count %d, want %d prior-pass groups",
 										label, gname, i, *pt.Count, wantGbc)
 									result.rawSchema = false
@@ -766,11 +782,11 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 						if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
 							t.Errorf("%q row %d: arp %v, want %v", fk, i, pt.ARP, wantAR)
 						}
-						if raw && !empty {
+						if raw {
 							if pt.Count == nil {
 								t.Errorf("%q row %d: count is absent, want %d visible prior-pass groups",
 									fk, i, visibleGroups)
-							} else if *pt.Count != int64(visibleGroups) {
+							} else if !l6RawCountMatches(*pt.Count, empty, visibleGroups) {
 								t.Errorf("%q row %d: count %d, want %d visible prior-pass groups",
 									fk, i, *pt.Count, visibleGroups)
 							}

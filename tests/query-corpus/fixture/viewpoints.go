@@ -117,6 +117,8 @@ func ViewBuckets(points []DBPoint, after, ueView int64, lines int) [][]float64 {
 // src/database/rrddim-collection.c:149-167 at the checked revision above;
 // SNRoundTrip cites the storage-number pack/unpack source.
 func (d Dimension) DBPoints(ue int64) []DBPoint {
+	_ = d.pointsByTime()
+
 	out := make([]DBPoint, 0, len(d.Points))
 	for _, p := range d.Points {
 		dp := DBPoint{Start: p.T - ue, End: p.T}

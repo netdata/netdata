@@ -467,6 +467,22 @@ func c023MCPPushCadenceFixture(t *testing.T, host, context string) (int64, int64
 }
 
 func TestCase023MCPQueryMetricsContract(t *testing.T) {
+	for _, contract := range []string{
+		"CASE-023/mcp-protocol-lifecycle",
+		"CASE-023/mcp-query-tool-schema",
+		"CASE-023/mcp-valid-result-schema",
+		"CASE-023/mcp-valid-query-units",
+		"CASE-023/mcp-valid-query-echo",
+		"CASE-023/mcp-valid-query-timestamps",
+		"CASE-023/mcp-valid-query-values",
+		"CASE-023/mcp-valid-query-anomaly-rates",
+		"CASE-023/mcp-valid-query-annotations",
+		"CASE-023/mcp-default-zero-options",
+		"CASE-023/mcp-invalid-options",
+	} {
+		registerContract(t, contract)
+	}
+
 	const (
 		host            = "c023-mcp"
 		cadenceHost     = "c023-mcp-cadence"
@@ -495,18 +511,28 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		{name: "number-of-times", units: "events"},
 	}
 
-	var initialize c023MCPResponse
+	var initialize *c023MCPResponse
+	session := func(t *testing.T) c023MCPResponse {
+		t.Helper()
+		if initialize == nil {
+			response := c023MCPPost(t, 1, "initialize", map[string]any{
+				"protocolVersion": "2025-03-26",
+				"capabilities":    map[string]any{},
+				"clientInfo": map[string]any{
+					"name":    "query-corpus",
+					"version": "1",
+				},
+			}, "")
+			c023MCPNotify(t, "notifications/initialized", map[string]any{}, response.Session)
+			initialize = &response
+		}
+		return *initialize
+	}
+
 	t.Run("protocol-lifecycle", func(t *testing.T) {
 		trackContract(t, "CASE-023/mcp-protocol-lifecycle")
 
-		initialize = c023MCPPost(t, 1, "initialize", map[string]any{
-			"protocolVersion": "2025-03-26",
-			"capabilities":    map[string]any{},
-			"clientInfo": map[string]any{
-				"name":    "query-corpus",
-				"version": "1",
-			},
-		}, "")
+		initialize := session(t)
 
 		initializeResult := c023MCPResult(t, initialize.Document, "initialize")
 		if got := initializeResult["protocolVersion"]; got != "2025-03-26" {
@@ -520,13 +546,12 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		}
 		capabilities := queryObject(t, initializeResult, "capabilities", "initialize.result.capabilities")
 		_ = queryObject(t, capabilities, "tools", "initialize.result.capabilities.tools")
-		c023MCPNotify(t, "notifications/initialized", map[string]any{}, initialize.Session)
 	})
 
 	t.Run("query-tool-schema", func(t *testing.T) {
 		trackContract(t, "CASE-023/mcp-query-tool-schema")
 
-		toolsList := c023MCPPost(t, 2, "tools/list", map[string]any{}, initialize.Session)
+		toolsList := c023MCPPost(t, 2, "tools/list", map[string]any{}, session(t).Session)
 		toolsResult := c023MCPResult(t, toolsList.Document, "tools/list")
 		tools, ok := toolsResult["tools"].([]any)
 		if !ok || len(tools) == 0 {
@@ -662,7 +687,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 				arguments := baseArguments(call.metric, call.dimension, call.after, call.before)
 				arguments["time_group"] = call.group
 				arguments["time_group_options"] = call.expression
-				response := c023MCPCall(t, requestID, initialize.Session, arguments)
+				response := c023MCPCall(t, requestID, session(t).Session, arguments)
 				requestID++
 				doc := c023MCPQueryDocument(t, response.Document)
 				check(t, call, doc)
@@ -768,7 +793,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 					if defaultCase.set {
 						arguments["time_group_options"] = defaultCase.value
 					}
-					response := c023MCPCall(t, requestID, initialize.Session, arguments)
+					response := c023MCPCall(t, requestID, session(t).Session, arguments)
 					requestID++
 					doc := c023MCPQueryDocument(t, response.Document)
 					want := equalZero
@@ -802,7 +827,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 						standardContext, "bool", fixture.T0, standard.LastT())
 					arguments["time_group"] = group.name
 					arguments["time_group_options"] = invalid.value
-					response := c023MCPCall(t, requestID, initialize.Session, arguments)
+					response := c023MCPCall(t, requestID, session(t).Session, arguments)
 					requestID++
 					c023MCPAssertOptionsError(t, response.Document, group.name)
 				})

@@ -87,6 +87,32 @@ func TestFixtureOraclesRejectInvalidCollectedValues(t *testing.T) {
 	}
 }
 
+func TestFixtureConsumersRejectDuplicateDimensionTimestamps(t *testing.T) {
+	d := Dimension{ID: "load", Points: []Point{
+		{T: 1, Collected: "1", Flags: "A"},
+		{T: 1, Collected: "2", Flags: "A"},
+	}}
+	chart := Chart{Dimensions: []Dimension{d}}
+	consumers := map[string]func(){
+		"chart-index":  func() { _ = chart.pointsByTime() },
+		"replay":       func() { _ = chart.ReplayWindow(0, 1) },
+		"expected":     func() { _ = d.Expected() },
+		"tier-windows": func() { _ = d.TierWindows(60, 1) },
+		"db-points":    func() { _ = d.DBPoints(1) },
+	}
+
+	for name, consume := range consumers {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("fixture consumer accepted duplicate dimension timestamps")
+				}
+			}()
+			consume()
+		})
+	}
+}
+
 func TestFixtureGapDoesNotParseCollectedPlaceholder(t *testing.T) {
 	d := Dimension{ID: "load", Points: []Point{{
 		T: 1, Collected: "not-a-number", Flags: "E",
