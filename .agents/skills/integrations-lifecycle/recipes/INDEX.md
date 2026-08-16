@@ -7,11 +7,6 @@ tasks a maintainer (or AI assistant) performs.
 |---|---|
 | `add-go-collector.md` | Adding a new go.d module from scratch (most common case). |
 | `update-collector.md` | Modifying an existing collector's metrics, config, alerts, or docs. |
-| `add-ibm-d-module.md` | Adding a new ibm.d module (where `metadata.yaml` is generated). |
-| `add-cloud-notification.md` | Adding a new cloud-notification destination. |
-| `add-secretstore-backend.md` | Adding a new secretstore backend. |
-| `add-service-discovery.md` | Adding a new service-discovery discoverer. |
-| `regenerate-locally.md` | Running the full pipeline locally to verify your changes before pushing. |
 
 ## Common preamble for all recipes
 
@@ -22,9 +17,9 @@ the Python deps once per machine:
 ./integrations/pip.sh
 ```
 
-That installs `jsonschema`, `referencing`, `jinja2`,
-`ruamel.yaml` -- the four packages `gen_integrations.py`
-needs.
+That installs the four packages `gen_integrations.py` needs --
+`jsonschema`, `referencing`, `jinja2`, and `ruamel.yaml` -- plus
+`markdown-it-py` for the generated-description contract tests.
 
 For fast iteration during development, prefer `-c plugin/module`
 scoping on `gen_docs_integrations.py` to skip cleaning/

@@ -6,6 +6,7 @@ modules:
       module_name: freeradius
       monitored_instance:
         name: FreeRADIUS
+        description: "Monitor FreeRADIUS authentication and accounting traffic by sending status-server requests."
         link: https://freeradius.org/
         categories:
           - data-collection.applications
@@ -22,7 +23,7 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors FreeRADIUS servers.
-          
+
           It collect metrics by sending [status-server](https://wiki.freeradius.org/config/Status) messages to the server.
         method_description: ""
       default_behavior:
@@ -109,7 +110,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -117,7 +118,7 @@ modules:
                     address: 127.0.0.1
                     port: 18121
                     secert: adminsecret
-                
+
                   - name: remote
                     address: 192.0.2.1
                     port: 18121

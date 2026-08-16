@@ -3,6 +3,21 @@
 ### Merged Pull Requests:
 
 - Rework Ceph collector as a Prometheus complement ([#23357](https://github.com/netdata/netdata/issues/23357))
+- Improve the support bundle: streaming api key, encoding fidelity, Windows ETW logs, permissions ([#23452](https://github.com/netdata/netdata/issues/23452))
+- Fix: replace dynamic proc netdev format strings ([#23450](https://github.com/netdata/netdata/issues/23450))
+- Refactor(go.d): migrate Ceph collector to framework v2 ([#23462](https://github.com/netdata/netdata/issues/23462))
+- Refactor: remove unused registry_generate_curl_urls function ([#23464](https://github.com/netdata/netdata/issues/23464))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/credentials from 1.19.34 to 1.19.35 in /src/go ([#23472](https://github.com/netdata/netdata/issues/23472))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.66.3 to 1.66.4 in /src/go ([#23468](https://github.com/netdata/netdata/issues/23468))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.35.4 to 1.35.5 in /src/go ([#23471](https://github.com/netdata/netdata/issues/23471))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.35 to 1.32.36 in /src/go ([#23473](https://github.com/netdata/netdata/issues/23473))
+- Fix(go.d/snmp): use correct OID for Aruba fan status ([#23478](https://github.com/netdata/netdata/issues/23478))
+- Harden CI change detection for large pull requests ([#23477](https://github.com/netdata/netdata/issues/23477))
+- Complete collector documentation descriptions ([#23476](https://github.com/netdata/netdata/issues/23476))
+- Fix(dbengine): acquire merged page references before publishing ([#23475](https://github.com/netdata/netdata/issues/23475))
+- Regenerate integrations docs ([#23484](https://github.com/netdata/netdata/issues/23484))
+- Correct zRAM and eBPF VFS descriptions ([#23487](https://github.com/netdata/netdata/issues/23487))
+- Regenerate integrations docs ([#23488](https://github.com/netdata/netdata/issues/23488))
 
 ## [2.11.0] - 2026-08-12
 

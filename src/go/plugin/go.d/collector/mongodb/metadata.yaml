@@ -6,6 +6,7 @@ modules:
       module_name: mongodb
       monitored_instance:
         name: MongoDB
+        description: "Monitor MongoDB operations, transactions, clients, replication, sharding, storage, and resource usage."
         link: https://www.mongodb.com/
         icon_filename: mongodb.svg
         categories:
@@ -173,7 +174,7 @@ modules:
                 jobs:
                   - name: local
                     uri: mongodb://netdata:password@localhost:27017
-                
+
                   - name: remote
                     uri: mongodb://netdata:password@203.0.113.0:27017
     troubleshooting:

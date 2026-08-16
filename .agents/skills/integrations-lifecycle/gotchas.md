@@ -100,19 +100,15 @@ before assuming the code does the obvious thing.
 - **Treat this file as dead code.** Do NOT rely on it.
   Follow-up must be tracked by a GitHub issue before implementation starts.
 
-### `gen_doc_service_discovery_page.py` is NOT in CI
+### `gen_doc_service_discovery_page.py` runs in both documentation workflows
 
-- File exists, runs correctly when invoked manually.
-- Workflow `.github/workflows/generate-integrations.yml`
-  runs only `gen_integrations.py`, `gen_docs_integrations.py`,
-  `gen_doc_collector_page.py`, `gen_doc_secrets_page.py`
-  (`generate-integrations.yml:48-63`).
-- Workflow `.github/workflows/check-markdown.yml` has the
-  same gap.
-- Consequence: `src/collectors/SERVICE-DISCOVERY.md` drifts
-  from source `metadata.yaml` until a developer manually
-  runs `python3 integrations/gen_doc_service_discovery_page.py`.
-- Follow-up must be tracked by a GitHub issue before implementation starts.
+- `.github/workflows/generate-integrations.yml` runs it after the shared
+  integration catalog and includes `src/collectors/SERVICE-DISCOVERY.md` in
+  the post-merge generated-artifact PR.
+- `.github/workflows/check-markdown.yml` runs the same producer before the
+  disposable Learn ingest.
+- Source PRs still run it locally to inspect the result, but leave the tracked
+  generated page to the post-merge workflow.
 
 ### `integrations/schemas/distros.json` is unused
 
@@ -238,18 +234,15 @@ only spaces translated. Not URL-safe in the strict sense
 
 ## Schemas are NOT strict
 
-`additionalProperties: false` is NOT set on most schemas. Two
-known undocumented fields that pass through silently:
+`additionalProperties: false` is NOT set on most schemas. One
+known undocumented field that passes through silently:
 
 - `alternative_monitored_instances` -- seen in
   `src/go/plugin/go.d/collector/postgres/metadata.yaml:21`.
-- `most_popular` -- seen in ibm.d-generated `metadata.yaml`
-  and elsewhere.
 
-Neither is in `collector.json`. They appear in
-`integrations.js` but no template renders them. They are
-harmless but misleading -- maintainers may assume they do
-something.
+It is not in `collector.json`. It appears in `integrations.js`
+but no template renders it. It is harmless but misleading --
+maintainers may assume it does something.
 
 ## `global` scope renamed to `<instance> instance`
 
@@ -354,11 +347,7 @@ with their marketing headers. None has a `<!--startmeta` block,
 none has any DO-NOT-EDIT comment.
 
 A maintainer who edits these files directly will have their
-edits silently overwritten on the next CI run (for
-COLLECTORS.md and SECRETS.md). For SERVICE-DISCOVERY.md the
-absence of CI wiring means manual edits stick until someone
-runs the script -- giving a false sense that hand-editing is
-acceptable.
+edits silently overwritten on the next CI run.
 
 ## Edge case in `build_path`
 
@@ -386,6 +375,13 @@ Draft-7 JSON Schema `dependencies` keyword: when
 `module_name` becomes required. Correct semantics, but
 non-obvious -- nothing else in the schemas uses
 `dependencies`, and no commentary explains it.
+
+## Page-description balance uses a custom schema format
+
+Draft-7 regular expressions cannot express arbitrary balanced parentheses readably. The shared page-description definition therefore
+sets `format: netdata-balanced-parentheses`, and `integrations/_common.py` registers that format so it calls the same balance helper as
+final Python description validation. Always validate integration source schemas through `make_validator()`; a generic Draft-7
+validator without the repository format checker will legally ignore the custom format and provide incomplete evidence.
 
 ## `fail_on_warnings` makes ALL warnings fatal
 
@@ -423,8 +419,8 @@ the right depth.
 ## `pip.sh` and the cmake module must stay in sync
 
 `integrations/pip.sh` is a 2-line script:
-`pip install jsonschema referencing jinja2 ruamel.yaml`. The
-same four packages are listed at
+`pip install jsonschema referencing jinja2 ruamel.yaml markdown-it-py`. The
+same five packages are listed at
 `packaging/cmake/Modules/NetdataRenderDocs.cmake:21`. Both
 must be updated together if the dep set changes (commented
 inline in `pip.sh`).

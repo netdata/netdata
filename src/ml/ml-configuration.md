@@ -212,7 +212,7 @@ For resource-constrained systems, consider these adjustments:
 
 ## Parameter Descriptions (Min/Max Values)
 
-# ML Parameter Settings
+## ML Parameter Settings
 
 | Category                          | Parameter                              | Range            | Description                                                                                                                              |
 |-----------------------------------|----------------------------------------|------------------|------------------------------------------------------------------------------------------------------------------------------------------|

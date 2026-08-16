@@ -6,6 +6,7 @@ modules:
       module_name: supervisord
       monitored_instance:
         name: Supervisor
+        description: "Monitor Supervisor-managed process states, exits, uptime, and downtime through its XML-RPC interface."
         link: http://supervisord.org/
         icon_filename: supervisord.png
         categories:
@@ -21,14 +22,14 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors Supervisor instances.
-          
+
           It can collect metrics from:
-          
+
           - [unix socket](http://supervisord.org/configuration.html?highlight=unix_http_server#unix-http-server-section-values)
           - [internal http server](http://supervisord.org/configuration.html?highlight=unix_http_server#inet-http-server-section-settings)
-          
+
           Used methods:
-          
+
           - [`supervisor.getAllProcessInfo`](http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo)
         method_description: ""
       supported_platforms:
@@ -103,13 +104,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collect metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: 'http://127.0.0.1:9001/RPC2'
-                
+
                   - name: remote
                     url: 'http://192.0.2.1:9001/RPC2'
     troubleshooting:
