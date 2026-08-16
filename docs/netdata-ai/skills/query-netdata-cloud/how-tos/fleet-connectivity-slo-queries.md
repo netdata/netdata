@@ -79,7 +79,7 @@ is the fraction of 1s**. No `countif` needed (see gotcha 3):
    ```
 
    Prefer this client-side subtraction over
-   `time_group: countif "=0"`, which needs the care described in
+   `time_group: "countif"` with `time_group_options: "=0"`, which needs the care described in
    gotcha 3.
 
 4. **Rank devices by percent of time the dimension was 1 (or 0).**
@@ -128,7 +128,7 @@ is the fraction of 1s**. No `countif` needed (see gotcha 3):
    room node count.
 3. **`countif` needs care on fleet-wide queries (measured
    2026-07-06, re-diagnosed 2026-07-25).** On a multi-parent space,
-   `time_group: countif "=0"` returned ~29–43% of the true value.
+   `time_group: "countif"` with `time_group_options: "=0"` returned ~29–43% of the true value.
    Two causes were involved; only the second is still live:
    - **Row order — fixed.** Agents return rows newest-first, while
      the multi-agent merge assumed oldest-first, so a fleet query
