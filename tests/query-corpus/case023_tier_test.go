@@ -137,7 +137,7 @@ func TestCase023TierEstimation(t *testing.T) {
 	}
 
 	near := func(got, want float64) bool { return math.Abs(got-want) < 1e-6 }
-	expected := func(value func(fixture.TierPoint) float64) []expectedColumnPoint {
+	expected := func(t *testing.T, value func(fixture.TierPoint) float64) []expectedColumnPoint {
 		t.Helper()
 		out := make([]expectedColumnPoint, buckets)
 		for i := range out {
@@ -182,7 +182,7 @@ func TestCase023TierEstimation(t *testing.T) {
 			_, cols := query(t, "percentage-of-time", tc.options)
 			// The oracle is exact; printTol only accounts for json2's seven
 			// fractional digits.
-			if !assertOnlyColumn(t, cols, d.ID) || !assertExactColumn(t, cols, d.ID, expected(tc.want), printTol) {
+			if !assertOnlyColumn(t, cols, d.ID) || !assertExactColumn(t, cols, d.ID, expected(t, tc.want), printTol) {
 				t.Errorf("percentage-of-time %s did not return the exact fixture-derived tier windows", tc.options)
 			}
 		}
@@ -195,7 +195,7 @@ func TestCase023TierEstimation(t *testing.T) {
 		trackContract(t, "CASE-023/tier-estimation-number-of-flaps")
 		_, cols := query(t, "number-of-flaps", "==0")
 		state, hasState := false, false
-		want := expected(func(w fixture.TierPoint) float64 {
+		want := expected(t, func(w fixture.TierPoint) float64 {
 			share := fractionEqual(w, 0)
 			flaps := 0.0
 			if share > 0 && share < 1 {
@@ -221,7 +221,7 @@ func TestCase023TierEstimation(t *testing.T) {
 	t.Run("number-of-times", func(t *testing.T) {
 		trackContract(t, "CASE-023/tier-estimation-number-of-times")
 		_, cols := query(t, "number-of-times", "==0")
-		want := expected(func(w fixture.TierPoint) float64 {
+		want := expected(t, func(w fixture.TierPoint) float64 {
 			if fractionEqual(w, 0) > 0 {
 				return 1
 			}
@@ -237,7 +237,7 @@ func TestCase023TierEstimation(t *testing.T) {
 	t.Run("percentage-of-samples", func(t *testing.T) {
 		trackContract(t, "CASE-023/tier-estimation-percentage-of-samples")
 		_, cols := query(t, "percentage-of-samples", "==0")
-		want := expected(func(w fixture.TierPoint) float64 {
+		want := expected(t, func(w fixture.TierPoint) float64 {
 			avg := w.Sum / float64(w.Count)
 			if near(avg, 0) {
 				return 100
@@ -408,7 +408,11 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 				end := after + int64(i+1)*bucketSpan
 				value := 0.0
 				if i%perWindow == 0 {
-					w := stored[tierWindowEnd(end, tier1Gran)]
+					storedEnd := tierWindowEnd(end, tier1Gran)
+					w, has := stored[storedEnd]
+					if !has || w.Count == 0 {
+						t.Fatalf("fixture has no populated tier-1 window ending at %d", storedEnd)
+					}
 					share := c023WindowFractionEqual(w, 0)
 					switch tc.group {
 					case "number-of-times":

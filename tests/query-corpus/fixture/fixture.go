@@ -230,6 +230,23 @@ func (d Dimension) pointsByTime() map[int64]Point {
 	return byTime
 }
 
+// pointsInTimeOrder returns the dimension in the same timestamp order used by
+// live and replication ingestion.
+func (d Dimension) pointsInTimeOrder() []Point {
+	byTime := d.pointsByTime()
+	times := make([]int64, 0, len(byTime))
+	for ts := range byTime {
+		times = append(times, ts)
+	}
+	sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
+
+	points := make([]Point, 0, len(times))
+	for _, ts := range times {
+		points = append(points, byTime[ts])
+	}
+	return points
+}
+
 func (c Chart) pointsByTime() []map[int64]Point {
 	byTime := make([]map[int64]Point, len(c.Dimensions))
 	for i, d := range c.Dimensions {
@@ -299,10 +316,8 @@ type ExpectedPoint struct {
 // anomalous (ARP 100). Values pass through the storage_number quantization
 // (SNRoundTrip).
 func (d Dimension) Expected() []ExpectedPoint {
-	_ = d.pointsByTime()
-
 	out := make([]ExpectedPoint, 0, len(d.Points))
-	for _, p := range d.Points {
+	for _, p := range d.pointsInTimeOrder() {
 		ep := ExpectedPoint{T: p.T}
 		flags := string(p.Flags)
 		if value, collected := p.CollectedValue(d.ID); !collected {

@@ -105,6 +105,7 @@ func TestDaemonRunRequiredFailsClosed(t *testing.T) {
 		"full run":              {want: true},
 		"listing":               {list: ".", want: false},
 		"empty selection":       {run: "^$", want: false},
+		"empty selection alt":   {run: "$^", want: false},
 		"pure exact":            {run: "^TestResolveCorpusPathsValidatesOneDeclaredEngine$", want: false},
 		"pure unanchored":       {run: "TestContractLedgerDeduplicatesAndKeepsFailuresSticky", want: true},
 		"allowlisted prefix":    {run: "^TestManifestDocumentAgainstDaemon$", want: true},

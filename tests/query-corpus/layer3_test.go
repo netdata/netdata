@@ -67,10 +67,13 @@ func verifyTimeGroup(t *testing.T, host string, ch fixture.Chart, name, options 
 	verifyTimeGroupAs(t, host, ch, tgQuery{Name: name, Options: options, OracleName: name, OracleOptions: options}, group)
 }
 
-func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, q tgQuery, group int) {
+func timeGroupColumnAndOracle(
+	t *testing.T, host string, ch fixture.Chart, q tgQuery, group int, diagnosticSuffix string,
+) ([]canon.Pt, []fixture.TGResult) {
 	t.Helper()
 
 	name, options := q.Name, q.Options
+	diagnostic := name + optSuffix(options) + diagnosticSuffix
 	d := ch.Dimensions[0]
 	n := int64(len(d.Points))
 	points := n / int64(group)
@@ -82,18 +85,26 @@ func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, q tgQuery, g
 	}
 	doc, err := td.DataV3(host, params)
 	if err != nil {
-		t.Fatalf("%s%s: %v", name, optSuffix(options), err)
+		t.Fatalf("%s: %v", diagnostic, err)
 	}
 	cols, err := canon.Columns(doc)
 	if err != nil {
-		t.Fatalf("%s%s: %v", name, optSuffix(options), err)
+		t.Fatalf("%s: %v", diagnostic, err)
 	}
 	col := cols[d.ID]
 	if int64(len(col)) != points {
-		t.Fatalf("%s%s: got %d buckets, want %d", name, optSuffix(options), len(col), points)
+		t.Fatalf("%s: got %d buckets, want %d", diagnostic, len(col), points)
 	}
 
 	exp := fixture.TGOracle(q.OracleName, q.OracleOptions, tgBuckets(d, group), group, int(points))
+	return col, exp
+}
+
+func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, q tgQuery, group int) {
+	t.Helper()
+
+	name, options := q.Name, q.Options
+	col, exp := timeGroupColumnAndOracle(t, host, ch, q, group, "")
 	for i, pt := range col {
 		want := exp[i]
 		bucketT := fixture.T0 + int64((i+1)*group)
@@ -115,28 +126,8 @@ func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, q tgQuery, g
 func verifyTimeGroupEmptyAnnotations(t *testing.T, host string, ch fixture.Chart, name, options string, group int) {
 	t.Helper()
 
-	d := ch.Dimensions[0]
-	n := int64(len(d.Points))
-	points := n / int64(group)
-	params := daemon.DataParams(ch.Context, fixture.T0, fixture.T0+n, points)
-	params.Set("time_group", name)
-	if options != "" {
-		params.Set("time_group_options", options)
-	}
-	doc, err := td.DataV3(host, params)
-	if err != nil {
-		t.Fatalf("%s%s annotations: %v", name, optSuffix(options), err)
-	}
-	cols, err := canon.Columns(doc)
-	if err != nil {
-		t.Fatalf("%s%s annotations: %v", name, optSuffix(options), err)
-	}
-	col := cols[d.ID]
-	if int64(len(col)) != points {
-		t.Fatalf("%s%s annotations: got %d buckets, want %d", name, optSuffix(options), len(col), points)
-	}
-
-	exp := fixture.TGOracle(name, options, tgBuckets(d, group), group, int(points))
+	q := tgQuery{Name: name, Options: options, OracleName: name, OracleOptions: options}
+	col, exp := timeGroupColumnAndOracle(t, host, ch, q, group, " annotations")
 	for i, pt := range col {
 		wantT := fixture.T0 + int64((i+1)*group)
 		if pt.T != wantT {
@@ -178,6 +169,9 @@ func layer3Canonical(chartID string) fixture.Chart {
 // TestLayer3Families drives every time-grouping family (and the alias/
 // variant spread) over the canonical fixture at group 10.
 func TestLayer3Families(t *testing.T) {
+	registerContract(t, "L3/family-values")
+	registerContract(t, "L3/family-annotations")
+
 	ch := layer3Canonical("fixture.l3canon")
 	pushLiveBurst(t, "l3-canon", guid(60), ch)
 	if _, err := td.WaitRetention("l3-canon", ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {

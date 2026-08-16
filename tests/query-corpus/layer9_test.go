@@ -422,6 +422,9 @@ func TestLayer9V2V3Parity(t *testing.T) {
 // onto the absolute ue grid (the same phase shift as every other
 // view): "natural" means the count and the values, not the times.
 func TestLayer9NaturalPoints(t *testing.T) {
+	registerContract(t, "L9/natural-points-grid")
+	registerContract(t, "L9/natural-points-values")
+
 	ch := l9Settle(t)
 
 	after := fixture.T0 + int64(3000)
@@ -515,6 +518,9 @@ func TestLayer9NaturalPoints(t *testing.T) {
 // established near-live partial-data trimming exception. Any rows that survive
 // wholly before retention remain explicit EMPTY rows.
 func TestLayer9LiveEdgeGrid(t *testing.T) {
+	registerContractComponent(t, "L9/window-normalization", "future-explicit-window")
+	registerContract(t, "L9/live-edge-empty-outside-retention")
+
 	const ue = 1
 	const n = 65
 	ctx := "fixture.l9edge"

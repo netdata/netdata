@@ -3,6 +3,7 @@
 package corpus
 
 import (
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
@@ -90,10 +91,12 @@ func c038HigherTierOnlyRateVolume(t *testing.T, dd *daemon.Daemon) bool {
 	query := func(label, dimension string, selected, gapped bool) bool {
 		t.Helper()
 
-		params := daemon.DataParams(c038Context, after, before, rows)
-		params.Set("time_group", "sum")
+		var params url.Values
 		if selected {
 			params = daemon.DataParamsTier(c038Context, 1, after, before, rows, "sum")
+		} else {
+			params = daemon.DataParams(c038Context, after, before, rows)
+			params.Set("time_group", "sum")
 		}
 		params.Set("scope_dimensions", dimension)
 		params.Set("options", "jsonwrap|unaligned")

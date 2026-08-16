@@ -105,7 +105,7 @@ func TestSelectorsMatchModes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	query := func(selector, options string) map[string][]canon.Pt {
+	query := func(t *testing.T, selector, options string) map[string][]canon.Pt {
 		t.Helper()
 		params := daemon.DataParams(ctx, fixture.T0, fixture.T0+10, 10)
 		params.Set("dimensions", selector)
@@ -142,18 +142,18 @@ func TestSelectorsMatchModes(t *testing.T) {
 	}
 
 	t.Run("default-matches-both", func(t *testing.T) {
-		sole(t, query("alpha_name", ""), "alpha_name", 10) // by name
-		sole(t, query("d2", ""), "beta_name", 20)          // by id
+		sole(t, query(t, "alpha_name", ""), "alpha_name", 10) // by name
+		sole(t, query(t, "d2", ""), "beta_name", 20)          // by id
 	})
 	t.Run("match-ids-only", func(t *testing.T) {
-		sole(t, query("d1", "match-ids"), "alpha_name", 10)
-		if cols := query("alpha_name", "match-ids"); len(cols) != 0 {
+		sole(t, query(t, "d1", "match-ids"), "alpha_name", 10)
+		if cols := query(t, "alpha_name", "match-ids"); len(cols) != 0 {
 			t.Errorf("match-ids matched a NAME: %v", keys2(cols))
 		}
 	})
 	t.Run("match-names-only", func(t *testing.T) {
-		sole(t, query("beta_name", "match-names"), "beta_name", 20)
-		if cols := query("d2", "match-names"); len(cols) != 0 {
+		sole(t, query(t, "beta_name", "match-names"), "beta_name", 20)
+		if cols := query(t, "d2", "match-names"); len(cols) != 0 {
 			t.Errorf("match-names matched an ID: %v", keys2(cols))
 		}
 	})
@@ -212,7 +212,7 @@ func TestCardinalityLimitSweep(t *testing.T) {
 		t.Skip("cardinality fixture not available (TestLayer8CardinalityLimit failed?)")
 	}
 
-	query := func(limit int) map[string][]canon.Pt {
+	query := func(t *testing.T, limit int) map[string][]canon.Pt {
 		t.Helper()
 		params := daemon.DataParams(context, fixture.T0, fixture.T0+20, 20)
 		params.Set("cardinality_limit", strconv.Itoa(limit))
@@ -228,7 +228,7 @@ func TestCardinalityLimitSweep(t *testing.T) {
 	}
 
 	t.Run("limit-2", func(t *testing.T) {
-		cols := query(2)
+		cols := query(t, 2)
 		if !assertExactColumnSet(t, cols, []string{"d6", "remaining 5 dimensions"}) {
 			t.Fail()
 		}
@@ -249,7 +249,7 @@ func TestCardinalityLimitSweep(t *testing.T) {
 
 	for _, limit := range []int{6, 7} {
 		t.Run("limit-"+strconv.Itoa(limit), func(t *testing.T) {
-			cols := query(limit)
+			cols := query(t, limit)
 			dimensions := []string{"d1", "d2", "d3", "d4", "d5", "d6"}
 			if !assertExactColumnSet(t, cols, dimensions) {
 				t.Fail()

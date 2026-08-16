@@ -462,6 +462,13 @@ func TestLayer2WholeChartAbsence(t *testing.T) {
 // read 16777220. The same fixture cross-checks the tier0 identity
 // (SNRoundTrip oracle) so both contracts are asserted on the same data.
 func TestLayer2SNvsOriginal(t *testing.T) {
+	for _, contract := range []string{
+		"L2/tier0-storage-number-quantization",
+		"L2/tier-rollup-original-values",
+	} {
+		registerContract(t, contract)
+	}
+
 	const v = "16777217"
 	ch := fixture.Series("fixture.l2snorig", "fixture.l2snorig", fixture.T0, 280, 1, func(_ int) string {
 		return v

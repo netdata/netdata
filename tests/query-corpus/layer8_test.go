@@ -92,6 +92,15 @@ func l8Query(t *testing.T, host, context, options string, extra map[string]strin
 }
 
 func TestLayer8PostProcessing(t *testing.T) {
+	for _, contract := range []string{
+		"L8/percentage-post-processing",
+		"L8/absolute-post-processing",
+		"L8/nonzero-post-processing",
+		"L8/null2zero-post-processing",
+	} {
+		registerContract(t, contract)
+	}
+
 	ch := l8Fixture()
 	pushLiveBurst(t, "l8-post", guid(92), ch)
 	if _, err := td.WaitRetention("l8-post", ch.Context, fixture.T0+1, fixture.T0+l8Rows, 15*time.Second); err != nil {

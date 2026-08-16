@@ -281,6 +281,13 @@ func TestCounterResets(t *testing.T) {
 	}
 
 	for name, tc := range cases {
+		registerContract(t, tc.contract)
+		if tc.blend != nil {
+			registerContractComponent(t, "L1/subsecond-rate-blending", name)
+		}
+	}
+
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel() // paced in real time — overlap the cases
 

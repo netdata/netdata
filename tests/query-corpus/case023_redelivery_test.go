@@ -33,6 +33,14 @@ import (
 // delivered to three buckets, so the two groupings that disagree about a
 // repeat are both exercised on the same data.
 func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
+	for _, contract := range []string{
+		"CASE-023/redelivery-samples-everywhere",
+		"CASE-023/redelivery-counted-once",
+		"CASE-023/redelivery-zero-not-empty",
+	} {
+		registerContract(t, contract)
+	}
+
 	const samples = 2400 // 40 tier-1 windows
 
 	// a 0/1 signal that varies inside every window, so no window is

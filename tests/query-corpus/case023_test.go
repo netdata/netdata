@@ -69,6 +69,18 @@ func c023FleetFixture(chart string) fixture.Chart {
 }
 
 func TestCase023FleetTimeGroupings(t *testing.T) {
+	for _, contract := range []string{
+		"CASE-023/fleet-grouping-echo",
+		"CASE-023/percentage-of-samples",
+		"CASE-023/percentage-of-time",
+		"CASE-023/number-of-times",
+		"CASE-023/number-of-flaps",
+		"CASE-023/gap-slot-width",
+		"CASE-023/fleet-grouping-units",
+	} {
+		registerContract(t, contract)
+	}
+
 	const chart = "fixture.c023"
 
 	// the three fixture series, 12 samples at T0+1 .. T0+12

@@ -55,14 +55,12 @@ type TierPoint struct {
 // window boundaries coincide with sample ends and end-assignment is
 // exact.
 func (d Dimension) TierWindows(granularity, updateEvery int64) map[int64]TierPoint {
-	_ = d.pointsByTime()
-
 	if granularity <= 0 || updateEvery <= 0 || granularity%updateEvery != 0 {
 		panic("fixture: tier granularity must be a positive multiple of update_every")
 	}
 	nominalSlots := int(granularity / updateEvery)
 	out := make(map[int64]TierPoint)
-	for _, p := range d.Points {
+	for _, p := range d.pointsInTimeOrder() {
 		end := p.T
 		if rem := end % granularity; rem != 0 {
 			end += granularity - rem

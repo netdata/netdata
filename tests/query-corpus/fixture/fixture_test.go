@@ -3,7 +3,6 @@
 package fixture
 
 import (
-	"math"
 	"testing"
 )
 
@@ -54,6 +53,23 @@ func TestChartRowTimesAreTheTimestampUnion(t *testing.T) {
 	}
 	if rows := chart.ReplayWindow(0, 3); len(rows) != len(want) {
 		t.Fatalf("ReplayWindow served %d rows, want timestamp union size %d", len(rows), len(want))
+	}
+}
+
+func TestDimensionOraclesFollowIngestionOrder(t *testing.T) {
+	d := Dimension{ID: "load", Points: []Point{
+		{T: 3, Collected: "3", Flags: "A"},
+		{T: 1, Collected: "1", Flags: "A"},
+		{T: 2, Collected: "2", Flags: "A"},
+	}}
+
+	expected := d.Expected()
+	db := d.DBPoints(1)
+	for i, wantT := range []int64{1, 2, 3} {
+		if expected[i].T != wantT || db[i].End != wantT {
+			t.Fatalf("oracle row %d ends at Expected/DBPoints %d/%d, want %d",
+				i, expected[i].T, db[i].End, wantT)
+		}
 	}
 }
 
@@ -154,7 +170,7 @@ func TestNumericCollectedValueIsFinite(t *testing.T) {
 	}}}
 
 	expected := d.Expected()
-	if expected[0].Value == nil || math.Abs(*expected[0].Value-SNRoundTrip(1.25)) > 0 {
+	if expected[0].Value == nil || *expected[0].Value != SNRoundTrip(1.25) {
 		t.Fatalf("Expected() = %+v", expected)
 	}
 	tier := d.TierWindows(60, 1)[60]

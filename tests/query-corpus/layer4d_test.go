@@ -280,18 +280,18 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 			t, dd, c4dContext, "l4d-child", c4dCounterDim, lastT, 3)
 		tier2After := c4dRegionStart(
 			t, "tier2-only",
-			c4dMax(availabilityTiers[2].FirstEntry, counterTiers[2].FirstEntry),
-			c4dMin(availabilityTiers[1].FirstEntry, counterTiers[1].FirstEntry),
+			max(availabilityTiers[2].FirstEntry, counterTiers[2].FirstEntry),
+			min(availabilityTiers[1].FirstEntry, counterTiers[1].FirstEntry),
 			conditionSpan)
 		tier1After := c4dRegionStart(
 			t, "tier1-only",
-			c4dMax(availabilityTiers[1].FirstEntry, counterTiers[1].FirstEntry),
-			c4dMin(availabilityTiers[0].FirstEntry, counterTiers[0].FirstEntry),
+			max(availabilityTiers[1].FirstEntry, counterTiers[1].FirstEntry),
+			min(availabilityTiers[0].FirstEntry, counterTiers[0].FirstEntry),
 			conditionSpan)
-		tier0First := c4dMax(availabilityTiers[0].FirstEntry, counterTiers[0].FirstEntry)
+		tier0First := max(availabilityTiers[0].FirstEntry, counterTiers[0].FirstEntry)
 		tier0After := c4dRegionStart(
 			t, "tier0-only", tier0First,
-			c4dMin(availabilityTiers[0].LastEntry, counterTiers[0].LastEntry),
+			min(availabilityTiers[0].LastEntry, counterTiers[0].LastEntry),
 			conditionSpan)
 
 		for _, tc := range []struct {
@@ -908,20 +908,6 @@ func c4dRequireSeamWindow(
 		t.Fatalf("%s (%d,%d] reaches tier%d first entry %d",
 			label, after, before, newerTier-1, tiers[newerTier-1].FirstEntry)
 	}
-}
-
-func c4dMin(a, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func c4dMax(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func c4dRegionStart(t *testing.T, label string, first, last, span int64) int64 {

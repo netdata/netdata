@@ -269,43 +269,34 @@ func tgSimple(name, options string, values []float64) TGResult {
 	panic("unknown time grouping oracle: " + name)
 }
 
+func namePercent(name, prefix string, defaultPercent float64) (float64, bool) {
+	suffix, ok := strings.CutPrefix(name, prefix)
+	if !ok {
+		return 0, false
+	}
+	if suffix == "" {
+		return defaultPercent, true
+	}
+	percent, err := strconv.ParseFloat(suffix, 64)
+	return percent, err == nil
+}
+
 // medianPercent maps median-family names to their default trim percent.
 func medianPercent(name string) (float64, bool) {
 	if name == "median" {
 		return 0.0, true
 	}
-	if s, ok := strings.CutPrefix(name, "trimmed-median"); ok {
-		if s == "" {
-			return 5.0, true
-		}
-		p, err := strconv.ParseFloat(s, 64)
-		return p, err == nil
-	}
-	return 0, false
+	return namePercent(name, "trimmed-median", 5.0)
 }
 
 // meanWindowPercent maps trimmed-mean names to the kept-slots percent.
 func meanWindowPercent(name string) (float64, bool) {
-	if s, ok := strings.CutPrefix(name, "trimmed-mean"); ok {
-		if s == "" {
-			return 5.0, true
-		}
-		p, err := strconv.ParseFloat(s, 64)
-		return p, err == nil
-	}
-	return 0, false
+	return namePercent(name, "trimmed-mean", 5.0)
 }
 
 // percentilePercent maps percentile names to the kept-slots percent.
 func percentilePercent(name string) (float64, bool) {
-	if s, ok := strings.CutPrefix(name, "percentile"); ok {
-		if s == "" {
-			return 95.0, true
-		}
-		p, err := strconv.ParseFloat(s, 64)
-		return p, err == nil
-	}
-	return 0, false
+	return namePercent(name, "percentile", 95.0)
 }
 
 // tgMedian mirrors tg_median_flush (median.h): sort, trim by VALUE RANGE
