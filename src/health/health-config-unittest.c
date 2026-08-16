@@ -1220,6 +1220,35 @@ static int test_dyncfg_time_group_round_trip(int *passed) {
     return failed;
 }
 
+static int test_dyncfg_rejects_non_string_time_group_options(int *passed) {
+    static const char *invalid_values[] = { "{}", "[]" };
+    int failed = 0;
+
+    for(size_t i = 0; i < sizeof(invalid_values) / sizeof(invalid_values[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+        buffer_sprintf(payload,
+                       "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                       "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                       "\"after\":-60,\"time_group\":\"percentage-of-time\","
+                       "\"time_group_options\":%s}},\"match\":{\"on\":\"chart\"}}}]}",
+                       invalid_values[i]);
+
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                    payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        if(code != HTTP_RESP_BAD_REQUEST || !strstr(buffer_tostring(result), "time_group_options")) {
+            fprintf(stderr,
+                    "FAILED [dyncfg rejects non-string time_group_options=%s]: code=%d response='%s'\n",
+                    invalid_values[i], code, buffer_tostring(result));
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    return failed;
+}
+
 // The written condition is trimmed before it is stored, and the trim must
 // not put a ceiling on how long it may be: a condition padded past a fixed
 // buffer used to come back empty, and the alert then ran the legacy
@@ -1290,6 +1319,7 @@ int health_config_unittest(void) {
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
     failed += test_prototype_rejects_non_positive_update_every(&passed);
     failed += test_dyncfg_time_group_round_trip(&passed);
+    failed += test_dyncfg_rejects_non_string_time_group_options(&passed);
     failed += test_dyncfg_long_condition_is_not_truncated(&passed);
     failed += test_expression_rejects_leave_the_default(&passed);
     failed += test_expression_omitted_operand_defaults_to_zero(&passed);

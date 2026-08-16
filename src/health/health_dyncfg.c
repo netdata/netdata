@@ -120,7 +120,8 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
             // condition/value pair above stays for older consumers
             // optional even under JSONC_REQUIRED: every alert written
             // before this field existed omits it
-            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "time_group_options", config->time_group_options, error, 0);
+            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(
+                jobj, path, "time_group_options", config->time_group_options, error, JSONC_STRICT);
 
             // and it has to parse, exactly as it does when the same alert
             // arrives in a .conf file and when the query API validates it.
