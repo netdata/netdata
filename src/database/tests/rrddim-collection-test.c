@@ -448,6 +448,7 @@ static size_t test_backfill_gap_composition(void) {
 
     nd_profile.storage_tiers = 2;
     default_backfill = RRD_BACKFILL_FULL;
+    captured_store_count = 0;
     backfill_started_count = 0;
     backfill_finished_count = 0;
     backfill_completed_count = 0;
