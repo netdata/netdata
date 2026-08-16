@@ -138,6 +138,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     QUERY_TARGET *qt = NULL;
 
     if(!time_grouping_expression_options_valid(group, group_options)) {
+        buffer_no_cacheable(w->response.data);
         buffer_sprintf(w->response.data, "Invalid time-group condition.");
         goto cleanup;
     }
