@@ -118,6 +118,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     wb->content_type = CT_APPLICATION_JSON;
 
     if(!time_grouping_expression_options_valid(time_group_method, time_group_options)) {
+        buffer_no_cacheable(wb);
         buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
         buffer_json_member_add_string(wb, "error", "Invalid time-group condition.");
         buffer_json_finalize(wb);
