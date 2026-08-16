@@ -52,8 +52,8 @@ across a stored window; see
 
 This query is available in alerts, e.g. `lookup: percentage-of-samples(>10) -5m`.
 
-`countif` is an alias of `percentage-of-samples`, which is the canonical name; both behave identically. It changes
-the units of charts. The result of the calculation is always from 0 to 100, expressing the percentage of database
-points that matched the condition.
+`countif` is an alias of `percentage-of-samples`, which is the canonical name; both behave identically. Using this
+grouping changes the chart units to a percentage. The result of the calculation is always from 0 to 100, expressing
+the percentage of database points that matched the condition.
 
 In APIs and badges can be used like this: `&group=countif&group_options=>10` in the URL.
