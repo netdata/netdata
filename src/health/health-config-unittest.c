@@ -1210,8 +1210,13 @@ static int test_dyncfg_time_group_round_trip(int *passed) {
                 errors++;
             }
 
-            if(!isnan(tests[i].expected_value) &&
-               (isnan(ac.time_group_value) || fabsl(ac.time_group_value - tests[i].expected_value) > 0.0001)) {
+            if(isnan(tests[i].expected_value) && !isnan(ac.time_group_value)) {
+                fprintf(stderr, "FAILED [%s]: re-parsed value %f, want it unset\n",
+                        tests[i].description, (double)ac.time_group_value);
+                errors++;
+            }
+            else if(!isnan(tests[i].expected_value) &&
+                    (isnan(ac.time_group_value) || fabsl(ac.time_group_value - tests[i].expected_value) > 0.0001)) {
                 fprintf(stderr, "FAILED [%s]: re-parsed value %f, want %f\n",
                         tests[i].description, (double)ac.time_group_value, (double)tests[i].expected_value);
                 errors++;
