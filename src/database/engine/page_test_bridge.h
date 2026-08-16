@@ -5,6 +5,10 @@
 
 #include "page.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 PGD *pgd_unittest_create(uint8_t type, uint32_t slots);
 PGD *pgd_unittest_create_from_disk_data(uint8_t type, void *base, uint32_t size);
 void pgd_unittest_free(PGD *pg);
@@ -26,5 +30,9 @@ size_t pgd_unittest_append_point(
 
 void pgd_unittest_cursor_reset(PGDC *pgdc, PGD *pgd, uint32_t position, uint32_t slots_per_point);
 bool pgd_unittest_cursor_next(PGDC *pgdc, uint32_t expected_position, STORAGE_POINT *sp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // NETDATA_DBENGINE_PAGE_TEST_BRIDGE_H
