@@ -321,8 +321,8 @@ func TestLayer3SignSemantics(t *testing.T) {
 // per decade, the rest gaps. stddev yields 0.0 (not null); average/min/
 // max/median pass the value through; incremental-sum answers from its
 // second value onward, measuring each against the one before it — the
-// leading single-value bucket loses its seed and every empty… non-carried
-// bucket resets (pinned as current contract).
+// leading single-value bucket seeds the chain and every empty bucket
+// preserves the baseline it received (pinned as current contract).
 func TestLayer3SparseBuckets(t *testing.T) {
 	trackContract(t, "L3/sparse-buckets")
 

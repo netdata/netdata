@@ -79,32 +79,34 @@ func c034HotEdgeFixture(t *testing.T, name, context string, machineGUID int, las
 	return host
 }
 
-func c034NearLiveFixture(
-	t *testing.T, name, context string, machineGUID int, updateEvery, first, last, delayedLast int64,
-) string {
+type c034NearLiveWindow struct {
+	updateEvery, first, last, delayedLast int64
+}
+
+func c034NearLiveFixture(t *testing.T, name, context string, machineGUID int, window c034NearLiveWindow) string {
 	t.Helper()
 
 	host := "c034-" + name
 	ch := fixture.Chart{
 		ID: context, Title: "near-live timestamp grid", Units: "units",
-		Family: "fixture", Context: context, UpdateEvery: int(updateEvery),
+		Family: "fixture", Context: context, UpdateEvery: int(window.updateEvery),
 		Dimensions: []fixture.Dimension{
 			{ID: "always", Algorithm: "absolute"},
 			{ID: "delayed", Algorithm: "absolute"},
 		},
 	}
-	for ts := first; ts <= last; ts += updateEvery {
+	for ts := window.first; ts <= window.last; ts += window.updateEvery {
 		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points, fixture.Point{
 			T: ts, Collected: "1", Flags: stream.FlagNotAnomalous,
 		})
-		if ts <= delayedLast {
+		if ts <= window.delayedLast {
 			ch.Dimensions[1].Points = append(ch.Dimensions[1].Points, fixture.Point{
 				T: ts, Collected: "2", Flags: stream.FlagNotAnomalous,
 			})
 		}
 	}
 	pushLiveBurst(t, host, guid(machineGUID), ch)
-	if _, err := td.WaitRetention(host, context, first, last, 15*time.Second); err != nil {
+	if _, err := td.WaitRetention(host, context, window.first, window.last, 15*time.Second); err != nil {
 		t.Fatal(err)
 	}
 	return host
@@ -382,9 +384,13 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 			grid := queryExpectedVirtualGrid(t, after, before, 6, false)
 			delayedLast := before + live.delayedLastOffset
 			wantTrimmedAfter := before + live.trimmedAfterOffset
-			host := c034NearLiveFixture(
-				t, live.name, live.context, live.machineGUID, updateEvery,
-				after+updateEvery, before, delayedLast)
+			window := c034NearLiveWindow{
+				updateEvery: updateEvery,
+				first:       after + updateEvery,
+				last:        before,
+				delayedLast: delayedLast,
+			}
+			host := c034NearLiveFixture(t, live.name, live.context, live.machineGUID, window)
 			requireNearLive(host, before)
 			params := daemon.DataParams(live.context, after, before, 6)
 			params.Set("scope_dimensions", "always|delayed")
