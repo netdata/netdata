@@ -181,6 +181,7 @@ int collection_test_query_is_finished(struct storage_engine_query_handle *seqh) 
 }
 
 void collection_test_query_finalize(struct storage_engine_query_handle *seqh __maybe_unused) {
+    // The mock query borrows fixture storage and owns no resources.
 }
 
 static STORAGE_POINT numeric_point(
