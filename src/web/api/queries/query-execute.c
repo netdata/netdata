@@ -208,8 +208,12 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
         if(new_point.added && new_point.tier == 0 &&
            new_point.sp.end_time_s > now_start_time &&
            new_point.sp.end_time_s <= now_end_time &&
-           netdata_double_isnumber(new_point.value))
+           netdata_double_isnumber(new_point.value)) {
+            if(unlikely(new_point.sp.flags & SN_FLAG_RESET))
+                ops->group_value_flags |= RRDR_VALUE_RESET;
+
             storage_point_merge_to(ops->group_point, new_point.sp);
+        }
 
         // read all the points of the db, prior to the time we need (now_end_time)
 
