@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func assertInvalidTimeGroupCondition(t *testing.T, endpoint string, params url.Values, wantJSON bool) {
+func assertInvalidTimeGroupCondition(t *testing.T, endpoint string, params url.Values, wantJSON, wantNoCache bool) {
 	t.Helper()
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -32,6 +32,10 @@ func assertInvalidTimeGroupCondition(t *testing.T, endpoint string, params url.V
 	if wantJSON && !json.Valid(body) {
 		t.Fatalf("%s returned invalid JSON body %q", endpoint, body)
 	}
+	if wantNoCache && resp.Header.Get("Cache-Control") != "no-cache, no-store, must-revalidate" {
+		t.Fatalf("%s returned Cache-Control %q, want a non-cacheable error response",
+			endpoint, resp.Header.Get("Cache-Control"))
+	}
 }
 
 func TestWeightsRejectMalformedTimeGroupCondition(t *testing.T) {
@@ -39,7 +43,7 @@ func TestWeightsRejectMalformedTimeGroupCondition(t *testing.T) {
 	assertInvalidTimeGroupCondition(t, "/api/v2/weights", url.Values{
 		"time_group":         {"percentage-of-time"},
 		"time_group_options": {"not-a-condition"},
-	}, true)
+	}, true, true)
 }
 
 func TestBadgeRejectMalformedTimeGroupCondition(t *testing.T) {
@@ -47,5 +51,5 @@ func TestBadgeRejectMalformedTimeGroupCondition(t *testing.T) {
 	assertInvalidTimeGroupCondition(t, "/api/v1/badge.svg", url.Values{
 		"group":         {"percentage-of-time"},
 		"group_options": {"not-a-condition"},
-	}, false)
+	}, false, true)
 }
