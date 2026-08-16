@@ -48,10 +48,13 @@ typedef struct query_engine_ops {
     time_t view_update_every;
     time_t query_granularity;
     TIER_QUERY_FETCH tier_query_fetch;
+    QUERY_POINT_MODE point_mode;
 
     // query planer
     size_t current_plan;
     time_t current_plan_expire_time;
+    time_t result_plan_expire_time;
+    time_t plan_switch_time_offset;
     time_t plan_expanded_after;
     time_t plan_expanded_before;
 
@@ -70,6 +73,8 @@ typedef struct query_engine_ops {
     // statistics
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
+
+    bool result_plan_expire_time_overflow;
 
     // the LATEST grouping with a single output point reached by the metric's
     // latest collection interval is answered from the collector's cached value,
@@ -95,6 +100,8 @@ typedef struct query_engine_ops_cache {
 
 // query planner
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
+#define query_result_plan_should_switch_plan(ops, now) \
+    ((now) >= (ops)->result_plan_expire_time && !(ops)->result_plan_expire_time_overflow)
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time);
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
 QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id);
