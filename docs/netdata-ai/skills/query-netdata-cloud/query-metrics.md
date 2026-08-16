@@ -384,13 +384,14 @@ Controls how raw data points within each time interval are combined into one val
 
 :::important
 
-When using `time_group` values other than `min`, `max`, `average`, or
-`sum`, request `"tier": 0` in the `window` object and verify in
-`db.per_tier` that tier 0 actually supplied the data. Do not use the
-result if the planner fell back to a coarser tier: advanced functions
-such as `median`, `stddev`, `ses`, `des`, `percentile`, `countif`,
-`trimmed-mean`, `trimmed-median`, and `extremes` require native
-samples to work correctly.
+For exact results from advanced functions such as `median`, `stddev`,
+`ses`, `des`, `percentile`, `trimmed-mean`, `trimmed-median`, and
+`extremes`, request `"tier": 0` in the `window` object and verify in
+`db.per_tier` that tier 0 actually supplied the data. The four condition
+groupings can use coarser tiers: `percentage-of-samples` then treats each
+stored point as one sample, while `percentage-of-time`, `number-of-flaps`,
+and `number-of-times` return estimates. Request tier 0 when the raw sample
+sequence matters.
 
 :::
 
