@@ -1,0 +1,17 @@
+receivers:
+  syslog:
+    udp:
+      listen_address: "0.0.0.0:54526"
+    protocol: rfc5424
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [syslog]
+      exporters: [otlp]
