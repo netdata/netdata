@@ -53,3 +53,19 @@ func TestBadgeRejectMalformedTimeGroupCondition(t *testing.T) {
 		"group_options": {"not-a-condition"},
 	}, false, true)
 }
+
+func TestV1DataRejectMalformedTimeGroupCondition(t *testing.T) {
+	trackContract(t, "CASE-023/v1-data-invalid-options")
+	assertInvalidTimeGroupCondition(t, "/api/v1/data", url.Values{
+		"group":         {"percentage-of-time"},
+		"group_options": {"not-a-condition"},
+	}, false, true)
+}
+
+func TestV2DataRejectMalformedTimeGroupCondition(t *testing.T) {
+	trackContract(t, "CASE-023/v2-data-invalid-options")
+	assertInvalidTimeGroupCondition(t, "/api/v2/data", url.Values{
+		"time_group":         {"percentage-of-time"},
+		"time_group_options": {"not-a-condition"},
+	}, false, true)
+}

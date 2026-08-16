@@ -159,6 +159,8 @@ set at the end.
 | CASE-023/mcp-invalid-options | non-string, malformed and non-finite MCP condition expressions return structured -32602 INVALID_PARAMS errors | n/a |  |
 | CASE-023/weights-invalid-options | the public weights endpoint rejects a malformed expression instead of silently executing the default ==0 condition | n/a |  |
 | CASE-023/badge-invalid-options | the public badge endpoint rejects a malformed expression instead of silently rendering the default ==0 condition | n/a |  |
+| CASE-023/v1-data-invalid-options | the public v1 data endpoint rejects a malformed expression without allowing its HTTP 400 response to be cached | n/a |  |
+| CASE-023/v2-data-invalid-options | the public v2 data endpoint rejects a malformed expression without allowing its HTTP 400 response to be cached | n/a |  |
 | CASE-023/mcp-default-zero-options | missing, empty and whitespace-only MCP conditions mean ==0, while an operator without an operand applies to zero, for every condition grouping and the countif alias | n/a |  |
 | CASE-023/tier-estimation-source | each forced higher-tier condition query reads exclusively from the requested stored tier and returns only the selected dimension | n/a |  |
 | CASE-023/tier-estimation-percentage-of-time | higher-tier percentage-of-time uses the approved min/max/average two-point mass estimator for steady-cadence stored windows | n/a |  |

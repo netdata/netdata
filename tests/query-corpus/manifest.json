@@ -655,6 +655,14 @@
     "proves": "the public badge endpoint rejects a malformed expression instead of silently rendering the default ==0 condition"
   },
   {
+    "name": "CASE-023/v1-data-invalid-options",
+    "proves": "the public v1 data endpoint rejects a malformed expression without allowing its HTTP 400 response to be cached"
+  },
+  {
+    "name": "CASE-023/v2-data-invalid-options",
+    "proves": "the public v2 data endpoint rejects a malformed expression without allowing its HTTP 400 response to be cached"
+  },
+  {
     "name": "CASE-023/mcp-default-zero-options",
     "proves": "missing, empty and whitespace-only MCP conditions mean ==0, while an operator without an operand applies to zero, for every condition grouping and the countif alias"
   },
@@ -1021,7 +1029,7 @@
   },
   {
     "name": "API/selectors",
-    "proves": "the selector surface with VALUE-exact oracles: nodes/instances/dimensions filters and their scope_ counterparts, '!' negation patterns, label key:value patterns (labels + scope_labels); match-ids/match-names dimension modes with id!=name dims (default matches BOTH; each mode excludes the other's namespace; a no-match response is the bare [time] labels row)",
+    "proves": "the selector surface with VALUE-exact oracles: nodes/instances/dimensions filters and their `scope_` counterparts, '!' negation patterns, label key:value patterns (`labels` + `scope_labels`); match-ids/match-names dimension modes with id!=name dims (default matches BOTH; each mode excludes the other's namespace; a no-match response is the bare [time] labels row)",
     "components": [
       "selectors",
       "match-modes"
