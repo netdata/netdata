@@ -455,9 +455,18 @@
                       "description": "The condition, written as an operator and a value: a number (>10), a gap token (==gap, !=nan, ==null, ==empty) or the previous collected sample (<previous, <last). An omitted or blank condition means ==0; an operator without a value applies to zero. When set, this is authoritative and the condition/value pair above is derived from it."
                     }
                   },
-                  "required": [
-                    "time_group_condition",
-                    "time_group_value"
+                  "anyOf": [
+                    {
+                      "required": [
+                        "time_group_options"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "time_group_condition",
+                        "time_group_value"
+                      ]
+                    }
                   ]
                 }
               }
@@ -824,6 +833,7 @@
               "ui:order": [
                 "data_source",
                 "time_group",
+                "time_group_options",
                 "time_group_condition",
                 "time_group_value",
                 "after",

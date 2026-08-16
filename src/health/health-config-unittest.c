@@ -1231,8 +1231,111 @@ static int test_dyncfg_time_group_round_trip(int *passed) {
     return failed;
 }
 
+static void dyncfg_required_condition_payload(BUFFER *payload, const char *condition_members) {
+    buffer_flush(payload);
+    buffer_sprintf(payload,
+                   "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                   "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                   "\"after\":-60,\"before\":0,\"time_group\":\"percentage-of-time\",%s%s"
+                   "\"dims_group\":\"sum\",\"data_source\":\"samples\",\"options\":[],\"dimensions\":\"*\"}},"
+                   "\"match\":{\"on\":\"chart\",\"host_labels\":\"*\",\"instance_labels\":\"*\"}}}]}",
+                   condition_members, *condition_members ? "," : "");
+}
+
+// ADD and UPDATE parse with JSONC_REQUIRED. They must accept the new
+// authoritative expression without making clients duplicate its derived
+// legacy condition/value pair, while old pair-only payloads remain valid.
+static int test_dyncfg_required_time_group_options(int *passed) {
+    static const char *name = "unittest-dyncfg-time-group-options";
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+    int failed = 0;
+    bool added = false;
+    bool initialized_prototypes = !health_globals.prototypes.dict;
+
+    if(initialized_prototypes) {
+        health_init_prototypes();
+        health_dyncfg_register_all_prototypes();
+    }
+
+    dyncfg_required_condition_payload(payload, "\"time_group_options\":\">\"");
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_ADD, name,
+                                payload, NULL, NULL, result, HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != DYNCFG_RESP_ACCEPTED) {
+        fprintf(stderr, "FAILED [DYNCFG ADD accepts options-only condition]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+        goto cleanup;
+    }
+    added = true;
+    (*passed)++;
+
+    buffer_flush(result);
+    dyncfg_required_condition_payload(payload, "\"time_group_options\":\"   \"");
+    code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                            DYNCFG_CMD_UPDATE, NULL, payload, NULL, NULL, result,
+                            HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != DYNCFG_RESP_ACCEPTED) {
+        fprintf(stderr, "FAILED [DYNCFG UPDATE accepts blank options-only zero condition]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    buffer_flush(result);
+    dyncfg_required_condition_payload(
+        payload, "\"time_group_condition\":\"!=\",\"time_group_value\":2");
+    code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                            DYNCFG_CMD_UPDATE, NULL, payload, NULL, NULL, result,
+                            HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != DYNCFG_RESP_ACCEPTED) {
+        fprintf(stderr, "FAILED [DYNCFG UPDATE keeps legacy condition pair]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    buffer_flush(result);
+    dyncfg_required_condition_payload(payload, "");
+    code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                            DYNCFG_CMD_UPDATE, NULL, payload, NULL, NULL, result,
+                            HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != HTTP_RESP_BAD_REQUEST ||
+       (!strstr(buffer_tostring(result), "time_group_condition") &&
+        !strstr(buffer_tostring(result), "time_group_value"))) {
+        fprintf(stderr, "FAILED [DYNCFG UPDATE still requires an old or new condition]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+cleanup:
+    if(added) {
+        buffer_flush(result);
+        code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                                DYNCFG_CMD_REMOVE, NULL, NULL, NULL, NULL, result,
+                                HTTP_ACCESS_NONE, "unittest", NULL);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "FAILED [DYNCFG condition test cleanup]: code=%d response='%s'\n",
+                    code, buffer_tostring(result));
+            failed++;
+        }
+    }
+
+    if(initialized_prototypes) {
+        health_dyncfg_unregister_all_prototypes();
+        dictionary_destroy(health_globals.prototypes.dict);
+        health_globals.prototypes.dict = NULL;
+    }
+
+    return failed;
+}
+
 static int test_dyncfg_rejects_non_string_time_group_options(int *passed) {
-    static const char *invalid_values[] = { "{}", "[]" };
+    static const char *invalid_values[] = { "{}", "[]", "1", "true", "null" };
     int failed = 0;
 
     for(size_t i = 0; i < sizeof(invalid_values) / sizeof(invalid_values[0]); i++) {
@@ -1330,6 +1433,7 @@ int health_config_unittest(void) {
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
     failed += test_prototype_rejects_non_positive_update_every(&passed);
     failed += test_dyncfg_time_group_round_trip(&passed);
+    failed += test_dyncfg_required_time_group_options(&passed);
     failed += test_dyncfg_rejects_non_string_time_group_options(&passed);
     failed += test_dyncfg_long_condition_is_not_truncated(&passed);
     failed += test_expression_rejects_leave_the_default(&passed);

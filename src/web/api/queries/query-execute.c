@@ -78,6 +78,9 @@ static NETDATA_DOUBLE query_point_grouping_value(
 ALWAYS_INLINE
 static time_t query_row_start_time(const QUERY_ENGINE_OPS *ops, time_t row_end_time) {
     time_t row_start = row_end_time - ops->view_update_every;
+
+    // Multi-row results keep the released lower-inclusive grid geometry;
+    // only a one-point result clips its sole interval to the requested window.
     return (ops->r->internal.qt->window.points == 1) ?
                MAX(row_start, ops->r->internal.qt->window.after) : row_start;
 }

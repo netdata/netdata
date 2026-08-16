@@ -107,6 +107,10 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error, flags);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error, flags);
 
+    TG_EXPRESSION time_group_expression;
+    bool has_time_group_expression = false;
+    unsigned time_group_value_flags = flags;
+
     switch(config->time_group) {
         default:
             break;
@@ -114,14 +118,27 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
         case RRDR_GROUPING_PERCENTAGE_OF_TIME:
         case RRDR_GROUPING_NUMBER_OF_FLAPS:
         case RRDR_GROUPING_NUMBER_OF_TIMES:
-        case RRDR_GROUPING_COUNTIF:
-            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error, flags);
-            // the expression is authoritative when present; the legacy
-            // condition/value pair above stays for older consumers
-            // optional even under JSONC_REQUIRED: every alert written
-            // before this field existed omits it
-            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(
-                jobj, path, "time_group_options", config->time_group_options, error, JSONC_STRICT);
+        case RRDR_GROUPING_COUNTIF: {
+            json_object *jtime_group_options = NULL;
+            bool has_time_group_options =
+                json_object_object_get_ex(jobj, "time_group_options", &jtime_group_options);
+
+            // New payloads may provide the authoritative expression alone;
+            // old payloads still have to provide the legacy pair.
+            unsigned legacy_flags = has_time_group_options ? JSONC_STRICT : flags;
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(
+                jobj, path, "time_group_condition", alerts_group_condition2id,
+                config->time_group_condition, error, legacy_flags);
+
+            if(has_time_group_options) {
+                if(!jtime_group_options || !json_object_is_type(jtime_group_options, json_type_string)) {
+                    buffer_sprintf(error, "invalid type for '%s.time_group_options' string", path);
+                    return false;
+                }
+
+                string_freez(config->time_group_options);
+                config->time_group_options = string_strdupz(json_object_get_string(jtime_group_options));
+            }
 
             // and it has to parse, exactly as it does when the same alert
             // arrives in a .conf file and when the query API validates it.
@@ -149,33 +166,36 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
                 freez(_copy);
             }
 
-            if(config->time_group_options) {
-                TG_EXPRESSION _e;
-                if(!tg_expression_parse(&_e, string2str(config->time_group_options))) {
+            if(has_time_group_options) {
+                const char *expression =
+                    config->time_group_options ? string2str(config->time_group_options) : "";
+                if(!tg_expression_parse(&time_group_expression, expression)) {
                     buffer_sprintf(error, "invalid condition '%s' in '%s.time_group_options'",
-                                   string2str(config->time_group_options), path);
+                                   expression, path);
                     return false;
                 }
+
+                has_time_group_expression = true;
+                time_group_value_flags = JSONC_STRICT;
             }
             // fall through
+        }
 
         case RRDR_GROUPING_TRIMMED_MEAN:
         case RRDR_GROUPING_TRIMMED_MEDIAN:
         case RRDR_GROUPING_PERCENTILE:
-            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error, flags);
+            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(
+                jobj, path, "time_group_value", config->time_group_value, error, time_group_value_flags);
             break;
     }
 
     // the written expression wins: the pair it implies replaces whatever the
     // payload carried, so an alert cannot be stored claiming one condition
     // and running another
-    if(config->time_group_options) {
-        TG_EXPRESSION e;
-        if(tg_expression_parse(&e, string2str(config->time_group_options))) {
-            config->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
-            config->time_group_value =
-                (e.operand == TG_EXPRESSION_OPERAND_NUMBER) ? e.target : NAN;
-        }
+    if(has_time_group_expression) {
+        config->time_group_condition = alert_lookup_condition_from_expression(time_group_expression.cmp);
+        config->time_group_value =
+            (time_group_expression.operand == TG_EXPRESSION_OPERAND_NUMBER) ? time_group_expression.target : NAN;
     }
 
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error, flags);
