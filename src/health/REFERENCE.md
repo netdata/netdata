@@ -642,8 +642,10 @@ or `<>`); with no operator the value compares equal. The value is one of:
 
 - **a number** - `lookup: percentage-of-time(>90) -1h`
 - **a gap token** - `gap`, `nan`, `null` and `empty` all mean "no data was
-  collected". Naming one is what makes gaps count at all; without one they
-  stay invisible, as they are for every other method.
+  collected". For `percentage-of-samples`, `number-of-flaps` and
+  `number-of-times`, naming one is what makes gaps count at all; without one
+  they stay invisible. `percentage-of-time` always includes uncollected time
+  in its denominator, while only a condition naming a gap can match it.
 - **the previous collected sample** - `previous` or `last`. Gaps are
   skipped, so a drop across a gap still counts, and the first sample of the
   window never matches.
