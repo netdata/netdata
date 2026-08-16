@@ -3,6 +3,7 @@
 package corpus
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,7 +12,7 @@ import (
 	"time"
 )
 
-func assertInvalidTimeGroupCondition(t *testing.T, endpoint string, params url.Values) {
+func assertInvalidTimeGroupCondition(t *testing.T, endpoint string, params url.Values, wantJSON bool) {
 	t.Helper()
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -28,6 +29,9 @@ func assertInvalidTimeGroupCondition(t *testing.T, endpoint string, params url.V
 		t.Fatalf("%s returned HTTP %d body %q, want HTTP 400 with the invalid-condition diagnostic",
 			endpoint, resp.StatusCode, body)
 	}
+	if wantJSON && !json.Valid(body) {
+		t.Fatalf("%s returned invalid JSON body %q", endpoint, body)
+	}
 }
 
 func TestWeightsRejectMalformedTimeGroupCondition(t *testing.T) {
@@ -35,7 +39,7 @@ func TestWeightsRejectMalformedTimeGroupCondition(t *testing.T) {
 	assertInvalidTimeGroupCondition(t, "/api/v2/weights", url.Values{
 		"time_group":         {"percentage-of-time"},
 		"time_group_options": {"not-a-condition"},
-	})
+	}, true)
 }
 
 func TestBadgeRejectMalformedTimeGroupCondition(t *testing.T) {
@@ -43,5 +47,5 @@ func TestBadgeRejectMalformedTimeGroupCondition(t *testing.T) {
 	assertInvalidTimeGroupCondition(t, "/api/v1/badge.svg", url.Values{
 		"group":         {"percentage-of-time"},
 		"group_options": {"not-a-condition"},
-	})
+	}, false)
 }
