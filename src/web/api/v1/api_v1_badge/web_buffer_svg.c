@@ -2,6 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "../../../server/web_client.h"
+#include "../../queries/tg-expression.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
 #define VERDANA_KERNING 0.2
@@ -950,6 +951,11 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         else if(!strcmp(name, "alarm")) alarm = value;
         else if(!strcmp(name, BADGE_URL_ARG_LBL_COLOR)) text_color_lbl_str = value;
         else if(!strcmp(name, BADGE_URL_ARG_VAL_COLOR)) text_color_val_str = value;
+    }
+
+    if(!time_grouping_expression_options_valid(group, group_options)) {
+        buffer_sprintf(w->response.data, "Invalid time-group condition.");
+        goto cleanup;
     }
 
     int fixed_width_lbl = -1;
