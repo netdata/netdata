@@ -179,7 +179,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "synonyms - which is what makes uncollected time participate for 'percentage-of-samples', 'number-of-flaps' and 'number-of-times' ('percentage-of-time' always counts it)), or the "
             "previous collected sample ('<previous' - 'last' is a synonym, so '<last' is the "
             "same condition - which counts counter resets such as reboots). There are no "
-            "and/or compounds. If the condition is omitted or blank it means '=0'; an operator "
+            "and/or compounds. A bare number means '=N'; if the condition is omitted or blank it means '=0'; an operator "
             "without a value applies to zero, so '>' means '>0'.\n"
             "Over a window long enough to read lower-resolution data 'percentage-of-time', "
             "'number-of-flaps' and 'number-of-times' return an estimate, and the counting ones "
