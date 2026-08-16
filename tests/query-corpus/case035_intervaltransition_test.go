@@ -258,26 +258,28 @@ func c035ExpectedAvailability(records []c035Record, after, before, step int64) [
 	return want
 }
 
-func c035ExpectedVolume(samples []c035Sample, after, before, step int64) []expectedColumnPoint {
+func c035ExpectedVolumeRows(samples []c035Sample, after, before, step int64, withMetadata bool) []expectedColumnPoint {
 	points := int((before - after) / step)
 	want := make([]expectedColumnPoint, points)
 	for i := range want {
 		rowStart := after + int64(i)*step
 		rowEnd := rowStart + step
-		want[i] = wantNumberAt(rowEnd, c035Measured(samples, rowStart, rowEnd))
+		value := c035Measured(samples, rowStart, rowEnd)
+		if withMetadata {
+			want[i] = wantNumberWithMetadataAt(rowEnd, value, 0, 0)
+		} else {
+			want[i] = wantNumberAt(rowEnd, value)
+		}
 	}
 	return want
 }
 
+func c035ExpectedVolume(samples []c035Sample, after, before, step int64) []expectedColumnPoint {
+	return c035ExpectedVolumeRows(samples, after, before, step, false)
+}
+
 func c035ExpectedCompleteVolume(samples []c035Sample, after, before, step int64) []expectedColumnPoint {
-	points := int((before - after) / step)
-	want := make([]expectedColumnPoint, points)
-	for i := range want {
-		rowStart := after + int64(i)*step
-		rowEnd := rowStart + step
-		want[i] = wantNumberWithMetadataAt(rowEnd, c035Measured(samples, rowStart, rowEnd), 0, 0)
-	}
-	return want
+	return c035ExpectedVolumeRows(samples, after, before, step, true)
 }
 
 type c035QuerySpec struct {

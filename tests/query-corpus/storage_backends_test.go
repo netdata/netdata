@@ -259,16 +259,20 @@ func waitDedicatedTierLastEntry(
 	}
 }
 
-func historicalGroupingAnswerHeld(
-	t *testing.T, dd *daemon.Daemon, host, context, dimension string,
-	after, before, points, value int64, partial bool,
-) bool {
+type historicalGroupingQuery struct {
+	host, context, dimension string
+	after, before, points    int64
+	value                    int64
+	partial                  bool
+}
+
+func historicalGroupingAnswerHeld(t *testing.T, dd *daemon.Daemon, q historicalGroupingQuery) bool {
 	t.Helper()
 
-	params := daemon.DataParamsTier(context, 1, after, before, points, "sum")
-	params.Set("scope_dimensions", dimension)
+	params := daemon.DataParamsTier(q.context, 1, q.after, q.before, q.points, "sum")
+	params.Set("scope_dimensions", q.dimension)
 	params.Set("options", "jsonwrap|unaligned")
-	doc, err := dd.DataV3(host, params)
+	doc, err := dd.DataV3(q.host, params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,19 +281,19 @@ func historicalGroupingAnswerHeld(
 		t.Fatal(err)
 	}
 	wantPA := int64(0)
-	if partial {
+	if q.partial {
 		wantPA = canon.AnnotationPartial
 	}
-	step := (before - after) / points
-	want := make([]expectedColumnPoint, 0, points)
-	for end := after + step; end <= before; end += step {
-		want = append(want, wantNumberWithPAAt(end, float64(value), wantPA))
+	step := (q.before - q.after) / q.points
+	want := make([]expectedColumnPoint, 0, q.points)
+	for end := q.after + step; end <= q.before; end += step {
+		want = append(want, wantNumberWithPAAt(end, float64(q.value), wantPA))
 	}
 
-	return queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, after, before, points, false)) &&
+	return queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, q.after, q.before, q.points, false)) &&
 		assertTierPresence(t, doc, []bool{false, true}) &&
-		assertOnlyColumn(t, cols, dimension) &&
-		assertExactColumn(t, cols, dimension, want, 0)
+		assertOnlyColumn(t, cols, q.dimension) &&
+		assertExactColumn(t, cols, q.dimension, want, 0)
 }
 
 func TestHistoricalTierGrouping(t *testing.T) {
@@ -318,7 +322,10 @@ func TestHistoricalTierGrouping(t *testing.T) {
 		ch.Dimensions[0].ID = dimension
 		closeFixture := pushDedicatedChart(t, dd, host, guid(420), ch)
 		waitDedicatedTierLastEntry(t, dd, host, context, 1, before)
-		if !historicalGroupingAnswerHeld(t, dd, host, context, dimension, after, before, 2, 8, false) {
+		if !historicalGroupingAnswerHeld(t, dd, historicalGroupingQuery{
+			host: host, context: context, dimension: dimension,
+			after: after, before: before, points: 2, value: 8,
+		}) {
 			t.Fatal("grouping-4 control did not produce two complete eight-second sums")
 		}
 		if err := closeFixture(); err != nil {
@@ -332,7 +339,10 @@ func TestHistoricalTierGrouping(t *testing.T) {
 			t.Fatal(err)
 		}
 		waitDedicatedTierLastEntry(t, dd, host, context, 1, before)
-		if !historicalGroupingAnswerHeld(t, dd, host, context, dimension, after, before, 2, 8, false) {
+		if !historicalGroupingAnswerHeld(t, dd, historicalGroupingQuery{
+			host: host, context: context, dimension: dimension,
+			after: after, before: before, points: 2, value: 8,
+		}) {
 			t.Errorf("BROKEN %s (%s): %s", contract, component, manifest[contract].Proves)
 		}
 	})
@@ -357,7 +367,10 @@ func TestHistoricalTierGrouping(t *testing.T) {
 		ch.Dimensions[0].ID = dimension
 		closeFixture := pushDedicatedChart(t, dd, host, guid(421), ch)
 		waitDedicatedTierLastEntry(t, dd, host, context, 1, before)
-		if !historicalGroupingAnswerHeld(t, dd, host, context, dimension, after, before, 2, 4, true) {
+		if !historicalGroupingAnswerHeld(t, dd, historicalGroupingQuery{
+			host: host, context: context, dimension: dimension,
+			after: after, before: before, points: 2, value: 4, partial: true,
+		}) {
 			t.Fatal("grouping-8 control did not produce two partial eight-second sums")
 		}
 		if err := closeFixture(); err != nil {
@@ -371,7 +384,10 @@ func TestHistoricalTierGrouping(t *testing.T) {
 			t.Fatal(err)
 		}
 		waitDedicatedTierLastEntry(t, dd, host, context, 1, before)
-		if !historicalGroupingAnswerHeld(t, dd, host, context, dimension, after, before, 2, 4, true) {
+		if !historicalGroupingAnswerHeld(t, dd, historicalGroupingQuery{
+			host: host, context: context, dimension: dimension,
+			after: after, before: before, points: 2, value: 4, partial: true,
+		}) {
 			t.Errorf("BROKEN %s (%s): %s", contract, component, manifest[contract].Proves)
 		}
 	})

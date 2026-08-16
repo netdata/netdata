@@ -368,144 +368,146 @@ func testLayer6TwoPassChains(t *testing.T, aggCombos []l6AggChain) l6ChainResult
 			groups := l6Groups(kc.key1, kc.key2, members)
 			for _, ac := range aggCombos {
 				label := mode + "/" + kc.key1 + "-" + ac.agg1 + "/" + kc.key2 + "-" + ac.agg2
-				params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
-				params.Set("group_by[0]", kc.key1)
-				params.Set("aggregation[0]", ac.agg1)
-				params.Set("group_by[1]", kc.key2)
-				params.Set("aggregation[1]", ac.agg2)
-				if kc.key1 == "label" {
-					params.Set("group_by_label[0]", "team")
-				}
-				if kc.key2 == "label" {
-					params.Set("group_by_label[1]", "team")
-				}
-				if raw {
-					params.Set("options", "jsonwrap|raw")
-				}
-				doc, err := td.DataV3All(params)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := queryPointSchemaField(doc, "hidden", false); err != nil {
-					t.Logf("%s: %v", label, err)
-					result.rawSchema = false
-				}
-				cols, err := canon.Columns(doc)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if len(cols) != len(groups) {
-					t.Logf("%s: got %d final groups %v, want %d %v", label, len(cols), keys2(cols), len(groups), keys2(groups))
-					result.grouping = false
-				}
-				var viewStats map[string]map[string]float64
-				assertViewARP := !raw && ac.agg1 != "average" && ac.agg2 != "average"
-				if assertViewARP {
-					var statsOK bool
-					viewStats, statsOK = strictDimensionStats(
-						t, doc, "view", keys2(groups), []string{"arp"})
-					if !statsOK {
-						t.Logf("%s: view dimension anomaly statistics are malformed", label)
-						result.viewAnomaly = false
+				t.Run(label, func(t *testing.T) {
+					params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
+					params.Set("group_by[0]", kc.key1)
+					params.Set("aggregation[0]", ac.agg1)
+					params.Set("group_by[1]", kc.key2)
+					params.Set("aggregation[1]", ac.agg2)
+					if kc.key1 == "label" {
+						params.Set("group_by_label[0]", "team")
 					}
-				}
-				for gname, pass1Groups := range groups {
-					col, ok := cols[gname]
-					if !ok {
-						t.Logf("%s: final group %q missing (have %v)", label, gname, keys2(cols))
-						result.grouping = false
-						result.grid, result.values = false, false
-						result.pointAnomaly, result.viewAnomaly = false, false
-						result.partialEmpty, result.rawSchema = false, false
-						continue
+					if kc.key2 == "label" {
+						params.Set("group_by_label[1]", "team")
 					}
-					if len(col) != l5Rows {
-						t.Logf("%s: %q got %d rows, want %d", label, gname, len(col), l5Rows)
-						result.grid, result.values = false, false
-						result.pointAnomaly, result.viewAnomaly = false, false
-						result.partialEmpty = false
+					if raw {
+						params.Set("options", "jsonwrap|raw")
+					}
+					doc, err := td.DataV3All(params)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := queryPointSchemaField(doc, "hidden", false); err != nil {
+						t.Logf("%s: %v", label, err)
 						result.rawSchema = false
 					}
-					viewARPTotal := 0.0
-					viewARPRows := 0
-					for rowIndex, pt := range col {
-						if rowIndex >= l5Rows {
-							break
+					cols, err := canon.Columns(doc)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(cols) != len(groups) {
+						t.Logf("%s: got %d final groups %v, want %d %v", label, len(cols), keys2(cols), len(groups), keys2(groups))
+						result.grouping = false
+					}
+					var viewStats map[string]map[string]float64
+					assertViewARP := !raw && ac.agg1 != "average" && ac.agg2 != "average"
+					if assertViewARP {
+						var statsOK bool
+						viewStats, statsOK = strictDimensionStats(
+							t, doc, "view", keys2(groups), []string{"arp"})
+						if !statsOK {
+							t.Logf("%s: view dimension anomaly statistics are malformed", label)
+							result.viewAnomaly = false
 						}
-						i := rowIndex + 1
-						wantT := fixture.T0 + int64(i)
-						want, wantAR, wantGbc, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i, raw)
-						if pt.T != wantT {
-							t.Logf("%s: %q row %d timestamp %d, want %d", label, gname, i, pt.T, wantT)
-							result.grid = false
-							result.values, result.pointAnomaly = false, false
-							result.viewAnomaly, result.partialEmpty = false, false
+					}
+					for gname, pass1Groups := range groups {
+						col, ok := cols[gname]
+						if !ok {
+							t.Logf("%s: final group %q missing (have %v)", label, gname, keys2(cols))
+							result.grouping = false
+							result.grid, result.values = false, false
+							result.pointAnomaly, result.viewAnomaly = false, false
+							result.partialEmpty, result.rawSchema = false, false
+							continue
+						}
+						if len(col) != l5Rows {
+							t.Logf("%s: %q got %d rows, want %d", label, gname, len(col), l5Rows)
+							result.grid, result.values = false, false
+							result.pointAnomaly, result.viewAnomaly = false, false
+							result.partialEmpty = false
 							result.rawSchema = false
 						}
-						switch {
-						case wantEmpty && pt.Value != nil:
-							t.Logf("%s: %q row %d value %v, want null", label, gname, i, *pt.Value)
-							result.partialEmpty = false
-						case !wantEmpty && pt.Value == nil:
-							t.Logf("%s: %q row %d null, want %v", label, gname, i, want)
-							result.values, result.partialEmpty = false, false
-						case !wantEmpty && !tierValueMatch(*pt.Value, want, 1e-9):
-							t.Logf("%s: %q row %d value %v, want %v", label, gname, i, *pt.Value, want)
-							result.values = false
-						}
-						if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
-							t.Logf("%s: %q row %d arp %v, want %v", label, gname, i, pt.ARP, wantAR)
-							result.pointAnomaly = false
-						}
-						if assertViewARP && !wantEmpty {
-							viewARPTotal += wantAR
-							viewARPRows++
-						}
-						if raw && !wantEmpty {
-							if pt.Count == nil {
-								t.Logf("%s: %q row %d raw point has no count", label, gname, i)
-								result.rawSchema = false
-							} else if *pt.Count != int64(wantGbc) {
-								t.Logf("%s: %q row %d count %d, want %d prior-pass groups",
-									label, gname, i, *pt.Count, wantGbc)
+						viewARPTotal := 0.0
+						viewARPRows := 0
+						for rowIndex, pt := range col {
+							if rowIndex >= l5Rows {
+								break
+							}
+							i := rowIndex + 1
+							wantT := fixture.T0 + int64(i)
+							want, wantAR, wantGbc, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i, raw)
+							if pt.T != wantT {
+								t.Logf("%s: %q row %d timestamp %d, want %d", label, gname, i, pt.T, wantT)
+								result.grid = false
+								result.values, result.pointAnomaly = false, false
+								result.viewAnomaly, result.partialEmpty = false, false
 								result.rawSchema = false
 							}
-						} else if pt.Count != nil {
-							t.Logf("%s: %q row %d count %d is present, want absent", label, gname, i, *pt.Count)
-							result.rawSchema = false
+							switch {
+							case wantEmpty && pt.Value != nil:
+								t.Logf("%s: %q row %d value %v, want null", label, gname, i, *pt.Value)
+								result.partialEmpty = false
+							case !wantEmpty && pt.Value == nil:
+								t.Logf("%s: %q row %d null, want %v", label, gname, i, want)
+								result.values, result.partialEmpty = false, false
+							case !wantEmpty && !tierValueMatch(*pt.Value, want, 1e-9):
+								t.Logf("%s: %q row %d value %v, want %v", label, gname, i, *pt.Value, want)
+								result.values = false
+							}
+							if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
+								t.Logf("%s: %q row %d arp %v, want %v", label, gname, i, pt.ARP, wantAR)
+								result.pointAnomaly = false
+							}
+							if assertViewARP && !wantEmpty {
+								viewARPTotal += wantAR
+								viewARPRows++
+							}
+							if raw && !wantEmpty {
+								if pt.Count == nil {
+									t.Logf("%s: %q row %d raw point has no count", label, gname, i)
+									result.rawSchema = false
+								} else if *pt.Count != int64(wantGbc) {
+									t.Logf("%s: %q row %d count %d, want %d prior-pass groups",
+										label, gname, i, *pt.Count, wantGbc)
+									result.rawSchema = false
+								}
+							} else if pt.Count != nil {
+								t.Logf("%s: %q row %d count %d is present, want absent", label, gname, i, *pt.Count)
+								result.rawSchema = false
+							}
+							wantPA := int64(0)
+							if wantEmpty {
+								wantPA = canon.AnnotationEmpty
+							} else if wantPartial {
+								wantPA = canon.AnnotationPartial
+							}
+							if pt.PA != wantPA {
+								t.Logf("%s: %q row %d pa %d, want exactly %d", label, gname, i, pt.PA, wantPA)
+								result.partialEmpty = false
+							}
 						}
-						wantPA := int64(0)
-						if wantEmpty {
-							wantPA = canon.AnnotationEmpty
-						} else if wantPartial {
-							wantPA = canon.AnnotationPartial
-						}
-						if pt.PA != wantPA {
-							t.Logf("%s: %q row %d pa %d, want exactly %d", label, gname, i, pt.PA, wantPA)
-							result.partialEmpty = false
+						if assertViewARP {
+							// Class B — dview truncates sum(row ARP)*10 into anomaly_count, then
+							// jsonwrap-v2 divides by the row count and the 1000x dview multiplier:
+							// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
+							// src/web/api/queries/query-group-by-finalize.c:380-460;
+							// src/web/api/queries/rrdr.h:51;
+							// src/libnetdata/storage-point.h:120-121;
+							// src/web/api/formatters/jsonwrap-v2.c:102-104,176-182.
+							got, ok := viewStats[gname]["arp"]
+							if !ok {
+								t.Logf("%s: %q view sts arp is missing (have %v)", label, gname, viewStats[gname])
+								result.viewAnomaly = false
+							} else if viewARPRows == 0 {
+								t.Logf("%s: %q fixture oracle found no rows for view sts arp", label, gname)
+								result.viewAnomaly = false
+							} else if want := math.Floor(viewARPTotal*10) / float64(viewARPRows*10); !tierValueMatch(got, want, 1e-9) {
+								t.Logf("%s: %q view sts arp %v, want mean row anomaly rate %v", label, gname, got, want)
+								result.viewAnomaly = false
+							}
 						}
 					}
-					if assertViewARP {
-						// Class B — dview truncates sum(row ARP)*10 into anomaly_count, then
-						// jsonwrap-v2 divides by the row count and the 1000x dview multiplier:
-						// netdata/netdata @ 89a2855db958400528ebd996e8869564c9c20862,
-						// src/web/api/queries/query-group-by-finalize.c:380-460;
-						// src/web/api/queries/rrdr.h:51;
-						// src/libnetdata/storage-point.h:120-121;
-						// src/web/api/formatters/jsonwrap-v2.c:102-104,176-182.
-						got, ok := viewStats[gname]["arp"]
-						if !ok {
-							t.Logf("%s: %q view sts arp is missing (have %v)", label, gname, viewStats[gname])
-							result.viewAnomaly = false
-						} else if viewARPRows == 0 {
-							t.Logf("%s: %q fixture oracle found no rows for view sts arp", label, gname)
-							result.viewAnomaly = false
-						} else if want := math.Floor(viewARPTotal*10) / float64(viewARPRows*10); !tierValueMatch(got, want, 1e-9) {
-							t.Logf("%s: %q view sts arp %v, want mean row anomaly rate %v", label, gname, got, want)
-							result.viewAnomaly = false
-						}
-					}
-				}
+				})
 			}
 		}
 	}

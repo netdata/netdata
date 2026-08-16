@@ -77,21 +77,32 @@ const (
 // CASE-017 pins that bug; the green cases here start before their data.
 func verifyTierWindows(t *testing.T, host string, ch fixture.Chart, tier int, granularity, firstEnd, lastEnd int64) {
 	t.Helper()
-	verifyTierWindowsWithReporter(t, host, ch, tier, granularity, firstEnd, lastEnd,
+	verifyTierWindowsWithReporter(t, tierWindowQuery{
+		host: host, chart: ch, tier: tier,
+		granularity: granularity, firstEnd: firstEnd, lastEnd: lastEnd,
+	},
 		func(_ tierWindowAssertion, format string, args ...any) {
 			t.Errorf(format, args...)
 		})
 }
 
+type tierWindowQuery struct {
+	host        string
+	chart       fixture.Chart
+	tier        int
+	granularity int64
+	firstEnd    int64
+	lastEnd     int64
+}
+
 func verifyTierWindowsWithReporter(
 	t *testing.T,
-	host string,
-	ch fixture.Chart,
-	tier int,
-	granularity, firstEnd, lastEnd int64,
+	q tierWindowQuery,
 	report func(tierWindowAssertion, string, ...any),
 ) {
 	t.Helper()
+	host, ch, tier := q.host, q.chart, q.tier
+	granularity, firstEnd, lastEnd := q.granularity, q.firstEnd, q.lastEnd
 
 	after := firstEnd - granularity
 	points := (lastEnd - after) / granularity
@@ -341,7 +352,10 @@ func TestLayer2Tier1Palette(t *testing.T) {
 			if _, err := td.WaitRetention(tc.hostname, tc.chart.Context, tc.chart.FirstT(), tc.chart.LastT(), 15*time.Second); err != nil {
 				t.Fatal(err)
 			}
-			verifyTierWindowsWithReporter(t, tc.hostname, tc.chart, 1, tier1Gran, tc.firstEnd, tc.lastEnd,
+			verifyTierWindowsWithReporter(t, tierWindowQuery{
+				host: tc.hostname, chart: tc.chart, tier: 1,
+				granularity: tier1Gran, firstEnd: tc.firstEnd, lastEnd: tc.lastEnd,
+			},
 				func(assertion tierWindowAssertion, format string, args ...any) {
 					t.Logf(format, args...)
 					for _, contract := range routes(tc.contract, assertion) {

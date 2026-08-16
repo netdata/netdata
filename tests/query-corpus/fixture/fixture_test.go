@@ -142,6 +142,17 @@ func TestParseCountifOptionsUsesStrictExpressionContract(t *testing.T) {
 		target float64
 	}{
 		"":         {"==", 0},
+		" ":        {"==", 0},
+		"\t":       {"==", 0},
+		">":        {">", 0},
+		">=":       {">=", 0},
+		"<":        {"<", 0},
+		"<=":       {"<=", 0},
+		"=":        {"==", 0},
+		"==":       {"==", 0},
+		":":        {"==", 0},
+		"!=":       {"!=", 0},
+		"<>":       {"!=", 0},
 		"40":       {"==", 40},
 		" = 40 ":   {"==", 40},
 		"==40":     {"==", 40},
@@ -170,7 +181,6 @@ func TestParseCountifOptionsUsesStrictExpressionContract(t *testing.T) {
 	}
 
 	for _, expression := range []string{
-		" ", "\t", ">", ">=", "<", "<=", "=", "==", ":", "!=", "<>",
 		"!1", "!:1", ">word", ">1junk", ">1e309", "NaN", "+Inf", "-Inf",
 		"0x1p2", "1_000",
 	} {

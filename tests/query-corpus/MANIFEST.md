@@ -157,6 +157,8 @@ set at the end.
 | CASE-023/mcp-valid-query-anomaly-rates | valid MCP condition queries preserve the exact anomaly rate of their selected source dimension independently of the grouped value | n/a |  |
 | CASE-023/mcp-valid-query-annotations | valid MCP condition queries preserve the exact RESET point-annotation bitmap independently of the grouped value | n/a |  |
 | CASE-023/mcp-invalid-options | non-string, malformed and non-finite MCP condition expressions return structured -32602 INVALID_PARAMS errors | n/a |  |
+| CASE-023/weights-invalid-options | the public weights endpoint rejects a malformed expression instead of silently executing the default ==0 condition | n/a |  |
+| CASE-023/badge-invalid-options | the public badge endpoint rejects a malformed expression instead of silently rendering the default ==0 condition | n/a |  |
 | CASE-023/mcp-default-zero-options | missing, empty and whitespace-only MCP conditions mean ==0, while an operator without an operand applies to zero, for every condition grouping and the countif alias | n/a |  |
 | CASE-023/tier-estimation-source | each forced higher-tier condition query reads exclusively from the requested stored tier and returns only the selected dimension | n/a |  |
 | CASE-023/tier-estimation-percentage-of-time | higher-tier percentage-of-time uses the approved min/max/average two-point mass estimator for steady-cadence stored windows | n/a |  |

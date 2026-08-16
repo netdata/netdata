@@ -673,7 +673,6 @@ func c4dFindFineSeam(t *testing.T, dd *daemon.Daemon, lastT int64) (c4dFineSeam,
 		// threshold strictly inside every retained tier1 record under the
 		// crossing tier2 record; one non-vacuous fine record is sufficient.
 		commonMin, commonMax := int64(0), int64(0xFFFFFF)
-		fineRecords := 0
 		for end := candidateBoundary + c4dTier1Grouping; end <= candidateCoarseEnd; end += c4dTier1Grouping {
 			recordMin := c4cValue(int64(d), end-c4dTier1Grouping+1-fixture.T0)
 			recordMax := recordMin
@@ -692,9 +691,8 @@ func c4dFindFineSeam(t *testing.T, dd *daemon.Daemon, lastT int64) (c4dFineSeam,
 			if recordMax < commonMax {
 				commonMax = recordMax
 			}
-			fineRecords++
 		}
-		if fineRecords < 1 || commonMax-commonMin < 2 {
+		if commonMax-commonMin < 2 {
 			continue
 		}
 

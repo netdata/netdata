@@ -79,6 +79,25 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 		}
 		return cols[ch.Dimensions[0].ID]
 	}
+	assertGridAndNonEmpty := func(t *testing.T, col []canon.Pt) bool {
+		t.Helper()
+		ok := len(col) == windows*perWindow
+		if !ok {
+			t.Errorf("returned %d rows, want %d", len(col), windows*perWindow)
+		}
+		for i, pt := range col {
+			wantT := after + int64(i+1)*bucketSpan
+			if pt.T != wantT {
+				t.Errorf("row %d ends at %d, want %d", i, pt.T, wantT)
+				ok = false
+			}
+			if pt.PA&canon.AnnotationEmpty != 0 {
+				t.Errorf("row %d at %d has PA=%d with EMPTY, want a numeric answer", i, pt.T, pt.PA)
+				ok = false
+			}
+		}
+		return ok
+	}
 
 	// percentage-of-samples answers in EVERY bucket: the engine has always
 	// delivered one point per bucket to this grouping, and a bucket that
@@ -109,8 +128,7 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 		trackContract(t, "CASE-023/redelivery-counted-once")
 		for _, group := range []string{"number-of-times", "number-of-flaps"} {
 			col := query(t, group, "==0")
-			if len(col) != windows*perWindow {
-				t.Errorf("%s returned %d rows, want %d", group, len(col), windows*perWindow)
+			if !assertGridAndNonEmpty(t, col) {
 				continue
 			}
 			for i := 0; i < len(col); i += perWindow {
@@ -125,8 +143,7 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 		trackContract(t, "CASE-023/redelivery-zero-not-empty")
 		for _, group := range []string{"number-of-times", "number-of-flaps"} {
 			col := query(t, group, "==0")
-			if len(col) != windows*perWindow {
-				t.Errorf("%s returned %d rows, want %d", group, len(col), windows*perWindow)
+			if !assertGridAndNonEmpty(t, col) {
 				continue
 			}
 			for i := range col {

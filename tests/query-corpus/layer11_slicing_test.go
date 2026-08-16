@@ -107,8 +107,8 @@ func TestL11SlicingOracleGuards(t *testing.T) {
 	if got := sliceEdgeAllowance(a, aligned+17, aligned+30); got != 420 {
 		t.Fatalf("two cuts through the same record allow %v, want one record content 420", got)
 	}
-	if got := sliceEdgeAllowance(a, aligned); got != 420 {
-		t.Fatalf("released aligned endpoint overlap allows %v, want one record content 420", got)
+	if got := sliceEdgeAllowance(a, aligned, aligned+duration); got != 420 {
+		t.Fatalf("aligned lower/upper endpoint allowance = %v, want only the lower record content 420", got)
 	}
 	if !sliceWithinTolerance(420, 420, 0) || sliceWithinTolerance(420.1, 420, 0) {
 		t.Fatal("edge tolerance does not accept its exact bound or rejects a meaningful excess")
@@ -266,17 +266,20 @@ func sliceCrossingRecord(a sliceAxes, edge int64) (end int64, content float64, c
 	return end, sliceRecordContent(a, end), true
 }
 
-func sliceEdgeAllowance(a sliceAxes, edges ...int64) float64 {
-	records := make(map[int64]float64, len(edges))
-	for _, edge := range edges {
+func sliceEdgeAllowance(a sliceAxes, lowerEdge, upperEdge int64) float64 {
+	records := make(map[int64]float64, 2)
+	addCrossing := func(edge int64) {
 		end, content, crosses := sliceCrossingRecord(a, edge)
-		if !crosses {
-			// Released query windows can include an aligned lower endpoint.
-			// Account for the one stored record ending exactly there.
-			end = edge
-			content = sliceRecordContent(a, end)
+		if crosses {
+			records[end] = content
 		}
-		records[end] = content
+	}
+	addCrossing(lowerEdge)
+	addCrossing(upperEdge)
+	if duration := sliceRecordDuration(a); duration > 0 && lowerEdge%duration == 0 {
+		// Released query windows can include the stored record ending at an
+		// aligned lower endpoint. An aligned upper endpoint is already inside.
+		records[lowerEdge] = sliceRecordContent(a, lowerEdge)
 	}
 	total := 0.0
 	for _, content := range records {

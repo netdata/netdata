@@ -788,23 +788,20 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 			invalidOptions := []struct {
 				name  string
 				value any
-				set   bool
 			}{
-				{name: "non-string", value: 0, set: true},
-				{name: "null", value: nil, set: true},
-				{name: "malformed", value: "abc", set: true},
-				{name: "positive-infinity", value: "+Inf", set: true},
-				{name: "negative-infinity", value: "-Inf", set: true},
-				{name: "overflow-to-infinity", value: "1e309", set: true},
+				{name: "non-string", value: 0},
+				{name: "null", value: nil},
+				{name: "malformed", value: "abc"},
+				{name: "positive-infinity", value: "+Inf"},
+				{name: "negative-infinity", value: "-Inf"},
+				{name: "overflow-to-infinity", value: "1e309"},
 			}
 			for _, invalid := range invalidOptions {
 				t.Run(group.name+"/"+invalid.name+"-options", func(t *testing.T) {
 					arguments := baseArguments(
 						standardContext, "bool", fixture.T0, standard.LastT())
 					arguments["time_group"] = group.name
-					if invalid.set {
-						arguments["time_group_options"] = invalid.value
-					}
+					arguments["time_group_options"] = invalid.value
 					response := c023MCPCall(t, requestID, initialize.Session, arguments)
 					requestID++
 					c023MCPAssertOptionsError(t, response.Document, group.name)
