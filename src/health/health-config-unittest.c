@@ -247,9 +247,10 @@ static const db_lookup_test_case_t test_cases[] = {
     { "countif(<==5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "less double equals invalid" },
     { "countif(>::5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater invalid" },
     { "countif(>=:5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater-equal invalid" },
-    // `<:` is less-or-equal, the same as `<=`: the query API has always
-    // read it that way and health now shares that grammar
+    // `<:`/`>:` are inclusive, the same as `<=`/`>=`: the query API has
+    // always read them that way and health now shares that grammar
     { "countif(<:5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL, 5.0, -600, 0, "colon after less" },
+    { "countif(>:5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 5.0, -600, 0, "colon after greater" },
 
     // the shared grammar: gap tokens and the predecessor keywords
     { "percentage-of-time(==gap) -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, DC_VALUE, -600, 0, "percentage-of-time equals gap" },
@@ -512,7 +513,12 @@ static int test_expression_rejects_leave_the_default(int *passed) {
 
     int failed = 0;
     for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
-        TG_EXPRESSION e;
+        TG_EXPRESSION e = {
+            .cmp = TG_EXPRESSION_GREATER,
+            .operand = TG_EXPRESSION_OPERAND_PREVIOUS,
+            .target = 123.0,
+            .has_previous = true,
+        };
         bool ok = tg_expression_parse(&e, tests[i].condition);
 
         if(ok != tests[i].valid) {
