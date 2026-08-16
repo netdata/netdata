@@ -46,12 +46,20 @@ ENUM_STR_MAP_DEFINE(https_client_resp_t) = {
         .name = "cannot set TLS SNI",
     },
     {
+        .id = HTTPS_CLIENT_RESP_NO_TLS_HOST_VERIFY,
+        .name = "cannot set TLS hostname/IP verification",
+    },
+    {
         .id = HTTPS_CLIENT_RESP_SSL_CONNECT_FAILED,
         .name = "SSL_connect() failed",
     },
     {
         .id = HTTPS_CLIENT_RESP_SSL_START_FAILED,
         .name = "cannot start SSL connection",
+    },
+    {
+        .id = HTTPS_CLIENT_RESP_SSL_CERT_VERIFY_FAILED,
+        .name = "TLS certificate verification failed",
     },
     {
         .id = HTTPS_CLIENT_RESP_UNKNOWN_REQUEST_TYPE,
@@ -742,6 +750,23 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     return preverify_ok;
 }
 
+// A rejected certificate can surface from either SSL_connect() or, because the socket
+// is non-blocking and the handshake then completes lazily inside the first
+// SSL_read()/SSL_write(), from the request itself. Whichever path reports the failure,
+// the operator needs the verification error, not a generic connect/IO error.
+static https_client_resp_t https_client_cert_error(SSL *ssl, const char *host, https_client_resp_t fallback)
+{
+    long verify_result = SSL_get_verify_result(ssl);
+    if (verify_result == X509_V_OK)
+        return fallback;
+
+    netdata_log_error(
+        "ACLK: TLS certificate verification failed for host '%s': %s",
+        host, X509_verify_cert_error_string(verify_result));
+
+    return HTTPS_CLIENT_RESP_SSL_CERT_VERIFY_FAILED;
+}
+
 https_client_resp_t https_request(https_req_t *request, https_req_response_t *response, bool *fallback_ipv4)
 {
     https_client_resp_t rc;
@@ -862,14 +887,36 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     if (!SSL_set_tlsext_host_name(ctx->ssl, request->host)) {
         rc = HTTPS_CLIENT_RESP_NO_TLS_SNI;
         netdata_log_error("ACLK: error setting TLS SNI host");
-        goto exit_CTX;
+        goto exit_SSL;
+    }
+
+    if (!cloud_config_insecure_get()) {
+        // SSL_CTX_set_verify(SSL_VERIFY_PEER) above only validates the certificate
+        // chain; it does not check that the certificate was issued for the host we
+        // are talking to. SSL_set_tlsext_host_name() sets SNI, which is a routing
+        // hint and carries no verification weight. Without the calls below, any
+        // certificate signed by a trusted CA - for any name - would be accepted.
+        //
+        // request->host may be either a DNS hostname or an IP literal.
+        // X509_VERIFY_PARAM_set1_ip_asc() parses the string as an IP and matches
+        // against the cert's iPAddress SAN; it returns 0 if the string is not a
+        // valid IP. X509_VERIFY_PARAM_set1_host() matches against the dNSName SAN.
+        // Try the IP path first; if the input is not an IP literal, fall back to
+        // hostname matching. Same pattern as mqtt_wss_client.c.
+        X509_VERIFY_PARAM *param = SSL_get0_param(ctx->ssl);
+        if (!X509_VERIFY_PARAM_set1_ip_asc(param, request->host) &&
+            !X509_VERIFY_PARAM_set1_host(param, request->host, 0)) {
+            rc = HTTPS_CLIENT_RESP_NO_TLS_HOST_VERIFY;
+            netdata_log_error("ACLK: error setting TLS hostname/IP verification for '%s'", request->host);
+            goto exit_SSL;
+        }
     }
 
     SSL_set_fd(ctx->ssl, ctx->sock);
     ret = SSL_connect(ctx->ssl);
     if (ret != -1 && ret != 1) {
-        rc = HTTPS_CLIENT_RESP_SSL_CONNECT_FAILED;
         netdata_log_error("ACLK: SSL failed to connect");
+        rc = https_client_cert_error(ctx->ssl, request->host, HTTPS_CLIENT_RESP_SSL_CONNECT_FAILED);
         goto exit_SSL;
     }
     if (ret == -1) {
@@ -877,8 +924,8 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         // consult SSL_connect documentation for details
         int ec = SSL_get_error(ctx->ssl, ret);
         if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
-            rc = HTTPS_CLIENT_RESP_SSL_START_FAILED;
             netdata_log_error("ACLK: failed to start SSL connection");
+            rc = https_client_cert_error(ctx->ssl, request->host, HTTPS_CLIENT_RESP_SSL_START_FAILED);
             goto exit_SSL;
         }
     }
@@ -887,6 +934,7 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     rc = handle_http_request(ctx);
     if (rc != HTTPS_CLIENT_RESP_OK) {
         netdata_log_error("ACLK: couldn't process request");
+        rc = https_client_cert_error(ctx->ssl, request->host, rc);
         http_parse_ctx_destroy(&ctx->parse_ctx);
         goto exit_SSL;
     }
