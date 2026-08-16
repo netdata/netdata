@@ -187,19 +187,21 @@ at lower resolution. Over a window long enough to read that older data,
   bucket covering the same stored interval reports that interval's estimate.
 
 `percentage-of-time` always measures against the **selected duration**, not
-against the part of it that was collected. Uncollected time is time the
-condition did not hold, so a metric with one collected sample matching the
-condition and the rest of the window missing answers a small percentage,
-not 100%. That is what makes it usable for availability.
+against the part of it that was collected. For a condition that does not match
+gaps, uncollected time does not enter the numerator, so a metric with one
+matching sample and the rest of the window missing answers a small percentage,
+not 100%. A condition such as `==gap` or `==null` includes uncollected time in
+the numerator instead. That is what makes it usable for availability.
 
 `percentage-of-samples` does NOT estimate: it treats each stored point as one
 sample and evaluates the condition on it, which is what it has always done.
 Over lower-resolution data that means it answers about stored points rather
 than about the samples behind them.
 
-Add `tier=0` to an HTTP request for exact answers, and check `db.per_tier` in
-the response to confirm tier 0 actually served the query. Tier 0 retention is
-short on busy parents, so a long window will not always have it.
+Use `tier=0` for the highest-resolution available result. When the response
+includes `db.per_tier`, such as with `format=json2`, inspect it to verify the
+selected tier; exactness still depends on the stored interval resolution. Tier
+0 retention is short on busy parents, so a long window will not always have it.
 
 ## Further processing
 

@@ -1159,7 +1159,7 @@ AGENT_TOOLS: dict[str, dict[str, Any]] = {
                 "time_group_options": {
                     "type": "string",
                     "title": "Time Group Options",
-                    "description": "Additional options for time grouping.\nFor 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\nFor 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', 'number-of-flaps' and 'number-of-times', specify a CONDITION: an operator ('>', '>=', '<', '<=', '=', '!=') followed by a number (e.g. '>0'), a gap token ('==gap', '!=gap'), or the previous collected sample ('<previous')."
+                    "description": "Additional options for time grouping.\nFor 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\nFor 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', 'number-of-flaps' and 'number-of-times', specify a CONDITION: an operator ('>', '>=', '<', '<=', '=', '!=') followed by a number (e.g. '>0'), a gap token ('==gap', '!=gap'), or the previous collected sample ('<previous'). For 'percentage-of-time', uncollected time always remains in the denominator and enters the numerator only when the condition matches gaps."
                 },
                 "tier": {
                     "type": "number",
