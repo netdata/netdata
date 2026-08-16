@@ -45,15 +45,24 @@ func wantEmptyWithMetadataAt(t int64, arp float64, pa int64) expectedColumnPoint
 	return expectedColumnPoint{T: t, ARP: &arp, PA: &pa}
 }
 
-// assertExactColumn rejects every vacuous-success path: a missing column,
-// dropped or duplicate row, timestamp drift, null in place of a number, or
-// a number in place of an explicitly expected empty row.
-func assertExactColumn(
+type exactColumnFields uint8
+
+const (
+	exactColumnValues exactColumnFields = 1 << iota
+	exactColumnMetadata
+	exactColumnAll = exactColumnValues | exactColumnMetadata
+)
+
+// assertExactColumnFields rejects every vacuous-success path while allowing
+// independently actionable value and metadata contracts to be evaluated
+// without one hiding the other.
+func assertExactColumnFields(
 	t *testing.T,
 	cols map[string][]canon.Pt,
 	dimension string,
 	want []expectedColumnPoint,
 	tolerance float64,
+	fields exactColumnFields,
 ) bool {
 	t.Helper()
 
@@ -95,16 +104,20 @@ func assertExactColumn(
 			report("dimension %q row %d ends at %d, want %d", dimension, i, pt.T, exp.T)
 			ok = false
 		}
-		if exp.ARP != nil &&
+		if fields&exactColumnMetadata != 0 && exp.ARP != nil &&
 			(math.IsNaN(pt.ARP) || math.IsInf(pt.ARP, 0) || pt.ARP != *exp.ARP) {
 			report("dimension %q row %d at %d has ARP %v, want exactly %v",
 				dimension, i, pt.T, pt.ARP, *exp.ARP)
 			ok = false
 		}
-		if exp.PA != nil && pt.PA != *exp.PA {
+		if fields&exactColumnMetadata != 0 && exp.PA != nil && pt.PA != *exp.PA {
 			report("dimension %q row %d at %d has PA %d, want exactly %d",
 				dimension, i, pt.T, pt.PA, *exp.PA)
 			ok = false
+		}
+
+		if fields&exactColumnValues == 0 {
+			continue
 		}
 
 		if exp.Value == nil {
@@ -143,6 +156,40 @@ func assertExactColumn(
 	}
 
 	return ok
+}
+
+// assertExactColumn rejects every vacuous-success path and compares values
+// plus every explicitly requested metadata field.
+func assertExactColumn(
+	t *testing.T,
+	cols map[string][]canon.Pt,
+	dimension string,
+	want []expectedColumnPoint,
+	tolerance float64,
+) bool {
+	t.Helper()
+	return assertExactColumnFields(t, cols, dimension, want, tolerance, exactColumnAll)
+}
+
+func assertExactColumnValues(
+	t *testing.T,
+	cols map[string][]canon.Pt,
+	dimension string,
+	want []expectedColumnPoint,
+	tolerance float64,
+) bool {
+	t.Helper()
+	return assertExactColumnFields(t, cols, dimension, want, tolerance, exactColumnValues)
+}
+
+func assertExactColumnMetadata(
+	t *testing.T,
+	cols map[string][]canon.Pt,
+	dimension string,
+	want []expectedColumnPoint,
+) bool {
+	t.Helper()
+	return assertExactColumnFields(t, cols, dimension, want, 0, exactColumnMetadata)
 }
 
 func assertOnlyColumn(t *testing.T, cols map[string][]canon.Pt, dimension string) bool {
@@ -781,6 +828,27 @@ func TestQueryAssertionGuardsDetectMutations(t *testing.T) {
 	}
 	if !assertExactColumn(t, map[string][]canon.Pt{"value": metadataColumn}, "value", metadataWant, 0) {
 		t.Fatal("exact metadata guard rejected its valid control")
+	}
+	wrongMetadata := []canon.Pt{
+		{T: 10, Value: &number, ARP: 50},
+		{T: 20, PA: canon.AnnotationEmpty},
+	}
+	if !assertExactColumnValues(t, map[string][]canon.Pt{"value": wrongMetadata}, "value", metadataWant, 0) {
+		t.Fatal("value-only guard rejected correct values with independently wrong metadata")
+	}
+	if assertExactColumnMetadata(t, map[string][]canon.Pt{"value": wrongMetadata}, "value", metadataWant) {
+		t.Fatal("metadata-only guard accepted wrong metadata")
+	}
+	wrongValue := 8.0
+	wrongValues := []canon.Pt{
+		{T: 10, Value: &wrongValue, ARP: 25, PA: canon.AnnotationPartial},
+		{T: 20, PA: canon.AnnotationEmpty},
+	}
+	if assertExactColumnValues(t, map[string][]canon.Pt{"value": wrongValues}, "value", metadataWant, 0) {
+		t.Fatal("value-only guard accepted a wrong value")
+	}
+	if !assertExactColumnMetadata(t, map[string][]canon.Pt{"value": wrongValues}, "value", metadataWant) {
+		t.Fatal("metadata-only guard rejected correct metadata with an independently wrong value")
 	}
 	numericEmpty := map[string][]canon.Pt{
 		"value": {{T: 10, Value: &number, PA: canon.AnnotationEmpty}},

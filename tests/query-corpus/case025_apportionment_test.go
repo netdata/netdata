@@ -81,7 +81,8 @@ func TestCase025OverlapOracle(t *testing.T) {
 // between a run and a real empty row. Both shapes require exact row ownership;
 // a whole-window total alone cannot distinguish them.
 func TestCase025CarrySurvivesGaps(t *testing.T) {
-	trackContract(t, "CASE-025/carry-survives-gaps")
+	registerContract(t, "CASE-025/carry-survives-gaps")
+	registerContract(t, "CASE-025/gap-evidence-follows-row-overlap")
 
 	const (
 		ctx     = "fixture.c025gap"
@@ -113,7 +114,7 @@ func TestCase025CarrySurvivesGaps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok := true
+	valuesOK, evidenceOK := true, true
 	for _, tc := range []struct {
 		name, dimension string
 		before          int64
@@ -145,25 +146,30 @@ func TestCase025CarrySurvivesGaps(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !assertSelectedTier(t, doc, 0) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		if !assertExactView(t, doc, after, tc.before, rowSpan) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !assertOnlyColumn(t, cols, tc.dimension) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
-		if !assertExactColumn(t, cols, tc.dimension, tc.want, 1e-9) {
+		if !assertExactColumnValues(t, cols, tc.dimension, tc.want, 1e-9) {
 			t.Logf("%s: wide-record shares did not land on their exact owning rows", tc.name)
-			ok = false
+			valuesOK = false
+		}
+		if !assertExactColumnMetadata(t, cols, tc.dimension, tc.want) {
+			t.Logf("%s: stored gap evidence did not follow the rows owning those intervals", tc.name)
+			evidenceOK = false
 		}
 	}
 
-	assertContract(t, "CASE-025/carry-survives-gaps", ok)
+	assertContract(t, "CASE-025/carry-survives-gaps", valuesOK)
+	assertContract(t, "CASE-025/gap-evidence-follows-row-overlap", evidenceOK)
 }
 
 // CASE-025b: a bucket that lies entirely inside one stored window reports

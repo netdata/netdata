@@ -22,7 +22,8 @@ import (
 )
 
 func TestCase026SettlementCarriesAnomaly(t *testing.T) {
-	trackContract(t, "CASE-026/anomaly-rate-covers-the-paid-seconds")
+	registerContract(t, "CASE-026/anomaly-rate-covers-the-paid-seconds")
+	registerContract(t, "CASE-026/settlement-values-belong-to-their-row")
 
 	const (
 		ctx     = "fixture.c026anom"
@@ -58,7 +59,7 @@ func TestCase026SettlementCarriesAnomaly(t *testing.T) {
 	}
 
 	last := base + int64(samples*ue)
-	ok := true
+	valuesOK, evidenceOK := true, true
 
 	for _, group := range []string{"sum", "average"} {
 		after := base
@@ -73,17 +74,17 @@ func TestCase026SettlementCarriesAnomaly(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !assertSelectedTier(t, doc, 0) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		if !assertExactView(t, doc, after, before, rowSpan) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 
 		want := make([]expectedColumnPoint, points)
@@ -113,11 +114,16 @@ func TestCase026SettlementCarriesAnomaly(t *testing.T) {
 			}
 			want[row] = wantNumberWithMetadataAt(rowEnd, rowValue, arp, pa)
 		}
-		if !assertExactColumn(t, cols, ch.Dimensions[0].ID, want, 1e-9) {
-			t.Logf("%s did not keep each row's value, anomaly membership, and RESET paired", group)
-			ok = false
+		if !assertExactColumnValues(t, cols, ch.Dimensions[0].ID, want, 1e-9) {
+			t.Logf("%s did not settle each value on its exact owning row", group)
+			valuesOK = false
+		}
+		if !assertExactColumnMetadata(t, cols, ch.Dimensions[0].ID, want) {
+			t.Logf("%s did not keep anomaly membership and RESET on their exact owning rows", group)
+			evidenceOK = false
 		}
 	}
 
-	assertContract(t, "CASE-026/anomaly-rate-covers-the-paid-seconds", ok)
+	assertContract(t, "CASE-026/anomaly-rate-covers-the-paid-seconds", evidenceOK)
+	assertContract(t, "CASE-026/settlement-values-belong-to-their-row", valuesOK)
 }

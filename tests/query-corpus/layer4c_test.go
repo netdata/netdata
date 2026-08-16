@@ -568,7 +568,8 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	})
 
 	t.Run("sum-conservation", func(t *testing.T) {
-		trackContract(t, "CASE-026/totals-survive-a-plan-switch")
+		registerContract(t, "CASE-026/totals-survive-a-plan-switch")
+		registerContract(t, "CASE-026/partial-evidence-survives-a-plan-switch")
 
 		flatTiers := c4DimensionRetention(
 			t, dd, c4cContext, "l4c-child", c4cConstDim, lastT, 2)
@@ -592,8 +593,10 @@ func TestLayer4PlanSwitching(t *testing.T) {
 		ok = c4cSumConserves(t, dd, "straddling", seamAfter,
 			[3]bool{true, true, false}) && ok
 		ok = c4cSumFocusedSeams(t, dd, flatBoundary) && ok
-		ok = c4cSumAcrossStorageGap(t, dd, lastT) && ok
+		gapValuesOK, gapEvidenceOK := c4cSumAcrossStorageGap(t, dd, lastT)
+		ok = gapValuesOK && ok
 		assertContract(t, "CASE-026/totals-survive-a-plan-switch", ok)
+		assertContract(t, "CASE-026/partial-evidence-survives-a-plan-switch", gapEvidenceOK)
 	})
 
 	t.Run("rate-volume", func(t *testing.T) {
@@ -1601,7 +1604,7 @@ func c4cConstantDBStatisticsCoherent(t *testing.T, doc map[string]any, raw bool)
 	return ok
 }
 
-func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) (bool, bool) {
 	t.Helper()
 
 	tiers := c4DimensionRetention(
@@ -1610,7 +1613,7 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 	offset := boundary - c4cDisjointEpoch
 	if offset < c4cDisjointPeriod || offset%c4cDisjointPeriod != 0 {
 		t.Logf("disjoint tier0 retention starts at %d, want a rotated burst boundary", boundary)
-		return false
+		return false, false
 	}
 	t.Logf("disjoint tier0 starts at t0%+d; tier1 starts at t0%+d",
 		boundary-fixture.T0, tiers[1].FirstEntry-fixture.T0)
@@ -1639,13 +1642,18 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 		controlWant[i] = wantNumberWithARPAt(ts, float64(c4cDisjointValue), arp)
 	}
 
-	ok := true
+	valuesOK, evidenceOK := true, true
 	if !assertSelectedTier(t, controlDoc, 0) ||
 		!assertTierPresence(t, controlDoc, []bool{true, false, false}) ||
-		!assertOnlyColumn(t, controlCols, c4cDisjointDim) ||
-		!assertExactColumn(t, controlCols, c4cDisjointDim, controlWant, 0) {
+		!assertOnlyColumn(t, controlCols, c4cDisjointDim) {
 		t.Log("disjoint seam tier0 control did not expose the exact retained burst")
-		ok = false
+		valuesOK, evidenceOK = false, false
+	}
+	if !assertExactColumnValues(t, controlCols, c4cDisjointDim, controlWant, 0) {
+		valuesOK = false
+	}
+	if !assertExactColumnMetadata(t, controlCols, c4cDisjointDim, controlWant) {
+		evidenceOK = false
 	}
 
 	coarseControl := daemon.DataParamsTier(
@@ -1660,15 +1668,21 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 	if err != nil {
 		t.Fatal(err)
 	}
+	coarseWant := []expectedColumnPoint{
+		wantNumberWithARPAt(controlBefore,
+			float64(60*c4cDisjointValue), 16.6666667),
+	}
 	if !assertSelectedTier(t, coarseDoc, 1) ||
 		!assertTierPresence(t, coarseDoc, []bool{false, true, false}) ||
-		!assertOnlyColumn(t, coarseCols, c4cDisjointDim) ||
-		!assertExactColumn(t, coarseCols, c4cDisjointDim, []expectedColumnPoint{
-			wantNumberWithARPAt(controlBefore,
-				float64(60*c4cDisjointValue), 16.6666667),
-		}, printTol) {
+		!assertOnlyColumn(t, coarseCols, c4cDisjointDim) {
 		t.Log("disjoint seam tier1 control did not expose the overlapping coarse record")
-		ok = false
+		valuesOK, evidenceOK = false, false
+	}
+	if !assertExactColumnValues(t, coarseCols, c4cDisjointDim, coarseWant, printTol) {
+		valuesOK = false
+	}
+	if !assertExactColumnMetadata(t, coarseCols, c4cDisjointDim, coarseWant) {
+		evidenceOK = false
 	}
 
 	const rowSpan = int64(10)
@@ -1731,20 +1745,23 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 
 		if !assertExactView(t, doc, seam.after, seam.before, rowSpan) {
 			t.Logf("disjoint storage-gap seam %s returned the wrong view", seam.label)
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		if !assertTierPresence(t, doc, []bool{true, true, false}) {
 			t.Logf("disjoint storage-gap seam %s did not use exactly tier1+tier0", seam.label)
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		if !assertOnlyColumn(t, cols, c4cDisjointDim) {
 			t.Logf("disjoint storage-gap seam %s returned the wrong columns", seam.label)
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
-		if !assertExactColumn(t, cols, c4cDisjointDim, want, 0) {
+		if !assertExactColumnValues(t, cols, c4cDisjointDim, want, 0) {
 			t.Logf("disjoint storage-gap seam %s lost retained values or charged the true storage hole",
 				seam.label)
-			ok = false
+			valuesOK = false
+		}
+		if !assertExactColumnMetadata(t, cols, c4cDisjointDim, want) {
+			evidenceOK = false
 		}
 	}
 
@@ -1823,24 +1840,35 @@ func c4cSumAcrossStorageGap(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
 			queryExpectedVirtualGrid(t, splitQueryAfter, splitBefore, split.points, false))
 		tiersOK := assertTierPresence(t, splitDoc, []bool{true, true, false})
 		columnOK := assertOnlyColumn(t, splitCols, c4cSplitDim)
-		valuesOK := assertExactColumn(t, splitCols, c4cSplitDim, split.want, 0)
-		if !gridOK || !tiersOK || !columnOK || !valuesOK {
+		splitValuesOK := assertExactColumnValues(t, splitCols, c4cSplitDim, split.want, 0)
+		splitEvidenceOK := assertExactColumnMetadata(t, splitCols, c4cSplitDim, split.want)
+		if !gridOK || !tiersOK || !columnOK {
+			valuesOK, evidenceOK = false, false
+		}
+		if !splitValuesOK {
 			t.Logf("split storage-gap tail %s violated exact coarse/fine ownership", split.label)
-			ok = false
+			valuesOK = false
+		}
+		if !splitEvidenceOK {
+			evidenceOK = false
 		}
 	}
 
-	if !c4cSumConsumesSoleBufferedPoint(t, dd, lastT) {
-		ok = false
+	soleValuesOK, soleEvidenceOK := c4cSumConsumesSoleBufferedPoint(t, dd, lastT)
+	if !soleValuesOK {
+		valuesOK = false
+	}
+	if !soleEvidenceOK {
+		evidenceOK = false
 	}
 	if !c4cRateSumOwnsEqualStartFinePoint(t, dd) {
-		ok = false
+		valuesOK = false
 	}
 
-	return ok
+	return valuesOK, evidenceOK
 }
 
-func c4cSumConsumesSoleBufferedPoint(t *testing.T, dd *daemon.Daemon, lastT int64) bool {
+func c4cSumConsumesSoleBufferedPoint(t *testing.T, dd *daemon.Daemon, lastT int64) (bool, bool) {
 	t.Helper()
 
 	tiers := c4DimensionRetention(t, dd, c4cContext, "l4c-child", c4cSoleDim, lastT, 2)
@@ -1865,26 +1893,33 @@ func c4cSumConsumesSoleBufferedPoint(t *testing.T, dd *daemon.Daemon, lastT int6
 		t.Fatal(err)
 	}
 
-	ok := queryTimestampGridExact(t, doc,
+	valuesOK := queryTimestampGridExact(t, doc,
 		queryExpectedVirtualGrid(t, after, before, 1, false))
+	evidenceOK := valuesOK
 	if !assertTierPresence(t, doc, []bool{true, true, false}) {
-		ok = false
+		valuesOK, evidenceOK = false, false
 	}
 	if points, valid := strictTierPoints(t, doc); !valid ||
 		points[0] != 1 || points[1] != 2 || points[2] != 0 {
 		t.Logf("sole-point seam tier reads = %v, want tier0=1 tier1=2 tier2=0", points)
-		ok = false
+		valuesOK, evidenceOK = false, false
 	}
-	if !assertOnlyColumn(t, cols, c4cSoleDim) ||
-		!assertExactColumn(t, cols, c4cSoleDim, []expectedColumnPoint{
-			wantNumberWithPAAt(before, 61*c4cSparseValue, canon.AnnotationPartial),
-		}, 0) {
-		ok = false
+	want := []expectedColumnPoint{
+		wantNumberWithPAAt(before, 61*c4cSparseValue, canon.AnnotationPartial),
 	}
-	if !ok {
+	if !assertOnlyColumn(t, cols, c4cSoleDim) {
+		valuesOK, evidenceOK = false, false
+	}
+	if !assertExactColumnValues(t, cols, c4cSoleDim, want, 0) {
+		valuesOK = false
+	}
+	if !assertExactColumnMetadata(t, cols, c4cSoleDim, want) {
+		evidenceOK = false
+	}
+	if !valuesOK || !evidenceOK {
 		t.Log("sole-point seam dropped the final buffered fine-tier point or changed its fixed grid/evidence")
 	}
-	return ok
+	return valuesOK, evidenceOK
 }
 
 func c4cRateSumOwnsEqualStartFinePoint(t *testing.T, dd *daemon.Daemon) bool {
