@@ -1147,8 +1147,11 @@ char *aclk_state(void)
     if (aclk_is_online) {
         int rcvd_cloud_msgs = __atomic_load_n(&aclk_rcvd_cloud_msgs, __ATOMIC_RELAXED);
         int pubacks_per_conn = __atomic_load_n(&aclk_pubacks_per_conn, __ATOMIC_RELAXED);
-        buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d\nPending PUBACKS: %d\nServer Receive Maximum: %u\n",
+        // the first three are per-connection; the timeout counter is not reset on reconnect,
+        // so it is labelled to say so rather than reading as another current-connection value
+        buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d\nPending PUBACKS: %d\nMQTT Messages Dropped Without a PUBACK (since start): %d\nServer Receive Maximum: %u\n",
                        rcvd_cloud_msgs, pubacks_per_conn, aclk_stats.mqtt.packets_waiting_puback,
+                       aclk_stats.mqtt.packets_timed_out,
                        (unsigned)aclk_stats.mqtt.rx_maximum);
 
         RRDHOST *host;
@@ -1288,6 +1291,9 @@ char *aclk_state_json(void)
 
     tmp = json_object_new_int((int32_t) aclk_stats.mqtt.packets_waiting_puback);
     json_object_object_add(msg, "pending-mqtt-pubacks", tmp);
+
+    tmp = json_object_new_int((int32_t) aclk_stats.mqtt.packets_timed_out);
+    json_object_object_add(msg, "timed-out-mqtt-pubacks-since-start", tmp);
 
     tmp = json_object_new_int((int32_t) aclk_stats.mqtt.rx_maximum);
     json_object_object_add(msg, "server-receive-maximum", tmp);
