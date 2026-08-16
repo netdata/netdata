@@ -397,9 +397,15 @@ sequence matters.
 
 #### time_group_options values
 
+For the four condition groupings, the operator is optional and a bare value means equality. Operators are `>`, `>=`
+(or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`), and `!=` (or `!:`, `!`, or `<>`). The value may be a number,
+a gap token (`gap`, `nan`, `null`, or `empty`), or the previous collected sample (`previous` or `last`). Omitted or
+empty input means `==0`; an operator without a value also applies to zero. `percentage-of-time` always includes
+uncollected time in its denominator and includes it in the numerator only when the condition matches gaps.
+
 | Used with        | Value format                | Example                            |
 |------------------|-----------------------------|------------------------------------|
-| `percentage-of-samples`, `percentage-of-time`, `number-of-flaps`, `number-of-times` | Operator + value | `">0"`, `"=0"`, `"<=100"`, a gap token `"==gap"` / `"!=nan"`, or the previous sample `"<previous"` / `"<last"` |
+| `percentage-of-samples`, `percentage-of-time`, `number-of-flaps`, `number-of-times` | Condition (see above) | `">0"`, `"=0"`, `"<=100"`, `"==gap"`, `"!=nan"`, `"<previous"` |
 | `percentile`     | Percentile value (0-100)    | `"95"`, `"99.5"`                   |
 | `trimmed-mean`   | Trim percentage             | `"5"`, `"10"`                      |
 | `trimmed-median` | Trim percentage             | `"5"`, `"10"`                      |

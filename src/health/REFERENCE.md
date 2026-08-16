@@ -637,8 +637,8 @@ reporting them, and each takes a condition:
 | `number-of-times` | how many samples matched | `events` |
 
 A condition is an operator followed by a value. The operators are `>`,
-`>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!`
-or `<>`); with no operator the value compares equal. The value is one of:
+`>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or
+`!:`, `!` or `<>`); with no operator the value compares equal. The value is one of:
 
 - **a number** - `lookup: percentage-of-time(>90) -1h`
 - **a gap token** - `gap`, `nan`, `null` and `empty` all mean "no data was

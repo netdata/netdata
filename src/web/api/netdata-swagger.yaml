@@ -1435,7 +1435,7 @@ paths:
             Additional options for the grouping function. `percentage-of-samples` (alias
             `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a
             condition: an optional operator (`>`, `>=` or `>:`, `<`, `<=` or `<:`, `=`, `==` or
-            `:`, `!=`, `!` or `<>`) followed by a number, a gap token (`gap`, `nan`, `null`,
+            `:`, `!=`, `!:`, `!` or `<>`) followed by a number, a gap token (`gap`, `nan`, `null`,
             `empty`) or the previous collected sample (`previous`, `last`). A bare value means
             equality; omitted or empty input means `==0`; an operator without a value applies to
             zero. There are no and/or compounds. `trimmed-mean`, `trimmed-median` and `percentile`
@@ -1681,8 +1681,8 @@ paths:
             Additional options for the time-series grouping function. Format depends on the
             selected group method: `percentage-of-samples` (alias `countif`),
             `percentage-of-time`, `number-of-flaps` and `number-of-times` take a condition - an
-            optional operator (`>`, `>=` or `>:`, `<`, `<=` or `<:`, `=`, `==` or `:`, `!=`, `!`
-            or `<>`) followed by a number, a gap token (`gap`, `nan`, `null`, `empty`) or the
+            optional operator (`>`, `>=` or `>:`, `<`, `<=` or `<:`, `=`, `==` or `:`, `!=`,
+            `!:`, `!` or `<>`) followed by a number, a gap token (`gap`, `nan`, `null`, `empty`) or the
             previous collected sample (`previous`, `last`). A bare value means equality; omitted
             or empty input means `==0`; an operator without a value applies to zero. There are no
             and/or compounds;
@@ -9326,7 +9326,7 @@ components:
       in: query
       description: |
         When the time grouping function supports additional parameters, this field can be used to pass them to it. `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a CONDITION; `trimmed-mean`, `trimmed-median` and `percentile` take a number.
-        A condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!` or `<>`); with no operator the value compares equal. The value is one of:
+        A condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!:`, `!` or `<>`); with no operator the value compares equal. The value is one of:
         - a number, e.g. `>10`
         - a gap token - `gap`, `nan`, `null` or `empty` are synonyms for "no data was collected", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. For `percentage-of-samples`, `number-of-flaps` and `number-of-times`, naming a gap token is what makes gaps participate at all; without one they are invisible for these three aggregations. `percentage-of-time` always counts uncollected time in its denominator, whatever the condition compares against.
         - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.
@@ -9342,7 +9342,7 @@ components:
       in: query
       description: |
         When the time grouping function supports additional parameters, this field can be used to pass them to it. `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a CONDITION; `trimmed-mean`, `trimmed-median` and `percentile` take a number.
-        A condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!` or `<>`); with no operator the value compares equal. The value is one of:
+        A condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!:`, `!` or `<>`); with no operator the value compares equal. The value is one of:
         - a number, e.g. `>10`
         - a gap token - `gap`, `nan`, `null` or `empty` are synonyms for "no data was collected", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. For `percentage-of-samples`, `number-of-flaps` and `number-of-times`, naming a gap token is what makes gaps participate at all; without one they are invisible for these three aggregations. `percentage-of-time` always counts uncollected time in its denominator, whatever the condition compares against.
         - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.
