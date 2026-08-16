@@ -384,10 +384,9 @@ static int run_db_lookup_test(const db_lookup_test_case_t *test) {
 
     // verify value for countif/percentile/trimmed-mean if specified
     if(!isnan(test->expected_value)) {
-        NETDATA_DOUBLE actual_value = isnan(ac.time_group_value) ? 0.0 : ac.time_group_value;
-        if(fabsl(actual_value - test->expected_value) > 0.0001) {
+        if(isnan(ac.time_group_value) || fabsl(ac.time_group_value - test->expected_value) > 0.0001) {
             fprintf(stderr, "FAILED [%s]: expected value %f but got %f\n",
-                    test->description, test->expected_value, actual_value);
+                    test->description, test->expected_value, ac.time_group_value);
             errors++;
         }
     }
