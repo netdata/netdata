@@ -220,6 +220,7 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
     time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
     if(!time_grouping_expression_options_valid(time_group, time_group_options)) {
+        buffer_no_cacheable(w->response.data);
         buffer_sprintf(w->response.data, "Invalid time-group condition.");
         return HTTP_RESP_BAD_REQUEST;
     }
