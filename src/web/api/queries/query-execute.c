@@ -626,12 +626,12 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             }
 
             if(likely(netdata_double_isnumber(carried_value))) {
+                if(unlikely(new_point.sp.flags & SN_FLAG_RESET))
+                    ops->group_value_flags |= RRDR_VALUE_RESET;
+
                 if(settle_value) {
                     if(likely(fpclassify(carried_value) != FP_ZERO))
                         ops->group_points_non_zero++;
-
-                    if(unlikely(new_point.sp.flags & SN_FLAG_RESET))
-                        ops->group_value_flags |= RRDR_VALUE_RESET;
 
                     r->time_grouping.add(r, carried_value);
                     if(!new_point.added)
