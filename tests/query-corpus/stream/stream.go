@@ -328,10 +328,16 @@ type ReplayValue struct {
 	Flags     string
 }
 
-// ReplayRow is one replicated second: the per-dimension samples at time T.
+// ReplayRow is one replicated sample: the per-dimension values at time T.
 type ReplayRow struct {
 	T    int64
 	Dims []ReplayValue
+}
+
+// ReplayChart is the retained interval and collection cadence of one chart.
+type ReplayChart struct {
+	FirstT, LastT int64
+	UpdateEvery   int
 }
 
 // ReplayHandler returns the fixture rows for chart in the window
@@ -342,7 +348,7 @@ type ReplayHandler func(chart string, after, before int64) []ReplayRow
 // until every chart in charts has been granted streaming (start_streaming
 // true), the parent closes, or timeout expires. It returns the number of
 // rows served per chart.
-func (c *Conn) ServeReplication(charts map[string]struct{ FirstT, LastT int64 }, childNow int64, handler ReplayHandler, timeout time.Duration) (map[string]int, error) {
+func (c *Conn) ServeReplication(charts map[string]ReplayChart, childNow int64, handler ReplayHandler, timeout time.Duration) (map[string]int, error) {
 	if err := c.Flush(); err != nil {
 		return nil, err
 	}
@@ -375,13 +381,17 @@ func (c *Conn) ServeReplication(charts map[string]struct{ FirstT, LastT int64 },
 		if !known {
 			return served, fmt.Errorf("stream: parent requested replication of unknown chart %q", chart)
 		}
+		updateEvery := ret.UpdateEvery
+		if updateEvery <= 0 {
+			updateEvery = 1
+		}
 
 		// Scope the response even when this replication window has no rows.
 		c.Linef("RBEGIN %s", qw(chart))
 
 		if after != 0 && before != 0 {
 			for _, row := range handler(chart, after, before) {
-				c.Linef("RBEGIN %s %d %d %d", qw(chart), row.T-1, row.T, childNow)
+				c.Linef("RBEGIN %s %d %d %d", qw(chart), row.T-int64(updateEvery), row.T, childNow)
 				for _, dv := range row.Dims {
 					if dv.Flags == FlagEmpty {
 						c.Linef("RSET %s NAN E", qw(dv.ID))
@@ -398,7 +408,8 @@ func (c *Conn) ServeReplication(charts map[string]struct{ FirstT, LastT int64 },
 			streamWord = "true"
 			granted[chart] = true
 		}
-		c.Linef("REND 1 %d %d %s %d %d %d", ret.FirstT, ret.LastT, streamWord, after, before, childNow)
+		c.Linef("REND %d %d %d %s %d %d %d",
+			updateEvery, ret.FirstT, ret.LastT, streamWord, after, before, childNow)
 		if err := c.Flush(); err != nil {
 			return served, err
 		}

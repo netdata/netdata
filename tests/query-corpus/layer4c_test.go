@@ -297,8 +297,8 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	conn.Dimension(c4cEqualRateDim, "incremental", 1, 1)
 	conn.ChartDefinitionEnd(firstT, c4cEqualLast, c4cEqualLast)
 	servedEqual, err := conn.ServeReplication(
-		map[string]struct{ FirstT, LastT int64 }{
-			c4cEqualContext: {FirstT: firstT, LastT: c4cEqualLast},
+		map[string]stream.ReplayChart{
+			c4cEqualContext: {FirstT: firstT, LastT: c4cEqualLast, UpdateEvery: 1},
 		},
 		c4cEqualLast,
 		func(_ string, after, before int64) []stream.ReplayRow {
@@ -332,7 +332,9 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
 
 	served, err := conn.ServeReplication(
-		map[string]struct{ FirstT, LastT int64 }{c4cContext: {FirstT: firstT, LastT: lastT}},
+		map[string]stream.ReplayChart{
+			c4cContext: {FirstT: firstT, LastT: lastT, UpdateEvery: 1},
+		},
 		lastT,
 		func(_ string, after, before int64) []stream.ReplayRow {
 			rows := make([]stream.ReplayRow, 0, before-after)

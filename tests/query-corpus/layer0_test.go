@@ -285,22 +285,26 @@ func pushLivePaced(t *testing.T, hostname, machineGUID string, ch fixture.Chart)
 }
 
 // pushReplication declares child retention and serves the parent's
-// replication requests from the fixture. firstT is declared one step before
+// replication requests from the fixture. firstT is declared one interval before
 // the first point because the request window (after, before] is exclusive
 // on the left.
 func pushReplication(t *testing.T, hostname, machineGUID string, ch fixture.Chart) {
 	t.Helper()
 	conn := connect(t, hostname, machineGUID, stream.CapsReplication)
 
-	firstT := ch.FirstT() - 1
+	updateEvery := ch.UpdateEvery
+	if updateEvery <= 0 {
+		updateEvery = 1
+	}
+	firstT := ch.FirstT() - int64(updateEvery)
 	lastT := ch.LastT()
 	childNow := lastT // fixture wall clock frozen at the last sample
 
 	ch.Define(conn)
 	conn.ChartDefinitionEnd(firstT, lastT, childNow)
 
-	charts := map[string]struct{ FirstT, LastT int64 }{
-		ch.ID: {FirstT: firstT, LastT: lastT},
+	charts := map[string]stream.ReplayChart{
+		ch.ID: {FirstT: firstT, LastT: lastT, UpdateEvery: updateEvery},
 	}
 	served, err := conn.ServeReplication(charts, childNow, func(chart string, after, before int64) []stream.ReplayRow {
 		return ch.ReplayWindow(after, before)

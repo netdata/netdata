@@ -164,3 +164,63 @@ func TestConnectPreservesFirstProtocolLineAfterCapabilities(t *testing.T) {
 		t.Fatalf("first protocol line = %q, want %q", line, sentinel)
 	}
 }
+
+func TestServeReplicationPreservesChartCadence(t *testing.T) {
+	childSide, parentSide := net.Pipe()
+	t.Cleanup(func() {
+		_ = childSide.Close()
+		_ = parentSide.Close()
+	})
+
+	child := &Conn{
+		conn: childSide,
+		r:    bufio.NewReader(childSide),
+		w:    bufio.NewWriter(childSide),
+	}
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := child.ServeReplication(
+			map[string]ReplayChart{
+				"fixture.chart": {FirstT: 100, LastT: 105, UpdateEvery: 5},
+			},
+			105,
+			func(_ string, _, _ int64) []ReplayRow {
+				return []ReplayRow{{
+					T: 105,
+					Dims: []ReplayValue{{
+						ID: "value", Collected: "7", Flags: FlagNotAnomalous,
+					}},
+				}}
+			},
+			time.Second,
+		)
+		result <- err
+	}()
+
+	if _, err := fmt.Fprintln(parentSide, `REPLAY_CHART "fixture.chart" "true" 100 105`); err != nil {
+		t.Fatal(err)
+	}
+	if err := parentSide.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	reader := bufio.NewReader(parentSide)
+	want := []string{
+		"RBEGIN 'fixture.chart'",
+		"RBEGIN 'fixture.chart' 100 105 105",
+		"RSET 'value' 7 A",
+		"REND 5 100 105 true 100 105 105",
+	}
+	for i, expected := range want {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("replication response line %d: %v", i, err)
+		}
+		if got := strings.TrimSpace(line); got != expected {
+			t.Fatalf("replication response line %d = %q, want %q", i, got, expected)
+		}
+	}
+	if err := <-result; err != nil {
+		t.Fatal(err)
+	}
+}

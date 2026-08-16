@@ -124,8 +124,8 @@ func TestCase015ReplicationDisconnectDiscard(t *testing.T) {
 	ch.Define(conn)
 	conn.ChartDefinitionEnd(firstT, lastT, lastT)
 
-	charts := map[string]struct{ FirstT, LastT int64 }{
-		ch.ID: {FirstT: firstT, LastT: lastT},
+	charts := map[string]stream.ReplayChart{
+		ch.ID: {FirstT: firstT, LastT: lastT, UpdateEvery: ch.UpdateEvery},
 	}
 	served, err := conn.ServeReplication(charts, lastT, func(chart string, after, before int64) []stream.ReplayRow {
 		return ch.ReplayWindow(after, before)

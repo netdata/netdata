@@ -107,7 +107,9 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 	// same incompressible generator as part (c): the quotas must fill with
 	// real bytes for rotation to happen
 	served, err := conn.ServeReplication(
-		map[string]struct{ FirstT, LastT int64 }{c4dContext: {FirstT: firstT, LastT: lastT}},
+		map[string]stream.ReplayChart{
+			c4dContext: {FirstT: firstT, LastT: lastT, UpdateEvery: 1},
+		},
 		lastT,
 		func(_ string, after, before int64) []stream.ReplayRow {
 			rows := make([]stream.ReplayRow, 0, before-after)
