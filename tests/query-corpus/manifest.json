@@ -840,7 +840,7 @@
   },
   {
     "name": "CASE-028/rate-with-gaps-totals-what-was-measured",
-    "proves": "a rate metric with holes in it totals the seconds that were MEASURED, on every tier, with every row exact. Above tier 0 a stable-cadence record's count and recovered gap_count partition its nominal slots: sum x duration/(count+gap_count) integrates measured time without inventing volume. The matrix separates update_every 1/10, tiers 0/1/2, two exact zooms, and gapped/no-gap controls; every gapped numeric row is exactly PARTIAL and every dense row is clean. Windows span whole stored records, so the oracle has no edge estimate or rounded query span"
+    "proves": "a rate metric with holes in it totals the seconds that were MEASURED, on every tier, with every row exact. Above tier 0 a stable-cadence record's count and recovered gap_count partition its nominal slots: sum x duration/(count+gap_count) integrates measured time without inventing volume. The matrix separates update_every 1/10, tiers 0/1/2, two exact zooms, and gapped/no-gap controls. Windows span whole stored records, so the oracle has no edge estimate or rounded query span"
   },
   {
     "name": "CASE-028/partial-and-off-grid-rate-windows",

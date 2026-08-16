@@ -280,18 +280,12 @@ func c028VolumeMatches(t *testing.T, q c028Query) bool {
 		ok = false
 	}
 	col := cols["rate"]
-	wantPA := int64(0)
-	if q.gapped {
-		wantPA = canon.AnnotationPartial
-	}
 	wantRows := make([]expectedColumnPoint, q.points)
 	for i := range wantRows {
 		rowAfter := q.after + int64(i)*rowSpan
 		rowBefore := rowAfter + rowSpan
-		wantRows[i] = wantNumberWithPAAt(
-			rowBefore,
-			c028Measured(q.ue, q.gapped, rowAfter, rowBefore),
-			wantPA)
+		wantRows[i] = wantNumberAt(
+			rowBefore, c028Measured(q.ue, q.gapped, rowAfter, rowBefore))
 	}
 	if !assertExactColumn(t, cols, "rate", wantRows, 1e-6) {
 		ok = false
