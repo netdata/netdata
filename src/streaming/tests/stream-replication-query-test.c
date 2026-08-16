@@ -153,10 +153,11 @@ int main(void) {
        q->points_read != 10 || q->points_generated != 9 ||
        strcmp(buffer_tostring(wb), expected) != 0) {
         fprintf(stderr,
-                "stream replication result: rrddim=%d gap=%d after=%ld before=%ld read=%zu generated=%zu\n"
+                "stream replication result: rrddim=%d gap=%d after=%" PRIdMAX " before=%" PRIdMAX
+                " read=%zu generated=%zu\n"
                 "expected:\n%sactual:\n%s",
                 stream_replication_test_used_rrddim_backend, finished_with_gap,
-                q->query.after, q->query.before,
+                (intmax_t)q->query.after, (intmax_t)q->query.before,
                 q->points_read, q->points_generated,
                 expected, buffer_tostring(wb));
         errors++;
