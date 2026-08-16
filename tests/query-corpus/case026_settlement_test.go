@@ -44,7 +44,7 @@ func TestCase026SettlementCarriesAnomaly(t *testing.T) {
 				if anomalous {
 					return stream.FlagReset
 				}
-				return "AR"
+				return stream.FlagNotAnomalous + stream.FlagReset
 			}
 			if anomalous {
 				return stream.FlagAnomalous

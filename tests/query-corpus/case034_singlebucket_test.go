@@ -80,20 +80,20 @@ func c034HotEdgeFixture(t *testing.T, name, context string, machineGUID int, las
 }
 
 func c034NearLiveFixture(
-	t *testing.T, name, context string, machineGUID int, first, last, delayedLast int64,
+	t *testing.T, name, context string, machineGUID int, updateEvery, first, last, delayedLast int64,
 ) string {
 	t.Helper()
 
 	host := "c034-" + name
 	ch := fixture.Chart{
 		ID: context, Title: "near-live timestamp grid", Units: "units",
-		Family: "fixture", Context: context, UpdateEvery: 10,
+		Family: "fixture", Context: context, UpdateEvery: int(updateEvery),
 		Dimensions: []fixture.Dimension{
 			{ID: "always", Algorithm: "absolute"},
 			{ID: "delayed", Algorithm: "absolute"},
 		},
 	}
-	for ts := first; ts <= last; ts += 10 {
+	for ts := first; ts <= last; ts += updateEvery {
 		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points, fixture.Point{
 			T: ts, Collected: "1", Flags: stream.FlagNotAnomalous,
 		})
@@ -344,34 +344,48 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 	})
 
 	t.Run("near-live-partial-data", func(t *testing.T) {
-		const trimmingContract = "CASE-034/near-live-partial-data-is-trimmed"
+		const (
+			trimmingContract = "CASE-034/near-live-partial-data-is-trimmed"
+			updateEvery      = int64(60)
+		)
 		trackContract(t, trimmingContract)
 
-		before := time.Now().Unix() - 1
-		before -= before % 10
-		after := before - 60
-		grid := queryExpectedVirtualGrid(t, after, before, 6, false)
 		fixtures := []struct {
-			name, context string
-			machineGUID   int
-			delayedLast   int64
-			rows          int
-			trimmedAfter  int64
+			name, context      string
+			machineGUID        int
+			delayedLastOffset  int64
+			rows               int
+			trimmedAfterOffset int64
 		}{
 			{
 				name: "near-live-complete", context: "fixture.c034_timestamp_grid.near_live_complete",
-				machineGUID: 346, delayedLast: before, rows: 6, trimmedAfter: before,
+				machineGUID: 346, rows: 6,
 			},
 			{
 				name: "near-live-missing-last", context: "fixture.c034_timestamp_grid.near_live_missing_last",
-				machineGUID: 347, delayedLast: before - 20, rows: 4, trimmedAfter: before - 10,
+				machineGUID: 347, delayedLastOffset: -2 * updateEvery, rows: 4, trimmedAfterOffset: -updateEvery,
 			},
 		}
 
 		ok := true
+		requireNearLive := func(host string, before int64) {
+			t.Helper()
+			if now := time.Now().Unix(); before < now-2*updateEvery {
+				t.Fatalf("%s fixture aged outside the near-live window: before=%d now=%d update_every=%d",
+					host, before, now, updateEvery)
+			}
+		}
 		for _, live := range fixtures {
+			before := time.Now().Unix() - 1
+			before -= before % updateEvery
+			after := before - 6*updateEvery
+			grid := queryExpectedVirtualGrid(t, after, before, 6, false)
+			delayedLast := before + live.delayedLastOffset
+			wantTrimmedAfter := before + live.trimmedAfterOffset
 			host := c034NearLiveFixture(
-				t, live.name, live.context, live.machineGUID, after+10, before, live.delayedLast)
+				t, live.name, live.context, live.machineGUID, updateEvery,
+				after+updateEvery, before, delayedLast)
+			requireNearLive(host, before)
 			params := daemon.DataParams(live.context, after, before, 6)
 			params.Set("scope_dimensions", "always|delayed")
 			params.Set("options", "jsonwrap|unaligned|virtual-points")
@@ -399,7 +413,7 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 			always := make([]expectedColumnPoint, 0, live.rows)
 			delayed := make([]expectedColumnPoint, 0, live.rows)
 			for row := 1; row <= live.rows; row++ {
-				ts := after + int64(row)*10
+				ts := after + int64(row)*updateEvery
 				always = append(always, wantNumberAt(ts, 1))
 				delayed = append(delayed, wantNumberAt(ts, 2))
 			}
@@ -411,6 +425,7 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 			debugParams := daemon.DataParams(live.context, after, before, 6)
 			debugParams.Set("scope_dimensions", "always|delayed")
 			debugParams.Set("options", "jsonwrap|unaligned|virtual-points|debug")
+			requireNearLive(host, before)
 			debugDoc, err := td.DataV3(host, debugParams)
 			if err != nil {
 				t.Fatal(err)
@@ -428,9 +443,10 @@ func TestCase034APITimestampGridIsImmutable(t *testing.T) {
 			expectedAfter, expectedOK := queryInteger(trimming["expected_after"])
 			trimmedAfter, trimmedOK := queryInteger(trimming["trimmed_after"])
 			if !maxOK || !expectedOK || !trimmedOK ||
-				maxEvery != 20 || expectedAfter != before-20 || trimmedAfter != live.trimmedAfter {
-				t.Logf("%s partial_data_trimming = %v, want max=20 expected_after=%d trimmed_after=%d",
-					host, trimming, before-20, live.trimmedAfter)
+				maxEvery != 2*updateEvery || expectedAfter != before-2*updateEvery ||
+				trimmedAfter != wantTrimmedAfter {
+				t.Logf("%s partial_data_trimming = %v, want max=%d expected_after=%d trimmed_after=%d",
+					host, trimming, 2*updateEvery, before-2*updateEvery, wantTrimmedAfter)
 				ok = false
 			}
 		}

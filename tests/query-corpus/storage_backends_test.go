@@ -303,11 +303,6 @@ func TestHistoricalTierGrouping(t *testing.T) {
 		before   = int64(fixture.T0 + 24)
 	)
 
-	dd := startDedicatedStorageDaemon(t, daemon.Options{
-		StorageTiers: 2,
-		TierGrouping: [3]int{0, 4, 0},
-	})
-
 	t.Run("complete-4-to-8", func(t *testing.T) {
 		const (
 			component = "complete-4-to-8"
@@ -316,6 +311,10 @@ func TestHistoricalTierGrouping(t *testing.T) {
 			dimension = "value"
 		)
 		trackContractComponent(t, contract, component)
+		dd := startDedicatedStorageDaemon(t, daemon.Options{
+			StorageTiers: 2,
+			TierGrouping: [3]int{0, 4, 0},
+		})
 
 		ch := fixture.Series(context, context, fixture.T0, 40, 1,
 			func(int) string { return "1" }, notAnom)
@@ -355,6 +354,10 @@ func TestHistoricalTierGrouping(t *testing.T) {
 			dimension = "value"
 		)
 		trackContractComponent(t, contract, component)
+		dd := startDedicatedStorageDaemon(t, daemon.Options{
+			StorageTiers: 2,
+			TierGrouping: [3]int{0, 8, 0},
+		})
 
 		ch := fixture.Series(context, context, fixture.T0, 40, 1,
 			func(int) string { return "1" },

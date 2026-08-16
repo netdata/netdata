@@ -31,7 +31,7 @@ func TestCase032ResetAnnotationIsNotRedelivered(t *testing.T) {
 		func(int) string { return "100" },
 		func(i int) string {
 			if i == 8 || i == samples {
-				return "AR"
+				return stream.FlagNotAnomalous + stream.FlagReset
 			}
 			return stream.FlagNotAnomalous
 		})

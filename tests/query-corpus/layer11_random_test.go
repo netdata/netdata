@@ -306,6 +306,6 @@ func TestLayer11RandomisedSlicing(t *testing.T) {
 		ok = false
 	}
 
-	t.Logf("%d randomized cases, %d distinct locally minimal failures", rounds, len(failures))
+	t.Logf("%d randomized cases, %d distinct locally minimal failures", len(cases), len(failures))
 	assertContract(t, "L11/randomised-slicing", ok)
 }

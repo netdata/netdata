@@ -60,7 +60,7 @@ func TestLayer1Palette(t *testing.T) {
 			hostname: "l1-reset", guid: guid(25),
 			chart: fixture.Series("fixture.l1reset", "fixture.l1reset", fixture.T0, 60, 1, modVal, func(i int) string {
 				if i == 20 {
-					return "AR" // reset annotation, explicitly not anomalous
+					return stream.FlagNotAnomalous + stream.FlagReset
 				}
 				return stream.FlagNotAnomalous
 			}),
@@ -69,7 +69,7 @@ func TestLayer1Palette(t *testing.T) {
 			hostname: "l1-resetanom", guid: guid(26),
 			chart: fixture.Series("fixture.l1resetanom", "fixture.l1resetanom", fixture.T0, 60, 1, modVal, func(i int) string {
 				if i == 20 {
-					return "R" // reset without 'A': reset AND anomalous
+					return stream.FlagReset // reset without 'A': reset AND anomalous
 				}
 				return stream.FlagNotAnomalous
 			}),

@@ -293,9 +293,9 @@ func TestLayer2Tier1Palette(t *testing.T) {
 			chart: fixture.Series("fixture.l2reset", "fixture.l2reset", fixture.T0, 280, 1, modVal, func(i int) string {
 				switch i {
 				case 50:
-					return "R"
+					return stream.FlagReset
 				case 110:
-					return "AR"
+					return stream.FlagNotAnomalous + stream.FlagReset
 				}
 				return stream.FlagNotAnomalous
 			}),

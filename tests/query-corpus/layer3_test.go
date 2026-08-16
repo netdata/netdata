@@ -169,7 +169,7 @@ func layer3Canonical(chartID string) fixture.Chart {
 		case i >= 41 && i <= 45:
 			return stream.FlagAnomalous
 		case i == 55:
-			return "AR"
+			return stream.FlagNotAnomalous + stream.FlagReset
 		}
 		return stream.FlagNotAnomalous
 	})
