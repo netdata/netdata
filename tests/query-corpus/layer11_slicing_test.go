@@ -344,6 +344,11 @@ func sliceSharedRecords(a sliceAxes, left, right sliceQueryResult) (content floa
 var (
 	sliceReady     = map[string]bool{}
 	sliceRetention = map[string][]daemon.Retention{}
+	sliceGUIDIndex = map[string]int{
+		"dense/1": 232, "dense/10": 233,
+		"gaps/1": 234, "gaps/10": 235,
+		"sparse/1": 236, "sparse/10": 237,
+	}
 )
 
 func sliceResponseDeclaredGrid(option string, points int64) bool {
@@ -400,7 +405,11 @@ func sliceFixture(t *testing.T, shape string, ue int) string {
 	}
 
 	host := "l11-" + shape + strconv.Itoa(ue)
-	pushLiveBurst(t, host, guid(232+len(sliceReady)), ch)
+	guidIndex, ok := sliceGUIDIndex[shape+"/"+strconv.Itoa(ue)]
+	if !ok {
+		t.Fatalf("slicing fixture has no GUID index for shape=%q update_every=%d", shape, ue)
+	}
+	pushLiveBurst(t, host, guid(guidIndex), ch)
 	if _, err := td.WaitRetention(host, ctx, ch.FirstT(), ch.LastT(), 30*time.Second); err != nil {
 		t.Fatal(err)
 	}

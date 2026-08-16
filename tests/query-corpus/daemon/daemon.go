@@ -70,6 +70,7 @@ type Daemon struct {
 
 	LaunchStartedAt time.Time
 	process         daemonProcess
+	processPID      int
 	waitCh          chan error
 
 	// Tests shorten these bounds; zero selects the production defaults.
@@ -326,6 +327,7 @@ func (d *Daemon) launch() error {
 		return fmt.Errorf("daemon: start %s: %w", d.Opts.Binary, err)
 	}
 	d.process = cmd.Process
+	d.processPID = cmd.Process.Pid
 	d.waitCh = make(chan error, 1)
 	go func() {
 		d.waitCh <- cmd.Wait()
@@ -353,6 +355,7 @@ func (d *Daemon) launch() error {
 			// the process is already reaped; make a later Stop() a no-op
 			// instead of blocking forever on the drained wait channel
 			d.process = nil
+			d.processPID = 0
 			return fmt.Errorf(
 				"daemon: exited during startup: %v; last readiness probe: %v (see %s/log/stdout.log)",
 				werr, lastProbeErr, d.Opts.RunDir)
@@ -438,6 +441,7 @@ func (d *Daemon) Stop() error {
 	select {
 	case waitErr := <-d.waitCh:
 		d.process = nil
+		d.processPID = 0
 		return errors.Join(termErr, waitErr)
 	case <-time.After(termWait):
 	}
@@ -449,12 +453,14 @@ func (d *Daemon) Stop() error {
 	select {
 	case <-d.waitCh:
 		d.process = nil
+		d.processPID = 0
 		return errors.Join(termErr, killErr)
 	case <-time.After(killWait):
 		return errors.Join(
 			termErr,
 			killErr,
-			fmt.Errorf("daemon: process did not deliver reap result within %s after SIGKILL", killWait))
+			fmt.Errorf("daemon: process PID %d did not deliver reap result within %s after SIGKILL",
+				d.processPID, killWait))
 	}
 }
 

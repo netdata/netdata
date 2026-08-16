@@ -476,6 +476,9 @@ func TestLayer2SNvsOriginal(t *testing.T) {
 
 	t.Run("tier-rollup-original", func(t *testing.T) {
 		trackContract(t, "L2/tier-rollup-original-values")
+		if _, err := td.WaitRetention("l2-snorig", ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
+			t.Fatal(err)
+		}
 		f, _ := strconv.ParseFloat(v, 64)
 		if q := fixture.SNRoundTrip(f); q == float64(float32(f)) {
 			t.Fatalf("fixture lost its discriminating power: SNRoundTrip(%s)=%v equals float32(%s)=%v",

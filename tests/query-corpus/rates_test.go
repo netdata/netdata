@@ -34,24 +34,23 @@ func TestIncrementalRates(t *testing.T) {
 		step     int64 // counter increment per interval (incremental) or the constant reading (absolute)
 		want     float64
 		samples  int
+		guidIdx  int
 	}{
 		// counter +100 per 5s interval → 20/s in the db
-		"incremental-ue5": {ue: 5, algo: "incremental", mul: 1, div: 1, step: 100, want: 20, samples: 8},
+		"incremental-ue5": {ue: 5, algo: "incremental", mul: 1, div: 1, step: 100, want: 20, samples: 8, guidIdx: 131},
 		// per-second control: +7 per 1s interval → 7/s
-		"incremental-ue1": {ue: 1, algo: "incremental", mul: 1, div: 1, step: 7, want: 7, samples: 10},
+		"incremental-ue1": {ue: 1, algo: "incremental", mul: 1, div: 1, step: 7, want: 7, samples: 10, guidIdx: 132},
 		// scaling: +100 per 2s with mul=8,div=10 → 100*0.8/2 = 40/s
-		"incremental-scaled-ue2": {ue: 2, algo: "incremental", mul: 8, div: 10, step: 100, want: 40, samples: 8},
+		"incremental-scaled-ue2": {ue: 2, algo: "incremental", mul: 8, div: 10, step: 100, want: 40, samples: 8, guidIdx: 133},
 		// absolute control at ue=2: the value is NOT divided by the
 		// interval — gauges are level readings, not rates
-		"absolute-ue2": {ue: 2, algo: "absolute", mul: 1, div: 1, step: 100, want: 100, samples: 9},
+		"absolute-ue2": {ue: 2, algo: "absolute", mul: 1, div: 1, step: 100, want: 100, samples: 9, guidIdx: 134},
 	}
 
-	i := 0
 	for name, tc := range cases {
-		i++
 		hostname := "rates-" + name
 		context := "fixture.rates_" + name
-		g := guid(130 + i)
+		g := guid(tc.guidIdx)
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel() // the cases pace in real time — overlap them

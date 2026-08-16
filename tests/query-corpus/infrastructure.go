@@ -101,7 +101,11 @@ func trackInfrastructureSetup(t *testing.T, ledger *infrastructureLedger, phase 
 	// Call the returned completion function after the setup proof and before
 	// query-contract assertions, while t.Failed() still describes setup only.
 	tracker := newInfrastructureSetupTracker(ledger, phase, t.Failed)
-	t.Cleanup(tracker.finish)
+	t.Cleanup(func() {
+		if !t.Skipped() {
+			tracker.finish()
+		}
+	})
 	return tracker.complete
 }
 

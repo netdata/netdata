@@ -42,6 +42,16 @@ func TestInfrastructureAttribution(t *testing.T) {
 		assertInfrastructurePhases(t, ledger, []string{"fixture/setup"})
 	})
 
+	t.Run("skipped setup is not an infrastructure failure", func(t *testing.T) {
+		ledger := newInfrastructureLedger()
+		t.Run("skipped setup", func(t *testing.T) {
+			trackInfrastructureSetup(t, ledger, "fixture/setup")
+			t.Skip("intentional setup skip")
+		})
+
+		assertInfrastructurePhases(t, ledger, nil)
+	})
+
 	t.Run("shutdown executes once and preserves its error", func(t *testing.T) {
 		ledger := newInfrastructureLedger()
 		calls := 0

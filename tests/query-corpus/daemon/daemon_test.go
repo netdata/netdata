@@ -303,6 +303,7 @@ func (p *fakeProcess) Kill() error {
 func testStoppingDaemon(process *fakeProcess, waitCh chan error) *Daemon {
 	return &Daemon{
 		process:     process,
+		processPID:  4242,
 		waitCh:      waitCh,
 		termTimeout: time.Millisecond,
 		killTimeout: time.Millisecond,
@@ -379,8 +380,8 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 
 		started := time.Now()
 		err := d.Stop()
-		if err == nil || !strings.Contains(err.Error(), "reap") {
-			t.Fatalf("Stop() error = %v, want reap timeout", err)
+		if err == nil || !strings.Contains(err.Error(), "reap") || !strings.Contains(err.Error(), "PID 4242") {
+			t.Fatalf("Stop() error = %v, want reap timeout identifying PID 4242", err)
 		}
 		if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
 			t.Fatalf("Stop() took %v, want bounded completion", elapsed)

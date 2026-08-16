@@ -172,22 +172,22 @@ func storageBackendStateHeld(t *testing.T, dd *daemon.Daemon) bool {
 func TestStorageBackendGapState(t *testing.T) {
 	const contract = "L1/storage-backend-gap-state"
 
-	cases := []struct {
-		component string
-		pageType  string
-		memory    string
-		restart   bool
+	cases := map[string]struct {
+		pageType string
+		memory   string
+		restart  bool
+		guidIdx  int
 	}{
-		{component: "dbengine-gorilla-hot", memory: "dbengine"},
-		{component: "dbengine-gorilla-restart", memory: "dbengine", restart: true},
-		{component: "dbengine-raw-hot", pageType: "raw", memory: "dbengine"},
-		{component: "dbengine-raw-restart", pageType: "raw", memory: "dbengine", restart: true},
-		{component: "ram", memory: "ram"},
-		{component: "alloc", memory: "alloc"},
+		"dbengine-gorilla-hot":     {memory: "dbengine", guidIdx: 410},
+		"dbengine-gorilla-restart": {memory: "dbengine", restart: true, guidIdx: 411},
+		"dbengine-raw-hot":         {pageType: "raw", memory: "dbengine", guidIdx: 412},
+		"dbengine-raw-restart":     {pageType: "raw", memory: "dbengine", restart: true, guidIdx: 413},
+		"ram":                      {memory: "ram", guidIdx: 414},
+		"alloc":                    {memory: "alloc", guidIdx: 415},
 	}
-	for i, tc := range cases {
-		t.Run(tc.component, func(t *testing.T) {
-			trackContractComponent(t, contract, tc.component)
+	for component, tc := range cases {
+		t.Run(component, func(t *testing.T) {
+			trackContractComponent(t, contract, component)
 			dd := startDedicatedStorageDaemon(t, daemon.Options{
 				StorageTiers: 1, DBEnginePageType: tc.pageType, StreamMemoryMode: tc.memory,
 			})
@@ -196,7 +196,7 @@ func TestStorageBackendGapState(t *testing.T) {
 				// The legacy ring reports the interval preceding its first stored sample.
 				expectedFirst = fixture.T0
 			}
-			closeFixture := pushStorageBackendFixture(t, dd, guid(410+i), expectedFirst)
+			closeFixture := pushStorageBackendFixture(t, dd, guid(tc.guidIdx), expectedFirst)
 			if tc.restart {
 				if err := closeFixture(); err != nil {
 					t.Fatal(err)
@@ -210,7 +210,7 @@ func TestStorageBackendGapState(t *testing.T) {
 				}
 			}
 			if !storageBackendStateHeld(t, dd) {
-				t.Errorf("BROKEN %s (%s): %s", contract, tc.component, manifest[contract].Proves)
+				t.Errorf("BROKEN %s (%s): %s", contract, component, manifest[contract].Proves)
 			}
 		})
 	}

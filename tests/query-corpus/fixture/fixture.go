@@ -283,7 +283,10 @@ type ExpectedPoint struct {
 	PA    int64
 }
 
-// Expected computes the tier0 read-back oracle for the dimension. SN flags
+// Expected computes the tier0 read-back oracle for the dimension. Live v2
+// SET2 and replicated RSET records carry the calculated value explicitly, so
+// Algorithm/Mul/Div metadata does not transform this value on the parent; v1
+// raw-counter fixtures use their own oracle. SN flags
 // text semantics: 'E' = empty slot (gap); 'R' = reset annotation; 'A' =
 // explicitly NOT anomalous — a sample without 'A' (and not empty) is
 // anomalous (ARP 100). Values pass through the storage_number quantization

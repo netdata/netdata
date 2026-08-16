@@ -42,9 +42,10 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 		contract           string
 		first, then        int
 		samples1, samples2 int
+		guidIdx            int
 	}{
-		"speeds-up":  {contract: "CASE-030/interval-change-speeding-up", first: slow, then: fast, samples1: 28800, samples2: 600},
-		"slows-down": {contract: "CASE-030/interval-change-slowing-down", first: fast, then: slow, samples1: 28800, samples2: 600},
+		"speeds-up":  {contract: "CASE-030/interval-change-speeding-up", first: slow, then: fast, samples1: 28800, samples2: 600, guidIdx: 280},
+		"slows-down": {contract: "CASE-030/interval-change-slowing-down", first: fast, then: slow, samples1: 28800, samples2: 600, guidIdx: 281},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -62,7 +63,7 @@ func TestCase030IntervalChangeKeepsHistory(t *testing.T) {
 			// both phases go over ONE connection: the chart is redefined
 			// with the new update_every, the way a collector whose interval
 			// changes does it
-			conn := connect(t, host, guid(280+len(name)), stream.CapsLive)
+			conn := connect(t, host, guid(tc.guidIdx), stream.CapsLive)
 			ch1.Define(conn)
 			ch1.PushLive(conn)
 			if err := conn.Flush(); err != nil {
