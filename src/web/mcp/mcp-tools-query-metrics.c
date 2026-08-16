@@ -174,7 +174,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "For 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\n"
             "For 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', "
             "'number-of-flaps' and 'number-of-times', specify a CONDITION: an operator "
-            "('>', '>=', '<', '<=', '=', '!=') followed by a value. The value is a number "
+            "('!', '!=', '!:', '<>', '=', '==', ':', '>', '>=', '>:', '<', '<=', '<:') "
+            "followed by a value. The value is a number "
             "(e.g. '>0'), a gap token ('==gap', '!=gap' - 'nan', 'null' and 'empty' are "
             "synonyms - which is what makes uncollected time participate for 'percentage-of-samples', 'number-of-flaps' and 'number-of-times' ('percentage-of-time' always counts it)), or the "
             "previous collected sample ('<previous' - 'last' is a synonym, so '<last' is the "
@@ -184,8 +185,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "Over a window long enough to read lower-resolution data 'percentage-of-time', "
             "'number-of-flaps' and 'number-of-times' return an estimate, and the counting ones "
             "report at most one event per stored interval; 'percentage-of-samples' does not "
-            "estimate - it evaluates each stored point as one sample. Pass tier=0 for exact "
-            "answers.");
+            "estimate - it evaluates each stored point as one sample. Request tier=0 for the "
+            "highest-resolution available data and verify db.per_tier when the raw sample sequence matters.");
     }
     buffer_json_object_close(buffer); // time_group_options
 

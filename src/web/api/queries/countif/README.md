@@ -44,8 +44,9 @@ with HTTP 400 rather than silently changing what was asked. The same grammar is 
 
 Over a window long enough to be served from lower-resolution data this
 grouping evaluates each STORED point as one sample, rather than reasoning
-about the samples behind it. `percentage-of-time` is the one that estimates
-across a stored window; see
+about the samples behind it. `percentage-of-time`, `number-of-flaps` and
+`number-of-times` estimate across stored windows; the counting groupings can
+report at most one event per stored interval. See
 [Accuracy over long windows](/src/web/api/queries/README.md#accuracy-over-long-windows).
 
 ## how to use
