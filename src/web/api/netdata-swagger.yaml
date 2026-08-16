@@ -1431,7 +1431,7 @@ paths:
             default: 1
         - name: group_options
           in: query
-          description: >
+          description: >-
             Additional options for the grouping function. `percentage-of-samples` (alias
             `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a
             condition: an optional operator (`>`, `>=` or `>:`, `<`, `<=` or `<:`, `=`, `==` or
@@ -1676,7 +1676,7 @@ paths:
             default: 1
         - name: group_options
           in: query
-          description: >
+          description: >-
             Additional options for the time-series grouping function. Format depends on the
             selected group method: `percentage-of-samples` (alias `countif`),
             `percentage-of-time`, `number-of-flaps` and `number-of-times` take a condition - an
