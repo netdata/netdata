@@ -13,6 +13,11 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.35 to 1.32.36 in /src/go ([#23473](https://github.com/netdata/netdata/issues/23473))
 - Fix(go.d/snmp): use correct OID for Aruba fan status ([#23478](https://github.com/netdata/netdata/issues/23478))
 - Harden CI change detection for large pull requests ([#23477](https://github.com/netdata/netdata/issues/23477))
+- Complete collector documentation descriptions ([#23476](https://github.com/netdata/netdata/issues/23476))
+- Fix(dbengine): acquire merged page references before publishing ([#23475](https://github.com/netdata/netdata/issues/23475))
+- Regenerate integrations docs ([#23484](https://github.com/netdata/netdata/issues/23484))
+- Correct zRAM and eBPF VFS descriptions ([#23487](https://github.com/netdata/netdata/issues/23487))
+- Regenerate integrations docs ([#23488](https://github.com/netdata/netdata/issues/23488))
 
 ## [2.11.0] - 2026-08-12
 
