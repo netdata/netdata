@@ -11,7 +11,7 @@ The condition is an operator followed by a value, given in the
 
 | operator | meaning |
 |---|---|
-| `!` or `!=` or `<>` | different from |
+| `!` or `!=` or `!:` or `<>` | different from |
 | `=` or `==` or `:` | equal to (also what a bare value means) |
 | `>` | greater than |
 | `>=` or `>:` | greater than or equal to |
