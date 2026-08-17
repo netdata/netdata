@@ -290,6 +290,11 @@ For a coordinated change, prepare both repositories together, merge the testdata
 requires it, update the local checkout to latest `master`, and rerun complete Netdata verification. This ordering avoids a
 Netdata revision whose required evidence does not yet exist; it is not a substitute for the consumer verification.
 
+During development, use the ignored `src/go/testdata` directory as a checkout of the contributor's testdata fork and work on
+paired feature branches in both repositories. Open paired pull requests, merge testdata first, update the local checkout to
+the merged testdata `master`, and rerun the complete Netdata proof before merging the Netdata pull request. Because the two
+repositories cannot merge atomically, the Netdata merge should follow promptly.
+
 ## Verification ownership
 
 ### Testdata producer checks

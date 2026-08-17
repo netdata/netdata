@@ -248,8 +248,6 @@ func (c *semanticCompiler) validateEvidenceClosure() error {
 			allowed = []string{"lifecycle", "unit", "label"}
 		case "collection_hazard":
 			allowed = []string{"collection_hazard"}
-		case "scope_delegation":
-			allowed = []string{"delegation"}
 		}
 		if exclusion.Reason == "not_chartable" {
 			if err := useAll(field, exclusion.Evidence, "lifecycle", "unit"); err != nil {

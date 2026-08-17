@@ -107,7 +107,7 @@ Key rules:
 - Pin every public upstream to a full commit and cite repository-relative paths/lines in evidence.
 - Evidence records have one typed `kind`; consumers may reference only compatible kinds. Common kinds include
   `registration`, `availability`, `population`, `lifecycle`, `unit`, `label`, `relationship`, `state_encoding`,
-  `normalization`, `identity`, `deprecation`, `collection_hazard`, `delegation`, and `display_convention`.
+  `normalization`, `identity`, `deprecation`, `collection_hazard`, and `display_convention`.
 - Every inline registration declares an exact or grammar family selector, Prometheus type/shape, optional environment
   condition, and registration evidence.
 - Every signal declares what one observation describes, its components, label domains/stability/cardinality, functional
@@ -235,7 +235,6 @@ and their additional fields are:
 | `not_chartable` | `lost_question`, `required_operation: age_from_unix_epoch` | drop before writer |
 | `metadata_only` | none; value must be a constant metadata carrier | `retain_writable_unrendered` |
 | `collection_hazard` | source hazard evidence | drop before writer |
-| `scope_delegation` | `delegated_domain` | source-backed drop/retain |
 
 `not_chartable` is intentionally narrow: the current strict operation is only deriving age from a Unix timestamp. Do not
 use it as a generic “not useful” escape hatch. `metadata_only` applies to a source-proven constant-one carrier with useful
@@ -245,6 +244,19 @@ metadata labels, not to any gauge that happened to equal one in a fixture.
 
 Use latest testdata `master`; the Netdata repository intentionally does not pin its commit. By default it is cloned at the
 ignored `src/go/testdata`; `--testdata-root` can name another checkout.
+
+For a coordinated source/profile change:
+
+1. Use `src/go/testdata` as a checkout of the contributor's `netdata/testdata` fork.
+2. Create one feature branch in testdata and one matching feature branch in Netdata.
+3. Author and validate the source contract and fixtures on the testdata branch while the Netdata proof consumes that local
+   checkout.
+4. Open the paired pull requests and merge testdata first.
+5. Update `src/go/testdata` to the merged testdata `master`, rerun complete Netdata verification, and then merge the Netdata
+   pull request promptly.
+
+The repositories cannot merge atomically under the latest-testdata model. This ordering keeps the unavoidable compatibility
+window short without adding a testdata pin or weakening consumer verification.
 
 From the Netdata repository root:
 
