@@ -140,12 +140,12 @@ void nd_windows_detect_prefix_and_override_paths(void) {
     // directly without POSIX translation, so the path must be in a form
     // that UCRT64's CRT handles natively (C:/... works; /c/... does not).
     // NOSONAR (c:S5813) — install_prefix is bounded by FILENAME_MAX; not user-controlled.
-    CLEAN_CHAR_P *run_parent = mallocz(strlen(install_prefix) + sizeof("/run")); // NOSONAR (c:S5813)
-    CLEAN_CHAR_P *run_dir = mallocz(strlen(install_prefix) + sizeof("/run/netdata")); // NOSONAR (c:S5813)
-    // NOSONAR (c:S5813) — same justification as the mallocz lines above.
-    snprintfz(run_parent, strlen(install_prefix) + sizeof("/run"), "%s/run", install_prefix);
-    // NOSONAR (c:S5813) — same justification as the mallocz lines above.
-    snprintfz(run_dir, strlen(install_prefix) + sizeof("/run/netdata"), "%s/run/netdata", install_prefix);
+    size_t run_parent_size = strlen(install_prefix) + sizeof("/run"); // NOSONAR (c:S5813)
+    size_t run_dir_size = strlen(install_prefix) + sizeof("/run/netdata"); // NOSONAR (c:S5813)
+    CLEAN_CHAR_P *run_parent = mallocz(run_parent_size);
+    CLEAN_CHAR_P *run_dir = mallocz(run_dir_size);
+    snprintfz(run_parent, run_parent_size, "%s/run", install_prefix);
+    snprintfz(run_dir, run_dir_size, "%s/run/netdata", install_prefix);
     (void)mkdir(run_parent, 0755);
     (void)mkdir(run_dir,    0755);
     nd_setenv("NETDATA_RUN_DIR", run_dir, 1);

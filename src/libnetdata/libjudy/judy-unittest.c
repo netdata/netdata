@@ -85,10 +85,10 @@ static int judy_unittest_cycle(void) {
         JUDY_TEST(deleted == 1, "delete existing sparse key");
     }
 
-    for (Word_t index = 0; index < JUDY_TEST_DENSE_ENTRIES; index++) {
-        Pvoid_t *remaining = JudyLGet(array, index, PJE0);
-        if (index % 2)
-            JUDY_TEST(remaining && (uintptr_t)*remaining == index + 1, "retain undeleted dense key");
+    for (Word_t remaining_index = 0; remaining_index < JUDY_TEST_DENSE_ENTRIES; remaining_index++) {
+        Pvoid_t *remaining = JudyLGet(array, remaining_index, PJE0);
+        if (remaining_index % 2)
+            JUDY_TEST(remaining && (uintptr_t)*remaining == remaining_index + 1, "retain undeleted dense key");
         else
             JUDY_TEST(remaining == NULL, "remove deleted dense key");
     }

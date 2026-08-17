@@ -198,14 +198,15 @@ int os_windows_path_translation_unittest(void) {
         CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(cases[i].input);
         const char *expected_prefix = cases[i].use_package_prefix ? "D:\\Relocated Netdata" : "";
         // NOSONAR (c:S5813) — expected_prefix and cases[i].expected_suffix are constant string literals; lengths are bounded.
-        CLEAN_CHAR_P *expected = mallocz(strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1); // NOSONAR (c:S5813)
+        size_t expected_size = strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1; // NOSONAR (c:S5813)
+        CLEAN_CHAR_P *expected = mallocz(expected_size);
         if (cases[i].use_package_prefix)
-            snprintfz( // NOSONAR (c:S5813) — see justification on the mallocz line above.
-                      expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
+            snprintfz(expected,
+                      expected_size,
                       "%s%s", expected_prefix, cases[i].expected_suffix);
         else
-            snprintfz( // NOSONAR (c:S5813) — see justification on the mallocz line above.
-                      expected, strlen(expected_prefix) + strlen(cases[i].expected_suffix) + 1,
+            snprintfz(expected,
+                      expected_size,
                       "%s", cases[i].expected_suffix);
 
         for (char *p = expected; *p; p++)
