@@ -22,6 +22,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if err != nil {
 			return nil, err
 		}
+		devicesChanged := !maps.Equal(c.scannedDevices, devices)
 
 		for k := range c.scannedDevices {
 			if _, ok := devices[k]; !ok {
@@ -33,7 +34,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			}
 		}
 
-		c.forceDevicePoll = !maps.Equal(c.scannedDevices, devices)
+		c.forceDevicePoll = devicesChanged
 		c.scannedDevices = devices
 		c.lastScanTime = now
 		c.forceScan = false

@@ -694,7 +694,7 @@ func TestCollector_RemovesChartsUsingAttachedResponseIdentity(t *testing.T) {
 	scanIndex := 0
 	collr := New()
 	collr.ScanEvery = confopt.Duration(time.Nanosecond)
-	collr.PollDevicesEvery = confopt.Duration(time.Nanosecond)
+	collr.PollDevicesEvery = confopt.Duration(time.Hour)
 	collr.exec = &mockSmartctlCliExec{
 		scanDataFunc: func() ([]byte, error) {
 			idx := min(scanIndex, len(scans)-1)
@@ -851,6 +851,37 @@ func TestCollector_AttachmentCollisionDoesNotRecordOrphanState(t *testing.T) {
 	}
 }
 
+func TestCollector_ChartAttachmentFailureRetriesWithoutOrphanState(t *testing.T) {
+	invalid := replaceFixtureValue(t, dataTypeSataDeviceHDDSda, "Raw_Read_Error_Rate", "Duplicate Name")
+	invalid = replaceFixtureValue(t, invalid, "Throughput_Performance", "Duplicate/Name")
+	responses := [][]byte{invalid, dataTypeSataDeviceHDDSda}
+	responseIndex := 0
+
+	collr := New()
+	collr.PollDevicesEvery = confopt.Duration(time.Nanosecond)
+	collr.exec = &mockSmartctlCliExec{
+		scanData: deviceScanData(t, "sat", "ATA", "/dev/sda"),
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, "/dev/sda", name)
+			require.Equal(t, "sat", deviceType)
+			idx := min(responseIndex, len(responses)-1)
+			responseIndex++
+			return responses[idx], nil
+		},
+	}
+
+	first := collr.Collect(context.Background())
+	require.Empty(t, first)
+	require.Empty(t, *collr.Charts())
+	require.Empty(t, collr.attachedDevices)
+
+	second := collr.Collect(context.Background())
+	require.NotEmpty(t, second)
+	require.NotEmpty(t, *collr.Charts())
+	require.Len(t, collr.attachedDevices, 1)
+	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), second)
+}
+
 func TestCollector_AddDeviceChartsIsAtomic(t *testing.T) {
 	result := gjson.ParseBytes(dataTypeNvmeDeviceNvme0)
 	dev := newSmartDevice(&result)
@@ -887,6 +918,10 @@ func TestCollector_AttributeMetricIdentityMatchesChart(t *testing.T) {
 }
 
 func nvmeScanData(t *testing.T, deviceNames ...string) []byte {
+	return deviceScanData(t, "nvme", "NVMe", deviceNames...)
+}
+
+func deviceScanData(t *testing.T, deviceType, protocol string, deviceNames ...string) []byte {
 	t.Helper()
 
 	devices := make([]map[string]string, 0, len(deviceNames))
@@ -894,8 +929,8 @@ func nvmeScanData(t *testing.T, deviceNames ...string) []byte {
 		devices = append(devices, map[string]string{
 			"name":      name,
 			"info_name": name,
-			"type":      "nvme",
-			"protocol":  "NVMe",
+			"type":      deviceType,
+			"protocol":  protocol,
 		})
 	}
 	data, err := json.Marshal(map[string]any{"devices": devices})
