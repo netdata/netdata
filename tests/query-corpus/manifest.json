@@ -909,15 +909,15 @@
   },
   {
     "name": "CASE-035/transition-volume-slowing-down",
-    "proves": "a metric slowing from update_every 1 to 10 preserves exact fixture-measured rate volume in the higher-tier row containing both cadences. The two-row forced-tier 1 and 2 queries retain one independently pinned homogeneous control to avoid one-point boundary policy; CASE-035/completed-rollup-keeps-original-cadence owns that control. This contract keeps the tier2-width raw tier0 control; CASE-035/tier0-page-boundary-keeps-every-sample owns the identical tier1-width raw control. These forced-tier queries do not cover an automatic plan switch during a cadence change"
+    "proves": "a metric slowing from update_every 1 to 10 preserves exact fixture-measured rate volume in the higher-tier row containing both cadences. The two-row forced-tier 1 and 2 queries retain one independently pinned homogeneous control to avoid one-point boundary policy; CASE-035/completed-rollup-keeps-original-cadence owns that control. This contract keeps the tier2-width raw tier0 control; CASE-035/tier0-page-boundary-keeps-every-sample owns the tier1-width raw control with a distinct rate at every sample. These forced-tier queries do not cover an automatic plan switch during a cadence change"
   },
   {
     "name": "CASE-035/transition-volume-speeding-up",
-    "proves": "the update_every 10 to 1 mirror preserves exact fixture-measured rate volume in the higher-tier row containing both cadences. The two-row forced-tier 1 and 2 queries retain one independently pinned homogeneous control to avoid one-point boundary policy; CASE-035/completed-rollup-keeps-original-cadence owns that control. This contract keeps the tier2-width raw tier0 control; CASE-035/tier0-page-boundary-keeps-every-sample owns the identical tier1-width raw control. These forced-tier queries do not cover an automatic plan switch during a cadence change"
+    "proves": "the update_every 10 to 1 mirror preserves exact fixture-measured rate volume in the higher-tier row containing both cadences. The two-row forced-tier 1 and 2 queries retain one independently pinned homogeneous control to avoid one-point boundary policy; CASE-035/completed-rollup-keeps-original-cadence owns that control. This contract keeps the tier2-width raw tier0 control; CASE-035/tier0-page-boundary-keeps-every-sample owns the tier1-width raw control with a distinct rate at every sample. These forced-tier queries do not cover an automatic plan switch during a cadence change"
   },
   {
     "name": "CASE-035/tier0-page-boundary-keeps-every-sample",
-    "proves": "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences returns every stored sample exactly once. The 10-to-1 direction pins the first ten fine-page samples so advancing by the old ten-second cadence cannot skip nine of them; the 1-to-10 mirror proves the fix does not duplicate or shift the first coarse-page sample. Exact SUM rows come from the fixture's per-sample rate-times-duration ledger, and the public timestamp grid is unchanged",
+    "proves": "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences preserves the exact fixture-measured volume of a series whose rate changes at every sample. The 10-to-1 direction gives the first fine-page samples distinct contributions, so advancing by the old ten-second cadence cannot skip nine equal-looking samples; the 1-to-10 mirror makes duplication or displacement of the first coarse-page sample change the exact row total. The oracle is the independent per-sample rate-times-duration ledger, and the public timestamp grid is unchanged",
     "components": [
       "slows-down",
       "speeds-up"

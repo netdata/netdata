@@ -17,10 +17,13 @@ import (
 )
 
 const (
-	c035FirstRate  = 10
-	c035SecondRate = 100
+	c035FirstRate          = 10
+	c035SecondRate         = 100
+	c035FirstIdentityRate  = 10000
+	c035SecondIdentityRate = 20000
 
 	c035RateDim         = "load"
+	c035IdentityRateDim = "identity_rate"
 	c035AvailabilityDim = "availability"
 	c035GapDim          = "gaps"
 )
@@ -37,9 +40,9 @@ type c035Record struct {
 }
 
 type c035Sample struct {
-	t, interval           int64
-	rate, availability    float64
-	gapDimensionCollected bool
+	t, interval                      int64
+	rate, identityRate, availability float64
+	gapDimensionCollected            bool
 }
 
 var c035Cases = []struct {
@@ -96,6 +99,16 @@ func c035Measured(samples []c035Sample, after, before int64) float64 {
 	return total
 }
 
+func c035MeasuredIdentityRate(samples []c035Sample, after, before int64) float64 {
+	total := 0.0
+	for _, sample := range samples {
+		if sample.t > after && sample.t <= before {
+			total += sample.identityRate * float64(sample.interval)
+		}
+	}
+	return total
+}
+
 // c035Phase builds one definition of the chart. The second definition changes
 // update_every on the same chart, exactly as a collector changing cadence
 // does. Availability moves from 0 to 1 at the same boundary.
@@ -111,6 +124,7 @@ func c035Phase(
 		Context: context, UpdateEvery: every,
 		Dimensions: []fixture.Dimension{
 			{ID: c035RateDim, Algorithm: "incremental"},
+			{ID: c035IdentityRateDim, Algorithm: "incremental"},
 			{ID: c035AvailabilityDim},
 			{ID: c035GapDim},
 		},
@@ -130,20 +144,23 @@ func c035Phase(
 		}
 
 		rate := c035FirstRate
+		identityRate := c035FirstIdentityRate + i
 		if second {
 			rate = c035SecondRate
+			identityRate = c035SecondIdentityRate + i
 		}
 		gapCollected := second || c035GapCollected(base, ts, tc.firstEvery)
 		ledger = append(ledger, c035Sample{
 			t: ts, interval: int64(every),
-			rate: float64(rate), availability: availabilityValue,
+			rate: float64(rate), identityRate: float64(identityRate), availability: availabilityValue,
 			gapDimensionCollected: gapCollected,
 		})
 		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points, point(strconv.Itoa(rate)))
-		ch.Dimensions[1].Points = append(ch.Dimensions[1].Points, point(availability))
+		ch.Dimensions[1].Points = append(ch.Dimensions[1].Points, point(strconv.Itoa(identityRate)))
+		ch.Dimensions[2].Points = append(ch.Dimensions[2].Points, point(availability))
 
 		if gapCollected {
-			ch.Dimensions[2].Points = append(ch.Dimensions[2].Points, point("1"))
+			ch.Dimensions[3].Points = append(ch.Dimensions[3].Points, point("1"))
 		}
 	}
 	return ch, ledger
@@ -269,13 +286,20 @@ func c035ExpectedAvailability(records []c035Record, after, before, step int64) [
 	return want
 }
 
-func c035ExpectedVolumeRows(samples []c035Sample, after, before, step int64, withMetadata bool) []expectedColumnPoint {
+func c035ExpectedVolumeRows(
+	samples []c035Sample,
+	after, before, step int64,
+	withMetadata, identity bool,
+) []expectedColumnPoint {
 	points := int((before - after) / step)
 	want := make([]expectedColumnPoint, points)
 	for i := range want {
 		rowStart := after + int64(i)*step
 		rowEnd := rowStart + step
 		value := c035Measured(samples, rowStart, rowEnd)
+		if identity {
+			value = c035MeasuredIdentityRate(samples, rowStart, rowEnd)
+		}
 		if withMetadata {
 			want[i] = wantNumberWithMetadataAt(rowEnd, value, 0, 0)
 		} else {
@@ -286,11 +310,15 @@ func c035ExpectedVolumeRows(samples []c035Sample, after, before, step int64, wit
 }
 
 func c035ExpectedVolume(samples []c035Sample, after, before, step int64) []expectedColumnPoint {
-	return c035ExpectedVolumeRows(samples, after, before, step, false)
+	return c035ExpectedVolumeRows(samples, after, before, step, false, false)
 }
 
 func c035ExpectedCompleteVolume(samples []c035Sample, after, before, step int64) []expectedColumnPoint {
-	return c035ExpectedVolumeRows(samples, after, before, step, true)
+	return c035ExpectedVolumeRows(samples, after, before, step, true, false)
+}
+
+func c035ExpectedIdentityVolume(samples []c035Sample, after, before, step int64) []expectedColumnPoint {
+	return c035ExpectedVolumeRows(samples, after, before, step, false, true)
 }
 
 type c035QuerySpec struct {
@@ -724,9 +752,9 @@ func TestCase035Tier0PageBoundaryKeepsEverySample(t *testing.T) {
 			state := c035Fixture(t, item.name, item.spec)
 			after, before, step := c035TransitionWindow(state.base, item.spec, tier1Gran)
 			if !c035QueryExact(t, c035QuerySpec{
-				context: state.context, host: state.host, dimension: c035RateDim,
+				context: state.context, host: state.host, dimension: c035IdentityRateDim,
 				tier: 0, after: after, before: before, step: step,
-				group: "sum", want: c035ExpectedVolume(state.samples, after, before, step),
+				group: "sum", want: c035ExpectedIdentityVolume(state.samples, after, before, step),
 			}) {
 				t.Errorf("BROKEN %s (%s): %s", contract, item.name, manifest[contract].Proves)
 			}
