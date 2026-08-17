@@ -1515,9 +1515,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
             if (vnodes_used < (size_t)vnodes_count)
                 strncpyz(vnode_guids[vnodes_used++], virtual_host->machine_guid, GUID_LEN);
         }
-#ifndef OS_WINDOWS
         (void) JudyLFreeArray(&parser->user.vnodes.JudyL, PJE0);
-#endif
     }
 
     // mark all charts of this plugin as obsolete

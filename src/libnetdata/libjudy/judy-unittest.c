@@ -75,6 +75,34 @@ static int judy_unittest_cycle(void) {
     JUDY_TEST(count == JUDY_TEST_DENSE_ENTRIES + _countof(sparse_keys),
               "ordered iteration visits every key exactly once");
 
+    for (Word_t deleted_index = 0; deleted_index < JUDY_TEST_DENSE_ENTRIES; deleted_index += 2) {
+        int deleted = JudyLDel(&array, deleted_index, PJE0);
+        JUDY_TEST(deleted == 1, "delete existing dense key");
+    }
+
+    for (size_t i = 0; i < _countof(sparse_keys); i++) {
+        int deleted = JudyLDel(&array, sparse_keys[i], PJE0);
+        JUDY_TEST(deleted == 1, "delete existing sparse key");
+    }
+
+    for (Word_t index = 0; index < JUDY_TEST_DENSE_ENTRIES; index++) {
+        Pvoid_t *remaining = JudyLGet(array, index, PJE0);
+        if (index % 2)
+            JUDY_TEST(remaining && (uintptr_t)*remaining == index + 1, "retain undeleted dense key");
+        else
+            JUDY_TEST(remaining == NULL, "remove deleted dense key");
+    }
+
+    for (size_t i = 0; i < _countof(sparse_keys); i++)
+        JUDY_TEST(JudyLGet(array, sparse_keys[i], PJE0) == NULL, "remove deleted sparse key");
+
+    for (Word_t deleted_index = 1; deleted_index < JUDY_TEST_DENSE_ENTRIES; deleted_index += 2) {
+        int deleted = JudyLDel(&array, deleted_index, PJE0);
+        JUDY_TEST(deleted == 1, "delete remaining dense key");
+    }
+
+    JUDY_TEST(array == NULL, "deleting every key clears the root pointer");
+
 cleanup:
     if (array) {
         Word_t freed = JudyLFreeArray(&array, PJE0);
