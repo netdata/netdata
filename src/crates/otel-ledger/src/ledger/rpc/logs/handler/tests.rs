@@ -99,6 +99,10 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     let counts = sfst::ChunkCounts {
         columns: sfst::ColumnsPresent::default(),
         trace_id_index: false,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -175,6 +179,10 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
     let counts = sfst::ChunkCounts {
         columns: sfst::ColumnsPresent::default(),
         trace_id_index: false,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -239,6 +247,10 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
     let counts = sfst::ChunkCounts {
         columns: sfst::ColumnsPresent::default(),
         trace_id_index: false,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -936,30 +948,16 @@ async fn histogram_click_numeric_anchor_navigates_to_time() {
 }
 
 #[test]
-fn patches_data_request_args_into_payload() {
-    // No "info" token — data request. info must be false so the
-    // handler runs the query path, not the capability descriptor.
-    let args = vec![
-        "after:100".to_string(),
-        "before:200".to_string(),
-        "slice:true".to_string(),
-    ];
-    let bytes = patch_args_into_payload(&args, None).unwrap();
-    let req: OtelLogsRequest = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(req.after, 100);
-    assert_eq!(req.before, 200);
-    assert!(!req.info);
-}
-
-#[test]
-fn patches_info_request_args_into_payload() {
-    // "info" token present — capability discovery.
+fn patched_args_payload_parses_as_a_logs_request() {
+    // The shim itself is tested in the parent rpc module; this pins
+    // that its synthesized payload deserializes into the LOGS request
+    // type with the window and info flag intact.
     let args = vec![
         "info".to_string(),
         "after:100".to_string(),
         "before:200".to_string(),
     ];
-    let bytes = patch_args_into_payload(&args, None).unwrap();
+    let bytes = crate::ledger::rpc::patch_args_into_payload(&args, None).unwrap();
     let req: OtelLogsRequest = serde_json::from_slice(&bytes).unwrap();
     assert!(req.info);
     assert_eq!(req.after, 100);

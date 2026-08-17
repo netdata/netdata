@@ -286,9 +286,11 @@ Netdata verification intentionally consumes the latest `netdata/testdata` `maste
 - Exact schema compilation, fixture replay, semantic reconciliation, and coverage form the compatibility boundary.
 - Historical Netdata revisions are not guaranteed to validate against later testdata `master` content.
 
-For a coordinated change, prepare both repositories together, merge the testdata evidence before the Netdata consumer that
-requires it, update the local checkout to latest `master`, and rerun complete Netdata verification. This ordering avoids a
-Netdata revision whose required evidence does not yet exist; it is not a substitute for the consumer verification.
+For a coordinated change, use the ignored `src/go/testdata` directory as a checkout of the contributor's testdata fork and
+work on paired feature branches in both repositories. Open paired pull requests, merge testdata first, update the local
+checkout to the merged testdata `master`, and rerun the complete Netdata proof before merging the Netdata pull request.
+Because the repositories cannot merge atomically, this ordering does not eliminate the latest-testdata compatibility window;
+it verifies the consumer against the source state it will consume, and the Netdata merge should follow promptly.
 
 ## Verification ownership
 

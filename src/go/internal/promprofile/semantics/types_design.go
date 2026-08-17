@@ -191,7 +191,6 @@ type DesignExclusion struct {
 	Replacement       string          `yaml:"replacement,omitempty"`
 	LostQuestion      string          `yaml:"lost_question,omitempty"`
 	RequiredOperation string          `yaml:"required_operation,omitempty"`
-	DelegatedDomain   string          `yaml:"delegated_domain,omitempty"`
 	Evidence          []string        `yaml:"evidence"`
 	Outcome           string          `yaml:"outcome"`
 }

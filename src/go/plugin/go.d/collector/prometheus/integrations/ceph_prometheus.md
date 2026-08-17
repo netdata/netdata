@@ -29,14 +29,17 @@ The built-in profile separates cluster-wide MGR health, quorum, capacity, placem
 from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. Optional branches cover
 CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
 scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
-and Tentacle 20.2.2. PG state flags and RGW global/user/bucket views are overlapping diagnostic populations and are
-not additive totals. Profile relabeling turns dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter, RocksDB
-cache, Finisher, Throttle, KernelDevice, mClock, messenger, RDMA, DPDK, and service-identity family names into stable
-profile inputs while preserving their source keys as identity labels. The source-complete profile materializes the
-entire declared release/producer union with zero generic fallback. Unknown future Ceph families remain visible
-through generic fallback until their source semantics can be curated; generic visibility is a forward-compatibility
-guard, not evidence that a known source family was fully modeled. The profile drops only the source-proven
-raw MGR RGW source-zone aliases because the stable normalized family is already charted.
+and Tentacle 20.2.2. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
+exposes cephadm node-proxy CPU, memory, storage, cooling, temperature, and per-component health metrics. Firmware
+remains source metadata and is not charted because Ceph exposes it as an info family. PG state flags and RGW
+global/user/bucket views are overlapping diagnostic populations and are not additive totals. Profile relabeling
+turns dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter, RocksDB cache, Finisher, Throttle, KernelDevice,
+mClock, messenger, RDMA, DPDK, and service-identity family names into stable profile inputs while preserving their
+source keys as identity labels. The source-complete profile materializes the entire declared release/producer union
+with zero generic fallback. Unknown future Ceph families remain visible through generic fallback until their source
+semantics can be curated; generic visibility is a forward-compatibility guard, not evidence that a known source
+family was fully modeled. The profile drops only the source-proven raw MGR RGW source-zone aliases because the stable
+normalized family is already charted.
 
 The chart model follows the producer's source lifecycle rather than relying on Prometheus wire type alone. Current
 populations that Ceph increments and decrements remain absolute, while cumulative work published through gauges is
@@ -97,7 +100,9 @@ UI configuration requires paid Netdata Cloud plan.
 Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics or
 deploy the official `ceph-exporter` for host-local daemon performance metrics. The stock profile supports the
 default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
-counters are required and size the job limits for the resulting series count.
+counters are required and size the job limits for the resulting series count. When cephadm node-proxy hardware
+reporting is enabled, hardware series scale with the cluster-wide component inventory; size both
+`max_time_series` and `max_time_series_per_metric` for that surface.
 
 
 

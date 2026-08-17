@@ -94,6 +94,22 @@ impl Bitmap {
         self.inverted
     }
 
+    /// The complement over the universe. Free: the descriptor flips its
+    /// inverted flag and keeps sharing the same tree bytes.
+    pub fn complement(&self) -> Bitmap {
+        Bitmap {
+            inner: self.inner,
+            inverted: !self.inverted,
+        }
+    }
+
+    /// Difference (`self \ other`) via `self ∩ complement(other)` —
+    /// the [`and`](Self::and) dispatch already handles every
+    /// inverted-flag combination.
+    pub fn and_not(&self, a: &[u8], other: &Bitmap, b: &[u8], out: &mut Vec<u8>) -> Bitmap {
+        self.and(a, &other.complement(), b, out)
+    }
+
     /// Access the underlying raw bitmap descriptor.
     pub fn inner(&self) -> RawBitmap {
         self.inner

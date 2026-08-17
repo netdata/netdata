@@ -26,6 +26,9 @@ use opentelemetry_proto::tonic::common::v1::{
 use opentelemetry_proto::tonic::logs::v1::LogRecord;
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::Span;
+use opentelemetry_proto::tonic::trace::v1::span::{Event as SpanEvent, Link as SpanLink};
+
+use crate::traces::FlattenedSpan;
 
 /// A node's identity within a [`SchemaTree`] — its arena index.
 pub type NodeId = u32;
@@ -308,9 +311,9 @@ impl Flattener {
         }
     }
 
-    /// How many attribute keys were sanitized (`'='` → `'_'`, the key=value
-    /// delimiter rule) so far. Callers log one aggregated warning per request
-    /// when non-zero.
+    /// How many attribute keys were sanitized so far — `'='` rewritten to
+    /// `'_'` (the key=value delimiter rule) or an empty key degraded to
+    /// `"_"`. Callers log one aggregated warning per request when non-zero.
     pub fn sanitized_keys(&self) -> u64 {
         self.sanitized_keys
     }
@@ -393,11 +396,18 @@ impl Flattener {
         node
     }
 
-    /// Emit a leaf entry under `parent` via `step`.
-    fn emit(&mut self, parent: NodeId, step: StepRef<'_>, value: Value, out: &mut Vec<Entry>) {
+    /// Build a leaf entry under `parent` via `step` (interning its node and
+    /// filling the emit-time hash) — the allocation-free single-entry form.
+    fn emit_one(&mut self, parent: NodeId, step: StepRef<'_>, value: Value) -> Entry {
         let node = self.child(parent, step, value.kind());
         let hash = hash_kv(&self.paths[node as usize], &value, &mut self.kv_buf);
-        out.push(Entry { node, value, hash });
+        Entry { node, value, hash }
+    }
+
+    /// Emit a leaf entry under `parent` via `step`.
+    fn emit(&mut self, parent: NodeId, step: StepRef<'_>, value: Value, out: &mut Vec<Entry>) {
+        let entry = self.emit_one(parent, step, value);
+        out.push(entry);
     }
 
     /// Flatten one OTLP `AnyValue` reached from `parent` via `step`. Consumes
@@ -448,7 +458,15 @@ impl Flattener {
         // passes through here, so rewrite '=' to '_' at this single choke
         // point — counted, so ingest can surface the rename.
         let sanitized;
-        let name: &str = if kv.key.contains('=') {
+        let name: &str = if kv.key.is_empty() {
+            // Proto3 accepts an empty key (OTLP only SHOULDs non-empty).
+            // Stored bare it becomes a prefix-only field ("attributes.")
+            // that enumerates as an empty attribute name and cannot
+            // round-trip through selections — degrade it the same way
+            // as the '=' rewrite, at the same choke point.
+            self.sanitized_keys += 1;
+            "_"
+        } else if kv.key.contains('=') {
             self.sanitized_keys += 1;
             sanitized = kv.key.replace('=', "_");
             &sanitized
@@ -549,10 +567,12 @@ impl Flattener {
     }
 
     /// Flatten a span's own fields — the queryable scalar facets (`name`, `kind`,
-    /// `status_code`) and `attributes.*`. Identifier/timing fields (`trace_id`,
-    /// `span_id`, `parent_span_id`, start/duration, `flags`,
-    /// `dropped_attributes_count`) are carried as per-row columns on [`crate::traces::SpanRecord`],
-    /// not as entries — same split as [`Flattener::flatten_record`] for logs.
+    /// `status_code`, `trace_state`, `status_message`), `attributes.*`, and the
+    /// structured `events[]` / `links[]` lists. Identifier/timing fields
+    /// (`trace_id`, `span_id`, `parent_span_id`, start/duration, `flags`, the
+    /// dropped counts) are carried as per-row scalars on
+    /// [`crate::traces::SpanRecord`], not as entries — same split as
+    /// [`Flattener::flatten_record`] for logs.
     ///
     /// Enum facets (`kind`, `status_code`) store **both** the raw OTLP int and a
     /// readable label, under a deliberate convention:
@@ -567,8 +587,10 @@ impl Flattener {
     /// span-specific (`SpanKind`/`StatusCode` are closed enums whose readable label
     /// is worth indexing, unlike the open numeric `severity_number`). For a
     /// non-default value the raw int is always emitted; the label only when the
-    /// variant is known.
-    pub fn flatten_span(&mut self, span: Span) -> Vec<Entry> {
+    /// variant is known. `trace_state` is carried **verbatim** (it embeds the W3C
+    /// sampling threshold `ot=th:`); `status_message` is emitted whenever
+    /// non-empty, independent of the status code.
+    pub fn flatten_span(&mut self, span: Span) -> FlattenedSpan {
         let mut out = Vec::new();
 
         if !span.name.is_empty() {
@@ -584,13 +606,21 @@ impl Flattener {
             self.scalar("_kind", Value::Int(span.kind as i64), &mut out);
         }
 
-        // status.code: 0 = UNSET ⇒ absence, skip. (status.message is deferred.)
+        if !span.trace_state.is_empty() {
+            self.scalar("trace_state", Value::Str(span.trace_state), &mut out);
+        }
+
+        // status.code: 0 = UNSET ⇒ absence, skip. The message round-trips whenever
+        // non-empty, even alongside an UNSET code (rare but wire-legal).
         if let Some(status) = span.status {
             if status.code != 0 {
                 if let Some(label) = status_code_label(status.code) {
                     self.scalar("status_code", Value::Str(label.to_string()), &mut out);
                 }
                 self.scalar("_status_code", Value::Int(status.code as i64), &mut out);
+            }
+            if !status.message.is_empty() {
+                self.scalar("status_message", Value::Str(status.message), &mut out);
             }
         }
 
@@ -600,7 +630,68 @@ impl Flattener {
                 self.flatten_kv(base, kv, &mut out);
             }
         }
-        out
+
+        let events = span
+            .events
+            .into_iter()
+            .map(|ev| self.flatten_event(ev))
+            .collect();
+        let links = span
+            .links
+            .into_iter()
+            .map(|link| self.flatten_link(link))
+            .collect();
+
+        FlattenedSpan {
+            entries: out,
+            events,
+            links,
+        }
+    }
+
+    /// Flatten one span event under the reserved `events.` namespace:
+    /// `events.name` plus `events.attributes.*`. The name entry is emitted even
+    /// for a (malformed) empty name — the sealed `EVNB` structure references a
+    /// name token per event, so it must always exist; a span attribute can never
+    /// collide with this namespace (span attributes live under `attributes.*`).
+    fn flatten_event(&mut self, ev: SpanEvent) -> crate::traces::EventRecord {
+        let events_node = self.descend(ROOT, &["events"]);
+        let name = self.emit_one(events_node, StepRef::Field("name"), Value::Str(ev.name));
+
+        let mut attributes = Vec::new();
+        if !ev.attributes.is_empty() {
+            let base = self.child(events_node, StepRef::Field("attributes"), Kind::Kvlist);
+            for kv in ev.attributes {
+                self.flatten_kv(base, kv, &mut attributes);
+            }
+        }
+        crate::traces::EventRecord {
+            time_unix_nano: ev.time_unix_nano,
+            dropped_attributes_count: ev.dropped_attributes_count,
+            name,
+            attributes,
+        }
+    }
+
+    /// Flatten one span link: attributes under `links.attributes.*`; the linked
+    /// ids, `trace_state`, and flags stay structured scalars (ids are near-unique
+    /// and deliberately not faceted — the log-correlation-id rule).
+    fn flatten_link(&mut self, link: SpanLink) -> crate::traces::LinkRecord {
+        let mut attributes = Vec::new();
+        if !link.attributes.is_empty() {
+            let base = self.descend(ROOT, &["links", "attributes"]);
+            for kv in link.attributes {
+                self.flatten_kv(base, kv, &mut attributes);
+            }
+        }
+        crate::traces::LinkRecord {
+            trace_id: TraceId::from_bytes(&link.trace_id).unwrap_or_default(),
+            span_id: SpanId::from_bytes(&link.span_id).unwrap_or_default(),
+            trace_state: link.trace_state,
+            flags: link.flags,
+            dropped_attributes_count: link.dropped_attributes_count,
+            attributes,
+        }
     }
 }
 
@@ -658,7 +749,7 @@ macro_rules! id_newtype {
             /// Parse **exactly** `$width` bytes; `None` for any other length. An
             /// empty/wrong-length id is the caller's to map (commonly
             /// `.unwrap_or_default()` → [`UNSET`](Self::UNSET)). Ingest normalization
-            /// (`normalize_log_request`/`normalize_trace_ids`) already clears
+            /// (`normalize_log_request`/`normalize_trace_request`) already clears
             /// wrong-length ids to empty, so a conformant id round-trips.
             pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
                 <[u8; $width]>::try_from(bytes).ok().map(Self)
@@ -719,6 +810,18 @@ impl MalformedIds {
     pub fn any(self) -> bool {
         self.trace > 0 || self.span > 0
     }
+}
+
+/// Inclusive client-timestamp acceptance window `[min_ns, max_ns]` for
+/// ingestion, signal-neutral. Logs judge a record's resolved `time_unix_nano`
+/// against it (`crate::logs::normalize_log_request`); traces judge the span's
+/// whole `[start, effective end]` interval
+/// (`crate::traces::normalize_trace_request`). Out-of-window items are dropped
+/// and counted as `rejected`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeBounds {
+    pub min_ns: u64,
+    pub max_ns: u64,
 }
 
 /// Render a typed value into its `key=value` string form, appended to `out`:

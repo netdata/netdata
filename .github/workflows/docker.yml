@@ -69,12 +69,6 @@ jobs:
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
-            *.go
-            go.mod
-            go.sum
-            **/*.go
-            **/go.mod
-            **/go.sum
             .dockerignore
             CMakeLists.txt
             netdata-installer.sh

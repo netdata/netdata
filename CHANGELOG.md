@@ -18,6 +18,8 @@
 - Regenerate integrations docs ([#23484](https://github.com/netdata/netdata/issues/23484))
 - Correct zRAM and eBPF VFS descriptions ([#23487](https://github.com/netdata/netdata/issues/23487))
 - Regenerate integrations docs ([#23488](https://github.com/netdata/netdata/issues/23488))
+- Aclk: report MQTT PUBACK timeouts separately ([#23486](https://github.com/netdata/netdata/issues/23486))
+- ACLK: Add TLS hostname and IP verification for HTTPS requests ([#23463](https://github.com/netdata/netdata/issues/23463))
 
 ## [2.11.0] - 2026-08-12
 

@@ -26,12 +26,31 @@ use crate::{
 /// Read just the [`Summary`] of an SFST from its bytes.
 ///
 /// Touches only the header, TOC, and `SUMR` chunk, and works on **every**
-/// SFST — including summary-only files (e.g. a content-light traces seal),
+/// SFST — including summary-only files (the format's minimal valid shape),
 /// which [`IndexReader::open`](crate::IndexReader::open) refuses because
 /// they carry no queryable chunks. The cheap path for recovery/registry-style
 /// scans that need identity + time range + record count without a query.
 pub fn read_summary(data: &[u8]) -> Result<Summary, Error> {
     ChunkReader::open(data)?.summary()
+}
+
+/// Read ONLY the [`Summary`] of a sealed SFST on disk, cheaply: the file
+/// is memory-mapped and just the header + TOC + `SUMR` pages fault in —
+/// never the whole file (`Advice::Random` suppresses readahead). The
+/// pattern the registry's recovery uses, exposed for tools that need a
+/// summary without loading the file (e.g. building query candidates).
+///
+/// Sealed SFSTs are immutable once finalized, so the short-lived read-only
+/// mapping is sound.
+pub fn read_summary_path(path: &std::path::Path) -> Result<Summary, Error> {
+    let file = std::fs::File::open(path)?;
+    // SAFETY: sealed SFSTs are immutable (the ingestor rolls new files
+    // rather than mutating); a read-only map for the duration of this
+    // call cannot observe concurrent modification.
+    let mmap = unsafe { memmap2::Mmap::map(&file) }?;
+    #[cfg(unix)]
+    let _ = mmap.advise(memmap2::Advice::Random);
+    read_summary(&mmap)
 }
 
 /// Decompress zstd, then deserialize with bincode. Crate-internal:
@@ -232,8 +251,13 @@ impl<'a> ChunkReader<'a> {
     pub(crate) fn high_field(&self, index: u16) -> Result<HighField, Error> {
         let mut high: HighField = unpack(self.high_field_raw(index)?)?;
         // `offsets` is `#[serde(skip)]`, so it deserializes empty — derive it
-        // from the decoded `key_lens` before the chunk is used.
-        high.rebuild_offsets();
+        // from the decoded `key_lens` before the chunk is used. A length
+        // mismatch is corruption the CRC cannot catch alone.
+        if !high.rebuild_offsets() {
+            return Err(Error::CorruptIndex(
+                "high-card field chunk key lengths disagree with its key blob".into(),
+            ));
+        }
         Ok(high)
     }
 
@@ -418,6 +442,92 @@ impl<'a> ChunkReader<'a> {
         Ok(index)
     }
 
+    // ── TBLM (trace-id bloom) ────────────────────────────────────────
+
+    /// Whether this file carries the optional per-file trace-id bloom (`TBLM`).
+    pub fn has_trace_id_bloom(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_TRACE_BLOOM)
+    }
+
+    /// Decode and validate the trace-id bloom (`TBLM`). Same trust-boundary
+    /// contract as [`trace_id_index`](Self::trace_id_index); callers gate on
+    /// [`has_trace_id_bloom`](Self::has_trace_id_bloom).
+    pub fn trace_id_bloom(&self) -> Result<crate::TraceIdBloom, Error> {
+        // The bloom derives from TIDX — the writer guarantees TBLM ⟹ TIDX at
+        // seal; this is the symmetric read-side guard for a file produced
+        // out-of-band. Without it, a definite bloom miss on such a file would
+        // silently report "trace absent" instead of surfacing the corruption.
+        if !self.has_trace_id_index() {
+            return Err(Error::CorruptIndex(
+                "trace_id bloom without the trace_id index it derives from".into(),
+            ));
+        }
+        // ...and the full dependency chain TBLM ⟹ TIDX ⟹ TRCE: a crafted file
+        // with the two chunks but no trace_id column would otherwise let a
+        // bloom miss answer "trace absent" where the exact path would have
+        // surfaced the corruption.
+        self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
+        let bloom: crate::TraceIdBloom = unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_BLOOM)?)?;
+        bloom.validate(self.record_count()?)?;
+        Ok(bloom)
+    }
+
+    // ── EVNB / LNKB (span event / link structures) ───────────────────
+
+    /// Whether this file carries the optional span event structure (`EVNB`).
+    pub fn has_event_index(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_EVENTS)
+    }
+
+    /// Whether this file carries the optional span link structure (`LNKB`).
+    pub fn has_link_index(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_LINKS)
+    }
+
+    /// Decode and validate the span event structure (`EVNB`). Same trust-boundary
+    /// contract as [`trace_id_index`](Self::trace_id_index): panic-safety-only
+    /// validation (skeleton consistency + token refs in range); callers gate on
+    /// [`has_event_index`](Self::has_event_index).
+    pub fn event_index(&self) -> Result<crate::EventIndex, Error> {
+        let index: crate::EventIndex = unpack(self.chunk_raw_by_id(crate::CHUNK_EVENTS)?)?;
+        let kv_total = self.metadata()?.id_ranges.high_end.0;
+        index.validate(self.record_count()?, kv_total)?;
+        Ok(index)
+    }
+
+    /// Whether the file carries the optional per-file trace rollup (`TRSU`).
+    pub fn has_trace_rollup(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_TRACE_ROLLUP)
+    }
+
+    /// Decode and validate the per-file trace rollup (`TRSU`): every
+    /// struct-of-arrays field must be index-parallel (the corrupt-file
+    /// guard — a length mismatch is a decode error, not a panic later).
+    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, Error> {
+        // The rollup summarizes the `TRCE` column — the writer guarantees
+        // TRSU ⟹ trace_id at seal; this is the symmetric read-side guard for
+        // a file produced out-of-band (the same guard TIDX and TBLM carry).
+        // Without it, a missing rollup row on such a file would let the
+        // trace-level gate prove "trace absent" where assembly would have
+        // surfaced the corruption.
+        self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
+        let rollup: crate::TraceRollup =
+            unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
+        // Structural validation lives on the type (unit-tested there):
+        // index-parallelism, ref ranges, flags, strictly increasing ids.
+        rollup.validate(self.metadata()?.id_ranges.high_end.0)?;
+        Ok(rollup)
+    }
+
+    /// Decode and validate the span link structure (`LNKB`). See
+    /// [`event_index`](Self::event_index).
+    pub fn link_index(&self) -> Result<crate::LinkIndex, Error> {
+        let index: crate::LinkIndex = unpack(self.chunk_raw_by_id(crate::CHUNK_LINKS)?)?;
+        let kv_total = self.metadata()?.id_ranges.high_end.0;
+        index.validate(self.record_count()?, kv_total)?;
+        Ok(index)
+    }
+
     // ── Stream-batch chunks ──────────────────────────────────────────
 
     /// Decompress and deserialize one stream-batch chunk by index.
@@ -431,7 +541,12 @@ impl<'a> ChunkReader<'a> {
         let mut batch: StreamBatch = unpack(self.stream_batch_raw(index)?)?;
         // `row_offsets` is `#[serde(skip)]`, so it deserializes empty —
         // derive it from the decoded `row_lens` before the batch is used.
-        batch.rebuild_offsets();
+        // A length mismatch is corruption the CRC cannot catch alone.
+        if !batch.rebuild_offsets() {
+            return Err(Error::CorruptIndex(
+                "stream batch row lengths disagree with its kv bytes".into(),
+            ));
+        }
         Ok(batch)
     }
 

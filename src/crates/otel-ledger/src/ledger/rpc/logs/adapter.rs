@@ -71,24 +71,6 @@ const NS_PER_S: i64 = 1_000_000_000;
 /// `after`/`before`. Matches the consuming UI's default time range.
 const DEFAULT_WINDOW_SECS: u32 = 15 * 60;
 
-/// Aim for at least this many time buckets across the window when picking
-/// from [`VALID_BUCKET_WIDTHS_S`]. With the curated widths and a
-/// 15-minute window this yields 15-second buckets (60 of them).
-const TARGET_BUCKETS: u32 = 60;
-
-/// "Nice" bucket widths in seconds. Ported from the legacy systemd-journal
-/// plugin's `calculate_bucket_duration` to keep histograms anchored to
-/// wall-clock-friendly intervals (1s, 2s, 5s, 10s, 15s, 30s, 1m, 5m, …).
-/// [`bucket_width_for_span_s`] picks the largest entry that produces at
-/// least [`TARGET_BUCKETS`] buckets across the span, so chart density is
-/// stable as the requested window scales.
-const VALID_BUCKET_WIDTHS_S: &[u32] = &[
-    1, 2, 5, 10, 15, 30, // seconds
-    60, 120, 180, 300, 600, 900, 1800, // minutes
-    3600, 7200, 21600, 28800, 43200, // hours
-    86400, 172800, 259200, 432000, 604800, 1209600, 2592000, // days
-];
-
 impl OtelLogsRequest {
     /// Canonicalize this wire request into the engine's neutral
     /// [`LogsQuery`]: default + bucket-align the window, build the
@@ -102,16 +84,9 @@ impl OtelLogsRequest {
     /// bad search is a clean request error rather than a per-file degrade.
     pub fn into_query(self) -> Result<LogsQuery, sfst::Error> {
         let (after, before) = effective_window(self.after, self.before);
-        let bucket_width_s = bucket_width_for_span_s(before.saturating_sub(after));
-        let (after, before) = align_window(after, before, bucket_width_s);
-
-        // `bucket_width_s` divides `(before - after)` exactly after
-        // alignment, so no `div_ceil` is needed.
-        let grid = sfst::Grid::new(
-            (after as i64) * NS_PER_S,
-            (bucket_width_s as i64) * NS_PER_S,
-            ((before - after) / bucket_width_s) as usize,
-        );
+        // Nice width + outward alignment + the exact grid — the shared
+        // derivation (`rpc::grid`) both otel Functions use.
+        let (grid, _, _) = crate::ledger::rpc::grid::grid_for_window_s(after, before);
 
         let anchor = self.anchor.and_then(|a| match a {
             AnchorParam::Cursor(s) => Cursor::decode(&s).map(Anchor::Cursor),
@@ -285,29 +260,6 @@ fn effective_window(after: u32, before: u32) -> (u32, u32) {
         .map(|d| d.as_secs() as u32)
         .unwrap_or(u32::MAX);
     (now.saturating_sub(DEFAULT_WINDOW_SECS), now)
-}
-
-/// Pick a "nice" bucket width (seconds) for a span: the largest entry in
-/// [`VALID_BUCKET_WIDTHS_S`] producing at least [`TARGET_BUCKETS`]
-/// buckets. Falls back to `1` for spans too short to satisfy it.
-fn bucket_width_for_span_s(span_s: u32) -> u32 {
-    VALID_BUCKET_WIDTHS_S
-        .iter()
-        .rev()
-        .find(|&&w| span_s / w >= TARGET_BUCKETS)
-        .copied()
-        .unwrap_or(1)
-}
-
-/// Round `[after, before)` outward to multiples of `width_s` — `after`
-/// floored, `before` ceiled — so the histogram grid anchors to absolute
-/// wall-clock boundaries (e.g. 15s buckets snap to `t % 15 == 0`). This
-/// keeps the chart x-axis stable across the UI's per-second polling:
-/// requests within the same bucket-width slot align to the same grid.
-fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) {
-    let aligned_after = (after / width_s) * width_s;
-    let aligned_before = before.div_ceil(width_s) * width_s;
-    (aligned_after, aligned_before)
 }
 
 // ── Engine result → wire envelope ───────────────────────────────────

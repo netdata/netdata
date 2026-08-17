@@ -1,9 +1,17 @@
-//! Indexer component that builds split-FST indexes from closed WAL files.
+//! Indexer component that seals closed WAL files into SFST index files.
+//!
+//! One component serves every signal: the actual seal body is injected as the
+//! component's [`SealFn`] argument — the logs pipeline spawns it with
+//! [`ng_index::build_sfst_file`], the traces pipeline with
+//! [`ng_index::build_sfst_traces_file`]. Both signals therefore share the
+//! concurrency/queueing loop and the `Indexed`/`IndexFailed` response mapping;
+//! only the WAL-decoding seal differs.
 //!
 //! Manages its own concurrency: tracks in-flight indexing tasks and queues
 //! excess requests when the concurrency limit is reached.
 
 use std::collections::{HashMap, VecDeque};
+use std::path::Path;
 
 use tokio::sync::mpsc;
 use tokio::time::Instant;
@@ -11,6 +19,14 @@ use tokio_util::sync::CancellationToken;
 
 use file_lifecycle::component::Component;
 use file_lifecycle::ipc::{IndexerRequest, IndexerResponse};
+
+/// The seal an [`Indexer`] runs per closed WAL file: read the WAL at the first
+/// path, write the SFST at the second, return the registry-facing summary +
+/// written size. Exactly the signature of the `ng_index` builders, so spawn
+/// sites pass them as plain fn items. Format checking lives inside the seal
+/// (each builder pins its own WAL `payload_format`), not in this component.
+pub type SealFn =
+    fn(&Path, &Path, &ng_index::Metrics) -> Result<(sfst::Summary, u64), ng_index::Error>;
 
 /// Tracks a single in-flight indexing operation.
 struct IndexerTask {
@@ -23,10 +39,10 @@ pub struct Indexer;
 impl Component for Indexer {
     type Request = IndexerRequest;
     type Response = IndexerResponse;
-    type Args = ();
+    type Args = SealFn;
 
     async fn run(
-        _args: (),
+        seal: SealFn,
         mut rx: mpsc::UnboundedReceiver<IndexerRequest>,
         tx: mpsc::UnboundedSender<IndexerResponse>,
         cancel: CancellationToken,
@@ -42,7 +58,7 @@ impl Component for Indexer {
                 req = rx.recv() => match req {
                     Some(req) => {
                         if in_flight.len() < max_concurrent {
-                            start_indexing(req, &mut in_flight, done_tx.clone());
+                            start_indexing(seal, req, &mut in_flight, done_tx.clone());
                         } else {
                             queue.push_back(req);
                         }
@@ -60,7 +76,7 @@ impl Component for Indexer {
                     let _ = tx.send(resp);
 
                     if let Some(req) = queue.pop_front() {
-                        start_indexing(req, &mut in_flight, done_tx.clone());
+                        start_indexing(seal, req, &mut in_flight, done_tx.clone());
                     }
                 }
             }
@@ -69,6 +85,7 @@ impl Component for Indexer {
 }
 
 fn start_indexing(
+    seal: SealFn,
     req: IndexerRequest,
     in_flight: &mut HashMap<u64, IndexerTask>,
     done_tx: mpsc::UnboundedSender<(u64, IndexerResponse)>,
@@ -97,8 +114,7 @@ fn start_indexing(
     );
 
     tokio::task::spawn_blocking(move || {
-        let resp = match ng_index::build_sfst_file(&wal_path, &sfst_path, &ng_index::Metrics::new())
-        {
+        let resp = match seal(&wal_path, &sfst_path, &ng_index::Metrics::new()) {
             Ok((summary, size)) => IndexerResponse::Indexed {
                 seq,
                 path: sfst_path,
