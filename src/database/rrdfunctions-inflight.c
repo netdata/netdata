@@ -151,6 +151,25 @@ void rrd_function_transactions_create(void) {
     dictionary_register_conflict_callback(rrd_function_transactions.dict, rrd_functions_inflight_conflict_cb, NULL);
 }
 
+// Key-format invariant: the broker keys transactions with
+// uuid_unparse_lower_compact() (see rrd_function_run), and so does the
+// pluginsd transport for its own inflight dictionary - a key-format change on
+// either side would silently turn every lookup here into a miss.
+bool rrd_function_transaction_deadline(const char *transaction, usec_t *out_stop_monotonic_ut) {
+    if(unlikely(!out_stop_monotonic_ut || !transaction || !*transaction || !rrd_function_transactions.dict))
+        return false;
+
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_function_transactions.dict, transaction);
+    if(!item)
+        return false;
+
+    struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
+    *out_stop_monotonic_ut = __atomic_load_n(&r->stop_monotonic_ut, __ATOMIC_RELAXED);
+    dictionary_acquired_item_release(rrd_function_transactions.dict, item);
+
+    return true;
+}
+
 // called ONLY from the ASAN-gated shutdown path (daemon-shutdown.c): in normal
 // operation the broker lives for the process lifetime and is never torn down -
 // the destroy exists so leak checking sees a clean heap
@@ -359,7 +378,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
         int rc = 0;
         while (rc == 0 && !cancelled && !tmp->data_are_ready) {
             usec_t now_mono_ut = now_monotonic_usec();
-            usec_t stop_mono_ut = __atomic_load_n(&r->stop_monotonic_ut, __ATOMIC_RELAXED) + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
+            usec_t stop_mono_ut = rrd_function_effective_deadline_ut(__atomic_load_n(&r->stop_monotonic_ut, __ATOMIC_RELAXED));
             if(now_mono_ut > stop_mono_ut) {
                 rc = UV_ETIMEDOUT;
                 break;

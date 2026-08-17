@@ -18,7 +18,9 @@ struct inflight_function {
 
     BUFFER *result_body_wb;
 
-    usec_t *stop_monotonic_ut; // pointer to caller data
+    // NO deadline pointer here: the transport reads deadlines exclusively
+    // through the broker-keyed accessor rrd_function_transaction_deadline()
+    // (the parser dict key IS the compact transaction id)
     usec_t started_monotonic_ut;
     usec_t sent_monotonic_ut;
     PARSER *parser;

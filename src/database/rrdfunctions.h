@@ -12,6 +12,12 @@
 
 #define RRDFUNCTIONS_TIMEOUT_EXTENSION_UT (1 * USEC_PER_SEC)
 
+// the broker grants every deadline a grace extension before enforcing it;
+// apply it through this helper only, so the policy lives in one place
+static inline usec_t rrd_function_effective_deadline_ut(usec_t stop_monotonic_ut) {
+    return stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
+}
+
 typedef void (*rrd_function_result_callback_t)(BUFFER *wb, int code, void *result_cb_data);
 typedef bool (*rrd_function_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 
@@ -35,6 +41,9 @@ struct rrd_function_execute {
 
     HTTP_ACCESS user_access;
 
+    // points into the broker record: valid ONLY for the duration of the
+    // execute_cb invocation - executors must not stash it; later deadline
+    // reads go through rrd_function_transaction_deadline()
     usec_t *stop_monotonic_ut;
 
     struct {

@@ -68,6 +68,23 @@ static int c6ut_noop_execute_cb(struct rrd_function_execute *rfe __maybe_unused,
     return HTTP_RESP_OK;
 }
 
+// an async function that never completes on its own: captures the transaction
+// and the broker's result callback so the test can finish it explicitly
+static struct {
+    char tx[UUID_COMPACT_STR_LEN];
+    BUFFER *result_wb;
+    rrd_function_result_callback_t result_cb;
+    void *result_cb_data;
+} c5b_capture;
+
+static int c5b_async_execute_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+    uuid_unparse_lower_compact(*rfe->transaction, c5b_capture.tx);
+    c5b_capture.result_wb = rfe->result.wb;
+    c5b_capture.result_cb = rfe->result.cb;
+    c5b_capture.result_cb_data = rfe->result.data;
+    return HTTP_RESP_OK;
+}
+
 // two of these race on the same parser to exercise the window between a GC
 // pass's unlock and its deferred dels (see gc_collected)
 struct c6ut_gc_race {
@@ -276,24 +293,44 @@ int pluginsd_functions_unittest(void) {
     }
 
     // 4. GC delete mid-defer + RESULT_END delivers exactly once (the
-    //    detach-then-deliver sweep)
+    //    detach-then-deliver sweep). Production-shaped: the call goes through
+    //    the broker (rrd_function_run), because the GC reads deadlines
+    //    exclusively through the broker-keyed accessor.
     {
         int before = errors;
         struct c6ut_sends sends = { 0 };
         struct c6ut_result res = { 0 };
         PARSER *parser = c6ut_parser_create(&sends);
 
-        usec_t stop_ut = now_monotonic_usec() + 60 * USEC_PER_SEC;
-        CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        char tx[UUID_COMPACT_STR_LEN];
+        rrd_function_transactions_create(); // idempotent
 
-        c6ut_execute(parser, "c6-gc-mid-defer-fn", &stop_ut, wb, &res, tx, NULL);
+        // the function is served by the pluginsd transport, as in production
+        rrd_function_add(host, NULL, "c6-gc-mid-defer-fn", 1, 0, 1, "gc", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+                         pluginsd_function_execute_cb, parser->inflight.transport);
+
+        // our own transaction id, so RESULT_BEGIN can reference it
+        nd_uuid_t uuid;
+        uuid_generate_random(uuid);
+        char tx[UUID_COMPACT_STR_LEN];
+        uuid_unparse_lower_compact(uuid, tx);
+
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        int code = rrd_function_run(host, wb, 1 /* second */, HTTP_ACCESS_ALL, "c6-gc-mid-defer-fn",
+                                    false /* don't wait */, tx,
+                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
+                                    NULL, "unittest", false);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "  FAILED gc-mid-defer: async run returned %d\n", code);
+            errors++;
+        }
+
         c6ut_result_begin(parser, tx, "200");
 
-        // expire it (the record's deadline pointer aliases our stop_ut) and
-        // run the GC: the defer's reference keeps the record alive, so the
-        // GC's delete only marks it pending - no delivery yet
-        stop_ut = 1;
+        // let the broker deadline (1s) plus the grace extension (1s) lapse,
+        // then run the GC: the defer's reference keeps the parser record
+        // alive, so the GC's delete only marks it pending - no delivery yet
+        sleep_usec(2200 * USEC_PER_MS);
         pluginsd_inflight_functions_garbage_collect(parser, now_monotonic_usec());
 
         if(res.calls != 0) {
@@ -322,6 +359,8 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  FAILED gc-mid-defer: parser destroy re-delivered (calls %zu)\n", res.calls);
             errors++;
         }
+
+        rrd_function_del(host, NULL, "c6-gc-mid-defer-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
 
         if(errors == before)
             fprintf(stderr, "  OK gc-mid-defer: GC delete mid-defer delivered exactly once, at RESULT_END\n");
@@ -453,6 +492,61 @@ int pluginsd_functions_unittest(void) {
 
         if(errors == before)
             fprintf(stderr, "  OK gc-race: concurrent GC passes cancel and deliver exactly once\n");
+    }
+
+    // 7. the broker-keyed deadline accessor (C5b): visible deadline, visible
+    //    extension-on-progress, miss after completion
+    {
+        int before = errors;
+
+        rrd_function_transactions_create(); // idempotent; the standalone env may lack it
+
+        // a SHORT timeout, so a PROGRESS actually extends it (the extension
+        // fires only when less than FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT
+        // remains)
+        rrd_function_add(host, NULL, "c5b-deadline-fn", 5, 0, 1, "deadline", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         c5b_async_execute_cb, NULL);
+
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        int code = rrd_function_run(host, wb, 5, HTTP_ACCESS_ALL, "c5b-deadline-fn",
+                                    false /* don't wait */, NULL,
+                                    NULL, NULL, NULL, NULL, NULL, NULL,
+                                    NULL, "unittest", false);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "  FAILED deadline: async run returned %d\n", code);
+            errors++;
+        }
+
+        usec_t d1 = 0, d2 = 0, d3 = 0;
+        if(!rrd_function_transaction_deadline(c5b_capture.tx, &d1) || !d1) {
+            fprintf(stderr, "  FAILED deadline: accessor missed a live transaction\n");
+            errors++;
+        }
+
+        rrd_function_progress(c5b_capture.tx);
+
+        if(!rrd_function_transaction_deadline(c5b_capture.tx, &d2)) {
+            fprintf(stderr, "  FAILED deadline: accessor missed after progress\n");
+            errors++;
+        }
+        else if(d2 <= d1) {
+            fprintf(stderr, "  FAILED deadline: progress did not extend the deadline (%"PRIu64" -> %"PRIu64")\n", d1, d2);
+            errors++;
+        }
+
+        // finish the call; the broker record must disappear
+        c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
+
+        if(rrd_function_transaction_deadline(c5b_capture.tx, &d3)) {
+            fprintf(stderr, "  FAILED deadline: accessor still finds a completed transaction\n");
+            errors++;
+        }
+
+        rrd_function_del(host, NULL, "c5b-deadline-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(errors == before)
+            fprintf(stderr, "  OK deadline: accessor sees the deadline, the progress extension, and the completion\n");
     }
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

@@ -210,9 +210,28 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
     dictionary_write_lock(parser->inflight.functions);
 
     parser->inflight.smaller_monotonic_timeout_ut = 0;
+    size_t skipped = 0;
     struct inflight_function *pf;
     dfe_start_write(parser->inflight.functions, pf) {
-        if (*pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < now_ut) {
+        // Broker-keyed deadline: the parser dict key IS the compact
+        // transaction id, so this is one O(1) broker lookup per entry.
+        usec_t stop_ut;
+        if(unlikely(!rrd_function_transaction_deadline(pf_dfe.name, &stop_ut))) {
+            // Invariant failure: every parser record must have a broker record
+            // (pluginsd always registers sync=false, incl. the dyncfg
+            // intercept, so the broker record outlives the parser entry).
+            // SKIP, never reap: reaping would run the delete-callback chain
+            // into memory whose invariant already failed.
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "FUNCTIONS: transaction '%s' has no broker record; skipping it during garbage collection",
+                   pf_dfe.name);
+            skipped++;
+            continue;
+        }
+
+        usec_t effective_ut = rrd_function_effective_deadline_ut(stop_ut);
+
+        if (effective_ut < now_ut) {
             // a previous GC pass (serialized by the write lock) has already
             // cancelled this record and queued its deletion; it just has not
             // executed the del yet (dels run after unlock)
@@ -244,10 +263,16 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
             victims = v;
         }
 
-        else if(!parser->inflight.smaller_monotonic_timeout_ut || *pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
-            parser->inflight.smaller_monotonic_timeout_ut = *pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
+        else if(!parser->inflight.smaller_monotonic_timeout_ut || effective_ut < parser->inflight.smaller_monotonic_timeout_ut)
+            parser->inflight.smaller_monotonic_timeout_ut = effective_ut;
     }
     dfe_done(pf);
+
+    // the all-skipped guard: with the timeout left at 0, every future
+    // submission would re-run this GC and re-log the misses - push the next
+    // attempt one extension away instead
+    if(!parser->inflight.smaller_monotonic_timeout_ut && skipped)
+        parser->inflight.smaller_monotonic_timeout_ut = rrd_function_effective_deadline_ut(now_ut);
 
     dictionary_write_unlock(parser->inflight.functions);
 
@@ -383,7 +408,6 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
 
     struct inflight_function tmp = {
             .started_monotonic_ut = now_ut,
-            .stop_monotonic_ut = rfe->stop_monotonic_ut,
             .result_body_wb = rfe->result.wb,
             .timeout_s = timeout_s,
             .function = string_strdupz(rfe->function),
@@ -450,9 +474,12 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
                                                             stream_has_capability(&parser->user, STREAM_CAP_PROGRESS))))
             rfe->register_progresser.cb(rfe->register_progresser.data, pluginsd_function_progress_to_plugin, transport);
 
+        // rfe->stop_monotonic_ut is valid for the duration of this execute_cb
+        // invocation only (the documented validity window) - the record itself
+        // carries no deadline pointer, the GC reads deadlines via the broker
         if (!parser->inflight.smaller_monotonic_timeout_ut ||
-            *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
-            parser->inflight.smaller_monotonic_timeout_ut = *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
+            rrd_function_effective_deadline_ut(*rfe->stop_monotonic_ut) < parser->inflight.smaller_monotonic_timeout_ut)
+            parser->inflight.smaller_monotonic_timeout_ut = rrd_function_effective_deadline_ut(*rfe->stop_monotonic_ut);
 
         // snapshot the staleness verdict under the lock, but run the GC only
         // AFTER releasing it: the write lock is recursive, so calling the GC

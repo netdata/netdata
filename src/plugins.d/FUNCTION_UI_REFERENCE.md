@@ -1498,8 +1498,11 @@ Functions support streaming for real-time updates:
 // Transaction management
 dictionary_set(parser->inflight.functions, transaction_str, &function_data);
 
-// Timeout handling
-if (*pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < now_ut) {
+// Timeout handling: deadlines are read through the broker-keyed accessor
+// (the transport holds no pointer into the broker record)
+usec_t stop_ut;
+if (rrd_function_transaction_deadline(transaction, &stop_ut) &&
+    rrd_function_effective_deadline_ut(stop_ut) < now_ut) {
     // Function timed out
 }
 
