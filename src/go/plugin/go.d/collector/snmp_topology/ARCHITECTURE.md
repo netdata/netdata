@@ -188,6 +188,9 @@ The generic L2 builder resolves address authority before neighbor matching:
   behavior;
 - every direct primary and alias claim seeds immutable ownership before
   neighbor resolution, including claims removed from public identity;
+- actors retain the complete reconciled alias set for match, focus, and
+  collapse, while each repeated link endpoint carries only the selected primary
+  or one deterministic alias as its IP identity hint;
 - addresses from inferred observations and LLDP/CDP neighbors are accumulated
   as claims and enter device identity only after the complete claim set proves
   exclusive ownership;

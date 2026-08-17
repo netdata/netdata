@@ -55,9 +55,23 @@ func selectedDeviceManagementIP(dev model.Device) string {
 	if addr := dev.ManagementIP.Unmap(); addr.IsValid() {
 		return addr.String()
 	}
-	addresses := deviceAddressStrings(dev)
-	if len(addresses) == 1 {
-		return addresses[0]
+	if len(dev.Addresses) == 1 {
+		if addr := dev.Addresses[0].Unmap(); addr.IsValid() {
+			return addr.String()
+		}
+	}
+	return ""
+}
+
+func deviceEndpointIPHint(dev model.Device) string {
+	if addr := dev.ManagementIP.Unmap(); addr.IsValid() {
+		return addr.String()
+	}
+	if len(dev.Addresses) == 0 {
+		return ""
+	}
+	if addr := dev.Addresses[0].Unmap(); addr.IsValid() {
+		return addr.String()
 	}
 	return ""
 }

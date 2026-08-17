@@ -11,7 +11,7 @@ import (
 )
 
 func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]model.Interface) graph.LinkEndpoint {
-	match := buildDeviceActorMatch(dev, nil)
+	match := buildDeviceEndpointMatch(dev)
 
 	port = strings.TrimSpace(port)
 	ifName := ""

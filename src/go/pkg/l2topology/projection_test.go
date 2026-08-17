@@ -3,6 +3,7 @@
 package l2topology
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -196,4 +197,129 @@ func TestProjectionDoesNotReintroduceRejectedCDPAddressAsEndpointIdentity(t *tes
 	require.Len(t, observerDetail.Ports, 1)
 	require.Len(t, observerDetail.Ports[0].Neighbors, 1)
 	require.Empty(t, observerDetail.Ports[0].Neighbors[0].RemoteIP)
+}
+
+func TestProjectionKeepsLinkEndpointIPHintsConstantSized(t *testing.T) {
+	const (
+		aliasCount = 256
+		linkCount  = 64
+	)
+
+	aliases := make([]string, 0, aliasCount)
+	for i := 0; i < aliasCount; i++ {
+		aliases = append(aliases, fmt.Sprintf("10.1.%d.%d", i/254, i%254+1))
+	}
+	remotes := make([]LLDPRemoteObservation, 0, linkCount)
+	for i := 0; i < linkCount; i++ {
+		remotes = append(remotes, LLDPRemoteObservation{
+			LocalPortNum: fmt.Sprintf("%d", i+1),
+			LocalPortID:  fmt.Sprintf("Ethernet%d", i+1),
+			ChassisID:    fmt.Sprintf("02:00:00:00:01:%02x", i+1),
+			SysName:      fmt.Sprintf("switch-%d", i+1),
+			PortID:       "Ethernet1",
+			ManagementIP: fmt.Sprintf("172.16.0.%d", i+1),
+		})
+	}
+
+	result, err := BuildL2ResultFromObservations([]L2Observation{{
+		DeviceID:          "router-a",
+		Hostname:          "router-a",
+		ManagementIP:      "10.0.0.1",
+		ManagementAliases: aliases,
+		ChassisID:         "02:00:00:00:00:01",
+		LLDPRemotes:       remotes,
+	}}, DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{
+		SchemaVersion: "1.0.0",
+		Source:        "snmp",
+		Layer:         "2",
+		AgentID:       "agent-1",
+		LocalDeviceID: "router-a",
+	})
+
+	var routerActorID string
+	for _, actor := range projection.Graph.Actors {
+		if actor.Match.SysName != "router-a" {
+			continue
+		}
+		routerActorID = actor.ActorID
+		require.Len(t, actor.Match.IPAddresses, aliasCount+1)
+	}
+	require.NotEmpty(t, routerActorID)
+	require.Len(t, projection.Graph.Links, linkCount)
+
+	totalEndpointIPHints := 0
+	for _, link := range projection.Graph.Links {
+		totalEndpointIPHints += len(link.Src.Match.IPAddresses) + len(link.Dst.Match.IPAddresses)
+		if link.SrcActorID == routerActorID {
+			require.Equal(t, []string{"10.0.0.1"}, link.Src.Match.IPAddresses)
+		}
+		if link.DstActorID == routerActorID {
+			require.Equal(t, []string{"10.0.0.1"}, link.Dst.Match.IPAddresses)
+		}
+	}
+	require.LessOrEqual(t, totalEndpointIPHints, 2*linkCount)
+}
+
+func TestProjectionResolvesConstantEndpointHintsPastSharedPrimary(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ManagementIP:      "10.0.0.1",
+			ManagementAliases: []string{"10.0.0.2"},
+			ChassisID:         "02:00:00:00:00:01",
+			LLDPRemotes: []LLDPRemoteObservation{{
+				LocalPortNum: "1",
+				LocalPortID:  "Ethernet1",
+				ChassisID:    "02:00:00:00:01:01",
+				SysName:      "remote-a",
+				PortID:       "Ethernet1",
+				ManagementIP: "172.16.0.1",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ManagementIP:      "10.0.0.1",
+			ManagementAliases: []string{"10.0.0.3"},
+			ChassisID:         "02:00:00:00:00:02",
+			LLDPRemotes: []LLDPRemoteObservation{{
+				LocalPortNum: "1",
+				LocalPortID:  "Ethernet1",
+				ChassisID:    "02:00:00:00:01:02",
+				SysName:      "remote-b",
+				PortID:       "Ethernet1",
+				ManagementIP: "172.16.0.2",
+			}},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+	projection := ToGraph(result, GraphOptions{
+		SchemaVersion: "1.0.0",
+		Source:        "snmp",
+		Layer:         "2",
+		AgentID:       "agent-1",
+		LocalDeviceID: "switch-a",
+	})
+
+	actorIDBySysName := make(map[string]string)
+	for _, actor := range projection.Graph.Actors {
+		actorIDBySysName[actor.Match.SysName] = actor.ActorID
+	}
+	require.NotEmpty(t, actorIDBySysName["switch-a"], "actors: %#v", projection.Graph.Actors)
+	require.NotEmpty(t, actorIDBySysName["switch-b"], "actors: %#v", projection.Graph.Actors)
+	require.NotEqual(t, actorIDBySysName["switch-a"], actorIDBySysName["switch-b"])
+
+	for _, link := range projection.Graph.Links {
+		sysName := link.Src.Match.SysName
+		if sysName != "switch-a" && sysName != "switch-b" {
+			continue
+		}
+		require.Equal(t, actorIDBySysName[sysName], link.SrcActorID)
+	}
 }

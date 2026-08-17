@@ -22,6 +22,20 @@ func topologyDeviceInferred(dev model.Device) bool {
 }
 
 func buildDeviceActorMatch(dev model.Device, reporterAliases []string) graph.Match {
+	match := buildDeviceBaseMatch(dev, reporterAliases)
+	match.IPAddresses = deviceAddressStrings(dev)
+	return match
+}
+
+func buildDeviceEndpointMatch(dev model.Device) graph.Match {
+	match := buildDeviceBaseMatch(dev, nil)
+	if ip := deviceEndpointIPHint(dev); ip != "" {
+		match.IPAddresses = []string{ip}
+	}
+	return match
+}
+
+func buildDeviceBaseMatch(dev model.Device, reporterAliases []string) graph.Match {
 	match := graph.Match{
 		SysObjectID: strings.TrimSpace(dev.SysObject),
 		SysName:     strings.TrimSpace(dev.Hostname),
@@ -53,8 +67,6 @@ func buildDeviceActorMatch(dev model.Device, reporterAliases []string) graph.Mat
 	if len(macSet) > 0 {
 		match.MacAddresses = sortedTopologySet(macSet)
 	}
-
-	match.IPAddresses = deviceAddressStrings(dev)
 
 	return match
 }
