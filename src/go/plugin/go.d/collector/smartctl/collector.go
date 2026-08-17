@@ -38,10 +38,10 @@ func New() *Collector {
 			DeviceSelector:   "*",
 			ConcurrentScans:  0, // Default to sequential
 		},
-		charts:      &collectorapi.Charts{},
-		forceScan:   true,
-		deviceSr:    matcher.TRUE(),
-		seenDevices: make(map[string]bool),
+		charts:          &collectorapi.Charts{},
+		forceScan:       true,
+		deviceSr:        matcher.TRUE(),
+		attachedDevices: make(map[string]attachedDevice),
 	}
 }
 
@@ -79,8 +79,14 @@ type Collector struct {
 	lastDevicePollTime time.Time
 	forceDevicePoll    bool
 
-	seenDevices map[string]bool
-	mx          map[string]int64
+	attachedDevices map[string]attachedDevice
+	mx              map[string]int64
+}
+
+type attachedDevice struct {
+	id         deviceIdentity
+	charts     collectorapi.Charts
+	smartAttrs smartAttributeIdentities
 }
 
 func (c *Collector) Configuration() any {
