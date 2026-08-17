@@ -362,5 +362,5 @@ func decodeManagementIPAddress(rawAddr string) (netip.Addr, managementAddressFam
 }
 
 func managementAddressIP(addr topologymodel.ManagementAddress) (netip.Addr, bool) {
-	return parseTopologyIPAddress(topologymodel.ManagementAddressIP(addr))
+	return topologymodel.ParseManagementAddressIP(addr)
 }

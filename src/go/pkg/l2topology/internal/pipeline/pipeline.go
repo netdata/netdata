@@ -46,7 +46,13 @@ func BuildL2ResultFromObservations(observations []model.L2Observation, opts mode
 		state.applyARP(observations)
 	}
 
-	identityAliasStats := reconcileDeviceIdentityAliases(state.devices, state.interfaces, state.enrichments)
+	identityAliasStats := reconcileDeviceIdentityAliases(
+		state.devices,
+		state.interfaces,
+		state.enrichments,
+		state.remoteManagementByDeviceID,
+		state.directManagementIPByDeviceID,
+	)
 	state.markManagedDevices()
 
 	return state.buildResult(identityAliasStats, opts.CollectedAt), nil

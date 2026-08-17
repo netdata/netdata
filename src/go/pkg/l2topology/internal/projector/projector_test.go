@@ -908,33 +908,53 @@ func TestCanonicalTopologyMatchKey_NormalizesEquivalentMACRepresentations(t *tes
 	require.Equal(t, "mac:70:49:a2:65:72:cd", canonicalTopologyMatchKey(raw))
 }
 
-func TestToGraph_UsesDeterministicPrimaryManagementIP(t *testing.T) {
-	result := model.Result{
-		Devices: []model.Device{
-			{
-				ID:        "device-a",
-				Hostname:  "device-a",
-				ChassisID: "aa:bb:cc:dd:ee:ff",
+func TestToGraph_UsesExplicitOrUnambiguousPrimaryManagementIP(t *testing.T) {
+	tests := map[string]struct {
+		device model.Device
+		want   string
+	}{
+		"explicit primary": {
+			device: model.Device{
+				ManagementIP: netip.MustParseAddr("10.0.0.9"),
 				Addresses: []netip.Addr{
-					netip.MustParseAddr("10.0.0.9"),
 					netip.MustParseAddr("10.0.0.2"),
 					netip.MustParseAddr("10.0.0.9"),
 				},
 			},
+			want: "10.0.0.9",
+		},
+		"legacy exactly one fallback": {
+			device: model.Device{Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")}},
+			want:   "10.0.0.2",
+		},
+		"legacy ambiguous addresses": {
+			device: model.Device{Addresses: []netip.Addr{
+				netip.MustParseAddr("10.0.0.9"),
+				netip.MustParseAddr("10.0.0.2"),
+			}},
 		},
 	}
 
-	data, _ := toGraphForTest(result, model.GraphOptions{
-		Source: "snmp",
-		Layer:  "2",
-		View:   "summary",
-	})
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			device := tt.device
+			device.ID = "device-a"
+			device.Hostname = "device-a"
+			device.ChassisID = "aa:bb:cc:dd:ee:ff"
 
-	actor := findActorBySysName(data.Actors, "device-a")
-	require.NotNil(t, actor)
-	detail := requireActorDetail(t, data, actor)
-	require.Equal(t, "10.0.0.2", detail.Device.ManagementIP)
-	require.Equal(t, []string{"10.0.0.2", "10.0.0.9"}, detail.Device.ManagementAddresses)
+			data, _ := toGraphForTest(model.Result{Devices: []model.Device{device}}, model.GraphOptions{
+				Source: "snmp",
+				Layer:  "2",
+				View:   "summary",
+			})
+
+			actor := findActorBySysName(data.Actors, "device-a")
+			require.NotNil(t, actor)
+			detail := requireActorDetail(t, data, actor)
+			require.Equal(t, tt.want, detail.Device.ManagementIP)
+			require.Equal(t, addressStrings(deviceAddressValues(device)), detail.Device.ManagementAddresses)
+		})
+	}
 }
 
 func TestToGraph_KeepsDistinctActorsWhenMACDiffersDespiteSameSecondaryIdentity(t *testing.T) {

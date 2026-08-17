@@ -664,6 +664,46 @@ func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t
 	require.Equal(t, topologyoptions.InferenceStrategyFDBMinimumKnowledge, topologyStatsToV1ForTest(t, data.Stats)["inference_strategy"])
 }
 
+func TestTopologyRegistry_DefaultSnapshotSuppressesInferredNeighborWithOnlyIneligibleManagementAddress(t *testing.T) {
+	registry := newTopologyRegistry()
+	cache := newTopologyCache()
+	cache.updateTime = time.Now().UTC()
+	cache.agentID = "agent-test"
+	cache.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "switch-a",
+		ManagementIP:  "192.0.2.1",
+	}
+	cache.lldpLocPorts["1"] = &lldpLocPort{
+		portNum:       "1",
+		portID:        "Gi0/1",
+		portIDSubtype: "interfaceName",
+	}
+	cache.lldpRemotes["1:1"] = &lldpRemote{
+		localPortNum:     "1",
+		remIndex:         "1",
+		chassisID:        "aa:bb:cc:dd:ee:ff",
+		chassisIDSubtype: "macAddress",
+		portID:           "Gi0/2",
+		portIDSubtype:    "interfaceName",
+		sysName:          "switch-b",
+		managementAddrs: []topologymodel.ManagementAddress{{
+			Address: "169.254.0.1", AddressType: "ipv4", Source: "lldp_remote",
+		}},
+	}
+	cache.finalizeTopologyCache()
+	registry.register(cache)
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	require.NotNil(t, findDeviceActorBySysName(data, "switch-a"))
+	require.Nil(t, findDeviceActorBySysName(data, "switch-b"))
+	require.Empty(t, data.Links)
+	require.Equal(t, "169.254.0.1", cache.lldpRemotes["1:1"].managementAddrs[0].Address)
+}
+
 func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManagedOverlapPruning(t *testing.T) {
 	registry := newTopologyRegistry()
 

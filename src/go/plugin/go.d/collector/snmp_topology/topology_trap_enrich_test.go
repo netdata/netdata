@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -68,6 +69,19 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 			wantInterfaceStatus: "skipped",
 			wantNeighborStatus:  "skipped",
 		},
+		"management-address-outranks-interface-address": {
+			setup: func(cache *topologyCache) {
+				cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{{
+					Address: "192.0.2.10", AddressType: "ipv4", Source: "lldp_local",
+				}}
+				cache.ifIndexByIP["192.0.2.10"] = "7"
+			},
+			source:              "192.0.2.10",
+			wantDeviceStatus:    "matched",
+			wantDeviceMethod:    "management_address",
+			wantInterfaceStatus: "skipped",
+			wantNeighborStatus:  "skipped",
+		},
 		"no-interface-match": {
 			setup: func(cache *topologyCache) {
 				cache.localDevice.ManagementIP = "192.0.2.30"
@@ -84,6 +98,7 @@ func TestTopologyCacheTrapEnrichment(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cache := newTopologyCache()
 			tc.setup(cache)
+			cache.rebuildTrapSourceMatchMethods()
 
 			enrich := cache.trapEnrichmentForSource(tc.source, tc.ifIndex)
 			require.NotNil(t, enrich)
@@ -116,6 +131,7 @@ func TestTopologyCacheTrapEnrichmentIncludesLocalDeviceIdentity(t *testing.T) {
 	cache.localDevice.Vendor = "cisco"
 	cache.localDevice.AgentID = "agent-node-id"
 	cache.localDevice.NetdataHostID = "vnode-node-id"
+	cache.rebuildTrapSourceMatchMethods()
 
 	enrich := cache.trapEnrichmentForSource("192.0.2.30", "")
 	require.NotNil(t, enrich)
@@ -132,6 +148,7 @@ func TestTrapEnrichmentHandleForSourceUsesPublishedRegistry(t *testing.T) {
 	cache.localDevice.ManagementIP = "192.0.2.20"
 	cache.ifNamesByIndex["11"] = "Gi0/11"
 	cache.lldpRemotes["11:1"] = &lldpRemote{sysName: "dist-c"}
+	cache.rebuildTrapSourceMatchMethods()
 
 	registry.register(cache)
 
@@ -157,6 +174,7 @@ func TestTrapEnrichmentHandleRejectsTypedNonIPManagementEvidence(t *testing.T) {
 	cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{
 		{Address: "c0000263", AddressType: "16", Source: "lldp_local"},
 	}
+	cache.rebuildTrapSourceMatchMethods()
 	registry.register(cache)
 
 	enrich := handle.EnrichmentForSource("192.0.2.99", "")
@@ -172,9 +190,11 @@ func TestTrapEnrichmentHandleForSourceAmbiguousRegistryMatchDoesNotEnrich(t *tes
 	cacheA := newTopologyCache()
 	cacheA.localDevice.ManagementIP = "192.0.2.20"
 	cacheA.ifNamesByIndex["11"] = "Gi0/11"
+	cacheA.rebuildTrapSourceMatchMethods()
 	cacheB := newTopologyCache()
 	cacheB.localDevice.ManagementIP = "192.0.2.20"
 	cacheB.ifNamesByIndex["11"] = "Gi0/11"
+	cacheB.rebuildTrapSourceMatchMethods()
 
 	registry.register(cacheA)
 	registry.register(cacheB)
@@ -185,6 +205,26 @@ func TestTrapEnrichmentHandleForSourceAmbiguousRegistryMatchDoesNotEnrich(t *tes
 	require.Equal(t, 2, enrich.DeviceMatches)
 	require.Empty(t, enrich.Interface)
 	require.Empty(t, enrich.Neighbors)
+}
+
+func BenchmarkTopologyCacheTrapEnrichmentForSource(b *testing.B) {
+	cache := newTopologyCache()
+	for i := 1; i <= 200; i++ {
+		cache.localDevice.ManagementAddresses = append(cache.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
+			Address:     fmt.Sprintf("192.0.2.%d", i),
+			AddressType: "ipv4",
+			Source:      "lldp_local",
+		})
+	}
+	cache.rebuildTrapSourceMatchMethods()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if enrichment := cache.trapEnrichmentForCanonicalSource("192.0.2.200", ""); enrichment == nil {
+			b.Fatal("expected trap enrichment")
+		}
+	}
 }
 
 func TestCollectorRunPublishesAndClearsTrapTopologyRegistry(t *testing.T) {

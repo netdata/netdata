@@ -27,6 +27,7 @@ type topologyCache struct {
 	ifIndexByIP          map[string]string
 	ifNetmaskByIP        map[string]string
 	l3InterfacesByIP     map[string]topologymodel.L3Interface
+	trapMatchMethodByIP  map[string]string
 	bridgePortToIf       map[string]string
 	fdbEntries           map[string]*fdbEntry
 	fdbIDToVlanID        map[string]string

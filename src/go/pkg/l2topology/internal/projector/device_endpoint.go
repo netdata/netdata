@@ -46,7 +46,7 @@ func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName 
 		IfName:       ifName,
 		PortID:       port,
 		SysName:      strings.TrimSpace(dev.Hostname),
-		ManagementIP: firstAddress(dev.Addresses),
+		ManagementIP: selectedDeviceManagementIP(dev),
 	}
 	if ifDescr != "" {
 		endpoint.IfDescr = ifDescr

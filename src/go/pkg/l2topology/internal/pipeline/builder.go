@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"net/netip"
 	"strings"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 type l2BuildState struct {
 	devices                      map[string]model.Device
 	managedObservationByDeviceID map[string]bool
+	directManagementIPByDeviceID map[string]bool
+	remoteManagementByDeviceID   map[string]map[string]netip.Addr
 	interfaces                   map[string]model.Interface
 	adjacencies                  map[string]model.Adjacency
 	attachments                  map[string]model.Attachment
@@ -38,6 +41,8 @@ func newL2BuildState(observationCount int) *l2BuildState {
 	return &l2BuildState{
 		devices:                      make(map[string]model.Device, observationCount),
 		managedObservationByDeviceID: make(map[string]bool, observationCount),
+		directManagementIPByDeviceID: make(map[string]bool, observationCount),
+		remoteManagementByDeviceID:   make(map[string]map[string]netip.Addr),
 		interfaces:                   make(map[string]model.Interface),
 		adjacencies:                  make(map[string]model.Adjacency),
 		attachments:                  make(map[string]model.Attachment),

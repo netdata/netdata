@@ -54,16 +54,7 @@ func buildDeviceActorMatch(dev model.Device, reporterAliases []string) graph.Mat
 		match.MacAddresses = sortedTopologySet(macSet)
 	}
 
-	if len(dev.Addresses) > 0 {
-		ips := make([]string, 0, len(dev.Addresses))
-		for _, addr := range dev.Addresses {
-			if !addr.IsValid() {
-				continue
-			}
-			ips = append(ips, addr.String())
-		}
-		match.IPAddresses = uniqueTopologyStrings(ips)
-	}
+	match.IPAddresses = deviceAddressStrings(dev)
 
 	return match
 }
@@ -80,8 +71,8 @@ func buildDeviceActorDetail(
 		DeviceID:              strings.TrimSpace(dev.ID),
 		Discovered:            discovered,
 		Inferred:              topologyDeviceInferred(dev),
-		ManagementIP:          firstAddress(dev.Addresses),
-		ManagementAddresses:   addressStrings(dev.Addresses),
+		ManagementIP:          selectedDeviceManagementIP(dev),
+		ManagementAddresses:   deviceAddressStrings(dev),
 		Protocols:             labelsCSVToSlice(dev.Labels, "protocols_observed"),
 		ProtocolsCollected:    labelsCSVToSlice(dev.Labels, "protocols_observed"),
 		Capabilities:          labelsCSVToSlice(dev.Labels, "capabilities"),

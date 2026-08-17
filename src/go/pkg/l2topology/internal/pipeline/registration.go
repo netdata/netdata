@@ -36,27 +36,44 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	if primaryMAC := primaryL2MACIdentity(obs.ChassisID, obs.BaseBridgeAddress); primaryMAC != "" {
 		device.ChassisID = primaryMAC
 	}
-	if !obs.Inferred {
-		s.managedObservationByDeviceID[deviceID] = true
-	}
+	incomingManaged := !obs.Inferred
+	existingManagementIPDirect := s.directManagementIPByDeviceID[deviceID]
 	if device.Hostname == "" {
 		device.Hostname = device.ID
 	}
 	if addr := parseAddr(obs.ManagementIP); addr.IsValid() {
+		device.ManagementIP = addr
 		device.Addresses = []netip.Addr{addr}
 	}
+	selectedManagementIPDirect := incomingManaged && device.ManagementIP.IsValid()
 	if len(device.Labels) == 0 {
 		device.Labels = make(map[string]string)
 	}
 	observedProtocols := observationProtocolsUsed(obs)
 	if existing, ok := s.devices[device.ID]; ok {
+		selectedManagementIP, selectedDirect := selectObservedManagementIP(
+			existing.ManagementIP,
+			device.ManagementIP,
+			existingManagementIPDirect,
+			selectedManagementIPDirect,
+		)
 		device = mergeObservedDevice(existing, device)
+		device.ManagementIP = selectedManagementIP
+		selectedManagementIPDirect = selectedDirect
 		if device.Labels == nil {
 			device.Labels = make(map[string]string)
 		}
 		for protocol := range csvToTopologySet(existing.Labels["protocols_observed"]) {
 			observedProtocols[protocol] = struct{}{}
 		}
+	}
+	if incomingManaged {
+		s.managedObservationByDeviceID[deviceID] = true
+	}
+	if selectedManagementIPDirect {
+		s.directManagementIPByDeviceID[deviceID] = true
+	} else {
+		delete(s.directManagementIPByDeviceID, deviceID)
 	}
 	if len(observedProtocols) > 0 {
 		device.Labels["protocols_observed"] = setToCSV(observedProtocols)
@@ -180,6 +197,27 @@ func mergeObservedDevice(existing, incoming model.Device) model.Device {
 		out.Hostname = out.ID
 	}
 	return out
+}
+
+func selectObservedManagementIP(existing, incoming netip.Addr, existingDirect, incomingDirect bool) (netip.Addr, bool) {
+	existing = existing.Unmap()
+	incoming = incoming.Unmap()
+	if !existing.IsValid() {
+		return incoming, incoming.IsValid() && incomingDirect
+	}
+	if !incoming.IsValid() {
+		return existing, existingDirect
+	}
+	if existingDirect != incomingDirect {
+		if incomingDirect {
+			return incoming, true
+		}
+		return existing, true
+	}
+	if incoming.Compare(existing) < 0 {
+		return incoming, incomingDirect
+	}
+	return existing, existingDirect
 }
 
 func mergeObservedDeviceAddresses(existing, incoming []netip.Addr) []netip.Addr {

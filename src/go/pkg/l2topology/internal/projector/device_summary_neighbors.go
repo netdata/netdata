@@ -50,7 +50,7 @@ func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, devic
 	if remoteName := strings.TrimSpace(remote.Hostname); remoteName != "" {
 		neighbor.RemoteDevice = remoteName
 	}
-	neighbor.RemoteIP = firstAddress(remote.Addresses)
+	neighbor.RemoteIP = selectedDeviceManagementIP(remote)
 	neighbor.RemoteChassisID = strings.TrimSpace(remote.ChassisID)
 	neighbor.RemoteCapabilities = topologyNeighborCapabilitiesFromLabels(remote.Labels)
 	if neighbor.RemoteIP == "" && protocol == "cdp" {

@@ -70,8 +70,8 @@ func ActorDetailManagementIPs(actor Actor) []string {
 		out = append(out, ip)
 	}
 	for _, address := range actor.Detail.SNMP.ManagementAddresses {
-		if ip := ActorDetailManagementIPValue(ManagementAddressIP(address)); ip != "" {
-			out = append(out, ip)
+		if ip, ok := ParseManagementAddressIP(address); ok && !ip.IsUnspecified() {
+			out = append(out, ip.String())
 		}
 	}
 	for _, address := range actor.Detail.L2.Device.ManagementAddresses {
@@ -86,31 +86,26 @@ func ActorDetailManagementIPValue(value string) string {
 	return topologyutil.NormalizeNonUnspecifiedIPAddress(value)
 }
 
-// ManagementAddressIP returns a canonical IP only when the typed management
-// address is an IP-family observation. An empty type retains legacy inference.
-func ManagementAddressIP(address ManagementAddress) string {
-	ip := topologyutil.NormalizeIPAddress(address.Address)
-	if ip == "" {
-		return ""
-	}
-
-	parsed, err := netip.ParseAddr(ip)
-	if err != nil || !parsed.IsValid() {
-		return ""
+// ParseManagementAddressIP accepts only IP-family observations. An empty type
+// retains legacy inference.
+func ParseManagementAddressIP(address ManagementAddress) (netip.Addr, bool) {
+	parsed, ok := topologyutil.ParseIPAddress(address.Address)
+	if !ok {
+		return netip.Addr{}, false
 	}
 	switch strings.ToLower(strings.TrimSpace(address.AddressType)) {
 	case "":
-		return parsed.Unmap().String()
+		return parsed.Unmap(), true
 	case "ipv4":
 		if parsed.Is4() {
-			return parsed.Unmap().String()
+			return parsed.Unmap(), true
 		}
 	case "ipv6":
 		if parsed.Is6() {
-			return parsed.String()
+			return parsed, true
 		}
 	}
-	return ""
+	return netip.Addr{}, false
 }
 
 func ActorDetailDeviceID(actor Actor) string {

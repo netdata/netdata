@@ -33,12 +33,13 @@ type Result struct {
 
 // Device is a discovered network device.
 type Device struct {
-	ID        string
-	Hostname  string
-	Addresses []netip.Addr
-	SysObject string
-	ChassisID string
-	Labels    map[string]string
+	ID           string
+	Hostname     string
+	ManagementIP netip.Addr
+	Addresses    []netip.Addr
+	SysObject    string
+	ChassisID    string
+	Labels       map[string]string
 }
 
 // Interface is a discovered interface on a device.
