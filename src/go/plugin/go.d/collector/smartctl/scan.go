@@ -20,7 +20,7 @@ func (s *scanDevice) key() string {
 }
 
 func (s *scanDevice) shortName() string {
-	return strings.TrimPrefix(s.name, "/dev/")
+	return cleanDeviceName(strings.TrimPrefix(s.name, "/dev/"))
 }
 
 func (c *Collector) scanDevices() (map[string]*scanDevice, error) {
