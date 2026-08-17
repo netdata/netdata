@@ -195,6 +195,9 @@ func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) 
 				ManagementIP: "::ffff:192.0.2.1",
 				ManagementAddresses: []topologymodel.ManagementAddress{
 					{Address: "192.0.2.1"},
+					{Address: "192.0.2.3", AddressType: "ipv4"},
+					{Address: "c0000263", AddressType: "16"},
+					{Address: "192.0.2.4", AddressType: "2"},
 				},
 			},
 			L2: topologyengine.ProjectionActorDetail{
@@ -205,7 +208,7 @@ func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) 
 		},
 	}
 
-	require.Equal(t, []string{"192.0.2.1", "192.0.2.2"}, topologymodel.ActorDetailManagementIPs(actor))
+	require.Equal(t, []string{"192.0.2.1", "192.0.2.2", "192.0.2.3"}, topologymodel.ActorDetailManagementIPs(actor))
 }
 
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {

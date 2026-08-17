@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
@@ -207,7 +208,7 @@ func (c *topologyCache) localDeviceIPMatchMethod(ip string) string {
 		return "management_ip"
 	}
 	for _, addr := range c.localDevice.ManagementAddresses {
-		if topologyutil.NormalizeIPAddress(addr.Address) == ip {
+		if topologymodel.ActorDetailManagementIPValue(topologymodel.ManagementAddressIP(addr)) == ip {
 			return "management_address"
 		}
 	}

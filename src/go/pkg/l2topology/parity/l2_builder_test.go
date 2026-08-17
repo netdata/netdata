@@ -154,6 +154,7 @@ func TestNormalizeCDPFixtureAddressHonorsCiscoNetworkProtocol(t *testing.T) {
 		"DECnet IP-like text":   {value: "10.0.0.2", addressType: "2"},
 		"family mismatch":       {value: "20010db8000000000000000000000001", addressType: "1"},
 		"missing family legacy": {value: "0A000002", want: "10.0.0.2"},
+		"ASCII-hex IPv4":        {value: "31302e302e302e31", addressType: "1", want: "10.0.0.1"},
 	}
 
 	for name, tc := range tests {

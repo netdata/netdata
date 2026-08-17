@@ -660,13 +660,24 @@ func normalizeCDPFixtureAddress(value, addressType string) string {
 		case 16:
 			family = "20"
 		default:
-			return ""
+			parsed, err := netip.ParseAddr(strings.TrimSpace(string(decoded)))
+			if err != nil || !parsed.IsValid() {
+				return ""
+			}
+			addr = parsed
+			if parsed.Is4() {
+				family = "1"
+			} else {
+				family = "20"
+			}
 		}
-		parsed, ok := netip.AddrFromSlice(decoded)
-		if !ok {
-			return ""
+		if !addr.IsValid() {
+			parsed, ok := netip.AddrFromSlice(decoded)
+			if !ok {
+				return ""
+			}
+			addr = parsed
 		}
-		addr = parsed
 	}
 
 	if addressType != "" && addressType != family {

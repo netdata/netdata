@@ -750,6 +750,45 @@ func TestTopologyRegistry_ManagedDeviceFocusTargets_ReturnsPerDeviceIPTargets(t 
 	require.Equal(t, "sw-a (10.0.0.1)", targets[0].Name)
 }
 
+func TestTopologyRegistry_ManagedFocusRejectsTypedNonIPManagementEvidence(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now()
+	for _, device := range []topologymodel.Device{
+		{
+			ChassisID:     "00:11:22:33:44:55",
+			ChassisIDType: "macAddress",
+			SysName:       "sw-a",
+			ManagementIP:  "192.0.2.10",
+			ManagementAddresses: []topologymodel.ManagementAddress{
+				{Address: "c0000263", AddressType: "16", Source: "lldp_local"},
+			},
+		},
+		{
+			ChassisID:     "aa:bb:cc:dd:ee:ff",
+			ChassisIDType: "macAddress",
+			SysName:       "sw-b",
+			ManagementIP:  "192.0.2.20",
+		},
+	} {
+		cache := newTopologyCache()
+		cache.updateTime = now
+		cache.lastUpdate = now
+		cache.agentID = device.SysName
+		cache.localDevice = device
+		registry.register(cache)
+	}
+
+	options := defaultTopologyQueryOptionsForTest()
+	options.ManagedDeviceFocus = "ip:192.0.2.99"
+	options.Depth = 0
+	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
+
+	require.True(t, ok)
+	require.Len(t, data.Actors, 2)
+	require.NotNil(t, findDeviceActorBySysName(data, "sw-a"))
+	require.NotNil(t, findDeviceActorBySysName(data, "sw-b"))
+}
+
 func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()

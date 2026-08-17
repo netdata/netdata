@@ -362,18 +362,5 @@ func decodeManagementIPAddress(rawAddr string) (netip.Addr, managementAddressFam
 }
 
 func managementAddressIP(addr topologymodel.ManagementAddress) (netip.Addr, bool) {
-	ip, ok := parseTopologyIPAddress(addr.Address)
-	if !ok {
-		return netip.Addr{}, false
-	}
-	switch strings.ToLower(strings.TrimSpace(addr.AddressType)) {
-	case "":
-		return ip, true
-	case "ipv4":
-		return ip, ip.Is4()
-	case "ipv6":
-		return ip, ip.Is6()
-	default:
-		return netip.Addr{}, false
-	}
+	return parseTopologyIPAddress(topologymodel.ManagementAddressIP(addr))
 }

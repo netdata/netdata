@@ -4,6 +4,7 @@ package topologymodel
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -69,7 +70,7 @@ func ActorDetailManagementIPs(actor Actor) []string {
 		out = append(out, ip)
 	}
 	for _, address := range actor.Detail.SNMP.ManagementAddresses {
-		if ip := ActorDetailManagementIPValue(address.Address); ip != "" {
+		if ip := ActorDetailManagementIPValue(ManagementAddressIP(address)); ip != "" {
 			out = append(out, ip)
 		}
 	}
@@ -83,6 +84,33 @@ func ActorDetailManagementIPs(actor Actor) []string {
 
 func ActorDetailManagementIPValue(value string) string {
 	return topologyutil.NormalizeNonUnspecifiedIPAddress(value)
+}
+
+// ManagementAddressIP returns a canonical IP only when the typed management
+// address is an IP-family observation. An empty type retains legacy inference.
+func ManagementAddressIP(address ManagementAddress) string {
+	ip := topologyutil.NormalizeIPAddress(address.Address)
+	if ip == "" {
+		return ""
+	}
+
+	parsed, err := netip.ParseAddr(ip)
+	if err != nil || !parsed.IsValid() {
+		return ""
+	}
+	switch strings.ToLower(strings.TrimSpace(address.AddressType)) {
+	case "":
+		return parsed.Unmap().String()
+	case "ipv4":
+		if parsed.Is4() {
+			return parsed.Unmap().String()
+		}
+	case "ipv6":
+		if parsed.Is6() {
+			return parsed.String()
+		}
+	}
+	return ""
 }
 
 func ActorDetailDeviceID(actor Actor) string {

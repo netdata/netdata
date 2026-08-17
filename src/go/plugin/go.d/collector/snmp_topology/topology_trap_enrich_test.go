@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
 
@@ -145,6 +146,23 @@ func TestTrapEnrichmentHandleForSourceUsesPublishedRegistry(t *testing.T) {
 	mapped := handle.EnrichmentForSource("::ffff:192.0.2.20", "11")
 	require.NotNil(t, mapped)
 	require.Equal(t, "Gi0/11", mapped.Interface)
+}
+
+func TestTrapEnrichmentHandleRejectsTypedNonIPManagementEvidence(t *testing.T) {
+	registry := newTopologyRegistry()
+	handle := publishTrapTopologyRegistryForTest(registry)
+
+	cache := newTopologyCache()
+	cache.localDevice.ManagementIP = "192.0.2.20"
+	cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{
+		{Address: "c0000263", AddressType: "16", Source: "lldp_local"},
+	}
+	registry.register(cache)
+
+	enrich := handle.EnrichmentForSource("192.0.2.99", "")
+	require.NotNil(t, enrich)
+	require.Equal(t, "no_match", enrich.DeviceStatus)
+	require.Zero(t, enrich.DeviceMatches)
 }
 
 func TestTrapEnrichmentHandleForSourceAmbiguousRegistryMatchDoesNotEnrich(t *testing.T) {

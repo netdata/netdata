@@ -465,8 +465,25 @@ func TestCollectorRefreshResolvesOnlyDueDNSTargets(t *testing.T) {
 
 	require.Zero(t, stats.errors)
 	mu.Lock()
-	defer mu.Unlock()
-	require.Equal(t, []string{"switch-due.example"}, calls)
+	gotCalls := append([]string(nil), calls...)
+	mu.Unlock()
+	require.Equal(t, []string{"switch-due.example"}, gotCalls)
+
+	dueSnapshot, ok := coll.deviceCaches[due.Hostname+":161"].snapshotEngineObservations()
+	require.True(t, ok)
+	require.Len(t, dueSnapshot.L2Observations, 1)
+	require.Equal(t, "192.0.2.20", dueSnapshot.L2Observations[0].ManagementIP)
+
+	data, ok := snapshotTopologyRegistryForTest(coll.topologyRegistry)
+	require.True(t, ok)
+	managementIPs := make([]string, 0, len(data.Actors))
+	for _, actor := range data.Actors {
+		if ip := topologymodel.ActorDetailManagementIP(actor); ip != "" {
+			managementIPs = append(managementIPs, ip)
+		}
+	}
+	sort.Strings(managementIPs)
+	require.Equal(t, []string{"192.0.2.10", "192.0.2.20"}, managementIPs)
 }
 
 func TestCollectorResolveTopologyTargetManagementIPsUsesStableBoundedSharedBudget(t *testing.T) {

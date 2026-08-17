@@ -94,9 +94,9 @@ Run(ctx)
 
 refreshTopology(ctx)
   read registered SNMP devices from ddsnmp.DeviceStore
-  build a stable plan of new or stale devices
+  build a plan of new or stale devices
   resolve planned DNS targets with up to eight workers under one shared 5s budget
-  for each planned device, in registration order:
+  for each planned device, in DeviceStore snapshot order:
     refreshDeviceTopology(ctx, key, device, selectedManagementIP)
   prune caches for devices no longer registered
 

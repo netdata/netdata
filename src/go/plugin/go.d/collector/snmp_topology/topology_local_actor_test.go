@@ -55,6 +55,23 @@ func TestAugmentTopologySnapshotLocalsMaterializesMissingPolledManagedActor(t *t
 	require.Equal(t, "192.0.2.2", actor.Detail.SNMP.ManagementIP)
 }
 
+func TestAddLocalActorFromCacheUsesOnlySelectedManagementIPForIdentity(t *testing.T) {
+	data := topologymodel.Data{}
+	local := topologymodel.Device{
+		SysName:      "router-b",
+		ManagementIP: "192.0.2.2",
+		ManagementAddresses: []topologymodel.ManagementAddress{
+			{Address: "192.0.2.3", AddressType: "ipv4", Source: "ip_mib"},
+			{Address: "c0000263", AddressType: "16", Source: "lldp_local"},
+		},
+	}
+
+	require.True(t, addLocalActorFromCache(&data, "router-b-id", local))
+	require.Len(t, data.Actors, 1)
+	require.Equal(t, []string{"192.0.2.2"}, data.Actors[0].Match.IPAddresses)
+	require.Equal(t, local.ManagementAddresses, data.Actors[0].Detail.SNMP.ManagementAddresses)
+}
+
 func TestEnrichLocalActorChartReferencesAddsTypedPortDetails(t *testing.T) {
 	actor := &topologymodel.Actor{
 		Detail: topologymodel.ActorDetail{

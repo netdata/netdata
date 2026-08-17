@@ -87,16 +87,9 @@ func topologyLocalActorMatch(local topologymodel.Device) topologymodel.Match {
 		}
 	}
 
-	ips := make([]string, 0, 1+len(local.ManagementAddresses))
 	if ip := topologyutil.NormalizeIPAddress(local.ManagementIP); ip != "" {
-		ips = append(ips, ip)
+		match.IPAddresses = []string{ip}
 	}
-	for _, addr := range local.ManagementAddresses {
-		if ip := topologyutil.NormalizeIPAddress(addr.Address); ip != "" {
-			ips = append(ips, ip)
-		}
-	}
-	match.IPAddresses = topologyutil.DeduplicateSortedStrings(ips)
 
 	return match
 }
