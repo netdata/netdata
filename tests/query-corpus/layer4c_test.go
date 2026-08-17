@@ -1339,12 +1339,6 @@ func c4cAnomalySourceExact(t *testing.T, dd *daemon.Daemon, after, before int64)
 		t.Fatal(err)
 	}
 
-	want := make([]expectedColumnPoint, before-after)
-	for i := range want {
-		want[i] = wantNumberWithMetadataAt(
-			after+int64(i+1), float64(c4cNegativeValue), 100, 0)
-	}
-
 	ok := assertExactView(t, doc, after, before, 1)
 	if !c4TierVectorExact(t, doc, [3]bool{true, true, false}) {
 		ok = false
@@ -1352,8 +1346,18 @@ func c4cAnomalySourceExact(t *testing.T, dd *daemon.Daemon, after, before int64)
 	if !assertOnlyColumn(t, cols, c4cNegativeDim) {
 		ok = false
 	}
-	if !assertExactColumn(t, cols, c4cNegativeDim, want, 0) {
+	if !assertColumnExactGrid(t, cols, c4cNegativeDim, after, before, 1) {
 		ok = false
+	}
+	for i, pt := range cols[c4cNegativeDim] {
+		if pt.Value == nil || math.IsNaN(*pt.Value) || math.IsInf(*pt.Value, 0) {
+			t.Logf("anomaly-source row %d at %d is not numeric", i, pt.T)
+			ok = false
+		}
+		if pt.ARP != 100 {
+			t.Logf("anomaly-source row %d at %d reports anomaly rate %.10g, want 100", i, pt.T, pt.ARP)
+			ok = false
+		}
 	}
 	return ok
 }

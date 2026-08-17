@@ -872,9 +872,10 @@
   },
   {
     "name": "CASE-033/anomaly-rate-counts-samples-in-the-row",
-    "proves": "a result row's anomaly rate describes its source evidence. At tier 0, samples anomalous at +50, +60 and +80 pin exclusive-start membership to exact ARP [0, 100/3, 50, 100/3] under average, max and sum, excluding the row-start and future samples. Across an automatic tier1-to-tier0 seam, an all-anomalous dimension remains ARP 100 on every exact numeric row, proving read-ahead must not lose or reclassify coarse-tier metadata when the active plan changes",
+    "proves": "a result row's anomaly rate describes its source evidence. At tier 0, samples anomalous at +50, +60 and +80 pin exclusive-start membership to exact ARP [0, 100/3, 50, 100/3] under average, max and sum, excluding the row-start and future samples. Five-second upsampling proves that a 10-second source point used by the preceding interpolated row contributes evidence on its own endpoint even after the point is marked consumed, but not on the preceding row. Across an automatic tier1-to-tier0 seam, an all-anomalous dimension remains ARP 100 on every exact numeric row, proving read-ahead must not lose or reclassify coarse-tier metadata when the active plan changes",
     "components": [
       "tier0-row",
+      "tier0-exact-endpoint",
       "plan-seam-source"
     ]
   },
