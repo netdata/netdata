@@ -420,8 +420,8 @@ bool apps_os_read_pid_stat_macos(struct pid_stat *p, void *ptr) {
                       p->values[PDF_THREADS]);
     }
 
-    // MacOS doesn't have a direct concept of process state like Linux,
-    // so updating process state count might need a different approach.
+    // p->state is not set on macOS; process state counting happens in
+    // apps_os_collect_all_pids_macos() from kinfo_proc.p_stat.
 
     return true;
 }
