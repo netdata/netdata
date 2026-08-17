@@ -95,18 +95,18 @@ func (c *Collector) Configuration() any {
 
 func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation: %s", err)
+		return fmt.Errorf("config validation: %w", err)
 	}
 
 	sr, err := c.initDeviceSelector()
 	if err != nil {
-		return fmt.Errorf("device selector initialization: %v", err)
+		return fmt.Errorf("device selector initialization: %w", err)
 	}
 	c.deviceSr = sr
 
 	smartctlExec, err := c.initSmartctlCli()
 	if err != nil {
-		return fmt.Errorf("smartctl exec initialization: %v", err)
+		return fmt.Errorf("smartctl exec initialization: %w", err)
 	}
 	c.exec = smartctlExec
 

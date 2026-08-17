@@ -22,7 +22,7 @@
         "title": "Scan interval",
         "description": "Interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup.",
         "type": "number",
-        "minimum": 1,
+        "minimum": 0,
         "default": 900
       },
       "poll_devices_every": {
@@ -48,12 +48,11 @@
         "title": "Device selector",
         "description": "Specifies a [pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to match the 'info name' of devices as reported by `smartctl --scan --json`. Only devices whose 'info name' matches this pattern will be collected.",
         "type": "string",
-        "minimum": 1,
         "default": "*"
       },
       "concurrent_scans": {
-        "title": "Concurrent scans",
-        "description": "Number of devices to scan concurrently. Set to 0 for sequential scanning (default), or a positive number for concurrent scanning.",
+        "title": "Concurrent device polls",
+        "description": "Number of devices to poll concurrently. Set to 0 for sequential polling (default), or a positive number for concurrent polling.",
         "type": "integer",
         "minimum": 0,
         "default": 0
@@ -68,10 +67,7 @@
         "uniqueItems": true,
         "items": {
           "title": "Device",
-          "type": [
-            "object",
-            "null"
-          ],
+          "type": "object",
           "required": [
             "name",
             "type"
@@ -131,7 +127,7 @@
       "ui:help": "Leave blank or use `*` to collect data for all devices."
     },
     "concurrent_scans": {
-      "ui:help": "Improves performance when monitoring many devices. Set to the number of devices to scan simultaneously, or 0 to disable concurrent scanning."
+      "ui:help": "Set to the number of devices to poll simultaneously, or 0 to use sequential polling."
     },
     "extra_devices": {
       "items": {

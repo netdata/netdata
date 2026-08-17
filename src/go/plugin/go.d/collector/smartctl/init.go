@@ -7,12 +7,26 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 func (c *Collector) validateConfig() error {
+	if c.Timeout.Duration() < 500*time.Millisecond {
+		return fmt.Errorf("timeout must be at least 500ms, got %s", c.Timeout.Duration())
+	}
+	if c.ScanEvery.Duration() < 0 {
+		return fmt.Errorf("scan interval must not be negative, got %s", c.ScanEvery.Duration())
+	}
+	if c.PollDevicesEvery.Duration() < time.Second {
+		return fmt.Errorf("device poll interval must be at least 1s, got %s", c.PollDevicesEvery.Duration())
+	}
+	if c.ConcurrentScans < 0 {
+		return fmt.Errorf("concurrent device polls must not be negative, got %d", c.ConcurrentScans)
+	}
+
 	switch c.NoCheckPowerMode {
 	case "never", "sleep", "standby", "idle":
 	default:

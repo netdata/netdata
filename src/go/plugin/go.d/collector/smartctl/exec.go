@@ -23,7 +23,7 @@ type smartctlCli interface {
 	deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error)
 }
 
-// ndsudoSmartctlCli executes smartctl via ndsudo (Linux)
+// ndsudoSmartctlCli executes smartctl via ndsudo on non-Windows platforms.
 type ndsudoSmartctlCli struct {
 	*logger.Logger
 
@@ -56,7 +56,7 @@ func (e *ndsudoSmartctlCli) execute(cmd string, args ...string) (*gjson.Result, 
 	bs, cmdStr, err := ndexec.RunNDSudoWithCmd(e.Logger, e.timeout, cmd, args...)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || isExecExitCode(err, 1) || len(bs) == 0 {
-			return nil, fmt.Errorf("'%s' execution failed: %v", cmdStr, err)
+			return nil, fmt.Errorf("'%s' execution failed: %w", cmdStr, err)
 		}
 	}
 
@@ -80,11 +80,11 @@ func newDirectSmartctlCli(smartctlPath string, timeout time.Duration, log *logge
 }
 
 func (e *directSmartctlCli) scan(open bool) (*gjson.Result, error) {
-	args := []string{"--json", "--scan"}
+	mode := "--scan"
 	if open {
-		args = append(args, "--scan-open")
+		mode = "--scan-open"
 	}
-	return e.execute(args...)
+	return e.execute("--json", mode)
 }
 
 func (e *directSmartctlCli) deviceInfo(deviceName, deviceType, powerMode string) (*gjson.Result, error) {
@@ -107,8 +107,11 @@ func (e *directSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 
 	bs, err := cmd.Output()
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || isExecExitCode(err, 1) || len(bs) == 0 {
-			return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("'%s' execution failed: %w", cmd, ctxErr)
+		}
+		if isExecExitCode(err, 1) || len(bs) == 0 {
+			return nil, fmt.Errorf("'%s' execution failed: %w", cmd, err)
 		}
 	}
 

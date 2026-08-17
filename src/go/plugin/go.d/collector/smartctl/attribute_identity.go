@@ -17,30 +17,22 @@ func newSmartAttributeIdentities(dev *smartDevice) smartAttributeIdentities {
 		return nil
 	}
 
-	type attributeGroup struct {
-		count        int
-		hasChartable bool
-	}
-	groups := make(map[string]attributeGroup)
+	groups := make(map[string]int)
 	for _, attr := range attrs {
-		if !isSmartAttrValid(attr) {
+		if !isSmartAttrChartable(attr) {
 			continue
 		}
-		baseName := cleanAttributeName(attributeNameMap(attr.name()))
-		group := groups[baseName]
-		group.count++
-		group.hasChartable = group.hasChartable || isSmartAttrChartable(attr)
-		groups[baseName] = group
+		groups[cleanAttributeName(attr.name())]++
 	}
 
 	identities := make(smartAttributeIdentities)
 	for _, attr := range attrs {
-		if !isSmartAttrValid(attr) {
+		if !isSmartAttrChartable(attr) {
 			continue
 		}
-		baseName := cleanAttributeName(attributeNameMap(attr.name()))
+		baseName := cleanAttributeName(attr.name())
 		name := baseName
-		if group := groups[baseName]; group.count > 1 && group.hasChartable {
+		if groups[baseName] > 1 {
 			name = disambiguateSmartAttributeName(baseName, attr.id())
 		}
 		identities[attr.id()] = smartAttributeIdentity{baseName: baseName, name: name}
@@ -53,15 +45,8 @@ func (ids smartAttributeIdentities) resolve(attr *smartAttribute) smartAttribute
 		return identity
 	}
 
-	baseName := cleanAttributeName(attributeNameMap(attr.name()))
-	name := baseName
-	for id, identity := range ids {
-		if id != attr.id() && identity.baseName == baseName {
-			name = disambiguateSmartAttributeName(baseName, attr.id())
-			break
-		}
-	}
-	return smartAttributeIdentity{baseName: baseName, name: name}
+	baseName := cleanAttributeName(attr.name())
+	return smartAttributeIdentity{baseName: baseName, name: baseName}
 }
 
 func disambiguateSmartAttributeName(baseName, id string) string {

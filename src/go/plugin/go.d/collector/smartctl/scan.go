@@ -7,10 +7,11 @@ import (
 )
 
 type scanDevice struct {
-	name     string
-	infoName string
-	typ      string
-	extra    bool // added via config "extra_devices"
+	name           string
+	infoName       string
+	typ            string
+	extra          bool // added via config "extra_devices"
+	typeUnresolved bool
 }
 
 func (s *scanDevice) key() string {
@@ -28,7 +29,7 @@ func (c *Collector) scanDevices() (map[string]*scanDevice, error) {
 
 	resp, err := c.exec.scan(scanOpen)
 	if err != nil {
-		return nil, fmt.Errorf("failed to scan devices: %v", err)
+		return nil, fmt.Errorf("failed to scan devices: %w", err)
 	}
 
 	devices := make(map[string]*scanDevice)
@@ -78,19 +79,25 @@ func (c *Collector) scanDevices() (map[string]*scanDevice, error) {
 }
 
 func (c *Collector) handleGuessedScsiScannedDevice(dev *scanDevice) {
-	if dev.typ != "scsi" || c.hasScannedDevice(dev) {
+	if dev.typ != "scsi" {
 		return
 	}
 
-	d := &scanDevice{name: dev.name, typ: "sat"}
-
-	if c.hasScannedDevice(d) {
-		dev.typ = d.typ
+	sat := &scanDevice{name: dev.name, typ: "sat"}
+	if c.hasScannedDevice(sat) {
+		dev.typ = sat.typ
+		return
+	}
+	if previous, ok := c.scannedDevices[dev.key()]; ok && !previous.typeUnresolved {
 		return
 	}
 
 	resp, _ := c.exec.deviceInfo(dev.name, "sat", c.NoCheckPowerMode)
-	if resp == nil || isExitStatusHasAnyBit(resp, 0, 1, 2) {
+	if resp == nil || isDeviceInLowerPowerMode(resp) {
+		dev.typeUnresolved = true
+		return
+	}
+	if isExitStatusHasAnyBit(resp, 0, 1, 2) {
 		return
 	}
 
