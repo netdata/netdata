@@ -6,6 +6,7 @@
 #include "rrd.h"
 
 #include "rrdcollector-internals.h"
+#include "rrdfunctions-transport.h"
 
 typedef enum __attribute__((packed)) {
     RRD_FUNCTION_LOCAL  = (1 << 0),
@@ -59,7 +60,40 @@ struct rrd_host_function {
 
     OBJECT_STATE_ID rrdhost_state_id;
     struct rrd_collector *collector;
+
+    // LEAF spinlock guarding the entry's SWAPPED fields: the (source,
+    // execute_cb_data) pair, execute_cb, and the help/tags STRINGs. The
+    // conflict callback takes it (inside the dictionary index write lock)
+    // around the swaps and the displaced releases/frees; readers take it
+    // standalone AFTER the standard item acquire (the item ref pins the
+    // entry memory, this lock pins the swapped CONTENTS) to capture the
+    // execute pair or byte-copy the strings. Leaf: never acquire any other
+    // lock while holding it.
+    SPINLOCK leaf_spinlock;
 };
+
+// does the registration source store a transport in execute_cb_data?
+// (INTERNAL data is caller-owned and never a transport)
+static inline bool rrd_function_source_has_transport(RRD_FUNCTION_REG_SOURCE source) {
+    return source == RRD_FUNCTION_REG_SOURCE_COLLECTOR || source == RRD_FUNCTION_REG_SOURCE_STREAMING;
+}
+
+// Capture-at-find: the execute pair captured under the leaf spinlock, with the
+// transport entry-pinned iff the source is transport-bearing. Executors NEVER
+// re-read rdcf->execute_cb / execute_cb_data at call time - a stale capture
+// degrades to a clean 503 via the transport's acquire-or-fail.
+struct rrd_function_capture {
+    rrd_function_execute_cb_t execute_cb;
+    void *execute_cb_data;
+    struct rrd_function_transport *transport_pin;   // entry-pinned; NULL for INTERNAL sources
+};
+
+void rrd_function_acquired_capture(RRD_FUNCTION_ACQUIRED *rfa, struct rrd_function_capture *out);
+
+static inline void rrd_function_capture_release(struct rrd_function_capture *c) {
+    rrd_function_transport_entry_release(c->transport_pin);
+    c->transport_pin = NULL;
+}
 
 static inline size_t rrd_functions_strlen_bounded(const char *s, size_t max) {
     size_t len = strnlen(s, max + 1);

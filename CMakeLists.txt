@@ -1745,6 +1745,7 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_dyncfg.c
         src/plugins.d/pluginsd_dyncfg.h
         src/plugins.d/pluginsd_functions.c
+        src/plugins.d/pluginsd_functions-unittest.c
         src/plugins.d/pluginsd_functions.h
         src/plugins.d/pluginsd_internals.c
         src/plugins.d/pluginsd_internals.h

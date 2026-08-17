@@ -76,8 +76,16 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
 
     netdata_log_error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
     pf->code = rrd_call_function_error(pf->result_body_wb, "This transaction is already in progress.", HTTP_RESP_BAD_REQUEST);
+
+    // delivering the SECOND caller's result here, inside the insertion
+    // critical section, is safe: that caller's waiter mutex is not yet taken
+    // (it is acquired only after its execute_cb returns)
     pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
+
+    // the loser's owned allocations - the old code leaked payload and source
     string_freez(pf->function);
+    buffer_free((void *)pf->payload);
+    freez((void *)pf->source);
 
     return false;
 }
@@ -104,23 +112,114 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
 }
 
 void pluginsd_inflight_functions_init(PARSER *parser) {
+    // the transport is what everyone who may need to reach this parser later
+    // stores (registry entries, cancellers/progressers, dyncfg nodes); the
+    // base entry ref created here is dropped by parser_destroy() after the
+    // parser is freed
+    parser->inflight.transport = rrd_function_transport_create(parser);
+
     parser->inflight.functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions, 0);
     dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
     dictionary_register_delete_callback(parser->inflight.functions, inflight_functions_delete_callback, parser);
     dictionary_register_conflict_callback(parser->inflight.functions, inflight_functions_conflict_callback, parser);
 }
 
+// destroy_all: called from parser_destroy() AFTER the transport was marked
+// dead and drained, so no execute/cancel/progress/GC can be inside the
+// container and a late execute_cb insert gets NULL from the destroyed
+// dictionary (its existing 503 branch answers the caller). The pre-destroy
+// drain delivers already-pending victims OUTSIDE the locks; the remaining
+// live records are delivered by dictionary_destroy() through the delete
+// callback - the destroy-time 503 sweep (each record's code was pre-set to
+// 503 at insert, so callers waiting on this plugin get a clean 503). A
+// straggler that goes pending after the drain is delivered by
+// dictionary_destroy() under the lock - bounded, and post-drain no
+// waiter-mutex counter-party exists.
 void pluginsd_inflight_functions_cleanup(PARSER *parser) {
+    if(parser->inflight.functions)
+        dictionary_garbage_collect_and_deliver(parser->inflight.functions);
     dictionary_destroy(parser->inflight.functions);
+    parser->inflight.functions = NULL;
+}
+
+// UAF-B destroy-mid-defer: the parser died between RESULT_BEGIN and
+// RESULT_END. Only two defer families exist:
+//   - the function family: action_data is an OWNED transaction STRING, the
+//     response ALIASES pf->result_body_wb (never freed here), and defer.item
+//     is the stashed acquired inflight item;
+//   - the JSON family: action_data is NULL and the response is OWNED.
+// Rule: free action_data always (owned STRING or NULL); free the response
+// only for the JSON family; release the stashed item only for the function
+// family. The release (without a del) leaves the record to the G3 sweep in
+// pluginsd_inflight_functions_cleanup(), which delivers it through the normal
+// delete callback - and the dictionary is never queued-for-destruction
+// forever behind our reference.
+void pluginsd_inflight_functions_release_deferred(PARSER *parser) {
+    if(parser->defer.item) {
+        struct inflight_function *pf = dictionary_acquired_item_value(parser->defer.item);
+
+        // a truncated stream must not report success; a plugin's own error
+        // code (e.g. 404) survives truncation
+        if(pf->code >= 200 && pf->code < 300)
+            pf->code = HTTP_RESP_SERVICE_UNAVAILABLE;
+
+        dictionary_acquired_item_release(parser->inflight.functions, parser->defer.item);
+        parser->defer.item = NULL;
+    }
+
+    if(parser->defer.action_data) {
+        // function family: the owned transaction STRING
+        string_freez((STRING *)parser->defer.action_data);
+        parser->defer.action_data = NULL;
+    }
+    else if(parser->defer.response) {
+        // JSON family: the owned response buffer
+        buffer_free(parser->defer.response);
+    }
+
+    parser->defer.response = NULL;
+    parser->defer.action = NULL;
+    parser->defer.end_keyword = NULL;
 }
 
 // ----------------------------------------------------------------------------
 
+// Expire timed-out transactions. The container phase (traversal, expiry
+// writes, the CANCEL notification to the plugin) runs under the parser dict
+// WRITE lock in ALL invocations - this is what makes the plain
+// smaller_monotonic_timeout_ut field sound; if this phase ever moves outside
+// the lock it needs a CAS loop, not relaxed atomics. Delivery (the delete
+// callbacks that hand results to waiters) happens strictly OUTSIDE the lock:
+// victims are dup'd under the locked traversal WITH their keys copied (the
+// item-owned key is freed with the item, and a concurrent sweep can free it
+// between our release and our del), then per-victim release-dup-then-
+// del-by-the-copied-key - the zero-ref del path is the only one that fires
+// the delete callback lock-free, and external releases never fire callbacks.
+// A victim some other reference keeps alive (e.g. a RESULT_BEGIN defer) goes
+// pending instead and is delivered by a later sweep. Enabling invariant (hard
+// constraint): no thread may hold a waiter mutex while acquiring this
+// dictionary's items lock - the keyed canceller/progresser touch only the
+// index lock, and execute_cb always precedes the wait-mutex acquisition.
 void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut) {
+    struct gc_victim {
+        const DICTIONARY_ITEM *item;
+        char *key;
+        struct gc_victim *next;
+    } *victims = NULL;
+
+    dictionary_write_lock(parser->inflight.functions);
+
     parser->inflight.smaller_monotonic_timeout_ut = 0;
     struct inflight_function *pf;
     dfe_start_write(parser->inflight.functions, pf) {
         if (*pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < now_ut) {
+            // a previous GC pass (serialized by the write lock) has already
+            // cancelled this record and queued its deletion; it just has not
+            // executed the del yet (dels run after unlock)
+            if(pf->gc_collected)
+                continue;
+            pf->gc_collected = true;
+
             internal_error(true,
                            "FUNCTION '%s' removing expired transaction '%s', after %"PRIu64" usec.",
                            string2str(pf->function), pf_dfe.name, now_ut - pf->started_monotonic_ut);
@@ -132,51 +231,90 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
 
             // Notify the plugin that the transaction has been cancelled due to timeout,
             // so it can stop any in-progress work for this transaction.
+            // GC runs only from execute_cb, whose caller holds a transport
+            // dispatcher ref - so this send is inside a guarded section.
             char buffer[2048];
             snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_CANCEL " %s\n", pf_dfe.name);
             send_to_plugin(buffer, pf->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
-            dictionary_del(parser->inflight.functions, pf_dfe.name);
+            struct gc_victim *v = mallocz(sizeof(*v));
+            v->item = dictionary_acquired_item_dup(parser->inflight.functions, pf_dfe.item);
+            v->key = strdupz(pf_dfe.name);
+            v->next = victims;
+            victims = v;
         }
 
         else if(!parser->inflight.smaller_monotonic_timeout_ut || *pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
             parser->inflight.smaller_monotonic_timeout_ut = *pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
     }
     dfe_done(pf);
+
+    dictionary_write_unlock(parser->inflight.functions);
+
+    // deliver outside all container locks
+    while(victims) {
+        struct gc_victim *v = victims;
+        victims = v->next;
+
+        dictionary_acquired_item_release(parser->inflight.functions, v->item);
+        dictionary_del(parser->inflight.functions, v->key);
+        freez(v->key);
+        freez(v);
+    }
+
+    // trailing drain: anything that went pending (a del that raced another
+    // reference) is delivered now, outside the locks; free when nothing is
+    // pending
+    dictionary_garbage_collect_and_deliver(parser->inflight.functions);
 }
 
 // ----------------------------------------------------------------------------
 
-static void pluginsd_function_cancel(void *data) {
-    struct inflight_function *look_for = data, *t;
+// Keyed and self-validating (UAF-A fix): `data` is the transport, the
+// transaction re-validates against THIS parser's inflight dictionary in O(1) -
+// no pointer-identity scan over recyclable storage, so a recycled record can
+// never false-match and cancel the wrong transaction. The dispatcher ref
+// guards the whole send (UAF-D class): once the parser starts tearing down,
+// the acquire fails and we bail cleanly.
+static void pluginsd_function_cancel(const char *transaction, void *data) {
+    struct rrd_function_transport *t = data;
 
-    bool sent = false;
-    dfe_start_read(look_for->parser->inflight.functions, t) {
-        if(look_for == t) {
-            const char *transaction = t_dfe.name;
-
-            internal_error(true, "PLUGINSD: sending function cancellation to plugin for transaction '%s'", transaction);
-
-            char buffer[2048];
-            snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_CANCEL " %s\n", transaction);
-
-            // send the command to the plugin
-            ssize_t ret = send_to_plugin(buffer, t->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
-            if(ret < 0)
-                sent = true;
-
-            break;
-        }
+    if(!rrd_function_transport_dispatcher_acquire(t)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "PLUGINSD: FUNCTION_CANCEL for transaction '%s', but the plugin is not running.",
+               transaction ? transaction : "(unset)");
+        return;
     }
-    dfe_done(t);
 
-    if(sent <= 0)
+    PARSER *parser = t->data;
+
+    const DICTIONARY_ITEM *item = transaction && *transaction
+        ? dictionary_get_and_acquire_item(parser->inflight.functions, transaction)
+        : NULL;
+
+    if(item) {
+        internal_error(true, "PLUGINSD: sending function cancellation to plugin for transaction '%s'", transaction);
+
+        char buffer[2048];
+        snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_CANCEL " %s\n", transaction);
+
+        // send the command to the plugin
+        send_to_plugin(buffer, parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
+
+        dictionary_acquired_item_release(parser->inflight.functions, item);
+    }
+    else
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
+
+    rrd_function_transport_dispatcher_release(t);
 }
 
+// `data` is the transport; the dispatcher ref guards the whole send (UAF-A/D
+// class). The keyed lookup in THIS parser's dictionary is the validation - a
+// transaction belonging to another parser simply misses.
 static void pluginsd_function_progress_to_plugin(const char *transaction, void *data) {
-    PARSER *parser = data;
+    struct rrd_function_transport *t = data;
 
     if(!transaction || !*transaction) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -184,32 +322,20 @@ static void pluginsd_function_progress_to_plugin(const char *transaction, void *
         return;
     }
 
-    if(!parser) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "PLUGINSD: FUNCTION_PROGRESS request without parser!");
+    if(!rrd_function_transport_dispatcher_acquire(t)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "PLUGINSD: FUNCTION_PROGRESS for transaction '%s', but the plugin is not running.", transaction);
         return;
     }
 
+    PARSER *parser = t->data;
     DICTIONARY *dict = parser->inflight.functions;
-
-    if(!dict) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "PLUGINSD: FUNCTION_PROGRESS request without inflight functions dictionary!");
-        return;
-    }
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict, transaction);
     if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: FUNCTION_PROGRESS request for transaction '%s' that is not in progress!", transaction);
-        return;
-    }
-
-    struct inflight_function *t = dictionary_acquired_item_value(item);
-    if(t->parser != parser) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "PLUGINSD: FUNCTION_PROGRESS request for transaction '%s' parser mismatch!", transaction);
-        dictionary_acquired_item_release(dict, item);
+        rrd_function_transport_dispatcher_release(t);
         return;
     }
 
@@ -219,13 +345,14 @@ static void pluginsd_function_progress_to_plugin(const char *transaction, void *
     snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_PROGRESS " %s\n", transaction);
 
     // send the command to the plugin
-    ssize_t ret = send_to_plugin(buffer, t->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
+    ssize_t ret = send_to_plugin(buffer, parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     if(ret != (ssize_t)strlen(buffer)) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "PLUGINSD: FUNCTION_PROGRESS request failed to send to plugin for transaction '%s'", transaction);
     }
 
     dictionary_acquired_item_release(dict, item);
+    rrd_function_transport_dispatcher_release(t);
 }
 
 // this is the function called from
@@ -234,7 +361,21 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    PARSER  *parser = data;
+    // `data` is the transport (UAF-C fix): the parser is dereferenced ONLY
+    // under a dispatcher ref - once the parser starts tearing down the
+    // acquire fails and the caller gets a clean 503 instead of a
+    // check-then-use race on freed parser memory
+    struct rrd_function_transport *transport = data;
+
+    if(!rrd_function_transport_dispatcher_acquire(transport)) {
+        int code = HTTP_RESP_SERVICE_UNAVAILABLE;
+        rrd_call_function_error(rfe->result.wb, "The plugin that offered this function is not available.", code);
+        if(rfe->result.cb)
+            rfe->result.cb(rfe->result.wb, code, rfe->result.data);
+        return code;
+    }
+
+    PARSER *parser = transport->data;
 
     usec_t now_ut = now_monotonic_usec();
 
@@ -283,35 +424,50 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
         buffer_free(tmp.payload);
         freez((void *)tmp.source);
 
+        rrd_function_transport_dispatcher_release(transport);
         return code;
     }
 
     if(!t->sent_successfully) {
         int code = t->code;
         dictionary_write_unlock(parser->inflight.functions);
+        // the del delivers this record's error through the delete callback,
+        // with no container locks held
         dictionary_del(parser->inflight.functions, transaction_str);
+        // the GC now takes the container write lock itself, so its container
+        // phase is locked on this path too (the old shape ran it unlocked
+        // here, racing the locked readers of the timeout field)
         pluginsd_inflight_functions_garbage_collect(parser, now_ut);
+        rrd_function_transport_dispatcher_release(transport);
         return code;
     }
     else {
         if (rfe->register_canceller.cb)
-            rfe->register_canceller.cb(rfe->register_canceller.data, pluginsd_function_cancel, t);
+            rfe->register_canceller.cb(rfe->register_canceller.data, pluginsd_function_cancel, transport);
 
         if (rfe->register_progresser.cb &&
             (parser->repertoire == PARSER_INIT_PLUGINSD || (parser->repertoire == PARSER_INIT_STREAMING &&
                                                             stream_has_capability(&parser->user, STREAM_CAP_PROGRESS))))
-            rfe->register_progresser.cb(rfe->register_progresser.data, pluginsd_function_progress_to_plugin, t->parser);
+            rfe->register_progresser.cb(rfe->register_progresser.data, pluginsd_function_progress_to_plugin, transport);
 
         if (!parser->inflight.smaller_monotonic_timeout_ut ||
             *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
             parser->inflight.smaller_monotonic_timeout_ut = *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
 
-        // garbage collect stale inflight functions
-        if (parser->inflight.smaller_monotonic_timeout_ut < now_ut)
-            pluginsd_inflight_functions_garbage_collect(parser, now_ut);
+        // snapshot the staleness verdict under the lock, but run the GC only
+        // AFTER releasing it: the write lock is recursive, so calling the GC
+        // while holding it would keep its delivery phase (the delete callbacks
+        // that hand results to waiters) effectively under the items write
+        // lock, re-arming the ABBA this step closes - the GC takes the lock
+        // itself for its container phase
+        bool gc_needed = (parser->inflight.smaller_monotonic_timeout_ut < now_ut);
 
         dictionary_write_unlock(parser->inflight.functions);
 
+        if (gc_needed)
+            pluginsd_inflight_functions_garbage_collect(parser, now_ut);
+
+        rrd_function_transport_dispatcher_release(transport);
         return HTTP_RESP_OK;
     }
 }
@@ -382,7 +538,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     rrd_function_add(host, st, name, timeout_s, priority, version, help, tags,
                      http_access_from_hex_mapping_old_roles(access_str), false,
                      from_streaming ? RRD_FUNCTION_REG_SOURCE_STREAMING : RRD_FUNCTION_REG_SOURCE_COLLECTOR,
-                     pluginsd_function_execute_cb, parser);
+                     pluginsd_function_execute_cb, parser->inflight.transport);
 
     parser->user.data_collections_count++;
 
@@ -427,23 +583,46 @@ PARSER_RC pluginsd_function_del(char **words, size_t num_words, PARSER *parser) 
 
 static void pluginsd_function_result_end(struct parser *parser, void *action_data) {
     STRING *key = action_data;
+
+    // release -> del -> sweep: the INVERSE of the registry's del-then-release
+    // idiom, and both inversions are load-bearing. This dictionary has no GC
+    // linkage and traversals skip deleted items, so del-then-release would
+    // DEFER the delete callback; release-then-del delivers it right here (the
+    // zero-ref del is the only lock-free delivery path). And release-then-del
+    // alone still does not deliver when a GC del landed mid-defer: that del
+    // unlinked the item from the hashtable first, so our del is a miss and
+    // our release only marks it pending - the sweep below delivers it. Net: a
+    // GC del mid-stream delivers at result_end (504 + partial body) in ALL
+    // interleavings.
+    if(parser->defer.item) {
+        dictionary_acquired_item_release(parser->inflight.functions, parser->defer.item);
+        parser->defer.item = NULL;
+    }
+
     if(key)
         dictionary_del(parser->inflight.functions, string2str(key));
     string_freez(key);
 
+    // early-returns when nothing is pending, so the happy path pays nothing
+    dictionary_garbage_collect_and_deliver(parser->inflight.functions);
+
     parser->user.data_collections_count++;
 }
 
-static inline struct inflight_function *inflight_function_find(PARSER *parser, const char *transaction) {
-    struct inflight_function *pf = NULL;
+// UAF-B fix: the caller gets an ACQUIRED item (or NULL), so the record - and
+// the result buffer the deferred body lines are appended to - cannot be freed
+// by a concurrent GC delete while the caller uses it
+static inline const DICTIONARY_ITEM *inflight_function_acquire(PARSER *parser, const char *transaction, const char *keyword) {
+    const DICTIONARY_ITEM *item = NULL;
 
     if(transaction && *transaction)
-        pf = (struct inflight_function *)dictionary_get(parser->inflight.functions, transaction);
+        item = dictionary_get_and_acquire_item(parser->inflight.functions, transaction);
 
-    if(!pf)
-        netdata_log_error("got a " PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN " for transaction '%s', but the transaction is not found.", transaction ? transaction : "(unset)");
+    if(!item)
+        netdata_log_error("got a %s for transaction '%s', but the transaction is not found.",
+                          keyword, transaction ? transaction : "(unset)");
 
-    return pf;
+    return item;
 }
 
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER *parser) {
@@ -467,7 +646,8 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER 
 
     time_t expiration = (expires && *expires) ? str2l(expires) : 0;
 
-    struct inflight_function *pf = inflight_function_find(parser, transaction);
+    const DICTIONARY_ITEM *item = inflight_function_acquire(parser, transaction, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN);
+    struct inflight_function *pf = item ? dictionary_acquired_item_value(item) : NULL;
     if(pf) {
         if(format && *format)
             pf->result_body_wb->content_type = content_type_string2id(format);
@@ -485,6 +665,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER 
     parser->defer.end_keyword = PLUGINSD_KEYWORD_FUNCTION_RESULT_END;
     parser->defer.action = pluginsd_function_result_end;
     parser->defer.action_data = string_strdupz(transaction); // it is ok is key is NULL
+    parser->defer.item = item; // held across the RESULT_BEGIN..END span (UAF-B)
     parser->flags |= PARSER_DEFER_UNTIL_KEYWORD;
 
     return PARSER_RC_OK;
@@ -497,13 +678,17 @@ PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *par
     char *done_str      = get_word(words, num_words, i++);
     char *all_str       = get_word(words, num_words, i++);
 
-    struct inflight_function *pf = inflight_function_find(parser, transaction);
-    if(pf) {
+    const DICTIONARY_ITEM *item = inflight_function_acquire(parser, transaction, PLUGINSD_KEYWORD_FUNCTION_PROGRESS);
+    if(item) {
+        struct inflight_function *pf = dictionary_acquired_item_value(item);
+
         size_t done = done_str && *done_str ? str2u(done_str) : 0;
         size_t all = all_str && *all_str ? str2u(all_str) : 0;
 
         if(pf->progress.cb)
             pf->progress.cb(&pf->transaction, pf->progress.data, done, all);
+
+        dictionary_acquired_item_release(parser->inflight.functions, item);
     }
 
     return PARSER_RC_OK;

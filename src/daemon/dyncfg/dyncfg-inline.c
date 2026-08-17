@@ -43,7 +43,7 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path,
 
     if(!dyncfg_add_low_level(host, id, path, status, type, source_type, source, cmds,
                              0, 0, true, view_access, edit_access,
-                             dyncfg_inline_callback, NULL)) {
+                             dyncfg_inline_callback, NULL, NULL)) {
         dictionary_del(dyncfg_nodes, id);
         return false;
     }

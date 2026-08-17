@@ -23,6 +23,14 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
     rdcf->rrdhost_state_id = object_state_id(&host->state_id);
     rdcf->unregistered = false;
 
+    spinlock_init(&rdcf->leaf_spinlock);
+
+    // the entry stores the transport (execute_cb_data) for transport-bearing
+    // sources - take the entry ref this storage owns; released by
+    // rrd_functions_cleanup() under the stored tag
+    if(rrd_function_source_has_transport(rdcf->source) && rdcf->execute_cb_data)
+        rrd_function_transport_entry_acquire(rdcf->execute_cb_data);
+
     if(!rdcf->priority)
         rdcf->priority = RRDFUNCTIONS_PRIORITY_DEFAULT;
 
@@ -33,6 +41,14 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
 
 static void rrd_functions_cleanup(struct rrd_host_function *rdcf) {
     rrd_collector_release(rdcf->collector);
+
+    // release the transport ref this (tag, data) pair owns - keyed on the tag
+    // the struct actually HOLDS (the conflict callback swaps them as one pair,
+    // so the displaced pair always lands here together). NULL-safe; INTERNAL
+    // data is caller-owned and never released.
+    if(rrd_function_source_has_transport(rdcf->source))
+        rrd_function_transport_entry_release(rdcf->execute_cb_data);
+
     string_freez(rdcf->help);
     string_freez(rdcf->tags);
 }
@@ -80,6 +96,14 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         rdcf->rrdhost_state_id = object_state_id(&host->state_id);
         changed = true;
     }
+
+    // Everything from here to the end swaps fields that concurrent readers
+    // capture or byte-copy under the entry's leaf spinlock (an item reference
+    // pins the entry memory but NOT the swapped contents - a displaced STRING
+    // or transport can be freed the moment it leaves the entry). Take the leaf
+    // lock around the swaps AND the displaced releases/frees below, so a
+    // reader either sees the old consistent contents or the new ones.
+    spinlock_lock(&rdcf->leaf_spinlock);
 
     if(rdcf->execute_cb != new_rdcf->execute_cb) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -169,22 +193,45 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 
     // (source, execute_cb_data) swap as ONE pair inside one conditional - never
     // as two independently-conditional swaps - so a later cleanup/release always
-    // keys on the ownership tag matching the data it actually holds
+    // keys on the ownership tag matching the data it actually holds.
+    //
+    // Transport accounting (the collector pattern in this same callback, see
+    // new_rdcf->collector above): when a DIFFERENT pair is installed, acquire
+    // an entry ref iff the INSTALLED tag is transport-bearing; the displaced
+    // pair lands in new_rdcf for rrd_functions_cleanup(new_rdcf) below to
+    // release under the DISPLACED tag. When NO swap occurs (equal pair -
+    // routine: a child re-sends its whole function list on every flag set and
+    // reconnect, and the dictionary fires this callback even for identical
+    // values), NEUTRALIZE new_rdcf (data NULL, non-transport tag) so the
+    // unconditional cleanup release is a no-op. Invariant: an equal-pair
+    // conflict nets ZERO refs - by neutralization, not by skipping the
+    // release.
     if(rdcf->execute_cb_data != new_rdcf->execute_cb_data || rdcf->source != new_rdcf->source) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: function '%s' of host '%s' changed execute callback data or registration source",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
+        if(rrd_function_source_has_transport(new_rdcf->source) && new_rdcf->execute_cb_data)
+            rrd_function_transport_entry_acquire(new_rdcf->execute_cb_data);
+
         SWAP(rdcf->execute_cb_data, new_rdcf->execute_cb_data);
         SWAP(rdcf->source, new_rdcf->source);
         changed = true;
+    }
+    else {
+        new_rdcf->execute_cb_data = NULL;
+        new_rdcf->source = RRD_FUNCTION_REG_SOURCE_INTERNAL;
     }
 
 //    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
 //                   rdcf->collector->tid, rdcf->collector->running ? "running" : "NOT running");
 
+    // under the leaf lock: frees the DISPLACED strings/transport ref, which a
+    // concurrent leaf-locked reader may otherwise still be copying
     rrd_functions_cleanup(new_rdcf);
+
+    spinlock_unlock(&rdcf->leaf_spinlock);
 
     return changed;
 }
@@ -221,6 +268,25 @@ void rrd_functions_host_destroy(RRDHOST *host) {
 void rrd_function_acquired_release(RRDHOST *host, RRD_FUNCTION_ACQUIRED *rfa) {
     if(!rfa) return;
     dictionary_acquired_item_release(host->functions->dict, (const DICTIONARY_ITEM *)rfa);
+}
+
+// Capture-at-find: snapshot the execute pair under the entry's leaf spinlock,
+// entry-pinning the transport for transport-bearing sources. The caller holds
+// the acquired item (pinning the entry memory); the leaf lock closes the
+// window where a concurrent re-registration swaps the pair and frees the
+// displaced transport between our read and our pin. The pin attaches ONLY to
+// the entry the find returned - never to prefix-retry intermediates, which
+// are released inside the find loop before this can run.
+void rrd_function_acquired_capture(RRD_FUNCTION_ACQUIRED *rfa, struct rrd_function_capture *out) {
+    struct rrd_host_function *rdcf = rrd_function_acquired_value(rfa);
+
+    spinlock_lock(&rdcf->leaf_spinlock);
+    out->execute_cb = rdcf->execute_cb;
+    out->execute_cb_data = rdcf->execute_cb_data;
+    out->transport_pin = (rrd_function_source_has_transport(rdcf->source) && rdcf->execute_cb_data)
+                             ? rrd_function_transport_entry_acquire(rdcf->execute_cb_data)
+                             : NULL;
+    spinlock_unlock(&rdcf->leaf_spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -333,6 +399,14 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .tags = string_strdupz(tags),
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions->dict, key, &tmp, sizeof(tmp));
+    if(unlikely(!item)) {
+        // dictionary destroyed (shutdown in progress) - neither the insert nor
+        // the conflict callback ran, so tmp's strings are still ours and no
+        // transport ref was taken; unwind cleanly
+        string_freez(tmp.help);
+        string_freez(tmp.tags);
+        return;
+    }
 
     if(st)
         dictionary_view_set(st->functions_view, key, item);

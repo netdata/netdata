@@ -120,6 +120,16 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
                "DYNCFG: cannot add job '%s' because host is missing", id);
     }
     else {
+        // snapshot the template's execute pair and PIN its transport under the
+        // template node's leaf lock: a lock-free read here could race a
+        // conflict-transfer's displaced release (plugin restart) and hand the
+        // new job node a freed transport. Our pin covers the window until the
+        // job node's insert callback takes its own; released below.
+        rrd_function_execute_cb_t template_cb;
+        void *template_cb_data;
+        struct rrd_function_transport *template_transport_pin =
+            dyncfg_node_execute_snapshot(df_template, &template_cb, &template_cb_data);
+
         const DICTIONARY_ITEM *item = dyncfg_add_internal(
             host,
             id,
@@ -135,9 +145,12 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
             df_template->sync,
             df_template->view_access,
             df_template->edit_access,
-            df_template->execute_cb,
-            df_template->execute_cb_data,
+            template_cb,
+            template_cb_data,
+            template_transport_pin,
             false);
+
+        rrd_function_transport_entry_release(template_transport_pin);
 
         // adding does not create df->dyncfg
         // we have to do it here
@@ -531,7 +544,18 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         rfe->result.cb = dyncfg_function_intercept_result_cb;
         rfe->result.data = dc;
 
-        rc = df->execute_cb(rfe, df->execute_cb_data);
+        // snapshot the execute pair and pin the transport under the node's
+        // leaf lock: without the pin, a concurrent conflict-transfer (plugin
+        // restart re-CREATE) could release the displaced transport between
+        // our read and the callback's own acquire-or-503
+        rrd_function_execute_cb_t execute_cb;
+        void *execute_cb_data;
+        struct rrd_function_transport *transport_pin =
+            dyncfg_node_execute_snapshot(df, &execute_cb, &execute_cb_data);
+
+        rc = execute_cb(rfe, execute_cb_data);
+
+        rrd_function_transport_entry_release(transport_pin);
     }
     else if(rfe->result.cb)
         rfe->result.cb(rfe->result.wb, rc, rfe->result.data);

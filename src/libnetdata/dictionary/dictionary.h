@@ -157,6 +157,11 @@ void dictionary_version_increment(DICTIONARY *dict);
 
 void dictionary_garbage_collect(DICTIONARY *dict);
 
+// like dictionary_garbage_collect(), but the victims' delete callbacks are
+// delivered OUTSIDE the dictionary locks (use when the delete callback can
+// take mutexes or deliver results to waiters); not supported on views
+size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict);
+
 size_t cleanup_destroyed_dictionaries(bool shutdown);
 
 // Report on allocated dictionaries - used during Address Sanitizer builds

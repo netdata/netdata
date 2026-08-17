@@ -127,7 +127,7 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
                              DYNCFG_STATUS_RUNNING, t2->type, t2->source_type, t2->source,
                              t2->cmds, 0, 0, t2->sync,
                              HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
-                             dyncfg_unittest_execute_cb, t2);
+                             dyncfg_unittest_execute_cb, t2, NULL);
     }
     else {
         dyncfg_unittest_register_error(t->id, "invalid command received to parse payload");
@@ -563,7 +563,7 @@ static TEST *dyncfg_unittest_add(TEST t) {
                               t.source_type, t.source,
                               t.cmds, 0, 0, t.sync,
                               HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
-                              dyncfg_unittest_execute_cb, ret)) {
+                              dyncfg_unittest_execute_cb, ret, NULL)) {
         dyncfg_unittest_register_error(t.id, "addition of job failed");
     }
 

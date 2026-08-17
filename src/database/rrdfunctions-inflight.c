@@ -27,6 +27,13 @@ struct rrd_function_inflight {
     // and we release it at the end
     struct rrd_host_function *rdcf;
 
+    // capture-at-find (see rrd_function_acquired_capture): executors use THIS
+    // pair, never rdcf->execute_cb / execute_cb_data re-read at call time - a
+    // concurrent re-registration swaps those and frees the displaced
+    // transport; the captured pin keeps ours alive and a stale capture
+    // degrades to a clean 503 via the transport's acquire-or-fail
+    struct rrd_function_capture captured;
+
     struct {
         BUFFER *wb;
 
@@ -89,6 +96,19 @@ static void rrd_functions_inflight_cleanup(struct rrd_function_inflight *r) {
     freez((void *)r->sanitized_cmd);
     freez((void *)r->source);
 
+    // the execute capture's transport pin (NULL for INTERNAL sources)
+    rrd_function_capture_release(&r->captured);
+
+    // the canceller/progresser registration pins: per the
+    // rrd_function_cancel_cb_t contract their data is a transport, entry-
+    // pinned at registration - BOTH released here, no dedup (an async record
+    // can hold two). NULL-safe, so cleanup on a never-inserted record (the
+    // early error paths) releases nothing.
+    rrd_function_transport_entry_release(r->canceller.data);
+    r->canceller.data = NULL;
+    rrd_function_transport_entry_release(r->progresser.data);
+    r->progresser.data = NULL;
+
     r->payload = NULL;
     r->transaction = NULL;
     r->cmd = NULL;
@@ -145,19 +165,36 @@ void rrd_function_transactions_destroy(void) {
 static void rrd_inflight_async_function_register_canceller_cb(void *register_canceller_cb_data, rrd_function_cancel_cb_t canceller_cb, void *canceller_cb_data) {
     struct rrd_function_inflight *r = register_canceller_cb_data;
 
+    // per the rrd_function_cancel_cb_t contract, canceller_cb_data is the
+    // registrar's transport: entry-pin it for the record's lifetime, so a late
+    // cancel after the transport's owner died acquire-fails on a valid (dead)
+    // transport instead of chasing a freed pointer. Released in
+    // rrd_functions_inflight_cleanup(). A re-registration (none exists today)
+    // releases the previous pin so it cannot leak.
+    rrd_function_transport_entry_acquire(canceller_cb_data);
+
     spinlock_lock(&r->callbacks.spinlock);
+    struct rrd_function_transport *previous = r->canceller.data;
     r->canceller.cb = canceller_cb;
     r->canceller.data = canceller_cb_data;
     spinlock_unlock(&r->callbacks.spinlock);
+
+    rrd_function_transport_entry_release(previous);
 }
 
 static void rrd_inflight_async_function_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
     struct rrd_function_inflight *r = register_progresser_cb_data;
 
+    // same contract, pin and re-registration handling as the canceller above
+    rrd_function_transport_entry_acquire(progresser_cb_data);
+
     spinlock_lock(&r->callbacks.spinlock);
+    struct rrd_function_transport *previous = r->progresser.data;
     r->progresser.cb = progresser_cb;
     r->progresser.data = progresser_cb_data;
     spinlock_unlock(&r->callbacks.spinlock);
+
+    rrd_function_transport_entry_release(previous);
 }
 
 // ----------------------------------------------------------------------------
@@ -165,7 +202,6 @@ static void rrd_inflight_async_function_register_progresser_cb(void *register_pr
 
 struct rrd_function_call_wait {
     RRDHOST *host;
-    RRD_FUNCTION_ACQUIRED *host_function_acquired;
     char *transaction;
 
     bool free_with_signal;
@@ -259,7 +295,7 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
             .data = r,
         },
     };
-    int code = r->rdcf->execute_cb(&rfe, r->rdcf->execute_cb_data);
+    int code = r->captured.execute_cb(&rfe, r->captured.execute_cb_data);
 
     return code;
 }
@@ -269,7 +305,6 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     tmp->free_with_signal = false;
     tmp->data_are_ready = false;
     tmp->host = r->host;
-    tmp->host_function_acquired = r->host_function_acquired;
     tmp->transaction = strdupz(r->transaction);
     netdata_mutex_init(&tmp->mutex);
     netdata_cond_init(&tmp->cond);
@@ -313,7 +348,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
             .data = r,
         },
     };
-    int code = r->rdcf->execute_cb(&rfe, r->rdcf->execute_cb_data);
+    int code = r->captured.execute_cb(&rfe, r->captured.execute_cb_data);
 
     // this has to happen after we execute the callback
     // because if an async call is responded in sync mode, there will be a deadlock.
@@ -589,6 +624,12 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     sanitized_source = NULL;
     uuid_copy(t.transaction_uuid, uuid);
 
+    // capture the execute pair NOW, under the entry's leaf lock, pinning the
+    // transport - executors must never re-read rdcf's pair at call time (see
+    // struct rrd_function_inflight.captured). The early error paths below
+    // release the pin via rrd_functions_inflight_cleanup(&t).
+    rrd_function_acquired_capture(host_function_acquired, &t.captured);
+
     bool duplicate_transaction = false;
     struct rrd_function_inflight *r = dictionary_set_advanced(
         rrd_function_transactions.dict, transaction, -1, &t, sizeof(t), &duplicate_transaction);
@@ -657,7 +698,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                 .data = NULL,
             },
         };
-        code = r->rdcf->execute_cb(&rfe, r->rdcf->execute_cb_data);
+        code = r->captured.execute_cb(&rfe, r->captured.execute_cb_data);
 
         rrd_inflight_function_cleanup(host, r->transaction);
         return code;
@@ -711,7 +752,7 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
     spinlock_unlock(&r->callbacks.spinlock);
 
     if(canceller_cb)
-        canceller_cb(canceller_cb_data);
+        canceller_cb(r->transaction, canceller_cb_data);
 
     rrd_collector_dispatcher_release(r->rdcf->collector);
 }

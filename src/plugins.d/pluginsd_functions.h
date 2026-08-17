@@ -4,6 +4,7 @@
 #define NETDATA_PLUGINSD_FUNCTIONS_H
 
 #include "pluginsd_internals.h"
+#include "database/rrdfunctions-transport.h"
 
 struct inflight_function {
     nd_uuid_t transaction;
@@ -24,6 +25,11 @@ struct inflight_function {
 
     bool sent_successfully;
 
+    // written only under the parser dict write lock: the GC pass that cancels
+    // this record and queues its deletion sets it, so a second GC pass entering
+    // between that pass's unlock and its del cannot re-send FUNCTION_CANCEL
+    bool gc_collected;
+
     struct {
         rrd_function_result_callback_t cb;
         void *data;
@@ -42,6 +48,7 @@ PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *par
 
 void pluginsd_inflight_functions_init(PARSER *parser);
 void pluginsd_inflight_functions_cleanup(PARSER *parser);
+void pluginsd_inflight_functions_release_deferred(PARSER *parser);
 void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut);
 
 int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data);

@@ -52,12 +52,30 @@ static void dyncfg_normalize(DYNCFG *df) {
 
 static void dyncfg_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     DYNCFG *df = value;
+
+    // the ONLY release site for the node's transport pin: dyncfg_cleanup()
+    // also serves conflict losers and file-load error paths (which never
+    // held a pin), and dyncfg_shutdown_low_level()'s dictionary_destroy fires
+    // this callback per node - an explicit release there would double-release
+    if(df->transport) {
+        rrd_function_transport_entry_release(df->transport);
+        df->transport = NULL;
+    }
+
     dyncfg_cleanup(df);
 }
 
 static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
     DYNCFG *df = value;
     dyncfg_normalize(df);
+
+    spinlock_init(&df->transport_spinlock);
+
+    // the tmp carried the plugin transport RAW (unpinned); the pin belongs to
+    // the NODE and is taken here, inside the insert callback - never on the
+    // tmp - so conflict losers hold nothing to leak
+    if(df->transport)
+        rrd_function_transport_entry_acquire(df->transport);
 
     const char *id = dictionary_acquired_item_name(item);
     size_t buf_size = strlen(id) + 20;
@@ -158,10 +176,28 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         changes++;
     }
 
+    // the predicate reads v's execute pair outside the node spinlock: safe
+    // because conflict callbacks are serialized by the dictionary index write
+    // lock (the only writers of these fields), and the concurrent
+    // snapshot-readers only read
     if(!v->execute_cb || (overwrite_cb && nv->execute_cb && (v->execute_cb != nv->execute_cb || v->execute_cb_data != nv->execute_cb_data))) {
+        // the transfer branch - including the !v->execute_cb rescue arm, where
+        // the displaced pin is provably NULL. Under the node's leaf spinlock so
+        // a concurrent reader (intercept invocation, template fan-out) either
+        // snapshots the old consistent triple or the new one; the DISPLACED
+        // pin is released before the new one is installed. nv's transport is
+        // the RAW (unpinned) pointer from the tmp, so losers hold nothing.
+        spinlock_lock(&v->transport_spinlock);
+
+        if(v->transport)
+            rrd_function_transport_entry_release(v->transport);
+        v->transport = nv->transport ? rrd_function_transport_entry_acquire(nv->transport) : NULL;
+
         v->sync = nv->sync,
         v->execute_cb = nv->execute_cb;
         v->execute_cb_data = nv->execute_cb_data;
+
+        spinlock_unlock(&v->transport_spinlock);
         changes++;
     }
 
@@ -213,6 +249,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
                                            usec_t created_ut, usec_t modified_ut,
                                            bool sync, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
                                            rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
+                                           struct rrd_function_transport *transport,
                                            bool overwrite_cb) {
     DYNCFG tmp = {
         .host_uuid = host->host_id,
@@ -232,6 +269,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
         .dyncfg = { 0 },
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
+        .transport = transport,     // RAW - the insert/transfer callbacks pin it
     };
 
     return dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), &overwrite_cb);
@@ -344,7 +382,8 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
                           DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source,
                           DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync,
                           HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
-                          rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+                          rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
+                          struct rrd_function_transport *transport) {
 
     if(view_access == HTTP_ACCESS_NONE)
         view_access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG;
@@ -376,7 +415,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
 
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds,
                                                       created_ut, modified_ut, sync, view_access, edit_access,
-                                                      execute_cb, execute_cb_data, true);
+                                                      execute_cb, execute_cb_data, transport, true);
     DYNCFG *df = dictionary_acquired_item_value(item);
 
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
