@@ -81,6 +81,7 @@ func reconcileDeviceIdentityAliases(
 	devices map[string]model.Device,
 	interfaces map[string]model.Interface,
 	enrichments map[string]*enrichmentAccumulator,
+	directOwnersByIP map[string]map[string]struct{},
 	remoteManagementByDeviceID map[string]map[string]netip.Addr,
 	directManagementIPByDeviceID map[string]bool,
 ) identityAliasReconcileStats {
@@ -89,7 +90,12 @@ func reconcileDeviceIdentityAliases(
 		return stats
 	}
 
-	ownersByIP := make(map[string]map[string]struct{})
+	ownersByIP := make(map[string]map[string]struct{}, len(directOwnersByIP))
+	for ip, owners := range directOwnersByIP {
+		copied := make(map[string]struct{}, len(owners))
+		maps.Copy(copied, owners)
+		ownersByIP[ip] = copied
+	}
 	addOwner := func(deviceID string, addr netip.Addr) {
 		deviceID = strings.TrimSpace(deviceID)
 		addr = addr.Unmap()

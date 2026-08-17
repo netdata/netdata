@@ -163,6 +163,7 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 		Detail: topologymodel.ActorDetail{
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
+					DeviceID:            "device-a",
 					ManagementIP:        "10.0.0.2",
 					ManagementAddresses: []string{"10.0.0.3", "not-an-ip"},
 				},
@@ -202,13 +203,36 @@ func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) 
 			},
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
+					DeviceID:            "device-a",
 					ManagementAddresses: []string{"::", "::ffff:192.0.2.2", "192.0.2.2"},
 				},
 			},
 		},
 	}
 
-	require.Equal(t, []string{"192.0.2.1", "192.0.2.2", "192.0.2.3"}, topologymodel.ActorDetailManagementIPs(actor))
+	require.Equal(t, []string{"192.0.2.2"}, topologymodel.ActorDetailManagementIPs(actor))
+}
+
+func TestTopologyActorDetailManagementIPsUsesOnlySelectedSNMPFallback(t *testing.T) {
+	snmpOnly := topologymodel.Actor{
+		Detail: topologymodel.ActorDetail{
+			SNMP: topologymodel.SNMPActorDetail{
+				ManagementIP: "192.0.2.1",
+				ManagementAddresses: []topologymodel.ManagementAddress{
+					{Address: "192.0.2.2", AddressType: "ipv4"},
+				},
+			},
+		},
+	}
+	require.Equal(t, "192.0.2.1", topologymodel.ActorDetailManagementIP(snmpOnly))
+	require.Equal(t, []string{"192.0.2.1"}, topologymodel.ActorDetailManagementIPs(snmpOnly))
+
+	l2WithoutPrimary := snmpOnly
+	l2WithoutPrimary.Detail.L2.Device.DeviceID = "device-a"
+	require.Empty(t, topologymodel.ActorDetailManagementIP(l2WithoutPrimary))
+	require.Empty(t, topologymodel.ActorDetailManagementIPs(l2WithoutPrimary))
+	require.False(t, topologyActorHasIP(l2WithoutPrimary, "192.0.2.1"))
+	require.False(t, topologyActorHasIP(l2WithoutPrimary, "192.0.2.2"))
 }
 
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {

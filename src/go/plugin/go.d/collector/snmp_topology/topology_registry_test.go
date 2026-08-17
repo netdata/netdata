@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -828,6 +829,103 @@ func TestTopologyRegistry_ManagedFocusRejectsTypedNonIPManagementEvidence(t *tes
 	require.NotNil(t, findDeviceActorBySysName(data, "sw-b"))
 }
 
+func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now().UTC()
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = now
+	cacheA.lastUpdate = now
+	cacheA.agentID = "sw-a"
+	cacheA.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-a",
+		ManagementIP:  "192.0.2.10",
+	}
+	cacheA.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIPAddr:  "192.0.2.20",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = now
+	cacheB.lastUpdate = now
+	cacheB.agentID = "sw-b"
+	cacheB.localDevice = topologymodel.Device{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-b",
+		ManagementIP:  "192.0.2.20",
+	}
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+	baseline, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	baselineA := findDeviceActorBySysName(baseline, "sw-a")
+	require.NotNil(t, baselineA)
+	require.NotContains(t, baselineA.Match.IPAddresses, "192.0.2.20")
+	require.NotContains(t, baselineA.Detail.L2.Device.ManagementAddresses, "192.0.2.20")
+	require.Equal(t, "192.0.2.20", baselineA.Detail.SNMP.ManagementAddresses[0].Address)
+
+	options := defaultTopologyQueryOptionsForTest()
+	options.ManagedDeviceFocus = "ip:192.0.2.20"
+	options.Depth = 0
+	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	require.Nil(t, findDeviceActorBySysName(data, "sw-a"))
+	require.NotNil(t, findDeviceActorBySysName(data, "sw-b"))
+}
+
+func TestTopologyRegistry_ManagedFocusRetainsUniqueReconciledLocalAlias(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now().UTC()
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = now
+	cacheA.lastUpdate = now
+	cacheA.agentID = "sw-a"
+	cacheA.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-a",
+		ManagementIP:  "192.0.2.10",
+	}
+	cacheA.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIPAddr:  "192.0.2.11",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = now
+	cacheB.lastUpdate = now
+	cacheB.agentID = "sw-b"
+	cacheB.localDevice = topologymodel.Device{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-b",
+		ManagementIP:  "192.0.2.20",
+	}
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+
+	options := defaultTopologyQueryOptionsForTest()
+	options.ManagedDeviceFocus = "ip:192.0.2.11"
+	options.Depth = 0
+	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	actor := findDeviceActorBySysName(data, "sw-a")
+	require.NotNil(t, actor)
+	require.Contains(t, actor.Match.IPAddresses, "192.0.2.11")
+	require.Contains(t, actor.Detail.L2.Device.ManagementAddresses, "192.0.2.11")
+}
+
 func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
@@ -1072,6 +1170,37 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 	require.Len(t, data.Links, 1)
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["links_total"])
 	require.Equal(t, 2, countActorsByType(data, "device"))
+}
+
+func TestTopologyRegistry_DuplicateCachesPreserveReconciledManagementPrimary(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now().UTC()
+
+	for _, managementIP := range []string{"192.0.2.30", "192.0.2.20"} {
+		cache := newTopologyCache()
+		cache.updateTime = now
+		cache.lastUpdate = now
+		cache.agentID = managementIP
+		cache.localDevice = topologymodel.Device{
+			ChassisID:     "00:11:22:33:44:55",
+			ChassisIDType: "macAddress",
+			SysName:       "sw-a",
+			ManagementIP:  managementIP,
+		}
+		registry.register(cache)
+	}
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	actor := findDeviceActorBySysName(data, "sw-a")
+	require.NotNil(t, actor)
+	require.Equal(t, "192.0.2.20", actor.Detail.L2.Device.ManagementIP)
+	require.Equal(t, "192.0.2.20", topologymodel.ActorDetailManagementIP(*actor))
+
+	payload, err := topologyv1renderer.Render(data)
+	require.NoError(t, err)
+	require.Equal(t, []string{"192.0.2.20"}, topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip"))
 }
 
 func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {

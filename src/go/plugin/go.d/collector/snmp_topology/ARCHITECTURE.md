@@ -175,12 +175,19 @@ Each cache snapshot is converted into:
   peers;
 - local device detail used to enrich the selected local actor.
 
-The generic L2 builder keeps direct management identity separate from inferred
-neighbor evidence:
+Each direct SNMP observation gives the generic L2 builder one selected
+`ManagementIP` plus vetted `ManagementAliases`. Raw typed SNMP management rows
+remain diagnostic and trap-matching evidence; public match, focus, and collapse
+identity consume the reconciled L2 result.
 
-- every selected address from a direct device observation participates in an
-  immutable unique-owner lookup built before neighbor resolution;
-- an address claimed by more than one direct device cannot resolve a neighbor;
+The generic L2 builder resolves address authority before neighbor matching:
+
+- a selected primary owns its address over another device's alias;
+- an alias claimed by multiple direct devices is removed from their public
+  identity, while selected-primary collisions keep the existing IP-collapse
+  behavior;
+- every direct primary and alias claim seeds immutable ownership before
+  neighbor resolution, including claims removed from public identity;
 - addresses from inferred observations and LLDP/CDP neighbors are accumulated
   as claims and enter device identity only after the complete claim set proves
   exclusive ownership;

@@ -21,12 +21,13 @@ type l2BuildState struct {
 	enrichments                  map[string]*enrichmentAccumulator
 	ifNameByDeviceIfIndex        map[string]string
 
-	hostToID       map[string]string
-	directIPOwners map[string]directIPOwner
-	directIPToID   map[string]string
-	chassisToID    map[string]string
-	macToID        map[string]string
-	bridgeAddrToID map[string]string
+	hostToID                map[string]string
+	directAddressClaimsByIP map[string]*directAddressClaims
+	directOwnersByIP        map[string]map[string]struct{}
+	directIPToID            map[string]string
+	chassisToID             map[string]string
+	macToID                 map[string]string
+	bridgeAddrToID          map[string]string
 
 	linksLLDP        int
 	linksCDP         int
@@ -38,9 +39,9 @@ type l2BuildState struct {
 	endpointIDs   map[string]struct{}
 }
 
-type directIPOwner struct {
-	deviceID  string
-	ambiguous bool
+type directAddressClaims struct {
+	primaryOwners map[string]struct{}
+	aliasOwners   map[string]struct{}
 }
 
 func newL2BuildState(observationCount int) *l2BuildState {
@@ -55,7 +56,7 @@ func newL2BuildState(observationCount int) *l2BuildState {
 		enrichments:                  make(map[string]*enrichmentAccumulator),
 		ifNameByDeviceIfIndex:        make(map[string]string),
 		hostToID:                     make(map[string]string, observationCount),
-		directIPOwners:               make(map[string]directIPOwner, observationCount),
+		directAddressClaimsByIP:      make(map[string]*directAddressClaims, observationCount),
 		chassisToID:                  make(map[string]string, observationCount),
 		macToID:                      make(map[string]string, observationCount),
 		bridgeAddrToID:               make(map[string]string, observationCount),

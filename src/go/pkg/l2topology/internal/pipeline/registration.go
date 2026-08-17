@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -43,10 +44,17 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		device.Hostname = device.ID
 	}
 	managementAddr := canonicalAddr(obs.ManagementIP)
-	if incomingManaged && managementAddr.IsValid() {
-		addr := managementAddr
-		device.ManagementIP = addr
-		device.Addresses = []netip.Addr{addr}
+	managementAliases := canonicalManagementAliases(obs.ManagementAliases)
+	if incomingManaged {
+		addresses := make(map[string]netip.Addr, 1+len(managementAliases))
+		for _, addr := range managementAliases {
+			addresses[addr.String()] = addr
+		}
+		if managementAddr.IsValid() {
+			device.ManagementIP = managementAddr
+			addresses[managementAddr.String()] = managementAddr
+		}
+		device.Addresses = sortedAddrValues(addresses)
 	}
 	selectedManagementIPDirect := incomingManaged && device.ManagementIP.IsValid()
 	if len(device.Labels) == 0 {
@@ -82,11 +90,19 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		device.Labels["protocols_observed"] = setToCSV(observedProtocols)
 	}
 	s.devices[device.ID] = device
-	if managementAddr.IsValid() {
-		if incomingManaged {
-			s.recordDirectManagementAddress(device.ID, managementAddr)
-		} else {
+	if incomingManaged {
+		if managementAddr.IsValid() {
+			s.recordDirectManagementAddress(device.ID, managementAddr, true)
+		}
+		for _, addr := range managementAliases {
+			s.recordDirectManagementAddress(device.ID, addr, false)
+		}
+	} else {
+		if managementAddr.IsValid() {
 			s.recordRemoteManagementAddress(device.ID, managementAddr.String())
+		}
+		for _, addr := range managementAliases {
+			s.recordRemoteManagementAddress(device.ID, addr.String())
 		}
 	}
 
@@ -184,31 +200,91 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	return nil
 }
 
-func (s *l2BuildState) recordDirectManagementAddress(deviceID string, addr netip.Addr) {
+func canonicalManagementAliases(values []string) []netip.Addr {
+	aliases := make(map[string]netip.Addr, len(values))
+	for _, value := range values {
+		addr := canonicalAddr(value)
+		if !isUsableAliasIPAddress(addr) {
+			continue
+		}
+		aliases[addr.String()] = addr
+	}
+	return sortedAddrValues(aliases)
+}
+
+func (s *l2BuildState) recordDirectManagementAddress(deviceID string, addr netip.Addr, selectedPrimary bool) {
 	deviceID = strings.TrimSpace(deviceID)
 	addr = addr.Unmap()
 	if deviceID == "" || !addr.IsValid() {
 		return
 	}
 
-	ip := addr.String()
-	owner := s.directIPOwners[ip]
-	if owner.deviceID == "" {
-		owner.deviceID = deviceID
-	} else if owner.deviceID != deviceID {
-		owner.ambiguous = true
+	claims := s.directAddressClaimsByIP[addr.String()]
+	if claims == nil {
+		claims = &directAddressClaims{
+			primaryOwners: make(map[string]struct{}),
+			aliasOwners:   make(map[string]struct{}),
+		}
+		s.directAddressClaimsByIP[addr.String()] = claims
 	}
-	s.directIPOwners[ip] = owner
+	if selectedPrimary {
+		claims.primaryOwners[deviceID] = struct{}{}
+	} else {
+		claims.aliasOwners[deviceID] = struct{}{}
+	}
 }
 
 func (s *l2BuildState) finalizeDirectIPIndex() {
-	s.directIPToID = make(map[string]string, len(s.directIPOwners))
-	for ip, owner := range s.directIPOwners {
-		if !owner.ambiguous && owner.deviceID != "" {
-			s.directIPToID[ip] = owner.deviceID
+	s.directIPToID = make(map[string]string, len(s.directAddressClaimsByIP))
+	s.directOwnersByIP = make(map[string]map[string]struct{}, len(s.directAddressClaimsByIP))
+	for ip, claims := range s.directAddressClaimsByIP {
+		owners := make(map[string]struct{}, len(claims.primaryOwners)+len(claims.aliasOwners))
+		maps.Copy(owners, claims.primaryOwners)
+		maps.Copy(owners, claims.aliasOwners)
+		s.directOwnersByIP[ip] = owners
+
+		if len(claims.primaryOwners) == 1 {
+			for deviceID := range claims.primaryOwners {
+				s.directIPToID[ip] = deviceID
+			}
+		} else if len(claims.primaryOwners) == 0 && len(claims.aliasOwners) == 1 {
+			for deviceID := range claims.aliasOwners {
+				s.directIPToID[ip] = deviceID
+			}
 		}
 	}
-	s.directIPOwners = nil
+
+	for deviceID, device := range s.devices {
+		addresses := make(map[string]netip.Addr, len(device.Addresses))
+		for _, addr := range device.Addresses {
+			addr = addr.Unmap()
+			if !addr.IsValid() || !s.keepDirectManagementAddress(deviceID, addr.String()) {
+				continue
+			}
+			addresses[addr.String()] = addr
+		}
+		device.Addresses = sortedAddrValues(addresses)
+		s.devices[deviceID] = device
+	}
+	s.directAddressClaimsByIP = nil
+}
+
+func (s *l2BuildState) keepDirectManagementAddress(deviceID, ip string) bool {
+	claims := s.directAddressClaimsByIP[ip]
+	if claims == nil {
+		return true
+	}
+	if _, primary := claims.primaryOwners[deviceID]; primary {
+		return true
+	}
+	if len(claims.primaryOwners) > 0 {
+		return false
+	}
+	if len(claims.aliasOwners) != 1 {
+		return false
+	}
+	_, owned := claims.aliasOwners[deviceID]
+	return owned
 }
 
 func mergeObservedDevice(existing, incoming model.Device) model.Device {

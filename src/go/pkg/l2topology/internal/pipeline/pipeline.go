@@ -50,6 +50,7 @@ func BuildL2ResultFromObservations(observations []model.L2Observation, opts mode
 		state.devices,
 		state.interfaces,
 		state.enrichments,
+		state.directOwnersByIP,
 		state.remoteManagementByDeviceID,
 		state.directManagementIPByDeviceID,
 	)

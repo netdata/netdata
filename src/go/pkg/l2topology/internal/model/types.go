@@ -84,9 +84,12 @@ type L2Observation struct {
 	DeviceID string
 	// Inferred marks observations synthesized from neighbor advertisements
 	// (for example LLDP/CDP remotes), not directly observed local devices.
-	Inferred          bool
-	Hostname          string
-	ManagementIP      string
+	Inferred     bool
+	Hostname     string
+	ManagementIP string
+	// ManagementAliases contains vetted canonical IP identity aliases. Raw or
+	// typed diagnostic address observations must not use this field.
+	ManagementAliases []string
 	SysObjectID       string
 	ChassisID         string
 	BaseBridgeAddress string

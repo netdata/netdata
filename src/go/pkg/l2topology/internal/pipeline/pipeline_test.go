@@ -1089,6 +1089,145 @@ func TestBuildL2ResultFromObservations_ResolvesOnlyUniqueDirectManagementAddress
 	})
 }
 
+func TestBuildL2ResultFromObservations_AppliesDirectManagementAliasAuthorityBeforeMatching(t *testing.T) {
+	t.Run("same-device duplicate alias remains unique", func(t *testing.T) {
+		observations := []model.L2Observation{
+			{DeviceID: "target", ManagementIP: "10.0.0.10", ManagementAliases: []string{"10.0.0.20"}},
+			{DeviceID: "target", ManagementIP: "10.0.0.11", ManagementAliases: []string{"10.0.0.20"}},
+			{
+				DeviceID:     "observer",
+				ManagementIP: "192.0.2.1",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/1",
+					Address:     "10.0.0.20",
+				}},
+			},
+		}
+
+		for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+			result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{EnableCDP: true})
+			require.NoError(t, err)
+			require.Len(t, result.Adjacencies, 1)
+			require.Equal(t, "target", result.Adjacencies[0].TargetID)
+			target := findDeviceByID(result.Devices, "target")
+			require.NotNil(t, target)
+			require.Equal(t, "10.0.0.10", target.ManagementIP.String())
+			require.ElementsMatch(t, []string{"10.0.0.10", "10.0.0.11", "10.0.0.20"}, deviceAddressStrings(*target))
+		}
+	})
+
+	t.Run("selected primary beats another device alias", func(t *testing.T) {
+		observations := []model.L2Observation{
+			{DeviceID: "target-a", ManagementIP: "10.0.0.10", ManagementAliases: []string{"10.0.0.20"}},
+			{DeviceID: "target-b", ManagementIP: "10.0.0.20"},
+			{
+				DeviceID:     "observer",
+				ManagementIP: "192.0.2.1",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/1",
+					Address:     "10.0.0.20",
+				}},
+			},
+		}
+
+		for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+			result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{EnableCDP: true})
+			require.NoError(t, err)
+			require.Len(t, result.Adjacencies, 1)
+			require.Equal(t, "target-b", result.Adjacencies[0].TargetID)
+			require.Equal(t, []string{"10.0.0.10"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-a")))
+			require.Equal(t, []string{"10.0.0.20"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-b")))
+		}
+	})
+
+	t.Run("alias collision resolves to neither owner", func(t *testing.T) {
+		observations := []model.L2Observation{
+			{DeviceID: "target-a", ManagementIP: "10.0.0.10", ManagementAliases: []string{"10.0.0.30"}},
+			{DeviceID: "target-b", ManagementIP: "10.0.0.20", ManagementAliases: []string{"10.0.0.30"}},
+			{
+				DeviceID:     "observer",
+				ManagementIP: "192.0.2.1",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/1",
+					Address:     "10.0.0.30",
+				}},
+			},
+		}
+
+		for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+			result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{EnableCDP: true})
+			require.NoError(t, err)
+			require.Len(t, result.Adjacencies, 1)
+			targetID := result.Adjacencies[0].TargetID
+			require.NotEqual(t, "target-a", targetID)
+			require.NotEqual(t, "target-b", targetID)
+			require.Equal(t, []string{"10.0.0.10"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-a")))
+			require.Equal(t, []string{"10.0.0.20"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-b")))
+		}
+	})
+
+	t.Run("primary collision remains ambiguous and retained", func(t *testing.T) {
+		result, err := BuildL2ResultFromObservations([]model.L2Observation{
+			{DeviceID: "target-a", ManagementIP: "10.0.0.20"},
+			{DeviceID: "target-b", ManagementIP: "10.0.0.20"},
+			{
+				DeviceID:     "observer",
+				ManagementIP: "192.0.2.1",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/1",
+					Address:     "10.0.0.20",
+				}},
+			},
+		}, model.DiscoverOptions{EnableCDP: true})
+		require.NoError(t, err)
+		require.Len(t, result.Adjacencies, 1)
+		require.NotEqual(t, "target-a", result.Adjacencies[0].TargetID)
+		require.NotEqual(t, "target-b", result.Adjacencies[0].TargetID)
+		require.Equal(t, []string{"10.0.0.20"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-a")))
+		require.Equal(t, []string{"10.0.0.20"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-b")))
+	})
+
+	t.Run("special-use aliases are rejected", func(t *testing.T) {
+		result, err := BuildL2ResultFromObservations([]model.L2Observation{{
+			DeviceID:          "target",
+			ManagementIP:      "192.0.2.1",
+			ManagementAliases: []string{"127.0.0.1", "169.254.0.1", "224.0.0.1", "255.255.255.255"},
+		}}, model.DiscoverOptions{})
+		require.NoError(t, err)
+		require.Equal(t, []string{"192.0.2.1"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target")))
+	})
+}
+
+func TestBuildL2ResultFromObservations_KeepsWeakClaimsFromOverridingDirectAliases(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{
+		{
+			DeviceID:          "target-a",
+			ManagementIP:      "10.0.0.10",
+			ManagementAliases: []string{"10.0.0.50"},
+		},
+		{
+			DeviceID:     "target-b",
+			ManagementIP: "10.0.0.20",
+			ChassisID:    "aa:bb:cc:dd:ee:ff",
+		},
+		{
+			DeviceID:     "observer",
+			ManagementIP: "192.0.2.1",
+			ARPNDEntries: []model.ARPNDObservation{{
+				Protocol: "arp",
+				IP:       "10.0.0.50",
+				MAC:      "aa:bb:cc:dd:ee:ff",
+				State:    "reachable",
+			}},
+		},
+		{DeviceID: "inferred", Inferred: true, ManagementAliases: []string{"10.0.0.50"}},
+	}, model.DiscoverOptions{EnableARP: true})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"10.0.0.10", "10.0.0.50"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-a")))
+	require.Equal(t, []string{"10.0.0.20"}, deviceAddressStrings(*findDeviceByID(result.Devices, "target-b")))
+	require.Empty(t, findDeviceByID(result.Devices, "inferred").Addresses)
+}
+
 func TestBuildL2ResultFromObservations_ReconcilesTopLevelInferredAddressClaims(t *testing.T) {
 	observations := []model.L2Observation{
 		{DeviceID: "remote-a", Hostname: "remote-a", Inferred: true, ManagementIP: "10.0.0.50"},

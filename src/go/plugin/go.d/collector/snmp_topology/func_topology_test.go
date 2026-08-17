@@ -416,7 +416,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Equal(t, "selected_side_endpoint", endpointType.Presentation.Modal.Sections[0].Columns[1].Projection.Kind)
 }
 
-func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
+func TestSNMPTopologyToV1_PrefersSNMPMetadataAndReconciledL2Primary(t *testing.T) {
 	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
@@ -431,6 +431,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
+							DeviceID:     "device-a",
 							ManagementIP: "10.0.0.1",
 							Vendor:       "L2 Vendor",
 							Capabilities: []string{"bridge"},
@@ -475,7 +476,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Equal(t, "SNMP Vendor", topologyV1StringColumnValues(t, payload, payload.Actors, "vendor")[0])
-	assert.Equal(t, "10.0.0.2", topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip")[0])
+	assert.Equal(t, "10.0.0.1", topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip")[0])
 	assert.Equal(t, []any{"router"}, topologyV1ColumnValues(t, payload.Actors, "capabilities")[0])
 	assert.Equal(t, uint64(24), topologyV1ColumnValues(t, payload.Actors, "ports_total")[0])
 }
