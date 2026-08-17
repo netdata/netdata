@@ -20,7 +20,7 @@ type smartDevice struct {
 
 func (d *smartDevice) deviceName() string {
 	v := d.data.Get("device.name").String()
-	return strings.TrimPrefix(v, "/dev/")
+	return cleanDeviceName(strings.TrimPrefix(v, "/dev/"))
 }
 
 func (d *smartDevice) deviceType() string {
@@ -116,4 +116,8 @@ func (a *smartAttribute) rawValue() string {
 
 func (a *smartAttribute) rawString() string {
 	return a.data.Get("raw.string").String()
+}
+
+func cleanDeviceName(name string) string {
+	return strings.NewReplacer(" ", "_", "/", "_").Replace(name)
 }
