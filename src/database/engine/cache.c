@@ -1546,12 +1546,12 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
         Pvoid_t *pages_judy_pptr = JudyLIns(metrics_judy_pptr, entry->metric_id, PJE0);
         if(unlikely(!pages_judy_pptr || pages_judy_pptr == PJERR))
             fatal("DBENGINE CACHE: cache '%s': JudyLIns(metrics_judy, 0x%lx) failed, metrics_judy = %p, result = %p",
-                  cache->config.name, (long unsigned)entry->metric_id, metrics_judy_pptr, pages_judy_pptr);
+                  cache->config.name, (long unsigned)entry->metric_id, *metrics_judy_pptr, pages_judy_pptr);
 
         Pvoid_t *page_ptr = JudyLIns(pages_judy_pptr, entry->start_time_s, PJE0);
         if(unlikely(!page_ptr || page_ptr == PJERR))
             fatal("DBENGINE CACHE: cache '%s': JudyLIns(pages_judy, %ld) failed, pages_judy = %p, result = %p",
-                  cache->config.name, (long)entry->start_time_s, pages_judy_pptr, page_ptr);
+                  cache->config.name, (long)entry->start_time_s, *pages_judy_pptr, page_ptr);
 
         pgc_stats_index_judy_change(cache, JudyAllocThreadPulseGetAndReset());
 
