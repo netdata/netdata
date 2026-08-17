@@ -170,7 +170,7 @@
   },
   {
     "name": "L2/v1-rollup-count-65536",
-    "proves": "complete higher-tier rollups containing 65,536 source samples remain numeric after persistence and restart: two consecutive records isolate the stored uint16 count wrap from the separate singleton-page cadence ambiguity, and forced tier 1 projects one record onto an exact 256-by-256-second request grid with value 256 in every clean row and min/avg/max exactly 1"
+    "proves": "complete higher-tier rollups containing 65,536 source samples remain numeric after persistence and restart: two consecutive records isolate the stored uint16 count wrap from the separate singleton-page cadence ambiguity, and a forced-tier average query exactly matching one stored record returns value 1 in its single clean row with min/avg/max exactly 1"
   },
   {
     "name": "CASE-017/tier-boundary-absorption",

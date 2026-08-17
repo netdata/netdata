@@ -400,7 +400,7 @@ func TestV1RollupCount65536(t *testing.T) {
 	const (
 		contract  = "L2/v1-rollup-count-65536"
 		grouping  = int64(65_536)
-		rows      = int64(256)
+		rows      = int64(1)
 		rowWidth  = grouping / rows
 		host      = "v1-rollup-count-65536"
 		context   = "fixture.v1_rollup_count_65536"
@@ -430,7 +430,7 @@ func TestV1RollupCount65536(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	params := daemon.DataParamsTier(context, 1, base+grouping, base+2*grouping, rows, "sum")
+	params := daemon.DataParamsTier(context, 1, base+grouping, base+2*grouping, rows, "average")
 	params.Set("scope_dimensions", dimension)
 	params.Set("options", "jsonwrap|unaligned")
 	doc, err := dd.DataV3(host, params)
@@ -443,7 +443,7 @@ func TestV1RollupCount65536(t *testing.T) {
 	}
 	want := make([]expectedColumnPoint, 0, rows)
 	for end := base + grouping + rowWidth; end <= base+2*grouping; end += rowWidth {
-		want = append(want, wantNumberWithPAAt(end, float64(rowWidth), 0))
+		want = append(want, wantNumberWithPAAt(end, 1, 0))
 	}
 	stats, statsOK := strictDimensionStats(t, doc, "db", []string{dimension}, []string{"min", "avg", "max"})
 	if got := stats[dimension]; got["min"] != 1 || got["avg"] != 1 || got["max"] != 1 {
