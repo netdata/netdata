@@ -5833,19 +5833,6 @@ views:
       dimensions: {}
       promote: []
       omit: {}
-  node_hardware.processors.cpu_cores:
-    family: Ceph/Node Hardware/Processors
-    question: How many cores does each reported CPU provide?
-    entity: node_hardware_cpu
-    inputs:
-      value:
-        signal: hardware_cpu_cores
-        components:
-        - value
-    labels:
-      dimensions: {}
-      promote: []
-      omit: {}
   node_hardware.cooling.fan_speed:
     family: Ceph/Node Hardware/Cooling
     question: What is the current speed of each reported fan?
@@ -5879,6 +5866,19 @@ views:
     inputs:
       value:
         signal: hardware_memory_capacity_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.processors.cpu_cores:
+    family: Ceph/Node Hardware/Processors
+    question: How many cores does each reported CPU provide?
+    entity: node_hardware_cpu
+    inputs:
+      value:
+        signal: hardware_cpu_cores
         components:
         - value
     labels:

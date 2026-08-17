@@ -97,7 +97,7 @@ func TestLoadRejectsStrictShapeAndVersionErrors(t *testing.T) {
 				_, err := LoadSourceSemantics(path)
 				return err
 			},
-			wantErr: "must be one of",
+			wantErr: `evidence.request_registration.kind "delegation" must be one of`,
 		},
 		"design retired scope delegation exclusion": {
 			filename: ProfileDesignFilename,
@@ -111,7 +111,22 @@ func TestLoadRejectsStrictShapeAndVersionErrors(t *testing.T) {
 				_, err := LoadProfileDesign(path)
 				return err
 			},
-			wantErr: "must be one of",
+			wantErr: `exclusions.delegated_requests.reason "scope_delegation" must be one of`,
+		},
+		"design retired delegated domain field": {
+			filename: ProfileDesignFilename,
+			content: strings.Replace(validProfileDesignV1, "exclusions: {}", `exclusions:
+  delegated_requests:
+    source: {signal: requests, components: [total]}
+    reason: metadata_only
+    delegated_domain: node_hardware
+    evidence: [request_population]
+    outcome: retain_writable_unrendered`, 1),
+			load: func(path string) error {
+				_, err := LoadProfileDesign(path)
+				return err
+			},
+			wantErr: "field delegated_domain not found",
 		},
 	}
 
