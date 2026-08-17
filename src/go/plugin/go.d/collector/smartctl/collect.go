@@ -23,11 +23,13 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, err
 		}
 
-		for k, dev := range c.scannedDevices {
+		for k := range c.scannedDevices {
 			if _, ok := devices[k]; !ok {
 				delete(c.scannedDevices, k)
-				delete(c.seenDevices, k)
-				c.removeDeviceCharts(dev)
+				if attached, ok := c.attachedDevices[k]; ok {
+					delete(c.attachedDevices, k)
+					removeDeviceCharts(attached.charts)
+				}
 			}
 		}
 
@@ -134,12 +136,26 @@ func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoRe
 		return nil
 	}
 
-	if !c.seenDevices[scanDev.key()] {
-		c.seenDevices[scanDev.key()] = true
-		c.addDeviceCharts(dev)
+	key := scanDev.key()
+	id := newDeviceIdentity(dev.deviceName(), dev.deviceType())
+	attached, seen := c.attachedDevices[key]
+	if !seen || attached.id != id {
+		for otherKey, other := range c.attachedDevices {
+			if otherKey != key && other.id.prefix == id.prefix {
+				return fmt.Errorf("device identity collides with already attached device '%s'", otherKey)
+			}
+		}
+		charts, err := c.addDeviceCharts(dev, id)
+		if err != nil {
+			return fmt.Errorf("failed to add charts for device '%s' type '%s': %w", scanDev.name, scanDev.typ, err)
+		}
+		if seen {
+			removeDeviceCharts(attached.charts)
+		}
+		c.attachedDevices[key] = attachedDevice{id: id, charts: charts}
 	}
 
-	c.collectSmartDevice(mx, dev)
+	c.collectSmartDevice(mx, dev, id)
 
 	return nil
 }
@@ -153,8 +169,8 @@ func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevic
 	})
 }
 
-func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
-	px := fmt.Sprintf("device_%s_type_%s_", dev.deviceName(), dev.deviceType())
+func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id deviceIdentity) {
+	px := id.prefix
 
 	if v, ok := dev.powerOnTime(); ok {
 		mx[px+"power_on_time"] = v
@@ -183,8 +199,7 @@ func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
 			if !isSmartAttrValid(attr) {
 				continue
 			}
-			n := strings.ToLower(attr.name())
-			n = strings.ReplaceAll(n, " ", "_")
+			n := cleanAttributeName(attributeNameMap(attr.name()))
 			px := fmt.Sprintf("%sattr_%s_", px, n)
 
 			if v, err := strconv.ParseInt(attr.value(), 10, 64); err == nil {

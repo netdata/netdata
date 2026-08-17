@@ -5,16 +5,20 @@ package smartctl
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -610,6 +614,310 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestCollector_CollectDeviceNameWithWhitespace(t *testing.T) {
+	const deviceName = "IOService:/Example Controller(Example)@0/Namespace@1"
+
+	collr := New()
+	collr.exec = &mockSmartctlCliExec{
+		scanData: nvmeScanData(t, deviceName),
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, deviceName, name)
+			require.Equal(t, "nvme", deviceType)
+			return replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", deviceName), nil
+		},
+	}
+
+	mx := collr.Collect(context.Background())
+
+	require.Len(t, *collr.Charts(), 4)
+	require.Len(t, mx, 5)
+	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+	for _, chart := range *collr.Charts() {
+		assert.Equal(t, -1, strings.IndexFunc(chart.ID, unicode.IsSpace), chart.ID)
+		assert.Equal(t, deviceName, chartLabelValue(chart, "device_name"), chart.ID)
+		for _, dim := range chart.Dims {
+			assert.Equal(t, -1, strings.IndexFunc(dim.ID, unicode.IsSpace), dim.ID)
+			assert.Contains(t, mx, dim.ID)
+		}
+	}
+}
+
+func TestCollector_NormalizedDeviceIdentityDoesNotAlias(t *testing.T) {
+	const (
+		whitespaceName = "IOService:/Example Controller(Example)@0/Namespace@1"
+		underscoreName = "IOService:/Example_Controller(Example)@0/Namespace@1"
+	)
+
+	collectIDs := func(t *testing.T, concurrentScans int) map[string]string {
+		collr := New()
+		collr.ConcurrentScans = concurrentScans
+		collr.exec = &mockSmartctlCliExec{
+			scanData: nvmeScanData(t, whitespaceName, underscoreName),
+			deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+				require.Equal(t, "nvme", deviceType)
+				return replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", name), nil
+			},
+		}
+
+		mx := collr.Collect(context.Background())
+		require.Len(t, *collr.Charts(), 8)
+		require.Len(t, mx, 10)
+		collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+		ids := make(map[string]string)
+		for _, chart := range *collr.Charts() {
+			if chart.Ctx == devicePowerOnTimeChartTmpl.Ctx {
+				ids[chartLabelValue(chart, "device_name")] = chart.ID
+			}
+		}
+		require.Len(t, ids, 2)
+		require.NotEqual(t, ids[whitespaceName], ids[underscoreName])
+		return ids
+	}
+
+	sequential := collectIDs(t, 0)
+	concurrent := collectIDs(t, 2)
+	assert.Equal(t, sequential, concurrent)
+}
+
+func TestCollector_RemovesChartsUsingAttachedResponseIdentity(t *testing.T) {
+	const (
+		scanName     = "IOService:/ScanAlias@0/Namespace@1"
+		responseName = "IOService:/Example Controller(Example)@0/Namespace@1"
+	)
+
+	scans := [][]byte{
+		nvmeScanData(t, scanName),
+		nvmeScanData(t),
+	}
+	scanIndex := 0
+	collr := New()
+	collr.ScanEvery = confopt.Duration(time.Nanosecond)
+	collr.PollDevicesEvery = confopt.Duration(time.Nanosecond)
+	collr.exec = &mockSmartctlCliExec{
+		scanDataFunc: func() ([]byte, error) {
+			idx := min(scanIndex, len(scans)-1)
+			scanIndex++
+			return scans[idx], nil
+		},
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, scanName, name)
+			require.Equal(t, "nvme", deviceType)
+			return replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", responseName), nil
+		},
+	}
+
+	first := collr.Collect(context.Background())
+	require.Len(t, *collr.Charts(), 4)
+	require.Len(t, first, 5)
+
+	second := collr.Collect(context.Background())
+	require.Empty(t, second)
+	for _, chart := range *collr.Charts() {
+		assert.True(t, chart.Obsolete, chart.ID)
+		assert.True(t, chart.IsRemoved(), chart.ID)
+	}
+}
+
+func TestCollector_RemovesOnlyChartsOwnedByDisappearedDevice(t *testing.T) {
+	const (
+		firstScanName  = "/dev/alias0"
+		secondScanName = "/dev/alias1"
+		firstName      = "foo"
+		secondName     = "foo_type_nvme_bar"
+	)
+
+	scans := [][]byte{
+		nvmeScanData(t, firstScanName, secondScanName),
+		nvmeScanData(t, secondScanName),
+	}
+	scanIndex := 0
+	collr := New()
+	collr.ScanEvery = confopt.Duration(time.Nanosecond)
+	collr.PollDevicesEvery = confopt.Duration(time.Nanosecond)
+	collr.exec = &mockSmartctlCliExec{
+		scanDataFunc: func() ([]byte, error) {
+			idx := min(scanIndex, len(scans)-1)
+			scanIndex++
+			return scans[idx], nil
+		},
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, "nvme", deviceType)
+			switch name {
+			case firstScanName:
+				return replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", firstName), nil
+			case secondScanName:
+				return replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", secondName), nil
+			default:
+				return nil, fmt.Errorf("unexpected device %q", name)
+			}
+		},
+	}
+
+	first := collr.Collect(context.Background())
+	require.Len(t, *collr.Charts(), 8)
+	require.Len(t, first, 10)
+
+	second := collr.Collect(context.Background())
+	require.Len(t, second, 5)
+
+	var removed, active int
+	for _, chart := range *collr.Charts() {
+		switch chartLabelValue(chart, "device_name") {
+		case firstName:
+			assert.True(t, chart.IsRemoved(), chart.ID)
+			removed++
+		case secondName:
+			assert.False(t, chart.IsRemoved(), chart.ID)
+			active++
+		default:
+			t.Errorf("unexpected device label on chart %q", chart.ID)
+		}
+	}
+	assert.Equal(t, 4, removed)
+	assert.Equal(t, 4, active)
+}
+
+func TestCollector_ReplacesChangedResponseIdentity(t *testing.T) {
+	const (
+		scanName   = "IOService:/ScanAlias@0/Namespace@1"
+		firstName  = "IOService:/First Controller(Example)@0/Namespace@1"
+		secondName = "IOService:/Second Controller(Example)@0/Namespace@1"
+	)
+
+	responses := []string{firstName, secondName}
+	responseIndex := 0
+	collr := New()
+	collr.PollDevicesEvery = confopt.Duration(time.Nanosecond)
+	collr.exec = &mockSmartctlCliExec{
+		scanData: nvmeScanData(t, scanName),
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, scanName, name)
+			require.Equal(t, "nvme", deviceType)
+			idx := min(responseIndex, len(responses)-1)
+			responseIndex++
+			return replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", responses[idx]), nil
+		},
+	}
+
+	first := collr.Collect(context.Background())
+	require.Len(t, first, 5)
+	require.Len(t, *collr.Charts(), 4)
+
+	second := collr.Collect(context.Background())
+	require.Len(t, second, 5)
+	require.Len(t, *collr.Charts(), 8)
+
+	var removed, active int
+	for _, chart := range *collr.Charts() {
+		switch chartLabelValue(chart, "device_name") {
+		case firstName:
+			assert.True(t, chart.Obsolete, chart.ID)
+			assert.True(t, chart.IsRemoved(), chart.ID)
+			removed++
+		case secondName:
+			assert.False(t, chart.Obsolete, chart.ID)
+			assert.False(t, chart.IsRemoved(), chart.ID)
+			active++
+		default:
+			t.Errorf("unexpected device label on chart %q", chart.ID)
+		}
+	}
+	assert.Equal(t, 4, removed)
+	assert.Equal(t, 4, active)
+	assert.Equal(t, newDeviceIdentity(secondName, "nvme"), collr.attachedDevices[scanName+"|nvme"].id)
+}
+
+func TestCollector_AttachmentCollisionDoesNotRecordOrphanState(t *testing.T) {
+	for _, concurrentScans := range []int{0, 2} {
+		t.Run(fmt.Sprintf("concurrent_scans=%d", concurrentScans), func(t *testing.T) {
+			collr := New()
+			collr.ConcurrentScans = concurrentScans
+			collr.exec = &mockSmartctlCliExec{
+				scanData: nvmeScanData(t, "/dev/alias0", "/dev/alias1"),
+				deviceDataFunc: func(_, deviceType, _ string) ([]byte, error) {
+					require.Equal(t, "nvme", deviceType)
+					return dataTypeNvmeDeviceNvme0, nil
+				},
+			}
+
+			mx := collr.Collect(context.Background())
+			require.Len(t, *collr.Charts(), 4)
+			require.Len(t, mx, 5)
+			assert.Len(t, collr.attachedDevices, 1)
+			collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+		})
+	}
+}
+
+func TestCollector_AddDeviceChartsIsAtomic(t *testing.T) {
+	result := gjson.ParseBytes(dataTypeNvmeDeviceNvme0)
+	dev := newSmartDevice(&result)
+	id := newDeviceIdentity(dev.deviceName(), dev.deviceType())
+	collr := New()
+
+	charts := collr.newDeviceCharts(dev, id)
+	existing := charts.Get(id.prefix + "smart_status")
+	require.NotNil(t, existing)
+	require.NoError(t, collr.Charts().Add(existing))
+
+	_, err := collr.addDeviceCharts(dev, id)
+	require.Error(t, err)
+	require.Len(t, *collr.Charts(), 1)
+	assert.Equal(t, existing, (*collr.Charts())[0])
+}
+
+func TestCollector_AttributeMetricIdentityMatchesChart(t *testing.T) {
+	data := replaceFixtureValue(t, dataTypeSataDeviceHDDSda, "Power_On_Hours", "Power/On_Hours")
+	result := gjson.ParseBytes(data)
+	dev := newSmartDevice(&result)
+	collr := New()
+
+	id := newDeviceIdentity(dev.deviceName(), dev.deviceType())
+	charts, err := collr.newDeviceSmartAttrCharts(dev, id)
+	require.NoError(t, err)
+	mx := make(map[string]int64)
+	collr.collectSmartDevice(mx, dev, id)
+
+	chart := charts.Get("device_sda_type_sat_smart_attr_power_on_hours")
+	require.NotNil(t, chart)
+	require.Len(t, chart.Dims, 1)
+	assert.Contains(t, mx, chart.Dims[0].ID)
+}
+
+func nvmeScanData(t *testing.T, deviceNames ...string) []byte {
+	t.Helper()
+
+	devices := make([]map[string]string, 0, len(deviceNames))
+	for _, name := range deviceNames {
+		devices = append(devices, map[string]string{
+			"name":      name,
+			"info_name": name,
+			"type":      "nvme",
+			"protocol":  "NVMe",
+		})
+	}
+	data, err := json.Marshal(map[string]any{"devices": devices})
+	require.NoError(t, err)
+	return data
+}
+
+func replaceFixtureValue(t *testing.T, data []byte, old, new string) []byte {
+	t.Helper()
+	require.Positive(t, bytes.Count(data, []byte(old)), "fixture does not contain %q", old)
+	return bytes.ReplaceAll(data, []byte(old), []byte(new))
+}
+
+func chartLabelValue(chart *collectorapi.Chart, key string) string {
+	for _, label := range chart.Labels {
+		if label.Key == key {
+			return label.Value
+		}
+	}
+	return ""
+}
+
 func prepareMockOkTypeSata() *mockSmartctlCliExec {
 	return &mockSmartctlCliExec{
 		errOnScan: false,
@@ -718,10 +1026,19 @@ func prepareMockEmptyResponse() *mockSmartctlCliExec {
 type mockSmartctlCliExec struct {
 	errOnScan      bool
 	scanData       []byte
+	scanDataFunc   func() ([]byte, error)
 	deviceDataFunc func(deviceName, deviceType, powerMode string) ([]byte, error)
 }
 
 func (m *mockSmartctlCliExec) scan(_ bool) (*gjson.Result, error) {
+	if m.scanDataFunc != nil {
+		data, err := m.scanDataFunc()
+		if err != nil {
+			return nil, err
+		}
+		res := gjson.ParseBytes(data)
+		return &res, nil
+	}
 	if m.errOnScan {
 		return nil, fmt.Errorf("mock.scan() error")
 	}

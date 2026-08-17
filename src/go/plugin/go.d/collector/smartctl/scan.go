@@ -3,9 +3,7 @@
 package smartctl
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 )
 
 type scanDevice struct {
@@ -17,10 +15,6 @@ type scanDevice struct {
 
 func (s *scanDevice) key() string {
 	return fmt.Sprintf("%s|%s", s.name, s.typ)
-}
-
-func (s *scanDevice) shortName() string {
-	return strings.TrimPrefix(s.name, "/dev/")
 }
 
 func (c *Collector) scanDevices() (map[string]*scanDevice, error) {
@@ -78,10 +72,6 @@ func (c *Collector) scanDevices() (map[string]*scanDevice, error) {
 		if _, ok := devices[dev.key()]; !ok {
 			devices[dev.key()] = dev
 		}
-	}
-
-	if len(devices) == 0 {
-		return nil, errors.New("no devices found during scan")
 	}
 
 	return devices, nil
