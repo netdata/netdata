@@ -269,7 +269,7 @@ static int dyncfg_config_execute_cb(struct nrpc_request *req, void *data) {
                "This can happen if the plugin that registered the dynamic configuration is not running now.",
                id, req->function);
 
-        rrd_call_function_error(
+        nrpc_call_error(
             req->result.wb,
             "Unknown config id given.", code);
     }

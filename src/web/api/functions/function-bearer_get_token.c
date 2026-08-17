@@ -28,7 +28,7 @@ static bool bearer_parse_json_payload(json_object *jobj, void *data, BUFFER *err
 
 int function_bearer_get_token(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload, const char *source) {
     if(!user_auth_source_is_cloud(source))
-        return rrd_call_function_error(
+        return nrpc_call_error(
             wb, "Bearer tokens can only be provided via NC.", HTTP_RESP_BAD_REQUEST);
 
     int code;
@@ -73,7 +73,7 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
 
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction_str);
-    return rrd_function_run(host, w->response.data, 10,
+    return nrpc_call(host, w->response.data, 10,
                             w->user_auth.access, FUNCTION_BEARER_GET_TOKEN, true,
                             transaction_str, NULL, NULL,
                             NULL, NULL,

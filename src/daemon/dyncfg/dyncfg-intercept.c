@@ -263,7 +263,7 @@ static void dyncfg_apply_action_on_all_template_jobs(struct nrpc_request *req, c
     dfe_done(df);
 
     if(req->progress.cb)
-        req->progress.cb(req->transaction, req->progress.data, done, all);
+        req->progress.cb(req->call_id, req->progress.data, done, all);
 
     dfe_start_reentrant(dyncfg_globals.nodes, df) {
         if(df->template == template && df->type == DYNCFG_TYPE_JOB) {
@@ -277,7 +277,7 @@ static void dyncfg_apply_action_on_all_template_jobs(struct nrpc_request *req, c
             dyncfg_echo(df_dfe.item, df, df_dfe.name, cmd_to_send_to_plugin);
 
             if(req->progress.cb)
-                req->progress.cb(req->transaction, req->progress.data, ++done, all);
+                req->progress.cb(req->call_id, req->progress.data, ++done, all);
         }
     }
     dfe_done(df);
@@ -320,7 +320,7 @@ int dyncfg_function_intercept_cb(struct nrpc_request *req, void *data __maybe_un
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    bool called_from_dyncfg_echo = rrd_function_has_this_original_result_callback(req->transaction, dyncfg_echo_cb);
+    bool called_from_dyncfg_echo = nrpc_call_has_result_cb(req->call_id, dyncfg_echo_cb);
     bool has_payload = req->payload && buffer_strlen(req->payload) ? true : false;
     bool make_the_call_to_plugin = true;
 
@@ -507,7 +507,7 @@ int dyncfg_function_intercept_cb(struct nrpc_request *req, void *data __maybe_un
                         .payload = req->payload,
                         .from_dyncfg_echo = called_from_dyncfg_echo,
                     };
-                    uuid_copy(dc.transaction.uuid, *req->transaction);
+                    uuid_copy(dc.transaction.uuid, *req->call_id);
 
                     dyncfg_log_user_action(df, &dc);
                 }
@@ -539,7 +539,7 @@ int dyncfg_function_intercept_cb(struct nrpc_request *req, void *data __maybe_un
 
     if(make_the_call_to_plugin) {
         struct dyncfg_call *dc = callocz(1, sizeof(*dc));
-        uuid_copy(dc->transaction.uuid, *req->transaction);
+        uuid_copy(dc->transaction.uuid, *req->call_id);
         dc->function = strdupz(req->function);
         dc->id = strdupz(id);
         dc->source = req->source ? strdupz(req->source) : NULL;

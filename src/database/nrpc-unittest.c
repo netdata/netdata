@@ -12,7 +12,7 @@
 // help output (log source names, file counts, sizes, coverage windows,
 // timestamps) BEFORE enforcing the caller's access level, while the normal
 // /api/v3/function path denied the same anonymous caller. The fix routes both
-// paths through rrd_function_verify_access(): /api/v3 via rrd_function_run(),
+// paths through nrpc_method_authorize(): /api/v3 via nrpc_call(),
 // and MCP by calling it directly before disclosing any metadata.
 //
 // This test pins the shared gate: for a protected function (like
@@ -91,7 +91,7 @@ int rrdfunctions_verify_access_unittest(void) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         NRPC_METHOD_ACQUIRED *item = (NRPC_METHOD_ACQUIRED *)(uintptr_t)0x1; // poison: verify it is reset
 
-        int code = rrd_function_verify_access(cases[i].host, wb, cases[i].fn,
+        int code = nrpc_method_authorize(cases[i].host, wb, cases[i].fn,
                                               cases[i].user_access, cases[i].allow_restricted, &item);
 
         bool ok = false, item_ok = false, body_ok = false;
@@ -120,7 +120,7 @@ int rrdfunctions_verify_access_unittest(void) {
         else
             item_ok = true;
 
-        // Denial must emit an error body (rrd_call_function_error), not silently return an
+        // Denial must emit an error body (nrpc_call_error), not silently return an
         // empty result_wb. A regression that drops the message would still pass the code and
         // item checks above but would leave the caller with nothing — the security fix
         // requires the denial to be explicit. Authorized calls do not touch result_wb here.
@@ -1710,7 +1710,7 @@ int rrdfunctions_registry_unittest(void) {
     // the standalone -W environment does not start the daemon, so the
     // transaction broker the run paths below need is not there yet (create is
     // idempotent)
-    rrd_function_transactions_create();
+    nrpc_inflight_calls_create();
 
     // 1. the key is the sanitized name; a name that sanitizes to empty is refused
     {
@@ -1763,7 +1763,7 @@ int rrdfunctions_registry_unittest(void) {
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             NRPC_METHOD_ACQUIRED *item = NULL;
-            int code = rrd_function_verify_access(host, wb, "reg-args-fn arg1 arg2",
+            int code = nrpc_method_authorize(host, wb, "reg-args-fn arg1 arg2",
                                                   HTTP_ACCESS_ANONYMOUS_DATA, false, &item);
             if(code != HTTP_RESP_OK || !item) {
                 fprintf(stderr, "  FAILED key: '<function> <args>' did not resolve to the function (code %d)\n", code);
@@ -1920,7 +1920,7 @@ int rrdfunctions_registry_unittest(void) {
         size_t a_before = reg_cb_a_calls, b_before = reg_cb_b_calls;
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
+            nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
                              NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
         }
         if(reg_cb_a_calls != a_before + 1 || reg_cb_b_calls != b_before) {
@@ -1958,7 +1958,7 @@ int rrdfunctions_registry_unittest(void) {
         a_before = reg_cb_a_calls; b_before = reg_cb_b_calls;
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
+            nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
                              NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", true /* allow restricted */);
         }
         if(reg_cb_b_calls != b_before + 1 || reg_cb_a_calls != a_before) {
@@ -2027,7 +2027,7 @@ int rrdfunctions_registry_unittest(void) {
             }
 
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "reg-provider-fn", true, NULL,
+            int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "reg-provider-fn", true, NULL,
                                         NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
             if(code != HTTP_RESP_SERVICE_UNAVAILABLE) {
                 fprintf(stderr, "  FAILED provider: running it returned %d, expected 503\n", code);

@@ -46,13 +46,13 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
     else {
         DYNCFG_CMDS c = dyncfg_cmds2id(action);
         if(!id || !*id || !dyncfg_is_valid_id(id)) {
-            rrd_call_function_error(w->response.data, "Invalid id", HTTP_RESP_BAD_REQUEST);
+            nrpc_call_error(w->response.data, "Invalid id", HTTP_RESP_BAD_REQUEST);
             freez(cmd);
             return HTTP_RESP_BAD_REQUEST;
         }
 
         if(c == DYNCFG_CMD_NONE) {
-            rrd_call_function_error(w->response.data, "Invalid action", HTTP_RESP_BAD_REQUEST);
+            nrpc_call_error(w->response.data, "Invalid action", HTTP_RESP_BAD_REQUEST);
             freez(cmd);
             return HTTP_RESP_BAD_REQUEST;
         }
@@ -70,7 +70,7 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
             }
 
             if(!add_name || !*add_name || !dyncfg_is_valid_id(add_name)) {
-                rrd_call_function_error(w->response.data, "Invalid name", HTTP_RESP_BAD_REQUEST);
+                nrpc_call_error(w->response.data, "Invalid name", HTTP_RESP_BAD_REQUEST);
                 freez(cmd);
                 return HTTP_RESP_BAD_REQUEST;
             }
@@ -84,7 +84,7 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
     user_auth_to_source_buffer(&w->user_auth, source);
 
     buffer_flush(w->response.data);
-    int code = rrd_function_run(host, w->response.data, timeout, w->user_auth.access, cmd,
+    int code = nrpc_call(host, w->response.data, timeout, w->user_auth.access, cmd,
                                 true, transaction,
                                 NULL, NULL,
                                 web_client_progress_functions_update, NULL,

@@ -600,16 +600,16 @@ int nrpc_registry_find(RRDHOST *host, BUFFER *wb, const char *name, size_t key_l
     if(!item) {
         if(found) {
             if(was_unregistered)
-                return rrd_call_function_error(wb,
+                return nrpc_call_error(wb,
                                                "This function has been unregistered by the plugin.",
                                                HTTP_RESP_SERVICE_UNAVAILABLE);
             else
-                return rrd_call_function_error(wb,
+                return nrpc_call_error(wb,
                                                "The plugin that registered this feature, is not currently running.",
                                                HTTP_RESP_SERVICE_UNAVAILABLE);
         }
         else
-            return rrd_call_function_error(wb,
+            return nrpc_call_error(wb,
                                            "This feature is not available on this host at this time.",
                                            HTTP_RESP_NOT_FOUND);
     }

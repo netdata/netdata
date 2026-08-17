@@ -328,7 +328,7 @@ static MCP_FUNCTION_REGISTRY_ENTRY *mcp_function_get_info(RRDHOST *host, const c
 
     // Call the function with info parameter
     BUFFER *response = buffer_create(0, NULL);
-    int code = rrd_function_run(
+    int code = nrpc_call(
         host,
         response,
         10,

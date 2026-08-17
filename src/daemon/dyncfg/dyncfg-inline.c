@@ -6,7 +6,7 @@ static DICTIONARY *dyncfg_nodes = NULL;
 
 static int dyncfg_inline_callback(struct nrpc_request *req, void *data __maybe_unused) {
     char tr[UUID_COMPACT_STR_LEN];
-    uuid_unparse_lower_compact(*req->transaction, tr);
+    uuid_unparse_lower_compact(*req->call_id, tr);
 
     bool cancelled = req->is_cancelled.cb ? req->is_cancelled.cb(req->is_cancelled.data) : false;
 

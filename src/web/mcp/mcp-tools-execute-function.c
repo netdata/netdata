@@ -2221,7 +2221,7 @@ static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload
     BUFFER *result_buffer = buffer_create(0, NULL);
     
     // Execute the function
-    int ret = rrd_function_run(
+    int ret = nrpc_call(
         data->request.host,
         result_buffer,
         (int)data->request.timeout,
@@ -2632,7 +2632,7 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     // /api/v3/function path denies. Enforce the same access here (GHSA-6628-vxm3-4g8g).
     {
         CLEAN_BUFFER *access_error = buffer_create(0, NULL);
-        int access_code = rrd_function_verify_access(
+        int access_code = nrpc_method_authorize(
             data.request.host, access_error, data.request.function,
             data.request.auth ? data.request.auth->access : HTTP_ACCESS_NONE,
             false, NULL);

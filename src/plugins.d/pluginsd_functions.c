@@ -59,7 +59,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
         pf->code = HTTP_RESP_SERVICE_UNAVAILABLE;
         netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
-        rrd_call_function_error(pf->result_body_wb, "Failed to send this request to the plugin that offered it.", pf->code);
+        nrpc_call_error(pf->result_body_wb, "Failed to send this request to the plugin that offered it.", pf->code);
     }
     else {
         pf->sent_successfully = true;
@@ -75,7 +75,7 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     struct inflight_function *pf = new_func;
 
     netdata_log_error("PLUGINSD_PARSER: duplicate UUID on pending function '%s' detected. Ignoring the second one.", string2str(pf->function));
-    pf->code = rrd_call_function_error(pf->result_body_wb, "This transaction is already in progress.", HTTP_RESP_BAD_REQUEST);
+    pf->code = nrpc_call_error(pf->result_body_wb, "This transaction is already in progress.", HTTP_RESP_BAD_REQUEST);
 
     // delivering the SECOND caller's result here, inside the insertion
     // critical section, is safe: that caller's waiter mutex is not yet taken
@@ -102,7 +102,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
                    pf->sent_monotonic_ut - pf->started_monotonic_ut, now_realtime_usec() - pf->sent_monotonic_ut);
 
     if(pf->code == HTTP_RESP_SERVICE_UNAVAILABLE && !buffer_strlen(pf->result_body_wb))
-        rrd_call_function_error(pf->result_body_wb, "The plugin that was servicing this request, exited before responding.", pf->code);
+        nrpc_call_error(pf->result_body_wb, "The plugin that was servicing this request, exited before responding.", pf->code);
 
     pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
 
@@ -216,7 +216,7 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
         // Broker-keyed deadline: the parser dict key IS the compact
         // transaction id, so this is one O(1) broker lookup per entry.
         usec_t stop_ut;
-        if(unlikely(!rrd_function_transaction_deadline(pf_dfe.name, &stop_ut))) {
+        if(unlikely(!nrpc_call_deadline(pf_dfe.name, &stop_ut))) {
             // Invariant failure: every parser record must have a broker record
             // (pluginsd always registers sync=false, incl. the dyncfg
             // intercept, so the broker record outlives the parser entry).
@@ -244,7 +244,7 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
                            string2str(pf->function), pf_dfe.name, now_ut - pf->started_monotonic_ut);
 
             if(!buffer_strlen(pf->result_body_wb) || pf->code == HTTP_RESP_OK)
-                pf->code = rrd_call_function_error(pf->result_body_wb,
+                pf->code = nrpc_call_error(pf->result_body_wb,
                                                    "Timeout waiting for a response.",
                                                    HTTP_RESP_GATEWAY_TIMEOUT);
 
@@ -381,7 +381,7 @@ static void pluginsd_function_progress_to_plugin(const char *transaction, void *
 }
 
 // this is the function called from
-// rrd_call_function_and_wait() and rrd_call_function_async()
+// rrd_call_function_and_wait() and nrpc_call_async()
 int pluginsd_function_execute_cb(struct nrpc_request *req, void *data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
@@ -394,7 +394,7 @@ int pluginsd_function_execute_cb(struct nrpc_request *req, void *data) {
 
     if(!nrpc_transport_dispatcher_acquire(transport)) {
         int code = HTTP_RESP_SERVICE_UNAVAILABLE;
-        rrd_call_function_error(req->result.wb, "The plugin that offered this function is not available.", code);
+        nrpc_call_error(req->result.wb, "The plugin that offered this function is not available.", code);
         if(req->result.cb)
             req->result.cb(req->result.wb, code, req->result.data);
         return code;
@@ -425,7 +425,7 @@ int pluginsd_function_execute_cb(struct nrpc_request *req, void *data) {
                     .data = req->progress.data,
             },
     };
-    uuid_copy(tmp.transaction, *req->transaction);
+    uuid_copy(tmp.transaction, *req->call_id);
 
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(tmp.transaction, transaction_str);
@@ -441,7 +441,7 @@ int pluginsd_function_execute_cb(struct nrpc_request *req, void *data) {
         dictionary_write_unlock(parser->inflight.functions);
 
         int code = HTTP_RESP_SERVICE_UNAVAILABLE;
-        rrd_call_function_error(req->result.wb, "The plugin is not available.", code);
+        nrpc_call_error(req->result.wb, "The plugin is not available.", code);
         req->result.cb(req->result.wb, code, req->result.data);
 
         string_freez(tmp.function);

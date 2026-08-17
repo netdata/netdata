@@ -473,7 +473,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 
     should_be_saved(t, c);
 
-    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ALL, cmd,
+    int rc = nrpc_call(localhost, wb, 10, HTTP_ACCESS_ALL, cmd,
                               true, NULL,
                               NULL, NULL,
                               NULL, NULL,
@@ -799,7 +799,7 @@ int dyncfg_unittest(void) {
     dictionary_register_delete_callback(dyncfg_unittest_data.nodes, dyncfg_unittest_delete_cb, NULL);
 
     dyncfg_unittest_cleanup_files();
-    rrd_function_transactions_create();
+    nrpc_inflight_calls_create();
     dyncfg_init(false);
     dyncfg_file_unittest();
 

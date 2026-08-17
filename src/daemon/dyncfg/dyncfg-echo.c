@@ -91,7 +91,7 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
     CLEAN_CHAR_P *buf = mallocz(buf_size);
     snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
-    rrd_function_run(
+    nrpc_call(
         host, e->wb, 10,
         HTTP_ACCESS_ALL, buf, false, NULL,
         dyncfg_echo_cb, e,
@@ -125,7 +125,7 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
     CLEAN_CHAR_P *buf = mallocz(buf_size);
     snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
-    rrd_function_run(
+    nrpc_call(
         host, e->wb, 10,
         HTTP_ACCESS_ALL, buf, false, NULL,
         dyncfg_echo_cb, e,
@@ -161,7 +161,7 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
     CLEAN_CHAR_P *buf = mallocz(buf_size);
     snprintfz(buf, buf_size, "%s %s", string2str(df_template->function), cmd);
 
-    rrd_function_run(
+    nrpc_call(
         host, e->wb, 10,
         HTTP_ACCESS_ALL, buf, false, NULL,
         dyncfg_echo_cb, e,

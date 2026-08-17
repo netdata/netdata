@@ -96,7 +96,7 @@ static struct {
 } c5b_capture;
 
 static int c5b_async_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
-    uuid_unparse_lower_compact(*req->transaction, c5b_capture.tx);
+    uuid_unparse_lower_compact(*req->call_id, c5b_capture.tx);
     c5b_capture.result_wb = req->result.wb;
     c5b_capture.result_cb = req->result.cb;
     c5b_capture.result_cb_data = req->result.data;
@@ -126,7 +126,7 @@ static void c7_pin_progresser(const char *transaction __maybe_unused, void *data
 }
 
 static int c7_pin_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
-    uuid_unparse_lower_compact(*req->transaction, c7_pin.tx);
+    uuid_unparse_lower_compact(*req->call_id, c7_pin.tx);
     c7_pin.result_wb = req->result.wb;
     c7_pin.result_cb = req->result.cb;
     c7_pin.result_cb_data = req->result.data;
@@ -154,12 +154,12 @@ static struct {
 } c7_sync;
 
 static int c7_sync_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
-    uuid_unparse_lower_compact(*req->transaction, c7_sync.tx);
+    uuid_unparse_lower_compact(*req->call_id, c7_sync.tx);
     c7_sync.has_canceller = (req->register_cancel_hook.cb != NULL);
     c7_sync.has_progresser = (req->register_progress_hook.cb != NULL);
 
     usec_t d = 0;
-    c7_sync.deadline_visible = rrd_function_transaction_deadline(c7_sync.tx, &d);
+    c7_sync.deadline_visible = nrpc_call_deadline(c7_sync.tx, &d);
 
     if(req->result.cb)
         req->result.cb(req->result.wb, HTTP_RESP_OK, req->result.data);
@@ -195,7 +195,7 @@ static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec
                            struct c6ut_canceller *canceller,
                            struct c6ut_progresser *progresser) {
     struct nrpc_request req = {
-        .transaction = uuid,
+        .call_id = uuid,
         .function = fn,
         .payload = NULL,
         .source = "unittest",
@@ -389,7 +389,7 @@ int pluginsd_functions_unittest(void) {
 
     // 4. GC delete mid-defer + RESULT_END delivers exactly once (the
     //    detach-then-deliver sweep). Production-shaped: the call goes through
-    //    the broker (rrd_function_run), because the GC reads deadlines
+    //    the broker (nrpc_call), because the GC reads deadlines
     //    exclusively through the broker-keyed accessor.
     {
         int before = errors;
@@ -397,7 +397,7 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result res = { 0 };
         PARSER *parser = c6ut_parser_create(&sends);
 
-        rrd_function_transactions_create(); // idempotent
+        nrpc_inflight_calls_create(); // idempotent
 
         // the function is served by the pluginsd transport, as in production
         nrpc_method_register(host, NULL, "c6-gc-mid-defer-fn", 1, 0, 1, "gc", "top",
@@ -411,7 +411,7 @@ int pluginsd_functions_unittest(void) {
         uuid_unparse_lower_compact(uuid, tx);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = rrd_function_run(host, wb, 1 /* second */, HTTP_ACCESS_ALL, "c6-gc-mid-defer-fn",
+        int code = nrpc_call(host, wb, 1 /* second */, HTTP_ACCESS_ALL, "c6-gc-mid-defer-fn",
                                     false /* don't wait */, tx,
                                     c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
                                     NULL, "unittest", false);
@@ -560,7 +560,7 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result res = { 0 };
         PARSER *parser = c6ut_parser_create(&sends);
 
-        rrd_function_transactions_create(); // idempotent
+        nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(host, NULL, "c6-gc-race-fn", 1, 0, 1, "gc", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
@@ -571,7 +571,7 @@ int pluginsd_functions_unittest(void) {
             size_t calls_before = res.calls;
 
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            int code = rrd_function_run(host, wb, 1 /* second */, HTTP_ACCESS_ALL, "c6-gc-race-fn",
+            int code = nrpc_call(host, wb, 1 /* second */, HTTP_ACCESS_ALL, "c6-gc-race-fn",
                                         false /* don't wait */, NULL,
                                         c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
                                         NULL, "unittest", false);
@@ -621,7 +621,7 @@ int pluginsd_functions_unittest(void) {
     {
         int before = errors;
 
-        rrd_function_transactions_create(); // idempotent; the standalone env may lack it
+        nrpc_inflight_calls_create(); // idempotent; the standalone env may lack it
 
         // a SHORT timeout, so a PROGRESS actually extends it (the extension
         // fires only when less than FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT
@@ -631,7 +631,7 @@ int pluginsd_functions_unittest(void) {
                          c5b_async_execute_cb, NULL);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = rrd_function_run(host, wb, 5, HTTP_ACCESS_ALL, "c5b-deadline-fn",
+        int code = nrpc_call(host, wb, 5, HTTP_ACCESS_ALL, "c5b-deadline-fn",
                                     false /* don't wait */, NULL,
                                     NULL, NULL, NULL, NULL, NULL, NULL,
                                     NULL, "unittest", false);
@@ -641,14 +641,14 @@ int pluginsd_functions_unittest(void) {
         }
 
         usec_t d1 = 0, d2 = 0, d3 = 0;
-        if(!rrd_function_transaction_deadline(c5b_capture.tx, &d1) || !d1) {
+        if(!nrpc_call_deadline(c5b_capture.tx, &d1) || !d1) {
             fprintf(stderr, "  FAILED deadline: accessor missed a live transaction\n");
             errors++;
         }
 
-        rrd_function_progress(c5b_capture.tx);
+        nrpc_call_progress(c5b_capture.tx);
 
-        if(!rrd_function_transaction_deadline(c5b_capture.tx, &d2)) {
+        if(!nrpc_call_deadline(c5b_capture.tx, &d2)) {
             fprintf(stderr, "  FAILED deadline: accessor missed after progress\n");
             errors++;
         }
@@ -660,7 +660,7 @@ int pluginsd_functions_unittest(void) {
         // finish the call; the broker record must disappear
         c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
 
-        if(rrd_function_transaction_deadline(c5b_capture.tx, &d3)) {
+        if(nrpc_call_deadline(c5b_capture.tx, &d3)) {
             fprintf(stderr, "  FAILED deadline: accessor still finds a completed transaction\n");
             errors++;
         }
@@ -680,7 +680,7 @@ int pluginsd_functions_unittest(void) {
         int before = errors;
         struct nrpc_transport *tr = nrpc_transport_create(NULL);
 
-        rrd_function_transactions_create(); // idempotent
+        nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(host, NULL, "c7-dead-transport-fn", 10, 0, 1, "dead", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
@@ -692,7 +692,7 @@ int pluginsd_functions_unittest(void) {
 
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "c7-dead-transport-fn",
+        int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "c7-dead-transport-fn",
                                     false /* don't wait */, NULL,
                                     c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
                                     NULL, "unittest", false);
@@ -799,7 +799,7 @@ int pluginsd_functions_unittest(void) {
     {
         int before = errors;
 
-        rrd_function_transactions_create(); // idempotent
+        nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(host, NULL, "c7-dup-fn", 10, 0, 1, "dup", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
@@ -814,9 +814,9 @@ int pluginsd_functions_unittest(void) {
         CLEAN_BUFFER *wb1 = buffer_create(0, NULL);
         CLEAN_BUFFER *wb2 = buffer_create(0, NULL);
 
-        int c1 = rrd_function_run(host, wb1, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
+        int c1 = nrpc_call(host, wb1, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
                                   c6ut_result_cb, &r1, NULL, NULL, NULL, NULL, NULL, "unittest", false);
-        int c2 = rrd_function_run(host, wb2, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
+        int c2 = nrpc_call(host, wb2, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
                                   c6ut_result_cb, &r2, NULL, NULL, NULL, NULL, NULL, "unittest", false);
 
         if(c1 != HTTP_RESP_OK || r1.calls != 0) {
@@ -832,7 +832,7 @@ int pluginsd_functions_unittest(void) {
 
         // the rejection must not have touched the transaction already in flight
         usec_t d = 0;
-        if(!rrd_function_transaction_deadline(tx, &d)) {
+        if(!nrpc_call_deadline(tx, &d)) {
             fprintf(stderr, "  FAILED duplicate: the rejection removed the running transaction from the broker\n");
             errors++;
         }
@@ -845,7 +845,7 @@ int pluginsd_functions_unittest(void) {
                     r1.calls, r1.code);
             errors++;
         }
-        if(rrd_function_transaction_deadline(tx, &d)) {
+        if(nrpc_call_deadline(tx, &d)) {
             fprintf(stderr, "  FAILED duplicate: the completed transaction is still in the broker\n");
             errors++;
         }
@@ -940,7 +940,7 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result res = { 0 };
         PARSER *parser = c6ut_parser_create(&sends);
 
-        rrd_function_transactions_create(); // idempotent - the record we make has no entry in it
+        nrpc_inflight_calls_create(); // idempotent - the record we make has no entry in it
 
         // already past its deadline, so the GC would reap it if it could read one
         usec_t stop_ut = now_monotonic_usec() - 10 * USEC_PER_SEC;
@@ -997,7 +997,7 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result res = { 0 };
         PARSER *parser = c6ut_parser_create(&sends);
 
-        rrd_function_transactions_create(); // idempotent
+        nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(host, NULL, "c7-grace-fn", 10, 0, 1, "grace", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
@@ -1005,7 +1005,7 @@ int pluginsd_functions_unittest(void) {
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         usec_t t0 = now_monotonic_usec();
-        int code = rrd_function_run(host, wb, 10 /* seconds */, HTTP_ACCESS_ALL, "c7-grace-fn",
+        int code = nrpc_call(host, wb, 10 /* seconds */, HTTP_ACCESS_ALL, "c7-grace-fn",
                                     false /* don't wait */, NULL,
                                     c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
                                     NULL, "unittest", false);
@@ -1050,7 +1050,7 @@ int pluginsd_functions_unittest(void) {
     {
         int before = errors;
 
-        rrd_function_transactions_create(); // idempotent
+        nrpc_inflight_calls_create(); // idempotent
 
         memset(&c7_pin, 0, sizeof(c7_pin));
         c7_pin.first = nrpc_transport_create(NULL);
@@ -1062,7 +1062,7 @@ int pluginsd_functions_unittest(void) {
 
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "c7-pin-fn", false, NULL,
+        int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "c7-pin-fn", false, NULL,
                                     c6ut_result_cb, &res, NULL, NULL, NULL, NULL, NULL, "unittest", false);
         if(code != HTTP_RESP_OK) {
             fprintf(stderr, "  FAILED pins: async run returned %d\n", code);
@@ -1082,23 +1082,23 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_cancel(c7_pin.tx);
+        nrpc_call_cancel(c7_pin.tx);
         if(c7_pin.cancels != 1) {
             fprintf(stderr, "  FAILED pins: CANCEL dispatched %zu times, expected 1\n", c7_pin.cancels);
             errors++;
         }
 
         // the `cancelled` flag makes a repeat a no-op
-        rrd_function_cancel(c7_pin.tx);
+        nrpc_call_cancel(c7_pin.tx);
         if(c7_pin.cancels != 1) {
             fprintf(stderr, "  FAILED pins: a repeated CANCEL was dispatched again (%zu)\n", c7_pin.cancels);
             errors++;
         }
 
         // an unknown transaction is a no-op, not a crash
-        rrd_function_cancel("0123456789abcdef0123456789abcdef");
+        nrpc_call_cancel("0123456789abcdef0123456789abcdef");
 
-        rrd_function_progress(c7_pin.tx);
+        nrpc_call_progress(c7_pin.tx);
         if(c7_pin.progresses != 1) {
             fprintf(stderr, "  FAILED pins: PROGRESS dispatched %zu times, expected 1\n", c7_pin.progresses);
             errors++;
@@ -1137,7 +1137,7 @@ int pluginsd_functions_unittest(void) {
     {
         int before = errors;
 
-        rrd_function_transactions_create(); // idempotent
+        nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(host, NULL, "c7-timeout-fn", 7, 0, 1, "timeout", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
@@ -1152,7 +1152,7 @@ int pluginsd_functions_unittest(void) {
         for(size_t i = 0; i < _countof(t); i++) {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             usec_t t0 = now_monotonic_usec();
-            int code = rrd_function_run(host, wb, t[i].ask, HTTP_ACCESS_ALL, "c7-timeout-fn", false, NULL,
+            int code = nrpc_call(host, wb, t[i].ask, HTTP_ACCESS_ALL, "c7-timeout-fn", false, NULL,
                                         NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
             if(code != HTTP_RESP_OK) {
                 fprintf(stderr, "  FAILED timeout: run returned %d\n", code);
@@ -1161,7 +1161,7 @@ int pluginsd_functions_unittest(void) {
             }
 
             usec_t d = 0;
-            if(!rrd_function_transaction_deadline(c5b_capture.tx, &d)) {
+            if(!nrpc_call_deadline(c5b_capture.tx, &d)) {
                 fprintf(stderr, "  FAILED timeout: the transaction is not in the broker\n");
                 errors++;
             }
@@ -1184,7 +1184,7 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result sres = { 0 };
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "c7-sync-fn", true, NULL,
+            int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "c7-sync-fn", true, NULL,
                                         c6ut_result_cb, &sres, NULL, NULL, NULL, NULL, NULL, "unittest", false);
             if(code != HTTP_RESP_OK) {
                 fprintf(stderr, "  FAILED sync: run returned %d\n", code);
@@ -1205,7 +1205,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
         usec_t d = 0;
-        if(rrd_function_transaction_deadline(c7_sync.tx, &d)) {
+        if(nrpc_call_deadline(c7_sync.tx, &d)) {
             fprintf(stderr, "  FAILED sync: the transaction survived the call\n");
             errors++;
         }

@@ -78,7 +78,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         tmp->transaction = string_strdupz(transaction);
         BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
 
-        rrd_function_run(s->host, wb, timeout,
+        nrpc_call(s->host, wb, timeout,
                          http_access_from_hex_mapping_old_roles(access), function, false, transaction,
                          stream_execute_function_callback, tmp,
                          stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
@@ -304,7 +304,7 @@ bool stream_sender_execute_commands(struct sender_state *s) {
 
             char *transaction = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
             if(transaction && *transaction)
-                rrd_function_cancel(transaction);
+                nrpc_call_cancel(transaction);
         }
         else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_FUNCTION);
@@ -315,7 +315,7 @@ bool stream_sender_execute_commands(struct sender_state *s) {
 
             char *transaction = get_word(s->thread.rbuf.line.words, s->thread.rbuf.line.num_words, 1);
             if(transaction && *transaction)
-                rrd_function_progress(transaction);
+                nrpc_call_progress(transaction);
         }
         else if (command && strcmp(command, PLUGINSD_KEYWORD_REPLAY_CHART) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_EXECUTE_REPLAY);

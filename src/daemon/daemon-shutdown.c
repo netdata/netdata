@@ -356,7 +356,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     mcp_functions_registry_cleanup();
     rrdhost_free_all();
     dyncfg_shutdown();
-    rrd_function_transactions_destroy();
+    nrpc_inflight_calls_destroy();
     health_plugin_destroy();
     cgroup_netdev_link_destroy();
     bearer_tokens_destroy();

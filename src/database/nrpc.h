@@ -21,20 +21,20 @@ static inline usec_t nrpc_effective_deadline_ut(usec_t stop_monotonic_ut) {
 typedef void (*nrpc_result_cb_t)(BUFFER *wb, int code, void *result_cb_data);
 typedef bool (*nrpc_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 
-// The canceller is keyed by transaction (daemon-internal contract: the sole
+// The canceller is keyed by call_id (daemon-internal contract: the sole
 // implementer is the pluginsd transport; plugin-side functions_evloop cancels
 // via a polled flag and registers no canceller). CONTRACT: cancellers and
 // progressers are registered ONLY by function transports - their `data` is a
 // struct nrpc_transport, and the broker entry-pins it for the record's
 // lifetime.
-typedef void (*nrpc_cancel_hook_cb_t)(const char *transaction, void *data);
+typedef void (*nrpc_cancel_hook_cb_t)(const char *call_id, void *data);
 typedef void (*nrpc_register_cancel_hook_cb_t)(void *register_cancel_cb_data, nrpc_cancel_hook_cb_t cancel_cb, void *cancel_cb_data);
-typedef void (*nrpc_progress_cb_t)(nd_uuid_t *transaction, void *data, size_t done, size_t all);
-typedef void (*nrpc_progress_hook_cb_t)(const char *transaction, void *data);
+typedef void (*nrpc_progress_cb_t)(nd_uuid_t *call_id, void *data, size_t done, size_t all);
+typedef void (*nrpc_progress_hook_cb_t)(const char *call_id, void *data);
 typedef void (*nrpc_register_progress_hook_cb_t)(void *register_progresser_cb_data, nrpc_progress_hook_cb_t progresser_cb, void *progresser_cb_data);
 
 struct nrpc_request {
-    nd_uuid_t *transaction;
+    nd_uuid_t *call_id;
     const char *function;
     BUFFER *payload;
     const char *source;
@@ -43,7 +43,7 @@ struct nrpc_request {
 
     // points into the broker record: valid ONLY for the duration of the
     // handler invocation - executors must not stash it; later deadline
-    // reads go through rrd_function_transaction_deadline()
+    // reads go through nrpc_call_deadline()
     usec_t *stop_monotonic_ut;
 
     struct {
@@ -107,7 +107,7 @@ typedef enum __attribute__((packed)) {
 void nrpc_registry_init(RRDHOST *host);
 void nrpc_registry_destroy(RRDHOST *host);
 
-// release a handle acquired via rrd_function_verify_access()
+// release a handle acquired via nrpc_method_authorize()
 void nrpc_method_acquired_release(RRDHOST *host, NRPC_METHOD_ACQUIRED *acquired);
 
 // add a function, to be run from the collector
@@ -121,26 +121,26 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
 bool nrpc_method_name_is_dyncfg(const char *name);
 
 // call a function, to be run from anywhere
-int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
+int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      HTTP_ACCESS user_access, const char *cmd,
-                     bool wait, const char *transaction,
+                     bool wait, const char *call_id,
                      nrpc_result_cb_t result_cb, void *result_cb_data,
                      nrpc_progress_cb_t progress_cb, void *progress_cb_data,
                      nrpc_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
                      BUFFER *payload, const char *source, bool allow_restricted);
 
 // Verify the caller may invoke `cmd` on `host`, applying the same RESTRICTED and access-level
-// checks rrd_function_run() enforces, WITHOUT executing the function. This lets non-execution
+// checks nrpc_call() enforces, WITHOUT executing the function. This lets non-execution
 // paths (e.g. MCP metadata/help generation) authorize a caller before disclosing anything.
 // On success returns HTTP_RESP_OK; if out_acquired != NULL it receives an acquired registry
 // handle the caller MUST release with nrpc_method_acquired_release(host, *out_acquired),
 // otherwise the handle is released internally. On failure it writes the error into result_wb,
 // releases any acquired handle, sets *out_acquired (if any) to NULL, and returns the HTTP code.
-int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd,
+int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
                               NRPC_METHOD_ACQUIRED **out_acquired);
 
-// Regression test for rrd_function_verify_access() access gating (GHSA-6628-vxm3-4g8g).
+// Regression test for nrpc_method_authorize() access gating (GHSA-6628-vxm3-4g8g).
 // Requires a prepared RRD (localhost). Returns the number of failures (0 = pass).
 int rrdfunctions_verify_access_unittest(void);
 int rrdfunctions_manifest_unittest(void);
@@ -151,7 +151,7 @@ int rrdfunctions_emitters_unittest(void);
 bool nrpc_method_available(RRDHOST *host, const char *function);
 bool nrpc_method_is_available(RRDHOST *host, struct nrpc_method *method);
 
-bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, nrpc_result_cb_t cb);
+bool nrpc_call_has_result_cb(nd_uuid_t *call_id, nrpc_result_cb_t cb);
 
 #include "nrpc-builtin.h"
 #include "nrpc-calls.h"

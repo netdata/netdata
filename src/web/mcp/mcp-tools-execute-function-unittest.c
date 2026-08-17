@@ -13,7 +13,7 @@
 // The metadata is produced by mcp_functions_registry_get() -> "<fn> info", run
 // with HTTP_ACCESS_ALL — so before the fix it ignored the caller's real access.
 //
-// The fix authorizes the caller (rrd_function_verify_access) in
+// The fix authorizes the caller (nrpc_method_authorize) in
 // mcp_tool_execute_function_execute() BEFORE that metadata path runs.
 //
 // This test drives the real MCP handler with an anonymous caller and a
@@ -106,7 +106,7 @@ int mcp_execute_function_access_unittest(void) {
     // transaction. Normal startup (and dyncfg_unittest) create the broker; the
     // standalone -W mcpfunctionaccesstest path does not, so ensure it here
     // (create is idempotent).
-    rrd_function_transactions_create();
+    nrpc_inflight_calls_create();
 
     // A protected function mirroring systemd-journal's access requirements.
     nrpc_method_register_builtin(host, NULL, MCP_UT_FN, 10, 0, 1,
