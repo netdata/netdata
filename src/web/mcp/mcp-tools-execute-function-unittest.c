@@ -102,10 +102,11 @@ int mcp_execute_function_access_unittest(void) {
 
     mcp_functions_registry_init();
 
-    // The info path executes the function, which registers an inflight request.
-    // Normal startup (and dyncfg_unittest) initialize this global; the standalone
-    // -W mcpfunctionaccesstest path does not, so ensure it here (init is idempotent).
-    rrd_functions_inflight_init();
+    // The info path executes the function, which registers an in-flight
+    // transaction. Normal startup (and dyncfg_unittest) create the broker; the
+    // standalone -W mcpfunctionaccesstest path does not, so ensure it here
+    // (create is idempotent).
+    rrd_function_transactions_create();
 
     // A protected function mirroring systemd-journal's access requirements.
     rrd_function_add_inline(host, NULL, MCP_UT_FN, 10, 0, 1,

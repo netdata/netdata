@@ -69,7 +69,14 @@ struct rrd_function_inflight {
     } progresser;
 };
 
-static DICTIONARY *rrd_functions_inflight_requests = NULL;
+// The transaction broker: every in-flight function call, keyed by its compact
+// transaction id. One global instance - transactions are process-wide, not
+// per-host (the record carries its host).
+struct rrd_function_transactions {
+    DICTIONARY *dict;
+};
+
+static struct rrd_function_transactions rrd_function_transactions = { .dict = NULL };
 
 static void rrd_function_cancel_inflight(struct rrd_function_inflight *r);
 
@@ -113,23 +120,26 @@ static bool rrd_functions_inflight_conflict_cb(const DICTIONARY_ITEM *item __may
     return false;
 }
 
-void rrd_functions_inflight_init(void) {
-    if(rrd_functions_inflight_requests)
+void rrd_function_transactions_create(void) {
+    if(rrd_function_transactions.dict)
         return;
 
-    rrd_functions_inflight_requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrd_function_inflight));
+    rrd_function_transactions.dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct rrd_function_inflight));
 
-    dictionary_register_insert_callback(rrd_functions_inflight_requests, rrd_functions_inflight_insert_cb, NULL);
-    dictionary_register_delete_callback(rrd_functions_inflight_requests, rrd_functions_inflight_delete_cb, NULL);
-    dictionary_register_conflict_callback(rrd_functions_inflight_requests, rrd_functions_inflight_conflict_cb, NULL);
+    dictionary_register_insert_callback(rrd_function_transactions.dict, rrd_functions_inflight_insert_cb, NULL);
+    dictionary_register_delete_callback(rrd_function_transactions.dict, rrd_functions_inflight_delete_cb, NULL);
+    dictionary_register_conflict_callback(rrd_function_transactions.dict, rrd_functions_inflight_conflict_cb, NULL);
 }
 
-void rrd_functions_inflight_destroy(void) {
-    if(!rrd_functions_inflight_requests)
+// called ONLY from the ASAN-gated shutdown path (daemon-shutdown.c): in normal
+// operation the broker lives for the process lifetime and is never torn down -
+// the destroy exists so leak checking sees a clean heap
+void rrd_function_transactions_destroy(void) {
+    if(!rrd_function_transactions.dict)
         return;
 
-    dictionary_destroy(rrd_functions_inflight_requests);
-    rrd_functions_inflight_requests = NULL;
+    dictionary_destroy(rrd_function_transactions.dict);
+    rrd_function_transactions.dict = NULL;
 }
 
 static void rrd_inflight_async_function_register_canceller_cb(void *register_canceller_cb_data, rrd_function_cancel_cb_t canceller_cb, void *canceller_cb_data) {
@@ -166,8 +176,8 @@ struct rrd_function_call_wait {
 };
 
 static void rrd_inflight_function_cleanup(RRDHOST *host __maybe_unused, const char *transaction) {
-    dictionary_del(rrd_functions_inflight_requests, transaction);
-    dictionary_garbage_collect(rrd_functions_inflight_requests);
+    dictionary_del(rrd_function_transactions.dict, transaction);
+    dictionary_garbage_collect(rrd_function_transactions.dict);
 }
 
 static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
@@ -581,7 +591,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     bool duplicate_transaction = false;
     struct rrd_function_inflight *r = dictionary_set_advanced(
-        rrd_functions_inflight_requests, transaction, -1, &t, sizeof(t), &duplicate_transaction);
+        rrd_function_transactions.dict, transaction, -1, &t, sizeof(t), &duplicate_transaction);
     if(!r) {
         // dictionary_set() returns NULL when the dictionary is destroyed (shutdown in progress)
         code = rrd_call_function_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
@@ -660,13 +670,13 @@ bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_
     bool ret = false;
     char str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(*transaction, str);
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, str);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_function_transactions.dict, str);
     if(item) {
         struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
         if(r->result.cb == cb)
             ret = true;
 
-        dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
+        dictionary_acquired_item_release(rrd_function_transactions.dict, item);
     }
     return ret;
 }
@@ -709,7 +719,7 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
 void rrd_function_cancel(const char *transaction) {
     // internal_error(true, "FUNCTIONS: request to cancel transaction '%s'", transaction);
 
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_function_transactions.dict, transaction);
     if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a CANCEL request for transaction '%s', but the transaction is not running.",
@@ -719,11 +729,11 @@ void rrd_function_cancel(const char *transaction) {
 
     struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
     rrd_function_cancel_inflight(r);
-    dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
+    dictionary_acquired_item_release(rrd_function_transactions.dict, item);
 }
 
 void rrd_function_progress(const char *transaction) {
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_function_transactions.dict, transaction);
     if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a PROGRESS request for transaction '%s', but the transaction is not running.",
@@ -756,7 +766,7 @@ void rrd_function_progress(const char *transaction) {
     rrd_collector_dispatcher_release(r->rdcf->collector);
 
 cleanup:
-    dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
+    dictionary_acquired_item_release(rrd_function_transactions.dict, item);
 }
 
 void rrd_function_call_progresser(nd_uuid_t *transaction) {

@@ -799,7 +799,7 @@ int dyncfg_unittest(void) {
     dictionary_register_delete_callback(dyncfg_unittest_data.nodes, dyncfg_unittest_delete_cb, NULL);
 
     dyncfg_unittest_cleanup_files();
-    rrd_functions_inflight_init();
+    rrd_function_transactions_create();
     dyncfg_init(false);
     dyncfg_file_unittest();
 

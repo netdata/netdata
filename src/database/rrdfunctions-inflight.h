@@ -5,7 +5,10 @@
 
 #include "rrd.h"
 
-void rrd_functions_inflight_init(void);
+// the transaction broker: create at startup; destroy exists only for the
+// ASAN-gated shutdown path (see rrd_function_transactions_destroy)
+void rrd_function_transactions_create(void);
+void rrd_function_transactions_destroy(void);
 
 // cancel a running function, to be run from anywhere
 void rrd_function_cancel(const char *transaction);

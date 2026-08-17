@@ -1109,7 +1109,7 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("inflight functions");
 
-    rrd_functions_inflight_init();
+    rrd_function_transactions_create();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("silencers");
