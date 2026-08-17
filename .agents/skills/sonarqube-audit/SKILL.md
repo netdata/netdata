@@ -172,6 +172,7 @@ Keep a record of profile decisions in a project-local doc under
 | Symptom                                | Likely cause                                                |
 |----------------------------------------|-------------------------------------------------------------|
 | HTTP 401 / 403 with HTML body          | Token wrong/expired, or Cloudflare blocking non-ASCII       |
+| Missing `.env` for a public PR query   | Try `https://sonarcloud.io/api/issues/search` with `componentKeys`, `pullRequest`, `sinceLeakPeriod=true`, and `statuses=OPEN,CONFIRMED`; this project endpoint is publicly readable, but write actions still require a token. |
 | Token works for issues but not hotspots| Hotspot endpoints have separate auth checks — token must have `Browse` permission |
 | Family-mode appears to stop at 500     | Outdated -- `sonar-mark.sh` family-mode now paginates transparently via `sq_paginate`. If you still see truncation, check `sq_paginate`'s array-key recognition list. |
 | `falsepositive` transition rejected    | Issue is not in `OPEN` or `CONFIRMED` state — check current status |
