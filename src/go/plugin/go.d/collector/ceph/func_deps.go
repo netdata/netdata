@@ -23,6 +23,8 @@ const (
 	hdrAcceptVersionV2  = "application/vnd.ceph.api.v2.0+json"
 )
 
+var maxInt64Float = math.Nextafter(float64(math.MaxInt64), 0)
+
 type funcDepsAdapter struct {
 	collector *Collector
 }

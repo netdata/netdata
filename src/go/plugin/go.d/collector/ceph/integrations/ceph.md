@@ -288,7 +288,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ceph_component_collection_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.component_collection_status | One or more Ceph metric components for cluster ${label:fsid} are failing |
+| [ ceph_component_collection_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.component_collection_status | Ceph ${label:component} metric collection for cluster ${label:fsid} is failing |
 | [ ceph_cluster_physical_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.cluster_physical_capacity_utilization | Ceph cluster ${label:fsid} disk space utilization |
 
 
@@ -301,6 +301,24 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 The default job emits the complete metric set. Per-entity metrics additionally honor their selectors and caps.
 
+
+
+### Per component
+
+These metrics refer to one Ceph API collection component.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| fsid | Unique Ceph cluster identifier. |
+| component | Ceph API collection component. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ceph.component_collection_status | Ceph Component Collection Status | success, failed | status |
 
 
 ### Per cluster
@@ -317,7 +335,6 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| ceph.component_collection_status | Ceph Component Collection Status | health, osds, pools | status |
 | ceph.cluster_status | Ceph Cluster Status | ok, err, warn | status |
 | ceph.cluster_hosts_count | Ceph Cluster Hosts | hosts | hosts |
 | ceph.cluster_monitors_count | Ceph Cluster Monitors | monitors | monitors |

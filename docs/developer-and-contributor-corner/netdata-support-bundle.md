@@ -84,10 +84,13 @@ The archive is organized into numbered directories so a person or an automated r
 - `06-state/`, persistent state such as the daemon status file used for crash analysis, database disk usage, and cloud claim state.
 - `07-runtime/`, live agent state read from the local API, collected only when the agent responds.
 - `08-network/`, local connectivity relevant to the agent.
+- `09-permissions/`, file modes, ownership, plugin capabilities, extended attributes, security contexts, and ACLs for the agent's directories and plugins.
 
 ## Privacy and sanitization
 
-- Secrets are always removed. This covers API tokens, passwords, stream API keys, bearer and basic credentials, private key blocks, and credentials embedded in URLs.
+- Secrets are removed. This covers API tokens, passwords, bearer and basic credentials, private key blocks, and credentials embedded in URLs.
+- One deliberate exception: the **streaming API key** is kept as-is in `04-config/stream.conf`, because support needs it to tell whether a child and its parent agree on the same key. Remove or mask that file before sending the bundle if you would rather not share it.
+- Collected files keep their original bytes, including a byte-order mark and CRLF line endings, so an encoding problem in your configuration is still visible.
 - IP addresses and hostnames are replaced with stable pseudonyms by default, so the same address reads as the same pseudonym across the whole bundle. Use `--no-obfuscate` to keep the real values.
 - When pseudonymization is on, the map from real values to pseudonyms is written next to the archive, not inside it. Keep that map private and do not attach it to a ticket.
 - Review the archive before you send it. The tool runs on your own host and you are in control of what leaves it.

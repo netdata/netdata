@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ceph/cephfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
@@ -108,15 +109,25 @@ func TestTargetReleaseDashboardContracts(t *testing.T) {
 			defer c.Cleanup(context.Background())
 
 			require.NoError(t, c.Check(context.Background()))
-			mx, err := c.collect(context.Background())
-			require.NoError(t, err)
-			assert.EqualValues(t, 0, mx["health_collection_failed"])
-			assert.EqualValues(t, 250000, mx["raw_capacity_used_bytes"])
-			assert.EqualValues(t, 10250, mx["client_perf_read_bytes_sec"])
-			assert.EqualValues(t, 1024250, mx["osd_00000000-0000-4000-8000-000000000001_read_bytes"])
-			assert.EqualValues(t, 900, mx["pool_pool-a_space_avail_bytes"])
-			assert.EqualValues(t, 10000, mx["pool_pool-a_space_utilization"])
-			collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+			require.NoError(t, collectOnce(c))
+			requireComponentStatus(t, c, "synthetic-fsid", "health", "success")
+			requireMetric(t, c, "cluster_physical_capacity_bytes", metrix.Labels{
+				"fsid": "synthetic-fsid", "state": "used",
+			}, 250000)
+			requireMetric(t, c, "cluster_client_io_bytes_per_sec", metrix.Labels{
+				"fsid": "synthetic-fsid", "direction": "read",
+			}, 10.25)
+			requireMetric(t, c, "osd_io_bytes_per_sec", metrix.Labels{
+				"fsid": "synthetic-fsid", "osd_uuid": "00000000-0000-4000-8000-000000000001",
+				"osd_name": "osd.0", "device_class": "ssd", "direction": "read",
+			}, 1024.25)
+			requireMetric(t, c, "pool_space_bytes", metrix.Labels{
+				"fsid": "synthetic-fsid", "pool_name": "pool-a", "state": "avail",
+			}, 900)
+			requireMetric(t, c, "pool_space_utilization_percent", metrix.Labels{
+				"fsid": "synthetic-fsid", "pool_name": "pool-a",
+			}, 10)
+			collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
 			for _, method := range cephfunc.Methods() {
 				response := c.funcRouter.Handle(context.Background(), method.ID, nil)
@@ -182,6 +193,15 @@ func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
 	health := read("api_health_minimal.json")
 	osds := read("api_osd.json")
 	pools := read("api_pool_stats.json")
+	var identity struct {
+		MonStatus struct {
+			MonMap struct {
+				FSID string `json:"fsid"`
+			} `json:"monmap"`
+		} `json:"mon_status"`
+	}
+	require.NoError(t, json.Unmarshal(monitor, &identity))
+	require.NotEmpty(t, identity.MonStatus.MonMap.FSID)
 	recorder := &wireRecorder{}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,12 +237,11 @@ func TestLegacyPacificDashboardContractEndToEnd(t *testing.T) {
 	c := newInitializedCollector(t, srv.URL, nil)
 	defer c.Cleanup(context.Background())
 	require.NoError(t, c.Check(context.Background()))
-	mx, err := c.collect(context.Background())
-	require.NoError(t, err)
-	assert.NotEmpty(t, mx)
-	assert.NotEmpty(t, c.clusterFSID())
-	assert.EqualValues(t, 100000, mx["pool_mySuperPool_space_utilization"])
-	collecttest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+	require.NoError(t, collectOnce(c))
+	requireMetric(t, c, "pool_space_utilization_percent", metrix.Labels{
+		"fsid": identity.MonStatus.MonMap.FSID, "pool_name": "mySuperPool",
+	}, 100)
+	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 	assert.Equal(t, expectedPacificRequests(), recorder.snapshot())
 }
 
