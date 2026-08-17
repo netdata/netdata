@@ -22,6 +22,18 @@ typedef enum __attribute__((packed)) {
 struct rrd_functions {
     RRDHOST *host;                  // back-pointer for the dictionary callbacks
     DICTIONARY *dict;               // the function definitions, keyed by sanitized name
+
+    // Pending FUNCTION_DEL queue towards the parent. Deleters (any thread)
+    // insert the sanitized name here BEFORE setting
+    // RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED; the streaming renderer clears the
+    // flag FIRST and then snapshots-and-clears this set under the spinlock, so
+    // a del landing after the snapshot re-sets the flag with its entry already
+    // queued and nothing is ever stranded. Only populated when the host has a
+    // stream sender configured (never-streaming hosts must not grow it).
+    struct {
+        SPINLOCK spinlock;
+        DICTIONARY *dict;           // keyed by sanitized name, no value (a set)
+    } pending_dels;
 };
 
 struct rrd_host_function {

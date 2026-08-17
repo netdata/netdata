@@ -799,3 +799,321 @@ int rrdfunctions_manifest_pacer_unittest(void) {
 
     return errors;
 }
+
+// ----------------------------------------------------------------------------
+// The streaming delete-path queue (C3).
+//
+// rrd_function_del() no longer sends FUNCTION_DEL synchronously; it queues the
+// sanitized name in the registry's pending_dels set (only when the host has a
+// stream sender configured) and sets RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED.
+// The renderer (stream_sender_send_global_rrdhost_functions) clears the flag,
+// snapshots-and-clears the set, emits the FUNCTION_DEL lines and then the full
+// re-list - one buffer. This pins:
+//
+//   1. the add/del truth table: which operations set the flag, queue a
+//      FUNCTION_DEL, and arm the cloud manifest - including the dyncfg quirk
+//      (dyncfg global deletes set the flag but never emit FUNCTION_DEL) and
+//      the no-sender case (never-streaming hosts must not grow the queue);
+//   2. drain order and discard: DEL lines precede the re-list; a false
+//      can_function_del verdict discards the snapshot without emitting;
+//   3. the concurrent del-during-drain race: under the insert-before-flag /
+//      clear-flag-before-snapshot protocol no DEL is ever lost or duplicated.
+
+struct fndel_race_ctx {
+    RRDHOST *host;
+    bool done;
+};
+
+#define FNDEL_RACE_N 200
+
+static void fndel_race_worker(void *arg) {
+    struct fndel_race_ctx *ctx = arg;
+    char name[64];
+    for(size_t i = 0; i < FNDEL_RACE_N; i++) {
+        snprintfz(name, sizeof(name), "tt-race-fn-%zu", i);
+        rrd_function_add(ctx->host, NULL, name, 10, 0, 1, "race", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+        rrd_function_del(ctx->host, NULL, name, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    }
+    __atomic_store_n(&ctx->done, true, __ATOMIC_RELEASE);
+}
+
+static bool fndel_queued(RRDHOST *host, const char *name) {
+    // set entries carry no value, so dictionary_get() would return NULL for
+    // present entries too - test membership through the item instead
+    spinlock_lock(&host->functions->pending_dels.spinlock);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions->pending_dels.dict, name);
+    bool ret = (item != NULL);
+    if(item)
+        dictionary_acquired_item_release(host->functions->pending_dels.dict, item);
+    spinlock_unlock(&host->functions->pending_dels.spinlock);
+    return ret;
+}
+
+static void fndel_flush_queue(RRDHOST *host) {
+    spinlock_lock(&host->functions->pending_dels.spinlock);
+    dictionary_flush(host->functions->pending_dels.dict);
+    spinlock_unlock(&host->functions->pending_dels.spinlock);
+}
+
+int rrdfunctions_del_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    RRDHOST *host = localhost;
+    if(!host || !host->functions) {
+        fprintf(stderr, "  FAILED: localhost (or its functions registry) is NULL\n");
+        return 1;
+    }
+
+    int errors = 0;
+
+    // fake a configured stream sender: the pending-del gate only checks the
+    // option bit and pointer non-NULLness (rrdhost_has_stream_sender_enabled),
+    // and no streaming thread runs in the unittest binary, so the poison
+    // pointer is never dereferenced; both are restored before returning
+    struct sender_state *saved_sender = host->sender;
+    bool saved_option = rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED);
+
+    // manifest arming is observed exactly like rrdfunctions_manifest_unittest()
+    // does: through the host's ACLK config send-time timestamp
+    bool config_created_here = (__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE) == NULL);
+    create_aclk_config(host, &host->host_id.uuid, NULL);
+    aclk_sync_cfg_t *cfg = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if(!cfg) {
+        fprintf(stderr, "  FAILED: could not create an ACLK config for localhost\n");
+        return 1;
+    }
+
+    // 1. the add/del truth table
+    {
+        struct {
+            const char *fn;
+            bool sender_enabled;
+            bool add_expect_arm;    // add always sets the flag for global functions
+            bool del_expect_queued;
+            bool del_expect_arm;    // del always sets the flag for global functions
+        } cases[] = {
+            // plain global function, sender configured: queued + armed both ways
+            { "tt-plain-fn",     true,  true,  true,  true  },
+            // plain global function, no sender: NOT queued (never-streaming host)
+            { "tt-nosender-fn",  false, true,  false, true  },
+            // dyncfg-shaped name (INTERNAL registration): flag quirk - no
+            // FUNCTION_DEL, and dyncfg is never in the manifest
+            { "config tt:job",   true,  false, false, false },
+            // restricted function: streams (queued) but is not in the manifest.
+            // NOTE: add still arms - a re-registration ADDING the restricted
+            // flag drops the function OUT of the manifest, and that transition
+            // must be reported (see the arm-site comment in rrd_function_add);
+            // only the del skips arming (the entry was never in the manifest)
+            { "__tt-hidden-fn",  true,  true,  true,  false },
+        };
+
+        int tt_errors_before = errors;
+        for(size_t i = 0; i < _countof(cases); i++) {
+            if(cases[i].sender_enabled) {
+                rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+                host->sender = (struct sender_state *)(uintptr_t)0x1;
+            }
+            else {
+                rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+                host->sender = NULL;
+            }
+
+            // --- add ---
+            rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+            aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
+
+            rrd_function_add(host, NULL, cases[i].fn, 10, 0, 1, "truth table", "top",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                             rrdfunctions_unittest_noop_cb, NULL);
+
+            if(!rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
+                fprintf(stderr, "  FAILED tt '%s': add did not set the flag\n", cases[i].fn);
+                errors++;
+            }
+            bool add_armed = aclk_send_timestamp_get(&cfg->node_manifest_send_time) != 0;
+            if(add_armed != cases[i].add_expect_arm) {
+                fprintf(stderr, "  FAILED tt '%s': add armed=%d, expected %d\n",
+                        cases[i].fn, add_armed, cases[i].add_expect_arm);
+                errors++;
+            }
+
+            // --- del ---
+            rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+            aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
+            fndel_flush_queue(host);
+
+            rrd_function_del(host, NULL, cases[i].fn, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+            if(!rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
+                fprintf(stderr, "  FAILED tt '%s': del did not set the flag\n", cases[i].fn);
+                errors++;
+            }
+            bool queued = fndel_queued(host, cases[i].fn);
+            if(queued != cases[i].del_expect_queued) {
+                fprintf(stderr, "  FAILED tt '%s': del queued=%d, expected %d\n",
+                        cases[i].fn, queued, cases[i].del_expect_queued);
+                errors++;
+            }
+            bool del_armed = aclk_send_timestamp_get(&cfg->node_manifest_send_time) != 0;
+            if(del_armed != cases[i].del_expect_arm) {
+                fprintf(stderr, "  FAILED tt '%s': del armed=%d, expected %d\n",
+                        cases[i].fn, del_armed, cases[i].del_expect_arm);
+                errors++;
+            }
+
+            fndel_flush_queue(host);
+        }
+
+        if(errors == tt_errors_before)
+            fprintf(stderr, "  OK truth table: flag/queue/arm behavior for plain, no-sender, dyncfg and restricted deletes\n");
+    }
+
+    // sender stays enabled (fake) for the drain and race sections
+    rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+    host->sender = (struct sender_state *)(uintptr_t)0x1;
+
+    // 2. drain order and the discard path
+    {
+        int drain_errors_before = errors;
+
+        rrd_function_add(host, NULL, "tt-keep-fn", 10, 0, 1, "keep", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+        rrd_function_add(host, NULL, "tt-del-fn", 10, 0, 1, "del", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+        rrd_function_del(host, NULL, "tt-del-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            stream_sender_send_global_rrdhost_functions(host, wb, false, true);
+            const char *out = buffer_tostring(wb);
+
+            const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-del-fn\"");
+            const char *keep_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"tt-keep-fn\"");
+            // "FUNCTION GLOBAL" cannot match a FUNCTION_DEL line (the next byte
+            // there is '_', not ' '), so this finds the first re-list line
+            const char *first_fn_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION " GLOBAL");
+
+            if(!del_line) {
+                fprintf(stderr, "  FAILED drain: FUNCTION_DEL line missing from the rendered output\n");
+                errors++;
+            }
+            if(!keep_line) {
+                fprintf(stderr, "  FAILED drain: surviving function missing from the re-list\n");
+                errors++;
+            }
+            if(del_line && first_fn_line && del_line > first_fn_line) {
+                fprintf(stderr, "  FAILED drain: FUNCTION_DEL emitted after the re-list started\n");
+                errors++;
+            }
+            if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
+                fprintf(stderr, "  FAILED drain: flag not cleared by the renderer\n");
+                errors++;
+            }
+            if(fndel_queued(host, "tt-del-fn")) {
+                fprintf(stderr, "  FAILED drain: queue not cleared after the drain\n");
+                errors++;
+            }
+        }
+
+        // discard: a parent without FUNCDEL support gets no DEL lines, and the
+        // queue is still emptied (matches the old silent drop)
+        rrd_function_del(host, NULL, "tt-keep-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            stream_sender_send_global_rrdhost_functions(host, wb, false, false);
+            const char *out = buffer_tostring(wb);
+
+            if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL)) {
+                fprintf(stderr, "  FAILED discard: FUNCTION_DEL emitted despite can_function_del=false\n");
+                errors++;
+            }
+            if(fndel_queued(host, "tt-keep-fn")) {
+                fprintf(stderr, "  FAILED discard: queue not emptied on the discard path\n");
+                errors++;
+            }
+        }
+
+        if(errors == drain_errors_before)
+            fprintf(stderr, "  OK drain: DEL-before-re-list ordering, flag/queue clearing, and the discard path\n");
+    }
+
+    // 3. concurrent del-during-drain: no DEL lost, none duplicated
+    {
+        int race_errors_before = errors;
+
+        struct fndel_race_ctx ctx = { .host = host, .done = false };
+        uint8_t *seen = callocz(FNDEL_RACE_N, sizeof(uint8_t));
+
+        ND_THREAD *worker = nd_thread_create("fndel-race", NETDATA_THREAD_OPTION_DONT_LOG,
+                                             fndel_race_worker, &ctx);
+        if(!worker) {
+            fprintf(stderr, "  FAILED race: could not create the worker thread\n");
+            errors++;
+        }
+        else {
+            bool worker_done = false;
+            char needle[128];
+            do {
+                // one final drain AFTER the worker is done catches anything the
+                // last mid-flight drain missed
+                worker_done = __atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE);
+
+                CLEAN_BUFFER *wb = buffer_create(0, NULL);
+                stream_sender_send_global_rrdhost_functions(host, wb, false, true);
+                const char *out = buffer_tostring(wb);
+
+                for(size_t i = 0; i < FNDEL_RACE_N; i++) {
+                    snprintfz(needle, sizeof(needle),
+                              PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-race-fn-%zu\"", i);
+                    if(strstr(out, needle))
+                        seen[i]++;
+                }
+
+                if(!worker_done)
+                    sleep_usec(1 * USEC_PER_MS);
+            } while(!worker_done);
+
+            nd_thread_join(worker);
+
+            size_t lost = 0, dup = 0;
+            for(size_t i = 0; i < FNDEL_RACE_N; i++) {
+                if(seen[i] == 0) lost++;
+                else if(seen[i] > 1) dup++;
+            }
+            if(lost) {
+                fprintf(stderr, "  FAILED race: %zu of %d FUNCTION_DELs were LOST\n", lost, FNDEL_RACE_N);
+                errors++;
+            }
+            if(dup) {
+                fprintf(stderr, "  FAILED race: %zu FUNCTION_DELs were emitted more than once\n", dup);
+                errors++;
+            }
+
+            if(errors == race_errors_before)
+                fprintf(stderr, "  OK race: %d concurrent deletes all drained exactly once\n", FNDEL_RACE_N);
+        }
+
+        freez(seen);
+    }
+
+    // restore localhost exactly as found
+    host->sender = saved_sender;
+    if(saved_option)
+        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+    else
+        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+    fndel_flush_queue(host);
+    aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
+    if(config_created_here)
+        destroy_aclk_config(host);
+
+    fprintf(stderr, "%s() %s (%d error%s)\n\n",
+            __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+
+    return errors;
+}

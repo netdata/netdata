@@ -229,6 +229,7 @@ int dyncfg_unittest(void);
 int rrdfunctions_verify_access_unittest(void);
 int rrdfunctions_manifest_unittest(void);
 int rrdfunctions_manifest_pacer_unittest(void);
+int rrdfunctions_del_unittest(void);
 int mcp_execute_function_access_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
@@ -511,6 +512,7 @@ int netdata_main(int argc, char **argv) {
                             if (rrdfunctions_verify_access_unittest()) return 1;
                             if (rrdfunctions_manifest_unittest()) return 1;
                             if (rrdfunctions_manifest_pacer_unittest()) return 1;
+                            if (rrdfunctions_del_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
@@ -727,6 +729,8 @@ int netdata_main(int argc, char **argv) {
                             return unittest_run_with_rrd(rrdfunctions_manifest_unittest);
                         else if(strcmp(optarg, "functionsmanifestpacertest") == 0)
                             return unittest_run_with_rrd(rrdfunctions_manifest_pacer_unittest);
+                        else if(strcmp(optarg, "functionsdeltest") == 0)
+                            return unittest_run_with_rrd(rrdfunctions_del_unittest);
                         else if(strcmp(optarg, "mcpfunctionaccesstest") == 0)
                             return unittest_run_with_rrd(mcp_execute_function_access_unittest);
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {

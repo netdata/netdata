@@ -13,7 +13,13 @@ void stream_send_global_functions(RRDHOST *host) {
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
-    stream_sender_send_global_rrdhost_functions(host, wb, stream_has_capability(host->sender, STREAM_CAP_DYNCFG));
+    // the renderer drains the pending FUNCTION_DEL queue too; it needs our
+    // verdict on whether the parent can accept FUNCTION_DEL (absorbed from the
+    // old stream_send_function_del gate)
+    stream_sender_send_global_rrdhost_functions(host, wb,
+                                                stream_has_capability(host->sender, STREAM_CAP_DYNCFG),
+                                                stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
+                                                    rrdhost_can_stream_metadata_to_parent(host));
 
     // send it as STREAM_TRAFFIC_TYPE_METADATA, not STREAM_TRAFFIC_TYPE_FUNCTIONS
     // this is just metadata not an interactive function call

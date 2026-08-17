@@ -2,7 +2,6 @@
 
 #include "rrd.h"
 #include "rrdfunctions-internals.h"
-#include "streaming/protocol/commands.h"
 
 #define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
 
@@ -202,12 +201,18 @@ void rrd_functions_host_init(RRDHOST *host) {
     dictionary_register_delete_callback(functions->dict, rrd_functions_delete_callback, functions);
     dictionary_register_conflict_callback(functions->dict, rrd_functions_conflict_callback, functions);
 
+    // eagerly created: deleters include non-stream threads (e.g. dyncfg), so
+    // the set must exist for the whole registry lifetime, not on first use
+    spinlock_init(&functions->pending_dels.spinlock);
+    functions->pending_dels.dict = dictionary_create(DICT_OPTION_SINGLE_THREADED); // guarded by pending_dels.spinlock
+
     host->functions = functions;
 }
 
 void rrd_functions_host_destroy(RRDHOST *host) {
     if(!host->functions) return;
 
+    dictionary_destroy(host->functions->pending_dels.dict);
     dictionary_destroy(host->functions->dict);
     freez(host->functions);
     host->functions = NULL;
@@ -409,8 +414,21 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, RRD_FUNCTION_
     dictionary_del(host->functions->dict, key);
     dictionary_acquired_item_release(host->functions->dict, item);
 
-    if(!st && !is_dyncfg)
-        stream_send_function_del(host, key);
+    // Queue the FUNCTION_DEL for the streaming renderer instead of sending it
+    // synchronously: the deleting thread must never block on sender
+    // backpressure, and the renderer (which owns the wire format) drains the
+    // queue on the next flag poll or reconnect push. Ordering contract: insert
+    // BEFORE setting the flag - the renderer clears the flag first and then
+    // snapshots the set, so a del can never be stranded (see the struct
+    // comment in rrdfunctions-internals.h). Not populated when the host has no
+    // sender configured, else it would grow for the process lifetime on
+    // never-streaming hosts. dyncfg global deletes keep their quirk: they set
+    // the flag but never emit FUNCTION_DEL.
+    if(!st && !is_dyncfg && rrdhost_has_stream_sender_enabled(host)) {
+        spinlock_lock(&host->functions->pending_dels.spinlock);
+        dictionary_set(host->functions->pending_dels.dict, key, NULL, 0);
+        spinlock_unlock(&host->functions->pending_dels.spinlock);
+    }
 
     if(!st)
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);

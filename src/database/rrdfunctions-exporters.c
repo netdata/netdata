@@ -26,7 +26,22 @@ void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb) {
     dfe_done(t);
 }
 
-void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool dyncfg) {
+// Renders the parent-facing view of this host's global functions: first the
+// queued FUNCTION_DEL lines, then the full FUNCTION re-list - one buffer, one
+// commit by the caller. `can_function_del` is the streaming caller's verdict
+// (STREAM_CAP_FUNCTION_DEL + metadata readiness) - this renderer deliberately
+// knows nothing about streaming; when the verdict is false the snapshot is
+// DISCARDED, matching the old silent drop and preventing unbounded growth on
+// parents without FUNCDEL support.
+void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool dyncfg, bool can_function_del) {
+    // Ordering contract with rrd_function_del(): clear the flag FIRST, then
+    // snapshot-and-clear the pending set under its lock. The deleter inserts
+    // into the set BEFORE setting the flag, so a del landing after our
+    // snapshot re-sets the flag with its entry already queued - the next poll
+    // drains it; nothing is ever lost. NOTE: the two callers run on DIFFERENT
+    // threads (the flag poll on collection/receiver threads, the reconnect
+    // push on the sender thread) and can race each other too - the atomic
+    // flag ops and the pending-set spinlock are what make that safe.
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     // after the flag clear, so a NULL registry (archived host racing the sender's
@@ -35,10 +50,24 @@ void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool
     if(!host->functions)
         return;
 
+    struct rrd_functions *functions = host->functions;
+    spinlock_lock(&functions->pending_dels.spinlock);
+    if(dictionary_entries(functions->pending_dels.dict)) {
+        if(can_function_del) {
+            void *t;
+            dfe_start_read(functions->pending_dels.dict, t) {
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"%s\"\n", t_dfe.name);
+            }
+            dfe_done(t);
+        }
+        dictionary_flush(functions->pending_dels.dict);
+    }
+    spinlock_unlock(&functions->pending_dels.spinlock);
+
     size_t configs = 0;
 
     struct rrd_host_function *tmp;
-    dfe_start_read(host->functions->dict, tmp) {
+    dfe_start_read(functions->dict, tmp) {
         if(!rrd_function_is_available(tmp, host)) continue;
         if(tmp->options & RRD_FUNCTION_LOCAL) continue;
         if(tmp->options & RRD_FUNCTION_DYNCFG) {
