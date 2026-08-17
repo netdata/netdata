@@ -243,8 +243,12 @@ void dictionary_garbage_collect(DICTIONARY *dict) {
 size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict) {
     if(!dict) return 0;
 
-    internal_fatal(is_view_dictionary(dict),
-                   "DICTIONARY: dictionary_garbage_collect_and_deliver() does not support views");
+    // hard API misuse, same class (and same handling) as the view check in
+    // dictionary_set_and_acquire_item_advanced(): a view here would scan
+    // master items with is_view=false and skip the index wrlock the view GC
+    // path requires - silent corruption in release builds if merely internal
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: dictionary_garbage_collect_and_deliver() does not support views.");
 
     // the happy path pays nothing
     if(DICTIONARY_PENDING_DELETES_GET(dict) <= 0)

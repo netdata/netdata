@@ -152,6 +152,15 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
 
         rrd_function_transport_entry_release(template_transport_pin);
 
+        if(unlikely(!item)) {
+            // the nodes dictionary is destroyed - the job node cannot be
+            // created; the snapshot pin is released above and
+            // dyncfg_add_internal() unwound its own tmp, so nothing is held
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "DYNCFG: cannot add job '%s' - the dyncfg registry is not available", id);
+            return;
+        }
+
         // adding does not create df->dyncfg
         // we have to do it here
 

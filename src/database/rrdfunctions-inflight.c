@@ -189,13 +189,18 @@ static void rrd_inflight_async_function_register_canceller_cb(void *register_can
     // cancel after the transport's owner died acquire-fails on a valid (dead)
     // transport instead of chasing a freed pointer. Released in
     // rrd_functions_inflight_cleanup(). A re-registration (none exists today)
-    // releases the previous pin so it cannot leak.
-    rrd_function_transport_entry_acquire(canceller_cb_data);
+    // releases the previous pin so it cannot leak. entry-acquire cannot fail
+    // on a legally held pointer (it fatals on use-after-release); storing its
+    // returned pointer keeps the sites that fill a dedicated transport field
+    // shaped the same way (dyncfg_insert_cb, dyncfg_conflict_cb). The registry
+    // entry sites store the transport as execute_cb_data itself, so they have
+    // no separate field to fill.
+    struct rrd_function_transport *pinned = rrd_function_transport_entry_acquire(canceller_cb_data);
 
     spinlock_lock(&r->callbacks.spinlock);
     struct rrd_function_transport *previous = r->canceller.data;
     r->canceller.cb = canceller_cb;
-    r->canceller.data = canceller_cb_data;
+    r->canceller.data = pinned;
     spinlock_unlock(&r->callbacks.spinlock);
 
     rrd_function_transport_entry_release(previous);
@@ -205,12 +210,12 @@ static void rrd_inflight_async_function_register_progresser_cb(void *register_pr
     struct rrd_function_inflight *r = register_progresser_cb_data;
 
     // same contract, pin and re-registration handling as the canceller above
-    rrd_function_transport_entry_acquire(progresser_cb_data);
+    struct rrd_function_transport *pinned = rrd_function_transport_entry_acquire(progresser_cb_data);
 
     spinlock_lock(&r->callbacks.spinlock);
     struct rrd_function_transport *previous = r->progresser.data;
     r->progresser.cb = progresser_cb;
-    r->progresser.data = progresser_cb_data;
+    r->progresser.data = pinned;
     spinlock_unlock(&r->callbacks.spinlock);
 
     rrd_function_transport_entry_release(previous);

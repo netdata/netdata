@@ -73,9 +73,11 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
 
     // the tmp carried the plugin transport RAW (unpinned); the pin belongs to
     // the NODE and is taken here, inside the insert callback - never on the
-    // tmp - so conflict losers hold nothing to leak
-    if(df->transport)
-        rrd_function_transport_entry_acquire(df->transport);
+    // tmp - so conflict losers hold nothing to leak. entry-acquire returns its
+    // argument (NULL-safe, fatals on use-after-release); storing the returned
+    // pointer keeps the sites that fill a dedicated transport field shaped the
+    // same way (dyncfg_conflict_cb, the inflight canceller/progresser pins)
+    df->transport = rrd_function_transport_entry_acquire(df->transport);
 
     const char *id = dictionary_acquired_item_name(item);
     size_t buf_size = strlen(id) + 20;
@@ -272,7 +274,16 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
         .transport = transport,     // RAW - the insert/transfer callbacks pin it
     };
 
-    return dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), &overwrite_cb);
+    const DICTIONARY_ITEM *item =
+        dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), &overwrite_cb);
+    if(unlikely(!item)) {
+        // dictionary destroyed - neither the insert nor the conflict callback
+        // ran, so tmp's STRINGs are still ours and the RAW transport was never
+        // pinned; unwind cleanly (same shape as rrd_function_add)
+        string_freez(tmp.path);
+        string_freez(tmp.current.source);
+    }
+    return item;
 }
 
 static void dyncfg_send_updates(const char *id) {
@@ -416,6 +427,15 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds,
                                                       created_ut, modified_ut, sync, view_access, edit_access,
                                                       execute_cb, execute_cb_data, transport, true);
+    if(unlikely(!item)) {
+        // the nodes dictionary is destroyed - no callback ran, so the RAW
+        // `transport` was never pinned, and dyncfg_add_internal() already
+        // unwound its tmp STRINGs; nothing is held here
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "DYNCFG: cannot add configuration '%s' - the dyncfg registry is not available", id);
+        return false;
+    }
+
     DYNCFG *df = dictionary_acquired_item_value(item);
 
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)

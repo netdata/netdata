@@ -14,9 +14,10 @@ bool dyncfg_available_for_rrdhost(RRDHOST *host);
 void dyncfg_host_init(RRDHOST *host);
 
 // low-level API used by plugins.d and high-level API.
-// `transport` must be set (to the plugin's function transport) when
-// execute_cb_data is one - i.e. by the pluginsd CONFIG path - and NULL for
-// every other caller; it becomes the node's pinned transport (see DYNCFG)
+// `transport` must be the plugin's function transport when `execute_cb_data`
+// is that same transport - i.e. only on the pluginsd CONFIG path; every other
+// caller passes NULL. When set it becomes the node's pinned transport (see
+// the DYNCFG struct).
 struct rrd_function_transport;
 bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type,
                           DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds,
