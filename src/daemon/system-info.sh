@@ -163,6 +163,7 @@ load_os_release() {
             os_release_value="${os_release_unescaped}"
             ;;
           \'*\') os_release_value="${os_release_value#\'}"; os_release_value="${os_release_value%\'}" ;;
+          *) ;;
         esac
         case "${os_release_scope}:${os_release_key}" in
           CONTAINER:NAME) CONTAINER_NAME="${os_release_value}" ;;
@@ -181,8 +182,10 @@ load_os_release() {
           HOST:VERSION_CODENAME) HOST_VERSION_CODENAME="${os_release_value}" ;;
           HOST:VARIANT) HOST_VARIANT="${os_release_value}" ;;
           HOST:BUILD_ID) HOST_BUILD_ID="${os_release_value}" ;;
+          *) ;;
         esac
         ;;
+      *) ;;
     esac
   done < "${os_release_file}"
 
@@ -205,13 +208,16 @@ load_lsb_release() {
         case "${lsb_release_value}" in
           \"*\") lsb_release_value="${lsb_release_value#\"}"; lsb_release_value="${lsb_release_value%\"}" ;;
           \'*\') lsb_release_value="${lsb_release_value#\'}"; lsb_release_value="${lsb_release_value%\'}" ;;
+          *) ;;
         esac
         case "${lsb_release_key}" in
           DISTRIB_ID) DISTRIB_ID="${lsb_release_value}" ;;
           DISTRIB_RELEASE) DISTRIB_RELEASE="${lsb_release_value}" ;;
           DISTRIB_CODENAME) DISTRIB_CODENAME="${lsb_release_value}" ;;
+          *) ;;
         esac
         ;;
+      *) ;;
     esac
   done < "${lsb_release_file}"
 
