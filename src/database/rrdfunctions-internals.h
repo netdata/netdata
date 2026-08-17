@@ -16,6 +16,14 @@ typedef enum __attribute__((packed)) {
     // this is 8-bit
 } RRD_FUNCTION_OPTIONS;
 
+// The per-host function registry behind the opaque RRD_FUNCTIONS handle.
+// It owns the definitions dictionary; the host back-pointer is what the
+// dictionary callbacks use to reach the host they serve.
+struct rrd_functions {
+    RRDHOST *host;                  // back-pointer for the dictionary callbacks
+    DICTIONARY *dict;               // the function definitions, keyed by sanitized name
+};
+
 struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
     bool unregistered;              // when true, the function is unavailable
@@ -42,7 +50,13 @@ static inline size_t rrd_functions_strlen_bounded(const char *s, size_t max) {
     return len;
 }
 
+// RRD_FUNCTION_ACQUIRED is an acquired item of the registry dictionary - the
+// handle type is opaque outside the module, these helpers unwrap it inside.
+static inline struct rrd_host_function *rrd_function_acquired_value(RRD_FUNCTION_ACQUIRED *rfa) {
+    return dictionary_acquired_item_value((const DICTIONARY_ITEM *)rfa);
+}
+
 bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
-int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item);
+int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, RRD_FUNCTION_ACQUIRED **out_acquired);
 
 #endif //NETDATA_RRDFUNCTIONS_INTERNALS_H

@@ -16,6 +16,7 @@ struct rrdset;
 typedef struct rrdhost RRDHOST;
 typedef struct ml_host rrd_ml_host_t;
 typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
+typedef struct rrd_functions RRD_FUNCTIONS;
 
 //#include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
@@ -355,7 +356,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // Support for functions
-    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
+    RRD_FUNCTIONS *functions;                       // the host's function registry, can be NULL
 
     // ------------------------------------------------------------------------
     // indexes

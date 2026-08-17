@@ -66,8 +66,15 @@ typedef int (*rrd_function_execute_cb_t)(struct rrd_function_execute *rfe, void 
 
 struct rrd_host_function;
 
+// opaque handle to an acquired function registry entry - the entry cannot be
+// freed while the handle is held (idiom: RRDSET_ACQUIRED, RRDHOST_ACQUIRED)
+typedef struct rrd_function_acquired RRD_FUNCTION_ACQUIRED;
+
 void rrd_functions_host_init(RRDHOST *host);
 void rrd_functions_host_destroy(RRDHOST *host);
+
+// release a handle acquired via rrd_function_verify_access()
+void rrd_function_acquired_release(RRDHOST *host, RRD_FUNCTION_ACQUIRED *rfa);
 
 // add a function, to be run from the collector
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
@@ -91,13 +98,13 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 // Verify the caller may invoke `cmd` on `host`, applying the same RESTRICTED and access-level
 // checks rrd_function_run() enforces, WITHOUT executing the function. This lets non-execution
 // paths (e.g. MCP metadata/help generation) authorize a caller before disclosing anything.
-// On success returns HTTP_RESP_OK; if out_acquired != NULL it receives an acquired dictionary
-// item the caller MUST release with dictionary_acquired_item_release(host->functions, *out_acquired),
-// otherwise the item is released internally. On failure it writes the error into result_wb,
-// releases any acquired item, sets *out_acquired (if any) to NULL, and returns the HTTP code.
+// On success returns HTTP_RESP_OK; if out_acquired != NULL it receives an acquired registry
+// handle the caller MUST release with rrd_function_acquired_release(host, *out_acquired),
+// otherwise the handle is released internally. On failure it writes the error into result_wb,
+// releases any acquired handle, sets *out_acquired (if any) to NULL, and returns the HTTP code.
 int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
-                              const DICTIONARY_ITEM **out_acquired);
+                              RRD_FUNCTION_ACQUIRED **out_acquired);
 
 // Regression test for rrd_function_verify_access() access gating (GHSA-6628-vxm3-4g8g).
 // Requires a prepared RRD (localhost). Returns the number of failures (0 = pass).

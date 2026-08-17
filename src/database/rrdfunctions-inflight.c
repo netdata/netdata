@@ -20,7 +20,7 @@ struct rrd_function_inflight {
 
     BUFFER *payload;
 
-    const DICTIONARY_ITEM *host_function_acquired;
+    RRD_FUNCTION_ACQUIRED *host_function_acquired;
 
     // the collector
     // we acquire this structure at the beginning,
@@ -94,7 +94,7 @@ static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe
     // internal_error(true, "FUNCTIONS: transaction '%s' finished", r->transaction);
 
     rrd_functions_inflight_cleanup(r);
-    dictionary_acquired_item_release(r->host->functions, r->host_function_acquired);
+    rrd_function_acquired_release(r->host, r->host_function_acquired);
 }
 
 static void rrd_functions_inflight_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -155,7 +155,7 @@ static void rrd_inflight_async_function_register_progresser_cb(void *register_pr
 
 struct rrd_function_call_wait {
     RRDHOST *host;
-    const DICTIONARY_ITEM *host_function_acquired;
+    RRD_FUNCTION_ACQUIRED *host_function_acquired;
     char *transaction;
 
     bool free_with_signal;
@@ -410,7 +410,7 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 
 int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
-                              const DICTIONARY_ITEM **out_acquired) {
+                              RRD_FUNCTION_ACQUIRED **out_acquired) {
 
     if(out_acquired)
         *out_acquired = NULL;
@@ -422,18 +422,18 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
 
-    const DICTIONARY_ITEM *host_function_acquired = NULL;
+    RRD_FUNCTION_ACQUIRED *host_function_acquired = NULL;
     int code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
     if(code != HTTP_RESP_OK)
         return code;
 
-    struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
+    struct rrd_host_function *rdcf = rrd_function_acquired_value(host_function_acquired);
 
     if((rdcf->options & RRD_FUNCTION_RESTRICTED) && !allow_restricted) {
         code = rrd_call_function_error(result_wb,
                                        "This feature is not available via this API.",
                                        HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
-        dictionary_acquired_item_release(host->functions, host_function_acquired);
+        rrd_function_acquired_release(host, host_function_acquired);
         return code;
     }
 
@@ -471,14 +471,14 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
         }
 
-        dictionary_acquired_item_release(host->functions, host_function_acquired);
+        rrd_function_acquired_release(host, host_function_acquired);
         return code;
     }
 
     if(out_acquired)
         *out_acquired = host_function_acquired;
     else
-        dictionary_acquired_item_release(host->functions, host_function_acquired);
+        rrd_function_acquired_release(host, host_function_acquired);
 
     return HTTP_RESP_OK;
 }
@@ -493,7 +493,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
-    const DICTIONARY_ITEM *host_function_acquired = NULL;
+    RRD_FUNCTION_ACQUIRED *host_function_acquired = NULL;
 
     const char *source_to_sanitize = source ? source : "";
     size_t sanitized_source_size = rrd_functions_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
@@ -527,7 +527,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         return code;
     }
 
-    struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
+    struct rrd_host_function *rdcf = rrd_function_acquired_value(host_function_acquired);
 
     if(timeout_s <= 0)
         timeout_s = rdcf->timeout;
@@ -587,7 +587,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         code = rrd_call_function_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
 
         rrd_functions_inflight_cleanup(&t);
-        dictionary_acquired_item_release(host->functions, t.host_function_acquired);
+        rrd_function_acquired_release(host, t.host_function_acquired);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);
@@ -603,7 +603,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         code = rrd_call_function_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
 
         rrd_functions_inflight_cleanup(&t);
-        dictionary_acquired_item_release(host->functions, t.host_function_acquired);
+        rrd_function_acquired_release(host, t.host_function_acquired);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);

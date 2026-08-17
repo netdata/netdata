@@ -89,7 +89,7 @@ int rrdfunctions_verify_access_unittest(void) {
     int errors = 0;
     for(size_t i = 0; i < _countof(cases); i++) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        const DICTIONARY_ITEM *item = (const DICTIONARY_ITEM *)(uintptr_t)0x1; // poison: verify it is reset
+        RRD_FUNCTION_ACQUIRED *item = (RRD_FUNCTION_ACQUIRED *)(uintptr_t)0x1; // poison: verify it is reset
 
         int code = rrd_function_verify_access(cases[i].host, wb, cases[i].fn,
                                               cases[i].user_access, cases[i].allow_restricted, &item);
@@ -133,7 +133,7 @@ int rrdfunctions_verify_access_unittest(void) {
             body_ok = true;
 
         if(item)
-            dictionary_acquired_item_release(cases[i].host->functions, item);
+            rrd_function_acquired_release(cases[i].host, item);
 
         if(ok && item_ok && body_ok)
             fprintf(stderr, "  OK case %zu: %s (access 0x%x, allow_restricted=%d) -> %d\n",

@@ -8,13 +8,15 @@
 
 // ----------------------------------------------------------------------------
 
-// we keep a dictionary per RRDSET with these functions
-// the dictionary is created on demand (only when a function is added to an RRDSET)
+// each host owns a function registry (RRD_FUNCTIONS) holding its function
+// definitions; an RRDSET gets a view into it on demand (only when a function
+// is added to that RRDSET)
 
 // ----------------------------------------------------------------------------
 
-static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *rrdhost) {
-    RRDHOST *host = rrdhost;
+static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *data) {
+    struct rrd_functions *functions = data;
+    RRDHOST *host = functions->host;
     struct rrd_host_function *rdcf = func;
 
     rrd_collector_started();
@@ -37,14 +39,15 @@ static void rrd_functions_cleanup(struct rrd_host_function *rdcf) {
 }
 
 static void rrd_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
-                                          void *rrdhost __maybe_unused) {
+                                          void *data __maybe_unused) {
     struct rrd_host_function *rdcf = func;
     rrd_functions_cleanup(rdcf);
 }
 
 static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func,
-                                            void *new_func, void *rrdhost) {
-    RRDHOST *host = rrdhost; (void)host;
+                                            void *new_func, void *data) {
+    struct rrd_functions *functions = data;
+    RRDHOST *host = functions->host; (void)host;
     struct rrd_host_function *rdcf = func;
     struct rrd_host_function *new_rdcf = new_func;
 
@@ -186,17 +189,29 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 void rrd_functions_host_init(RRDHOST *host) {
     if(host->functions) return;
 
-    host->functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+    struct rrd_functions *functions = callocz(1, sizeof(struct rrd_functions));
+    functions->host = host;
+    functions->dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                  &dictionary_stats_category_functions, sizeof(struct rrd_host_function));
 
-    dictionary_register_insert_callback(host->functions, rrd_functions_insert_callback, host);
-    dictionary_register_delete_callback(host->functions, rrd_functions_delete_callback, host);
-    dictionary_register_conflict_callback(host->functions, rrd_functions_conflict_callback, host);
+    dictionary_register_insert_callback(functions->dict, rrd_functions_insert_callback, functions);
+    dictionary_register_delete_callback(functions->dict, rrd_functions_delete_callback, functions);
+    dictionary_register_conflict_callback(functions->dict, rrd_functions_conflict_callback, functions);
+
+    host->functions = functions;
 }
 
 void rrd_functions_host_destroy(RRDHOST *host) {
-    dictionary_destroy(host->functions);
+    if(!host->functions) return;
+
+    dictionary_destroy(host->functions->dict);
+    freez(host->functions);
     host->functions = NULL;
+}
+
+void rrd_function_acquired_release(RRDHOST *host, RRD_FUNCTION_ACQUIRED *rfa) {
+    if(!rfa) return;
+    dictionary_acquired_item_release(host->functions->dict, (const DICTIONARY_ITEM *)rfa);
 }
 
 // ----------------------------------------------------------------------------
@@ -248,7 +263,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     }
 
     if(st && !st->functions_view)
-        st->functions_view = dictionary_create_view(host->functions);
+        st->functions_view = dictionary_create_view(host->functions->dict);
 
     size_t key_size = rrd_functions_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
@@ -284,14 +299,14 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .help = string_strdupz(help),
         .tags = string_strdupz(tags),
     };
-    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions, key, &tmp, sizeof(tmp));
+    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->functions->dict, key, &tmp, sizeof(tmp));
 
     if(st)
         dictionary_view_set(st->functions_view, key, item);
     else
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
-    dictionary_acquired_item_release(host->functions, item);
+    dictionary_acquired_item_release(host->functions->dict, item);
 
     // Refresh the cloud function manifest. Only DYNCFG is excluded: it is derived from the
     // key, so such an entry can never enter or leave the manifest. RESTRICTED comes from the
@@ -310,7 +325,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     CLEAN_CHAR_P *key = mallocz(key_size);
     rrd_functions_sanitize(key, name, key_size);
 
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions, key);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions->dict, key);
     if(!item)
         return false;
 
@@ -324,7 +339,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
                    name,
                    rdcf->collector ? "another collector" : "unknown",
                    thread_rrd_collector ? "current collector" : "non-collector thread");
-            dictionary_acquired_item_release(host->functions, item);
+            dictionary_acquired_item_release(host->functions->dict, item);
             return false;
         }
     }
@@ -344,7 +359,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     if(!internal && is_dyncfg) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "FUNCTIONS: refusing to unregister dyncfg function '%s' via FUNCTION_DEL", name);
-        dictionary_acquired_item_release(host->functions, item);
+        dictionary_acquired_item_release(host->functions->dict, item);
         return false;
     }
 
@@ -363,8 +378,8 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     // resurrect it through the conflict callback (a re-add now allocates a fresh
     // item). The value is freed once the last reference - this one plus any
     // in-flight execution - is released.
-    dictionary_del(host->functions, key);
-    dictionary_acquired_item_release(host->functions, item);
+    dictionary_del(host->functions->dict, key);
+    dictionary_acquired_item_release(host->functions->dict, item);
 
     if(!st && !is_dyncfg)
         stream_send_function_del(host, key);
@@ -372,7 +387,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     if(!st)
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
-    dictionary_garbage_collect(host->functions);
+    dictionary_garbage_collect(host->functions->dict);
 
     // after the delete, so the arm always follows the change it reports
     if(in_manifest)
@@ -394,7 +409,7 @@ bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host) {
     return true;
 }
 
-int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item) {
+int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, RRD_FUNCTION_ACQUIRED **out_acquired) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
     strncpyz(buffer, name, sizeof(buffer) - 1);
     key_length = strnlen(buffer, sizeof(buffer));
@@ -404,13 +419,13 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
 
     bool found = false;
     bool was_unregistered = false;
-    *item = NULL;
+    const DICTIONARY_ITEM *item = NULL;
     if(host->functions) {
         while (buffer[0]) {
-            if((*item = dictionary_get_and_acquire_item(host->functions, buffer))) {
+            if((item = dictionary_get_and_acquire_item(host->functions->dict, buffer))) {
                 found = true;
 
-                struct rrd_host_function *rdcf = dictionary_acquired_item_value(*item);
+                struct rrd_host_function *rdcf = dictionary_acquired_item_value(item);
                 if(rrd_function_is_available(rdcf, host)) {
                     break;
                 }
@@ -429,8 +444,8 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                            );
 
                     was_unregistered = __atomic_load_n(&rdcf->unregistered, __ATOMIC_ACQUIRE);
-                    dictionary_acquired_item_release(host->functions, *item);
-                    *item = NULL;
+                    dictionary_acquired_item_release(host->functions->dict, item);
+                    item = NULL;
                 }
             }
 
@@ -449,7 +464,9 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
 
     buffer_flush(wb);
 
-    if(!(*item)) {
+    *out_acquired = (RRD_FUNCTION_ACQUIRED *)item;
+
+    if(!item) {
         if(found) {
             if(was_unregistered)
                 return rrd_call_function_error(wb,
@@ -474,13 +491,13 @@ bool rrd_function_available(RRDHOST *host, const char *function) {
         return false;
 
     bool ret = false;
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions, function);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions->dict, function);
     if(item) {
         struct rrd_host_function *rdcf = dictionary_acquired_item_value(item);
         if(rrd_function_is_available(rdcf, host))
             ret = true;
 
-        dictionary_acquired_item_release(host->functions, item);
+        dictionary_acquired_item_release(host->functions->dict, item);
     }
 
     return ret;

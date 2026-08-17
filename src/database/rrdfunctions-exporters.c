@@ -29,10 +29,16 @@ void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb) {
 void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool dyncfg) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
+    // after the flag clear, so a NULL registry (archived host racing the sender's
+    // flag poll) behaves exactly like the old NULL-tolerant dictionary traversal:
+    // flag cleared, nothing emitted
+    if(!host->functions)
+        return;
+
     size_t configs = 0;
 
     struct rrd_host_function *tmp;
-    dfe_start_read(host->functions, tmp) {
+    dfe_start_read(host->functions->dict, tmp) {
         if(!rrd_function_is_available(tmp, host)) continue;
         if(tmp->options & RRD_FUNCTION_LOCAL) continue;
         if(tmp->options & RRD_FUNCTION_DYNCFG) {
@@ -100,7 +106,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
     buffer_json_member_add_object(wb, "functions");
 
     struct rrd_host_function *t;
-    dfe_start_read(host->functions, t) {
+    dfe_start_read(host->functions->dict, t) {
         if(!rrd_function_is_available(t, host)) continue;
         if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
 
@@ -143,10 +149,10 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
 
 void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size,
                             STRING **help, STRING **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
-    if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
+    if(!host || !host->functions || !dictionary_entries(host->functions->dict) || !dst) return;
 
     struct rrd_host_function *t;
-    dfe_start_read(host->functions, t) {
+    dfe_start_read(host->functions->dict, t) {
         if(!rrd_function_is_available(t, host)) continue;
         if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
 
@@ -190,10 +196,10 @@ DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
     DICTIONARY *dst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_register_delete_callback(dst, manifest_entry_delete_cb, NULL);
 
-    if(!host || !host->functions || !dictionary_entries(host->functions)) return dst;
+    if(!host || !host->functions || !dictionary_entries(host->functions->dict)) return dst;
 
     struct rrd_host_function *t;
-    dfe_start_read(host->functions, t) {
+    dfe_start_read(host->functions->dict, t) {
         if(!rrd_function_is_available(t, host)) continue;
         if(t->options & (RRD_FUNCTION_DYNCFG | RRD_FUNCTION_RESTRICTED)) continue;
 
