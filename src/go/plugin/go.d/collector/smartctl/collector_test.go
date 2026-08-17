@@ -650,13 +650,23 @@ func TestCollector_NormalizedDeviceIdentityDoesNotAlias(t *testing.T) {
 	)
 
 	collectIDs := func(t *testing.T, concurrentScans int) map[string]string {
+		responses := map[string][]byte{
+			whitespaceName: replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", whitespaceName),
+			underscoreName: replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", underscoreName),
+		}
 		collr := New()
 		collr.ConcurrentScans = concurrentScans
 		collr.exec = &mockSmartctlCliExec{
 			scanData: nvmeScanData(t, whitespaceName, underscoreName),
 			deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
-				require.Equal(t, "nvme", deviceType)
-				return replaceFixtureValue(t, dataTypeNvmeDeviceNvme0, "/dev/nvme0", name), nil
+				if deviceType != "nvme" {
+					return nil, fmt.Errorf("unexpected device type %q", deviceType)
+				}
+				response, ok := responses[name]
+				if !ok {
+					return nil, fmt.Errorf("unexpected device name %q", name)
+				}
+				return response, nil
 			},
 		}
 
@@ -863,7 +873,9 @@ func TestCollector_AttachmentCollisionDoesNotRecordOrphanState(t *testing.T) {
 			collr.exec = &mockSmartctlCliExec{
 				scanData: nvmeScanData(t, "/dev/alias0", "/dev/alias1"),
 				deviceDataFunc: func(_, deviceType, _ string) ([]byte, error) {
-					require.Equal(t, "nvme", deviceType)
+					if deviceType != "nvme" {
+						return nil, fmt.Errorf("unexpected device type %q", deviceType)
+					}
 					return dataTypeNvmeDeviceNvme0, nil
 				},
 			}
