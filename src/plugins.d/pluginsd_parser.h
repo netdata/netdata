@@ -139,7 +139,7 @@ struct parser {
     } defer;
 
     struct {
-        DICTIONARY *functions;
+        DICTIONARY *calls;
         usec_t smaller_monotonic_timeout_ut;
 
         // the refcounted lifetime shell handed to everyone who may need to

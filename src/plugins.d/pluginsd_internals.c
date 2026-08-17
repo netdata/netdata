@@ -59,7 +59,7 @@ void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     parser_init_repertoire(parser, repertoire);
 
     if (repertoire & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING))
-        pluginsd_inflight_functions_init(parser);
+        pluginsd_calls_init(parser);
 }
 
 void parser_destroy(PARSER *parser) {
@@ -70,7 +70,7 @@ void parser_destroy(PARSER *parser) {
     //    item (forcing a 2xx code to 503 - a truncated stream must not report
     //    success) so the sweep below can deliver it and the dictionary is not
     //    queued-for-destruction forever behind our reference
-    pluginsd_inflight_functions_release_deferred(parser);
+    pluginsd_calls_release_deferred(parser);
 
     // 2. mark the transport dead and drain the dispatchers: after this no
     //    execute/cancel/progress/GC holds or can acquire the parser.
@@ -89,7 +89,7 @@ void parser_destroy(PARSER *parser) {
 
     // 3. destroy the container: pre-destroy drain + the destroy-time 503
     //    sweep answer every caller still waiting on this plugin
-    pluginsd_inflight_functions_cleanup(parser);
+    pluginsd_calls_cleanup(parser);
 
     // 4. free the parser, THEN drop the transport's base ref: survivors
     //    (registry entries, dyncfg nodes, broker pins) keep holding a valid

@@ -33,7 +33,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
         HTTP_ACCESS edit_access = http_access_from_hex(edit_permissions_str);
 
         // UAF-C fix: the node stores the plugin's TRANSPORT, not the raw
-        // parser - both as the execute data (pluginsd_function_execute_cb
+        // parser - both as the execute data (pluginsd_nrpc_handler
         // expects it and does acquire-or-503) and as the node's pinned
         // transport, so the node outliving the parser holds a valid (dead)
         // transport instead of a dangling parser pointer
@@ -51,7 +51,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
                 false,
                 view_access,
                 edit_access,
-                pluginsd_function_execute_cb,
+                pluginsd_nrpc_handler,
                 parser->inflight.transport,
                 parser->inflight.transport))
             return PARSER_RC_ERROR;

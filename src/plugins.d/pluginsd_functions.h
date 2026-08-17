@@ -6,7 +6,7 @@
 #include "pluginsd_internals.h"
 #include "database/nrpc-transport.h"
 
-struct inflight_function {
+struct pluginsd_call {
     nd_uuid_t transaction;
 
     int code;
@@ -48,11 +48,11 @@ PARSER_RC pluginsd_function_del(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *parser);
 
-void pluginsd_inflight_functions_init(PARSER *parser);
-void pluginsd_inflight_functions_cleanup(PARSER *parser);
-void pluginsd_inflight_functions_release_deferred(PARSER *parser);
-void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut);
+void pluginsd_calls_init(PARSER *parser);
+void pluginsd_calls_cleanup(PARSER *parser);
+void pluginsd_calls_release_deferred(PARSER *parser);
+void pluginsd_calls_garbage_collect(PARSER  *parser, usec_t now_ut);
 
-int pluginsd_function_execute_cb(struct nrpc_request *req, void *data);
+int pluginsd_nrpc_handler(struct nrpc_request *req, void *data);
 
 #endif //NETDATA_PLUGINSD_FUNCTIONS_H

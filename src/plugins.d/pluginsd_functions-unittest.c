@@ -176,7 +176,7 @@ struct c6ut_gc_race {
 
 static void c6ut_gc_race_thread(void *arg) {
     struct c6ut_gc_race *g = arg;
-    pluginsd_inflight_functions_garbage_collect(g->parser, g->now_ut);
+    pluginsd_calls_garbage_collect(g->parser, g->now_ut);
 }
 
 static PARSER *c6ut_parser_create(struct c6ut_sends *sends) {
@@ -216,7 +216,7 @@ static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec
         },
     };
 
-    return pluginsd_function_execute_cb(&req, parser->inflight.transport);
+    return pluginsd_nrpc_handler(&req, parser->inflight.transport);
 }
 
 // drive one function call into the parser's transport, returning the compact
@@ -402,7 +402,7 @@ int pluginsd_functions_unittest(void) {
         // the function is served by the pluginsd transport, as in production
         nrpc_method_register(host, NULL, "c6-gc-mid-defer-fn", 1, 0, 1, "gc", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_function_execute_cb, parser->inflight.transport);
+                         pluginsd_nrpc_handler, parser->inflight.transport);
 
         // our own transaction id, so RESULT_BEGIN can reference it
         nd_uuid_t uuid;
@@ -426,7 +426,7 @@ int pluginsd_functions_unittest(void) {
         // then run the GC: the defer's reference keeps the parser record
         // alive, so the GC's delete only marks it pending - no delivery yet
         sleep_usec(2200 * USEC_PER_MS);
-        pluginsd_inflight_functions_garbage_collect(parser, now_monotonic_usec());
+        pluginsd_calls_garbage_collect(parser, now_monotonic_usec());
 
         if(res.calls != 0) {
             fprintf(stderr, "  FAILED gc-mid-defer: GC delivered %zu times while the defer holds the record\n", res.calls);
@@ -564,7 +564,7 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_method_register(host, NULL, "c6-gc-race-fn", 1, 0, 1, "gc", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_function_execute_cb, parser->inflight.transport);
+                         pluginsd_nrpc_handler, parser->inflight.transport);
 
         for(size_t i = 0; i < 50 && errors == before; i++) {
             size_t cancels_before = sends.cancels;
@@ -684,7 +684,7 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_method_register(host, NULL, "c7-dead-transport-fn", 10, 0, 1, "dead", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_function_execute_cb, tr);
+                         pluginsd_nrpc_handler, tr);
 
         // the owner tears down: dispatchers drained and `data` invalidated,
         // while the registry entry keeps holding the (dead) transport
@@ -913,7 +913,7 @@ int pluginsd_functions_unittest(void) {
                     res.calls, res.code);
             errors++;
         }
-        if(dictionary_entries(parser->inflight.functions) != 0) {
+        if(dictionary_entries(parser->inflight.calls) != 0) {
             fprintf(stderr, "  FAILED send-fail: the record survived a failed send\n");
             errors++;
         }
@@ -959,7 +959,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        pluginsd_inflight_functions_garbage_collect(parser, now_monotonic_usec() + 3600 * USEC_PER_SEC);
+        pluginsd_calls_garbage_collect(parser, now_monotonic_usec() + 3600 * USEC_PER_SEC);
 
         if(res.calls) {
             fprintf(stderr, "  FAILED gc-skip: an explicit GC pass reaped the record anyway (calls %zu)\n", res.calls);
@@ -969,7 +969,7 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  FAILED gc-skip: a CANCEL was sent for a record the GC must not touch\n");
             errors++;
         }
-        if(dictionary_entries(parser->inflight.functions) != 1) {
+        if(dictionary_entries(parser->inflight.calls) != 1) {
             fprintf(stderr, "  FAILED gc-skip: the skipped record left the dictionary\n");
             errors++;
         }
@@ -1001,7 +1001,7 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_method_register(host, NULL, "c7-grace-fn", 10, 0, 1, "grace", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_function_execute_cb, parser->inflight.transport);
+                         pluginsd_nrpc_handler, parser->inflight.transport);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         usec_t t0 = now_monotonic_usec();
@@ -1015,7 +1015,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         // 100ms before the deadline+grace: nothing may happen
-        pluginsd_inflight_functions_garbage_collect(parser, t0 + 10 * USEC_PER_SEC + 900 * USEC_PER_MS);
+        pluginsd_calls_garbage_collect(parser, t0 + 10 * USEC_PER_SEC + 900 * USEC_PER_MS);
         if(sends.cancels || res.calls) {
             fprintf(stderr, "  FAILED grace: a transaction inside the grace window was cancelled"
                             " (%zu cancels, %zu deliveries)\n", sends.cancels, res.calls);
@@ -1023,7 +1023,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         // 500ms past it: cancelled once and timed out
-        pluginsd_inflight_functions_garbage_collect(parser, t0 + 11 * USEC_PER_SEC + 500 * USEC_PER_MS);
+        pluginsd_calls_garbage_collect(parser, t0 + 11 * USEC_PER_SEC + 500 * USEC_PER_MS);
         if(sends.cancels != 1) {
             fprintf(stderr, "  FAILED grace: %zu CANCELs past the grace window, expected 1\n", sends.cancels);
             errors++;
