@@ -929,7 +929,11 @@
   },
   {
     "name": "CASE-038/higher-tier-only-rate-volume",
-    "proves": "archived dense and alternating-gap incremental metrics with no tier-0 retention or pre-restart live/cache state still return exact fixture-measured rate volume from retained tier 1. Forced-tier and automatic queries require zero tier-0 retention and reads, covering tier-1 retention and reads, the exact requested timestamp grid, and exact PA: dense rows clean, every gapped numeric row PARTIAL"
+    "proves": "archived dense and alternating-gap incremental metrics with no tier-0 retention or pre-restart live/cache state still return exact fixture-measured rate volume from retained tier 1. Forced-tier and automatic queries require zero tier-0 retention and reads, covering tier-1 retention and reads and the exact requested timestamp grid"
+  },
+  {
+    "name": "CASE-038/higher-tier-only-rate-partial-evidence",
+    "proves": "archived dense and alternating-gap incremental metrics with no tier-0 retention or pre-restart live/cache state preserve exact row evidence from retained tier 1 in both forced-tier and automatic queries: dense numeric rows remain clean and every gapped numeric row is PARTIAL"
   },
   {
     "name": "CASE-019/v1-json-name-escaping",

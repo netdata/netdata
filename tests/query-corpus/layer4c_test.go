@@ -755,7 +755,8 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	})
 
 	t.Run("higher-tier-only-rate-volume", func(t *testing.T) {
-		trackContract(t, "CASE-038/higher-tier-only-rate-volume")
+		registerContract(t, "CASE-038/higher-tier-only-rate-volume")
+		registerContract(t, "CASE-038/higher-tier-only-rate-partial-evidence")
 
 		err := conn.Close()
 		conn = nil
@@ -766,8 +767,9 @@ func TestLayer4PlanSwitching(t *testing.T) {
 			t.Fatalf("restart dedicated daemon: %v", err)
 		}
 
-		assertContract(t, "CASE-038/higher-tier-only-rate-volume",
-			c038HigherTierOnlyRateVolume(t, dd))
+		valuesOK, evidenceOK := c038HigherTierOnlyRateVolume(t, dd)
+		assertContract(t, "CASE-038/higher-tier-only-rate-volume", valuesOK)
+		assertContract(t, "CASE-038/higher-tier-only-rate-partial-evidence", evidenceOK)
 	})
 }
 

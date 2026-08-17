@@ -79,7 +79,7 @@ func c038StoreArchivedRate(t *testing.T, dd *daemon.Daemon) {
 // dense rows cover every second. Gapped rows cover every other second and
 // must also carry PARTIAL. This proves legacy tier-1 gap reconstruction does
 // not depend on retained tier-0 samples or pre-restart live/cache state.
-func c038HigherTierOnlyRateVolume(t *testing.T, dd *daemon.Daemon) bool {
+func c038HigherTierOnlyRateVolume(t *testing.T, dd *daemon.Daemon) (bool, bool) {
 	t.Helper()
 
 	const (
@@ -88,7 +88,7 @@ func c038HigherTierOnlyRateVolume(t *testing.T, dd *daemon.Daemon) bool {
 	)
 	after := int64(fixture.T0 - fixture.T0%60) // absolute tier-1 boundary
 	before := after + rows*rowSpan
-	query := func(label, dimension string, selected, gapped bool) bool {
+	query := func(label, dimension string, selected, gapped bool) (bool, bool) {
 		t.Helper()
 
 		var params url.Values
@@ -117,16 +117,19 @@ func c038HigherTierOnlyRateVolume(t *testing.T, dd *daemon.Daemon) bool {
 				label, after, before, tiers[1])
 		}
 
-		ok := assertSelectedTier(t, doc, 1)
+		valuesOK, evidenceOK := true, true
+		if !assertSelectedTier(t, doc, 1) {
+			valuesOK, evidenceOK = false, false
+		}
 		if !assertExactView(t, doc, after, before, rowSpan) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		cols, err := canon.Columns(doc)
 		if err != nil {
 			t.Fatalf("%s columns: %v", label, err)
 		}
 		if !assertOnlyColumn(t, cols, dimension) {
-			ok = false
+			valuesOK, evidenceOK = false, false
 		}
 		wantPA := int64(0)
 		measuredSeconds := rowSpan
@@ -141,14 +144,17 @@ func c038HigherTierOnlyRateVolume(t *testing.T, dd *daemon.Daemon) bool {
 				float64(c038Rate)*float64(measuredSeconds),
 				wantPA)
 		}
-		if !assertExactColumn(t, cols, dimension, want, 0) {
+		if !assertExactColumnValues(t, cols, dimension, want, 0) {
 			t.Logf("%s did not preserve fixture rate x selected seconds", label)
-			ok = false
+			valuesOK = false
 		}
-		return ok
+		if !assertExactColumnMetadata(t, cols, dimension, want) {
+			evidenceOK = false
+		}
+		return valuesOK, evidenceOK
 	}
 
-	ok := true
+	valuesOK, evidenceOK := true, true
 	for _, shape := range []struct {
 		dimension string
 		gapped    bool
@@ -156,16 +162,26 @@ func c038HigherTierOnlyRateVolume(t *testing.T, dd *daemon.Daemon) bool {
 		{dimension: c038DenseDim},
 		{dimension: c038GappedDim, gapped: true},
 	} {
-		if !query("forced-tier-1/"+shape.dimension, shape.dimension, true, shape.gapped) {
-			ok = false
+		queryValuesOK, queryEvidenceOK := query(
+			"forced-tier-1/"+shape.dimension, shape.dimension, true, shape.gapped)
+		if !queryValuesOK {
+			valuesOK = false
 		}
-		if !query("automatic-tier/"+shape.dimension, shape.dimension, false, shape.gapped) {
-			ok = false
+		if !queryEvidenceOK {
+			evidenceOK = false
+		}
+		queryValuesOK, queryEvidenceOK = query(
+			"automatic-tier/"+shape.dimension, shape.dimension, false, shape.gapped)
+		if !queryValuesOK {
+			valuesOK = false
+		}
+		if !queryEvidenceOK {
+			evidenceOK = false
 		}
 	}
-	if !ok {
+	if !valuesOK {
 		t.Logf("expected dense rows to integrate %ds and gapped rows to integrate %ds",
 			rowSpan, rowSpan/2)
 	}
-	return ok
+	return valuesOK, evidenceOK
 }
