@@ -322,8 +322,13 @@ fi
 # Label-only OS metadata uses standard os-release keys. Do not infer an edition,
 # codename, or point release when the operating system does not provide one.
 HOST_OS_LABEL_NAME="${HOST_NAME}"
-HOST_OS_LABEL_VERSION="${HOST_VERSION_ID}"
-HOST_OS_LABEL_RELEASE="${HOST_VERSION_ID}"
+if [ -n "${HOST_VERSION_ID}" ] && [ "${HOST_VERSION_ID}" != "unknown" ] && [ "${HOST_VERSION_ID}" != "none" ]; then
+  HOST_OS_LABEL_VERSION="${HOST_VERSION_ID}"
+  HOST_OS_LABEL_RELEASE="${HOST_VERSION_ID}"
+else
+  HOST_OS_LABEL_VERSION="${HOST_VERSION}"
+  HOST_OS_LABEL_RELEASE="${HOST_VERSION}"
+fi
 HOST_OS_LABEL_CODENAME="${HOST_VERSION_CODENAME}"
 HOST_OS_LABEL_EDITION="${HOST_VARIANT}"
 HOST_OS_LABEL_BUILD="${HOST_BUILD_ID}"

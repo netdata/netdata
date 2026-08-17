@@ -355,31 +355,21 @@ void netdata_windows_format_os_version(char *out, size_t length, const char *pro
     (void)snprintf(out, length, "Microsoft %s", name);
 }
 
-static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build)
+static void netdata_windows_discover_os_version(char *os, size_t length, DWORD build,
+                                                const char *product_name, const char *display_version)
 {
-    char product_name[256];
-    if (netdata_registry_get_string(product_name,
-                                    sizeof(product_name) - 1,
-                                    HKEY_LOCAL_MACHINE,
-                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                    "ProductName")) {
+    if (product_name && *product_name) {
         netdata_windows_format_os_version(os, length, product_name, build, IsWindowsServer());
         return;
     }
 
-    char versionName[256];
-    if (!netdata_registry_get_string(versionName,
-                                    255,
-                                    HKEY_LOCAL_MACHINE,
-                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                    "DisplayVersion"))
-    {
+    if (!display_version || !*display_version) {
         (void)snprintf(os, length, "Microsoft Windows");
         return;
     }
 
     if (IsWindowsServer()) {
-        (void)snprintf(os, length, "Microsoft Windows Version %s", versionName);
+        (void)snprintf(os, length, "Microsoft Windows Version %s", display_version);
         return;
     }
 
@@ -426,32 +416,10 @@ static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD bui
     (void)snprintf(out, length, "Windows %u.%u.%u Build: %u", major, minor, build, build);
 }
 
-static char *netdata_windows_get_edition(void)
-{
-    static char edition[256] = {0};
-    
-    // Try to read EditionID first, which is more precise
-    if (netdata_registry_get_string(edition, sizeof(edition)-1, HKEY_LOCAL_MACHINE, 
-                                   "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 
-                                   "EditionID")) {
-        return edition;
-    }
-    
-    // If EditionID fails, try ProductName
-    if (netdata_registry_get_string(edition, sizeof(edition)-1, HKEY_LOCAL_MACHINE, 
-                                   "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 
-                                   "ProductName")) {
-        return edition;
-    }
-    
-    // Return unknown if both methods fail
-    return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
-}
-
-static char *netdata_windows_get_os_id_like(DWORD build)
+static const char *netdata_windows_get_os_id_like(DWORD build, const char *edition_id, const char *product_name)
 {
     static char id_like[256];
-    char *edition = netdata_windows_get_edition();
+    const char *edition = edition_id && *edition_id ? edition_id : product_name;
     const char *base_id = "";
     
     if (IsWindowsServer()) {
@@ -489,9 +457,10 @@ static char *netdata_windows_get_os_id_like(DWORD build)
     }
     
     // If we have a valid edition, append it to the ID_LIKE with a dash
-    if (strcmp(edition, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) != 0) {
+    if (edition && *edition) {
         snprintf(id_like, sizeof(id_like), "%s-%s", base_id, edition);
-    } else {
+    }
+    else {
         strcpy(id_like, base_id);
     }
     
@@ -534,17 +503,11 @@ static void netdata_windows_get_local_os_info(NETDATA_WINDOWS_OS_INFO *info)
 
     snprintf(info->name, sizeof(info->name), "%s", "Microsoft Windows");
 
-    DWORD build = netdata_windows_get_current_build();
-    netdata_windows_discover_os_version(info->id, sizeof(info->id), build);
-    snprintf(info->version, sizeof(info->version), "%s", info->id);
-    snprintf(info->version_id, sizeof(info->version_id), "%s", info->id);
-    snprintf(info->id_like, sizeof(info->id_like), "%s", netdata_windows_get_os_id_like(build));
-    snprintf(info->detection, sizeof(info->detection), "%s", NETDATA_WIN_DETECTION_METHOD);
-
     char product_name[256] = {0};
     char display_version[64] = {0};
     char edition_id[256] = {0};
     DWORD ubr = 0;
+    DWORD build = netdata_windows_get_current_build();
     bool has_ubr = netdata_windows_get_update_revision(&ubr);
     (void)netdata_registry_get_string(product_name, sizeof(product_name) - 1, HKEY_LOCAL_MACHINE,
                                       "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "ProductName");
@@ -552,6 +515,13 @@ static void netdata_windows_get_local_os_info(NETDATA_WINDOWS_OS_INFO *info)
                                       "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "DisplayVersion");
     (void)netdata_registry_get_string(edition_id, sizeof(edition_id) - 1, HKEY_LOCAL_MACHINE,
                                       "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "EditionID");
+
+    netdata_windows_discover_os_version(info->id, sizeof(info->id), build, product_name, display_version);
+    snprintf(info->version, sizeof(info->version), "%s", info->id);
+    snprintf(info->version_id, sizeof(info->version_id), "%s", info->id);
+    snprintf(info->id_like, sizeof(info->id_like), "%s",
+             netdata_windows_get_os_id_like(build, edition_id, product_name));
+    snprintf(info->detection, sizeof(info->detection), "%s", NETDATA_WIN_DETECTION_METHOD);
     netdata_windows_parse_os_labels(&info->labels, product_name, display_version, edition_id,
                                     build, ubr, has_ubr, IsWindowsServer());
 }
