@@ -13,6 +13,11 @@ void stream_send_global_functions(RRDHOST *host) {
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
+    // {render + commit} must be atomic against the flag-poll call site in
+    // stream_send_metrics_init() - see the global_functions_spinlock comment
+    // in stream-sender-internals.h
+    spinlock_lock(&host->sender->global_functions_spinlock);
+
     // the renderer drains the pending FUNCTION_DEL queue too; it needs our
     // verdict on whether the parent can accept FUNCTION_DEL (absorbed from the
     // old stream_send_function_del gate)
@@ -24,4 +29,6 @@ void stream_send_global_functions(RRDHOST *host) {
     // send it as STREAM_TRAFFIC_TYPE_METADATA, not STREAM_TRAFFIC_TYPE_FUNCTIONS
     // this is just metadata not an interactive function call
     sender_commit_clean_buffer(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+
+    spinlock_unlock(&host->sender->global_functions_spinlock);
 }

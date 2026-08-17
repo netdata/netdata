@@ -139,10 +139,14 @@ void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool
     // snapshot-and-clear the pending set under its lock. The deleter inserts
     // into the set BEFORE setting the flag, so a del landing after our
     // snapshot re-sets the flag with its entry already queued - the next poll
-    // drains it; nothing is ever lost. NOTE: the two callers run on DIFFERENT
-    // threads (the flag poll on collection/receiver threads, the reconnect
-    // push on the sender thread) and can race each other too - the atomic
-    // flag ops and the pending-set spinlock are what make that safe.
+    // drains it; nothing is ever lost. NOTE: the two streaming callers run on
+    // DIFFERENT threads (the flag poll on collection/receiver threads, the
+    // reconnect push on the sender thread) and can race each other too - the
+    // flag/spinlock protocol keeps the QUEUE lossless, but the callers must
+    // additionally hold the sender's global_functions_spinlock across
+    // {render + commit}, or a stale rendered buffer could commit its
+    // FUNCTION_DEL lines after a fresh re-list (see the lock's comment in
+    // stream-sender-internals.h).
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     // after the flag clear, so a NULL registry (archived host racing the sender's

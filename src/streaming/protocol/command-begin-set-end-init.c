@@ -46,12 +46,18 @@ ALWAYS_INLINE RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t w
     }
 
     if(unlikely(host_flags & RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
+        // {render + commit} must be atomic against the other renderer call
+        // site and against concurrent pollers here (host_flags is a stale
+        // snapshot, so several collection threads can enter together) - see
+        // the global_functions_spinlock comment in stream-sender-internals.h
+        spinlock_lock(&host->sender->global_functions_spinlock);
         BUFFER *wb = preferred_sender_buffer(host);
         stream_sender_send_global_rrdhost_functions(host, wb,
                                                     stream_has_capability(host->sender, STREAM_CAP_DYNCFG),
                                                     stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                         rrdhost_can_stream_metadata_to_parent(host));
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
+        spinlock_unlock(&host->sender->global_functions_spinlock);
     }
 
     bool exposed_upstream = rrdset_check_upstream_exposed(st);

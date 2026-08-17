@@ -817,7 +817,10 @@ int rrdfunctions_manifest_pacer_unittest(void) {
 //   2. drain order and discard: DEL lines precede the re-list; a false
 //      can_function_del verdict discards the snapshot without emitting;
 //   3. the concurrent del-during-drain race: under the insert-before-flag /
-//      clear-flag-before-snapshot protocol no DEL is ever lost or duplicated.
+//      clear-flag-before-snapshot protocol no DEL is ever lost or duplicated;
+//   4. re-add cancellation: a global re-add removes a queued-but-unrendered
+//      FUNCTION_DEL for the same key, so a del(f) -> add(f) sequence never
+//      makes the parent drop the live function on the next drain.
 
 struct fndel_race_ctx {
     RRDHOST *host;
@@ -1098,6 +1101,50 @@ int rrdfunctions_del_unittest(void) {
         }
 
         freez(seen);
+    }
+
+    // 4. re-add cancels a queued-but-unrendered FUNCTION_DEL
+    {
+        int readd_errors_before = errors;
+
+        rrd_function_add(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+        rrd_function_del(host, NULL, "tt-readd-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(!fndel_queued(host, "tt-readd-fn")) {
+            fprintf(stderr, "  FAILED re-add: del did not queue the FUNCTION_DEL\n");
+            errors++;
+        }
+
+        rrd_function_add(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+
+        if(fndel_queued(host, "tt-readd-fn")) {
+            fprintf(stderr, "  FAILED re-add: the queued FUNCTION_DEL survived the re-add\n");
+            errors++;
+        }
+
+        {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            stream_sender_send_global_rrdhost_functions(host, wb, false, true);
+            const char *out = buffer_tostring(wb);
+
+            if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-readd-fn\"")) {
+                fprintf(stderr, "  FAILED re-add: FUNCTION_DEL emitted for the live re-added function\n");
+                errors++;
+            }
+            if(!strstr(out, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"tt-readd-fn\"")) {
+                fprintf(stderr, "  FAILED re-add: re-added function missing from the re-list\n");
+                errors++;
+            }
+        }
+
+        rrd_function_del(host, NULL, "tt-readd-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(errors == readd_errors_before)
+            fprintf(stderr, "  OK re-add: a global re-add cancels the queued FUNCTION_DEL\n");
     }
 
     // restore localhost exactly as found

@@ -410,8 +410,22 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
 
     if(st)
         dictionary_view_set(st->functions_view, key, item);
-    else
+    else {
+        // A re-add cancels a queued-but-not-yet-rendered FUNCTION_DEL for the
+        // same key: without this, a del(f) -> add(f) sequence whose del is
+        // still queued would emit "FUNCTION_DEL f" on the next drain and the
+        // parent would drop the just re-added live function. Removed BEFORE
+        // setting the flag, mirroring the del path's insert-before-flag
+        // ordering (see the pending_dels comment in rrdfunctions-internals.h).
+        // Gated like the del path: dyncfg entries never queue, and hosts
+        // without a sender have nothing queued.
+        if(!(options & RRD_FUNCTION_DYNCFG) && rrdhost_has_stream_sender_enabled(host)) {
+            spinlock_lock(&host->functions->pending_dels.spinlock);
+            dictionary_del(host->functions->pending_dels.dict, key);
+            spinlock_unlock(&host->functions->pending_dels.spinlock);
+        }
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+    }
 
     dictionary_acquired_item_release(host->functions->dict, item);
 
