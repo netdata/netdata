@@ -134,7 +134,11 @@
   },
   {
     "name": "L2/partial-wide-point",
-    "proves": "one partial higher-tier record projected into six finer result rows marks every numeric derived row exactly PARTIAL while preserving the requested timestamp grid; PARTIAL is evidence state, not a one-time event on the source record"
+    "proves": "one partial higher-tier record projected into six finer result rows marks every numeric derived row exactly PARTIAL; PARTIAL is evidence state, not a one-time event on the source record"
+  },
+  {
+    "name": "L2/partial-wide-point-values",
+    "proves": "one higher-tier record projected into six finer result rows preserves the exact source value in every row"
   },
   {
     "name": "L2/whole-chart-absence",

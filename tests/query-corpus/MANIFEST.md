@@ -38,7 +38,8 @@ set at the end.
 | L2/tier1-anomaly-rate | tier1 rollups report the exact fractional anomaly rate derived from anomaly_count divided by count | n/a |  |
 | L2/tier1-reset-flags | tier1 pages do not retain tier0 RESET annotations because the higher-tier page format stores no point flags | n/a |  |
 | L2/tier1-float32-fields | tier1 sum, minimum and maximum fields match the ARRAY_TIER1 float32 write-rounding contract | n/a |  |
-| L2/partial-wide-point | one partial higher-tier record projected into six finer result rows marks every numeric derived row exactly PARTIAL while preserving the requested timestamp grid; PARTIAL is evidence state, not a one-time event on the source record | n/a |  |
+| L2/partial-wide-point | one partial higher-tier record projected into six finer result rows marks every numeric derived row exactly PARTIAL; PARTIAL is evidence state, not a one-time event on the source record | n/a |  |
+| L2/partial-wide-point-values | one higher-tier record projected into six finer result rows preserves the exact source value in every row | n/a |  |
 | L2/whole-chart-absence | never-stored tier windows (whole-chart gap) read identically to stored-empty windows: null + EMPTY annotation, with correct partial counts on the flanking windows | n/a |  |
 | L2/tier0-storage-number-quantization | tier0 reads the value 2^24+1 through the established storage_number decimal-mantissa quantization path | n/a |  |
 | L2/tier-rollup-original-values | higher tiers aggregate the original collected double for 2^24+1 before applying the tier page's float32 field encoding, rather than aggregating the tier0 storage_number value | n/a |  |

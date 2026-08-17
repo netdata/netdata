@@ -20,6 +20,7 @@
 package corpus
 
 import (
+	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -382,7 +383,8 @@ func TestLayer2Tier1Palette(t *testing.T) {
 // the source evidence behind each derived row, so it must not disappear after
 // the record's first delivery.
 func TestLayer2PartialWidePoint(t *testing.T) {
-	trackContract(t, "L2/partial-wide-point")
+	registerContract(t, "L2/partial-wide-point")
+	registerContract(t, "L2/partial-wide-point-values")
 
 	const value = 7
 	ch := fixture.Series("fixture.l2partialwide", "fixture.l2partialwide", fixture.T0, 280, 1,
@@ -404,22 +406,35 @@ func TestLayer2PartialWidePoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok := assertSelectedTier(t, doc, 1) && assertExactView(t, doc, after, firstEnd, rowSpan)
+	commonOK := true
+	if !assertSelectedTier(t, doc, 1) || !assertExactView(t, doc, after, firstEnd, rowSpan) {
+		commonOK = false
+	}
 	cols, err := canon.Columns(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !assertOnlyColumn(t, cols, ch.Dimensions[0].ID) {
-		ok = false
+		commonOK = false
+	}
+	for i, point := range cols[ch.Dimensions[0].ID] {
+		if point.Value == nil || math.IsNaN(*point.Value) || math.IsInf(*point.Value, 0) {
+			t.Logf("dimension %q row %d at %d is not numeric", ch.Dimensions[0].ID, i, point.T)
+			commonOK = false
+		}
 	}
 	want := make([]expectedColumnPoint, rows)
 	for i := range want {
 		want[i] = wantNumberWithPAAt(after+int64(i+1)*rowSpan, value, canon.AnnotationPartial)
 	}
-	if !assertExactColumn(t, cols, ch.Dimensions[0].ID, want, 0) {
-		ok = false
-	}
-	assertContract(t, "L2/partial-wide-point", ok)
+	t.Run("values", func(t *testing.T) {
+		ok := commonOK && assertExactColumnValues(t, cols, ch.Dimensions[0].ID, want, 0)
+		assertContract(t, "L2/partial-wide-point-values", ok)
+	})
+	t.Run("evidence", func(t *testing.T) {
+		ok := commonOK && assertExactColumnMetadata(t, cols, ch.Dimensions[0].ID, want)
+		assertContract(t, "L2/partial-wide-point", ok)
+	})
 }
 
 // TestLayer2WholeChartAbsence pins the two flavors of a missing tier window:
