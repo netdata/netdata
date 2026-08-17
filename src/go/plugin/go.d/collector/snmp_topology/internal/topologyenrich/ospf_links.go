@@ -13,19 +13,28 @@ import (
 )
 
 func ApplyOSPFAdjacency(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.OSPFEnrichmentStats {
+	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
+	return applyOSPFAdjacencyWithResolver(data, aggregate, resolver)
+}
+
+func applyOSPFAdjacencyWithResolver(
+	data *topologymodel.Data,
+	aggregate topologymodel.ObservationAggregate,
+	resolver *topologyL3ActorResolverProvider,
+) topologymodel.OSPFEnrichmentStats {
 	var stats topologymodel.OSPFEnrichmentStats
 	if data == nil || len(aggregate.OSPFNeighbors) == 0 {
 		return finishTopologyOSPFAdjacencyEnrichment(data, stats)
 	}
 
-	resolver := newTopologyL3ActorResolver(data, aggregate.Snapshots)
+	actorResolver := resolver.resolve()
 	seen := existingTopologyOSPFLinkKeys(data.Links)
 	neighborRowsByActor := make(map[string][]topologymodel.OSPFNeighborDetailRow)
 
 	for _, row := range aggregate.OSPFNeighbors {
 		stats.ObservedRows++
-		localRef, localOK := resolver.resolveDeviceID(row.DeviceID)
-		remoteRef, remoteOK := resolver.resolveRouterEndpoint(row.NeighborRouterID, row.NeighborIP)
+		localRef, localOK := actorResolver.resolveDeviceID(row.DeviceID)
+		remoteRef, remoteOK := actorResolver.resolveRouterEndpoint(row.NeighborRouterID, row.NeighborIP)
 		if localOK {
 			modalRow := topologyOSPFNeighborActorRow(row)
 			if remoteOK {

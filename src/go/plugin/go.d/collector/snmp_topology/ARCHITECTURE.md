@@ -225,15 +225,23 @@ aggregate observations
   -> convert generic graph to topologymodel.Data
   -> augment local actors with SNMP device/cache detail
   -> topologyshape.ApplyPolicies
-  -> topologyenrich.ApplyL3Subnet
-  -> topologyenrich.ApplyOSPFAdjacency
-  -> topologyenrich.ApplyBGPAdjacency
+  -> topologyenrich.ApplyLayer3 (L3 subnet, OSPF, BGP)
   -> topologyshape.ApplyDepthFocusFilter
 ```
 
 For the low-confidence map type, the builder creates a strict map and a
 probable map, marks probable-only link deltas, then applies the same L3/OSPF/BGP
 enrichment and depth/focus filtering to the probable map.
+
+Local actor augmentation indexes the pre-policy actor generation once by its
+local identity subset: chassis id, system name, and selected management IP.
+Policy shaping can collapse, remove, and reorder actors, so that index is
+discarded before `ApplyPolicies`. `ApplyLayer3` then builds one post-policy
+resolver from copied managed-actor references and shares it across L3 subnet,
+OSPF, and BGP enrichment. BGP runs last because it extends the resolver with
+BGP-local identifiers and interface addresses. This keeps actor-alias work
+linear in the indexed identities instead of repeating the complete alias scan
+for every cache snapshot and logical L3 enricher.
 
 L3 subnet enrichment has two grains:
 

@@ -32,6 +32,51 @@ func TestTopologyL3ActorResolverSuppressesAmbiguousIP(t *testing.T) {
 	require.False(t, ok)
 }
 
+func TestTopologyL3ActorResolverSuppressesAmbiguousSnapshotIdentity(t *testing.T) {
+	data := topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			topologyL3ManagedActorForTest("router-a", nil, "198.51.100.1"),
+			topologyL3ManagedActorForTest("router-b", nil, "198.51.100.2"),
+		},
+	}
+	data.Actors[0].Match.SysName = "shared-router"
+	data.Actors[1].Match.SysName = "shared-router"
+	snapshots := []topologymodel.ObservationSnapshot{{
+		LocalDeviceID: "shared-device-id",
+		LocalDevice: topologymodel.Device{
+			SysName:      "shared-router",
+			OSPFRouterID: "192.0.2.100",
+		},
+	}}
+
+	resolver := newTopologyL3ActorResolver(&data, snapshots)
+	_, deviceOK := resolver.resolveDeviceID("shared-device-id")
+	_, routerOK := resolver.resolveRouterID("192.0.2.100")
+
+	require.False(t, deviceOK)
+	require.False(t, routerOK)
+}
+
+func TestTopologyL3ActorResolverIndexesOnlyManagedSNMPDevices(t *testing.T) {
+	managed := topologyL3ManagedActorForTest("managed", nil, "198.51.100.1")
+	nonSNMP := topologyL3ManagedActorForTest("non-snmp", nil, "198.51.100.1")
+	nonSNMP.Source = "lldp"
+	inferred := topologyL3ManagedActorForTest("inferred", map[string]any{"inferred": true}, "198.51.100.1")
+	endpoint := topologyL3ManagedActorForTest("endpoint", nil, "198.51.100.1")
+	endpoint.ActorType = "endpoint"
+	data := topologymodel.Data{Actors: []topologymodel.Actor{nonSNMP, inferred, endpoint, managed}}
+	snapshots := []topologymodel.ObservationSnapshot{{
+		LocalDeviceID: "polled-device",
+		LocalDevice:   topologymodel.Device{ManagementIP: "198.51.100.1"},
+	}}
+
+	resolver := newTopologyL3ActorResolver(&data, snapshots)
+	ref, ok := resolver.resolveDeviceID("polled-device")
+
+	require.True(t, ok)
+	require.Equal(t, "managed", ref.actorID)
+}
+
 func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 	tests := map[string]struct {
 		data                     topologymodel.Data

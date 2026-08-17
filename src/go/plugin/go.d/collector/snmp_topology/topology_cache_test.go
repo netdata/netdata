@@ -1725,7 +1725,7 @@ func TestBuildLocalTopologyDevice_MapsVersionToSoftwareOnly(t *testing.T) {
 	require.Empty(t, device.HardwareVersion)
 }
 
-func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
+func TestAugmentTopologySnapshotLocalsInjectsIdentityFields(t *testing.T) {
 	data := topologymodel.Data{
 		Actors: []topologymodel.Actor{
 			{
@@ -1782,7 +1782,7 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 		},
 	}
 
-	augmentLocalActorFromCache(&data, local)
+	augmentTopologySnapshotLocals(&data, []topologymodel.ObservationSnapshot{{LocalDevice: local}})
 
 	actor := findDeviceActorBySysName(data, "sw1")
 	require.NotNil(t, actor)

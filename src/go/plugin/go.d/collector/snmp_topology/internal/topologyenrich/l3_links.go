@@ -19,6 +19,15 @@ import (
 const topologyL3SubnetSource = "ip_mib"
 
 func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.L3EnrichmentStats {
+	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
+	return applyL3SubnetWithResolver(data, aggregate, resolver)
+}
+
+func applyL3SubnetWithResolver(
+	data *topologymodel.Data,
+	aggregate topologymodel.ObservationAggregate,
+	resolver *topologyL3ActorResolverProvider,
+) topologymodel.L3EnrichmentStats {
 	var stats topologymodel.L3EnrichmentStats
 	if data == nil || len(aggregate.L3Interfaces) == 0 {
 		return finishTopologyL3SubnetEnrichment(data, stats)
@@ -30,15 +39,15 @@ func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.Observation
 		return finishTopologyL3SubnetEnrichment(data, stats)
 	}
 
-	resolver := newTopologyL3ActorResolver(data, aggregate.Snapshots)
+	actorResolver := resolver.resolve()
 	directSeen := existingTopologyL3LinkKeys(data.Links)
 	for _, adjacency := range candidates.Adjacencies {
-		srcRef, ok := resolver.resolve(adjacency.A)
+		srcRef, ok := actorResolver.resolve(adjacency.A)
 		if !ok {
 			stats.SuppressedUnresolvedActor++
 			continue
 		}
-		dstRef, ok := resolver.resolve(adjacency.B)
+		dstRef, ok := actorResolver.resolve(adjacency.B)
 		if !ok {
 			stats.SuppressedUnresolvedActor++
 			continue
@@ -58,7 +67,7 @@ func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.Observation
 		stats.EmittedLinks++
 	}
 
-	applyTopologyL3SubnetSegments(data, candidates.Segments, resolver, strings.TrimSpace(aggregate.ProducerScopeID), &stats)
+	applyTopologyL3SubnetSegments(data, candidates.Segments, actorResolver, strings.TrimSpace(aggregate.ProducerScopeID), &stats)
 
 	sort.Slice(data.Actors, func(i, j int) bool {
 		return strings.TrimSpace(data.Actors[i].ActorID) < strings.TrimSpace(data.Actors[j].ActorID)

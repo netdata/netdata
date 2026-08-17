@@ -21,6 +21,28 @@ type topologyL3ActorResolver struct {
 	byRouterID map[string]topologyL3ActorRef
 }
 
+type topologyL3ActorResolverProvider struct {
+	data        *topologymodel.Data
+	snapshots   []topologymodel.ObservationSnapshot
+	resolver    topologyL3ActorResolver
+	initialized bool
+}
+
+func newTopologyL3ActorResolverProvider(
+	data *topologymodel.Data,
+	snapshots []topologymodel.ObservationSnapshot,
+) *topologyL3ActorResolverProvider {
+	return &topologyL3ActorResolverProvider{data: data, snapshots: snapshots}
+}
+
+func (p *topologyL3ActorResolverProvider) resolve() topologyL3ActorResolver {
+	if !p.initialized {
+		p.resolver = newTopologyL3ActorResolver(p.data, p.snapshots)
+		p.initialized = true
+	}
+	return p.resolver
+}
+
 func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) topologyL3ActorResolver {
 	resolver := topologyL3ActorResolver{
 		byActorID:  make(map[string]topologyL3ActorRef),
@@ -32,16 +54,18 @@ func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymo
 		return resolver
 	}
 
-	managedActors := make([]topologymodel.Actor, 0, len(data.Actors))
+	managedActors := make([]topologyL3ActorRef, 0, len(data.Actors))
+	localMatchIndex := topologymodel.NewLocalActorMatchIndex()
 	for _, actor := range data.Actors {
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
 		}
-		managedActors = append(managedActors, actor)
 		ref := topologyL3ActorRef{
 			actorID: strings.TrimSpace(actor.ActorID),
 			match:   actor.Match,
 		}
+		managedActors = append(managedActors, ref)
+		localMatchIndex.AddMatch(len(managedActors)-1, actor.Match)
 		if ref.actorID != "" {
 			resolver.byActorID[ref.actorID] = ref
 		}
@@ -56,23 +80,17 @@ func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymo
 		}
 	}
 
+	matches := make([]int, 0, 1)
 	for _, snapshot := range snapshots {
 		deviceID := strings.TrimSpace(snapshot.LocalDeviceID)
 		if deviceID == "" {
 			continue
 		}
-		for _, actor := range managedActors {
-			if !topologymodel.MatchLocalActor(actor.Match, snapshot.LocalDevice) {
-				continue
-			}
-			resolver.addUniqueDeviceID(deviceID, topologyL3ActorRef{
-				actorID: strings.TrimSpace(actor.ActorID),
-				match:   actor.Match,
-			})
-			resolver.addUniqueRouterID(snapshot.LocalDevice.OSPFRouterID, topologyL3ActorRef{
-				actorID: strings.TrimSpace(actor.ActorID),
-				match:   actor.Match,
-			})
+		matches = localMatchIndex.MatchIndexes(matches[:0], snapshot.LocalDevice)
+		for _, actorIndex := range matches {
+			ref := managedActors[actorIndex]
+			resolver.addUniqueDeviceID(deviceID, ref)
+			resolver.addUniqueRouterID(snapshot.LocalDevice.OSPFRouterID, ref)
 		}
 	}
 

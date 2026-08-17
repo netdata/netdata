@@ -13,12 +13,21 @@ import (
 )
 
 func ApplyBGPAdjacency(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.BGPEnrichmentStats {
+	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
+	return applyBGPAdjacencyWithResolver(data, aggregate, resolver)
+}
+
+func applyBGPAdjacencyWithResolver(
+	data *topologymodel.Data,
+	aggregate topologymodel.ObservationAggregate,
+	l3Resolver *topologyL3ActorResolverProvider,
+) topologymodel.BGPEnrichmentStats {
 	var stats topologymodel.BGPEnrichmentStats
 	if data == nil || len(aggregate.BGPPeers) == 0 {
 		return finishTopologyBGPAdjacencyEnrichment(data, stats)
 	}
 
-	resolver := newTopologyBGPActorResolver(data, aggregate)
+	resolver := newTopologyBGPActorResolver(l3Resolver.resolve(), aggregate)
 	seen := existingTopologyBGPLinkKeys(data.Links)
 	peerRowsByActor := make(map[string][]topologymodel.BGPPeerDetailRow)
 
@@ -80,9 +89,9 @@ type topologyBGPActorResolver struct {
 	byIdentifier map[string]topologyL3ActorRef
 }
 
-func newTopologyBGPActorResolver(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologyBGPActorResolver {
+func newTopologyBGPActorResolver(l3 topologyL3ActorResolver, aggregate topologymodel.ObservationAggregate) topologyBGPActorResolver {
 	resolver := topologyBGPActorResolver{
-		l3:           newTopologyL3ActorResolver(data, aggregate.Snapshots),
+		l3:           l3,
 		byIdentifier: make(map[string]topologyL3ActorRef),
 	}
 	for _, row := range aggregate.L3Interfaces {

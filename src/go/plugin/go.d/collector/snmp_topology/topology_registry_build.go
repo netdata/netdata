@@ -40,9 +40,7 @@ func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate
 	}
 	augmentTopologySnapshotLocals(&data, aggregate.Snapshots)
 	topologyshape.ApplyPolicies(&data, options)
-	topologyenrich.ApplyL3Subnet(&data, aggregate)
-	topologyenrich.ApplyOSPFAdjacency(&data, aggregate)
-	topologyenrich.ApplyBGPAdjacency(&data, aggregate)
+	topologyenrich.ApplyLayer3(&data, aggregate)
 	topologyshape.ApplyDepthFocusFilter(&data, options)
 	return data, true
 }
@@ -78,21 +76,39 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
 	topologyshape.ApplyPolicies(&probableData, probableOptions)
 	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
-	topologyenrich.ApplyL3Subnet(&probableData, aggregate)
-	topologyenrich.ApplyOSPFAdjacency(&probableData, aggregate)
-	topologyenrich.ApplyBGPAdjacency(&probableData, aggregate)
+	topologyenrich.ApplyLayer3(&probableData, aggregate)
 	topologyshape.ApplyDepthFocusFilter(&probableData, options)
 	return probableData, true
 }
 
 func augmentTopologySnapshotLocals(data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) {
+	if data == nil || len(snapshots) == 0 {
+		return
+	}
+	index := topologymodel.NewLocalActorMatchIndex()
+	for i := range data.Actors {
+		actor := data.Actors[i]
+		index.AddActorID(actor.ActorID)
+		if topologyengine.IsDeviceActorType(actor.ActorType) {
+			index.AddMatch(i, actor.Match)
+		}
+	}
+
 	for _, snapshot := range snapshots {
-		if augmentLocalActorFromCache(data, snapshot.LocalDevice) {
+		if actorIndex, ok := index.FirstMatch(snapshot.LocalDevice); ok {
+			augmentLocalActor(&data.Actors[actorIndex], snapshot.LocalDevice)
 			continue
 		}
 		// The default map is a managed-device map: show polled SNMP devices even
 		// when no L2 relationship emitted a local actor yet.
-		addLocalActorFromCache(data, snapshot.LocalDeviceID, snapshot.LocalDevice)
+		actor, ok := topologyLocalActorFromCache(snapshot.LocalDeviceID, snapshot.LocalDevice)
+		if !ok || index.ContainsActorID(actor.ActorID) {
+			continue
+		}
+		data.Actors = append(data.Actors, actor)
+		actorIndex := len(data.Actors) - 1
+		index.AddActorID(actor.ActorID)
+		index.AddMatch(actorIndex, actor.Match)
 	}
 }
 
