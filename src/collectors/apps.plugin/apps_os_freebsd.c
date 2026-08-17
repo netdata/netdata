@@ -319,16 +319,20 @@ cleanup:
     return false;
 }
 
-// FreeBSD maintains ki_stat for every process, including sleeping (SSLEEP),
-// stopped (SSTOP) and zombie (SZOMB) states. Zombies are present in the
-// KERN_PROC_PROC data and are counted like any other process.
-static inline void update_proc_state_count_freebsd(char ki_stat) {
+// FreeBSD maintains ki_stat for every process; SSLEEP covers both
+// interruptible and uninterruptible sleep, distinguished by TDF_SINTR in
+// ki_tdflags (ps shows uninterruptible sleep as 'D'). Zombies are present in
+// the KERN_PROC_PROC data and are counted like any other process.
+static inline void update_proc_state_count_freebsd(char ki_stat, long ki_tdflags) {
     switch (ki_stat) {
         case SRUN:
             proc_state_count[PROC_STATUS_RUNNING] += 1;
             break;
         case SSLEEP:
-            proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            if (ki_tdflags & TDF_SINTR)
+                proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            else
+                proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
             break;
         case SZOMB:
             proc_state_count[PROC_STATUS_ZOMBIE] += 1;
@@ -394,7 +398,7 @@ bool apps_os_collect_all_pids_freebsd(void) {
         pid_t pid = procbase[i].ki_pid;
         if (pid <= 0) continue;
 
-        update_proc_state_count_freebsd(procbase[i].ki_stat);
+        update_proc_state_count_freebsd(procbase[i].ki_stat, procbase[i].ki_tdflags);
 
         incrementally_collect_data_for_pid(pid, &procbase[i]);
     }
