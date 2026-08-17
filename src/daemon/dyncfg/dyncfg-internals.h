@@ -7,7 +7,7 @@
 #include "database/rrd.h"
 #include "database/rrdfunctions.h"
 #include "database/rrdfunctions-internals.h"
-#include "database/rrdcollector-internals.h"
+#include "database/rrdfunctions-provider-internals.h"
 
 typedef struct dyncfg {
     ND_UUID host_uuid;

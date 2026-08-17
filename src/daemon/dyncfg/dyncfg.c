@@ -421,7 +421,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
 //        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
 
-    rrd_collector_started();
+    rrd_function_provider_started();
     rrd_function_add(
         host,
         NULL,

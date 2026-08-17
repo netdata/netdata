@@ -10,7 +10,7 @@
 // registered a function (for pluginsd/streaming: the PARSER), without ever
 // dereferencing it after death.
 //
-// Two refcounts, the rrd_collector shape (rrdcollector.c):
+// Two refcounts, the rrd_function_provider shape (rrdfunctions-provider.c):
 //
 // - entry refcount: one ref per holder that STORES the transport - registry
 //   entries (COLLECTOR/STREAMING source only), the DYNCFG node pin, the

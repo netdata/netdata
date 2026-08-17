@@ -5,7 +5,7 @@
 
 #include "rrd.h"
 
-#include "rrdcollector-internals.h"
+#include "rrdfunctions-provider-internals.h"
 #include "rrdfunctions-transport.h"
 
 // The per-host function registry behind the opaque RRD_FUNCTIONS handle.
@@ -50,7 +50,7 @@ struct rrd_host_function {
     void *execute_cb_data;
 
     OBJECT_STATE_ID rrdhost_state_id;
-    struct rrd_collector *collector;
+    struct rrd_function_provider *provider;
 
     // LEAF spinlock guarding the entry's SWAPPED fields: the (source,
     // execute_cb_data) pair, execute_cb, and the help/tags STRINGs. The

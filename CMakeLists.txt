@@ -1773,8 +1773,8 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
         src/database/contexts/rrdcontext-worker.c
-        src/database/rrdcollector.c
-        src/database/rrdcollector.h
+        src/database/rrdfunctions-provider.c
+        src/database/rrdfunctions-provider.h
         src/database/rrddim.c
         src/database/rrdfunctions.c
         src/database/rrdfunctions.h
@@ -1819,7 +1819,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-exporters.h
         src/database/rrdfunctions-unittest.c
         src/database/rrdfunctions-internals.h
-        src/database/rrdcollector-internals.h
+        src/database/rrdfunctions-provider-internals.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c

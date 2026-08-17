@@ -1417,7 +1417,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
     pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
 
-    rrd_collector_started();
+    rrd_function_provider_started();
 
     size_t count = 0;
 
@@ -1477,7 +1477,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
         cd->serial_failures++;
 
     // The vnodes this plugin fed also carry its functions, and those only become unavailable
-    // once rrd_collector_finished() runs below. The manifest refresh therefore has to happen
+    // once rrd_function_provider_finished() runs below. The manifest refresh therefore has to happen
     // after that, so snapshot the hosts here - the JudyL lives in the parser, which is
     // also destroyed below (before the manifest arms).
     //
@@ -1533,9 +1533,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     // path has no per-receiver equivalent - its collector is per stream
     // thread - and relies on the transport lifetime instead). Safe to
     // reorder: the obsolete-charts sweep above keys on collector_tid, the
-    // vnode snapshot was taken earlier, and rrd_collector_finished() is
+    // vnode snapshot was taken earlier, and rrd_function_provider_finished() is
     // idempotent per worker iteration.
-    rrd_collector_finished();
+    rrd_function_provider_finished();
     pluginsd_process_cleanup(parser);
 
     // the functions this plugin registered are still in host->functions, but their collector

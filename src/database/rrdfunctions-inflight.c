@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdcollector-internals.h"
+#include "rrdfunctions-provider-internals.h"
 #include "rrdfunctions-internals.h"
 #include "rrdfunctions-inflight.h"
 
@@ -755,7 +755,7 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
 
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
-    if(!rrd_collector_dispatcher_acquire(r->rdcf->collector)) {
+    if(!rrd_function_provider_dispatcher_acquire(r->rdcf->provider)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a CANCEL request for transaction '%s', but the collector is not running.",
                r->transaction);
@@ -773,7 +773,7 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
     if(canceller_cb)
         canceller_cb(r->transaction, canceller_cb_data);
 
-    rrd_collector_dispatcher_release(r->rdcf->collector);
+    rrd_function_provider_dispatcher_release(r->rdcf->provider);
 }
 
 void rrd_function_cancel(const char *transaction) {
@@ -803,7 +803,7 @@ void rrd_function_progress(const char *transaction) {
 
     struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
 
-    if(!rrd_collector_dispatcher_acquire(r->rdcf->collector)) {
+    if(!rrd_function_provider_dispatcher_acquire(r->rdcf->provider)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a PROGRESS request for transaction '%s', but the collector is not running.",
                transaction);
@@ -823,7 +823,7 @@ void rrd_function_progress(const char *transaction) {
     if(progresser_cb)
         progresser_cb(transaction, progresser_cb_data);
 
-    rrd_collector_dispatcher_release(r->rdcf->collector);
+    rrd_function_provider_dispatcher_release(r->rdcf->provider);
 
 cleanup:
     dictionary_acquired_item_release(rrd_function_transactions.dict, item);

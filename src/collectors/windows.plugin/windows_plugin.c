@@ -264,7 +264,7 @@ void win_plugin_main(void *ptr)
 {
     worker_register("WIN");
 
-    rrd_collector_started();
+    rrd_function_provider_started();
     PerflibNamesRegistryInitialize();
 
     CLEANUP_FUNCTION_REGISTER(windows_main_cleanup) cleanup_ptr = ptr;
