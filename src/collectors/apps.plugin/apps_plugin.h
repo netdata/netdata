@@ -96,7 +96,7 @@ struct pid_info {
 #define PROCESSES_HAVE_CMDLINE               1
 #define PROCESSES_HAVE_PID_LIMITS            0
 #define PROCESSES_HAVE_COMM_AND_NAME         0
-#define PROCESSES_HAVE_STATE                 0
+#define PROCESSES_HAVE_STATE                 1
 #define PPID_SHOULD_BE_RUNNING               1
 #define INCREMENTAL_DATA_COLLECTION          1
 #define CPU_TO_NANOSECONDCORES (1) // already in nanoseconds

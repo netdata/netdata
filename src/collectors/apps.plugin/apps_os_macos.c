@@ -426,9 +426,40 @@ bool apps_os_read_pid_stat_macos(struct pid_stat *p, void *ptr) {
     return true;
 }
 
+// On macOS the kernel only distinguishes the stopped (SSTOP) and zombie (SZOMB)
+// states in p_stat; every live process reports SRUN whether it is running or
+// sleeping, so "running" counts all live (non-zombie, non-stopped) processes
+// and SSLEEP never fires. Zombies must be counted here, because they are
+// skipped from per-process metrics (they have no Mach task).
+static inline void update_proc_state_count_macos(char p_stat) {
+    switch (p_stat) {
+        case SRUN:
+            proc_state_count[PROC_STATUS_RUNNING] += 1;
+            break;
+        case SSLEEP:
+            proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            break;
+        case SZOMB:
+            proc_state_count[PROC_STATUS_ZOMBIE] += 1;
+            break;
+        case SSTOP:
+            proc_state_count[PROC_STATUS_STOPPED] += 1;
+            break;
+        default:
+            // SIDL (still being created) and any future states are not counted,
+            // mirroring the Linux default case.
+            break;
+    }
+}
+
 bool apps_os_collect_all_pids_macos(void) {
     static pid_t *pids = NULL;
     static int allocatedProcessCount = 0;
+
+#if (PROCESSES_HAVE_STATE == 1)
+    // clear process state counter
+    memset(proc_state_count, 0, sizeof proc_state_count);
+#endif
 
     // Get the number of processes
     int numberOfProcesses = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
@@ -472,6 +503,11 @@ bool apps_os_collect_all_pids_macos(void) {
         }
         if(procSize == 0) // no such process
             continue;
+
+        // count the process state before skipping zombies, so that
+        // system.processes_state includes zombies even though they are
+        // excluded from per-process metrics (they have no Mach task)
+        update_proc_state_count_macos(pi.proc.kp_proc.p_stat);
 
         // zombies have no Mach task and proc_pidinfo() resolves pids via proc_find(),
         // which skips SZOMB entries - so every proc_pidinfo() flavor below returns
