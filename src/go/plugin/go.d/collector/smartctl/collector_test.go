@@ -851,18 +851,94 @@ func TestCollector_AttachmentCollisionDoesNotRecordOrphanState(t *testing.T) {
 	}
 }
 
+func TestCollector_DisambiguatesConflictingAttributeNames(t *testing.T) {
+	data := replaceFixtureValue(t, dataTypeSataDeviceHDDSda, "Raw_Read_Error_Rate", "Duplicate Name")
+	data = replaceFixtureValue(t, data, "Throughput_Performance", "Duplicate/Name")
+
+	for name, response := range map[string][]byte{
+		"original order": data,
+		"reverse order":  reverseSmartAttributes(t, data),
+	} {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.exec = &mockSmartctlCliExec{
+				scanData: deviceScanData(t, "sat", "ATA", "/dev/sda"),
+				deviceDataFunc: func(deviceName, deviceType, _ string) ([]byte, error) {
+					require.Equal(t, "/dev/sda", deviceName)
+					require.Equal(t, "sat", deviceType)
+					return response, nil
+				},
+			}
+
+			mx := collr.Collect(context.Background())
+			require.NotEmpty(t, mx)
+			require.NotEmpty(t, *collr.Charts())
+			require.Len(t, collr.attachedDevices, 1)
+			collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+			for key, want := range map[string]int64{
+				"device_sda_type_sat_attr_duplicate_name_id_1_normalized": 100,
+				"device_sda_type_sat_attr_duplicate_name_id_1_raw":        0,
+				"device_sda_type_sat_attr_duplicate_name_id_1_decoded":    0,
+				"device_sda_type_sat_attr_duplicate_name_id_2_normalized": 148,
+				"device_sda_type_sat_attr_duplicate_name_id_2_raw":        48,
+				"device_sda_type_sat_attr_duplicate_name_id_2_decoded":    48,
+			} {
+				if assert.Contains(t, mx, key) {
+					assert.Equal(t, want, mx[key])
+				}
+			}
+			assert.NotContains(t, mx, "device_sda_type_sat_attr_duplicate_name_normalized")
+			assert.NotNil(t, collr.Charts().Get("device_sda_type_sat_smart_attr_duplicate_name_id_1"))
+			assert.NotNil(t, collr.Charts().Get("device_sda_type_sat_smart_attr_duplicate_name_id_2"))
+		})
+	}
+}
+
+func TestCollector_KeepsConflictingAttributeIdentityAcrossPolls(t *testing.T) {
+	firstResponse := replaceFixtureValue(t, dataTypeSataDeviceHDDSda, "Raw_Read_Error_Rate", "Duplicate Name")
+	firstResponse = replaceFixtureValue(t, firstResponse, "Throughput_Performance", "Duplicate/Name")
+	secondResponse := replaceFixtureValue(t, firstResponse, "Duplicate/Name", "Throughput_Performance")
+	responses := [][]byte{firstResponse, secondResponse}
+	responseIndex := 0
+
+	collr := New()
+	collr.PollDevicesEvery = confopt.Duration(time.Nanosecond)
+	collr.exec = &mockSmartctlCliExec{
+		scanData: deviceScanData(t, "sat", "ATA", "/dev/sda"),
+		deviceDataFunc: func(deviceName, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, "/dev/sda", deviceName)
+			require.Equal(t, "sat", deviceType)
+			idx := min(responseIndex, len(responses)-1)
+			responseIndex++
+			return responses[idx], nil
+		},
+	}
+
+	first := collr.Collect(context.Background())
+	require.NotEmpty(t, first)
+	second := collr.Collect(context.Background())
+	require.NotEmpty(t, second)
+	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), second)
+	assert.Contains(t, second, "device_sda_type_sat_attr_duplicate_name_id_1_normalized")
+	assert.Contains(t, second, "device_sda_type_sat_attr_duplicate_name_id_2_normalized")
+	assert.NotContains(t, second, "device_sda_type_sat_attr_duplicate_name_normalized")
+	assert.NotContains(t, second, "device_sda_type_sat_attr_throughput_performance_normalized")
+}
+
 func TestCollector_AddDeviceChartsIsAtomic(t *testing.T) {
 	result := gjson.ParseBytes(dataTypeNvmeDeviceNvme0)
 	dev := newSmartDevice(&result)
 	id := newDeviceIdentity(dev.deviceName(), dev.deviceType())
 	collr := New()
+	smartAttrs := newSmartAttributeIdentities(dev)
 
 	charts := collr.newDeviceCharts(dev, id)
 	existing := charts.Get(id.prefix + "smart_status")
 	require.NotNil(t, existing)
 	require.NoError(t, collr.Charts().Add(existing))
 
-	_, err := collr.addDeviceCharts(dev, id)
+	_, err := collr.addDeviceCharts(dev, id, smartAttrs)
 	require.Error(t, err)
 	require.Len(t, *collr.Charts(), 1)
 	assert.Equal(t, existing, (*collr.Charts())[0])
@@ -875,10 +951,11 @@ func TestCollector_AttributeMetricIdentityMatchesChart(t *testing.T) {
 	collr := New()
 
 	id := newDeviceIdentity(dev.deviceName(), dev.deviceType())
-	charts, err := collr.newDeviceSmartAttrCharts(dev, id)
+	smartAttrs := newSmartAttributeIdentities(dev)
+	charts, err := collr.newDeviceSmartAttrCharts(dev, id, smartAttrs)
 	require.NoError(t, err)
 	mx := make(map[string]int64)
-	collr.collectSmartDevice(mx, dev, id)
+	collr.collectSmartDevice(mx, dev, id, smartAttrs)
 
 	chart := charts.Get("device_sda_type_sat_smart_attr_power_on_hours")
 	require.NotNil(t, chart)
@@ -887,6 +964,10 @@ func TestCollector_AttributeMetricIdentityMatchesChart(t *testing.T) {
 }
 
 func nvmeScanData(t *testing.T, deviceNames ...string) []byte {
+	return deviceScanData(t, "nvme", "NVMe", deviceNames...)
+}
+
+func deviceScanData(t *testing.T, deviceType, protocol string, deviceNames ...string) []byte {
 	t.Helper()
 
 	devices := make([]map[string]string, 0, len(deviceNames))
@@ -894,8 +975,8 @@ func nvmeScanData(t *testing.T, deviceNames ...string) []byte {
 		devices = append(devices, map[string]string{
 			"name":      name,
 			"info_name": name,
-			"type":      "nvme",
-			"protocol":  "NVMe",
+			"type":      deviceType,
+			"protocol":  protocol,
 		})
 	}
 	data, err := json.Marshal(map[string]any{"devices": devices})
@@ -907,6 +988,19 @@ func replaceFixtureValue(t *testing.T, data []byte, old, new string) []byte {
 	t.Helper()
 	require.Positive(t, bytes.Count(data, []byte(old)), "fixture does not contain %q", old)
 	return bytes.ReplaceAll(data, []byte(old), []byte(new))
+}
+
+func reverseSmartAttributes(t *testing.T, data []byte) []byte {
+	t.Helper()
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(data, &payload))
+	attrs := payload["ata_smart_attributes"].(map[string]any)["table"].([]any)
+	for left, right := 0, len(attrs)-1; left < right; left, right = left+1, right-1 {
+		attrs[left], attrs[right] = attrs[right], attrs[left]
+	}
+	result, err := json.Marshal(payload)
+	require.NoError(t, err)
+	return result
 }
 
 func chartLabelValue(chart *collectorapi.Chart, key string) string {

@@ -171,7 +171,7 @@ var (
 	}
 )
 
-func (c *Collector) addDeviceCharts(dev *smartDevice, id deviceIdentity) (collectorapi.Charts, error) {
+func (c *Collector) addDeviceCharts(dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) (collectorapi.Charts, error) {
 	charts := collectorapi.Charts{}
 
 	if cs := c.newDeviceCharts(dev, id); cs != nil && len(*cs) > 0 {
@@ -179,7 +179,7 @@ func (c *Collector) addDeviceCharts(dev *smartDevice, id deviceIdentity) (collec
 			return nil, err
 		}
 	}
-	cs, err := c.newDeviceSmartAttrCharts(dev, id)
+	cs, err := c.newDeviceSmartAttrCharts(dev, id, smartAttrs)
 	if err != nil {
 		return nil, err
 	}
@@ -245,17 +245,16 @@ func (c *Collector) newDeviceCharts(dev *smartDevice, id deviceIdentity) *collec
 	return charts
 }
 
-func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity) (*collectorapi.Charts, error) {
+func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) (*collectorapi.Charts, error) {
 	attrs, ok := dev.ataSmartAttributeTable()
 	if !ok {
 		return nil, nil
 	}
 	charts := collectorapi.Charts{}
 
+	warned := make(map[string]bool)
 	for _, attr := range attrs {
-		if !isSmartAttrValid(attr) ||
-			strings.HasPrefix(attr.name(), "Unknown") ||
-			strings.HasPrefix(attr.name(), "Not_In_Use") {
+		if !isSmartAttrChartable(attr) {
 			continue
 		}
 
@@ -265,7 +264,12 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity
 		}
 
 		attrName := attributeNameMap(attr.name())
-		cleanAttrName := cleanAttributeName(attrName)
+		identity := smartAttrs.resolve(attr)
+		cleanAttrName := identity.name
+		if identity.name != identity.baseName && !warned[identity.baseName] {
+			c.Warningf("device '%s' type '%s': SMART attributes normalize to '%s'; using attribute IDs to disambiguate", dev.deviceName(), dev.deviceType(), identity.baseName)
+			warned[identity.baseName] = true
+		}
 
 		for _, chart := range cs {
 			if chart.ID == deviceSmartAttributeDecodedChartTmpl.ID {
