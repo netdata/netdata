@@ -382,21 +382,14 @@ static void log_forwarder_thread_func(void *arg) {
                         for(i = 0; i < nfds; i++) {
                             DWORD avail = 0;
                             if(!PeekNamedPipe(handles[i], NULL, 0, NULL, &avail, NULL))
-                                // broken pipe: for the notification pipe treat as POLLHUP so the
-                                // shutdown path fires; for entry pipes treat as POLLIN so read()
-                                // can detect EOF and mark the entry for deletion
-                                pfds[i].revents = (i == 0) ? POLLHUP : POLLIN;
+                                pfds[i].revents = POLLHUP;
                             else if(avail > 0)
                                 pfds[i].revents = POLLIN;
                             if(pfds[i].revents) ret++;
                         }
-                        if(!ret) {
-                            // race: WaitFor triggered but PeekNamedPipe saw nothing yet
-                            pfds[wr - WAIT_OBJECT_0].revents = POLLIN;
-                            ret = 1;
-                        }
                     }
                     else {
+                        Sleep((DWORD)timeout);
                         ret = -1; // WAIT_FAILED or WAIT_ABANDONED
                     }
                 }

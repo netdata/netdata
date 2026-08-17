@@ -1288,6 +1288,8 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
+    rrdeng_file_deletion_drain(ctx);
+
     if(unittest_running && ctx->dynamically_allocated)
         freez(ctx);
 

@@ -336,14 +336,9 @@ int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *pa
     }
     spinlock_unlock(&ctx->deletion.spinlock);
 
-    if (start) {
-        int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
-                               rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
-        if (unlikely(rc)) {
-            rrdeng_file_deletion_finish(deletion);
-            return rc;
-        }
-    }
+    if (start)
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FILE_DELETE, deletion, NULL,
+                       STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     return 0;
 }
@@ -2759,6 +2754,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_EXTENT_WRITE,                             "extent write");
     worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
     worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
+    worker_register_job_name(RRDENG_OPCODE_FILE_DELETE,                              "file delete");
     worker_register_job_name(RRDENG_OPCODE_JOURNAL_INDEX,                            "journal index");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_MAIN,                               "flush init");
     worker_register_job_name(RRDENG_OPCODE_EVICT_MAIN,                               "evict init");
@@ -2925,6 +2921,11 @@ void dbengine_event_loop(void* arg) {
                         __atomic_store_n(&ctx->atomic.now_deleting_files, true, __ATOMIC_RELAXED);
                         work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate);
                     }
+                    break;
+                }
+
+                case RRDENG_OPCODE_FILE_DELETE: {
+                    rrdeng_file_deletion_start(cmd.data);
                     break;
                 }
 
