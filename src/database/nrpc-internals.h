@@ -89,7 +89,7 @@ static inline void nrpc_capture_release(struct nrpc_capture *c) {
 static inline size_t nrpc_strlen_bounded(const char *s, size_t max) {
     size_t len = strnlen(s, max + 1);
     if(unlikely(len > max))
-        fatal("RRDFUNCTIONS: string exceeds maximum supported length.");
+        fatal("NRPC: string exceeds maximum supported length.");
 
     return len;
 }

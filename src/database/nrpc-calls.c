@@ -6,7 +6,7 @@
 
 struct nrpc_call {
     RRDHOST *host;
-    nd_uuid_t transaction_uuid;
+    nd_uuid_t call_id_uuid;
     const char *call_id;
     const char *cmd;
     const char *sanitized_cmd;
@@ -22,7 +22,7 @@ struct nrpc_call {
 
     NRPC_METHOD_ACQUIRED *method_acquired;
 
-    // the collector
+    // the method being called
     // we acquire this structure at the beginning,
     // and we release it at the end
     struct nrpc_method *method;
@@ -60,7 +60,7 @@ struct nrpc_call {
         // used to signal the function to cancel
         nrpc_cancel_hook_cb_t cb;
         void *data;
-    } canceller;
+    } cancel_hook;
 
     struct {
         // callback to receive progress reports from function
@@ -73,11 +73,11 @@ struct nrpc_call {
         // used to send progress requests to function
         nrpc_progress_hook_cb_t cb;
         void *data;
-    } progresser;
+    } progress_hook;
 };
 
-// The call_id broker: every in-flight function call, keyed by its compact
-// call_id id. One global instance - transactions are process-wide, not
+// The in-flight calls table: every in-flight call, keyed by its compact
+// call_id. One global instance - in-flight calls are process-wide, not
 // per-host (the record carries its host).
 struct nrpc_inflight_calls {
     DICTIONARY *dict;
@@ -99,15 +99,15 @@ static void nrpc_call_cleanup(struct nrpc_call *call) {
     // the execute capture's transport pin (NULL for INTERNAL sources)
     nrpc_capture_release(&call->captured);
 
-    // the canceller/progresser registration pins: per the
+    // the cancel_hook/progress_hook registration pins: per the
     // nrpc_cancel_hook_cb_t contract their data is a transport, entry-
     // pinned at registration - BOTH released here, no dedup (an async record
     // can hold two). NULL-safe, so cleanup on a never-inserted record (the
     // early error paths) releases nothing.
-    nrpc_transport_entry_release(call->canceller.data);
-    call->canceller.data = NULL;
-    nrpc_transport_entry_release(call->progresser.data);
-    call->progresser.data = NULL;
+    nrpc_transport_entry_release(call->cancel_hook.data);
+    call->cancel_hook.data = NULL;
+    nrpc_transport_entry_release(call->progress_hook.data);
+    call->progress_hook.data = NULL;
 
     call->payload = NULL;
     call->call_id = NULL;
@@ -118,7 +118,7 @@ static void nrpc_call_cleanup(struct nrpc_call *call) {
 static void nrpc_inflight_calls_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct nrpc_call *call = value;
 
-    // internal_error(true, "FUNCTIONS: call_id '%s' finished", call->call_id);
+    // internal_error(true, "NRPC: call_id '%s' finished", call->call_id);
 
     nrpc_call_cleanup(call);
     nrpc_method_acquired_release(call->host, call->method_acquired);
@@ -133,9 +133,9 @@ static bool nrpc_inflight_calls_conflict_cb(const DICTIONARY_ITEM *item __maybe_
                                                void *old_value __maybe_unused,
                                                void *new_value __maybe_unused,
                                                void *data) {
-    bool *duplicate_transaction = data;
-    if(duplicate_transaction)
-        *duplicate_transaction = true;
+    bool *duplicate_call_id = data;
+    if(duplicate_call_id)
+        *duplicate_call_id = true;
 
     return false;
 }
@@ -151,7 +151,7 @@ void nrpc_inflight_calls_create(void) {
     dictionary_register_conflict_callback(nrpc_inflight_calls.dict, nrpc_inflight_calls_conflict_cb, NULL);
 }
 
-// Key-format invariant: the broker keys transactions with
+// Key-format invariant: the in-flight calls table keys call_ids with
 // uuid_unparse_lower_compact() (see nrpc_call), and so does the
 // pluginsd transport for its own inflight dictionary - a key-format change on
 // either side would silently turn every lookup here into a miss.
@@ -171,7 +171,7 @@ bool nrpc_call_deadline(const char *call_id, usec_t *out_stop_monotonic_ut) {
 }
 
 // called ONLY from the ASAN-gated shutdown path (daemon-shutdown.c): in normal
-// operation the broker lives for the process lifetime and is never torn down -
+// operation the table lives for the process lifetime and is never torn down -
 // the destroy exists so leak checking sees a clean heap
 void nrpc_inflight_calls_destroy(void) {
     if(!nrpc_inflight_calls.dict)
@@ -181,10 +181,10 @@ void nrpc_inflight_calls_destroy(void) {
     nrpc_inflight_calls.dict = NULL;
 }
 
-static void nrpc_call_register_cancel_hook_cb(void *register_canceller_cb_data, nrpc_cancel_hook_cb_t canceller_cb, void *canceller_cb_data) {
-    struct nrpc_call *call = register_canceller_cb_data;
+static void nrpc_call_register_cancel_hook_cb(void *register_cancel_hook_cb_data, nrpc_cancel_hook_cb_t cancel_hook_cb, void *cancel_hook_cb_data) {
+    struct nrpc_call *call = register_cancel_hook_cb_data;
 
-    // per the nrpc_cancel_hook_cb_t contract, canceller_cb_data is the
+    // per the nrpc_cancel_hook_cb_t contract, cancel_hook_cb_data is the
     // registrar's transport: entry-pin it for the record's lifetime, so a late
     // cancel after the transport's owner died acquire-fails on a valid (dead)
     // transport instead of chasing a freed pointer. Released in
@@ -195,27 +195,27 @@ static void nrpc_call_register_cancel_hook_cb(void *register_canceller_cb_data, 
     // shaped the same way (dyncfg_insert_cb, dyncfg_conflict_cb). The registry
     // entry sites store the transport as handler_data itself, so they have
     // no separate field to fill.
-    struct nrpc_transport *pinned = nrpc_transport_entry_acquire(canceller_cb_data);
+    struct nrpc_transport *pinned = nrpc_transport_entry_acquire(cancel_hook_cb_data);
 
     spinlock_lock(&call->callbacks.spinlock);
-    struct nrpc_transport *previous = call->canceller.data;
-    call->canceller.cb = canceller_cb;
-    call->canceller.data = pinned;
+    struct nrpc_transport *previous = call->cancel_hook.data;
+    call->cancel_hook.cb = cancel_hook_cb;
+    call->cancel_hook.data = pinned;
     spinlock_unlock(&call->callbacks.spinlock);
 
     nrpc_transport_entry_release(previous);
 }
 
-static void nrpc_call_register_progress_hook_cb(void *register_progresser_cb_data, nrpc_progress_hook_cb_t progresser_cb, void *progresser_cb_data) {
-    struct nrpc_call *call = register_progresser_cb_data;
+static void nrpc_call_register_progress_hook_cb(void *register_progress_hook_cb_data, nrpc_progress_hook_cb_t progress_hook_cb, void *progress_hook_cb_data) {
+    struct nrpc_call *call = register_progress_hook_cb_data;
 
-    // same contract, pin and re-registration handling as the canceller above
-    struct nrpc_transport *pinned = nrpc_transport_entry_acquire(progresser_cb_data);
+    // same contract, pin and re-registration handling as the cancel_hook above
+    struct nrpc_transport *pinned = nrpc_transport_entry_acquire(progress_hook_cb_data);
 
     spinlock_lock(&call->callbacks.spinlock);
-    struct nrpc_transport *previous = call->progresser.data;
-    call->progresser.cb = progresser_cb;
-    call->progresser.data = pinned;
+    struct nrpc_transport *previous = call->progress_hook.data;
+    call->progress_hook.cb = progress_hook_cb;
+    call->progress_hook.data = pinned;
     spinlock_unlock(&call->callbacks.spinlock);
 
     nrpc_transport_entry_release(previous);
@@ -291,7 +291,7 @@ static bool nrpc_call_is_cancelled(void *data) {
 
 static inline int nrpc_call_async_nowait(struct nrpc_call *call) {
     struct nrpc_request req = {
-        .call_id = &call->transaction_uuid,
+        .call_id = &call->call_id_uuid,
         .function = call->sanitized_cmd,
         .payload = call->payload,
         .user_access = call->user_access,
@@ -334,14 +334,14 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
     netdata_cond_init(&tmp->cond);
 
     // we need a temporary BUFFER, because we may time out and the caller supplied one may vanish,
-    // so we create a new one we guarantee will survive until the collector finishes...
+    // so we create a new one we guarantee will survive until the handler finishes...
 
     bool we_should_free = false;
     BUFFER *temp_wb  = buffer_create(1024, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = call->result.wb->content_type;
 
     struct nrpc_request req = {
-        .call_id = &call->transaction_uuid,
+        .call_id = &call->call_id_uuid,
         .function = call->sanitized_cmd,
         .payload = call->payload,
         .user_access = call->user_access,
@@ -400,7 +400,7 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
                 rc = 0;
                 if (!tmp->data_are_ready && call->is_cancelled.cb &&
                     call->is_cancelled.cb(call->is_cancelled.data)) {
-                    //                    internal_error(true, "FUNCTIONS: call_id '%s' is cancelled while waiting for response",
+                    //                    internal_error(true, "NRPC: call_id '%s' is cancelled while waiting for response",
                     //                                   call->call_id);
                     cancelled = true;
                     nrpc_call_cancel_internal(call);
@@ -489,7 +489,7 @@ int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
                                        HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
-    size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
+    size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, cmd, sizeof(sanitized_cmd));
 
     NRPC_METHOD_ACQUIRED *method_acquired = NULL;
     int code = nrpc_registry_find(host, result_wb, sanitized_cmd, sanitized_cmd_length, &method_acquired);
@@ -567,7 +567,7 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     const char *source_to_sanitize = source ? source : "";
     size_t sanitized_source_size = nrpc_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *sanitized_source = mallocz(sanitized_source_size);
-    rrd_functions_sanitize(sanitized_source, source_to_sanitize, sanitized_source_size);
+    nrpc_sanitize_name(sanitized_source, source_to_sanitize, sanitized_source_size);
 
     // ------------------------------------------------------------------------
     // check for the host
@@ -585,7 +585,7 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     // ------------------------------------------------------------------------
     // find the function and verify the caller's access
 
-    size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
+    size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, cmd, sizeof(sanitized_cmd));
 
     code = nrpc_method_authorize(host, result_wb, cmd, user_access, allow_restricted, &method_acquired);
     if(code != HTTP_RESP_OK) {
@@ -646,7 +646,7 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         },
     };
     sanitized_source = NULL;
-    uuid_copy(t.transaction_uuid, uuid);
+    uuid_copy(t.call_id_uuid, uuid);
 
     // capture the execute pair NOW, under the entry's leaf lock, pinning the
     // transport - executors must never re-read method's pair at call time (see
@@ -654,9 +654,9 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     // release the pin via nrpc_call_cleanup(&t).
     nrpc_method_capture(method_acquired, &t.captured);
 
-    bool duplicate_transaction = false;
+    bool duplicate_call_id = false;
     struct nrpc_call *call = dictionary_set_advanced(
-        nrpc_inflight_calls.dict, call_id, -1, &t, sizeof(t), &duplicate_transaction);
+        nrpc_inflight_calls.dict, call_id, -1, &t, sizeof(t), &duplicate_call_id);
     if(!call) {
         // dictionary_set() returns NULL when the dictionary is destroyed (shutdown in progress)
         code = nrpc_call_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
@@ -670,9 +670,9 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         return code;
     }
 
-    if(duplicate_transaction) {
+    if(duplicate_call_id) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "FUNCTIONS: duplicate call_id '%s', function: '%s'",
+               "NRPC: duplicate call_id '%s', method: '%s'",
                t.call_id, t.cmd);
 
         code = nrpc_call_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
@@ -685,13 +685,13 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
         return code;
     }
-    // internal_error(true, "FUNCTIONS: call_id '%s' started", call->call_id);
+    // internal_error(true, "NRPC: call_id '%s' started", call->call_id);
 
     if(call->method->sync) {
         // the caller has to wait
 
         struct nrpc_request req = {
-            .call_id = &call->transaction_uuid,
+            .call_id = &call->call_id_uuid,
             .function = call->sanitized_cmd,
             .payload = call->payload,
             .user_access = call->user_access,
@@ -753,7 +753,7 @@ static void nrpc_call_cancel_internal(struct nrpc_call *call) {
     bool cancelled = __atomic_load_n(&call->cancelled, __ATOMIC_RELAXED);
     if(cancelled) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: received a CANCEL request for call_id '%s', but it is already cancelled.",
+               "NRPC: received a CANCEL request for call_id '%s', but it is already cancelled.",
                call->call_id);
         return;
     }
@@ -762,32 +762,32 @@ static void nrpc_call_cancel_internal(struct nrpc_call *call) {
 
     if(!nrpc_serving_dispatcher_acquire(call->method->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: received a CANCEL request for call_id '%s', but the collector is not running.",
+               "NRPC: received a CANCEL request for call_id '%s', but the serving thread is not running.",
                call->call_id);
         return;
     }
 
-    nrpc_cancel_hook_cb_t canceller_cb;
-    void *canceller_cb_data;
+    nrpc_cancel_hook_cb_t cancel_hook_cb;
+    void *cancel_hook_cb_data;
 
     spinlock_lock(&call->callbacks.spinlock);
-    canceller_cb = call->canceller.cb;
-    canceller_cb_data = call->canceller.data;
+    cancel_hook_cb = call->cancel_hook.cb;
+    cancel_hook_cb_data = call->cancel_hook.data;
     spinlock_unlock(&call->callbacks.spinlock);
 
-    if(canceller_cb)
-        canceller_cb(call->call_id, canceller_cb_data);
+    if(cancel_hook_cb)
+        cancel_hook_cb(call->call_id, cancel_hook_cb_data);
 
     nrpc_serving_dispatcher_release(call->method->serving);
 }
 
 void nrpc_call_cancel(const char *call_id) {
-    // internal_error(true, "FUNCTIONS: request to cancel call_id '%s'", call_id);
+    // internal_error(true, "NRPC: request to cancel call_id '%s'", call_id);
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(nrpc_inflight_calls.dict, call_id);
     if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: received a CANCEL request for call_id '%s', but the call_id is not running.",
+               "NRPC: received a CANCEL request for call_id '%s', but the call_id is not running.",
                call_id);
         return;
     }
@@ -801,7 +801,7 @@ void nrpc_call_progress(const char *call_id) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(nrpc_inflight_calls.dict, call_id);
     if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: received a PROGRESS request for call_id '%s', but the call_id is not running.",
+               "NRPC: received a PROGRESS request for call_id '%s', but the call_id is not running.",
                call_id);
         return;
     }
@@ -810,23 +810,23 @@ void nrpc_call_progress(const char *call_id) {
 
     if(!nrpc_serving_dispatcher_acquire(call->method->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: received a PROGRESS request for call_id '%s', but the collector is not running.",
+               "NRPC: received a PROGRESS request for call_id '%s', but the serving thread is not running.",
                call_id);
         goto cleanup;
     }
 
     functions_stop_monotonic_update_on_progress(&call->stop_monotonic_ut);
 
-    nrpc_progress_hook_cb_t progresser_cb;
-    void *progresser_cb_data;
+    nrpc_progress_hook_cb_t progress_hook_cb;
+    void *progress_hook_cb_data;
 
     spinlock_lock(&call->callbacks.spinlock);
-    progresser_cb = call->progresser.cb;
-    progresser_cb_data = call->progresser.data;
+    progress_hook_cb = call->progress_hook.cb;
+    progress_hook_cb_data = call->progress_hook.data;
     spinlock_unlock(&call->callbacks.spinlock);
 
-    if(progresser_cb)
-        progresser_cb(call_id, progresser_cb_data);
+    if(progress_hook_cb)
+        progress_hook_cb(call_id, progress_hook_cb_data);
 
     nrpc_serving_dispatcher_release(call->method->serving);
 

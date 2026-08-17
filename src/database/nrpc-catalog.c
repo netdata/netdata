@@ -299,7 +299,7 @@ static void host_function_to_dict_cb(const struct nrpc_method_view *v, void *dat
 
     size_t function_name_len = nrpc_strlen_bounded(v->name, PLUGINSD_LINE_MAX);
     if(unlikely(function_name_len > SIZE_MAX - UINT64_MAX_LENGTH - sizeof(NRPC_VERSION_SEPARATOR)))
-        fatal("RRDFUNCTIONS: function key is too large.");
+        fatal("NRPC: method key is too large.");
 
     size_t key_size = UINT64_MAX_LENGTH + sizeof(NRPC_VERSION_SEPARATOR) + function_name_len;
     CLEAN_CHAR_P *key = mallocz(key_size);

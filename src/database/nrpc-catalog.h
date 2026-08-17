@@ -13,7 +13,7 @@
 // the module touches the registry dictionary or its entries directly
 
 // which functions a traversal visits; EVERY filter includes the availability
-// check (collector running, host state current, not unregistered)
+// check (serving thread running, host state current, not unregistered)
 typedef enum {
     NRPC_CATALOG_FILTER_USER,        // + skip DYNCFG and RESTRICTED (user-facing lists, cloud)
     NRPC_CATALOG_FILTER_STREAM_CHART,  // + skip DYNCFG (chart functions stream, RESTRICTED included)

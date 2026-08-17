@@ -19,7 +19,7 @@ static void pluginsd_calls_insert_cb(const DICTIONARY_ITEM *item, void *func, vo
 
     int rc = uuid_parse_flexi(transaction, pf->transaction);
     if(rc != 0)
-        netdata_log_error("FUNCTION: '%s': cannot parse transaction UUID", string2str(pf->function));
+        netdata_log_error("PLUGINSD: FUNCTION '%s': cannot parse the transaction UUID (the wire name of the call_id)", string2str(pf->function));
 
     CLEAN_BUFFER *buffer = buffer_create(1024, NULL);
     if(pf->payload && buffer_strlen(pf->payload)) {
@@ -58,14 +58,14 @@ static void pluginsd_calls_insert_cb(const DICTIONARY_ITEM *item, void *func, vo
         pf->sent_successfully = false;
 
         pf->code = HTTP_RESP_SERVICE_UNAVAILABLE;
-        netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
+        netdata_log_error("PLUGINSD: FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
         nrpc_call_error(pf->result_body_wb, "Failed to send this request to the plugin that offered it.", pf->code);
     }
     else {
         pf->sent_successfully = true;
 
         internal_error(LOG_FUNCTIONS,
-                       "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %"PRIu64" usec)",
+                       "PLUGINSD: FUNCTION '%s' with transaction '%s' sent to the plugin (%zd bytes, in %"PRIu64" usec)",
                        string2str(pf->function), dictionary_acquired_item_name(item), ret,
                        pf->sent_monotonic_ut - pf->started_monotonic_ut);
     }
@@ -95,7 +95,7 @@ static void pluginsd_calls_delete_cb(const DICTIONARY_ITEM *item __maybe_unused,
     struct parser *parser = (struct parser *)parser_ptr; (void)parser;
 
     internal_error(LOG_FUNCTIONS,
-                   "FUNCTION '%s' result of transaction '%s' received from collector "
+                   "PLUGINSD: FUNCTION '%s' result of transaction '%s' received from the plugin "
                    "(%zu bytes, request %"PRIu64" usec, response %"PRIu64" usec)",
                    string2str(pf->function), dictionary_acquired_item_name(item),
                    buffer_strlen(pf->result_body_wb),
@@ -113,7 +113,7 @@ static void pluginsd_calls_delete_cb(const DICTIONARY_ITEM *item __maybe_unused,
 
 void pluginsd_calls_init(PARSER *parser) {
     // the transport is what everyone who may need to reach this parser later
-    // stores (registry entries, cancellers/progressers, dyncfg nodes); the
+    // stores (registry entries, cancel/progress hooks, dyncfg nodes); the
     // base entry ref created here is dropped by parser_destroy() after the
     // parser is freed
     parser->inflight.transport = nrpc_transport_create(parser);
@@ -198,7 +198,7 @@ void pluginsd_calls_release_deferred(PARSER *parser) {
 // A victim some other reference keeps alive (e.g. a RESULT_BEGIN defer) goes
 // pending instead and is delivered by a later sweep. Enabling invariant (hard
 // constraint): no thread may hold a waiter mutex while acquiring this
-// dictionary's items lock - the keyed canceller/progresser touch only the
+// dictionary's items lock - the keyed cancel/progress hooks touch only the
 // index lock, and handler always precedes the wait-mutex acquisition.
 void pluginsd_calls_garbage_collect(PARSER  *parser, usec_t now_ut) {
     struct gc_victim {
@@ -214,16 +214,16 @@ void pluginsd_calls_garbage_collect(PARSER  *parser, usec_t now_ut) {
     struct pluginsd_call *pf;
     dfe_start_write(parser->inflight.calls, pf) {
         // Broker-keyed deadline: the parser dict key IS the compact
-        // transaction id, so this is one O(1) broker lookup per entry.
+        // transaction id (the wire name of the call_id), so this is one O(1) in-flight-table lookup per entry.
         usec_t stop_ut;
         if(unlikely(!nrpc_call_deadline(pf_dfe.name, &stop_ut))) {
-            // Invariant failure: every parser record must have a broker record
+            // Invariant failure: every parser record must have an in-flight call record
             // (pluginsd always registers sync=false, incl. the dyncfg
-            // intercept, so the broker record outlives the parser entry).
+            // intercept, so the in-flight call record outlives the parser entry).
             // SKIP, never reap: reaping would run the delete-callback chain
             // into memory whose invariant already failed.
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "FUNCTIONS: transaction '%s' has no broker record; skipping it during garbage collection",
+                   "PLUGINSD: transaction '%s' has no in-flight call record; skipping it during garbage collection",
                    pf_dfe.name);
             skipped++;
             continue;
@@ -240,7 +240,7 @@ void pluginsd_calls_garbage_collect(PARSER  *parser, usec_t now_ut) {
             pf->gc_collected = true;
 
             internal_error(true,
-                           "FUNCTION '%s' removing expired transaction '%s', after %"PRIu64" usec.",
+                           "PLUGINSD: FUNCTION '%s' removing expired transaction '%s', after %"PRIu64" usec.",
                            string2str(pf->function), pf_dfe.name, now_ut - pf->started_monotonic_ut);
 
             if(!buffer_strlen(pf->result_body_wb) || pf->code == HTTP_RESP_OK)
@@ -380,8 +380,8 @@ static void pluginsd_function_progress_to_plugin(const char *transaction, void *
     nrpc_transport_dispatcher_release(t);
 }
 
-// this is the function called from
-// rrd_call_function_and_wait() and nrpc_call_async()
+// the handler this transport registers for every plugin-offered method:
+// the nrpc_handler_cb_t of the pluginsd transport, invoked by nrpc_call()
 int pluginsd_nrpc_handler(struct nrpc_request *req, void *data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
@@ -476,7 +476,7 @@ int pluginsd_nrpc_handler(struct nrpc_request *req, void *data) {
 
         // req->stop_monotonic_ut is valid for the duration of this handler
         // invocation only (the documented validity window) - the record itself
-        // carries no deadline pointer, the GC reads deadlines via the broker
+        // carries no deadline pointer, the GC reads deadlines via the in-flight table
         if (!parser->inflight.smaller_monotonic_timeout_ut ||
             nrpc_effective_deadline_ut(*req->stop_monotonic_ut) < parser->inflight.smaller_monotonic_timeout_ut)
             parser->inflight.smaller_monotonic_timeout_ut = nrpc_effective_deadline_ut(*req->stop_monotonic_ut);
@@ -538,9 +538,9 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     }
 
     // Reserved dynamic-configuration function names ("config", "config <id>")
-    // are enforced by the registry itself on the sanitized key: a COLLECTOR
+    // are enforced by the registry itself on the sanitized key: a PLUGIN-source
     // registration of such a name is rejected by nrpc_method_register(), while a
-    // STREAMING one (a child's synthetic "config" proxy on its own host) is
+    // STREAM-source one (a child's synthetic "config" proxy on its own host) is
     // accepted - see the reasoning at the enforcement site in nrpc-registry.c.
     bool from_streaming = (parser->repertoire & PARSER_INIT_STREAMING) != 0;
 

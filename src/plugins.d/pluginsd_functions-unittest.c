@@ -32,29 +32,29 @@ struct c6ut_result {
     int code;
 };
 
-// mimics the broker's registration callbacks: stores the (cb, data) pair and
+// mimics the in-flight table's registration callbacks: stores the (cb, data) pair and
 // entry-pins the transport, per the nrpc_cancel_hook_cb_t contract
-struct c6ut_canceller {
+struct c6ut_cancel_hook {
     nrpc_cancel_hook_cb_t cb;
     struct nrpc_transport *transport; // entry-pinned
 };
 
-static void c6ut_register_canceller_cb(void *register_cancel_cb_data, nrpc_cancel_hook_cb_t cancel_cb, void *cancel_cb_data) {
-    struct c6ut_canceller *c = register_cancel_cb_data;
-    c->cb = cancel_cb;
-    c->transport = nrpc_transport_entry_acquire(cancel_cb_data);
+static void c6ut_register_cancel_hook_cb(void *register_cancel_hook_cb_data, nrpc_cancel_hook_cb_t cancel_hook_cb, void *cancel_hook_cb_data) {
+    struct c6ut_cancel_hook *c = register_cancel_hook_cb_data;
+    c->cb = cancel_hook_cb;
+    c->transport = nrpc_transport_entry_acquire(cancel_hook_cb_data);
 }
 
-// same, for the progresser half of the registration contract
-struct c6ut_progresser {
+// same, for the progress_hook half of the registration contract
+struct c6ut_progress_hook {
     nrpc_progress_hook_cb_t cb;
     struct nrpc_transport *transport; // entry-pinned
 };
 
-static void c6ut_register_progresser_cb(void *register_progresser_cb_data, nrpc_progress_hook_cb_t progresser_cb, void *progresser_cb_data) {
-    struct c6ut_progresser *p = register_progresser_cb_data;
-    p->cb = progresser_cb;
-    p->transport = nrpc_transport_entry_acquire(progresser_cb_data);
+static void c6ut_register_progress_hook_cb(void *register_progress_hook_cb_data, nrpc_progress_hook_cb_t progress_hook_cb, void *progress_hook_cb_data) {
+    struct c6ut_progress_hook *p = register_progress_hook_cb_data;
+    p->cb = progress_hook_cb;
+    p->transport = nrpc_transport_entry_acquire(progress_hook_cb_data);
 }
 
 static void c6ut_result_cb(BUFFER *wb __maybe_unused, int code, void *data) {
@@ -87,7 +87,7 @@ static int c6ut_noop_execute_cb(struct nrpc_request *req __maybe_unused, void *d
 }
 
 // an async function that never completes on its own: captures the transaction
-// and the broker's result callback so the test can finish it explicitly
+// and the in-flight table's result callback so the test can finish it explicitly
 static struct {
     char tx[UUID_COMPACT_STR_LEN];
     BUFFER *result_wb;
@@ -103,7 +103,7 @@ static int c5b_async_execute_cb(struct nrpc_request *req, void *data __maybe_unu
     return HTTP_RESP_OK;
 }
 
-// an async function that registers a canceller and a progresser with
+// an async function that registers a cancel_hook and a progress_hook with
 // transports of the test's choosing, so the record's registration PINS can be
 // counted (and a re-registration's release verified)
 static struct {
@@ -117,11 +117,11 @@ static struct {
     void *result_cb_data;
 } c7_pin;
 
-static void c7_pin_canceller(const char *transaction __maybe_unused, void *data __maybe_unused) {
+static void c7_pin_cancel_hook(const char *transaction __maybe_unused, void *data __maybe_unused) {
     c7_pin.cancels++;
 }
 
-static void c7_pin_progresser(const char *transaction __maybe_unused, void *data __maybe_unused) {
+static void c7_pin_progress_hook(const char *transaction __maybe_unused, void *data __maybe_unused) {
     c7_pin.progresses++;
 }
 
@@ -134,29 +134,29 @@ static int c7_pin_execute_cb(struct nrpc_request *req, void *data __maybe_unused
     if(req->register_cancel_hook.cb) {
         // registering twice: the second registration must release the pin the
         // first one took, or the first transport leaks a ref forever
-        req->register_cancel_hook.cb(req->register_cancel_hook.data, c7_pin_canceller, c7_pin.first);
-        req->register_cancel_hook.cb(req->register_cancel_hook.data, c7_pin_canceller, c7_pin.second);
+        req->register_cancel_hook.cb(req->register_cancel_hook.data, c7_pin_cancel_hook, c7_pin.first);
+        req->register_cancel_hook.cb(req->register_cancel_hook.data, c7_pin_cancel_hook, c7_pin.second);
     }
 
     if(req->register_progress_hook.cb)
-        req->register_progress_hook.cb(req->register_progress_hook.data, c7_pin_progresser, c7_pin.second);
+        req->register_progress_hook.cb(req->register_progress_hook.data, c7_pin_progress_hook, c7_pin.second);
 
     return HTTP_RESP_OK;
 }
 
-// a SYNC function: it must be executed inline, with no canceller/progresser
-// registration hooks, and must leave no broker record behind
+// a SYNC function: it must be executed inline, with no cancel_hook/progress_hook
+// registration hooks, and must leave no in-flight call record behind
 static struct {
     char tx[UUID_COMPACT_STR_LEN];
-    bool has_canceller;
-    bool has_progresser;
+    bool has_cancel_hook;
+    bool has_progress_hook;
     bool deadline_visible;
 } c7_sync;
 
 static int c7_sync_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
     uuid_unparse_lower_compact(*req->call_id, c7_sync.tx);
-    c7_sync.has_canceller = (req->register_cancel_hook.cb != NULL);
-    c7_sync.has_progresser = (req->register_progress_hook.cb != NULL);
+    c7_sync.has_cancel_hook = (req->register_cancel_hook.cb != NULL);
+    c7_sync.has_progress_hook = (req->register_progress_hook.cb != NULL);
 
     usec_t d = 0;
     c7_sync.deadline_visible = nrpc_call_deadline(c7_sync.tx, &d);
@@ -192,8 +192,8 @@ static PARSER *c6ut_parser_create(struct c6ut_sends *sends) {
 // transaction id (so duplicates can be forced)
 static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec_t *stop_ut,
                            BUFFER *wb, struct c6ut_result *res,
-                           struct c6ut_canceller *canceller,
-                           struct c6ut_progresser *progresser) {
+                           struct c6ut_cancel_hook *cancel_hook,
+                           struct c6ut_progress_hook *progress_hook) {
     struct nrpc_request req = {
         .call_id = uuid,
         .function = fn,
@@ -207,12 +207,12 @@ static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec
             .data = res,
         },
         .register_cancel_hook = {
-            .cb = canceller ? c6ut_register_canceller_cb : NULL,
-            .data = canceller,
+            .cb = cancel_hook ? c6ut_register_cancel_hook_cb : NULL,
+            .data = cancel_hook,
         },
         .register_progress_hook = {
-            .cb = progresser ? c6ut_register_progresser_cb : NULL,
-            .data = progresser,
+            .cb = progress_hook ? c6ut_register_progress_hook_cb : NULL,
+            .data = progress_hook,
         },
     };
 
@@ -224,12 +224,12 @@ static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec
 static int c6ut_execute(PARSER *parser, const char *fn, usec_t *stop_ut,
                         BUFFER *wb, struct c6ut_result *res,
                         char tx[UUID_COMPACT_STR_LEN],
-                        struct c6ut_canceller *canceller) {
+                        struct c6ut_cancel_hook *cancel_hook) {
     nd_uuid_t uuid;
     uuid_generate_random(uuid);
     uuid_unparse_lower_compact(uuid, tx);
 
-    return c6ut_execute_tx(parser, fn, &uuid, stop_ut, wb, res, canceller, NULL);
+    return c6ut_execute_tx(parser, fn, &uuid, stop_ut, wb, res, cancel_hook, NULL);
 }
 
 static void c6ut_result_begin(PARSER *parser, const char *tx, const char *status) {
@@ -275,8 +275,8 @@ int pluginsd_functions_unittest(void) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         char tx[UUID_COMPACT_STR_LEN];
 
-        struct c6ut_canceller canceller = { 0 };
-        int code = c6ut_execute(parser, "c6-truncated-fn", &stop_ut, wb, &res, tx, &canceller);
+        struct c6ut_cancel_hook cancel_hook = { 0 };
+        int code = c6ut_execute(parser, "c6-truncated-fn", &stop_ut, wb, &res, tx, &cancel_hook);
         if(code != HTTP_RESP_OK) {
             fprintf(stderr, "  FAILED truncation: execute returned %d\n", code);
             errors++;
@@ -288,14 +288,14 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        // the keyed canceller, while the plugin lives: O(1) lookup + CANCEL send
-        if(!canceller.cb || !canceller.transport) {
-            fprintf(stderr, "  FAILED truncation: no canceller was registered\n");
+        // the keyed cancel_hook, while the plugin lives: O(1) lookup + CANCEL send
+        if(!cancel_hook.cb || !cancel_hook.transport) {
+            fprintf(stderr, "  FAILED truncation: no cancel_hook was registered\n");
             errors++;
         }
         else {
             size_t cancels_before = sends.cancels;
-            canceller.cb(tx, canceller.transport);
+            cancel_hook.cb(tx, cancel_hook.transport);
             if(sends.cancels != cancels_before + 1) {
                 fprintf(stderr, "  FAILED truncation: live cancel did not send a CANCEL to the plugin\n");
                 errors++;
@@ -304,17 +304,17 @@ int pluginsd_functions_unittest(void) {
 
         parser_destroy(parser); // ...but dies before RESULT_END
 
-        // the keyed canceller AFTER death: the dispatcher acquire fails on the
+        // the keyed cancel_hook AFTER death: the dispatcher acquire fails on the
         // pinned (dead) transport - no send, no crash
-        if(canceller.cb) {
+        if(cancel_hook.cb) {
             size_t cancels_before = sends.cancels;
-            canceller.cb(tx, canceller.transport);
+            cancel_hook.cb(tx, cancel_hook.transport);
             if(sends.cancels != cancels_before) {
                 fprintf(stderr, "  FAILED truncation: cancel after parser death still sent to the plugin\n");
                 errors++;
             }
         }
-        nrpc_transport_entry_release(canceller.transport);
+        nrpc_transport_entry_release(cancel_hook.transport);
 
         if(res.calls != 1) {
             fprintf(stderr, "  FAILED truncation: result delivered %zu times, expected exactly once\n", res.calls);
@@ -389,8 +389,8 @@ int pluginsd_functions_unittest(void) {
 
     // 4. GC delete mid-defer + RESULT_END delivers exactly once (the
     //    detach-then-deliver sweep). Production-shaped: the call goes through
-    //    the broker (nrpc_call), because the GC reads deadlines
-    //    exclusively through the broker-keyed accessor.
+    //    the in-flight calls table (nrpc_call), because the GC reads deadlines
+    //    exclusively through the in-flight calls table-keyed accessor.
     {
         int before = errors;
         struct c6ut_sends sends = { 0 };
@@ -422,7 +422,7 @@ int pluginsd_functions_unittest(void) {
 
         c6ut_result_begin(parser, tx, "200");
 
-        // let the broker deadline (1s) plus the grace extension (1s) lapse,
+        // let the in-flight calls table deadline (1s) plus the grace extension (1s) lapse,
         // then run the GC: the defer's reference keeps the parser record
         // alive, so the GC's delete only marks it pending - no delivery yet
         sleep_usec(2200 * USEC_PER_MS);
@@ -616,7 +616,7 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  OK gc-race: concurrent GC passes cancel and deliver exactly once\n");
     }
 
-    // 7. the broker-keyed deadline accessor (C5b): visible deadline, visible
+    // 7. the in-flight calls table-keyed deadline accessor (C5b): visible deadline, visible
     //    extension-on-progress, miss after completion
     {
         int before = errors;
@@ -657,7 +657,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        // finish the call; the broker record must disappear
+        // finish the call; the in-flight call record must disappear
         c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
 
         if(nrpc_call_deadline(c5b_capture.tx, &d3)) {
@@ -718,7 +718,7 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  OK dead-transport: an entry of a dead plugin answers exactly one clean 503\n");
     }
 
-    // 9. cancellers and progressers are KEYED, not pointer-identity matched
+    // 9. cancel and progress hooks are KEYED, not pointer-identity matched
     //    (UAF-A): a request carrying one plugin's transport and another
     //    plugin's transaction must reach neither plugin. Before the refactor
     //    this was a scan over recyclable records, where a recycled record
@@ -734,8 +734,8 @@ int pluginsd_functions_unittest(void) {
         CLEAN_BUFFER *wba = buffer_create(0, NULL);
         CLEAN_BUFFER *wbb = buffer_create(0, NULL);
         char txa[UUID_COMPACT_STR_LEN], txb[UUID_COMPACT_STR_LEN];
-        struct c6ut_canceller can_a = { 0 };
-        struct c6ut_progresser prg_a = { 0 };
+        struct c6ut_cancel_hook can_a = { 0 };
+        struct c6ut_progress_hook prg_a = { 0 };
 
         nd_uuid_t ua, ub;
         uuid_generate_random(ua); uuid_unparse_lower_compact(ua, txa);
@@ -745,7 +745,7 @@ int pluginsd_functions_unittest(void) {
         c6ut_execute_tx(pb, "c7-keyed-b", &ub, &stop_ut, wbb, &res_b, NULL, NULL);
 
         if(!can_a.cb || !prg_a.cb) {
-            fprintf(stderr, "  FAILED keyed: no canceller/progresser was registered\n");
+            fprintf(stderr, "  FAILED keyed: no cancel_hook/progress_hook was registered\n");
             errors++;
         }
         else {
@@ -792,7 +792,7 @@ int pluginsd_functions_unittest(void) {
     }
 
     // 10. duplicate transaction ids, on both sides of the transport.
-    //     The broker rejects the second caller with 400 and must leave the
+    //     The in-flight calls table rejects the second caller with 400 and must leave the
     //     first (still running) transaction completely untouched; the parser's
     //     own conflict callback does the same for its dictionary, and frees
     //     the loser's payload/source/function (ASAN checks that half).
@@ -833,7 +833,7 @@ int pluginsd_functions_unittest(void) {
         // the rejection must not have touched the transaction already in flight
         usec_t d = 0;
         if(!nrpc_call_deadline(tx, &d)) {
-            fprintf(stderr, "  FAILED duplicate: the rejection removed the running transaction from the broker\n");
+            fprintf(stderr, "  FAILED duplicate: the rejection removed the running transaction from the in-flight calls table\n");
             errors++;
         }
 
@@ -846,7 +846,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
         if(nrpc_call_deadline(tx, &d)) {
-            fprintf(stderr, "  FAILED duplicate: the completed transaction is still in the broker\n");
+            fprintf(stderr, "  FAILED duplicate: the completed transaction is still in the in-flight calls table\n");
             errors++;
         }
 
@@ -887,7 +887,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         if(errors == before)
-            fprintf(stderr, "  OK duplicate: both the broker and the parser reject a duplicate without disturbing the original\n");
+            fprintf(stderr, "  OK duplicate: both the in-flight calls table and the parser reject a duplicate without disturbing the original\n");
     }
 
     // 11. a request that cannot even be written to the plugin is answered
@@ -929,7 +929,7 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  OK send-fail: an unsendable request is answered once and leaves nothing behind\n");
     }
 
-    // 12. GC invariant: a parser record with no broker record is SKIPPED, never
+    // 12. GC invariant: a parser record with no in-flight call record is SKIPPED, never
     //     reaped - reaping would run the delete-callback chain into memory
     //     whose invariant already failed. The all-skipped guard must also push
     //     the next GC attempt one extension away, or every later submission
@@ -951,7 +951,7 @@ int pluginsd_functions_unittest(void) {
 
         // handler itself runs the GC when the deadline is already behind us
         if(res.calls) {
-            fprintf(stderr, "  FAILED gc-skip: a record without a broker entry was reaped at submission\n");
+            fprintf(stderr, "  FAILED gc-skip: a record without a in-flight calls table entry was reaped at submission\n");
             errors++;
         }
         if(parser->inflight.smaller_monotonic_timeout_ut <= nrpc_effective_deadline_ut(stop_ut)) {
@@ -984,7 +984,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         if(errors == before)
-            fprintf(stderr, "  OK gc-skip: a record with no broker entry is skipped, never reaped, and answered at destroy\n");
+            fprintf(stderr, "  OK gc-skip: a record with no in-flight calls table entry is skipped, never reaped, and answered at destroy\n");
     }
 
     // 13. the grace extension is real: every deadline gets
@@ -1041,8 +1041,8 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  OK grace: the deadline is enforced one extension late, and exactly once\n");
     }
 
-    // 14. the broker's registration pins and the cancel protocol:
-    //     a canceller/progresser registration entry-pins its transport for the
+    // 14. the in-flight calls table's registration pins and the cancel protocol:
+    //     a cancel_hook/progress_hook registration entry-pins its transport for the
     //     record's lifetime (so a late cancel finds a valid, dead transport
     //     instead of freed memory), a re-registration releases the previous
     //     pin, completion releases both, and a second CANCEL for the same
@@ -1069,15 +1069,15 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        // first: base ref only (the canceller re-registration released its pin)
+        // first: base ref only (the cancel_hook re-registration released its pin)
         if(refcount_references(&c7_pin.first->entry_refcount) != 1) {
-            fprintf(stderr, "  FAILED pins: a canceller re-registration leaked the previous pin (refs %d != 1)\n",
+            fprintf(stderr, "  FAILED pins: a cancel_hook re-registration leaked the previous pin (refs %d != 1)\n",
                     refcount_references(&c7_pin.first->entry_refcount));
             errors++;
         }
-        // second: base + the canceller pin + the progresser pin
+        // second: base + the cancel_hook pin + the progress_hook pin
         if(refcount_references(&c7_pin.second->entry_refcount) != 3) {
-            fprintf(stderr, "  FAILED pins: the canceller/progresser pins are %d, expected 3 (base + 2)\n",
+            fprintf(stderr, "  FAILED pins: the cancel_hook/progress_hook pins are %d, expected 3 (base + 2)\n",
                     refcount_references(&c7_pin.second->entry_refcount));
             errors++;
         }
@@ -1129,11 +1129,11 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  OK pins: registration pins are taken, re-taken and released; CANCEL is idempotent\n");
     }
 
-    // 15. the deadline the broker records, and the sync shortcut.
+    // 15. the deadline the in-flight calls table records, and the sync shortcut.
     //     A caller that gives no timeout gets the one the function was
     //     registered with; a sync function is executed inline, is visible in
-    //     the broker only for the duration of the call, and is offered no
-    //     canceller/progresser (there is nothing to cancel after it returns).
+    //     the in-flight calls table only for the duration of the call, and is offered no
+    //     cancel_hook/progress_hook (there is nothing to cancel after it returns).
     {
         int before = errors;
 
@@ -1162,7 +1162,7 @@ int pluginsd_functions_unittest(void) {
 
             usec_t d = 0;
             if(!nrpc_call_deadline(c5b_capture.tx, &d)) {
-                fprintf(stderr, "  FAILED timeout: the transaction is not in the broker\n");
+                fprintf(stderr, "  FAILED timeout: the transaction is not in the in-flight calls table\n");
                 errors++;
             }
             else if(d < t0 + t[i].expect_s * USEC_PER_SEC || d >= t0 + (t[i].expect_s + 1) * USEC_PER_SEC) {
@@ -1197,11 +1197,11 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
         if(!c7_sync.deadline_visible) {
-            fprintf(stderr, "  FAILED sync: the transaction was not in the broker during the call\n");
+            fprintf(stderr, "  FAILED sync: the transaction was not in the in-flight calls table during the call\n");
             errors++;
         }
-        if(c7_sync.has_canceller || c7_sync.has_progresser) {
-            fprintf(stderr, "  FAILED sync: a sync call was offered a canceller/progresser registration\n");
+        if(c7_sync.has_cancel_hook || c7_sync.has_progress_hook) {
+            fprintf(stderr, "  FAILED sync: a sync call was offered a cancel_hook/progress_hook registration\n");
             errors++;
         }
         usec_t d = 0;

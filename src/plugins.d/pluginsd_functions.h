@@ -19,7 +19,7 @@ struct pluginsd_call {
     BUFFER *result_body_wb;
 
     // NO deadline pointer here: the transport reads deadlines exclusively
-    // through the broker-keyed accessor nrpc_call_deadline()
+    // through the table-keyed accessor nrpc_call_deadline()
     // (the parser dict key IS the compact transaction id)
     usec_t started_monotonic_ut;
     usec_t sent_monotonic_ut;

@@ -30,7 +30,7 @@ void nrpc_method_register_builtin(RRDHOST *host, RRDSET *st, const char *name, i
                              const char *help, const char *tags,
                              HTTP_ACCESS access, nrpc_builtin_handler_cb_t handler) {
 
-    nrpc_serving_started(); // this creates a collector that runs for as long as netdata runs
+    nrpc_serving_started(); // this creates a serving handle that lives for as long as netdata runs
 
     nrpc_method_register(host, st, name, timeout, priority, version,
                      help, tags, access, true, NRPC_SOURCE_DAEMON,

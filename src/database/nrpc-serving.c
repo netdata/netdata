@@ -41,7 +41,7 @@ void nrpc_serving_dispatcher_release(struct nrpc_serving_handle *serving) {
 
 static void nrpc_serving_free(struct nrpc_serving_handle *serving) {
     if(nrpc_serving_running(serving) || !refcount_acquire_for_deletion(&serving->entry_refcount))
-        // the collector is still referenced by charts.
+        // the serving handle is still referenced by registered methods.
         // leave it hanging there, the last chart will actually free it.
         return;
 
@@ -49,7 +49,7 @@ static void nrpc_serving_free(struct nrpc_serving_handle *serving) {
     freez(serving);
 }
 
-// called once per collector
+// called once per serving thread
 void nrpc_serving_started(void) {
     if(!nrpc_thread_serving)
         nrpc_thread_serving = callocz(1, sizeof(struct nrpc_serving_handle));
@@ -58,7 +58,7 @@ void nrpc_serving_started(void) {
     __atomic_store_n(&nrpc_thread_serving->running, true, __ATOMIC_RELAXED);
 }
 
-// called once per collector
+// called once per serving thread
 void nrpc_serving_finished(void) {
     if(!nrpc_thread_serving)
         return;
@@ -66,7 +66,7 @@ void nrpc_serving_finished(void) {
     __atomic_store_n(&nrpc_thread_serving->running, false, __ATOMIC_RELAXED);
 
     // wait for any cancellation requests to be dispatched;
-    // the problem is that cancellation requests require a structure allocated by the collector,
+    // the problem is that cancellation requests require a structure allocated by the serving thread,
     // so, while cancellation requests are being dispatched, this structure is accessed.
     // delaying the exit of the thread is required to avoid cleaning up this structure.
     //
@@ -91,7 +91,7 @@ struct nrpc_serving_handle *nrpc_serving_current_thread_acquire(void) {
     nrpc_serving_started();
 
     if(!nrpc_serving_acquire(nrpc_thread_serving))
-        internal_fatal(true, "FUNCTIONS: Trying to acquire a the current thread collector, that is currently exiting.");
+        internal_fatal(true, "NRPC: trying to acquire the current thread's serving handle while it is exiting.");
 
     return nrpc_thread_serving;
 }

@@ -34,7 +34,7 @@ static void nrpc_registry_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     if(!method->priority)
         method->priority = NRPC_PRIORITY_DEFAULT;
 
-//    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+//    internal_error(true, "NRPC: registering method '%s' on host '%s', serving tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
 //                   method->serving->tid, method->serving->running ? "running" : "NOT running");
 }
@@ -77,7 +77,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->serving != nrpc_thread_serving) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed collector from %d to %d",
+               "NRPC: method '%s' of host '%s' changed serving thread from %d to %d",
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
                nrpc_serving_tid(method->serving), nrpc_serving_tid(nrpc_thread_serving));
 
@@ -88,7 +88,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->rrdhost_state_id != object_state_id(&host->state_id)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed state id from %u to %u",
+               "NRPC: method '%s' of host '%s' changed state id from %u to %u",
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
                method->rrdhost_state_id,
                object_state_id(&host->state_id));
@@ -107,7 +107,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->handler != new_method->handler) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed execute callback",
+               "NRPC: method '%s' of host '%s' changed handler",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(method->handler, new_method->handler);
@@ -116,7 +116,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->help != new_method->help) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed help text",
+               "NRPC: method '%s' of host '%s' changed help text",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(method->help, new_method->help);
@@ -125,7 +125,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->tags != new_method->tags) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed tags",
+               "NRPC: method '%s' of host '%s' changed tags",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(method->tags, new_method->tags);
@@ -137,7 +137,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
         // keeping them in sync with the swapped tags is what makes a re-registration
         // with the "hidden" tag actually restrict the function
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed options",
+               "NRPC: method '%s' of host '%s' changed flags",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(method->options, new_method->options);
@@ -146,7 +146,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->timeout != new_method->timeout) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed timeout (from %d to %d)",
+               "NRPC: method '%s' of host '%s' changed timeout (from %d to %d)",
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
                method->timeout, new_method->timeout);
 
@@ -156,7 +156,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->version != new_method->version) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed version (from %"PRIu32", to %"PRIu32")",
+               "NRPC: method '%s' of host '%s' changed version (from %"PRIu32", to %"PRIu32")",
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
                method->version, new_method->version);
 
@@ -166,7 +166,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->priority != new_method->priority) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed priority",
+               "NRPC: method '%s' of host '%s' changed priority",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(method->priority, new_method->priority);
@@ -175,7 +175,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->access != new_method->access) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed access level",
+               "NRPC: method '%s' of host '%s' changed access level",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(method->access, new_method->access);
@@ -184,7 +184,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->sync != new_method->sync) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed sync/async mode",
+               "NRPC: method '%s' of host '%s' changed sync/async mode",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(method->sync, new_method->sync);
@@ -195,7 +195,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
     // as two independently-conditional swaps - so a later cleanup/release always
     // keys on the ownership tag matching the data it actually holds.
     //
-    // Transport accounting (the collector pattern in this same callback, see
+    // Transport accounting (the serving-handle pattern in this same callback, see
     // new_method->serving above): when a DIFFERENT pair is installed, acquire
     // an entry ref iff the INSTALLED tag is transport-bearing; the displaced
     // pair lands in new_method for nrpc_method_cleanup(new_method) below to
@@ -208,7 +208,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
     // release.
     if(method->handler_data != new_method->handler_data || method->source != new_method->source) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed execute callback data or registration source",
+               "NRPC: method '%s' of host '%s' changed handler data or registration source",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         if(nrpc_source_has_transport(new_method->source) && new_method->handler_data)
@@ -223,7 +223,7 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
         new_method->source = NRPC_SOURCE_DAEMON;
     }
 
-//    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
+//    internal_error(true, "NRPC: registering method '%s' on host '%s', serving tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
 //                   method->serving->tid, method->serving->running ? "running" : "NOT running");
 
@@ -335,24 +335,24 @@ void nrpc_method_register(RRDHOST *host, RRDSET *st, const char *name, int timeo
 
     size_t key_size = nrpc_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
-    rrd_functions_sanitize(key, name, key_size);
+    nrpc_sanitize_name(key, name, key_size);
 
     // text_sanitize() wipes a result that is entirely underscores, so a name like "__" sanitizes
     // to "". Such a name is unusable (it could never be looked up) and it would also defeat the
     // "__" prefix check in nrpc_method_is_restricted() below, so refuse it outright.
     if(unlikely(!*key)) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "FUNCTIONS: refusing to register function '%s' on host '%s': the name sanitizes to an empty string",
+               "NRPC: refusing to register method '%s' on host '%s': the name sanitizes to an empty string",
                name, rrdhost_hostname(host));
         return;
     }
 
     // Reserved dynamic-configuration function names ("config", "config <id>") are
-    // owned exclusively by the dyncfg subsystem. A local plugin (COLLECTOR)
+    // owned exclusively by the dyncfg subsystem. A local plugin (NRPC_SOURCE_PLUGIN)
     // registering one would collide in the registry and make
     // nrpc_registry_conflict_cb() swap the built-in dyncfg execute callback
     // out, hijacking the config tree. Local plugins do dyncfg via the DYNCFG
-    // protocol (not FUNCTION), so no legitimate COLLECTOR registration uses these
+    // protocol (not FUNCTION), so no legitimate PLUGIN-source registration uses these
     // names.
     //
     // Streaming is the exception and MUST be preserved: a child streams a single
@@ -369,7 +369,7 @@ void nrpc_method_register(RRDHOST *host, RRDSET *st, const char *name, int timeo
         // a raw name with leading whitespace/control chars or embedded newlines
         // would make this log line misleading or malformed.
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "FUNCTIONS: 'host:%s' attempted to register reserved dynamic-configuration function '%s' from a collector. Ignoring it.",
+               "NRPC: 'host:%s' attempted to register reserved dynamic-configuration method '%s' from a plugin. Ignoring it.",
                rrdhost_hostname(host), key);
         return;
     }
@@ -441,7 +441,7 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
 
     size_t key_size = nrpc_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
-    rrd_functions_sanitize(key, name, key_size);
+    nrpc_sanitize_name(key, name, key_size);
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rpc_registry->dict, key);
     if(!item)
@@ -452,11 +452,11 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
     if(source == NRPC_SOURCE_PLUGIN) {
         if(!nrpc_thread_serving || method->serving != nrpc_thread_serving) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "FUNCTIONS: refusing to unregister function '%s' - "
-                   "collector mismatch (registered by %s, unregister requested by %s)",
+                   "NRPC: refusing to unregister method '%s' - "
+                   "serving-thread mismatch (registered by %s, unregister requested by %s)",
                    name,
-                   method->serving ? "another collector" : "unknown",
-                   nrpc_thread_serving ? "current collector" : "non-collector thread");
+                   method->serving ? "another serving thread" : "unknown",
+                   nrpc_thread_serving ? "current serving thread" : "a thread with no serving handle");
             dictionary_acquired_item_release(host->rpc_registry->dict, item);
             return false;
         }
@@ -476,7 +476,7 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
     // removed exclusively by the dyncfg subsystem (INTERNAL deletes).
     if(source != NRPC_SOURCE_DAEMON && is_dyncfg) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "FUNCTIONS: refusing to unregister dyncfg function '%s' via FUNCTION_DEL", name);
+               "NRPC: refusing to unregister dyncfg method '%s' via FUNCTION_DEL", name);
         dictionary_acquired_item_release(host->rpc_registry->dict, item);
         return false;
     }
@@ -563,8 +563,8 @@ int nrpc_registry_find(RRDHOST *host, BUFFER *wb, const char *name, size_t key_l
                 else {
 
                     nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                           "Function '%s' is not available. "
-                           "host '%s', collector = { tid: %d, running: %s }, host tid { rcv: %d, snd: %d }, host state { id: %u, expected %u }, hops: %d",
+                           "Method '%s' is not available. "
+                           "host '%s', serving = { tid: %d, running: %s }, host tid { rcv: %d, snd: %d }, host state { id: %u, expected %u }, hops: %d",
                            name,
                            rrdhost_hostname(host),
                            nrpc_serving_tid(method->serving),

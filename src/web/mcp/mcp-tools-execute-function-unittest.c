@@ -102,8 +102,8 @@ int mcp_execute_function_access_unittest(void) {
 
     mcp_functions_registry_init();
 
-    // The info path executes the function, which registers an in-flight
-    // transaction. Normal startup (and dyncfg_unittest) create the broker; the
+    // The info path executes the method, which registers an in-flight
+    // call. Normal startup (and dyncfg_unittest) create the in-flight calls table; the
     // standalone -W mcpfunctionaccesstest path does not, so ensure it here
     // (create is idempotent).
     nrpc_inflight_calls_create();

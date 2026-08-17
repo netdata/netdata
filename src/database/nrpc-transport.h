@@ -6,22 +6,22 @@
 #include "libnetdata/libnetdata.h"
 
 // The refcounted lifetime shell for a function transport - the object function
-// executors, cancellers, progressers and GC use to reach the connection that
+// executors, cancel/progress hooks and GC use to reach the connection that
 // registered a function (for pluginsd/streaming: the PARSER), without ever
 // dereferencing it after death.
 //
 // Two refcounts, the nrpc_serving_handle shape (nrpc-serving.c):
 //
 // - entry refcount: one ref per holder that STORES the transport - registry
-//   entries (COLLECTOR/STREAMING source only), the DYNCFG node pin, the
-//   broker-record canceller/progresser pins, the lookup-time pin, plus a base
+//   entries (PLUGIN/STREAM source only), the DYNCFG node pin, the
+//   in-flight-call cancel/progress hook pins, the lookup-time pin, plus a base
 //   ref held by the transport's owner (the parser). The struct is freed when
 //   this reaches zero - possibly long after the owner died (normal for
 //   streaming: registry entries survive disconnect). The destructor is
 //   owner-independent: it never touches `data`.
 //
 // - dispatcher refcount: transient holders around every send (handler,
-//   canceller, progresser, GC sends): acquire-or-fail. The owner's teardown
+//   cancel hook, progress hook, GC sends): acquire-or-fail. The owner's teardown
 //   marks the transport dead, drains this counter with
 //   refcount_acquire_for_deletion_and_wait() (deadlock-free: entry refs live
 //   on the OTHER counter), then frees the owner (`data` becomes invalid), then
@@ -52,7 +52,7 @@ static inline struct nrpc_transport *nrpc_transport_entry_acquire(struct nrpc_tr
     if(!refcount_acquire(&t->entry_refcount))
         // cannot happen while any holder legally stores the transport (each
         // holder owns a ref); a failure here is a use-after-release bug
-        fatal("FUNCTIONS TRANSPORT: entry acquire on a released transport");
+        fatal("NRPC: transport entry acquire on a released transport");
     return t;
 }
 

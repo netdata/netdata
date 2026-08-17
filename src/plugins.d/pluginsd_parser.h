@@ -143,7 +143,7 @@ struct parser {
         usec_t smaller_monotonic_timeout_ut;
 
         // the refcounted lifetime shell handed to everyone who may need to
-        // reach this parser later (registry entries, cancellers, progressers,
+        // reach this parser later (registry entries, cancel/progress hooks,
         // dyncfg nodes); see parser_destroy() for the teardown protocol
         struct nrpc_transport *transport;
     } inflight;

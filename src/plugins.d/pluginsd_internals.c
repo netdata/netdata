@@ -92,7 +92,7 @@ void parser_destroy(PARSER *parser) {
     pluginsd_calls_cleanup(parser);
 
     // 4. free the parser, THEN drop the transport's base ref: survivors
-    //    (registry entries, dyncfg nodes, broker pins) keep holding a valid
+    //    (registry entries, dyncfg nodes, in-flight-call pins) keep holding a valid
     //    but dead transport until they release it; its destructor never
     //    touches the parser
     struct nrpc_transport *transport = parser->inflight.transport;

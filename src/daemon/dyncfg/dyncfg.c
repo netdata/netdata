@@ -76,7 +76,7 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
     // tmp - so conflict losers hold nothing to leak. entry-acquire returns its
     // argument (NULL-safe, fatals on use-after-release); storing the returned
     // pointer keeps the sites that fill a dedicated transport field shaped the
-    // same way (dyncfg_conflict_cb, the inflight canceller/progresser pins)
+    // same way (dyncfg_conflict_cb, the in-flight cancel/progress hook pins)
     df->transport = nrpc_transport_entry_acquire(df->transport);
 
     const char *id = dictionary_acquired_item_name(item);

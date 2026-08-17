@@ -13,7 +13,7 @@
 // timestamps) BEFORE enforcing the caller's access level, while the normal
 // /api/v3/function path denied the same anonymous caller. The fix routes both
 // paths through nrpc_method_authorize(): /api/v3 via nrpc_call(),
-// and MCP by calling it directly before disclosing any metadata.
+// and MCP by calling it directly before disclosing any descriptor data.
 //
 // This test pins the shared gate: for a protected function (like
 // systemd-journal, which requires signed-in + same-space + sensitive-data), an
@@ -198,7 +198,7 @@ int nrpc_manifest_unittest(void) {
 
     for(size_t i = 0; i < _countof(names); i++) {
         char key[PLUGINSD_LINE_MAX];
-        rrd_functions_sanitize(key, names[i].raw, sizeof(key));
+        nrpc_sanitize_name(key, names[i].raw, sizeof(key));
         bool got = nrpc_method_name_is_dyncfg(key);
 
         if(got != names[i].expected_dyncfg) {
@@ -212,7 +212,7 @@ int nrpc_manifest_unittest(void) {
                     names[i].raw, key, got ? "true" : "false");
     }
 
-    // 1b. Registry-side enforcement of the dyncfg namespace: a COLLECTOR registration of a
+    // 1b. Registry-side enforcement of the dyncfg namespace: a PLUGIN-source registration of a
     //     reserved name must be rejected by nrpc_method_register() itself (the caller-side pluginsd
     //     guard was removed - the registry is now the only gate). The bare "config" name is the
     //     LIVE dyncfg function on localhost, so the assertions also pin that a rejected
@@ -235,7 +235,7 @@ int nrpc_manifest_unittest(void) {
                              nrpc_unittest_noop_cb, NULL);
 
         if(dictionary_get(host->rpc_registry->dict, "config c2-reject:job")) {
-            fprintf(stderr, "  FAILED enforcement: COLLECTOR registered reserved name 'config c2-reject:job'\n");
+            fprintf(stderr, "  FAILED enforcement: PLUGIN-source registration created reserved name 'config c2-reject:job'\n");
             errors++;
             nrpc_method_unregister(host, NULL, "config c2-reject:job", NRPC_SOURCE_DAEMON);
         }
@@ -245,20 +245,20 @@ int nrpc_manifest_unittest(void) {
         struct nrpc_method *live_after = dictionary_get(host->rpc_registry->dict, "config");
         if(live && (!live_after || live_after->handler != live_cb ||
                     live_after->handler == nrpc_unittest_noop_cb)) {
-            fprintf(stderr, "  FAILED enforcement: COLLECTOR registration of 'config' touched the live dyncfg entry\n");
+            fprintf(stderr, "  FAILED enforcement: PLUGIN-source registration of 'config' touched the live dyncfg entry\n");
             errors++;
         }
 
         // if there is NO live "config" in this environment, the rejected registrations must
         // not have created one
         if(!live && dictionary_get(host->rpc_registry->dict, "config")) {
-            fprintf(stderr, "  FAILED enforcement: COLLECTOR registration created reserved name 'config'\n");
+            fprintf(stderr, "  FAILED enforcement: PLUGIN-source registration created reserved name 'config'\n");
             errors++;
             nrpc_method_unregister(host, NULL, "config", NRPC_SOURCE_DAEMON);
         }
 
         if(errors == enforce_errors_before)
-            fprintf(stderr, "  OK enforcement: COLLECTOR registrations of 'config', ' config' and 'config <id>' rejected\n");
+            fprintf(stderr, "  OK enforcement: PLUGIN-source registrations of 'config', ' config' and 'config <id>' rejected\n");
     }
 
     // 2. The manifest dictionary itself, using names that cannot collide with live functions.
@@ -307,7 +307,7 @@ int nrpc_manifest_unittest(void) {
     dfe_start_read(manifest, v) {
         (void)v;
         char key[PLUGINSD_LINE_MAX];
-        rrd_functions_sanitize(key, v_dfe.name, sizeof(key));
+        nrpc_sanitize_name(key, v_dfe.name, sizeof(key));
         if(nrpc_method_name_is_dyncfg(key)) {
             fprintf(stderr, "  FAILED: dyncfg function '%s' present in the manifest\n", v_dfe.name);
             errors++;
@@ -1546,7 +1546,7 @@ int nrpc_catalog_unittest(void) {
 
 // ----------------------------------------------------------------------------
 // The registry itself (C1/C2): what may be registered, what may be deleted and
-// by whom, what the conflict callback swaps, and how a provider (collector)
+// by whom, what the conflict callback swaps, and how a serving thread
 // that goes away takes its functions out of every view.
 //
 // These are the contracts every other consumer sits on top of, and none of
@@ -1560,16 +1560,16 @@ int nrpc_catalog_unittest(void) {
 //      lookups for availability do not;
 //   2. the dyncfg namespace is per-SOURCE: STREAMING (a child's synthetic
 //      "config" proxy) and INTERNAL (the dyncfg subsystem) may register
-//      reserved names, a COLLECTOR may not - and a rejected COLLECTOR
+//      reserved names, a PLUGIN-source registration may not - and a rejected one
 //      registration must not disturb the entry that is already there;
-//   3. deletion is gated the same way: FUNCTION_DEL (COLLECTOR/STREAMING) can
-//      never remove a dyncfg entry, and a COLLECTOR may only remove what its
-//      OWN provider registered;
+//   3. deletion is gated the same way: FUNCTION_DEL (PLUGIN/STREAM source) can
+//      never remove a dyncfg entry, and a PLUGIN-source delete may only remove what its
+//      OWN serving thread registered;
 //   4. the conflict callback swaps every changed field of an existing entry -
 //      including options, which are derived from the tags, so a
 //      re-registration that adds the "hidden" tag actually restricts the
 //      function (and removing it un-restricts it);
-//   5. a function whose provider stopped stays in the registry but disappears
+//   5. a function whose serving thread stopped stays in the registry but disappears
 //      from every view and answers 503;
 //   6. help/tags are handed to consumers as byte copies taken under the
 //      entry's leaf lock, so a concurrent re-registration can never hand out a
@@ -1627,26 +1627,26 @@ static int reg_execute_cb_b(struct nrpc_request *req, void *data __maybe_unused)
 }
 
 // a delete attempted from a thread that never registered anything, so its
-// nrpc_thread_serving is NULL - the COLLECTOR ownership check must
+// nrpc_thread_serving is NULL - the PLUGIN-source ownership check must
 // refuse it
 struct reg_del_ctx {
     RRDHOST *host;
     const char *name;
-    bool collector_del;
+    bool plugin_del;
     bool internal_del;
 };
 
 static void reg_del_worker(void *arg) {
     struct reg_del_ctx *c = arg;
-    c->collector_del = nrpc_method_unregister(c->host, NULL, c->name, NRPC_SOURCE_PLUGIN);
+    c->plugin_del = nrpc_method_unregister(c->host, NULL, c->name, NRPC_SOURCE_PLUGIN);
 }
 
-// registers a function and then ends its provider, exactly like a plugin
+// registers a method and then ends its serving handle, exactly like a plugin
 // thread that exits while its functions are still in the registry
-static void reg_provider_worker(void *arg) {
+static void reg_serving_worker(void *arg) {
     RRDHOST *host = arg;
     nrpc_serving_started();
-    nrpc_method_register(host, NULL, "reg-provider-fn", 10, 0, 1, "provider", "top",
+    nrpc_method_register(host, NULL, "reg-serving-fn", 10, 0, 1, "serving", "top",
                      HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                      nrpc_unittest_noop_cb, NULL);
     nrpc_serving_finished();
@@ -1708,7 +1708,7 @@ int nrpc_registry_unittest(void) {
     int errors = 0;
 
     // the standalone -W environment does not start the daemon, so the
-    // transaction broker the run paths below need is not there yet (create is
+    // in-flight calls table the run paths below need is not there yet (create is
     // idempotent)
     nrpc_inflight_calls_create();
 
@@ -1812,7 +1812,7 @@ int nrpc_registry_unittest(void) {
                 errors++;
             }
 
-            // a collector cannot take it over - the rejection must not reach
+            // a plugin registration cannot take it over - the rejection must not reach
             // the conflict callback, so the installed execute callback stays
             nrpc_method_register(host, NULL, fn, 10, 0, 1, "hijack", "config",
                              HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_PLUGIN,
@@ -1820,7 +1820,7 @@ int nrpc_registry_unittest(void) {
 
             struct nrpc_method *after = dictionary_get(host->rpc_registry->dict, fn);
             if(!after || after->handler != reg_execute_cb_a) {
-                fprintf(stderr, "  FAILED namespace: a COLLECTOR registration hijacked a reserved name\n");
+                fprintf(stderr, "  FAILED namespace: a PLUGIN-source registration hijacked a reserved name\n");
                 errors++;
             }
         }
@@ -1831,7 +1831,7 @@ int nrpc_registry_unittest(void) {
             errors++;
         }
         if(nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_PLUGIN)) {
-            fprintf(stderr, "  FAILED namespace: COLLECTOR FUNCTION_DEL removed a dyncfg function\n");
+            fprintf(stderr, "  FAILED namespace: a PLUGIN-source FUNCTION_DEL removed a dyncfg method\n");
             errors++;
         }
         if(!dictionary_get(host->rpc_registry->dict, fn)) {
@@ -1844,10 +1844,10 @@ int nrpc_registry_unittest(void) {
         }
 
         if(errors == before)
-            fprintf(stderr, "  OK namespace: STREAMING/INTERNAL own the dyncfg namespace, COLLECTOR is locked out\n");
+            fprintf(stderr, "  OK namespace: STREAM/DAEMON own the dyncfg namespace, PLUGIN source is locked out\n");
     }
 
-    // 3b. deleting what is not there, and deleting what another collector owns
+    // 3b. deleting what is not there, and deleting what another serving thread owns
     {
         int before = errors;
 
@@ -1874,24 +1874,24 @@ int nrpc_registry_unittest(void) {
         else {
             nd_thread_join(t);
 
-            if(ctx.collector_del) {
-                fprintf(stderr, "  FAILED del: a foreign collector removed a function it did not register\n");
+            if(ctx.plugin_del) {
+                fprintf(stderr, "  FAILED del: a foreign serving thread removed a method it did not register\n");
                 errors++;
             }
             if(!dictionary_get(host->rpc_registry->dict, "reg-owned-fn")) {
-                fprintf(stderr, "  FAILED del: a refused COLLECTOR delete removed the entry anyway\n");
+                fprintf(stderr, "  FAILED del: a refused PLUGIN-source delete removed the entry anyway\n");
                 errors++;
             }
         }
 
-        // the registering thread (this one) may remove it as a COLLECTOR
+        // the registering thread (this one) may remove it as a PLUGIN-source delete
         if(!nrpc_method_unregister(host, NULL, "reg-owned-fn", NRPC_SOURCE_PLUGIN)) {
-            fprintf(stderr, "  FAILED del: the registering collector could not remove its own function\n");
+            fprintf(stderr, "  FAILED del: the registering serving thread could not remove its own method\n");
             errors++;
         }
 
         if(errors == before)
-            fprintf(stderr, "  OK del: unknown/empty names, and COLLECTOR deletes are scoped to the registering provider\n");
+            fprintf(stderr, "  OK del: unknown/empty names, and PLUGIN-source deletes are scoped to the registering serving thread\n");
     }
 
     // 4. the conflict callback swaps every changed field - including the
@@ -1997,14 +1997,14 @@ int nrpc_registry_unittest(void) {
             fprintf(stderr, "  OK swap: every field swaps, tags drive the RESTRICTED option both ways, cb takes over\n");
     }
 
-    // 5. a provider that stopped takes its functions out of every view, but
+    // 5. a serving thread that stopped takes its methods out of every view, but
     //    the entries stay in the registry until they are deleted
     {
         int before = errors;
 
-        ND_THREAD *t = nd_thread_create("reg-provider", NETDATA_THREAD_OPTION_DONT_LOG, reg_provider_worker, host);
+        ND_THREAD *t = nd_thread_create("reg-serving", NETDATA_THREAD_OPTION_DONT_LOG, reg_serving_worker, host);
         if(!t) {
-            fprintf(stderr, "  FAILED provider: could not create the worker thread\n");
+            fprintf(stderr, "  FAILED serving: could not create the worker thread\n");
             errors++;
         }
         else {
@@ -2012,43 +2012,43 @@ int nrpc_registry_unittest(void) {
 
             struct reg_probe p;
 
-            if(!dictionary_get(host->rpc_registry->dict, "reg-provider-fn")) {
-                fprintf(stderr, "  FAILED provider: the entry was removed when its provider stopped\n");
+            if(!dictionary_get(host->rpc_registry->dict, "reg-serving-fn")) {
+                fprintf(stderr, "  FAILED serving: the entry was removed when its serving thread stopped\n");
                 errors++;
             }
-            if(nrpc_method_available(host, "reg-provider-fn")) {
-                fprintf(stderr, "  FAILED provider: a function of a stopped provider is still available\n");
+            if(nrpc_method_available(host, "reg-serving-fn")) {
+                fprintf(stderr, "  FAILED serving: a method of a stopped serving thread is still available\n");
                 errors++;
             }
-            if(reg_probe_run(host, NRPC_CATALOG_FILTER_USER, "reg-provider-fn", &p) ||
-               reg_probe_run(host, NRPC_CATALOG_FILTER_STREAM_GLOBAL, "reg-provider-fn", &p)) {
-                fprintf(stderr, "  FAILED provider: a function of a stopped provider is still exported\n");
+            if(reg_probe_run(host, NRPC_CATALOG_FILTER_USER, "reg-serving-fn", &p) ||
+               reg_probe_run(host, NRPC_CATALOG_FILTER_STREAM_GLOBAL, "reg-serving-fn", &p)) {
+                fprintf(stderr, "  FAILED serving: a method of a stopped serving thread is still exported\n");
                 errors++;
             }
 
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "reg-provider-fn", true, NULL,
+            int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "reg-serving-fn", true, NULL,
                                         NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
             if(code != HTTP_RESP_SERVICE_UNAVAILABLE) {
-                fprintf(stderr, "  FAILED provider: running it returned %d, expected 503\n", code);
+                fprintf(stderr, "  FAILED serving: running it returned %d, expected 503\n", code);
                 errors++;
             }
             if(!strstr(buffer_tostring(wb), "not currently running")) {
-                fprintf(stderr, "  FAILED provider: the 503 does not say the plugin is not running\n");
+                fprintf(stderr, "  FAILED serving: the 503 does not say the plugin is not running\n");
                 errors++;
             }
 
-            // the provider structure itself is released only when the last
+            // the serving handle itself is released only when the last
             // entry referencing it goes away (ASAN verifies there is no leak
             // and no use-after-free here)
-            if(!nrpc_method_unregister(host, NULL, "reg-provider-fn", NRPC_SOURCE_DAEMON)) {
-                fprintf(stderr, "  FAILED provider: could not delete the orphaned function\n");
+            if(!nrpc_method_unregister(host, NULL, "reg-serving-fn", NRPC_SOURCE_DAEMON)) {
+                fprintf(stderr, "  FAILED serving: could not delete the orphaned function\n");
                 errors++;
             }
         }
 
         if(errors == before)
-            fprintf(stderr, "  OK provider: a stopped provider hides its functions everywhere and answers 503\n");
+            fprintf(stderr, "  OK serving: a stopped serving thread hides its methods everywhere and answers 503\n");
     }
 
     // 6. help/tags are byte copies taken under the entry's leaf lock: a
