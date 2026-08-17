@@ -86,6 +86,15 @@ struct rrd_host_function;
 // freed while the handle is held (idiom: RRDSET_ACQUIRED, RRDHOST_ACQUIRED)
 typedef struct rrd_function_acquired RRD_FUNCTION_ACQUIRED;
 
+typedef enum __attribute__((packed)) {
+    RRD_FUNCTION_LOCAL  = (1 << 0),
+    RRD_FUNCTION_GLOBAL = (1 << 1),
+    RRD_FUNCTION_DYNCFG = (1 << 2),
+    RRD_FUNCTION_RESTRICTED = (1 << 3), // this function is restricted (hidden from user)
+
+    // this is 8-bit
+} RRD_FUNCTION_OPTIONS;
+
 // who is registering (or unregistering) a function - the registry enforces
 // per-source rules (e.g. only the dyncfg subsystem and streaming children may
 // register dyncfg-reserved names) and, on delete, who may remove what
@@ -136,6 +145,7 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
 int rrdfunctions_verify_access_unittest(void);
 int rrdfunctions_manifest_unittest(void);
 int rrdfunctions_del_unittest(void);
+int rrdfunctions_emitters_unittest(void);
 
 bool rrd_function_available(RRDHOST *host, const char *function);
 bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);

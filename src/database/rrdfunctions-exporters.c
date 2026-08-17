@@ -3,27 +3,128 @@
 #include "rrdfunctions-internals.h"
 #include "rrdfunctions-exporters.h"
 
-void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb) {
-    if(!st->functions_view)
-        return;
+// ----------------------------------------------------------------------------
+// the iteration core
+
+// Walks one registry dictionary (the host's, or a chart's view of it) and
+// hands the callback a self-contained snapshot of every visited entry.
+//
+// availability_host may be NULL to skip the host-state check (the historical
+// semantics of instances resolved through the contexts index).
+//
+// The snapshot - including the help/tags byte copies - is taken under the
+// entry's LEAF spinlock: an item reference pins the entry memory but NOT the
+// swapped contents, and the conflict callback frees displaced STRINGs under
+// that same lock, so a copy taken outside it could read freed bytes.
+static size_t rrd_functions_view_foreach(DICTIONARY *dict, RRDHOST *availability_host,
+                                         RRD_FUNCTIONS_FILTER filter,
+                                         rrd_function_view_cb_t cb, void *data) {
+    if(!dict) return 0;
+
+    size_t dyncfg_count = 0;
 
     struct rrd_host_function *t;
-    dfe_start_read(st->functions_view, t) {
-        if(!rrd_function_is_available(t, st->rrdhost)) continue;
-        if(t->options & RRD_FUNCTION_DYNCFG) continue;
+    dfe_start_read(dict, t) {
+        if(!rrd_function_is_available(t, availability_host)) continue;
 
-        buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n"
-                       , t_dfe.name
-                       , t->timeout
-                       , string2str(t->help)
-                       , string2str(t->tags)
-                       , (HTTP_ACCESS_FORMAT_CAST)t->access
-                       , t->priority
-                       , t->version
-        );
+        struct rrd_function_view v = { .name = t_dfe.name };
+        char *help = NULL, *tags = NULL;
+        bool visit = false;
+
+        spinlock_lock(&t->leaf_spinlock);
+
+        v.options = t->options;
+
+        switch(filter) {
+            case RRD_FUNCTIONS_FILTER_EXPORTABLE:
+                visit = !(v.options & (RRD_FUNCTION_DYNCFG | RRD_FUNCTION_RESTRICTED));
+                break;
+
+            case RRD_FUNCTIONS_FILTER_STREAMABLE_CHART:
+                visit = !(v.options & RRD_FUNCTION_DYNCFG);
+                break;
+
+            case RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL:
+                if(v.options & RRD_FUNCTION_DYNCFG)
+                    dyncfg_count++;
+                visit = !(v.options & (RRD_FUNCTION_LOCAL | RRD_FUNCTION_DYNCFG));
+                break;
+        }
+
+        if(visit) {
+            v.timeout = t->timeout;
+            v.access = t->access;
+            v.priority = t->priority;
+            v.version = t->version;
+            help = strdupz(string2str(t->help));
+            tags = strdupz(string2str(t->tags));
+        }
+
+        spinlock_unlock(&t->leaf_spinlock);
+
+        if(visit) {
+            v.help = help;
+            v.tags = tags;
+            cb(&v, data);
+            freez(help);
+            freez(tags);
+        }
     }
     dfe_done(t);
+
+    return dyncfg_count;
+}
+
+size_t rrd_functions_host_foreach(RRDHOST *host, RRD_FUNCTIONS_FILTER filter, rrd_function_view_cb_t cb, void *data) {
+    if(!host || !host->functions) return 0;
+    return rrd_functions_view_foreach(host->functions->dict, host, filter, cb, data);
+}
+
+size_t rrd_functions_rrdset_foreach(RRDSET *st, RRD_FUNCTIONS_FILTER filter, rrd_function_view_cb_t cb, void *data) {
+    if(!st || !st->functions_view) return 0;
+    return rrd_functions_view_foreach(st->functions_view, st->rrdhost, filter, cb, data);
+}
+
+void rrd_functions_rrdset_view_destroy(RRDSET *st) {
+    dictionary_destroy(st->functions_view);
+    st->functions_view = NULL;
+}
+
+// ----------------------------------------------------------------------------
+// the streaming emitters
+
+static void stream_chart_function_cb(const struct rrd_function_view *v, void *data) {
+    BUFFER *wb = data;
+
+    buffer_sprintf(wb
+                   , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n"
+                   , v->name
+                   , v->timeout
+                   , v->help
+                   , v->tags
+                   , (HTTP_ACCESS_FORMAT_CAST)v->access
+                   , v->priority
+                   , v->version
+    );
+}
+
+void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb) {
+    rrd_functions_rrdset_foreach(st, RRD_FUNCTIONS_FILTER_STREAMABLE_CHART, stream_chart_function_cb, wb);
+}
+
+static void stream_global_function_cb(const struct rrd_function_view *v, void *data) {
+    BUFFER *wb = data;
+
+    buffer_sprintf(wb
+                   , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n"
+                   , v->name
+                   , v->timeout
+                   , v->help
+                   , v->tags
+                   , (HTTP_ACCESS_FORMAT_CAST)v->access
+                   , v->priority
+                   , v->version
+    );
 }
 
 // Renders the parent-facing view of this host's global functions: first the
@@ -64,69 +165,66 @@ void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool
     }
     spinlock_unlock(&functions->pending_dels.spinlock);
 
-    size_t configs = 0;
-
-    struct rrd_host_function *tmp;
-    dfe_start_read(functions->dict, tmp) {
-        if(!rrd_function_is_available(tmp, host)) continue;
-        if(tmp->options & RRD_FUNCTION_LOCAL) continue;
-        if(tmp->options & RRD_FUNCTION_DYNCFG) {
-            // we should not send dyncfg to this parent
-            configs++;
-            continue;
-        }
-
-        buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n"
-                       , tmp_dfe.name
-                       , tmp->timeout
-                       , string2str(tmp->help)
-                       , string2str(tmp->tags)
-                       , (HTTP_ACCESS_FORMAT_CAST)tmp->access
-                       , tmp->priority
-                       , tmp->version
-        );
-    }
-    dfe_done(tmp);
+    size_t configs = rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL,
+                                                stream_global_function_cb, wb);
 
     if(dyncfg && configs)
         dyncfg_add_streaming(wb);
 }
 
-static void functions2json(DICTIONARY *functions, BUFFER *wb, RRDHOST *host) {
-    struct rrd_host_function *t;
-    dfe_start_read(functions, t) {
-        if(!rrd_function_is_available(t, host)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
+// ----------------------------------------------------------------------------
+// the JSON renderers
 
-        buffer_json_member_add_object(wb, t_dfe.name);
-        {
-            buffer_json_member_add_string_or_empty(wb, "help", string2str(t->help));
-            buffer_json_member_add_int64(wb, "timeout", (int64_t) t->timeout);
-            buffer_json_member_add_uint64(wb, "version", (uint64_t) t->version);
+static void chart_function2json_cb(const struct rrd_function_view *v, void *data) {
+    BUFFER *wb = data;
 
-            char options[65];
-            snprintfz(
-                options, 64
-                , "%s%s"
-                , (t->options & RRD_FUNCTION_LOCAL) ? "LOCAL " : ""
-                , (t->options & RRD_FUNCTION_GLOBAL) ? "GLOBAL" : ""
-            );
+    buffer_json_member_add_object(wb, v->name);
+    {
+        buffer_json_member_add_string_or_empty(wb, "help", v->help);
+        buffer_json_member_add_int64(wb, "timeout", (int64_t)v->timeout);
+        buffer_json_member_add_uint64(wb, "version", (uint64_t)v->version);
 
-            buffer_json_member_add_string_or_empty(wb, "options", options);
-            buffer_json_member_add_string_or_empty(wb, "tags", string2str(t->tags));
-            http_access2buffer_json_array(wb, "access", t->access);
-            buffer_json_member_add_uint64(wb, "priority", t->priority);
-        }
-        buffer_json_object_close(wb);
+        char options[65];
+        snprintfz(
+            options, 64
+            , "%s%s"
+            , (v->options & RRD_FUNCTION_LOCAL) ? "LOCAL " : ""
+            , (v->options & RRD_FUNCTION_GLOBAL) ? "GLOBAL" : ""
+        );
+
+        buffer_json_member_add_string_or_empty(wb, "options", options);
+        buffer_json_member_add_string_or_empty(wb, "tags", v->tags);
+        http_access2buffer_json_array(wb, "access", v->access);
+        buffer_json_member_add_uint64(wb, "priority", v->priority);
     }
-    dfe_done(t);
+    buffer_json_object_close(wb);
 }
 
 void chart_functions2json(RRDSET *st, BUFFER *wb) {
-    if(!st || !st->functions_view) return;
+    rrd_functions_rrdset_foreach(st, RRD_FUNCTIONS_FILTER_EXPORTABLE, chart_function2json_cb, wb);
+}
 
-    functions2json(st->functions_view, wb, st->rrdhost);
+static void host_function2json_cb(const struct rrd_function_view *v, void *data) {
+    BUFFER *wb = data;
+
+    buffer_json_member_add_object(wb, v->name);
+    {
+        buffer_json_member_add_string(wb, "help", v->help);
+        buffer_json_member_add_int64(wb, "timeout", v->timeout);
+        buffer_json_member_add_uint64(wb, "version", (uint64_t)v->version);
+        buffer_json_member_add_array(wb, "options");
+        {
+            if (v->options & RRD_FUNCTION_GLOBAL)
+                buffer_json_add_array_item_string(wb, "GLOBAL");
+            if (v->options & RRD_FUNCTION_LOCAL)
+                buffer_json_add_array_item_string(wb, "LOCAL");
+        }
+        buffer_json_array_close(wb);
+        buffer_json_member_add_string(wb, "tags", v->tags);
+        http_access2buffer_json_array(wb, "access", v->access);
+        buffer_json_member_add_uint64(wb, "priority", v->priority);
+    }
+    buffer_json_object_close(wb);
 }
 
 void host_functions2json(RRDHOST *host, BUFFER *wb) {
@@ -134,85 +232,99 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "functions");
 
-    struct rrd_host_function *t;
-    dfe_start_read(host->functions->dict, t) {
-        if(!rrd_function_is_available(t, host)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
-
-        buffer_json_member_add_object(wb, t_dfe.name);
-        {
-            buffer_json_member_add_string(wb, "help", string2str(t->help));
-            buffer_json_member_add_int64(wb, "timeout", t->timeout);
-            buffer_json_member_add_uint64(wb, "version", (uint64_t) t->version);
-            buffer_json_member_add_array(wb, "options");
-            {
-                if (t->options & RRD_FUNCTION_GLOBAL)
-                    buffer_json_add_array_item_string(wb, "GLOBAL");
-                if (t->options & RRD_FUNCTION_LOCAL)
-                    buffer_json_add_array_item_string(wb, "LOCAL");
-            }
-            buffer_json_array_close(wb);
-            buffer_json_member_add_string(wb, "tags", string2str(t->tags));
-            http_access2buffer_json_array(wb, "access", t->access);
-            buffer_json_member_add_uint64(wb, "priority", t->priority);
-        }
-        buffer_json_object_close(wb);
-    }
-    dfe_done(t);
+    rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, host_function2json_cb, wb);
 
     buffer_json_object_close(wb);
 }
 
-void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size) {
-    if(!rrdset_functions_view || !dst) return;
+// ----------------------------------------------------------------------------
+// the dictionary exporters
 
-    struct rrd_host_function *t;
-    dfe_start_read(rrdset_functions_view, t) {
-        if(!rrd_function_is_available(t, NULL)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
+struct functions_to_dict_ctx {
+    DICTIONARY *dst;
+    void *value;
+    size_t value_size;
+};
 
-        dictionary_set(dst, t_dfe.name, value, value_size);
-    }
-    dfe_done(t);
+static void chart_function_to_dict_cb(const struct rrd_function_view *v, void *data) {
+    struct functions_to_dict_ctx *ctx = data;
+    dictionary_set(ctx->dst, v->name, ctx->value, ctx->value_size);
+}
+
+void chart_functions_to_dict(RRDSET *st, DICTIONARY *dst, void *value, size_t value_size) {
+    if(!st || !st->functions_view || !dst) return;
+
+    struct functions_to_dict_ctx ctx = { .dst = dst, .value = value, .value_size = value_size };
+
+    // host==NULL availability semantics preserved: instances resolved through
+    // the contexts index skip the host-state check
+    rrd_functions_view_foreach(st->functions_view, NULL, RRD_FUNCTIONS_FILTER_EXPORTABLE,
+                               chart_function_to_dict_cb, &ctx);
+}
+
+struct host_functions_to_dict_ctx {
+    DICTIONARY *dst;
+    void *value;
+    size_t value_size;
+    const char **help;
+    const char **tags;
+    HTTP_ACCESS *access;
+    int *priority;
+    uint32_t *version;
+};
+
+static void host_function_to_dict_cb(const struct rrd_function_view *v, void *data) {
+    struct host_functions_to_dict_ctx *ctx = data;
+
+    // OWNED copies: the destination dictionary's callbacks free them (the
+    // conflict callback for losers, the delete callback for entries)
+    if(ctx->help)
+        *ctx->help = strdupz(v->help);
+
+    if(ctx->tags)
+        *ctx->tags = strdupz(v->tags);
+
+    if(ctx->access)
+        *ctx->access = v->access;
+
+    if(ctx->priority)
+        *ctx->priority = v->priority;
+
+    if(ctx->version)
+        *ctx->version = v->version;
+
+    size_t function_name_len = rrd_functions_strlen_bounded(v->name, PLUGINSD_LINE_MAX);
+    if(unlikely(function_name_len > SIZE_MAX - UINT64_MAX_LENGTH - sizeof(RRDFUNCTIONS_VERSION_SEPARATOR)))
+        fatal("RRDFUNCTIONS: function key is too large.");
+
+    size_t key_size = UINT64_MAX_LENGTH + sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) + function_name_len;
+    CLEAN_CHAR_P *key = mallocz(key_size);
+    snprintfz(key, key_size, "%"PRIu32 RRDFUNCTIONS_VERSION_SEPARATOR "%s",
+              v->version, v->name);
+
+    dictionary_set(ctx->dst, key, ctx->value, ctx->value_size);
 }
 
 void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size,
-                            STRING **help, STRING **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
+                            const char **help, const char **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
     if(!host || !host->functions || !dictionary_entries(host->functions->dict) || !dst) return;
 
-    struct rrd_host_function *t;
-    dfe_start_read(host->functions->dict, t) {
-        if(!rrd_function_is_available(t, host)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG| RRD_FUNCTION_RESTRICTED)) continue;
+    struct host_functions_to_dict_ctx ctx = {
+        .dst = dst,
+        .value = value,
+        .value_size = value_size,
+        .help = help,
+        .tags = tags,
+        .access = access,
+        .priority = priority,
+        .version = version,
+    };
 
-        if(help)
-            *help = t->help;
-
-        if(tags)
-            *tags = t->tags;
-
-        if(access)
-            *access = t->access;
-
-        if(priority)
-            *priority = t->priority;
-
-        if(version)
-            *version = t->version;
-
-        size_t function_name_len = rrd_functions_strlen_bounded(t_dfe.name, PLUGINSD_LINE_MAX);
-        if(unlikely(function_name_len > SIZE_MAX - UINT64_MAX_LENGTH - sizeof(RRDFUNCTIONS_VERSION_SEPARATOR)))
-            fatal("RRDFUNCTIONS: function key is too large.");
-
-        size_t key_size = UINT64_MAX_LENGTH + sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) + function_name_len;
-        CLEAN_CHAR_P *key = mallocz(key_size);
-        snprintfz(key, key_size, "%"PRIu32 RRDFUNCTIONS_VERSION_SEPARATOR "%s",
-                  t->version, t_dfe.name);
-
-        dictionary_set(dst, key, value, value_size);
-    }
-    dfe_done(t);
+    rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, host_function_to_dict_cb, &ctx);
 }
+
+// ----------------------------------------------------------------------------
+// the ACLK node-instance manifest
 
 static void manifest_entry_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                                      void *data __maybe_unused) {
@@ -221,33 +333,27 @@ static void manifest_entry_delete_cb(const DICTIONARY_ITEM *item __maybe_unused,
     freez((void *)e->tags);
 }
 
+static void manifest_entry_cb(const struct rrd_function_view *v, void *data) {
+    DICTIONARY *dst = data;
+
+    struct rrd_function_manifest_entry e = {
+        .help = strdupz(v->help),
+        .tags = strdupz(v->tags),
+        .access = v->access,
+        .priority = v->priority,
+        .version = v->version,
+    };
+
+    dictionary_set(dst, v->name, &e, sizeof(e));
+}
+
 DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
     DICTIONARY *dst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_register_delete_callback(dst, manifest_entry_delete_cb, NULL);
 
     if(!host || !host->functions || !dictionary_entries(host->functions->dict)) return dst;
 
-    struct rrd_host_function *t;
-    dfe_start_read(host->functions->dict, t) {
-        if(!rrd_function_is_available(t, host)) continue;
-        if(t->options & (RRD_FUNCTION_DYNCFG | RRD_FUNCTION_RESTRICTED)) continue;
-
-        // Copy the bytes rather than taking a STRING reference. The conflict callback swaps
-        // help/tags and frees the displaced STRING under the dictionary INDEX lock, while this
-        // traversal only holds the ITEMS lock - so string_dup() here would be a refcount
-        // read-modify-write on a STRING that can already be freed, which also fatal()s on a
-        // deleted string. Every sibling exporter reads these the same way.
-        struct rrd_function_manifest_entry e = {
-            .help = strdupz(string2str(t->help)),
-            .tags = strdupz(string2str(t->tags)),
-            .access = t->access,
-            .priority = t->priority,
-            .version = t->version,
-        };
-
-        dictionary_set(dst, t_dfe.name, &e, sizeof(e));
-    }
-    dfe_done(t);
+    rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, manifest_entry_cb, dst);
 
     return dst;
 }

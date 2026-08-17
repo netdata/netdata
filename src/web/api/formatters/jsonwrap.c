@@ -54,7 +54,7 @@ void query_target_functions(BUFFER *wb, const char *key, RRDR *r) {
             continue;
 
         ria = qi->ria;
-        chart_functions_to_dict(rrdinstance_acquired_functions(ria), funcs, NULL, 0);
+        chart_functions_to_dict(rrdinstance_acquired_rrdset(ria), funcs, NULL, 0);
     }
 
     buffer_json_member_add_array(wb, key);

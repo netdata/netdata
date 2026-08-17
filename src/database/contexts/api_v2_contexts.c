@@ -25,8 +25,13 @@ struct function_v2_entry {
     size_t size;
     size_t used;
     size_t *node_ids;
-    STRING *help;
-    STRING *tags;
+
+    // OWNED byte copies (see host_functions_to_dict): a borrowed STRING
+    // reference could be swapped and freed by a concurrent function
+    // re-registration before the rendering phase reads it
+    const char *help;
+    const char *tags;
+
     HTTP_ACCESS access;
     int priority;
     uint32_t version;
@@ -793,12 +798,18 @@ static bool functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     t->node_ids[t->used++] = *v;
 
+    // the loser's owned copies (the kept entry keeps its own)
+    freez((void *)n->help);
+    freez((void *)n->tags);
+
     return true;
 }
 
 static void functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct function_v2_entry *t = value;
     freez(t->node_ids);
+    freez((void *)t->help);
+    freez((void *)t->tags);
 }
 
 static void contexts_cleanup(struct context_v2_entry *n) {
@@ -1481,7 +1492,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                             name = t_dfe.name;
 
                         buffer_json_member_add_string(wb, "name", name);
-                        buffer_json_member_add_string(wb, "help", string2str(t->help));
+                        buffer_json_member_add_string(wb, "help", t->help ? t->help : "");
 
                         if (!(ctl.options & CONTEXTS_OPTION_MCP)) {
                             buffer_json_member_add_array(wb, "ni");
@@ -1494,7 +1505,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                             buffer_json_member_add_uint64(wb, "priority", t->priority);
                             buffer_json_member_add_uint64(wb, "version", t->version);
                         }
-                        buffer_json_member_add_string(wb, "tags", string2str(t->tags));
+                        buffer_json_member_add_string(wb, "tags", t->tags ? t->tags : "");
                         http_access2buffer_json_array(wb, "access", t->access);
                     }
                     buffer_json_object_close(wb);

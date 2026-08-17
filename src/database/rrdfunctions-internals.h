@@ -8,15 +8,6 @@
 #include "rrdcollector-internals.h"
 #include "rrdfunctions-transport.h"
 
-typedef enum __attribute__((packed)) {
-    RRD_FUNCTION_LOCAL  = (1 << 0),
-    RRD_FUNCTION_GLOBAL = (1 << 1),
-    RRD_FUNCTION_DYNCFG = (1 << 2),
-    RRD_FUNCTION_RESTRICTED = (1 << 3), // this function is restricted (hidden from user)
-
-    // this is 8-bit
-} RRD_FUNCTION_OPTIONS;
-
 // The per-host function registry behind the opaque RRD_FUNCTIONS handle.
 // It owns the definitions dictionary; the host back-pointer is what the
 // dictionary callbacks use to reach the host they serve.

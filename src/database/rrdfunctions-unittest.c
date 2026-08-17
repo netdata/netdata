@@ -1117,3 +1117,183 @@ int rrdfunctions_del_unittest(void) {
 
     return errors;
 }
+
+// ----------------------------------------------------------------------------
+// Golden-output test for the two streaming emitters (step 8 prerequisite).
+//
+// Pins the BYTES the post-C3 emitters produce for a controlled fixture set, so
+// the C4 iteration-API rewrite can be verified to reproduce them identically.
+// The expected lines are built here with their own copies of the format
+// strings - not by calling the emitters - so any rewrite that changes the
+// bytes fails this test. Covered: the FUNCTION_DEL-before-re-list order and
+// the dyncfg FUNCDEL quirk (dyncfg deletes never emit FUNCTION_DEL), the
+// dyncfg-count => dyncfg_add_streaming() synthetic "config" line (only when
+// the parent supports DYNCFG), RESTRICTED functions DO stream, DYNCFG and
+// LOCAL functions do not appear in the global list, and the chart emitter's
+// exact full output.
+
+int rrdfunctions_emitters_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    RRDHOST *host = localhost;
+    if(!host || !host->functions) {
+        fprintf(stderr, "  FAILED: localhost (or its functions registry) is NULL\n");
+        return 1;
+    }
+
+    int errors = 0;
+
+    // fake a configured sender so deletes queue (see rrdfunctions_del_unittest)
+    struct sender_state *saved_sender = host->sender;
+    bool saved_option = rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED);
+    rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+    host->sender = (struct sender_state *)(uintptr_t)0x1;
+    fndel_flush_queue(host);
+
+    // ------------------------------------------------------------------ fixtures
+    // registered in FIXED order; the registry dict preserves insertion order,
+    // so the fixture lines appear in this relative order in the output
+    rrd_function_add(host, NULL, "c4-global-fn", 11, 42, 3, "c4 global help", "top",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                     rrdfunctions_unittest_noop_cb, NULL);
+    rrd_function_add(host, NULL, "__c4-restricted-fn", 12, 43, 4, "c4 restricted", "top",
+                     HTTP_ACCESS_NONE, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                     rrdfunctions_unittest_noop_cb, NULL);
+    rrd_function_add(host, NULL, "config c4test:job", 120, 1000, 1, "Dynamic configuration", "config",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                     rrdfunctions_unittest_noop_cb, NULL);
+
+    // one plain global delete (queued) and one dyncfg delete (flag only - the quirk)
+    rrd_function_add(host, NULL, "c4-deleted-fn", 14, 45, 6, "c4 deleted", "top",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                     rrdfunctions_unittest_noop_cb, NULL);
+    rrd_function_add(host, NULL, "config c4del:job", 120, 1000, 1, "Dynamic configuration", "config",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                     rrdfunctions_unittest_noop_cb, NULL);
+    rrd_function_del(host, NULL, "c4-deleted-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    rrd_function_del(host, NULL, "config c4del:job", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+    // a chart with one LOCAL function - the chart emitter's whole output
+    RRDSET *st = rrdset_create_localhost("c4test", "c4chart", NULL, "c4fam", "c4test.ctx",
+                                         "c4 title", "units", "c4plugin", "c4module",
+                                         999999, 1, RRDSET_TYPE_LINE);
+    if(!st) {
+        fprintf(stderr, "  FAILED: could not create the fixture chart\n");
+        errors++;
+    }
+    else
+        rrd_function_add(host, st, "c4-chart-fn", 13, 44, 5, "c4 chart help", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+
+    // ------------------------------------------------------- expected line bytes
+    CLEAN_BUFFER *exp_global = buffer_create(0, NULL);
+    buffer_sprintf(exp_global,
+                   PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n",
+                   "c4-global-fn", 11, "c4 global help", "top",
+                   (HTTP_ACCESS_FORMAT_CAST)HTTP_ACCESS_ANONYMOUS_DATA, 42, (uint32_t)3);
+
+    CLEAN_BUFFER *exp_restricted = buffer_create(0, NULL);
+    buffer_sprintf(exp_restricted,
+                   PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n",
+                   "__c4-restricted-fn", 12, "c4 restricted", "top",
+                   (HTTP_ACCESS_FORMAT_CAST)HTTP_ACCESS_NONE, 43, (uint32_t)4);
+
+    CLEAN_BUFFER *exp_del = buffer_create(0, NULL);
+    buffer_sprintf(exp_del, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"%s\"\n", "c4-deleted-fn");
+
+    CLEAN_BUFFER *exp_dyncfg = buffer_create(0, NULL);
+    buffer_sprintf(exp_dyncfg,
+                   PLUGINSD_KEYWORD_FUNCTION " GLOBAL " PLUGINSD_FUNCTION_CONFIG " %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n",
+                   120, "Dynamic configuration", "config", (unsigned)HTTP_ACCESS_ANONYMOUS_DATA, 1000);
+
+    CLEAN_BUFFER *exp_chart = buffer_create(0, NULL);
+    buffer_sprintf(exp_chart,
+                   PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n",
+                   "c4-chart-fn", 13, "c4 chart help", "top",
+                   (HTTP_ACCESS_FORMAT_CAST)HTTP_ACCESS_ANONYMOUS_DATA, 44, (uint32_t)5);
+
+    // ------------------------------------------------------------ global emitter
+    {
+        int before = errors;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        stream_sender_send_global_rrdhost_functions(host, wb, true /* dyncfg */, true /* can_function_del */);
+        const char *out = buffer_tostring(wb);
+
+        const char *p_del        = strstr(out, buffer_tostring(exp_del));
+        const char *p_global     = strstr(out, buffer_tostring(exp_global));
+        const char *p_restricted = strstr(out, buffer_tostring(exp_restricted));
+        const char *p_dyncfg     = strstr(out, buffer_tostring(exp_dyncfg));
+        const char *p_first_fn   = strstr(out, PLUGINSD_KEYWORD_FUNCTION " ");
+
+        if(!p_del)        { fprintf(stderr, "  FAILED global: FUNCTION_DEL line bytes not found\n"); errors++; }
+        if(!p_global)     { fprintf(stderr, "  FAILED global: c4-global-fn line bytes not found\n"); errors++; }
+        if(!p_restricted) { fprintf(stderr, "  FAILED global: restricted function did not stream\n"); errors++; }
+        if(!p_dyncfg)     { fprintf(stderr, "  FAILED global: dyncfg_add_streaming synthetic line not found\n"); errors++; }
+        if(strstr(out, "\"config c4test:job\"")) {
+            fprintf(stderr, "  FAILED global: dyncfg function leaked into the global list\n"); errors++;
+        }
+        if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"config c4del:job\"")) {
+            fprintf(stderr, "  FAILED global: dyncfg delete emitted FUNCTION_DEL (quirk broken)\n"); errors++;
+        }
+        if(strstr(out, "\"c4-chart-fn\"")) {
+            fprintf(stderr, "  FAILED global: LOCAL function leaked into the global list\n"); errors++;
+        }
+        if(p_del && p_first_fn && p_del > p_first_fn) {
+            fprintf(stderr, "  FAILED global: FUNCTION_DEL did not precede the re-list\n"); errors++;
+        }
+        if(p_global && p_restricted && p_global > p_restricted) {
+            fprintf(stderr, "  FAILED global: fixture lines out of registration order\n"); errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK global emitter: DEL-first order, exact line bytes, quirk, dyncfg count, filters\n");
+    }
+
+    // no-dyncfg-capability variant: the synthetic config line must be absent
+    {
+        int before = errors;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        stream_sender_send_global_rrdhost_functions(host, wb, false /* dyncfg */, true);
+        if(strstr(buffer_tostring(wb), buffer_tostring(exp_dyncfg))) {
+            fprintf(stderr, "  FAILED global: synthetic config line emitted without DYNCFG capability\n");
+            errors++;
+        }
+        if(errors == before)
+            fprintf(stderr, "  OK global emitter: no synthetic config line without the capability\n");
+    }
+
+    // ------------------------------------------------------------- chart emitter
+    if(st) {
+        int before = errors;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        stream_sender_send_rrdset_functions(st, wb);
+        if(strcmp(buffer_tostring(wb), buffer_tostring(exp_chart)) != 0) {
+            fprintf(stderr, "  FAILED chart: output is not byte-identical to the golden\n    expected: %s    got:      %s",
+                    buffer_tostring(exp_chart), buffer_tostring(wb));
+            errors++;
+        }
+        if(errors == before)
+            fprintf(stderr, "  OK chart emitter: byte-identical output\n");
+    }
+
+    // -------------------------------------------------------------------- cleanup
+    if(st)
+        rrd_function_del(host, st, "c4-chart-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    rrd_function_del(host, NULL, "c4-global-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    rrd_function_del(host, NULL, "__c4-restricted-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    rrd_function_del(host, NULL, "config c4test:job", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    fndel_flush_queue(host);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
+    host->sender = saved_sender;
+    if(saved_option)
+        rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
+    else
+        rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+
+    fprintf(stderr, "%s() %s (%d error%s)\n\n",
+            __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+
+    return errors;
+}

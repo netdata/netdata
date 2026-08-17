@@ -146,7 +146,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_stream_send_chart_slot_release(st);
 
-    dictionary_destroy(st->functions_view);
+    rrd_functions_rrdset_view_destroy(st);
 
     rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 
