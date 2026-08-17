@@ -69,9 +69,12 @@ void rrd_collector_finished(void) {
     // the problem is that cancellation requests require a structure allocated by the collector,
     // so, while cancellation requests are being dispatched, this structure is accessed.
     // delaying the exit of the thread is required to avoid cleaning up this structure.
-
-    while(!refcount_acquire_for_deletion(&thread_rrd_collector->refcount_dispatcher))
-        sleep_usec(1 * USEC_PER_MS);
+    //
+    // mark-for-deletion + wait in one step: new dispatcher acquisitions fail
+    // from the CAS on, so the drain cannot be extended by new dispatches (the
+    // old 1ms-sleep retry loop left the count at 0 between retries, letting
+    // new dispatchers in indefinitely)
+    (void)refcount_acquire_for_deletion_and_wait(&thread_rrd_collector->refcount_dispatcher);
 
     rrd_collector_free(thread_rrd_collector);
     thread_rrd_collector = NULL;

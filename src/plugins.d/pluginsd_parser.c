@@ -1479,7 +1479,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     // The vnodes this plugin fed also carry its functions, and those only become unavailable
     // once rrd_collector_finished() runs below. The manifest refresh therefore has to happen
     // after that, so snapshot the hosts here - the JudyL lives in the parser, which is
-    // destroyed first.
+    // also destroyed below (before the manifest arms).
     //
     // Snapshot machine guids rather than RRDHOST pointers: the loop below clears
     // RRDHOST_FLAG_COLLECTOR_ONLINE, which is exactly what makes rrdhost_is_online() false and so
@@ -1526,8 +1526,17 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     }
     rrdset_foreach_done(st);
 
-    pluginsd_process_cleanup(parser);
+    // Invalidate the collector and drain in-flight dispatchers BEFORE freeing
+    // the parser: cancel/progress callbacks registered by this plugin's
+    // functions carry parser-derived pointers, so the parser must outlive the
+    // dispatcher drain (defense-in-depth on the plugin path; the streaming
+    // path has no per-receiver equivalent - its collector is per stream
+    // thread - and relies on the transport lifetime instead). Safe to
+    // reorder: the obsolete-charts sweep above keys on collector_tid, the
+    // vnode snapshot was taken earlier, and rrd_collector_finished() is
+    // idempotent per worker iteration.
     rrd_collector_finished();
+    pluginsd_process_cleanup(parser);
 
     // the functions this plugin registered are still in host->functions, but their collector
     // is no longer running, so they must drop out of the cloud manifest
