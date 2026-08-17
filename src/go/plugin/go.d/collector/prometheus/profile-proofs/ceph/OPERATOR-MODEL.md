@@ -14,6 +14,7 @@ all machine-verifiable behavior and coverage.
 ```text
 Ceph cluster
   -> control plane: MON, MGR, cephadm, health
+  -> node hardware: CPU, memory, storage, fans, temperatures, component health/firmware
   -> storage topology: pools -> PGs -> OSDs -> BlueStore/BlueFS/devices
   -> client services:
        CephFS -> filesystem -> MDS -> clients/sessions/cache/journal/purge queue
@@ -36,7 +37,8 @@ Ceph cluster
 7. RBD and RBD Mirror: per-image I/O, persistent write log, object cache, and replication progress/outcomes.
 8. RGW: operations, latency/bytes, cache, lifecycle, notifications, topics, and multisite synchronization.
 9. NVMe-oF: gateway/reactor state, host connectivity, subsystem inventory, namespace/listener topology, and bdev I/O.
-10. Shared runtime: schedulers, messenger workers, RDMA/DPDK, finishers, throttles, memory pools, and exporters.
+10. Node hardware: processor and memory inventory, storage capacity, cooling, temperatures, and component health.
+11. Shared runtime: schedulers, messenger workers, RDMA/DPDK, finishers, throttles, memory pools, and exporters.
 
 Navigation starts with service impact and convergence, follows user-facing services, then descends into storage-engine and
 runtime causes. Signals remain with the component that can explain them instead of being grouped globally by unit or type.
@@ -54,6 +56,12 @@ RBD PWL:             {ceph_daemon, librbd_pwl_key, remaining emitted labels}
 runtime component:   {ceph_daemon, normalized component identity, remaining emitted labels}
 RGW entity:          {instance_id, emitted user/bucket/topic/zone labels}
 NVMe-oF entity:      {gateway labels, nqn/host/device labels as emitted}
+hardware component:  {hostname, category, component}
+hardware CPU:        {hostname, cpu, manufacturer, model, total_threads}
+hardware fan:        {hostname, fan_name}
+hardware memory:     {hostname, dimm, type}
+hardware storage:    {hostname, device, model, protocol, firmware_version, slot, serial_number}
+hardware sensor:     {hostname, sensor_name}
 ```
 
 - MGR and ceph-exporter label sets differ by family and remain extensible.
@@ -82,6 +90,8 @@ retains the stable normalized families. Unknown suffixes are not silently classi
 - MGR and ceph-exporter can expose the same daemon schema with different Prometheus wire types. Long-running-average sums are
   cumulative in source and therefore remain incremental in both variants.
 - Release-specific scrub and optional-daemon surfaces remain distinct causal branches where their contracts differ.
+- Tentacle adds node-proxy hardware observations and primary-OSD PG-rebuild duration counters. Hardware measurements are
+  owned by the node-hardware domain; PG-rebuild duration remains with OSD recovery.
 - NVMe-oF process/platform metrics are part of the gateway surface; Python GC is not fabricated because that producer
   unregisters it.
 - The NVMe-oF listener speed family has a misleading bytes suffix. Its implementation reads the kernel interface speed value,
@@ -108,6 +118,8 @@ retains the stable normalized families. Unknown suffixes are not silently classi
 - Raw process-start epoch cannot be transformed into age, so it is excluded while CPU, memory, and file descriptors remain.
 - Writer-ineligible information families retain their lost metadata questions in the source contract rather than being
   presented as numeric state.
+- Hardware firmware information remains a metadata-only constant-one carrier. Its labels remain documented in the source
+  contract but the writer-ineligible info family is not presented as a numeric chart.
 - Duplicate aliases are excluded only when source proves the canonical family represents the same observation.
 - Address-bearing objecter families are not discarded: the profile extracts their address identity and charts the finite
   operation branches.
