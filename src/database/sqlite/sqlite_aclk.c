@@ -1402,7 +1402,9 @@ void aclk_arm_node_manifest(RRDHOST *host)
     // caller - rrdhost_free_unlinked() - and everything this function's callers depend on is torn
     // down earlier in it:
     //   1. rrdhost_index_del_by_guid()          - the host stops being findable
-    //   2. stream_receiver_signal_to_stop_and_wait() - blocks until host->receiver is NULL
+    //   2. stream_receiver_signal_to_stop_and_wait() - waits for host->receiver to become NULL,
+    //      but the wait is BOUNDED (~2s) and gives up on a stalled receiver thread, so step 2 is
+    //      best-effort, not a guarantee (pre-existing residual, tracked separately)
     //   3. rrd_functions_host_destroy()         - host->functions becomes NULL
     //   4. destroy_aclk_config()                - only now is the config freed
     // So the function-registry callers (which must first mutate host->functions) and

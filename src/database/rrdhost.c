@@ -929,8 +929,11 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     //   until the sender thread is joined there, it can still run the global-
     //   functions renderer, which locks host->functions->pending_dels.spinlock
     //   and traverses its dictionary - destroying earlier is a use-after-free
-    //   on the sender thread (the receiver was already stopped at the top of
-    //   this function, so the other direction of the ACLK contract holds).
+    //   on the sender thread. (The receiver stop at the top of this function
+    //   is a BOUNDED ~2s wait that can give up on a stalled receiver thread -
+    //   see stream_receiver_signal_to_stop_and_wait() - so the receiver side
+    //   is best-effort, not a guarantee; that pre-existing residual is
+    //   tracked separately and is not widened by this ordering.)
     // - it MUST be destroyed BEFORE destroy_aclk_config() in
     //   rrdhost_free_unlinked() - the ACLK teardown contract documented in
     //   sqlite_aclk.c (aclk_arm_node_manifest).
