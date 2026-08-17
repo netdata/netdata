@@ -22,6 +22,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if err != nil {
 			return nil, err
 		}
+		devicesChanged := !maps.EqualFunc(c.scannedDevices, devices, func(left, right *scanDevice) bool {
+			return *left == *right
+		})
 
 		for k := range c.scannedDevices {
 			if _, ok := devices[k]; !ok {
@@ -33,7 +36,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			}
 		}
 
-		c.forceDevicePoll = !maps.Equal(c.scannedDevices, devices)
+		c.forceDevicePoll = devicesChanged
 		c.scannedDevices = devices
 		c.lastScanTime = now
 		c.forceScan = false
@@ -198,18 +201,18 @@ func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id
 
 	if attrs, ok := dev.ataSmartAttributeTable(); ok {
 		for _, attr := range attrs {
-			if !isSmartAttrValid(attr) {
+			if !isSmartAttrChartable(attr) {
 				continue
 			}
-			n := smartAttrs.resolve(attr).name
+			identity, ok := smartAttrs[attr.id()]
+			if !ok {
+				continue
+			}
+			n := identity.name
 			px := fmt.Sprintf("%sattr_%s_", px, n)
 
 			if v, err := strconv.ParseInt(attr.value(), 10, 64); err == nil {
 				mx[px+"normalized"] = v
-			}
-
-			if v, err := strconv.ParseInt(attr.rawValue(), 10, 64); err == nil {
-				mx[px+"raw"] = v
 			}
 
 			rs := strings.TrimSpace(attr.rawString())

@@ -231,12 +231,7 @@ func (c *Collector) newDeviceCharts(dev *smartDevice, id deviceIdentity) *collec
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id.name, id.typ)
-		chart.Labels = []collectorapi.Label{
-			{Key: "device_name", Value: dev.deviceName()},
-			{Key: "device_type", Value: dev.deviceType()},
-			{Key: "model_name", Value: dev.modelName()},
-			{Key: "serial_number", Value: dev.serialNumber()},
-		}
+		chart.Labels = deviceChartLabels(dev)
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ)
 		}
@@ -264,7 +259,7 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity
 		}
 
 		attrName := attributeNameMap(attr.name())
-		identity := smartAttrs.resolve(attr)
+		identity := smartAttrs[attr.id()]
 		cleanAttrName := identity.name
 		if identity.name != identity.baseName && !warned[identity.baseName] {
 			c.Warningf("device '%s' type '%s': SMART attributes normalize to '%s'; using attribute IDs to disambiguate", dev.deviceName(), dev.deviceType(), identity.baseName)
@@ -279,12 +274,7 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity
 			chart.Title = fmt.Sprintf(chart.Title, attrName)
 			chart.Fam = fmt.Sprintf(chart.Fam, cleanAttrName)
 			chart.Ctx = fmt.Sprintf(chart.Ctx, cleanAttrName)
-			chart.Labels = []collectorapi.Label{
-				{Key: "device_name", Value: dev.deviceName()},
-				{Key: "device_type", Value: dev.deviceType()},
-				{Key: "model_name", Value: dev.modelName()},
-				{Key: "serial_number", Value: dev.serialNumber()},
-			}
+			chart.Labels = deviceChartLabels(dev)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ, cleanAttrName)
 				dim.Name = fmt.Sprintf(dim.Name, cleanAttrName)
@@ -308,12 +298,7 @@ func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice, id deviceIdent
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id.name, id.typ)
-		chart.Labels = []collectorapi.Label{
-			{Key: "device_name", Value: dev.deviceName()},
-			{Key: "device_type", Value: dev.deviceType()},
-			{Key: "model_name", Value: dev.modelName()},
-			{Key: "serial_number", Value: dev.serialNumber()},
-		}
+		chart.Labels = deviceChartLabels(dev)
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ)
 		}
@@ -322,15 +307,19 @@ func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice, id deviceIdent
 	return charts
 }
 
-var attrNameReplacer = strings.NewReplacer("/", "_")
-
-func cleanAttributeName(attrName string) string {
-	attrName, _ = replaceIDWhitespace(attrNameReplacer.Replace(attrName))
-	return strings.ToLower(attrName)
+func deviceChartLabels(dev *smartDevice) []collectorapi.Label {
+	return []collectorapi.Label{
+		{Key: "device_name", Value: dev.deviceName()},
+		{Key: "device_type", Value: dev.deviceType()},
+		{Key: "model_name", Value: dev.modelName()},
+		{Key: "serial_number", Value: dev.serialNumber()},
+	}
 }
 
-func attributeUnit(attrName string) string {
-	units := map[string]string{
+var (
+	attrNameReplacer = strings.NewReplacer("/", "_")
+
+	smartAttributeUnits = map[string]string{
 		"Airflow_Temperature_Cel": "Celsius",
 		"Case_Temperature":        "Celsius",
 		"Drive_Temperature":       "Celsius",
@@ -351,8 +340,15 @@ func attributeUnit(attrName string) string {
 		"Reported_Uncorrect":      "errors",
 		"Command_Timeout":         "events",
 	}
+)
 
-	if unit, ok := units[attrName]; ok {
+func cleanAttributeName(attrName string) string {
+	attrName, _ = replaceIDWhitespace(attrNameReplacer.Replace(attrName))
+	return strings.ToLower(attrName)
+}
+
+func attributeUnit(attrName string) string {
+	if unit, ok := smartAttributeUnits[attrName]; ok {
 		return unit
 	}
 

@@ -173,6 +173,81 @@ func TestCollector_Check(t *testing.T) {
 	}
 }
 
+func wantMetricsTypeSata() map[string]int64 {
+	return map[string]int64{
+		"device_sda_type_sat_ata_smart_error_log_summary_count":       0,
+		"device_sda_type_sat_attr_current_pending_sector_decoded":     0,
+		"device_sda_type_sat_attr_current_pending_sector_normalized":  100,
+		"device_sda_type_sat_attr_load_cycle_count_decoded":           360,
+		"device_sda_type_sat_attr_load_cycle_count_normalized":        100,
+		"device_sda_type_sat_attr_offline_uncorrectable_decoded":      0,
+		"device_sda_type_sat_attr_offline_uncorrectable_normalized":   100,
+		"device_sda_type_sat_attr_power-off_retract_count_decoded":    360,
+		"device_sda_type_sat_attr_power-off_retract_count_normalized": 100,
+		"device_sda_type_sat_attr_power_cycle_count_decoded":          12,
+		"device_sda_type_sat_attr_power_cycle_count_normalized":       100,
+		"device_sda_type_sat_attr_power_on_hours_decoded":             8244,
+		"device_sda_type_sat_attr_power_on_hours_normalized":          99,
+		"device_sda_type_sat_attr_raw_read_error_rate_decoded":        0,
+		"device_sda_type_sat_attr_raw_read_error_rate_normalized":     100,
+		"device_sda_type_sat_attr_reallocated_event_count_decoded":    0,
+		"device_sda_type_sat_attr_reallocated_event_count_normalized": 100,
+		"device_sda_type_sat_attr_reallocated_sector_ct_decoded":      0,
+		"device_sda_type_sat_attr_reallocated_sector_ct_normalized":   100,
+		"device_sda_type_sat_attr_seek_error_rate_decoded":            0,
+		"device_sda_type_sat_attr_seek_error_rate_normalized":         100,
+		"device_sda_type_sat_attr_seek_time_performance_decoded":      15,
+		"device_sda_type_sat_attr_seek_time_performance_normalized":   140,
+		"device_sda_type_sat_attr_spin_retry_count_decoded":           0,
+		"device_sda_type_sat_attr_spin_retry_count_normalized":        100,
+		"device_sda_type_sat_attr_spin_up_time_decoded":               281,
+		"device_sda_type_sat_attr_spin_up_time_normalized":            86,
+		"device_sda_type_sat_attr_start_stop_count_decoded":           12,
+		"device_sda_type_sat_attr_start_stop_count_normalized":        100,
+		"device_sda_type_sat_attr_temperature_celsius_decoded":        49,
+		"device_sda_type_sat_attr_temperature_celsius_normalized":     43,
+		"device_sda_type_sat_attr_throughput_performance_decoded":     48,
+		"device_sda_type_sat_attr_throughput_performance_normalized":  148,
+		"device_sda_type_sat_attr_udma_crc_error_count_decoded":       0,
+		"device_sda_type_sat_attr_udma_crc_error_count_normalized":    100,
+		"device_sda_type_sat_power_cycle_count":                       12,
+		"device_sda_type_sat_power_on_time":                           29678400,
+		"device_sda_type_sat_smart_status_failed":                     0,
+		"device_sda_type_sat_smart_status_passed":                     1,
+		"device_sda_type_sat_temperature":                             49,
+		"device_sdc_type_sat_ata_smart_error_log_summary_count":       0,
+		"device_sdc_type_sat_attr_available_reservd_space_decoded":    100,
+		"device_sdc_type_sat_attr_available_reservd_space_normalized": 100,
+		"device_sdc_type_sat_attr_command_timeout_decoded":            0,
+		"device_sdc_type_sat_attr_command_timeout_normalized":         100,
+		"device_sdc_type_sat_attr_end-to-end_error_decoded":           0,
+		"device_sdc_type_sat_attr_end-to-end_error_normalized":        100,
+		"device_sdc_type_sat_attr_media_wearout_indicator_decoded":    65406,
+		"device_sdc_type_sat_attr_media_wearout_indicator_normalized": 100,
+		"device_sdc_type_sat_attr_power_cycle_count_decoded":          13,
+		"device_sdc_type_sat_attr_power_cycle_count_normalized":       100,
+		"device_sdc_type_sat_attr_power_on_hours_decoded":             8244,
+		"device_sdc_type_sat_attr_power_on_hours_normalized":          100,
+		"device_sdc_type_sat_attr_reallocated_sector_ct_decoded":      0,
+		"device_sdc_type_sat_attr_reallocated_sector_ct_normalized":   100,
+		"device_sdc_type_sat_attr_reported_uncorrect_decoded":         0,
+		"device_sdc_type_sat_attr_reported_uncorrect_normalized":      100,
+		"device_sdc_type_sat_attr_temperature_celsius_decoded":        27,
+		"device_sdc_type_sat_attr_temperature_celsius_normalized":     73,
+		"device_sdc_type_sat_attr_total_lbas_read_decoded":            76778,
+		"device_sdc_type_sat_attr_total_lbas_read_normalized":         253,
+		"device_sdc_type_sat_attr_total_lbas_written_decoded":         173833,
+		"device_sdc_type_sat_attr_total_lbas_written_normalized":      253,
+		"device_sdc_type_sat_attr_udma_crc_error_count_decoded":       0,
+		"device_sdc_type_sat_attr_udma_crc_error_count_normalized":    100,
+		"device_sdc_type_sat_power_cycle_count":                       13,
+		"device_sdc_type_sat_power_on_time":                           29678400,
+		"device_sdc_type_sat_smart_status_failed":                     0,
+		"device_sdc_type_sat_smart_status_passed":                     1,
+		"device_sdc_type_sat_temperature":                             27,
+	}
+}
+
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareMock   func() *mockSmartctlCliExec
@@ -183,116 +258,7 @@ func TestCollector_Collect(t *testing.T) {
 		"success type sata devices": {
 			prepareMock: prepareMockOkTypeSata,
 			wantCharts:  68,
-			wantMetrics: map[string]int64{
-				"device_sda_type_sat_ata_smart_error_log_summary_count":       0,
-				"device_sda_type_sat_attr_current_pending_sector_decoded":     0,
-				"device_sda_type_sat_attr_current_pending_sector_normalized":  100,
-				"device_sda_type_sat_attr_current_pending_sector_raw":         0,
-				"device_sda_type_sat_attr_load_cycle_count_decoded":           360,
-				"device_sda_type_sat_attr_load_cycle_count_normalized":        100,
-				"device_sda_type_sat_attr_load_cycle_count_raw":               360,
-				"device_sda_type_sat_attr_offline_uncorrectable_decoded":      0,
-				"device_sda_type_sat_attr_offline_uncorrectable_normalized":   100,
-				"device_sda_type_sat_attr_offline_uncorrectable_raw":          0,
-				"device_sda_type_sat_attr_power-off_retract_count_decoded":    360,
-				"device_sda_type_sat_attr_power-off_retract_count_normalized": 100,
-				"device_sda_type_sat_attr_power-off_retract_count_raw":        360,
-				"device_sda_type_sat_attr_power_cycle_count_decoded":          12,
-				"device_sda_type_sat_attr_power_cycle_count_normalized":       100,
-				"device_sda_type_sat_attr_power_cycle_count_raw":              12,
-				"device_sda_type_sat_attr_power_on_hours_decoded":             8244,
-				"device_sda_type_sat_attr_power_on_hours_normalized":          99,
-				"device_sda_type_sat_attr_power_on_hours_raw":                 8244,
-				"device_sda_type_sat_attr_raw_read_error_rate_decoded":        0,
-				"device_sda_type_sat_attr_raw_read_error_rate_normalized":     100,
-				"device_sda_type_sat_attr_raw_read_error_rate_raw":            0,
-				"device_sda_type_sat_attr_reallocated_event_count_decoded":    0,
-				"device_sda_type_sat_attr_reallocated_event_count_normalized": 100,
-				"device_sda_type_sat_attr_reallocated_event_count_raw":        0,
-				"device_sda_type_sat_attr_reallocated_sector_ct_decoded":      0,
-				"device_sda_type_sat_attr_reallocated_sector_ct_normalized":   100,
-				"device_sda_type_sat_attr_reallocated_sector_ct_raw":          0,
-				"device_sda_type_sat_attr_seek_error_rate_decoded":            0,
-				"device_sda_type_sat_attr_seek_error_rate_normalized":         100,
-				"device_sda_type_sat_attr_seek_error_rate_raw":                0,
-				"device_sda_type_sat_attr_seek_time_performance_decoded":      15,
-				"device_sda_type_sat_attr_seek_time_performance_normalized":   140,
-				"device_sda_type_sat_attr_seek_time_performance_raw":          15,
-				"device_sda_type_sat_attr_spin_retry_count_decoded":           0,
-				"device_sda_type_sat_attr_spin_retry_count_normalized":        100,
-				"device_sda_type_sat_attr_spin_retry_count_raw":               0,
-				"device_sda_type_sat_attr_spin_up_time_decoded":               281,
-				"device_sda_type_sat_attr_spin_up_time_normalized":            86,
-				"device_sda_type_sat_attr_spin_up_time_raw":                   25788088601,
-				"device_sda_type_sat_attr_start_stop_count_decoded":           12,
-				"device_sda_type_sat_attr_start_stop_count_normalized":        100,
-				"device_sda_type_sat_attr_start_stop_count_raw":               12,
-				"device_sda_type_sat_attr_temperature_celsius_decoded":        49,
-				"device_sda_type_sat_attr_temperature_celsius_normalized":     43,
-				"device_sda_type_sat_attr_temperature_celsius_raw":            240519741489,
-				"device_sda_type_sat_attr_throughput_performance_decoded":     48,
-				"device_sda_type_sat_attr_throughput_performance_normalized":  148,
-				"device_sda_type_sat_attr_throughput_performance_raw":         48,
-				"device_sda_type_sat_attr_udma_crc_error_count_decoded":       0,
-				"device_sda_type_sat_attr_udma_crc_error_count_normalized":    100,
-				"device_sda_type_sat_attr_udma_crc_error_count_raw":           0,
-				"device_sda_type_sat_attr_unknown_attribute_decoded":          100,
-				"device_sda_type_sat_attr_unknown_attribute_normalized":       100,
-				"device_sda_type_sat_attr_unknown_attribute_raw":              100,
-				"device_sda_type_sat_power_cycle_count":                       12,
-				"device_sda_type_sat_power_on_time":                           29678400,
-				"device_sda_type_sat_smart_status_failed":                     0,
-				"device_sda_type_sat_smart_status_passed":                     1,
-				"device_sda_type_sat_temperature":                             49,
-				"device_sdc_type_sat_ata_smart_error_log_summary_count":       0,
-				"device_sdc_type_sat_attr_available_reservd_space_decoded":    100,
-				"device_sdc_type_sat_attr_available_reservd_space_normalized": 100,
-				"device_sdc_type_sat_attr_available_reservd_space_raw":        100,
-				"device_sdc_type_sat_attr_command_timeout_decoded":            0,
-				"device_sdc_type_sat_attr_command_timeout_normalized":         100,
-				"device_sdc_type_sat_attr_command_timeout_raw":                0,
-				"device_sdc_type_sat_attr_end-to-end_error_decoded":           0,
-				"device_sdc_type_sat_attr_end-to-end_error_normalized":        100,
-				"device_sdc_type_sat_attr_end-to-end_error_raw":               0,
-				"device_sdc_type_sat_attr_media_wearout_indicator_decoded":    65406,
-				"device_sdc_type_sat_attr_media_wearout_indicator_normalized": 100,
-				"device_sdc_type_sat_attr_media_wearout_indicator_raw":        65406,
-				"device_sdc_type_sat_attr_power_cycle_count_decoded":          13,
-				"device_sdc_type_sat_attr_power_cycle_count_normalized":       100,
-				"device_sdc_type_sat_attr_power_cycle_count_raw":              13,
-				"device_sdc_type_sat_attr_power_on_hours_decoded":             8244,
-				"device_sdc_type_sat_attr_power_on_hours_normalized":          100,
-				"device_sdc_type_sat_attr_power_on_hours_raw":                 8244,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_decoded":      0,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_normalized":   100,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_raw":          0,
-				"device_sdc_type_sat_attr_reported_uncorrect_decoded":         0,
-				"device_sdc_type_sat_attr_reported_uncorrect_normalized":      100,
-				"device_sdc_type_sat_attr_reported_uncorrect_raw":             0,
-				"device_sdc_type_sat_attr_temperature_celsius_decoded":        27,
-				"device_sdc_type_sat_attr_temperature_celsius_normalized":     73,
-				"device_sdc_type_sat_attr_temperature_celsius_raw":            184684970011,
-				"device_sdc_type_sat_attr_total_lbas_read_decoded":            76778,
-				"device_sdc_type_sat_attr_total_lbas_read_normalized":         253,
-				"device_sdc_type_sat_attr_total_lbas_read_raw":                76778,
-				"device_sdc_type_sat_attr_total_lbas_written_decoded":         173833,
-				"device_sdc_type_sat_attr_total_lbas_written_normalized":      253,
-				"device_sdc_type_sat_attr_total_lbas_written_raw":             173833,
-				"device_sdc_type_sat_attr_udma_crc_error_count_decoded":       0,
-				"device_sdc_type_sat_attr_udma_crc_error_count_normalized":    100,
-				"device_sdc_type_sat_attr_udma_crc_error_count_raw":           0,
-				"device_sdc_type_sat_attr_unknown_attribute_decoded":          0,
-				"device_sdc_type_sat_attr_unknown_attribute_normalized":       0,
-				"device_sdc_type_sat_attr_unknown_attribute_raw":              0,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_decoded":      4694419309637,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_normalized":   4,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_raw":          4694419309637,
-				"device_sdc_type_sat_power_cycle_count":                       13,
-				"device_sdc_type_sat_power_on_time":                           29678400,
-				"device_sdc_type_sat_smart_status_failed":                     0,
-				"device_sdc_type_sat_smart_status_passed":                     1,
-				"device_sdc_type_sat_temperature":                             27,
-			},
+			wantMetrics: wantMetricsTypeSata(),
 		},
 		"success type sata devices concurrent": {
 			prepareMock: prepareMockOkTypeSata,
@@ -301,117 +267,8 @@ func TestCollector_Collect(t *testing.T) {
 				cfg.ConcurrentScans = 2
 				return cfg
 			},
-			wantCharts: 68,
-			wantMetrics: map[string]int64{
-				"device_sda_type_sat_ata_smart_error_log_summary_count":       0,
-				"device_sda_type_sat_attr_current_pending_sector_decoded":     0,
-				"device_sda_type_sat_attr_current_pending_sector_normalized":  100,
-				"device_sda_type_sat_attr_current_pending_sector_raw":         0,
-				"device_sda_type_sat_attr_load_cycle_count_decoded":           360,
-				"device_sda_type_sat_attr_load_cycle_count_normalized":        100,
-				"device_sda_type_sat_attr_load_cycle_count_raw":               360,
-				"device_sda_type_sat_attr_offline_uncorrectable_decoded":      0,
-				"device_sda_type_sat_attr_offline_uncorrectable_normalized":   100,
-				"device_sda_type_sat_attr_offline_uncorrectable_raw":          0,
-				"device_sda_type_sat_attr_power-off_retract_count_decoded":    360,
-				"device_sda_type_sat_attr_power-off_retract_count_normalized": 100,
-				"device_sda_type_sat_attr_power-off_retract_count_raw":        360,
-				"device_sda_type_sat_attr_power_cycle_count_decoded":          12,
-				"device_sda_type_sat_attr_power_cycle_count_normalized":       100,
-				"device_sda_type_sat_attr_power_cycle_count_raw":              12,
-				"device_sda_type_sat_attr_power_on_hours_decoded":             8244,
-				"device_sda_type_sat_attr_power_on_hours_normalized":          99,
-				"device_sda_type_sat_attr_power_on_hours_raw":                 8244,
-				"device_sda_type_sat_attr_raw_read_error_rate_decoded":        0,
-				"device_sda_type_sat_attr_raw_read_error_rate_normalized":     100,
-				"device_sda_type_sat_attr_raw_read_error_rate_raw":            0,
-				"device_sda_type_sat_attr_reallocated_event_count_decoded":    0,
-				"device_sda_type_sat_attr_reallocated_event_count_normalized": 100,
-				"device_sda_type_sat_attr_reallocated_event_count_raw":        0,
-				"device_sda_type_sat_attr_reallocated_sector_ct_decoded":      0,
-				"device_sda_type_sat_attr_reallocated_sector_ct_normalized":   100,
-				"device_sda_type_sat_attr_reallocated_sector_ct_raw":          0,
-				"device_sda_type_sat_attr_seek_error_rate_decoded":            0,
-				"device_sda_type_sat_attr_seek_error_rate_normalized":         100,
-				"device_sda_type_sat_attr_seek_error_rate_raw":                0,
-				"device_sda_type_sat_attr_seek_time_performance_decoded":      15,
-				"device_sda_type_sat_attr_seek_time_performance_normalized":   140,
-				"device_sda_type_sat_attr_seek_time_performance_raw":          15,
-				"device_sda_type_sat_attr_spin_retry_count_decoded":           0,
-				"device_sda_type_sat_attr_spin_retry_count_normalized":        100,
-				"device_sda_type_sat_attr_spin_retry_count_raw":               0,
-				"device_sda_type_sat_attr_spin_up_time_decoded":               281,
-				"device_sda_type_sat_attr_spin_up_time_normalized":            86,
-				"device_sda_type_sat_attr_spin_up_time_raw":                   25788088601,
-				"device_sda_type_sat_attr_start_stop_count_decoded":           12,
-				"device_sda_type_sat_attr_start_stop_count_normalized":        100,
-				"device_sda_type_sat_attr_start_stop_count_raw":               12,
-				"device_sda_type_sat_attr_temperature_celsius_decoded":        49,
-				"device_sda_type_sat_attr_temperature_celsius_normalized":     43,
-				"device_sda_type_sat_attr_temperature_celsius_raw":            240519741489,
-				"device_sda_type_sat_attr_throughput_performance_decoded":     48,
-				"device_sda_type_sat_attr_throughput_performance_normalized":  148,
-				"device_sda_type_sat_attr_throughput_performance_raw":         48,
-				"device_sda_type_sat_attr_udma_crc_error_count_decoded":       0,
-				"device_sda_type_sat_attr_udma_crc_error_count_normalized":    100,
-				"device_sda_type_sat_attr_udma_crc_error_count_raw":           0,
-				"device_sda_type_sat_attr_unknown_attribute_decoded":          100,
-				"device_sda_type_sat_attr_unknown_attribute_normalized":       100,
-				"device_sda_type_sat_attr_unknown_attribute_raw":              100,
-				"device_sda_type_sat_power_cycle_count":                       12,
-				"device_sda_type_sat_power_on_time":                           29678400,
-				"device_sda_type_sat_smart_status_failed":                     0,
-				"device_sda_type_sat_smart_status_passed":                     1,
-				"device_sda_type_sat_temperature":                             49,
-				"device_sdc_type_sat_ata_smart_error_log_summary_count":       0,
-				"device_sdc_type_sat_attr_available_reservd_space_decoded":    100,
-				"device_sdc_type_sat_attr_available_reservd_space_normalized": 100,
-				"device_sdc_type_sat_attr_available_reservd_space_raw":        100,
-				"device_sdc_type_sat_attr_command_timeout_decoded":            0,
-				"device_sdc_type_sat_attr_command_timeout_normalized":         100,
-				"device_sdc_type_sat_attr_command_timeout_raw":                0,
-				"device_sdc_type_sat_attr_end-to-end_error_decoded":           0,
-				"device_sdc_type_sat_attr_end-to-end_error_normalized":        100,
-				"device_sdc_type_sat_attr_end-to-end_error_raw":               0,
-				"device_sdc_type_sat_attr_media_wearout_indicator_decoded":    65406,
-				"device_sdc_type_sat_attr_media_wearout_indicator_normalized": 100,
-				"device_sdc_type_sat_attr_media_wearout_indicator_raw":        65406,
-				"device_sdc_type_sat_attr_power_cycle_count_decoded":          13,
-				"device_sdc_type_sat_attr_power_cycle_count_normalized":       100,
-				"device_sdc_type_sat_attr_power_cycle_count_raw":              13,
-				"device_sdc_type_sat_attr_power_on_hours_decoded":             8244,
-				"device_sdc_type_sat_attr_power_on_hours_normalized":          100,
-				"device_sdc_type_sat_attr_power_on_hours_raw":                 8244,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_decoded":      0,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_normalized":   100,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_raw":          0,
-				"device_sdc_type_sat_attr_reported_uncorrect_decoded":         0,
-				"device_sdc_type_sat_attr_reported_uncorrect_normalized":      100,
-				"device_sdc_type_sat_attr_reported_uncorrect_raw":             0,
-				"device_sdc_type_sat_attr_temperature_celsius_decoded":        27,
-				"device_sdc_type_sat_attr_temperature_celsius_normalized":     73,
-				"device_sdc_type_sat_attr_temperature_celsius_raw":            184684970011,
-				"device_sdc_type_sat_attr_total_lbas_read_decoded":            76778,
-				"device_sdc_type_sat_attr_total_lbas_read_normalized":         253,
-				"device_sdc_type_sat_attr_total_lbas_read_raw":                76778,
-				"device_sdc_type_sat_attr_total_lbas_written_decoded":         173833,
-				"device_sdc_type_sat_attr_total_lbas_written_normalized":      253,
-				"device_sdc_type_sat_attr_total_lbas_written_raw":             173833,
-				"device_sdc_type_sat_attr_udma_crc_error_count_decoded":       0,
-				"device_sdc_type_sat_attr_udma_crc_error_count_normalized":    100,
-				"device_sdc_type_sat_attr_udma_crc_error_count_raw":           0,
-				"device_sdc_type_sat_attr_unknown_attribute_decoded":          0,
-				"device_sdc_type_sat_attr_unknown_attribute_normalized":       0,
-				"device_sdc_type_sat_attr_unknown_attribute_raw":              0,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_decoded":      4694419309637,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_normalized":   4,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_raw":          4694419309637,
-				"device_sdc_type_sat_power_cycle_count":                       13,
-				"device_sdc_type_sat_power_on_time":                           29678400,
-				"device_sdc_type_sat_smart_status_failed":                     0,
-				"device_sdc_type_sat_smart_status_passed":                     1,
-				"device_sdc_type_sat_temperature":                             27,
-			},
+			wantCharts:  68,
+			wantMetrics: wantMetricsTypeSata(),
 		},
 		"success type nvme devices": {
 			prepareMock: prepareMockOkTypeNvme,
@@ -467,116 +324,7 @@ func TestCollector_Collect(t *testing.T) {
 		"success type sata devices non-fatal exit status": {
 			prepareMock: prepareMockOkTypeSataNonFatalExitStatus,
 			wantCharts:  68,
-			wantMetrics: map[string]int64{
-				"device_sda_type_sat_ata_smart_error_log_summary_count":       0,
-				"device_sda_type_sat_attr_current_pending_sector_decoded":     0,
-				"device_sda_type_sat_attr_current_pending_sector_normalized":  100,
-				"device_sda_type_sat_attr_current_pending_sector_raw":         0,
-				"device_sda_type_sat_attr_load_cycle_count_decoded":           360,
-				"device_sda_type_sat_attr_load_cycle_count_normalized":        100,
-				"device_sda_type_sat_attr_load_cycle_count_raw":               360,
-				"device_sda_type_sat_attr_offline_uncorrectable_decoded":      0,
-				"device_sda_type_sat_attr_offline_uncorrectable_normalized":   100,
-				"device_sda_type_sat_attr_offline_uncorrectable_raw":          0,
-				"device_sda_type_sat_attr_power-off_retract_count_decoded":    360,
-				"device_sda_type_sat_attr_power-off_retract_count_normalized": 100,
-				"device_sda_type_sat_attr_power-off_retract_count_raw":        360,
-				"device_sda_type_sat_attr_power_cycle_count_decoded":          12,
-				"device_sda_type_sat_attr_power_cycle_count_normalized":       100,
-				"device_sda_type_sat_attr_power_cycle_count_raw":              12,
-				"device_sda_type_sat_attr_power_on_hours_decoded":             8244,
-				"device_sda_type_sat_attr_power_on_hours_normalized":          99,
-				"device_sda_type_sat_attr_power_on_hours_raw":                 8244,
-				"device_sda_type_sat_attr_raw_read_error_rate_decoded":        0,
-				"device_sda_type_sat_attr_raw_read_error_rate_normalized":     100,
-				"device_sda_type_sat_attr_raw_read_error_rate_raw":            0,
-				"device_sda_type_sat_attr_reallocated_event_count_decoded":    0,
-				"device_sda_type_sat_attr_reallocated_event_count_normalized": 100,
-				"device_sda_type_sat_attr_reallocated_event_count_raw":        0,
-				"device_sda_type_sat_attr_reallocated_sector_ct_decoded":      0,
-				"device_sda_type_sat_attr_reallocated_sector_ct_normalized":   100,
-				"device_sda_type_sat_attr_reallocated_sector_ct_raw":          0,
-				"device_sda_type_sat_attr_seek_error_rate_decoded":            0,
-				"device_sda_type_sat_attr_seek_error_rate_normalized":         100,
-				"device_sda_type_sat_attr_seek_error_rate_raw":                0,
-				"device_sda_type_sat_attr_seek_time_performance_decoded":      15,
-				"device_sda_type_sat_attr_seek_time_performance_normalized":   140,
-				"device_sda_type_sat_attr_seek_time_performance_raw":          15,
-				"device_sda_type_sat_attr_spin_retry_count_decoded":           0,
-				"device_sda_type_sat_attr_spin_retry_count_normalized":        100,
-				"device_sda_type_sat_attr_spin_retry_count_raw":               0,
-				"device_sda_type_sat_attr_spin_up_time_decoded":               281,
-				"device_sda_type_sat_attr_spin_up_time_normalized":            86,
-				"device_sda_type_sat_attr_spin_up_time_raw":                   25788088601,
-				"device_sda_type_sat_attr_start_stop_count_decoded":           12,
-				"device_sda_type_sat_attr_start_stop_count_normalized":        100,
-				"device_sda_type_sat_attr_start_stop_count_raw":               12,
-				"device_sda_type_sat_attr_temperature_celsius_decoded":        49,
-				"device_sda_type_sat_attr_temperature_celsius_normalized":     43,
-				"device_sda_type_sat_attr_temperature_celsius_raw":            240519741489,
-				"device_sda_type_sat_attr_throughput_performance_decoded":     48,
-				"device_sda_type_sat_attr_throughput_performance_normalized":  148,
-				"device_sda_type_sat_attr_throughput_performance_raw":         48,
-				"device_sda_type_sat_attr_udma_crc_error_count_decoded":       0,
-				"device_sda_type_sat_attr_udma_crc_error_count_normalized":    100,
-				"device_sda_type_sat_attr_udma_crc_error_count_raw":           0,
-				"device_sda_type_sat_attr_unknown_attribute_decoded":          100,
-				"device_sda_type_sat_attr_unknown_attribute_normalized":       100,
-				"device_sda_type_sat_attr_unknown_attribute_raw":              100,
-				"device_sda_type_sat_power_cycle_count":                       12,
-				"device_sda_type_sat_power_on_time":                           29678400,
-				"device_sda_type_sat_smart_status_failed":                     0,
-				"device_sda_type_sat_smart_status_passed":                     1,
-				"device_sda_type_sat_temperature":                             49,
-				"device_sdc_type_sat_ata_smart_error_log_summary_count":       0,
-				"device_sdc_type_sat_attr_available_reservd_space_decoded":    100,
-				"device_sdc_type_sat_attr_available_reservd_space_normalized": 100,
-				"device_sdc_type_sat_attr_available_reservd_space_raw":        100,
-				"device_sdc_type_sat_attr_command_timeout_decoded":            0,
-				"device_sdc_type_sat_attr_command_timeout_normalized":         100,
-				"device_sdc_type_sat_attr_command_timeout_raw":                0,
-				"device_sdc_type_sat_attr_end-to-end_error_decoded":           0,
-				"device_sdc_type_sat_attr_end-to-end_error_normalized":        100,
-				"device_sdc_type_sat_attr_end-to-end_error_raw":               0,
-				"device_sdc_type_sat_attr_media_wearout_indicator_decoded":    65406,
-				"device_sdc_type_sat_attr_media_wearout_indicator_normalized": 100,
-				"device_sdc_type_sat_attr_media_wearout_indicator_raw":        65406,
-				"device_sdc_type_sat_attr_power_cycle_count_decoded":          13,
-				"device_sdc_type_sat_attr_power_cycle_count_normalized":       100,
-				"device_sdc_type_sat_attr_power_cycle_count_raw":              13,
-				"device_sdc_type_sat_attr_power_on_hours_decoded":             8244,
-				"device_sdc_type_sat_attr_power_on_hours_normalized":          100,
-				"device_sdc_type_sat_attr_power_on_hours_raw":                 8244,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_decoded":      0,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_normalized":   100,
-				"device_sdc_type_sat_attr_reallocated_sector_ct_raw":          0,
-				"device_sdc_type_sat_attr_reported_uncorrect_decoded":         0,
-				"device_sdc_type_sat_attr_reported_uncorrect_normalized":      100,
-				"device_sdc_type_sat_attr_reported_uncorrect_raw":             0,
-				"device_sdc_type_sat_attr_temperature_celsius_decoded":        27,
-				"device_sdc_type_sat_attr_temperature_celsius_normalized":     73,
-				"device_sdc_type_sat_attr_temperature_celsius_raw":            184684970011,
-				"device_sdc_type_sat_attr_total_lbas_read_decoded":            76778,
-				"device_sdc_type_sat_attr_total_lbas_read_normalized":         253,
-				"device_sdc_type_sat_attr_total_lbas_read_raw":                76778,
-				"device_sdc_type_sat_attr_total_lbas_written_decoded":         173833,
-				"device_sdc_type_sat_attr_total_lbas_written_normalized":      253,
-				"device_sdc_type_sat_attr_total_lbas_written_raw":             173833,
-				"device_sdc_type_sat_attr_udma_crc_error_count_decoded":       0,
-				"device_sdc_type_sat_attr_udma_crc_error_count_normalized":    100,
-				"device_sdc_type_sat_attr_udma_crc_error_count_raw":           0,
-				"device_sdc_type_sat_attr_unknown_attribute_decoded":          0,
-				"device_sdc_type_sat_attr_unknown_attribute_normalized":       0,
-				"device_sdc_type_sat_attr_unknown_attribute_raw":              0,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_decoded":      4694419309637,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_normalized":   4,
-				"device_sdc_type_sat_attr_unknown_ssd_attribute_raw":          4694419309637,
-				"device_sdc_type_sat_power_cycle_count":                       13,
-				"device_sdc_type_sat_power_on_time":                           29678400,
-				"device_sdc_type_sat_smart_status_failed":                     0,
-				"device_sdc_type_sat_smart_status_passed":                     1,
-				"device_sdc_type_sat_temperature":                             27,
-			},
+			wantMetrics: wantMetricsTypeSata(),
 		},
 		"error on scan": {
 			prepareMock: prepareMockErrOnScan,
@@ -681,6 +429,67 @@ func TestCollector_NormalizedDeviceIdentityDoesNotAlias(t *testing.T) {
 	assert.Equal(t, sequential, concurrent)
 }
 
+func TestCollector_UnchangedRescanDoesNotForceDevicePoll(t *testing.T) {
+	const deviceName = "/dev/nvme0"
+
+	devicePolls := 0
+	collr := New()
+	collr.ScanEvery = confopt.Duration(time.Nanosecond)
+	collr.PollDevicesEvery = confopt.Duration(time.Hour)
+	collr.exec = &mockSmartctlCliExec{
+		scanData: nvmeScanData(t, deviceName),
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, deviceName, name)
+			require.Equal(t, "nvme", deviceType)
+			devicePolls++
+			return dataTypeNvmeDeviceNvme0, nil
+		},
+	}
+
+	first := collr.Collect(context.Background())
+	require.NotEmpty(t, first)
+	second := collr.Collect(context.Background())
+	require.Equal(t, first, second)
+	assert.Equal(t, 1, devicePolls)
+}
+
+func TestCollector_AddedDeviceForcesDevicePoll(t *testing.T) {
+	scans := [][]byte{
+		nvmeScanData(t, "/dev/nvme0"),
+		nvmeScanData(t, "/dev/nvme0", "/dev/nvme1"),
+	}
+	scanIndex := 0
+	devicePolls := make(map[string]int)
+	collr := New()
+	collr.ScanEvery = confopt.Duration(time.Nanosecond)
+	collr.PollDevicesEvery = confopt.Duration(time.Hour)
+	collr.exec = &mockSmartctlCliExec{
+		scanDataFunc: func() ([]byte, error) {
+			idx := min(scanIndex, len(scans)-1)
+			scanIndex++
+			return scans[idx], nil
+		},
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, "nvme", deviceType)
+			devicePolls[name]++
+			switch name {
+			case "/dev/nvme0":
+				return dataTypeNvmeDeviceNvme0, nil
+			case "/dev/nvme1":
+				return dataTypeNvmeDeviceNvme1, nil
+			default:
+				return nil, fmt.Errorf("unexpected device %q", name)
+			}
+		},
+	}
+
+	first := collr.Collect(context.Background())
+	require.Len(t, first, 5)
+	second := collr.Collect(context.Background())
+	require.Len(t, second, 10)
+	assert.Equal(t, map[string]int{"/dev/nvme0": 2, "/dev/nvme1": 1}, devicePolls)
+}
+
 func TestCollector_RemovesChartsUsingAttachedResponseIdentity(t *testing.T) {
 	const (
 		scanName     = "IOService:/ScanAlias@0/Namespace@1"
@@ -694,7 +503,7 @@ func TestCollector_RemovesChartsUsingAttachedResponseIdentity(t *testing.T) {
 	scanIndex := 0
 	collr := New()
 	collr.ScanEvery = confopt.Duration(time.Nanosecond)
-	collr.PollDevicesEvery = confopt.Duration(time.Nanosecond)
+	collr.PollDevicesEvery = confopt.Duration(time.Hour)
 	collr.exec = &mockSmartctlCliExec{
 		scanDataFunc: func() ([]byte, error) {
 			idx := min(scanIndex, len(scans)-1)
@@ -717,6 +526,77 @@ func TestCollector_RemovesChartsUsingAttachedResponseIdentity(t *testing.T) {
 	for _, chart := range *collr.Charts() {
 		assert.True(t, chart.Obsolete, chart.ID)
 		assert.True(t, chart.IsRemoved(), chart.ID)
+	}
+}
+
+func TestCollector_EmitsOnlyChartBackedAttributeMetrics(t *testing.T) {
+	collr := New()
+	collr.exec = &mockSmartctlCliExec{
+		scanData: deviceScanData(t, "sat", "ATA", "/dev/sda"),
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, "/dev/sda", name)
+			require.Equal(t, "sat", deviceType)
+			return dataTypeSataDeviceHDDSda, nil
+		},
+	}
+
+	mx := collr.Collect(context.Background())
+	require.NotEmpty(t, mx)
+	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+	assert.NotContains(t, mx, "device_sda_type_sat_attr_unknown_attribute_normalized")
+	assert.NotContains(t, mx, "device_sda_type_sat_attr_power_on_hours_raw")
+}
+
+func TestCollector_RetriesUnresolvedScsiTypeWithScanEveryDisabled(t *testing.T) {
+	const deviceName = "/dev/sda"
+
+	for name, firstProbe := range map[string]func() ([]byte, error){
+		"transport failure": func() ([]byte, error) {
+			return nil, fmt.Errorf("transient SAT probe failure")
+		},
+		"device open failure": func() ([]byte, error) {
+			data := bytes.Replace(dataTypeSataDeviceHDDSda, []byte(`"exit_status": 0`), []byte(`"exit_status": 2`), 1)
+			return data, fmt.Errorf("exit status 2")
+		},
+		"ATA command failure": func() ([]byte, error) {
+			data := bytes.Replace(dataTypeSataDeviceHDDSda, []byte(`"exit_status": 0`), []byte(`"exit_status": 4`), 1)
+			return data, fmt.Errorf("exit status 4")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			satProbes := 0
+			collr := New()
+			collr.ScanEvery = 0
+			collr.exec = &mockSmartctlCliExec{
+				scanData: deviceScanData(t, "scsi", "SCSI", deviceName),
+				deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+					require.Equal(t, deviceName, name)
+					require.Equal(t, "sat", deviceType)
+					satProbes++
+					if satProbes == 1 {
+						return firstProbe()
+					}
+					return dataTypeSataDeviceHDDSda, nil
+				},
+			}
+
+			first, err := collr.scanDevices()
+			require.NoError(t, err)
+			require.Contains(t, first, deviceName+"|scsi")
+			assert.True(t, first[deviceName+"|scsi"].typeUnresolved)
+			collr.scannedDevices = first
+
+			second, err := collr.scanDevices()
+			require.NoError(t, err)
+			require.Contains(t, second, deviceName+"|sat")
+			assert.Equal(t, 2, satProbes)
+			collr.scannedDevices = second
+
+			third, err := collr.scanDevices()
+			require.NoError(t, err)
+			require.Contains(t, third, deviceName+"|sat")
+			assert.Equal(t, 2, satProbes, "confirmed SAT devices must use the cached fast path")
+		})
 	}
 }
 
@@ -878,10 +758,8 @@ func TestCollector_DisambiguatesConflictingAttributeNames(t *testing.T) {
 
 			for key, want := range map[string]int64{
 				"device_sda_type_sat_attr_duplicate_name_id_1_normalized": 100,
-				"device_sda_type_sat_attr_duplicate_name_id_1_raw":        0,
 				"device_sda_type_sat_attr_duplicate_name_id_1_decoded":    0,
 				"device_sda_type_sat_attr_duplicate_name_id_2_normalized": 148,
-				"device_sda_type_sat_attr_duplicate_name_id_2_raw":        48,
 				"device_sda_type_sat_attr_duplicate_name_id_2_decoded":    48,
 			} {
 				if assert.Contains(t, mx, key) {
