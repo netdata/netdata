@@ -18,11 +18,11 @@ entities:
     grain: model_name and engine
     identity:
       required:
-      - model_name
-      - engine
+        - model_name
+        - engine
       optional:
-      - ReplicaId
-      - WorkerId
+        - ReplicaId
+        - WorkerId
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
         service views in Netdata.
@@ -30,12 +30,12 @@ entities:
     grain: model_name and engine and finished_reason
     identity:
       required:
-      - model_name
-      - engine
-      - finished_reason
+        - model_name
+        - engine
+        - finished_reason
       optional:
-      - ReplicaId
-      - WorkerId
+        - ReplicaId
+        - WorkerId
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
         service views in Netdata.
@@ -43,13 +43,13 @@ entities:
     grain: model_name and engine and operation and status
     identity:
       required:
-      - model_name
-      - engine
-      - operation
-      - status
+        - model_name
+        - engine
+        - operation
+        - status
       optional:
-      - ReplicaId
-      - WorkerId
+        - ReplicaId
+        - WorkerId
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
         service views in Netdata.
@@ -62,10 +62,10 @@ entities:
     grain: model_name and request_type and mode and outcome
     identity:
       required:
-      - model_name
-      - request_type
-      - mode
-      - outcome
+        - model_name
+        - request_type
+        - mode
+        - outcome
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful source entity lets operators diagnose it directly and aggregate broader
@@ -79,7 +79,7 @@ normalizations:
     source_prefix: ray_vllm_
     target_prefix: 'vllm:'
     evidence:
-    - ray_namespace_relationship
+      - ray_namespace_relationship
   generated_registration_epochs:
     kind: generated_component_exclusion
     source:
@@ -88,699 +88,699 @@ normalizations:
       component: scalar
     outcome: drop_before_writer
     evidence:
-    - created_registration
-    - component_lifecycle
-    - source_units
+      - created_registration
+      - component_lifecycle
+      - source_units
 exclusions:
   duplicate_e2e_request_latency_seconds_count:
     source:
       signal: e2e_request_latency_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_kv_block_idle_before_evict_seconds_count:
     source:
       signal: kv_block_idle_before_evict_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: kv_cache_residency.events
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_kv_offload_load_size_sum:
     source:
       signal: kv_offload_load_size
       components:
-      - sum
+        - sum
     reason: equivalent_duplicate
     covering_view: kv_offloading.transfer_bytes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_kv_offload_store_size_sum:
     source:
       signal: kv_offload_store_size
       components:
-      - sum
+        - sum
     reason: equivalent_duplicate
     covering_view: kv_offloading.transfer_bytes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_mooncake_store_operation_time_seconds_count:
     source:
       signal: mooncake_store_operation_time_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: mooncake_connector.timing.operations
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_nixl_bytes_transferred_count:
     source:
       signal: nixl_bytes_transferred
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: nixl_connector.successful_transfers
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_nixl_num_descriptors_count:
     source:
       signal: nixl_num_descriptors
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: nixl_connector.successful_transfers
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_nixl_post_time_seconds_count:
     source:
       signal: nixl_post_time_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: nixl_connector.successful_transfers
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_num_requests_waiting:
     source:
       signal: num_requests_waiting
       components:
-      - value
+        - value
     reason: equivalent_duplicate
     covering_view: scheduler.request_state
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_prompt_tokens_cached_total:
     source:
       signal: prompt_tokens_cached_total
       components:
-      - value
+        - value
     reason: equivalent_duplicate
     covering_view: prefill.prompt_tokens_by_source
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_prompt_tokens_total:
     source:
       signal: prompt_tokens_total
       components:
-      - value
+        - value
     reason: equivalent_duplicate
     covering_view: prefill.prompt_tokens_by_source
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_decode_time_seconds_count:
     source:
       signal: request_decode_time_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_generation_tokens_count:
     source:
       signal: request_generation_tokens
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_inference_time_seconds_count:
     source:
       signal: request_inference_time_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_max_num_generation_tokens_count:
     source:
       signal: request_max_num_generation_tokens
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.parent_requests
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_prefill_kv_computed_tokens_count:
     source:
       signal: request_prefill_kv_computed_tokens
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_prefill_time_seconds_count:
     source:
       signal: request_prefill_time_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_prompt_tokens_count:
     source:
       signal: request_prompt_tokens
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_queue_time_seconds_count:
     source:
       signal: request_queue_time_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   duplicate_request_time_per_output_token_seconds_count:
     source:
       signal: request_time_per_output_token_seconds
       components:
-      - count
+        - count
     reason: equivalent_duplicate
     covering_view: request_lifecycle.outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   deprecated_offload_bytes_cpu_to_gpu:
     source:
       signal: deprecated_offload_bytes_total
       components:
-      - value
+        - value
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: CPU_to_GPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: CPU_to_GPU
     reason: source_superseded
     replacement: kv_offload_load_bytes_total
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_bytes_gpu_to_cpu:
     source:
       signal: deprecated_offload_bytes_total
       components:
-      - value
+        - value
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: GPU_to_CPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: GPU_to_CPU
     reason: source_superseded
     replacement: kv_offload_store_bytes_total
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_time_cpu_to_gpu:
     source:
       signal: deprecated_offload_time_total
       components:
-      - value
+        - value
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: CPU_to_GPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: CPU_to_GPU
     reason: source_superseded
     replacement: kv_offload_load_time_total
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_time_gpu_to_cpu:
     source:
       signal: deprecated_offload_time_total
       components:
-      - value
+        - value
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: GPU_to_CPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: GPU_to_CPU
     reason: source_superseded
     replacement: kv_offload_store_time_total
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_size_cpu_to_gpu:
     source:
       signal: deprecated_offload_size
       components:
-      - bucket
+        - bucket
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: CPU_to_GPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: CPU_to_GPU
     reason: source_superseded
     replacement: kv_offload_load_size
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_size_gpu_to_cpu:
     source:
       signal: deprecated_offload_size
       components:
-      - bucket
+        - bucket
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: GPU_to_CPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: GPU_to_CPU
     reason: source_superseded
     replacement: kv_offload_store_size
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_size_count_cpu_to_gpu:
     source:
       signal: deprecated_offload_size
       components:
-      - count
+        - count
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: CPU_to_GPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: CPU_to_GPU
     reason: source_superseded
     replacement: kv_offload_load_size
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_size_count_gpu_to_cpu:
     source:
       signal: deprecated_offload_size
       components:
-      - count
+        - count
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: GPU_to_CPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: GPU_to_CPU
     reason: source_superseded
     replacement: kv_offload_store_size
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_size_sum_cpu_to_gpu:
     source:
       signal: deprecated_offload_size
       components:
-      - sum
+        - sum
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: CPU_to_GPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: CPU_to_GPU
     reason: source_superseded
     replacement: kv_offload_load_size
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_offload_size_sum_gpu_to_cpu:
     source:
       signal: deprecated_offload_size
       components:
-      - sum
+        - sum
       where:
         any:
-        - all:
-          - label: transfer_type
-            op: eq
-            value: GPU_to_CPU
+          - all:
+              - label: transfer_type
+                op: eq
+                value: GPU_to_CPU
     reason: source_superseded
     replacement: kv_offload_store_size
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   ray_alias_corrupted_requests_total:
     source:
       signal: ray_alias_corrupted_requests_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: corrupted_requests_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_deprecated_offload_bytes_total:
     source:
       signal: ray_alias_deprecated_offload_bytes_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: deprecated_offload_bytes_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_deprecated_offload_time_total:
     source:
       signal: ray_alias_deprecated_offload_time_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: deprecated_offload_time_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_diffusion_num_canvas_positions_total:
     source:
       signal: ray_alias_diffusion_num_canvas_positions_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: diffusion_num_canvas_positions_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_diffusion_num_committed_tokens_total:
     source:
       signal: ray_alias_diffusion_num_committed_tokens_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: diffusion_num_committed_tokens_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_diffusion_num_denoising_steps_total:
     source:
       signal: ray_alias_diffusion_num_denoising_steps_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: diffusion_num_denoising_steps_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_external_prefix_cache_hits_total:
     source:
       signal: ray_alias_external_prefix_cache_hits_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: external_prefix_cache_hits_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_external_prefix_cache_queries_total:
     source:
       signal: ray_alias_external_prefix_cache_queries_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: external_prefix_cache_queries_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_generation_tokens_total:
     source:
       signal: ray_alias_generation_tokens_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: generation_tokens_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_hf3fs_num_failed_load_total:
     source:
       signal: ray_alias_hf3fs_num_failed_load_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: hf3fs_num_failed_load_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_hf3fs_num_failed_save_total:
     source:
       signal: ray_alias_hf3fs_num_failed_save_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: hf3fs_num_failed_save_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_kv_offload_allocation_failure_total:
     source:
       signal: ray_alias_kv_offload_allocation_failure_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: kv_offload_allocation_failure_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_kv_offload_load_bytes_total:
     source:
       signal: ray_alias_kv_offload_load_bytes_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: kv_offload_load_bytes_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_kv_offload_load_time_total:
     source:
       signal: ray_alias_kv_offload_load_time_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: kv_offload_load_time_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_kv_offload_store_bytes_total:
     source:
       signal: ray_alias_kv_offload_store_bytes_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: kv_offload_store_bytes_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_kv_offload_store_time_total:
     source:
       signal: ray_alias_kv_offload_store_time_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: kv_offload_store_time_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_kv_offload_stores_skipped_total:
     source:
       signal: ray_alias_kv_offload_stores_skipped_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: kv_offload_stores_skipped_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_mm_cache_hits_total:
     source:
       signal: ray_alias_mm_cache_hits_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: mm_cache_hits_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_mm_cache_queries_total:
     source:
       signal: ray_alias_mm_cache_queries_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: mm_cache_queries_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_nixl_num_failed_notifications_total:
     source:
       signal: ray_alias_nixl_num_failed_notifications_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: nixl_num_failed_notifications_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_nixl_num_failed_transfers_total:
     source:
       signal: ray_alias_nixl_num_failed_transfers_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: nixl_num_failed_transfers_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_nixl_num_kv_expired_reqs_total:
     source:
       signal: ray_alias_nixl_num_kv_expired_reqs_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: nixl_num_kv_expired_reqs_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_num_preemptions_total:
     source:
       signal: ray_alias_num_preemptions_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: num_preemptions_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_prefix_cache_hits_total:
     source:
       signal: ray_alias_prefix_cache_hits_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: prefix_cache_hits_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_prefix_cache_queries_total:
     source:
       signal: ray_alias_prefix_cache_queries_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: prefix_cache_queries_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_prompt_tokens_by_source_total:
     source:
       signal: ray_alias_prompt_tokens_by_source_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: prompt_tokens_by_source_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_prompt_tokens_cached_total:
     source:
       signal: ray_alias_prompt_tokens_cached_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: prompt_tokens_cached_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_prompt_tokens_total:
     source:
       signal: ray_alias_prompt_tokens_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: prompt_tokens_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_request_success_total:
     source:
       signal: ray_alias_request_success_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: request_success_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_spec_decode_num_accepted_tokens_per_pos_total:
     source:
       signal: ray_alias_spec_decode_num_accepted_tokens_per_pos_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: spec_decode_num_accepted_tokens_per_pos_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_spec_decode_num_accepted_tokens_total:
     source:
       signal: ray_alias_spec_decode_num_accepted_tokens_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: spec_decode_num_accepted_tokens_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_spec_decode_num_draft_tokens_total:
     source:
       signal: ray_alias_spec_decode_num_draft_tokens_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: spec_decode_num_draft_tokens_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
   ray_alias_spec_decode_num_drafts_total:
     source:
       signal: ray_alias_spec_decode_num_drafts_total
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: spec_decode_num_drafts_total
     evidence:
-    - ray_compatibility_deprecation
+      - ray_compatibility_deprecation
     outcome: drop_before_writer
 limitations: {}
 views:
@@ -792,13 +792,13 @@ views:
       corrupted:
         signal: corrupted_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.time_to_first_token:
     family: vLLM/Request Lifecycle
@@ -808,13 +808,13 @@ views:
       time_to_first_token:
         signal: time_to_first_token_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.end_to_end_latency:
     family: vLLM/Request Lifecycle
@@ -824,13 +824,13 @@ views:
       end_to_end_latency:
         signal: e2e_request_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.first_token_requests:
     family: vLLM/Request Lifecycle
@@ -840,13 +840,13 @@ views:
       requests:
         signal: time_to_first_token_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.completed_pre_response_time:
     family: vLLM/Request Lifecycle
@@ -856,13 +856,13 @@ views:
       time:
         signal: time_to_first_token_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.completed_end_to_end_time:
     family: vLLM/Request Lifecycle
@@ -872,13 +872,13 @@ views:
       time:
         signal: e2e_request_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.requested_sequences:
     family: vLLM/Request Lifecycle
@@ -888,13 +888,13 @@ views:
       requested_sequences:
         signal: request_params_n
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.requested_sequence_volume:
     family: vLLM/Request Lifecycle
@@ -904,13 +904,13 @@ views:
       sequences:
         signal: request_params_n
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.requested_token_limit:
     family: vLLM/Request Lifecycle
@@ -920,13 +920,13 @@ views:
       requested_token_limit:
         signal: request_params_max_tokens
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.requested_token_limits_sum:
     family: vLLM/Request Lifecycle
@@ -936,13 +936,13 @@ views:
       token_limits:
         signal: request_params_max_tokens
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.requests_with_explicit_token_limit:
     family: vLLM/Request Lifecycle
@@ -952,13 +952,13 @@ views:
       requests:
         signal: request_params_max_tokens
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.maximum_generated_tokens:
     family: vLLM/Request Lifecycle
@@ -968,13 +968,13 @@ views:
       maximum_generated_tokens:
         signal: request_max_num_generation_tokens
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.maximum_generated_tokens_sum:
     family: vLLM/Request Lifecycle
@@ -984,13 +984,13 @@ views:
       maximums:
         signal: request_max_num_generation_tokens
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.parent_requests:
     family: vLLM/Request Lifecycle
@@ -1000,13 +1000,13 @@ views:
       requests:
         signal: request_params_n
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   request_lifecycle.outcomes:
     family: vLLM/Request Lifecycle/Outcomes
@@ -1016,13 +1016,13 @@ views:
       requests:
         signal: request_success_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   scheduler.request_state:
     family: vLLM/Scheduler
@@ -1032,35 +1032,35 @@ views:
       running:
         signal: num_requests_running
         components:
-        - value
+          - value
       waiting_capacity:
         signal: num_requests_waiting_by_reason
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: reason
-              op: eq
-              value: capacity
+            - all:
+                - label: reason
+                  op: eq
+                  value: capacity
       waiting_deferred:
         signal: num_requests_waiting_by_reason
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: reason
-              op: eq
-              value: deferred
+            - all:
+                - label: reason
+                  op: eq
+                  value: deferred
     labels:
       dimensions:
         reason:
           render: input_role
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   scheduler.preemptions:
     family: vLLM/Scheduler
@@ -1070,13 +1070,13 @@ views:
       preemptions:
         signal: num_preemptions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   scheduler.sleep_state:
     family: vLLM/Scheduler
@@ -1086,15 +1086,15 @@ views:
       sleep_state:
         signal: engine_sleep_state
         components:
-        - value
+          - value
     labels:
       dimensions:
         sleep_state:
           render: label_value
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   scheduler.queue_time:
     family: vLLM/Scheduler
@@ -1104,13 +1104,13 @@ views:
       queue_time:
         signal: request_queue_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   scheduler.completed_queue_time:
     family: vLLM/Scheduler
@@ -1120,13 +1120,13 @@ views:
       time:
         signal: request_queue_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   prefill.prompt_tokens_by_source:
     family: vLLM/Prefill
@@ -1136,15 +1136,15 @@ views:
       source:
         signal: prompt_tokens_by_source_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         source:
           render: label_value
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   prefill.prompt_size:
     family: vLLM/Prefill
@@ -1154,13 +1154,13 @@ views:
       prompt_size:
         signal: request_prompt_tokens
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   prefill.prefill_time:
     family: vLLM/Prefill
@@ -1170,13 +1170,13 @@ views:
       prefill_time:
         signal: request_prefill_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   prefill.computed_kv_tokens:
     family: vLLM/Prefill
@@ -1186,13 +1186,13 @@ views:
       computed_kv_tokens:
         signal: request_prefill_kv_computed_tokens
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   prefill.completed_request_prompt_volume:
     family: vLLM/Prefill
@@ -1202,13 +1202,13 @@ views:
       prompt_tokens:
         signal: request_prompt_tokens
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   prefill.computed_kv_token_volume:
     family: vLLM/Prefill
@@ -1218,13 +1218,13 @@ views:
       computed_tokens:
         signal: request_prefill_kv_computed_tokens
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   prefill.completed_time:
     family: vLLM/Prefill
@@ -1234,13 +1234,13 @@ views:
       time:
         signal: request_prefill_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.generation_throughput:
     family: vLLM/Decode
@@ -1250,13 +1250,13 @@ views:
       generated:
         signal: generation_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.output_size:
     family: vLLM/Decode
@@ -1266,13 +1266,13 @@ views:
       output_size:
         signal: request_generation_tokens
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.decode_time:
     family: vLLM/Decode
@@ -1282,13 +1282,13 @@ views:
       decode_time:
         signal: request_decode_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.inter_token_latency:
     family: vLLM/Decode
@@ -1298,13 +1298,13 @@ views:
       inter_token_latency:
         signal: inter_token_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.mean_output_token_time:
     family: vLLM/Decode
@@ -1314,13 +1314,13 @@ views:
       mean_output_token_time:
         signal: request_time_per_output_token_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.output_token_volume:
     family: vLLM/Decode
@@ -1330,13 +1330,13 @@ views:
       output_tokens:
         signal: request_generation_tokens
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.completed_time:
     family: vLLM/Decode
@@ -1346,13 +1346,13 @@ views:
       time:
         signal: request_decode_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.inter_token_intervals:
     family: vLLM/Decode
@@ -1362,13 +1362,13 @@ views:
       intervals:
         signal: inter_token_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.inter_token_interval_time:
     family: vLLM/Decode
@@ -1378,13 +1378,13 @@ views:
       intervals:
         signal: inter_token_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   decode.accumulated_mean_output_token_time:
     family: vLLM/Decode
@@ -1394,13 +1394,13 @@ views:
       request_means:
         signal: request_time_per_output_token_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   engine_execution.inference_time:
     family: vLLM/Engine Execution
@@ -1410,13 +1410,13 @@ views:
       inference_time:
         signal: request_inference_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   engine_execution.completed_time:
     family: vLLM/Engine Execution
@@ -1426,13 +1426,13 @@ views:
       time:
         signal: request_inference_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   engine_execution.tokens_per_step:
     family: vLLM/Engine Execution
@@ -1442,13 +1442,13 @@ views:
       tokens_per_step:
         signal: iteration_tokens_total
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   engine_execution.engine_steps:
     family: vLLM/Engine Execution
@@ -1458,13 +1458,13 @@ views:
       steps:
         signal: iteration_tokens_total
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   engine_execution.step_token_volume:
     family: vLLM/Engine Execution
@@ -1474,13 +1474,13 @@ views:
       tokens:
         signal: iteration_tokens_total
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   engine_execution.estimated_compute:
     family: vLLM/Engine Execution
@@ -1490,19 +1490,19 @@ views:
       compute:
         signal: estimated_flops_per_gpu_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
     display:
       convention: gflops_per_second_per_gpu
       reason: Operators compare accelerator work in billions of floating-point operations per second per GPU.
       evidence:
-      - display_conventions
+        - display_conventions
   engine_execution.estimated_memory_bandwidth:
     family: vLLM/Engine Execution
     question: At what rate does estimated memory bandwidth per gpu change?
@@ -1511,23 +1511,23 @@ views:
       read:
         signal: estimated_read_bytes_per_gpu_total
         components:
-        - value
+          - value
       write:
         signal: estimated_write_bytes_per_gpu_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
     display:
       convention: gigabytes_per_second_per_gpu
       reason: Operators compare accelerator memory traffic in gigabytes per second per GPU.
       evidence:
-      - display_conventions
+        - display_conventions
   kv_cache.usage:
     family: vLLM/KV Cache
     question: What is the current kv cache usage?
@@ -1536,19 +1536,19 @@ views:
       used:
         signal: kv_cache_usage_perc
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
     display:
       convention: percentage
       reason: Operators interpret the exported ratio as a percentage.
       evidence:
-      - display_conventions
+        - display_conventions
   kv_cache.local_prefix:
     family: vLLM/KV Cache
     question: At what rate does local prefix cache change?
@@ -1557,17 +1557,17 @@ views:
       queries:
         signal: prefix_cache_queries_total
         components:
-        - value
+          - value
       hits:
         signal: prefix_cache_hits_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_cache.external_prefix:
     family: vLLM/KV Cache
@@ -1577,17 +1577,17 @@ views:
       queries:
         signal: external_prefix_cache_queries_total
         components:
-        - value
+          - value
       hits:
         signal: external_prefix_cache_hits_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_cache.multimodal:
     family: vLLM/KV Cache
@@ -1597,17 +1597,17 @@ views:
       queries:
         signal: mm_cache_queries_total
         components:
-        - value
+          - value
       hits:
         signal: mm_cache_hits_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_cache_residency.block_lifetime:
     family: vLLM/KV Cache Residency
@@ -1617,13 +1617,13 @@ views:
       block_lifetime:
         signal: kv_block_lifetime_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_cache_residency.idle_before_eviction:
     family: vLLM/KV Cache Residency
@@ -1633,13 +1633,13 @@ views:
       idle_before_eviction:
         signal: kv_block_idle_before_evict_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_cache_residency.reuse_gap:
     family: vLLM/KV Cache Residency
@@ -1649,13 +1649,13 @@ views:
       reuse_gap:
         signal: kv_block_reuse_gap_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_cache_residency.events:
     family: vLLM/KV Cache Residency
@@ -1665,17 +1665,17 @@ views:
       evictions:
         signal: kv_block_lifetime_seconds
         components:
-        - count
+          - count
       reuse_gaps:
         signal: kv_block_reuse_gap_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_cache_residency.accumulated_time:
     family: vLLM/KV Cache Residency
@@ -1685,21 +1685,21 @@ views:
       lifetime:
         signal: kv_block_lifetime_seconds
         components:
-        - sum
+          - sum
       idle_before_eviction:
         signal: kv_block_idle_before_evict_seconds
         components:
-        - sum
+          - sum
       reuse_gap:
         signal: kv_block_reuse_gap_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.load_size:
     family: vLLM/KV Offloading
@@ -1709,13 +1709,13 @@ views:
       load_size:
         signal: kv_offload_load_size
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.store_size:
     family: vLLM/KV Offloading
@@ -1725,13 +1725,13 @@ views:
       store_size:
         signal: kv_offload_store_size
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.transfer_operations:
     family: vLLM/KV Offloading
@@ -1741,17 +1741,17 @@ views:
       loads:
         signal: kv_offload_load_size
         components:
-        - count
+          - count
       stores:
         signal: kv_offload_store_size
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.transfer_bytes:
     family: vLLM/KV Offloading
@@ -1761,17 +1761,17 @@ views:
       loaded:
         signal: kv_offload_load_bytes_total
         components:
-        - value
+          - value
       stored:
         signal: kv_offload_store_bytes_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.completed_transfer_time:
     family: vLLM/KV Offloading
@@ -1781,17 +1781,17 @@ views:
       load:
         signal: kv_offload_load_time_total
         components:
-        - value
+          - value
       store:
         signal: kv_offload_store_time_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.lookup_sync_delay:
     family: vLLM/KV Offloading
@@ -1801,13 +1801,13 @@ views:
       lookup_sync_delay:
         signal: kv_offload_lookup_sync_delay_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.lookup_async_delay:
     family: vLLM/KV Offloading
@@ -1817,13 +1817,13 @@ views:
       lookup_async_delay:
         signal: kv_offload_lookup_async_delay_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.lookup_measurements:
     family: vLLM/KV Offloading
@@ -1833,17 +1833,17 @@ views:
       synchronous:
         signal: kv_offload_lookup_sync_delay_seconds
         components:
-        - count
+          - count
       asynchronous:
         signal: kv_offload_lookup_async_delay_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.lookup_delay_accumulation:
     family: vLLM/KV Offloading
@@ -1853,17 +1853,17 @@ views:
       synchronous:
         signal: kv_offload_lookup_sync_delay_seconds
         components:
-        - sum
+          - sum
       asynchronous:
         signal: kv_offload_lookup_async_delay_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.cpu_cache_usage:
     family: vLLM/KV Offloading
@@ -1873,27 +1873,27 @@ views:
       total:
         signal: kv_offload_cpu_cache_usage_perc
         components:
-        - value
+          - value
       writes:
         signal: kv_offload_cpu_cache_write_usage_perc
         components:
-        - value
+          - value
       reads:
         signal: kv_offload_cpu_cache_read_usage_perc
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
     display:
       convention: percentage
       reason: Operators interpret the exported ratio as a percentage.
       evidence:
-      - display_conventions
+        - display_conventions
   kv_offloading.cpu_allocation_size:
     family: vLLM/KV Offloading
     question: How is cpu kv allocation size distributed?
@@ -1902,13 +1902,13 @@ views:
       cpu_allocation_size:
         signal: kv_offload_cpu_allocation_size
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.cpu_allocation_measurements:
     family: vLLM/KV Offloading
@@ -1918,13 +1918,13 @@ views:
       allocations:
         signal: kv_offload_cpu_allocation_size
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.cpu_allocation_volume:
     family: vLLM/KV Offloading
@@ -1934,13 +1934,13 @@ views:
       blocks:
         signal: kv_offload_cpu_allocation_size
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.admission_outcomes:
     family: vLLM/KV Offloading
@@ -1950,17 +1950,17 @@ views:
       allocation_failures:
         signal: kv_offload_allocation_failure_total
         components:
-        - value
+          - value
       stores_skipped:
         signal: kv_offload_stores_skipped_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.tiering_lookup_sync_delay:
     family: vLLM/KV Offloading
@@ -1970,13 +1970,13 @@ views:
       tiering_lookup_sync_delay:
         signal: kv_offload_tiering_lookup_sync_delay_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.tiering_lookup_async_delay:
     family: vLLM/KV Offloading
@@ -1986,13 +1986,13 @@ views:
       tiering_lookup_async_delay:
         signal: kv_offload_tiering_lookup_async_delay_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.tiering_lookup_measurements:
     family: vLLM/KV Offloading
@@ -2002,17 +2002,17 @@ views:
       synchronous:
         signal: kv_offload_tiering_lookup_sync_delay_seconds
         components:
-        - count
+          - count
       asynchronous:
         signal: kv_offload_tiering_lookup_async_delay_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   kv_offloading.tiering_lookup_delay_accumulation:
     family: vLLM/KV Offloading
@@ -2022,17 +2022,17 @@ views:
       synchronous:
         signal: kv_offload_tiering_lookup_sync_delay_seconds
         components:
-        - sum
+          - sum
       asynchronous:
         signal: kv_offload_tiering_lookup_async_delay_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.transfer_duration:
     family: vLLM/NIXL Connector
@@ -2042,13 +2042,13 @@ views:
       transfer_duration:
         signal: nixl_xfer_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.post_time:
     family: vLLM/NIXL Connector
@@ -2058,13 +2058,13 @@ views:
       post_time:
         signal: nixl_post_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.transfer_size:
     family: vLLM/NIXL Connector
@@ -2074,13 +2074,13 @@ views:
       transfer_size:
         signal: nixl_bytes_transferred
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.transfer_descriptors:
     family: vLLM/NIXL Connector
@@ -2090,13 +2090,13 @@ views:
       transfer_descriptors:
         signal: nixl_num_descriptors
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.successful_transfers:
     family: vLLM/NIXL Connector
@@ -2106,13 +2106,13 @@ views:
       transfers:
         signal: nixl_xfer_time_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.completed_transfer_time:
     family: vLLM/NIXL Connector
@@ -2122,17 +2122,17 @@ views:
       transfer:
         signal: nixl_xfer_time_seconds
         components:
-        - sum
+          - sum
       post:
         signal: nixl_post_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.transfer_throughput:
     family: vLLM/NIXL Connector
@@ -2142,13 +2142,13 @@ views:
       transferred:
         signal: nixl_bytes_transferred
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.descriptor_throughput:
     family: vLLM/NIXL Connector
@@ -2158,13 +2158,13 @@ views:
       descriptors:
         signal: nixl_num_descriptors
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.failures:
     family: vLLM/NIXL Connector
@@ -2174,17 +2174,17 @@ views:
       transfers:
         signal: nixl_num_failed_transfers_total
         components:
-        - value
+          - value
       notifications:
         signal: nixl_num_failed_notifications_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   nixl_connector.expired_requests:
     family: vLLM/NIXL Connector
@@ -2194,13 +2194,13 @@ views:
       expired:
         signal: nixl_num_kv_expired_reqs_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   hf3fs_connector.save_duration:
     family: vLLM/HF3FS Connector
@@ -2210,13 +2210,13 @@ views:
       save_duration:
         signal: hf3fs_save_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   hf3fs_connector.load_duration:
     family: vLLM/HF3FS Connector
@@ -2226,13 +2226,13 @@ views:
       load_duration:
         signal: hf3fs_load_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   hf3fs_connector.transfer_measurements:
     family: vLLM/HF3FS Connector
@@ -2242,17 +2242,17 @@ views:
       saves:
         signal: hf3fs_save_duration_seconds
         components:
-        - count
+          - count
       loads:
         signal: hf3fs_load_duration_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   hf3fs_connector.completed_transfer_time:
     family: vLLM/HF3FS Connector
@@ -2262,17 +2262,17 @@ views:
       saves:
         signal: hf3fs_save_duration_seconds
         components:
-        - sum
+          - sum
       loads:
         signal: hf3fs_load_duration_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   hf3fs_connector.failures:
     family: vLLM/HF3FS Connector
@@ -2282,17 +2282,17 @@ views:
       saves:
         signal: hf3fs_num_failed_save_total
         components:
-        - value
+          - value
       loads:
         signal: hf3fs_num_failed_load_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   mooncake_connector.timing.duration:
     family: vLLM/Mooncake Connector/Operation Timing
@@ -2302,13 +2302,13 @@ views:
       duration:
         signal: mooncake_store_operation_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   mooncake_connector.timing.operations:
     family: vLLM/Mooncake Connector/Operation Timing
@@ -2318,13 +2318,13 @@ views:
       operations:
         signal: mooncake_store_operation_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   mooncake_connector.timing.completed_time:
     family: vLLM/Mooncake Connector/Operation Timing
@@ -2334,13 +2334,13 @@ views:
       time:
         signal: mooncake_store_operation_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   mooncake_connector.volume.keys:
     family: vLLM/Mooncake Connector/Operation Volume
@@ -2350,13 +2350,13 @@ views:
       keys:
         signal: mooncake_store_operation_keys_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   mooncake_connector.volume.bytes:
     family: vLLM/Mooncake Connector/Operation Volume
@@ -2366,13 +2366,13 @@ views:
       bytes:
         signal: mooncake_store_operation_bytes_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   mooncake_connector.volume.failed_keys:
     family: vLLM/Mooncake Connector/Operation Volume
@@ -2382,13 +2382,13 @@ views:
       failed:
         signal: mooncake_store_operation_failed_keys_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   speculative_decoding.drafts:
     family: vLLM/Speculative Decoding
@@ -2398,13 +2398,13 @@ views:
       drafts:
         signal: spec_decode_num_drafts_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   speculative_decoding.token_outcomes:
     family: vLLM/Speculative Decoding
@@ -2414,17 +2414,17 @@ views:
       proposed:
         signal: spec_decode_num_draft_tokens_total
         components:
-        - value
+          - value
       accepted:
         signal: spec_decode_num_accepted_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   speculative_decoding.accepted_by_position:
     family: vLLM/Speculative Decoding
@@ -2434,15 +2434,15 @@ views:
       position:
         signal: spec_decode_num_accepted_tokens_per_pos_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         position:
           render: label_value
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   diffusion_decoding.denoising_steps:
     family: vLLM/Diffusion Decoding
@@ -2452,13 +2452,13 @@ views:
       steps:
         signal: diffusion_num_denoising_steps_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   diffusion_decoding.canvas_positions:
     family: vLLM/Diffusion Decoding
@@ -2468,13 +2468,13 @@ views:
       positions:
         signal: diffusion_num_canvas_positions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   diffusion_decoding.committed_tokens:
     family: vLLM/Diffusion Decoding
@@ -2484,13 +2484,13 @@ views:
       committed:
         signal: diffusion_num_committed_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - Component
-      - SessionName
-      - Version
+        - Component
+        - SessionName
+        - Version
       omit: {}
   websocket_service.active_connections:
     family: vLLM/WebSocket Service
@@ -2500,7 +2500,7 @@ views:
       active:
         signal: websocket_connections_active
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2513,11 +2513,11 @@ views:
       opened:
         signal: websocket_connections_total
         components:
-        - value
+          - value
       closed:
         signal: websocket_connection_duration_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -2530,7 +2530,7 @@ views:
       connection_duration:
         signal: websocket_connection_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -2543,7 +2543,7 @@ views:
       time:
         signal: websocket_connection_duration_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -2556,7 +2556,7 @@ views:
       invocations:
         signal: tool_call_parser_invocations_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []

@@ -16,8 +16,8 @@ entities:
     grain: api_provider, model
     identity:
       required:
-      - api_provider
-      - model
+        - api_provider
+        - model
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -26,9 +26,9 @@ entities:
     grain: api_provider
     identity:
       required:
-      - api_provider
+        - api_provider
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -36,7 +36,7 @@ entities:
     grain: callback_name
     identity:
       required:
-      - callback_name
+        - callback_name
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -50,7 +50,7 @@ entities:
     grain: end_user
     identity:
       required:
-      - end_user
+        - end_user
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -59,8 +59,8 @@ entities:
     grain: function_name, error_class
     identity:
       required:
-      - function_name
-      - error_class
+        - function_name
+        - error_class
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -69,8 +69,8 @@ entities:
     grain: guardrail_name, hook_type
     identity:
       required:
-      - guardrail_name
-      - hook_type
+        - guardrail_name
+        - hook_type
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -79,9 +79,9 @@ entities:
     grain: guardrail_name, hook_type, error_type
     identity:
       required:
-      - guardrail_name
-      - hook_type
-      - error_type
+        - guardrail_name
+        - hook_type
+        - error_type
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -90,9 +90,9 @@ entities:
     grain: guardrail_name, hook_type, status
     identity:
       required:
-      - guardrail_name
-      - hook_type
-      - status
+        - guardrail_name
+        - hook_type
+        - status
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -101,7 +101,7 @@ entities:
     grain: hashed_api_key
     identity:
       required:
-      - hashed_api_key
+        - hashed_api_key
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -110,10 +110,10 @@ entities:
     grain: hashed_api_key, model
     identity:
       required:
-      - hashed_api_key
-      - model
+        - hashed_api_key
+        - model
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -121,9 +121,9 @@ entities:
     grain: hashed_api_key
     identity:
       required:
-      - hashed_api_key
+        - hashed_api_key
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -131,8 +131,8 @@ entities:
     grain: mcp_server_name, mcp_tool_name
     identity:
       required:
-      - mcp_server_name
-      - mcp_tool_name
+        - mcp_server_name
+        - mcp_tool_name
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -141,7 +141,7 @@ entities:
     grain: model_id
     identity:
       required:
-      - model_id
+        - model_id
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -150,8 +150,8 @@ entities:
     grain: model_id, service_tier
     identity:
       required:
-      - model_id
-      - service_tier
+        - model_id
+        - service_tier
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -160,8 +160,8 @@ entities:
     grain: model_id, status_class
     identity:
       required:
-      - model_id
-      - status_class
+        - model_id
+        - status_class
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -170,9 +170,9 @@ entities:
     grain: model_id, status_class, exception_class
     identity:
       required:
-      - model_id
-      - status_class
-      - exception_class
+        - model_id
+        - status_class
+        - exception_class
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -181,9 +181,9 @@ entities:
     grain: model_id
     identity:
       required:
-      - model_id
+        - model_id
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -191,7 +191,7 @@ entities:
     grain: org_id
     identity:
       required:
-      - org_id
+        - org_id
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -200,9 +200,9 @@ entities:
     grain: org_id
     identity:
       required:
-      - org_id
+        - org_id
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -210,14 +210,14 @@ entities:
     grain: rate_limit_category, rate_limit_type
     identity:
       required:
-      - rate_limit_category
-      - rate_limit_type
+        - rate_limit_category
+        - rate_limit_type
       optional: []
   requested_model:
     grain: requested_model
     identity:
       required:
-      - requested_model
+        - requested_model
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -226,8 +226,8 @@ entities:
     grain: requested_model, fallback_model
     identity:
       required:
-      - requested_model
-      - fallback_model
+        - requested_model
+        - fallback_model
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -236,14 +236,14 @@ entities:
     grain: result
     identity:
       required:
-      - result
+        - result
       optional: []
   route_status_class:
     grain: route, status_class
     identity:
       required:
-      - route
-      - status_class
+        - route
+        - status_class
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -252,14 +252,14 @@ entities:
     grain: service
     identity:
       required:
-      - service
+        - service
       optional: []
   status_class_exception_class:
     grain: status_class, exception_class
     identity:
       required:
-      - status_class
-      - exception_class
+        - status_class
+        - exception_class
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -268,7 +268,7 @@ entities:
     grain: team
     identity:
       required:
-      - team
+        - team
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -277,9 +277,9 @@ entities:
     grain: team
     identity:
       required:
-      - team
+        - team
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -287,7 +287,7 @@ entities:
     grain: user
     identity:
       required:
-      - user
+        - user
       optional: []
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
@@ -296,9 +296,9 @@ entities:
     grain: user
     identity:
       required:
-      - user
+        - user
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -307,7 +307,7 @@ entities:
     identity:
       required: []
       optional:
-      - pid
+        - pid
     high_cardinality_acceptance:
       operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
         through Netdata aggregation.
@@ -322,9 +322,9 @@ normalizations:
       component: scalar
     outcome: drop_before_writer
     evidence:
-    - created_registration
-    - component_lifecycle
-    - source_units
+      - created_registration
+      - component_lifecycle
+      - source_units
   requested_model_label:
     kind: label_rename
     source_label: model_group
@@ -340,25 +340,25 @@ normalizations:
     applies_to:
       signal: proxy_total_requests_metric_total
       components:
-      - value
+        - value
     source_label: status_code
     target_label: status_class
     ranges:
-    - min: 100
-      max: 199
-      value: 1xx
-    - min: 200
-      max: 299
-      value: 2xx
-    - min: 300
-      max: 399
-      value: 3xx
-    - min: 400
-      max: 499
-      value: 4xx
-    - min: 500
-      max: 599
-      value: 5xx
+      - min: 100
+        max: 199
+        value: 1xx
+      - min: 200
+        max: 299
+        value: 2xx
+      - min: 300
+        max: 399
+        value: 3xx
+      - min: 400
+        max: 499
+        value: 4xx
+      - min: 500
+        max: 599
+        value: 5xx
     missing:
       set: unclassified
     malformed:
@@ -368,33 +368,33 @@ normalizations:
     output:
       meaning: Bounded HTTP status class.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   proxy_failure_status_class:
     kind: category
     applies_to:
       signal: proxy_failed_requests_metric_total
       components:
-      - value
+        - value
     source_label: exception_status
     target_label: status_class
     ranges:
-    - min: 100
-      max: 199
-      value: 1xx
-    - min: 200
-      max: 299
-      value: 2xx
-    - min: 300
-      max: 399
-      value: 3xx
-    - min: 400
-      max: 499
-      value: 4xx
-    - min: 500
-      max: 599
-      value: 5xx
+      - min: 100
+        max: 199
+        value: 1xx
+      - min: 200
+        max: 299
+        value: 2xx
+      - min: 300
+        max: 399
+        value: 3xx
+      - min: 400
+        max: 499
+        value: 4xx
+      - min: 500
+        max: 599
+        value: 5xx
     missing:
       set: unclassified
     malformed:
@@ -404,33 +404,33 @@ normalizations:
     output:
       meaning: Bounded HTTP status class.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   deployment_failure_status_class:
     kind: category
     applies_to:
       signal: deployment_failure_responses_total
       components:
-      - value
+        - value
     source_label: exception_status
     target_label: status_class
     ranges:
-    - min: 100
-      max: 199
-      value: 1xx
-    - min: 200
-      max: 299
-      value: 2xx
-    - min: 300
-      max: 399
-      value: 3xx
-    - min: 400
-      max: 499
-      value: 4xx
-    - min: 500
-      max: 599
-      value: 5xx
+      - min: 100
+        max: 199
+        value: 1xx
+      - min: 200
+        max: 299
+        value: 2xx
+      - min: 300
+        max: 399
+        value: 3xx
+      - min: 400
+        max: 499
+        value: 4xx
+      - min: 500
+        max: 599
+        value: 5xx
     missing:
       set: unclassified
     malformed:
@@ -440,33 +440,33 @@ normalizations:
     output:
       meaning: Bounded HTTP status class.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   deployment_cooldown_status_class:
     kind: category
     applies_to:
       signal: deployment_cooled_down_total
       components:
-      - value
+        - value
     source_label: exception_status
     target_label: status_class
     ranges:
-    - min: 100
-      max: 199
-      value: 1xx
-    - min: 200
-      max: 299
-      value: 2xx
-    - min: 300
-      max: 399
-      value: 3xx
-    - min: 400
-      max: 499
-      value: 4xx
-    - min: 500
-      max: 599
-      value: 5xx
+      - min: 100
+        max: 199
+        value: 1xx
+      - min: 200
+        max: 299
+        value: 2xx
+      - min: 300
+        max: 399
+        value: 3xx
+      - min: 400
+        max: 499
+        value: 4xx
+      - min: 500
+        max: 599
+        value: 5xx
     missing:
       set: unclassified
     malformed:
@@ -476,17 +476,17 @@ normalizations:
     output:
       meaning: Bounded HTTP status class.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   internal_latency_service:
     kind: category
     applies_to:
       signal: internal_service_latency
       components:
-      - bucket
-      - count
-      - sum
+        - bucket
+        - count
+        - sum
     source_label: __name__
     target_label: service
     exact:
@@ -532,15 +532,15 @@ normalizations:
     output:
       meaning: Internal LiteLLM service category encoded in the metric name.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   internal_failure_service:
     kind: category
     applies_to:
       signal: internal_service_failures
       components:
-      - value
+        - value
     source_label: __name__
     target_label: service
     exact:
@@ -564,15 +564,15 @@ normalizations:
     output:
       meaning: Internal LiteLLM service category encoded in the metric name.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   internal_total_service:
     kind: category
     applies_to:
       signal: internal_service_totals
       components:
-      - value
+        - value
     source_label: __name__
     target_label: service
     exact:
@@ -596,17 +596,17 @@ normalizations:
     output:
       meaning: Internal LiteLLM service category encoded in the metric name.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   internal_success_outcome:
     kind: category
     applies_to:
       signal: internal_service_latency
       components:
-      - bucket
-      - count
-      - sum
+        - bucket
+        - count
+        - sum
     source_label: __name__
     target_label: outcome
     exact:
@@ -652,15 +652,15 @@ normalizations:
     output:
       meaning: Internal service request outcome encoded in the metric name.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   internal_failure_outcome:
     kind: category
     applies_to:
       signal: internal_service_failures
       components:
-      - value
+        - value
     source_label: __name__
     target_label: outcome
     exact:
@@ -684,17 +684,17 @@ normalizations:
     output:
       meaning: Internal service request outcome encoded in the metric name.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
   internal_latency_measurement:
     kind: category
     applies_to:
       signal: internal_service_latency
       components:
-      - bucket
-      - count
-      - sum
+        - bucket
+        - count
+        - sum
     source_label: __name__
     target_label: measurement
     exact:
@@ -740,97 +740,97 @@ normalizations:
     output:
       meaning: Internal service measurement category encoded in the metric name.
       evidence:
-      - source_labels
+        - source_labels
     evidence:
-    - normalization_contract
+      - normalization_contract
 exclusions:
   deprecated_failed_requests:
     source:
       signal: deprecated_failed_requests
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: proxy_failed_requests_metric_total
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   deprecated_total_requests:
     source:
       signal: deprecated_total_requests
       components:
-      - value
+        - value
     reason: source_superseded
     replacement: proxy_total_requests_metric_total
     evidence:
-    - deprecated_sources
+      - deprecated_sources
     outcome: drop_before_writer
   batch_cost_poll_timestamp:
     source:
       signal: check_batch_cost_last_run_timestamp
       components:
-      - value
+        - value
     reason: not_chartable
     lost_question: How long has it been since the batch-cost poll last ran?
     required_operation: age_from_unix_epoch
     evidence:
-    - component_lifecycle
-    - source_units
+      - component_lifecycle
+      - source_units
     outcome: drop_before_writer
   internal_service_totals:
     source:
       signal: internal_service_totals
       components:
-      - value
+        - value
     reason: equivalent_duplicate
     covering_view: internal_services.request_outcomes
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   guardrail_requests_counter:
     source:
       signal: guardrail_requests_total
       components:
-      - value
+        - value
     reason: equivalent_duplicate
     covering_view: guardrails.invocations
     evidence:
-    - source_relationships
+      - source_relationships
     outcome: retain_writable_unrendered
   check_batch_cost_jobs_polled:
     source:
       signal: check_batch_cost_jobs_polled
       components:
-      - value
+        - value
     reason: collection_hazard
     evidence:
-    - collection_hazards
+      - collection_hazards
     outcome: retain_writable_unrendered
   managed_file_size_bytes:
     source:
       signal: managed_file_size_bytes
       components:
-      - value
+        - value
     reason: collection_hazard
     evidence:
-    - collection_hazards
+      - collection_hazards
     outcome: retain_writable_unrendered
   pod_lock_manager_size:
     source:
       signal: pod_lock_manager_size
       components:
-      - value
+        - value
     reason: collection_hazard
     evidence:
-    - collection_hazards
+      - collection_hazards
     outcome: retain_writable_unrendered
   spend_update_queue_sizes:
     source:
       signal: spend_update_queue_sizes
       components:
-      - value
+        - value
     reason: collection_hazard
     evidence:
-    - collection_hazards
+      - collection_hazards
     outcome: retain_writable_unrendered
 limitations: {}
 views:
@@ -842,7 +842,7 @@ views:
       requests:
         signal: proxy_total_requests_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -877,7 +877,7 @@ views:
       failures:
         signal: proxy_failed_requests_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -912,14 +912,14 @@ views:
       failures:
         signal: proxy_failed_requests_metric_total
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: rate_limit_category
-              op: nonblank
-            - label: rate_limit_type
-              op: nonblank
+            - all:
+                - label: rate_limit_category
+                  op: nonblank
+                - label: rate_limit_type
+                  op: nonblank
     labels:
       dimensions: {}
       promote: []
@@ -954,7 +954,7 @@ views:
       requests:
         signal: in_flight_requests
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -967,12 +967,12 @@ views:
       distribution:
         signal: request_queue_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -995,12 +995,12 @@ views:
       requests:
         signal: request_queue_time_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1023,12 +1023,12 @@ views:
       time:
         signal: request_queue_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1051,12 +1051,12 @@ views:
       distribution:
         signal: request_total_latency_metric
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1079,12 +1079,12 @@ views:
       requests:
         signal: request_total_latency_metric
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1107,12 +1107,12 @@ views:
       time:
         signal: request_total_latency_metric
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1135,12 +1135,12 @@ views:
       distribution:
         signal: overhead_latency_metric
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1158,12 +1158,12 @@ views:
       requests:
         signal: overhead_latency_metric
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1181,12 +1181,12 @@ views:
       time:
         signal: overhead_latency_metric
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1204,12 +1204,12 @@ views:
       distribution:
         signal: overhead_with_guardrails_latency_metric
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1227,12 +1227,12 @@ views:
       requests:
         signal: overhead_with_guardrails_latency_metric
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1250,12 +1250,12 @@ views:
       time:
         signal: overhead_with_guardrails_latency_metric
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1273,12 +1273,12 @@ views:
       requests:
         signal: deployment_total_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1300,16 +1300,16 @@ views:
       successful:
         signal: deployment_success_responses_total
         components:
-        - value
+          - value
       failed:
         signal: deployment_failure_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1334,7 +1334,7 @@ views:
       failures:
         signal: deployment_failure_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1358,7 +1358,7 @@ views:
       convention: request_failures
       reason: The existing operator view expresses the source measurement as failures/s.
       evidence:
-      - display_conventions
+        - display_conventions
   routing.deployment_health.cooldowns:
     family: LiteLLM/Routing and Deployments/Deployment Health
     question: What does deployment cooldowns report for each model_id, status_class?
@@ -1367,7 +1367,7 @@ views:
       cooldowns:
         signal: deployment_cooled_down_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1388,12 +1388,12 @@ views:
       state:
         signal: deployment_state
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
     reduction:
@@ -1408,12 +1408,12 @@ views:
       limit:
         signal: deployment_rpm_limit
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
     reduction:
@@ -1424,7 +1424,7 @@ views:
       convention: requests_per_minute
       reason: The existing operator view expresses the source measurement as requests/min.
       evidence:
-      - display_conventions
+        - display_conventions
   routing.deployment_capacity.token_limit:
     family: LiteLLM/Routing and Deployments/Deployment Capacity
     question: What does deployment token limit report for each model_id?
@@ -1433,12 +1433,12 @@ views:
       limit:
         signal: deployment_tpm_limit
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
     reduction:
@@ -1449,7 +1449,7 @@ views:
       convention: tokens_per_minute
       reason: The existing operator view expresses the source measurement as tokens/min.
       evidence:
-      - display_conventions
+        - display_conventions
   routing.deployment_capacity.remaining_requests:
     family: LiteLLM/Routing and Deployments/Deployment Capacity
     question: What does provider remaining requests report for each model_id?
@@ -1458,12 +1458,12 @@ views:
       remaining:
         signal: remaining_requests_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1483,12 +1483,12 @@ views:
       remaining:
         signal: remaining_tokens_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1508,12 +1508,12 @@ views:
       distribution:
         signal: deployment_latency_per_output_token
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1534,12 +1534,12 @@ views:
       requests:
         signal: deployment_latency_per_output_token
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1560,12 +1560,12 @@ views:
       time:
         signal: deployment_latency_per_output_token
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1586,11 +1586,11 @@ views:
       successful:
         signal: deployment_successful_fallbacks_total
         components:
-        - value
+          - value
       failed:
         signal: deployment_failed_fallbacks_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1614,12 +1614,12 @@ views:
       distribution:
         signal: llm_api_latency_metric
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1642,12 +1642,12 @@ views:
       requests:
         signal: llm_api_latency_metric
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1670,12 +1670,12 @@ views:
       time:
         signal: llm_api_latency_metric
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1698,12 +1698,12 @@ views:
       distribution:
         signal: llm_api_time_to_first_token_metric
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1726,12 +1726,12 @@ views:
       requests:
         signal: llm_api_time_to_first_token_metric
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1754,12 +1754,12 @@ views:
       time:
         signal: llm_api_time_to_first_token_metric
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1782,16 +1782,16 @@ views:
       input:
         signal: input_tokens_metric_total
         components:
-        - value
+          - value
       output:
         signal: output_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1815,12 +1815,12 @@ views:
       total:
         signal: total_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1844,12 +1844,12 @@ views:
       spend:
         signal: spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1877,20 +1877,20 @@ views:
       input_audio:
         signal: input_audio_tokens_metric_total
         components:
-        - value
+          - value
       output_audio:
         signal: output_audio_tokens_metric_total
         components:
-        - value
+          - value
       output_reasoning:
         signal: output_reasoning_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1912,12 +1912,12 @@ views:
       images:
         signal: images_generated_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1941,12 +1941,12 @@ views:
       duration:
         signal: video_duration_seconds_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -1970,15 +1970,15 @@ views:
       input:
         signal: input_tokens_metric_total
         components:
-        - value
+          - value
       output:
         signal: output_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit:
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2003,11 +2003,11 @@ views:
       total:
         signal: total_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit:
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2032,11 +2032,11 @@ views:
       spend:
         signal: spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit:
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
         client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2066,15 +2066,15 @@ views:
       input:
         signal: input_tokens_metric_total
         components:
-        - value
+          - value
       output:
         signal: output_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - team_alias
+        - team_alias
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2099,11 +2099,11 @@ views:
       total:
         signal: total_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - team_alias
+        - team_alias
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2128,11 +2128,11 @@ views:
       spend:
         signal: spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - team_alias
+        - team_alias
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2162,11 +2162,11 @@ views:
       input:
         signal: input_tokens_metric_total
         components:
-        - value
+          - value
       output:
         signal: output_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2195,7 +2195,7 @@ views:
       total:
         signal: total_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2224,7 +2224,7 @@ views:
       spend:
         signal: spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2258,15 +2258,15 @@ views:
       input:
         signal: input_tokens_metric_total
         components:
-        - value
+          - value
       output:
         signal: output_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - org_alias
+        - org_alias
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2291,11 +2291,11 @@ views:
       total:
         signal: total_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - org_alias
+        - org_alias
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2320,11 +2320,11 @@ views:
       spend:
         signal: spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - org_alias
+        - org_alias
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2354,11 +2354,11 @@ views:
       input:
         signal: input_tokens_metric_total
         components:
-        - value
+          - value
       output:
         signal: output_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2387,7 +2387,7 @@ views:
       total:
         signal: total_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2416,7 +2416,7 @@ views:
       spend:
         signal: spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2450,11 +2450,11 @@ views:
       input:
         signal: input_tokens_metric_total
         components:
-        - value
+          - value
       output:
         signal: output_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2483,7 +2483,7 @@ views:
       total:
         signal: total_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2512,7 +2512,7 @@ views:
       spend:
         signal: spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2546,16 +2546,16 @@ views:
       hits:
         signal: cache_hits_metric_total
         components:
-        - value
+          - value
       misses:
         signal: cache_misses_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2575,12 +2575,12 @@ views:
       cached:
         signal: cached_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2600,16 +2600,16 @@ views:
       read:
         signal: input_cached_tokens_metric_total
         components:
-        - value
+          - value
       creation:
         signal: input_cache_creation_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2631,16 +2631,16 @@ views:
       read:
         signal: provider_cache_read_input_tokens_metric_total
         components:
-        - value
+          - value
       creation:
         signal: provider_cache_creation_input_tokens_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_provider
-      - model
+        - api_provider
+        - model
       omit:
         api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
         end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2660,11 +2660,11 @@ views:
       remaining:
         signal: remaining_api_key_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit: {}
   governance.api_keys.budget_limit:
     family: LiteLLM/Governance/API Keys
@@ -2674,11 +2674,11 @@ views:
       limit:
         signal: api_key_max_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit: {}
   governance.api_keys.budget_reset_window:
     family: LiteLLM/Governance/API Keys
@@ -2688,17 +2688,17 @@ views:
       remaining:
         signal: api_key_budget_remaining_hours_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit: {}
     display:
       convention: duration_hours
       reason: The existing operator view expresses the source measurement as hours.
       evidence:
-      - display_conventions
+        - display_conventions
   governance.api_keys.model_request_headroom:
     family: LiteLLM/Governance/API Keys
     question: What does api-key model request headroom report for each hashed_api_key, model?
@@ -2707,11 +2707,11 @@ views:
       remaining:
         signal: remaining_api_key_requests_for_model
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit:
         metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
         model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2728,11 +2728,11 @@ views:
       remaining:
         signal: remaining_api_key_tokens_for_model
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - api_key_alias
+        - api_key_alias
       omit:
         metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
         model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
@@ -2749,11 +2749,11 @@ views:
       remaining:
         signal: remaining_org_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - org_alias
+        - org_alias
       omit: {}
   governance.organizations.budget_limit:
     family: LiteLLM/Governance/Organizations
@@ -2763,11 +2763,11 @@ views:
       limit:
         signal: org_max_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - org_alias
+        - org_alias
       omit: {}
   governance.organizations.budget_reset_window:
     family: LiteLLM/Governance/Organizations
@@ -2777,17 +2777,17 @@ views:
       remaining:
         signal: org_budget_remaining_hours_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - org_alias
+        - org_alias
       omit: {}
     display:
       convention: duration_hours
       reason: The existing operator view expresses the source measurement as hours.
       evidence:
-      - display_conventions
+        - display_conventions
   governance.teams.remaining_budget:
     family: LiteLLM/Governance/Teams
     question: What does team remaining budget report for each team?
@@ -2796,11 +2796,11 @@ views:
       remaining:
         signal: remaining_team_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - team_alias
+        - team_alias
       omit: {}
   governance.teams.budget_limit:
     family: LiteLLM/Governance/Teams
@@ -2810,11 +2810,11 @@ views:
       limit:
         signal: team_max_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - team_alias
+        - team_alias
       omit: {}
   governance.teams.budget_reset_window:
     family: LiteLLM/Governance/Teams
@@ -2824,17 +2824,17 @@ views:
       remaining:
         signal: team_budget_remaining_hours_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - team_alias
+        - team_alias
       omit: {}
     display:
       convention: duration_hours
       reason: The existing operator view expresses the source measurement as hours.
       evidence:
-      - display_conventions
+        - display_conventions
   governance.teams.membership:
     family: LiteLLM/Governance/Teams
     question: What does team membership report for each team?
@@ -2843,11 +2843,11 @@ views:
       members:
         signal: team_members_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote:
-      - team_alias
+        - team_alias
       omit: {}
   governance.users.remaining_budget:
     family: LiteLLM/Governance/Users
@@ -2857,7 +2857,7 @@ views:
       remaining:
         signal: remaining_user_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2876,7 +2876,7 @@ views:
       limit:
         signal: user_max_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2895,7 +2895,7 @@ views:
       remaining:
         signal: user_budget_remaining_hours_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2910,7 +2910,7 @@ views:
       convention: duration_hours
       reason: The existing operator view expresses the source measurement as hours.
       evidence:
-      - display_conventions
+        - display_conventions
   governance.providers.remaining_budget:
     family: LiteLLM/Governance/Providers
     question: What does provider remaining budget report for each api_provider?
@@ -2919,7 +2919,7 @@ views:
       remaining:
         signal: provider_remaining_budget_metric
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2932,7 +2932,7 @@ views:
       invocations:
         signal: guardrail_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -2949,7 +2949,7 @@ views:
       errors:
         signal: guardrail_errors_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2962,7 +2962,7 @@ views:
       distribution:
         signal: guardrail_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -2981,7 +2981,7 @@ views:
       time:
         signal: guardrail_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3000,7 +3000,7 @@ views:
       calls:
         signal: mcp_tool_calls_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3023,7 +3023,7 @@ views:
       spend:
         signal: mcp_tool_call_spend_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3046,7 +3046,7 @@ views:
       created:
         signal: managed_batch_created_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3066,7 +3066,7 @@ views:
       cost_tracked:
         signal: check_batch_cost_jobs_processed_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3079,7 +3079,7 @@ views:
       errors:
         signal: check_batch_cost_errors_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3097,7 +3097,7 @@ views:
       created:
         signal: managed_file_created_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3117,7 +3117,7 @@ views:
       deletions:
         signal: managed_file_deleted_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3130,7 +3130,7 @@ views:
       distribution:
         signal: managed_batch_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3143,7 +3143,7 @@ views:
       completed:
         signal: managed_batch_duration_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3156,7 +3156,7 @@ views:
       time:
         signal: managed_batch_duration_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3169,7 +3169,7 @@ views:
       users:
         signal: total_users
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3182,7 +3182,7 @@ views:
       users:
         signal: active_users
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3195,7 +3195,7 @@ views:
       teams:
         signal: teams_count
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3208,7 +3208,7 @@ views:
       failures:
         signal: callback_logging_failures_metric_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3221,11 +3221,11 @@ views:
       outcome_successful:
         signal: internal_service_latency
         components:
-        - count
+          - count
       outcome_failed:
         signal: internal_service_failures
         components:
-        - value
+          - value
     labels:
       dimensions:
         outcome:
@@ -3259,9 +3259,10 @@ views:
     entity: function_name_error_class
     inputs:
       ? service_auth_batch_write_to_db_postgres_proxy_pre_call_redis_redis_daily_org_spend_update_queue_redis_daily_tag_spend_update_queue_redis_daily_team_spend_update_queue_reset_budget_job_router_self
-      : signal: internal_service_failures
+        :
+        signal: internal_service_failures
         components:
-        - value
+          - value
     labels:
       dimensions:
         service:
@@ -3287,7 +3288,7 @@ views:
       convention: request_failures
       reason: The existing operator view expresses the source measurement as failures/s.
       evidence:
-      - display_conventions
+        - display_conventions
   internal_services.latency_distribution:
     family: LiteLLM/Internal Services
     question: What does internal service latency distribution report for each service?
@@ -3296,7 +3297,7 @@ views:
       distribution:
         signal: internal_service_latency
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3325,7 +3326,7 @@ views:
       measurement_time:
         signal: internal_service_latency
         components:
-        - sum
+          - sum
     labels:
       dimensions:
         measurement:

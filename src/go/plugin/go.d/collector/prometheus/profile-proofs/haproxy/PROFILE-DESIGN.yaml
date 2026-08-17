@@ -17,41 +17,41 @@ entities:
     grain: HAProxy frontend
     identity:
       required:
-      - proxy
+        - proxy
       optional: []
   listener:
     grain: HAProxy listener
     identity:
       required:
-      - proxy
-      - listener
+        - proxy
+        - listener
       optional: []
   backend:
     grain: HAProxy backend
     identity:
       required:
-      - proxy
+        - proxy
       optional: []
   server:
     grain: HAProxy server
     identity:
       required:
-      - proxy
-      - server
+        - proxy
+        - server
       optional: []
   resolver:
     grain: HAProxy nameserver
     identity:
       required:
-      - resolver
-      - nameserver
+        - resolver
+        - nameserver
       optional: []
   sticktable:
     grain: HAProxy stick table
     identity:
       required:
-      - name
-      - type
+        - name
+        - type
       optional: []
 label_policies: {}
 reduction_policies: {}
@@ -61,45 +61,45 @@ exclusions:
     source:
       signal: process_start_time_seconds
       components:
-      - value
+        - value
     reason: not_chartable
     lost_question: How long has the HAProxy worker process been running?
     required_operation: age_from_unix_epoch
     evidence:
-    - process_lifecycle
-    - process_unit
+      - process_lifecycle
+      - process_unit
     outcome: retain_writable_unrendered
   process_node_metadata:
     source:
       signal: process_node
       components:
-      - value
+        - value
     reason: metadata_only
     evidence:
-    - process_lifecycle
-    - process_unit
-    - process_labels
+      - process_lifecycle
+      - process_unit
+      - process_labels
     outcome: retain_writable_unrendered
   process_description_metadata:
     source:
       signal: process_description
       components:
-      - value
+        - value
     reason: metadata_only
     evidence:
-    - process_lifecycle
-    - process_unit
-    - process_labels
+      - process_lifecycle
+      - process_unit
+      - process_labels
     outcome: retain_writable_unrendered
   deprecated_backend_aggregate_status:
     source:
       signal: backend_agg_server_check_status
       components:
-      - value
+        - value
     reason: equivalent_duplicate
     covering_view: backend_agg_server_status
     evidence:
-    - aggregate_status_replacement
+      - aggregate_status_replacement
     outcome: retain_writable_unrendered
 limitations: {}
 views:
@@ -111,7 +111,7 @@ views:
       value:
         signal: process_recv_logs_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -124,7 +124,7 @@ views:
       value:
         signal: process_relative_process_id
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -137,7 +137,7 @@ views:
       value:
         signal: process_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -150,7 +150,7 @@ views:
       value:
         signal: process_nbthread
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -163,7 +163,7 @@ views:
       value:
         signal: process_nbproc
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -176,7 +176,7 @@ views:
       value:
         signal: process_current_zlib_memory
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -189,7 +189,7 @@ views:
       value:
         signal: process_limit_http_comp
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -202,7 +202,7 @@ views:
       value:
         signal: process_max_zlib_memory
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -215,7 +215,7 @@ views:
       value:
         signal: process_connections_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -228,7 +228,7 @@ views:
       value:
         signal: process_current_connection_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -241,7 +241,7 @@ views:
       value:
         signal: process_current_connections
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -254,7 +254,7 @@ views:
       value:
         signal: process_hard_max_connections
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -267,7 +267,7 @@ views:
       value:
         signal: process_limit_connection_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -280,7 +280,7 @@ views:
       value:
         signal: process_max_connection_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -293,7 +293,7 @@ views:
       value:
         signal: process_max_connections
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -306,7 +306,7 @@ views:
       value:
         signal: process_max_fds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -319,7 +319,7 @@ views:
       value:
         signal: process_max_pipes
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -332,7 +332,7 @@ views:
       value:
         signal: process_max_sockets
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -345,11 +345,11 @@ views:
       used:
         signal: process_pipes_used_total
         components:
-        - value
+          - value
       free:
         signal: process_pipes_free_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -362,7 +362,7 @@ views:
       value:
         signal: process_dropped_logs_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -375,7 +375,7 @@ views:
       value:
         signal: process_failed_resolutions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -388,7 +388,7 @@ views:
       value:
         signal: process_total_warnings
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -401,7 +401,7 @@ views:
       value:
         signal: process_active_peers
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -414,7 +414,7 @@ views:
       value:
         signal: process_max_memory_bytes
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -427,7 +427,7 @@ views:
       value:
         signal: process_pool_allocated_bytes
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -440,7 +440,7 @@ views:
       value:
         signal: process_pool_failures_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -453,7 +453,7 @@ views:
       value:
         signal: process_pool_used_bytes
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -466,7 +466,7 @@ views:
       value:
         signal: process_current_run_queue
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -479,7 +479,7 @@ views:
       value:
         signal: process_current_backend_ssl_key_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -492,7 +492,7 @@ views:
       value:
         signal: process_current_frontend_ssl_key_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -505,7 +505,7 @@ views:
       value:
         signal: process_current_ssl_connections
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -518,7 +518,7 @@ views:
       value:
         signal: process_current_ssl_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -531,7 +531,7 @@ views:
       value:
         signal: process_frontend_ssl_reuse
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -540,7 +540,7 @@ views:
       convention: percentage
       reason: HAProxy exports this ratio on the operator-facing zero-to-one-hundred percentage scale.
       evidence:
-      - percentage_display
+        - percentage_display
   process_limit_ssl_rate:
     family: HAProxy/Process/SSL
     question: What value does HAProxy currently report for limit ssl rate?
@@ -549,7 +549,7 @@ views:
       value:
         signal: process_limit_ssl_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -562,7 +562,7 @@ views:
       value:
         signal: process_max_backend_ssl_key_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -575,7 +575,7 @@ views:
       value:
         signal: process_max_frontend_ssl_key_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -588,7 +588,7 @@ views:
       value:
         signal: process_max_ssl_connections
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -601,7 +601,7 @@ views:
       value:
         signal: process_max_ssl_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -614,7 +614,7 @@ views:
       value:
         signal: process_ssl_cache_lookups_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -627,7 +627,7 @@ views:
       value:
         signal: process_ssl_cache_misses_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -640,7 +640,7 @@ views:
       value:
         signal: process_ssl_connections_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -653,7 +653,7 @@ views:
       value:
         signal: process_connected_peers
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -666,7 +666,7 @@ views:
       value:
         signal: process_current_tasks
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -679,7 +679,7 @@ views:
       value:
         signal: process_jobs
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -692,7 +692,7 @@ views:
       value:
         signal: process_listeners
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -705,7 +705,7 @@ views:
       value:
         signal: process_unstoppable_jobs
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -718,7 +718,7 @@ views:
       value:
         signal: process_current_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -731,7 +731,7 @@ views:
       value:
         signal: process_limit_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -744,7 +744,7 @@ views:
       value:
         signal: process_max_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -757,7 +757,7 @@ views:
       value:
         signal: process_busy_polling_enabled
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -770,7 +770,7 @@ views:
       value:
         signal: process_stopping
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -783,7 +783,7 @@ views:
       value:
         signal: process_idle_time_percent
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -792,7 +792,7 @@ views:
       convention: percentage
       reason: HAProxy exports this ratio on the operator-facing zero-to-one-hundred percentage scale.
       evidence:
-      - percentage_display
+        - percentage_display
   process_uptime_seconds:
     family: HAProxy/Process/Timing
     question: What value does HAProxy currently report for uptime seconds?
@@ -801,7 +801,7 @@ views:
       value:
         signal: process_uptime_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -814,7 +814,7 @@ views:
       value:
         signal: process_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -827,7 +827,7 @@ views:
       value:
         signal: process_bytes_out_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -840,7 +840,7 @@ views:
       value:
         signal: process_http_comp_bytes_in_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -853,7 +853,7 @@ views:
       value:
         signal: process_http_comp_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -866,7 +866,7 @@ views:
       value:
         signal: process_spliced_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -879,7 +879,7 @@ views:
       value:
         signal: frontend_http_comp_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -892,7 +892,7 @@ views:
       value:
         signal: frontend_connections_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -905,7 +905,7 @@ views:
       value:
         signal: frontend_connections_rate_max
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -918,7 +918,7 @@ views:
       value:
         signal: frontend_denied_connections_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -931,15 +931,15 @@ views:
       request:
         signal: frontend_request_errors_total
         components:
-        - value
+          - value
       header_rewriting:
         signal: frontend_failed_header_rewriting_total
         components:
-        - value
+          - value
       internal:
         signal: frontend_internal_errors_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -952,7 +952,7 @@ views:
       value:
         signal: frontend_requests_denied_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -965,7 +965,7 @@ views:
       value:
         signal: frontend_responses_denied_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -978,7 +978,7 @@ views:
       value:
         signal: frontend_http_cache_hits_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -991,7 +991,7 @@ views:
       value:
         signal: frontend_http_cache_lookups_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1004,7 +1004,7 @@ views:
       value:
         signal: frontend_http_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1017,7 +1017,7 @@ views:
       value:
         signal: frontend_http_requests_rate_max
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1030,7 +1030,7 @@ views:
       code:
         signal: frontend_http_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         code:
@@ -1045,7 +1045,7 @@ views:
       value:
         signal: frontend_intercepted_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1058,7 +1058,7 @@ views:
       value:
         signal: frontend_current_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1071,7 +1071,7 @@ views:
       value:
         signal: frontend_current_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1084,7 +1084,7 @@ views:
       value:
         signal: frontend_denied_sessions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1097,7 +1097,7 @@ views:
       value:
         signal: frontend_limit_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1110,7 +1110,7 @@ views:
       value:
         signal: frontend_limit_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1123,7 +1123,7 @@ views:
       value:
         signal: frontend_max_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1136,7 +1136,7 @@ views:
       value:
         signal: frontend_max_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1149,7 +1149,7 @@ views:
       value:
         signal: frontend_sessions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1162,7 +1162,7 @@ views:
       state:
         signal: frontend_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -1177,7 +1177,7 @@ views:
       value:
         signal: frontend_http_comp_bytes_bypassed_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1190,7 +1190,7 @@ views:
       value:
         signal: frontend_http_comp_bytes_in_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1203,7 +1203,7 @@ views:
       value:
         signal: frontend_http_comp_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1216,11 +1216,11 @@ views:
       in:
         signal: frontend_bytes_in_total
         components:
-        - value
+          - value
       out:
         signal: frontend_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1233,7 +1233,7 @@ views:
       value:
         signal: listener_connections_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1246,7 +1246,7 @@ views:
       value:
         signal: listener_denied_connections_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1259,15 +1259,15 @@ views:
       request:
         signal: listener_request_errors_total
         components:
-        - value
+          - value
       header_rewriting:
         signal: listener_failed_header_rewriting_total
         components:
-        - value
+          - value
       internal:
         signal: listener_internal_errors_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1280,7 +1280,7 @@ views:
       value:
         signal: listener_requests_denied_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1293,7 +1293,7 @@ views:
       value:
         signal: listener_responses_denied_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1306,7 +1306,7 @@ views:
       value:
         signal: listener_current_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1319,7 +1319,7 @@ views:
       value:
         signal: listener_denied_sessions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1332,7 +1332,7 @@ views:
       value:
         signal: listener_limit_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1345,7 +1345,7 @@ views:
       value:
         signal: listener_max_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1358,7 +1358,7 @@ views:
       value:
         signal: listener_sessions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1371,7 +1371,7 @@ views:
       state:
         signal: listener_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -1386,11 +1386,11 @@ views:
       in:
         signal: listener_bytes_in_total
         components:
-        - value
+          - value
       out:
         signal: listener_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1403,7 +1403,7 @@ views:
       value:
         signal: backend_http_comp_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1416,7 +1416,7 @@ views:
       value:
         signal: backend_connection_attempts_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1429,7 +1429,7 @@ views:
       value:
         signal: backend_connection_reuses_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1442,11 +1442,11 @@ views:
       client:
         signal: backend_client_aborts_total
         components:
-        - value
+          - value
       server:
         signal: backend_server_aborts_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1459,19 +1459,19 @@ views:
       response:
         signal: backend_response_errors_total
         components:
-        - value
+          - value
       connection:
         signal: backend_connection_errors_total
         components:
-        - value
+          - value
       header_rewriting:
         signal: backend_failed_header_rewriting_total
         components:
-        - value
+          - value
       internal:
         signal: backend_internal_errors_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1484,7 +1484,7 @@ views:
       value:
         signal: backend_requests_denied_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1497,7 +1497,7 @@ views:
       value:
         signal: backend_responses_denied_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1510,11 +1510,11 @@ views:
       retry:
         signal: backend_retry_warnings_total
         components:
-        - value
+          - value
       redispatch:
         signal: backend_redispatch_warnings_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1527,7 +1527,7 @@ views:
       value:
         signal: backend_http_cache_hits_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1540,7 +1540,7 @@ views:
       value:
         signal: backend_http_cache_lookups_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1553,7 +1553,7 @@ views:
       value:
         signal: backend_http_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1566,7 +1566,7 @@ views:
       code:
         signal: backend_http_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         code:
@@ -1581,11 +1581,11 @@ views:
       active:
         signal: backend_active_servers
         components:
-        - value
+          - value
       backup:
         signal: backend_backup_servers
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1598,7 +1598,7 @@ views:
       value:
         signal: backend_check_last_change_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1611,7 +1611,7 @@ views:
       value:
         signal: backend_downtime_seconds_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1624,7 +1624,7 @@ views:
       value:
         signal: backend_check_up_down_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1637,7 +1637,7 @@ views:
       value:
         signal: backend_loadbalanced_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1650,7 +1650,7 @@ views:
       value:
         signal: backend_uweight
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1663,7 +1663,7 @@ views:
       value:
         signal: backend_weight
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1676,7 +1676,7 @@ views:
       value:
         signal: backend_current_queue
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1689,7 +1689,7 @@ views:
       value:
         signal: backend_max_queue
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1702,7 +1702,7 @@ views:
       value:
         signal: backend_max_queue_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1715,7 +1715,7 @@ views:
       value:
         signal: backend_queue_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1728,7 +1728,7 @@ views:
       value:
         signal: backend_current_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1741,7 +1741,7 @@ views:
       value:
         signal: backend_current_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1754,7 +1754,7 @@ views:
       value:
         signal: backend_last_session_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1767,7 +1767,7 @@ views:
       value:
         signal: backend_limit_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1780,7 +1780,7 @@ views:
       value:
         signal: backend_max_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1793,7 +1793,7 @@ views:
       value:
         signal: backend_max_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1806,7 +1806,7 @@ views:
       value:
         signal: backend_sessions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1819,7 +1819,7 @@ views:
       state:
         signal: backend_agg_check_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -1834,7 +1834,7 @@ views:
       state:
         signal: backend_agg_server_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -1849,7 +1849,7 @@ views:
       state:
         signal: backend_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -1864,7 +1864,7 @@ views:
       value:
         signal: backend_total_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1877,7 +1877,7 @@ views:
       value:
         signal: backend_connect_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1890,7 +1890,7 @@ views:
       value:
         signal: backend_max_connect_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1903,7 +1903,7 @@ views:
       value:
         signal: backend_max_response_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1916,7 +1916,7 @@ views:
       value:
         signal: backend_max_total_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1929,7 +1929,7 @@ views:
       value:
         signal: backend_response_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1942,7 +1942,7 @@ views:
       value:
         signal: backend_http_comp_bytes_bypassed_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1955,7 +1955,7 @@ views:
       value:
         signal: backend_http_comp_bytes_in_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1968,7 +1968,7 @@ views:
       value:
         signal: backend_http_comp_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1981,11 +1981,11 @@ views:
       in:
         signal: backend_bytes_in_total
         components:
-        - value
+          - value
       out:
         signal: backend_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1998,7 +1998,7 @@ views:
       value:
         signal: server_connection_attempts_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2011,7 +2011,7 @@ views:
       value:
         signal: server_connection_reuses_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2024,7 +2024,7 @@ views:
       value:
         signal: server_idle_connections_current
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2037,7 +2037,7 @@ views:
       value:
         signal: server_used_connections_current
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2050,7 +2050,7 @@ views:
       value:
         signal: server_idle_connections_limit
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2063,11 +2063,11 @@ views:
       safe:
         signal: server_safe_idle_connections_current
         components:
-        - value
+          - value
       unsafe:
         signal: server_unsafe_idle_connections_current
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2080,7 +2080,7 @@ views:
       value:
         signal: server_need_connections_current
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2093,11 +2093,11 @@ views:
       client:
         signal: server_client_aborts_total
         components:
-        - value
+          - value
       server:
         signal: server_server_aborts_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2110,7 +2110,7 @@ views:
       value:
         signal: server_check_failures_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2123,19 +2123,19 @@ views:
       response:
         signal: server_response_errors_total
         components:
-        - value
+          - value
       connection:
         signal: server_connection_errors_total
         components:
-        - value
+          - value
       header_rewriting:
         signal: server_failed_header_rewriting_total
         components:
-        - value
+          - value
       internal:
         signal: server_internal_errors_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2148,7 +2148,7 @@ views:
       value:
         signal: server_responses_denied_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2161,11 +2161,11 @@ views:
       retry:
         signal: server_retry_warnings_total
         components:
-        - value
+          - value
       redispatch:
         signal: server_redispatch_warnings_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2178,7 +2178,7 @@ views:
       value:
         signal: server_http_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2191,7 +2191,7 @@ views:
       code:
         signal: server_http_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         code:
@@ -2206,7 +2206,7 @@ views:
       value:
         signal: server_agent_code
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2219,7 +2219,7 @@ views:
       value:
         signal: server_agent_duration_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2232,7 +2232,7 @@ views:
       value:
         signal: server_check_code
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2245,7 +2245,7 @@ views:
       value:
         signal: server_check_duration_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2258,7 +2258,7 @@ views:
       value:
         signal: server_check_last_change_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2271,7 +2271,7 @@ views:
       value:
         signal: server_current_throttle
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2280,7 +2280,7 @@ views:
       convention: percentage
       reason: HAProxy exports this ratio on the operator-facing zero-to-one-hundred percentage scale.
       evidence:
-      - percentage_display
+        - percentage_display
   server_downtime_seconds_total:
     family: HAProxy/Servers/Health
     question: What per-second rate does HAProxy report for downtime seconds?
@@ -2289,7 +2289,7 @@ views:
       value:
         signal: server_downtime_seconds_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2302,7 +2302,7 @@ views:
       value:
         signal: server_check_up_down_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2315,7 +2315,7 @@ views:
       value:
         signal: server_loadbalanced_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2328,11 +2328,11 @@ views:
       active:
         signal: server_active
         components:
-        - value
+          - value
       backup:
         signal: server_backup
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2345,7 +2345,7 @@ views:
       value:
         signal: server_uweight
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2358,7 +2358,7 @@ views:
       value:
         signal: server_weight
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2371,7 +2371,7 @@ views:
       value:
         signal: server_current_queue
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2384,7 +2384,7 @@ views:
       value:
         signal: server_max_queue
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2397,7 +2397,7 @@ views:
       value:
         signal: server_max_queue_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2410,7 +2410,7 @@ views:
       value:
         signal: server_queue_limit
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2423,7 +2423,7 @@ views:
       value:
         signal: server_queue_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2436,7 +2436,7 @@ views:
       value:
         signal: server_current_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2449,7 +2449,7 @@ views:
       value:
         signal: server_current_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2462,7 +2462,7 @@ views:
       value:
         signal: server_last_session_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2475,7 +2475,7 @@ views:
       value:
         signal: server_limit_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2488,7 +2488,7 @@ views:
       value:
         signal: server_max_session_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2501,7 +2501,7 @@ views:
       value:
         signal: server_max_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2514,7 +2514,7 @@ views:
       value:
         signal: server_sessions_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2527,7 +2527,7 @@ views:
       state:
         signal: server_agent_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -2542,7 +2542,7 @@ views:
       state:
         signal: server_check_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -2557,7 +2557,7 @@ views:
       state:
         signal: server_status
         components:
-        - value
+          - value
     labels:
       dimensions:
         state:
@@ -2572,7 +2572,7 @@ views:
       value:
         signal: server_total_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2585,7 +2585,7 @@ views:
       value:
         signal: server_connect_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2598,7 +2598,7 @@ views:
       value:
         signal: server_max_connect_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2611,7 +2611,7 @@ views:
       value:
         signal: server_max_response_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2624,7 +2624,7 @@ views:
       value:
         signal: server_max_total_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2637,7 +2637,7 @@ views:
       value:
         signal: server_response_time_average_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2650,11 +2650,11 @@ views:
       in:
         signal: server_bytes_in_total
         components:
-        - value
+          - value
       out:
         signal: server_bytes_out_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2667,7 +2667,7 @@ views:
       value:
         signal: resolver_any_err
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2680,7 +2680,7 @@ views:
       value:
         signal: resolver_cname
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2693,7 +2693,7 @@ views:
       value:
         signal: resolver_cname_error
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2706,7 +2706,7 @@ views:
       value:
         signal: resolver_invalid
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2719,7 +2719,7 @@ views:
       value:
         signal: resolver_nx
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2732,7 +2732,7 @@ views:
       value:
         signal: resolver_other
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2745,7 +2745,7 @@ views:
       value:
         signal: resolver_outdated
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2758,7 +2758,7 @@ views:
       value:
         signal: resolver_refused
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2771,7 +2771,7 @@ views:
       value:
         signal: resolver_send_error
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2784,7 +2784,7 @@ views:
       value:
         signal: resolver_sent
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2797,7 +2797,7 @@ views:
       value:
         signal: resolver_timeout
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2810,7 +2810,7 @@ views:
       value:
         signal: resolver_too_big
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2823,7 +2823,7 @@ views:
       value:
         signal: resolver_truncated
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2836,7 +2836,7 @@ views:
       value:
         signal: resolver_update
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2849,7 +2849,7 @@ views:
       value:
         signal: resolver_valid
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2862,7 +2862,7 @@ views:
       value:
         signal: sticktable_size
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2875,7 +2875,7 @@ views:
       value:
         signal: sticktable_used
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []

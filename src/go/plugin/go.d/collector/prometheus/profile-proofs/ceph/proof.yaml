@@ -188,798 +188,798 @@ cases:
         mgr_rbd_stats: enabled
     coverage: true
     steps:
-    - fixture: fixtures/ceph_reef_ceph_exporter_limit11.prom
-      expected:
-        verdict: PASS
-      observations:
-        objecter.accumulated_latency#value:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.accumulated_latency#value
-        objecter.byte_throughput#value:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.byte_throughput#value
-        objecter.commands#command_resend:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.commands#command_resend
-        objecter.commands#command_send:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.commands#command_send
-        objecter.latency_measurements#value:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.latency_measurements#value
-        objecter.lingering_operations#linger_ping:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.lingering_operations#linger_ping
-        objecter.lingering_operations#linger_resend:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.lingering_operations#linger_resend
-        objecter.lingering_operations#linger_send:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.lingering_operations#linger_send
-        objecter.maps#map_full:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.maps#map_full
-        objecter.maps#map_inc:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.maps#map_inc
-        objecter.operation_vector_entries#value:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operation_vector_entries#value
-        objecter.operations#omap_del:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#omap_del
-        objecter.operations#omap_rd:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#omap_rd
-        objecter.operations#omap_wr:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#omap_wr
-        objecter.operations#op:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op
-        objecter.operations#op_pg:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op_pg
-        objecter.operations#op_r:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op_r
-        objecter.operations#op_reply:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op_reply
-        objecter.operations#op_resend:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op_resend
-        objecter.operations#op_rmw:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op_rmw
-        objecter.operations#op_send:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op_send
-        objecter.operations#op_w:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#op_w
-        objecter.operations#osdop_append:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_append
-        objecter.operations#osdop_call:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_call
-        objecter.operations#osdop_clonerange:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_clonerange
-        objecter.operations#osdop_cmpxattr:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_cmpxattr
-        objecter.operations#osdop_create:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_create
-        objecter.operations#osdop_delete:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_delete
-        objecter.operations#osdop_getxattr:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_getxattr
-        objecter.operations#osdop_mapext:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_mapext
-        objecter.operations#osdop_notify:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_notify
-        objecter.operations#osdop_other:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_other
-        objecter.operations#osdop_pgls:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_pgls
-        objecter.operations#osdop_pgls_filter:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_pgls_filter
-        objecter.operations#osdop_read:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_read
-        objecter.operations#osdop_resetxattrs:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_resetxattrs
-        objecter.operations#osdop_rmxattr:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_rmxattr
-        objecter.operations#osdop_setxattr:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_setxattr
-        objecter.operations#osdop_sparse_read:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_sparse_read
-        objecter.operations#osdop_src_cmpxattr:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_src_cmpxattr
-        objecter.operations#osdop_stat:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_stat
-        objecter.operations#osdop_truncate:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_truncate
-        objecter.operations#osdop_watch:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_watch
-        objecter.operations#osdop_write:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_write
-        objecter.operations#osdop_writefull:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_writefull
-        objecter.operations#osdop_writesame:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_writesame
-        objecter.operations#osdop_zero:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.operations#osdop_zero
-        objecter.osd_sessions#osd_session_close:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.osd_sessions#osd_session_close
-        objecter.osd_sessions#osd_session_open:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.osd_sessions#osd_session_open
-        objecter.pool_operations#poolop_resend:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.pool_operations#poolop_resend
-        objecter.pool_operations#poolop_send:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.pool_operations#poolop_send
-        objecter.stat_requests#poolstat_resend:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.stat_requests#poolstat_resend
-        objecter.stat_requests#poolstat_send:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.stat_requests#poolstat_send
-        objecter.stat_requests#statfs_resend:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.stat_requests#statfs_resend
-        objecter.stat_requests#statfs_send:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.stat_requests#statfs_send
-        objecter.submitted_operations#value:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.submitted_operations#value
-    - fixture: fixtures/ceph_reef_ceph_exporter_objecter_churn.prom
-      expected:
-        verdict: PASS
-      observations:
-        objecter.accumulated_latency#value:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.accumulated_latency#value
-        objecter.byte_throughput#value:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.byte_throughput#value
-        objecter.commands#command_resend:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.commands#command_resend
-        objecter.commands#command_send:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.commands#command_send
-        objecter.latency_measurements#value:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.latency_measurements#value
-        objecter.lingering_operations#linger_ping:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.lingering_operations#linger_ping
-        objecter.lingering_operations#linger_resend:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.lingering_operations#linger_resend
-        objecter.lingering_operations#linger_send:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.lingering_operations#linger_send
-        objecter.maps#map_full:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.maps#map_full
-        objecter.maps#map_inc:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.maps#map_inc
-        objecter.operation_vector_entries#value:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operation_vector_entries#value
-        objecter.operations#omap_del:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#omap_del
-        objecter.operations#omap_rd:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#omap_rd
-        objecter.operations#omap_wr:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#omap_wr
-        objecter.operations#op:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op
-        objecter.operations#op_pg:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op_pg
-        objecter.operations#op_r:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op_r
-        objecter.operations#op_reply:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op_reply
-        objecter.operations#op_resend:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op_resend
-        objecter.operations#op_rmw:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op_rmw
-        objecter.operations#op_send:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op_send
-        objecter.operations#op_w:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#op_w
-        objecter.operations#osdop_append:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_append
-        objecter.operations#osdop_call:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_call
-        objecter.operations#osdop_clonerange:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_clonerange
-        objecter.operations#osdop_cmpxattr:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_cmpxattr
-        objecter.operations#osdop_create:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_create
-        objecter.operations#osdop_delete:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_delete
-        objecter.operations#osdop_getxattr:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_getxattr
-        objecter.operations#osdop_mapext:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_mapext
-        objecter.operations#osdop_notify:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_notify
-        objecter.operations#osdop_other:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_other
-        objecter.operations#osdop_pgls:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_pgls
-        objecter.operations#osdop_pgls_filter:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_pgls_filter
-        objecter.operations#osdop_read:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_read
-        objecter.operations#osdop_resetxattrs:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_resetxattrs
-        objecter.operations#osdop_rmxattr:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_rmxattr
-        objecter.operations#osdop_setxattr:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_setxattr
-        objecter.operations#osdop_sparse_read:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_sparse_read
-        objecter.operations#osdop_src_cmpxattr:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_src_cmpxattr
-        objecter.operations#osdop_stat:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_stat
-        objecter.operations#osdop_truncate:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_truncate
-        objecter.operations#osdop_watch:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_watch
-        objecter.operations#osdop_write:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_write
-        objecter.operations#osdop_writefull:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_writefull
-        objecter.operations#osdop_writesame:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_writesame
-        objecter.operations#osdop_zero:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.operations#osdop_zero
-        objecter.osd_sessions#osd_session_close:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.osd_sessions#osd_session_close
-        objecter.osd_sessions#osd_session_open:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.osd_sessions#osd_session_open
-        objecter.pool_operations#poolop_resend:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.pool_operations#poolop_resend
-        objecter.pool_operations#poolop_send:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.pool_operations#poolop_send
-        objecter.stat_requests#poolstat_resend:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.stat_requests#poolstat_resend
-        objecter.stat_requests#poolstat_send:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.stat_requests#poolstat_send
-        objecter.stat_requests#statfs_resend:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.stat_requests#statfs_resend
-        objecter.stat_requests#statfs_send:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.stat_requests#statfs_send
-        objecter.submitted_operations#value:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.submitted_operations#value
+      - fixture: fixtures/ceph_reef_ceph_exporter_limit11.prom
+        expected:
+          verdict: PASS
+        observations:
+          objecter.accumulated_latency#value:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.accumulated_latency#value
+          objecter.byte_throughput#value:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.byte_throughput#value
+          objecter.commands#command_resend:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.commands#command_resend
+          objecter.commands#command_send:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.commands#command_send
+          objecter.latency_measurements#value:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.latency_measurements#value
+          objecter.lingering_operations#linger_ping:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.lingering_operations#linger_ping
+          objecter.lingering_operations#linger_resend:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.lingering_operations#linger_resend
+          objecter.lingering_operations#linger_send:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.lingering_operations#linger_send
+          objecter.maps#map_full:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.maps#map_full
+          objecter.maps#map_inc:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.maps#map_inc
+          objecter.operation_vector_entries#value:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operation_vector_entries#value
+          objecter.operations#omap_del:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#omap_del
+          objecter.operations#omap_rd:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#omap_rd
+          objecter.operations#omap_wr:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#omap_wr
+          objecter.operations#op:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op
+          objecter.operations#op_pg:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op_pg
+          objecter.operations#op_r:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op_r
+          objecter.operations#op_reply:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op_reply
+          objecter.operations#op_resend:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op_resend
+          objecter.operations#op_rmw:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op_rmw
+          objecter.operations#op_send:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op_send
+          objecter.operations#op_w:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#op_w
+          objecter.operations#osdop_append:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_append
+          objecter.operations#osdop_call:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_call
+          objecter.operations#osdop_clonerange:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_clonerange
+          objecter.operations#osdop_cmpxattr:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_cmpxattr
+          objecter.operations#osdop_create:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_create
+          objecter.operations#osdop_delete:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_delete
+          objecter.operations#osdop_getxattr:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_getxattr
+          objecter.operations#osdop_mapext:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_mapext
+          objecter.operations#osdop_notify:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_notify
+          objecter.operations#osdop_other:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_other
+          objecter.operations#osdop_pgls:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_pgls
+          objecter.operations#osdop_pgls_filter:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_pgls_filter
+          objecter.operations#osdop_read:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_read
+          objecter.operations#osdop_resetxattrs:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_resetxattrs
+          objecter.operations#osdop_rmxattr:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_rmxattr
+          objecter.operations#osdop_setxattr:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_setxattr
+          objecter.operations#osdop_sparse_read:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_sparse_read
+          objecter.operations#osdop_src_cmpxattr:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_src_cmpxattr
+          objecter.operations#osdop_stat:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_stat
+          objecter.operations#osdop_truncate:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_truncate
+          objecter.operations#osdop_watch:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_watch
+          objecter.operations#osdop_write:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_write
+          objecter.operations#osdop_writefull:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_writefull
+          objecter.operations#osdop_writesame:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_writesame
+          objecter.operations#osdop_zero:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.operations#osdop_zero
+          objecter.osd_sessions#osd_session_close:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.osd_sessions#osd_session_close
+          objecter.osd_sessions#osd_session_open:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.osd_sessions#osd_session_open
+          objecter.pool_operations#poolop_resend:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.pool_operations#poolop_resend
+          objecter.pool_operations#poolop_send:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.pool_operations#poolop_send
+          objecter.stat_requests#poolstat_resend:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.stat_requests#poolstat_resend
+          objecter.stat_requests#poolstat_send:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.stat_requests#poolstat_send
+          objecter.stat_requests#statfs_resend:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.stat_requests#statfs_resend
+          objecter.stat_requests#statfs_send:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.stat_requests#statfs_send
+          objecter.submitted_operations#value:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.submitted_operations#value
+      - fixture: fixtures/ceph_reef_ceph_exporter_objecter_churn.prom
+        expected:
+          verdict: PASS
+        observations:
+          objecter.accumulated_latency#value:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.accumulated_latency#value
+          objecter.byte_throughput#value:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.byte_throughput#value
+          objecter.commands#command_resend:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.commands#command_resend
+          objecter.commands#command_send:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.commands#command_send
+          objecter.latency_measurements#value:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.latency_measurements#value
+          objecter.lingering_operations#linger_ping:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.lingering_operations#linger_ping
+          objecter.lingering_operations#linger_resend:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.lingering_operations#linger_resend
+          objecter.lingering_operations#linger_send:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.lingering_operations#linger_send
+          objecter.maps#map_full:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.maps#map_full
+          objecter.maps#map_inc:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.maps#map_inc
+          objecter.operation_vector_entries#value:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operation_vector_entries#value
+          objecter.operations#omap_del:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#omap_del
+          objecter.operations#omap_rd:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#omap_rd
+          objecter.operations#omap_wr:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#omap_wr
+          objecter.operations#op:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op
+          objecter.operations#op_pg:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op_pg
+          objecter.operations#op_r:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op_r
+          objecter.operations#op_reply:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op_reply
+          objecter.operations#op_resend:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op_resend
+          objecter.operations#op_rmw:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op_rmw
+          objecter.operations#op_send:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op_send
+          objecter.operations#op_w:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#op_w
+          objecter.operations#osdop_append:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_append
+          objecter.operations#osdop_call:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_call
+          objecter.operations#osdop_clonerange:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_clonerange
+          objecter.operations#osdop_cmpxattr:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_cmpxattr
+          objecter.operations#osdop_create:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_create
+          objecter.operations#osdop_delete:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_delete
+          objecter.operations#osdop_getxattr:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_getxattr
+          objecter.operations#osdop_mapext:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_mapext
+          objecter.operations#osdop_notify:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_notify
+          objecter.operations#osdop_other:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_other
+          objecter.operations#osdop_pgls:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_pgls
+          objecter.operations#osdop_pgls_filter:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_pgls_filter
+          objecter.operations#osdop_read:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_read
+          objecter.operations#osdop_resetxattrs:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_resetxattrs
+          objecter.operations#osdop_rmxattr:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_rmxattr
+          objecter.operations#osdop_setxattr:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_setxattr
+          objecter.operations#osdop_sparse_read:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_sparse_read
+          objecter.operations#osdop_src_cmpxattr:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_src_cmpxattr
+          objecter.operations#osdop_stat:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_stat
+          objecter.operations#osdop_truncate:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_truncate
+          objecter.operations#osdop_watch:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_watch
+          objecter.operations#osdop_write:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_write
+          objecter.operations#osdop_writefull:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_writefull
+          objecter.operations#osdop_writesame:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_writesame
+          objecter.operations#osdop_zero:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.operations#osdop_zero
+          objecter.osd_sessions#osd_session_close:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.osd_sessions#osd_session_close
+          objecter.osd_sessions#osd_session_open:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.osd_sessions#osd_session_open
+          objecter.pool_operations#poolop_resend:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.pool_operations#poolop_resend
+          objecter.pool_operations#poolop_send:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.pool_operations#poolop_send
+          objecter.stat_requests#poolstat_resend:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.stat_requests#poolstat_resend
+          objecter.stat_requests#poolstat_send:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.stat_requests#poolstat_send
+          objecter.stat_requests#statfs_resend:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.stat_requests#statfs_resend
+          objecter.stat_requests#statfs_send:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.stat_requests#statfs_send
+          objecter.submitted_operations#value:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.submitted_operations#value
   tentacle_ceph_exporter_objecter_churn:
     environment:
       ceph:
@@ -990,53 +990,53 @@ cases:
         mgr_rbd_stats: enabled
     coverage: true
     steps:
-    - fixture: fixtures/ceph_tentacle_ceph_exporter_limit11.prom
-      expected:
-        verdict: PASS
-      observations:
-        objecter.replica_reads#replica_read_bounced:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.replica_reads#replica_read_bounced
-        objecter.replica_reads#replica_read_completed:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.replica_reads#replica_read_completed
-        objecter.replica_reads#replica_read_sent:
-          state: current
-          predicates:
-            membership: establish
-            aggregate: matches_reducer
-            identity: establish
-          limitation: objecter.replica_reads#replica_read_sent
-    - fixture: fixtures/ceph_tentacle_ceph_exporter_objecter_churn.prom
-      expected:
-        verdict: PASS
-      observations:
-        objecter.replica_reads#replica_read_bounced:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.replica_reads#replica_read_bounced
-        objecter.replica_reads#replica_read_completed:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.replica_reads#replica_read_completed
-        objecter.replica_reads#replica_read_sent:
-          state: current
-          predicates:
-            membership: removed
-            aggregate: decreased
-            identity: unchanged
-          limitation: objecter.replica_reads#replica_read_sent
+      - fixture: fixtures/ceph_tentacle_ceph_exporter_limit11.prom
+        expected:
+          verdict: PASS
+        observations:
+          objecter.replica_reads#replica_read_bounced:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.replica_reads#replica_read_bounced
+          objecter.replica_reads#replica_read_completed:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.replica_reads#replica_read_completed
+          objecter.replica_reads#replica_read_sent:
+            state: current
+            predicates:
+              membership: establish
+              aggregate: matches_reducer
+              identity: establish
+            limitation: objecter.replica_reads#replica_read_sent
+      - fixture: fixtures/ceph_tentacle_ceph_exporter_objecter_churn.prom
+        expected:
+          verdict: PASS
+        observations:
+          objecter.replica_reads#replica_read_bounced:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.replica_reads#replica_read_bounced
+          objecter.replica_reads#replica_read_completed:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.replica_reads#replica_read_completed
+          objecter.replica_reads#replica_read_sent:
+            state: current
+            predicates:
+              membership: removed
+              aggregate: decreased
+              identity: unchanged
+            limitation: objecter.replica_reads#replica_read_sent
