@@ -22,7 +22,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if err != nil {
 			return nil, err
 		}
-		devicesChanged := !maps.Equal(c.scannedDevices, devices)
+		devicesChanged := !maps.EqualFunc(c.scannedDevices, devices, func(left, right *scanDevice) bool {
+			return *left == *right
+		})
 
 		for k := range c.scannedDevices {
 			if _, ok := devices[k]; !ok {
@@ -146,17 +148,19 @@ func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoRe
 				return fmt.Errorf("device identity collides with already attached device '%s'", otherKey)
 			}
 		}
-		charts, err := c.addDeviceCharts(dev, id)
+		smartAttrs := newSmartAttributeIdentities(dev)
+		charts, err := c.addDeviceCharts(dev, id, smartAttrs)
 		if err != nil {
 			return fmt.Errorf("failed to add charts for device '%s' type '%s': %w", scanDev.name, scanDev.typ, err)
 		}
 		if seen {
 			removeDeviceCharts(attached.charts)
 		}
-		c.attachedDevices[key] = attachedDevice{id: id, charts: charts}
+		attached = attachedDevice{id: id, charts: charts, smartAttrs: smartAttrs}
+		c.attachedDevices[key] = attached
 	}
 
-	c.collectSmartDevice(mx, dev, id)
+	c.collectSmartDevice(mx, dev, id, attached.smartAttrs)
 
 	return nil
 }
@@ -170,7 +174,7 @@ func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevic
 	})
 }
 
-func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id deviceIdentity) {
+func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) {
 	px := id.prefix
 
 	if v, ok := dev.powerOnTime(); ok {
@@ -200,7 +204,7 @@ func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id
 			if !isSmartAttrValid(attr) {
 				continue
 			}
-			n := cleanAttributeName(attributeNameMap(attr.name()))
+			n := smartAttrs.resolve(attr).name
 			px := fmt.Sprintf("%sattr_%s_", px, n)
 
 			if v, err := strconv.ParseInt(attr.value(), 10, 64); err == nil {

@@ -84,8 +84,9 @@ type Collector struct {
 }
 
 type attachedDevice struct {
-	id     deviceIdentity
-	charts collectorapi.Charts
+	id         deviceIdentity
+	charts     collectorapi.Charts
+	smartAttrs smartAttributeIdentities
 }
 
 func (c *Collector) Configuration() any {

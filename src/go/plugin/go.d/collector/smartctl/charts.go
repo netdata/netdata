@@ -171,7 +171,7 @@ var (
 	}
 )
 
-func (c *Collector) addDeviceCharts(dev *smartDevice, id deviceIdentity) (collectorapi.Charts, error) {
+func (c *Collector) addDeviceCharts(dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) (collectorapi.Charts, error) {
 	charts := collectorapi.Charts{}
 
 	if cs := c.newDeviceCharts(dev, id); cs != nil && len(*cs) > 0 {
@@ -179,7 +179,7 @@ func (c *Collector) addDeviceCharts(dev *smartDevice, id deviceIdentity) (collec
 			return nil, err
 		}
 	}
-	cs, err := c.newDeviceSmartAttrCharts(dev, id)
+	cs, err := c.newDeviceSmartAttrCharts(dev, id, smartAttrs)
 	if err != nil {
 		return nil, err
 	}
@@ -231,12 +231,7 @@ func (c *Collector) newDeviceCharts(dev *smartDevice, id deviceIdentity) *collec
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id.name, id.typ)
-		chart.Labels = []collectorapi.Label{
-			{Key: "device_name", Value: dev.deviceName()},
-			{Key: "device_type", Value: dev.deviceType()},
-			{Key: "model_name", Value: dev.modelName()},
-			{Key: "serial_number", Value: dev.serialNumber()},
-		}
+		chart.Labels = deviceChartLabels(dev)
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ)
 		}
@@ -245,17 +240,16 @@ func (c *Collector) newDeviceCharts(dev *smartDevice, id deviceIdentity) *collec
 	return charts
 }
 
-func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity) (*collectorapi.Charts, error) {
+func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) (*collectorapi.Charts, error) {
 	attrs, ok := dev.ataSmartAttributeTable()
 	if !ok {
 		return nil, nil
 	}
 	charts := collectorapi.Charts{}
 
+	warned := make(map[string]bool)
 	for _, attr := range attrs {
-		if !isSmartAttrValid(attr) ||
-			strings.HasPrefix(attr.name(), "Unknown") ||
-			strings.HasPrefix(attr.name(), "Not_In_Use") {
+		if !isSmartAttrChartable(attr) {
 			continue
 		}
 
@@ -265,7 +259,12 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity
 		}
 
 		attrName := attributeNameMap(attr.name())
-		cleanAttrName := cleanAttributeName(attrName)
+		identity := smartAttrs.resolve(attr)
+		cleanAttrName := identity.name
+		if identity.name != identity.baseName && !warned[identity.baseName] {
+			c.Warningf("device '%s' type '%s': SMART attributes normalize to '%s'; using attribute IDs to disambiguate", dev.deviceName(), dev.deviceType(), identity.baseName)
+			warned[identity.baseName] = true
+		}
 
 		for _, chart := range cs {
 			if chart.ID == deviceSmartAttributeDecodedChartTmpl.ID {
@@ -275,12 +274,7 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity
 			chart.Title = fmt.Sprintf(chart.Title, attrName)
 			chart.Fam = fmt.Sprintf(chart.Fam, cleanAttrName)
 			chart.Ctx = fmt.Sprintf(chart.Ctx, cleanAttrName)
-			chart.Labels = []collectorapi.Label{
-				{Key: "device_name", Value: dev.deviceName()},
-				{Key: "device_type", Value: dev.deviceType()},
-				{Key: "model_name", Value: dev.modelName()},
-				{Key: "serial_number", Value: dev.serialNumber()},
-			}
+			chart.Labels = deviceChartLabels(dev)
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ, cleanAttrName)
 				dim.Name = fmt.Sprintf(dim.Name, cleanAttrName)
@@ -304,18 +298,22 @@ func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice, id deviceIdent
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id.name, id.typ)
-		chart.Labels = []collectorapi.Label{
-			{Key: "device_name", Value: dev.deviceName()},
-			{Key: "device_type", Value: dev.deviceType()},
-			{Key: "model_name", Value: dev.modelName()},
-			{Key: "serial_number", Value: dev.serialNumber()},
-		}
+		chart.Labels = deviceChartLabels(dev)
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ)
 		}
 	}
 
 	return charts
+}
+
+func deviceChartLabels(dev *smartDevice) []collectorapi.Label {
+	return []collectorapi.Label{
+		{Key: "device_name", Value: dev.deviceName()},
+		{Key: "device_type", Value: dev.deviceType()},
+		{Key: "model_name", Value: dev.modelName()},
+		{Key: "serial_number", Value: dev.serialNumber()},
+	}
 }
 
 var attrNameReplacer = strings.NewReplacer("/", "_")
