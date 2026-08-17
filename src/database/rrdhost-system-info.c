@@ -219,7 +219,9 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
         info->host_os_name = strdupz("Microsoft Windows");
     else
         rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
+    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_display_version");
+    if (!info->host_os_version)
+        rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_name, "_os_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_version, "_os_version");
     rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_release, "_os_release");
@@ -270,6 +272,9 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
         rrdlabels_add(labels, "_os_version", system_info->host_os_label_version, RRDLABEL_SRC_AUTO);
     else if (system_info->host_os_version)
         rrdlabels_add(labels, "_os_version", system_info->host_os_version, RRDLABEL_SRC_AUTO);
+
+    if (system_info->host_os_version)
+        rrdlabels_add(labels, "_os_display_version", system_info->host_os_version, RRDLABEL_SRC_AUTO);
 
     if (system_info->host_os_label_release)
         rrdlabels_add(labels, "_os_release", system_info->host_os_label_release, RRDLABEL_SRC_AUTO);

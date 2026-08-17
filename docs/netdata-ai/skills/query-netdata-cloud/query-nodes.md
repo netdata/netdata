@@ -85,13 +85,20 @@ Hardware and OS facts live in `.labels`:
 |---|---|
 | CPU architecture | `.labels._architecture` |
 | Kernel version | `.labels._kernel_version` |
-| OS name / version | `.labels._os_name`, `._os_version` |
+| OS family and metadata | `.labels._os`, `._os_name`, `._os_version`, `._os_release`, `._os_codename`, `._os_edition`, `._os_build` |
+| Compatibility display version | `.labels._os_display_version` |
 | CPU cores | `.labels._system_cores` |
 | Total RAM (bytes) | `.labels._system_ram_total` |
 | Total disk space (bytes) | `.labels._system_disk_space` |
 | Container / virt | `.labels._container`, `._is_k8s_node` |
 | Cloud provider / region / instance type | `.labels._cloud_provider_type`, `._cloud_instance_region`, `._cloud_instance_type` |
 | Parent role | `.labels._is_parent` (`"true"` / `"false"` strings) |
+
+`_os_version` is a normalized vendor product version (for example, Windows `11` or Ubuntu `24.04`), rather than the
+legacy presentation string. `_os_release` carries the release/update stream when available; on Unix hosts without a
+separate native value it is emitted equal to `_os_version` for compatibility.
+`_os_display_version` is a compatibility transport field that preserves the legacy presentation value for streamed
+node metadata; use `_os_version` for normalized label filtering.
 
 For deeper per-host introspection (vnodes, failed jobs, claim_id),
 fall through to the agent-direct path in

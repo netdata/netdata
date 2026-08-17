@@ -199,7 +199,7 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
 // Host
 static DWORD netdata_windows_get_current_build()
 {
-    char cBuild[64];
+    char cBuild[64] = { 0 };
     if (!netdata_registry_get_string(
             cBuild, 63, HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild"))
         return 0;
@@ -231,6 +231,12 @@ static const char *netdata_windows_server_version_from_build(DWORD build)
         return "2019";
     if (build >= 14393)
         return "2016";
+    if (build >= 9600)
+        return "2012R2";
+    if (build >= 9200)
+        return "2012";
+    if (build >= 7601)
+        return "2008R2";
     return "";
 }
 
@@ -416,55 +422,30 @@ static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD bui
     (void)snprintf(out, length, "Windows %u.%u.%u Build: %u", major, minor, build, build);
 }
 
-static const char *netdata_windows_get_os_id_like(DWORD build, const char *edition_id, const char *product_name)
+void netdata_windows_format_os_id_like(char *out, size_t length, DWORD build, const char *edition_id,
+                                       const char *product_name, bool is_server)
 {
-    static char id_like[256];
+    if (!length)
+        return;
+
     const char *edition = edition_id && *edition_id ? edition_id : product_name;
-    const char *base_id = "";
-    
-    if (IsWindowsServer()) {
-        // Windows Server versions based on build numbers
-        if (build >= 25000)
-            base_id = "Windows-Server-2025";
-        else if (build >= 20348)
-            base_id = "Windows-Server-2022";
-        else if (build >= 17763)
-            base_id = "Windows-Server-2019";
-        else if (build >= 14393)
-            base_id = "Windows-Server-2016";
-        else if (build >= 9600)
-            base_id = "Windows-Server-2012R2";
-        else if (build >= 9200)
-            base_id = "Windows-Server-2012";
-        else if (build >= 7601)
-            base_id = "Windows-Server-2008R2";
-        else
-            base_id = "Windows-Server";
+    const char *version = is_server ? netdata_windows_server_version_from_build(build)
+                                    : netdata_windows_client_version_from_build(build);
+    char base_id[64];
+
+    if (*version) {
+        (void)snprintf(base_id, sizeof(base_id), "%s-%s",
+                       is_server ? "Windows-Server" : NETDATA_WINDOWS_OS_PREFIX_CLIENT,
+                       version);
     } else {
-        // Windows client versions
-        if (build >= 22000)
-            base_id = "Windows-11";
-        else if (build >= 10240)
-            base_id = "Windows-10";
-        else if (build >= 9600)
-            base_id = "Windows-8.1";
-        else if (build >= 9200)
-            base_id = "Windows-8";
-        else if (build >= 7601)
-            base_id = "Windows-7";
-        else
-            base_id = "Windows";
+        (void)snprintf(base_id, sizeof(base_id), "%s",
+                       is_server ? "Windows-Server" : NETDATA_WINDOWS_OS_PREFIX_CLIENT);
     }
-    
-    // If we have a valid edition, append it to the ID_LIKE with a dash
-    if (edition && *edition) {
-        snprintf(id_like, sizeof(id_like), "%s-%s", base_id, edition);
-    }
-    else {
-        strcpy(id_like, base_id);
-    }
-    
-    return id_like;
+
+    if (edition && *edition)
+        (void)snprintf(out, length, "%s-%s", base_id, edition);
+    else
+        (void)snprintf(out, length, "%s", base_id);
 }
 
 static void netdata_windows_set_os_fields(struct rrdhost_system_info *systemInfo,
@@ -519,8 +500,8 @@ static void netdata_windows_get_local_os_info(NETDATA_WINDOWS_OS_INFO *info)
     netdata_windows_discover_os_version(info->id, sizeof(info->id), build, product_name, display_version);
     snprintf(info->version, sizeof(info->version), "%s", info->id);
     snprintf(info->version_id, sizeof(info->version_id), "%s", info->id);
-    snprintf(info->id_like, sizeof(info->id_like), "%s",
-             netdata_windows_get_os_id_like(build, edition_id, product_name));
+    netdata_windows_format_os_id_like(info->id_like, sizeof(info->id_like), build, edition_id, product_name,
+                                      IsWindowsServer());
     snprintf(info->detection, sizeof(info->detection), "%s", NETDATA_WIN_DETECTION_METHOD);
     netdata_windows_parse_os_labels(&info->labels, product_name, display_version, edition_id,
                                     build, ubr, has_ubr, IsWindowsServer());

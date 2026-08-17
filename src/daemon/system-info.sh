@@ -247,18 +247,19 @@ else
   # shellcheck disable=SC2153
   if [ "${CONTAINER_NAME}" = "unknown" ] || [ "${CONTAINER_VERSION}" = "unknown" ] || [ "${CONTAINER_ID}" = "unknown" ]; then
     if [ -f "/etc/lsb-release" ]; then
-      if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
-        CONTAINER_OS_DETECTION="/etc/lsb-release"
-      else
-        CONTAINER_OS_DETECTION="Mixed"
-      fi
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      load_lsb_release /etc/lsb-release
-      if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
-      if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
-      if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
+      if load_lsb_release /etc/lsb-release; then
+        if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
+          CONTAINER_OS_DETECTION="/etc/lsb-release"
+        else
+          CONTAINER_OS_DETECTION="Mixed"
+        fi
+        if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
+        if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
+        if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
+      fi
     fi
     if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
       if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
@@ -298,18 +299,19 @@ else
   fi
   if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
     if [ -f "/host/etc/lsb-release" ]; then
-      if [ "${HOST_OS_DETECTION}" = "unknown" ]; then
-        HOST_OS_DETECTION="/host/etc/lsb-release"
-      else
-        HOST_OS_DETECTION="Mixed"
-      fi
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      load_lsb_release /host/etc/lsb-release
-      if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
-      if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
-      if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
+      if load_lsb_release /host/etc/lsb-release; then
+        if [ "${HOST_OS_DETECTION}" = "unknown" ]; then
+          HOST_OS_DETECTION="/host/etc/lsb-release"
+        else
+          HOST_OS_DETECTION="Mixed"
+        fi
+        if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
+        if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
+        if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
+      fi
     fi
   fi
 fi
@@ -810,23 +812,23 @@ get_default_interface_ip() {
 
 get_default_interface_ip -4
 
-echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
-echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
-echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
-echo "NETDATA_CONTAINER_OS_VERSION=${CONTAINER_VERSION}"
-echo "NETDATA_CONTAINER_OS_VERSION_ID=${CONTAINER_VERSION_ID}"
-echo "NETDATA_CONTAINER_OS_DETECTION=${CONTAINER_OS_DETECTION}"
-echo "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE=${CONTAINER_IS_OFFICIAL_IMAGE}"
-echo "NETDATA_HOST_OS_NAME=${HOST_NAME}"
-echo "NETDATA_HOST_OS_ID=${HOST_ID}"
-echo "NETDATA_HOST_OS_ID_LIKE=${HOST_ID_LIKE}"
-echo "NETDATA_HOST_OS_VERSION=${HOST_VERSION}"
-echo "NETDATA_HOST_OS_VERSION_ID=${HOST_VERSION_ID}"
-echo "NETDATA_HOST_OS_DETECTION=${HOST_OS_DETECTION}"
+printf 'NETDATA_CONTAINER_OS_NAME=%s\n' "${CONTAINER_NAME}"
+printf 'NETDATA_CONTAINER_OS_ID=%s\n' "${CONTAINER_ID}"
+printf 'NETDATA_CONTAINER_OS_ID_LIKE=%s\n' "${CONTAINER_ID_LIKE}"
+printf 'NETDATA_CONTAINER_OS_VERSION=%s\n' "${CONTAINER_VERSION}"
+printf 'NETDATA_CONTAINER_OS_VERSION_ID=%s\n' "${CONTAINER_VERSION_ID}"
+printf 'NETDATA_CONTAINER_OS_DETECTION=%s\n' "${CONTAINER_OS_DETECTION}"
+printf 'NETDATA_CONTAINER_IS_OFFICIAL_IMAGE=%s\n' "${CONTAINER_IS_OFFICIAL_IMAGE}"
+printf 'NETDATA_HOST_OS_NAME=%s\n' "${HOST_NAME}"
+printf 'NETDATA_HOST_OS_ID=%s\n' "${HOST_ID}"
+printf 'NETDATA_HOST_OS_ID_LIKE=%s\n' "${HOST_ID_LIKE}"
+printf 'NETDATA_HOST_OS_VERSION=%s\n' "${HOST_VERSION}"
+printf 'NETDATA_HOST_OS_VERSION_ID=%s\n' "${HOST_VERSION_ID}"
+printf 'NETDATA_HOST_OS_DETECTION=%s\n' "${HOST_OS_DETECTION}"
 for label_field in NAME VERSION RELEASE CODENAME EDITION BUILD; do
   eval "label_value=\${HOST_OS_LABEL_${label_field}}"
   if [ -n "${label_value}" ] && [ "${label_value}" != "unknown" ] && [ "${label_value}" != "none" ]; then
-    echo "NETDATA_HOST_OS_LABEL_${label_field}=${label_value}"
+    printf 'NETDATA_HOST_OS_LABEL_%s=%s\n' "${label_field}" "${label_value}"
   fi
 done
 echo "NETDATA_HOST_IS_K8S_NODE=${HOST_IS_K8S_NODE}"

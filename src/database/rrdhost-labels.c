@@ -382,6 +382,7 @@ static int os_metadata_labels_unittest(void) {
     (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_VERSION", "24.04");
     (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_RELEASE", "24.04");
     (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_CODENAME", "noble");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_VERSION", "Ubuntu 24.04.3 LTS");
     rrdhost_system_info_to_rrdlabels(system_info, labels);
 
     const struct {
@@ -392,6 +393,7 @@ static int os_metadata_labels_unittest(void) {
         { "_os_version", "24.04" },
         { "_os_release", "24.04" },
         { "_os_codename", "noble" },
+        { "_os_display_version", "Ubuntu 24.04.3 LTS" },
     };
 
     for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
@@ -412,14 +414,16 @@ static int streamed_windows_system_info_unittest(void) {
     rrdlabels_add(labels, "_os", "windows", RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os_name", "Windows", RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os_version", "11", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_display_version", "Microsoft Windows 11 Home", RRDLABEL_SRC_AUTO);
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(labels);
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     rrdhost_system_info_to_json_v1(wb, system_info);
 
-    int err = !strstr(buffer_tostring(wb), "Microsoft Windows");
-    fprintf(stderr, "  streamed Windows public OS name: %s\n", err ? "FAILED" : "OK");
+    int err = !strstr(buffer_tostring(wb), "Microsoft Windows") ||
+              !strstr(buffer_tostring(wb), "Microsoft Windows 11 Home");
+    fprintf(stderr, "  streamed Windows public OS name and version: %s\n", err ? "FAILED" : "OK");
 
     rrdhost_system_info_free(system_info);
     rrdlabels_destroy(labels);

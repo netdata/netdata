@@ -235,6 +235,7 @@ There are a few special keys that are used to define the system information of t
 - `_os_codename`
 - `_os_edition`
 - `_os_build`
+- `_os_display_version`
 - `_kernel_version`
 - `_system_cores`
 - `_system_cpu_freq`

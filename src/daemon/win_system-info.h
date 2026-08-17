@@ -52,6 +52,8 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
 const char *netdata_windows_normalize_virt_string(const char *raw);
 const char *netdata_windows_resolve_virt_detection(const char *wmi, const char *smbios, const char *registry);
 void netdata_windows_format_os_version(char *out, size_t length, const char *product_name, DWORD build, bool is_server);
+void netdata_windows_format_os_id_like(char *out, size_t length, DWORD build, const char *edition_id,
+                                       const char *product_name, bool is_server);
 void netdata_windows_parse_os_labels(NETDATA_WINDOWS_OS_LABELS *labels, const char *product_name,
                                      const char *display_version, const char *edition_id, DWORD build,
                                      DWORD ubr, bool has_ubr, bool is_server);

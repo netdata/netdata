@@ -6,7 +6,6 @@
 #include "database/contexts/rrdcontext-internal.h"
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
-#include "database/rrdhost-labels.h"
 #endif
 
 #if defined(OS_LINUX)
@@ -2527,6 +2526,10 @@ int unit_test_windows_os_version(void) {
          "Windows Server", "2022", "23H2", "Datacenter: Azure Edition", "20348.0"},
         {NULL, NULL, "Professional", 26100, 0, false, false,
          "Windows", "11", "", "Professional", ""},
+        {NULL, NULL, "ServerDatacenter", 25000, 0, false, true,
+         "Windows Server", "2022", "", "ServerDatacenter", ""},
+        {NULL, NULL, "ServerDatacenter", 26100, 0, false, true,
+         "Windows Server", "2025", "", "ServerDatacenter", ""},
     };
 
     int failures = 0;
@@ -2545,13 +2548,59 @@ int unit_test_windows_os_version(void) {
         }
     }
 
+    static const struct {
+        const char *product_name;
+        DWORD build;
+        bool is_server;
+        const char *expected;
+    } version_cases[] = {
+        {"Windows 10 Home", 19045, false, "Microsoft Windows 10 Home"},
+        {"Windows 10 Home", 26100, false, "Microsoft Windows 11 Home"},
+        {"Windows Server 2022 Datacenter", 20348, true, "Microsoft Windows Server 2022 Datacenter"},
+    };
+
+    for (size_t i = 0; i < sizeof(version_cases) / sizeof(version_cases[0]); i++) {
+        char version[256];
+        netdata_windows_format_os_version(version, sizeof(version), version_cases[i].product_name,
+                                          version_cases[i].build, version_cases[i].is_server);
+        if (strcmp(version, version_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: formatter case '%s' produced '%s'\n",
+                    version_cases[i].product_name, version);
+            failures++;
+        }
+    }
+
+    static const struct {
+        DWORD build;
+        bool is_server;
+        const char *edition_id;
+        const char *expected;
+    } id_like_cases[] = {
+        {25000, true, "ServerDatacenter", "Windows-Server-2022-ServerDatacenter"},
+        {26100, true, "ServerDatacenter", "Windows-Server-2025-ServerDatacenter"},
+        {9600, true, "ServerDatacenter", "Windows-Server-2012R2-ServerDatacenter"},
+        {26100, false, "Core", "Windows-11-Core"},
+    };
+
+    for (size_t i = 0; i < sizeof(id_like_cases) / sizeof(id_like_cases[0]); i++) {
+        char id_like[256];
+        netdata_windows_format_os_id_like(id_like, sizeof(id_like), id_like_cases[i].build,
+                                          id_like_cases[i].edition_id, NULL, id_like_cases[i].is_server);
+        if (strcmp(id_like, id_like_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: id-like build %u produced '%s'\n",
+                    id_like_cases[i].build, id_like);
+            failures++;
+        }
+    }
+
     if(failures) {
         fprintf(stderr, "unit_test_windows_os_version: %d failure(s)\n", failures);
         return 1;
     }
 
-    fprintf(stderr, "unit_test_windows_os_version: OK (%zu label cases)\n",
-            sizeof(cases) / sizeof(cases[0]));
+    fprintf(stderr, "unit_test_windows_os_version: OK (%zu label, %zu formatter, %zu id-like cases)\n",
+            sizeof(cases) / sizeof(cases[0]), sizeof(version_cases) / sizeof(version_cases[0]),
+            sizeof(id_like_cases) / sizeof(id_like_cases[0]));
     return 0;
 }
 
