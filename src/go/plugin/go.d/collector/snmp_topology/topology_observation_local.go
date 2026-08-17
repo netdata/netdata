@@ -12,7 +12,7 @@ import (
 )
 
 func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
-	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
+	localManagementIP := normalizeEligibleManagementIP(local.ManagementIP)
 	if localManagementIP == "" {
 		localManagementIP = pickManagementIP(local.ManagementAddresses)
 	}

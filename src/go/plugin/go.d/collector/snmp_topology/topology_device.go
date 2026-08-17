@@ -23,6 +23,7 @@ func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 	if dev.ChartContextPrefix == "" {
 		dev.ChartContextPrefix = topologyProfileChartContextPrefix
 	}
+	dev.ManagementIP = normalizeEligibleManagementIP(dev.ManagementIP)
 	if dev.ManagementIP == "" && len(dev.ManagementAddresses) > 0 {
 		if ip := pickManagementIP(dev.ManagementAddresses); ip != "" {
 			dev.ManagementIP = ip

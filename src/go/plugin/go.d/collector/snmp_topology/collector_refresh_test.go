@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"sync"
 	"testing"
 	"time"
@@ -311,6 +312,101 @@ func TestCollectorNewDeviceCollectionCacheUsesEffectiveDeviceCheckEvery(t *testi
 	cache := coll.newDeviceCollectionCache(ddsnmp.DeviceConnectionInfo{Hostname: "switch-a"})
 
 	require.Equal(t, defaultRefreshEvery+2*defaultDeviceCheckEvery, cache.staleAfter)
+}
+
+func TestCollectorResolveDeviceTargetManagementIP(t *testing.T) {
+	t.Run("literal target bypasses resolver", func(t *testing.T) {
+		coll := newTestSNMPTopologyCollector()
+		coll.resolveTargetIPs = func(context.Context, string) ([]netip.Addr, error) {
+			t.Fatal("literal target must not use DNS resolution")
+			return nil, nil
+		}
+
+		require.Equal(t, "192.0.2.10", coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+			Hostname: "::ffff:192.0.2.10",
+		}))
+		require.Empty(t, coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+			Hostname: "127.0.0.1",
+		}))
+	})
+
+	t.Run("DNS target uses bounded deterministic eligible result", func(t *testing.T) {
+		coll := newTestSNMPTopologyCollector()
+		calls := 0
+		coll.resolveTargetIPs = func(ctx context.Context, host string) ([]netip.Addr, error) {
+			calls++
+			require.Equal(t, "switch.example", host)
+			deadline, ok := ctx.Deadline()
+			require.True(t, ok)
+			require.LessOrEqual(t, time.Until(deadline), topologyTargetLookupMaxTimeout)
+			return []netip.Addr{
+				netip.MustParseAddr("127.0.0.1"),
+				netip.MustParseAddr("198.51.100.20"),
+				netip.MustParseAddr("10.0.0.20"),
+				netip.MustParseAddr("10.0.0.10"),
+			}, nil
+		}
+
+		got := coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+			Hostname: "switch.example",
+			Timeout:  5,
+		})
+		require.Equal(t, "10.0.0.10", got)
+		require.Equal(t, 1, calls)
+	})
+
+	t.Run("lookup failure falls back without an identity", func(t *testing.T) {
+		coll := newTestSNMPTopologyCollector()
+		coll.resolveTargetIPs = func(context.Context, string) ([]netip.Addr, error) {
+			return nil, errors.New("lookup failed")
+		}
+
+		require.Empty(t, coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+			Hostname: "switch.example",
+		}))
+	})
+}
+
+func TestCollectorRefreshPrefersResolvedTargetManagementIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "switch.example",
+		Port:        161,
+		Timeout:     5,
+		SysObjectID: "1.3.6.1.4.1.9.1.1",
+	}
+	mockHandler := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClient(mockHandler, dev)
+
+	coll := newTestSNMPTopologyCollector()
+	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.resolveTargetIPs = func(context.Context, string) ([]netip.Addr, error) {
+		return []netip.Addr{netip.MustParseAddr("192.0.2.50")}, nil
+	}
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+		return []*ddsnmp.Profile{{}}
+	}
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+			return []*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{{
+				TopologyKind: ddsnmp.KindIpIfIndex,
+				Tags: map[string]string{
+					tagTopoIfIndex: "1",
+					tagTopoIPAddr:  "10.0.0.1",
+					tagTopoIPMask:  "255.255.255.0",
+				},
+			}}}}, nil
+		})
+	}
+
+	key := dev.Hostname + ":161"
+	require.True(t, coll.refreshDeviceTopology(context.Background(), key, dev))
+	snapshot, ok := coll.deviceCaches[key].snapshotEngineObservations()
+	require.True(t, ok)
+	require.Len(t, snapshot.L2Observations, 1)
+	require.Equal(t, "192.0.2.50", snapshot.L2Observations[0].ManagementIP)
 }
 
 func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T) {

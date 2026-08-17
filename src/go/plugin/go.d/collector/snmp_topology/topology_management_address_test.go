@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,4 +39,80 @@ func TestReconstructLldpRemMgmtAddrHex_FromOctets(t *testing.T) {
 		tagLldpRemMgmtAddrOctetPref + "3": "4",
 		tagLldpRemMgmtAddrOctetPref + "4": "60",
 	}))
+}
+
+func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testing.T) {
+	var addrs []topologymodel.ManagementAddress
+	for _, address := range []string{
+		"127.0.0.1",
+		"::1",
+		"169.254.1.1",
+		"fe80::1",
+		"0.0.0.0",
+		"::",
+		"224.0.0.1",
+		"255.255.255.255",
+		"ff02::1",
+		"192.0.2.10",
+		"::ffff:192.0.2.10",
+		"opaque-management-address",
+	} {
+		addrs = appendManagementAddress(addrs, topologymodel.ManagementAddress{
+			Address: address,
+			Source:  "test",
+		})
+	}
+
+	require.Equal(t, []topologymodel.ManagementAddress{
+		{Address: "192.0.2.10", AddressType: "ipv4", Source: "test"},
+		{Address: "opaque-management-address", Source: "test"},
+	}, addrs)
+}
+
+func TestPickManagementIPUsesSourceScopeAndNumericPrecedence(t *testing.T) {
+	tests := map[string]struct {
+		addrs []topologymodel.ManagementAddress
+		want  string
+	}{
+		"advertised before IP MIB scope": {
+			addrs: []topologymodel.ManagementAddress{
+				{Address: "10.0.0.1", Source: "ip_mib"},
+				{Address: "198.51.100.1", Source: "lldp_remote"},
+			},
+			want: "198.51.100.1",
+		},
+		"private before other in same source": {
+			addrs: []topologymodel.ManagementAddress{
+				{Address: "198.51.100.1", Source: "ip_mib"},
+				{Address: "10.0.0.1", Source: "ip_mib"},
+			},
+			want: "10.0.0.1",
+		},
+		"numeric before lexical": {
+			addrs: []topologymodel.ManagementAddress{
+				{Address: "10.20.4.205", Source: "ip_mib"},
+				{Address: "10.20.4.60", Source: "ip_mib"},
+			},
+			want: "10.20.4.60",
+		},
+		"mapped IPv4 is canonical": {
+			addrs: []topologymodel.ManagementAddress{
+				{Address: "::ffff:192.0.2.10", Source: "ip_mib"},
+			},
+			want: "192.0.2.10",
+		},
+		"non IP and unusable values are ignored": {
+			addrs: []topologymodel.ManagementAddress{
+				{Address: "opaque"},
+				{Address: "127.0.0.1", Source: "lldp_remote"},
+				{Address: "fe80::1", Source: "cdp_cache_address"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, pickManagementIP(tc.addrs))
+		})
+	}
 }

@@ -62,47 +62,39 @@ type lldpLocPort struct {
 }
 
 type lldpRemote struct {
-	localPortNum       string
-	remIndex           string
-	chassisID          string
-	chassisIDSubtype   string
-	portID             string
-	portIDSubtype      string
-	portDesc           string
-	sysName            string
-	sysDesc            string
-	sysCapSupported    string
-	sysCapEnabled      string
-	managementAddr     string
-	managementAddrType string
-	managementAddrs    []topologymodel.ManagementAddress
+	localPortNum     string
+	remIndex         string
+	chassisID        string
+	chassisIDSubtype string
+	portID           string
+	portIDSubtype    string
+	portDesc         string
+	sysName          string
+	sysDesc          string
+	sysCapSupported  string
+	sysCapEnabled    string
+	managementAddrs  []topologymodel.ManagementAddress
 }
 
 type cdpRemote struct {
-	ifIndex               string
-	ifName                string
-	deviceIndex           string
-	deviceID              string
-	devicePort            string
-	platform              string
-	capabilities          string
-	addressType           string
-	address               string
-	version               string
-	vtpMgmtDomain         string
-	nativeVLAN            string
-	duplex                string
-	powerConsumption      string
-	mtu                   string
-	sysName               string
-	sysObjectID           string
-	primaryMgmtAddrType   string
-	primaryMgmtAddr       string
-	secondaryMgmtAddrType string
-	secondaryMgmtAddr     string
-	physicalLocation      string
-	lastChange            string
-	managementAddrs       []topologymodel.ManagementAddress
+	ifIndex          string
+	ifName           string
+	deviceIndex      string
+	deviceID         string
+	devicePort       string
+	platform         string
+	capabilities     string
+	version          string
+	vtpMgmtDomain    string
+	nativeVLAN       string
+	duplex           string
+	powerConsumption string
+	mtu              string
+	sysName          string
+	sysObjectID      string
+	physicalLocation string
+	lastChange       string
+	managementAddrs  []topologymodel.ManagementAddress
 }
 
 type fdbEntry struct {

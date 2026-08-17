@@ -113,7 +113,6 @@ func (c *topologyCache) updateLldpRemote(tags map[string]string) {
 		entry.sysCapEnabled = v
 	}
 	if v := tags[tagLldpRemMgmtAddr]; v != "" {
-		entry.managementAddr = v
 		addr, addrType := normalizeManagementAddress(v, tags[tagLldpRemMgmtAddrSubtype])
 		if addr != "" {
 			entry.managementAddrs = appendManagementAddress(entry.managementAddrs, topologymodel.ManagementAddress{

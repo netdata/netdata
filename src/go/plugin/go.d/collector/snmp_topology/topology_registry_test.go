@@ -44,7 +44,9 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	cacheB := newTopologyCache()
@@ -70,7 +72,9 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 		portID:           "Gi0/1",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-a",
-		managementAddr:   "10.0.0.1",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.1", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	registry.register(cacheA)
@@ -208,7 +212,9 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	registry.register(cache)
@@ -654,7 +660,9 @@ func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManaged
 		portID:           "9c:6b:00:7b:98:c7",
 		portIDSubtype:    "macAddress",
 		sysName:          "nova",
-		managementAddr:   "172.22.0.1",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "172.22.0.1", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 	cache.ifNamesByIndex["1"] = "Gi0/1"
 	cache.ifNamesByIndex["2"] = "Gi0/2"
@@ -736,7 +744,9 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 	cache.cdpRemotes["1:1"] = &cdpRemote{
 		ifIndex:    "1",
@@ -744,7 +754,9 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 		deviceID:   "sw-b",
 		sysName:    "sw-b",
 		devicePort: "Gi0/2",
-		address:    "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "cdp_cache_address"},
+		},
 	}
 
 	snapshot, ok := cache.snapshotEngineObservations()
@@ -856,7 +868,9 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	cacheB := newTopologyCache()
@@ -882,7 +896,9 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 		portID:           "Gi0/1",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-a",
-		managementAddr:   "10.0.0.1",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.1", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	registry.register(cacheA)
@@ -926,7 +942,9 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	cacheB := newTopologyCache()

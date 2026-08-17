@@ -7,7 +7,10 @@ import (
 	_ "embed"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/netip"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -80,6 +83,9 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
+		resolveTargetIPs: func(ctx context.Context, host string) ([]netip.Addr, error) {
+			return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+		},
 		store:   metricStore,
 		metrics: newCollectorMetrics(metricStore),
 	}
@@ -107,6 +113,7 @@ type (
 		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
 		newSnmpClient    func() gosnmp.Handler
 		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
+		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
 	}
 	deviceSource interface {
 		Devices() []ddsnmp.DeviceConnectionInfo
@@ -163,8 +170,9 @@ func (c *Collector) Run(ctx context.Context) error {
 }
 
 const (
-	defaultDeviceCheckEvery = time.Minute
-	defaultRefreshEvery     = 30 * time.Minute
+	defaultDeviceCheckEvery        = time.Minute
+	defaultRefreshEvery            = 30 * time.Minute
+	topologyTargetLookupMaxTimeout = 5 * time.Second
 )
 
 func (c *Collector) deviceCheckEvery() time.Duration {
@@ -345,9 +353,15 @@ func (c *Collector) refreshDeviceTopology(ctx context.Context, key string, dev d
 		return false
 	}
 
+	managementIP := c.resolveDeviceTargetManagementIP(ctx, dev)
+	if ctx.Err() != nil {
+		return false
+	}
+
 	// Build the next snapshot off-registry. Function readers keep seeing the
 	// previous complete snapshot until this collection is fully ingested.
 	next := c.newDeviceCollectionCache(dev)
+	next.localDevice.ManagementIP = managementIP
 
 	next.updateTopologySysUptime(sysUptime)
 	next.updateTopologyProfileTags(pms)
@@ -395,6 +409,35 @@ func (c *Collector) newDeviceCollectionCache(dev ddsnmp.DeviceConnectionInfo) *t
 	cache.agentID = dev.Hostname
 	cache.localDevice = buildLocalTopologyDevice(dev)
 	return cache
+}
+
+func (c *Collector) resolveDeviceTargetManagementIP(ctx context.Context, dev ddsnmp.DeviceConnectionInfo) string {
+	host := strings.TrimSpace(dev.Hostname)
+	if host == "" {
+		return ""
+	}
+	if _, isIP := parseTopologyIPAddress(host); isIP {
+		return normalizeEligibleManagementIP(host)
+	}
+	if c.resolveTargetIPs == nil {
+		return ""
+	}
+
+	timeout := topologyTargetLookupMaxTimeout
+	if dev.Timeout > 0 {
+		timeout = min(time.Duration(dev.Timeout)*time.Second, topologyTargetLookupMaxTimeout)
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	addrs, err := c.resolveTargetIPs(lookupCtx, host)
+	if err != nil {
+		if ctx.Err() == nil {
+			c.Debugf("device '%s': failed to resolve topology management target: %v", host, err)
+		}
+		return ""
+	}
+	return pickTargetManagementIP(addrs)
 }
 
 func (c *Collector) pruneStaleDeviceCaches(seen map[string]bool) {

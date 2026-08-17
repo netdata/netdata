@@ -44,6 +44,7 @@ type topologyScenarioDevice struct {
 	name         string
 	actorType    string
 	mgmtIP       string
+	target       string
 	chassisMAC   string
 	sysObjectID  string
 	routerID     string
@@ -111,6 +112,7 @@ func (s *topologyScenario) device(actorType, name, mgmtIP, chassisMAC, routerID,
 		name:         name,
 		actorType:    actorType,
 		mgmtIP:       mgmtIP,
+		target:       mgmtIP,
 		chassisMAC:   topologyutil.NormalizeMAC(chassisMAC),
 		sysObjectID:  fmt.Sprintf("1.3.6.1.4.1.8072.3.2.%d", len(s.devs)+1),
 		routerID:     routerID,
@@ -119,6 +121,11 @@ func (s *topologyScenario) device(actorType, name, mgmtIP, chassisMAC, routerID,
 	}
 	s.devs = append(s.devs, dev)
 	return dev
+}
+
+func (d *topologyScenarioDevice) Target(value string) *topologyScenarioDevice {
+	d.target = strings.TrimSpace(value)
+	return d
 }
 
 func (d *topologyScenarioDevice) Port(name string, ifIndex int) *topologyScenarioPort {
@@ -202,7 +209,7 @@ func (s *topologyScenario) cacheForDevice(t testing.TB, dev *topologyScenarioDev
 	t.Helper()
 
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
-		Hostname:    dev.mgmtIP,
+		Hostname:    dev.target,
 		SysObjectID: dev.sysObjectID,
 		SysName:     dev.name,
 		SysDescr:    topologyScenarioSysDescr,

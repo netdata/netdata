@@ -96,6 +96,10 @@ func topologyScenarioCases() map[string]topologyScenarioCase {
 			scenario: newBGPDirectScenario(),
 			assert:   assertBGPDirectScenario,
 		},
+		"dns_targets_shared_loopback": {
+			scenario: newDNSTargetsSharedLoopbackScenario(),
+			assert:   assertDNSTargetsSharedLoopbackScenario,
+		},
 	}
 }
 
@@ -374,6 +378,17 @@ func newBGPDirectScenario() *topologyScenario {
 	routerA := s.Router("bgp-router-a", "192.0.2.141", "02:00:00:00:0e:01", "192.0.2.241", "65141")
 	routerB := s.Router("bgp-router-b", "192.0.2.142", "02:00:00:00:0e:02", "192.0.2.242", "65142")
 	s.BGP(routerA, routerB, "default")
+	return s
+}
+
+func newDNSTargetsSharedLoopbackScenario() *topologyScenario {
+	s := newTopologyScenario("dns_targets_shared_loopback")
+	switchA := s.Switch("dns-switch-a", "192.168.10.1", "02:00:00:00:0f:01").Target("switch-a.example")
+	switchB := s.Switch("dns-switch-b", "192.168.20.1", "02:00:00:00:0f:02").Target("switch-b.example")
+	switchA.Port("management", 1).IPv4("192.168.10.1/24")
+	switchA.Port("loopback", 2).IPv4("127.0.0.1/8")
+	switchB.Port("management", 1).IPv4("192.168.20.1/24")
+	switchB.Port("loopback", 2).IPv4("127.0.0.1/8")
 	return s
 }
 
@@ -699,6 +714,15 @@ func assertBGPDirectScenario(t testing.TB, data topologyv1test.NormalizedData) {
 	})
 	assertScenarioStatEquals(t, data, "bgp_adjacency_emitted_links", 1)
 	assertScenarioStatEquals(t, data, "bgp_adjacency_visible_links", 1)
+}
+
+func assertDNSTargetsSharedLoopbackScenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "dns-switch-a", Type: "switch", ManagementIP: "192.168.10.1"},
+		{Name: "dns-switch-b", Type: "switch", ManagementIP: "192.168.20.1"},
+	})
 }
 
 func assertScenarioActors(t testing.TB, data topologyv1test.NormalizedData, want []topologyScenarioActorExpectation) {
