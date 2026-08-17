@@ -124,6 +124,7 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	finalizeLocalManagementAddresses(&c.localDevice, c.ifNetmaskByIP)
 	c.updateFDBDiagnostics()
 	stats := topologyCacheFinalizeStats{
 		agentID:      c.agentID,

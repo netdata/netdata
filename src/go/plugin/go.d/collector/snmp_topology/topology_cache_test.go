@@ -270,6 +270,61 @@ func TestTopologyCache_UpdateIfIndexByIP_PreservesInventoryAndFiltersManagementC
 	})
 }
 
+func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources(t *testing.T) {
+	tests := map[string]struct {
+		lldpFirst bool
+	}{
+		"IP MIB before local LLDP": {},
+		"local LLDP before IP MIB": {lldpFirst: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyCache()
+			cache.localDevice.ManagementIP = "192.0.2.0"
+			addLLDP := func() {
+				cache.updateLldpLocManAddr(map[string]string{
+					tagLldpLocMgmtAddrSubtype: "1",
+					tagLldpLocMgmtAddr:        "c0000200",
+				})
+			}
+			addIPMIB := func() {
+				cache.updateIfIndexByIP(map[string]string{
+					tagTopoIfIndex: "1",
+					tagTopoIPAddr:  "192.0.2.0",
+					tagTopoIPMask:  "255.255.255.0",
+				})
+				cache.updateIfIndexByIP(map[string]string{
+					tagTopoIfIndex: "2",
+					tagTopoIPAddr:  "192.0.2.10",
+					tagTopoIPMask:  "255.255.255.0",
+				})
+			}
+
+			if tc.lldpFirst {
+				addLLDP()
+				addIPMIB()
+			} else {
+				addIPMIB()
+				addLLDP()
+			}
+			cache.finalizeTopologyCache()
+
+			require.Equal(t, "1", cache.ifIndexByIP["192.0.2.0"])
+			require.Contains(t, cache.l3InterfacesByIP, "192.0.2.0")
+			require.Empty(t, cache.localDevice.ManagementIP)
+			require.Equal(t, []topologymodel.ManagementAddress{{
+				Address:     "192.0.2.10",
+				AddressType: "ipv4",
+				Source:      "ip_mib",
+			}}, cache.localDevice.ManagementAddresses)
+
+			obs := cache.buildEngineObservation(cache.localDevice)
+			require.Equal(t, "192.0.2.10", obs.ManagementIP)
+		})
+	}
+}
+
 func TestTopologyCache_UpdateTopologyProfileTags_LLDPDoesNotOverrideExistingSNMPIdentity(t *testing.T) {
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "10.20.4.2"})
 	cache.localDevice.ChassisID = "18:fd:74:33:1a:9c"

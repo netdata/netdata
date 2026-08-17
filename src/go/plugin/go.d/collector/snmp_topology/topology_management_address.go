@@ -235,6 +235,31 @@ func isEligibleManagementInterfaceAddress(ip, netmask string) bool {
 	return !isNetwork && !isBroadcast
 }
 
+func finalizeLocalManagementAddresses(device *topologymodel.Device, netmasks map[string]string) {
+	if device == nil {
+		return
+	}
+
+	if ip := normalizeEligibleManagementIP(device.ManagementIP); ip != "" &&
+		isEligibleManagementInterfaceAddress(ip, netmasks[ip]) {
+		device.ManagementIP = ip
+	} else {
+		device.ManagementIP = ""
+	}
+
+	addrs := device.ManagementAddresses
+	filtered := addrs[:0]
+	for _, addr := range addrs {
+		ip, ok := parseTopologyIPAddress(addr.Address)
+		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmasks[ip.String()]) {
+			continue
+		}
+		filtered = append(filtered, addr)
+	}
+	clear(addrs[len(filtered):])
+	device.ManagementAddresses = filtered
+}
+
 func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
 	lengthStr := strings.TrimSpace(tags[tagLldpRemMgmtAddrLen])
 	length, err := strconv.Atoi(lengthStr)
