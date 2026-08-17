@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#ifndef NETDATA_RRDFUNCTIONS_H
-#define NETDATA_RRDFUNCTIONS_H 1
+#ifndef NETDATA_NRPC_H
+#define NETDATA_NRPC_H 1
 
 // ----------------------------------------------------------------------------
 
@@ -153,8 +153,8 @@ bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
 
 bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_function_result_callback_t cb);
 
-#include "rrdfunctions-inline.h"
-#include "rrdfunctions-inflight.h"
-#include "rrdfunctions-exporters.h"
+#include "nrpc-builtin.h"
+#include "nrpc-calls.h"
+#include "nrpc-catalog.h"
 
-#endif // NETDATA_RRDFUNCTIONS_H
+#endif // NETDATA_NRPC_H

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdfunctions-internals.h"
-#include "rrdfunctions-exporters.h"
+#include "nrpc-internals.h"
+#include "nrpc-catalog.h"
 
 // ----------------------------------------------------------------------------
 // the iteration core

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "pluginsd_functions.h"
-#include "database/rrdfunctions-internals.h"
+#include "database/nrpc-internals.h"
 #include "daemon/dyncfg/dyncfg-internals.h"
 #include "daemon/dyncfg/dyncfg.h"
 

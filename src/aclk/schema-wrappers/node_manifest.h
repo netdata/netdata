@@ -18,7 +18,7 @@ struct update_node_instance_manifest {
     struct timeval updated_at;
 
     // dictionary keyed by function name -> struct rrd_function_manifest_entry
-    // (see database/rrdfunctions-exporters.h, built by host_functions_to_manifest_dict())
+    // (see database/nrpc-catalog.h, built by host_functions_to_manifest_dict())
     DICTIONARY *functions;
 };
 

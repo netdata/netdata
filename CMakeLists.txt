@@ -1773,13 +1773,13 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
         src/database/contexts/rrdcontext-worker.c
-        src/database/rrdfunctions-provider.c
-        src/database/rrdfunctions-provider.h
+        src/database/nrpc-serving.c
+        src/database/nrpc-serving.h
         src/database/rrddim.c
-        src/database/rrdfunctions.c
-        src/database/rrdfunctions.h
-        src/database/rrdfunctions-inline.c
-        src/database/rrdfunctions-inline.h
+        src/database/nrpc-registry.c
+        src/database/nrpc.h
+        src/database/nrpc-builtin.c
+        src/database/nrpc-builtin.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
@@ -1813,13 +1813,14 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_alert.h
         src/web/api/queries/KolmogorovSmirnovDist.c
         src/web/api/queries/KolmogorovSmirnovDist.h
-        src/database/rrdfunctions-inflight.c
-        src/database/rrdfunctions-inflight.h
-        src/database/rrdfunctions-exporters.c
-        src/database/rrdfunctions-exporters.h
-        src/database/rrdfunctions-unittest.c
-        src/database/rrdfunctions-internals.h
-        src/database/rrdfunctions-provider-internals.h
+        src/database/nrpc-calls.c
+        src/database/nrpc-calls.h
+        src/database/nrpc-catalog.c
+        src/database/nrpc-catalog.h
+        src/database/nrpc-unittest.c
+        src/database/nrpc-internals.h
+        src/database/nrpc-serving-internals.h
+        src/database/nrpc-transport.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c

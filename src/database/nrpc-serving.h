@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_RRDFUNCTIONS_PROVIDER_H
-#define NETDATA_RRDFUNCTIONS_PROVIDER_H
+#ifndef NETDATA_NRPC_SERVING_H
+#define NETDATA_NRPC_SERVING_H
 
 #include "libnetdata/libnetdata.h"
 
@@ -11,4 +11,4 @@
 void rrd_function_provider_started(void);
 void rrd_function_provider_finished(void);
 
-#endif //NETDATA_RRDFUNCTIONS_PROVIDER_H
+#endif //NETDATA_NRPC_SERVING_H

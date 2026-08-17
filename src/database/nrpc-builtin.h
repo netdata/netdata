@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_RRDFUNCTIONS_INLINE_H
-#define NETDATA_RRDFUNCTIONS_INLINE_H
+#ifndef NETDATA_NRPC_BUILTIN_H
+#define NETDATA_NRPC_BUILTIN_H
 
 #include "rrd.h"
 
@@ -11,4 +11,4 @@ void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int ti
                              const char *help, const char *tags,
                              HTTP_ACCESS access, rrd_function_execute_inline_cb_t execute_cb);
 
-#endif //NETDATA_RRDFUNCTIONS_INLINE_H
+#endif //NETDATA_NRPC_BUILTIN_H

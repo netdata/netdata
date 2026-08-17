@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_RRDFUNCTIONS_INTERNALS_H
-#define NETDATA_RRDFUNCTIONS_INTERNALS_H
+#ifndef NETDATA_NRPC_INTERNALS_H
+#define NETDATA_NRPC_INTERNALS_H
 
 #include "rrd.h"
 
-#include "rrdfunctions-provider-internals.h"
-#include "rrdfunctions-transport.h"
+#include "nrpc-serving-internals.h"
+#include "nrpc-transport.h"
 
 // The per-host function registry behind the opaque RRD_FUNCTIONS handle.
 // It owns the definitions dictionary; the host back-pointer is what the
@@ -103,4 +103,4 @@ static inline struct rrd_host_function *rrd_function_acquired_value(RRD_FUNCTION
 bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, RRD_FUNCTION_ACQUIRED **out_acquired);
 
-#endif //NETDATA_RRDFUNCTIONS_INTERNALS_H
+#endif //NETDATA_NRPC_INTERNALS_H

@@ -541,7 +541,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     // are enforced by the registry itself on the sanitized key: a COLLECTOR
     // registration of such a name is rejected by rrd_function_add(), while a
     // STREAMING one (a child's synthetic "config" proxy on its own host) is
-    // accepted - see the reasoning at the enforcement site in rrdfunctions.c.
+    // accepted - see the reasoning at the enforcement site in nrpc-registry.c.
     bool from_streaming = (parser->repertoire & PARSER_INIT_STREAMING) != 0;
 
     int timeout_s = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;

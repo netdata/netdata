@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_RRDFUNCTIONS_TRANSPORT_H
-#define NETDATA_RRDFUNCTIONS_TRANSPORT_H
+#ifndef NETDATA_NRPC_TRANSPORT_H
+#define NETDATA_NRPC_TRANSPORT_H
 
 #include "libnetdata/libnetdata.h"
 
@@ -10,7 +10,7 @@
 // registered a function (for pluginsd/streaming: the PARSER), without ever
 // dereferencing it after death.
 //
-// Two refcounts, the rrd_function_provider shape (rrdfunctions-provider.c):
+// Two refcounts, the rrd_function_provider shape (nrpc-serving.c):
 //
 // - entry refcount: one ref per holder that STORES the transport - registry
 //   entries (COLLECTOR/STREAMING source only), the DYNCFG node pin, the
@@ -90,4 +90,4 @@ static inline void rrd_function_transport_owner_release(struct rrd_function_tran
     rrd_function_transport_entry_release(t);
 }
 
-#endif // NETDATA_RRDFUNCTIONS_TRANSPORT_H
+#endif // NETDATA_NRPC_TRANSPORT_H

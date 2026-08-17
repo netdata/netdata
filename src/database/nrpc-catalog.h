@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_RRDFUNCTIONS_EXPORTERS_H
-#define NETDATA_RRDFUNCTIONS_EXPORTERS_H
+#ifndef NETDATA_NRPC_CATALOG_H
+#define NETDATA_NRPC_CATALOG_H
 
 #include "rrd.h"
 
@@ -86,4 +86,4 @@ DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host);
 // identical to the one already sent. Change detection only, not security-sensitive.
 uint64_t manifest_dict_hash(DICTIONARY *dict, const char *node_id, const char *claim_id);
 
-#endif // NETDATA_RRDFUNCTIONS_EXPORTERS_H
+#endif // NETDATA_NRPC_CATALOG_H

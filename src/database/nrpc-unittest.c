@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrd.h"
-#include "rrdfunctions-internals.h"
+#include "nrpc-internals.h"
 #include "sqlite/sqlite_aclk_node.h"
 #include "aclk/aclk_query_queue.h"
 

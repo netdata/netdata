@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdfunctions-provider-internals.h"
-#include "rrdfunctions-internals.h"
-#include "rrdfunctions-inflight.h"
+#include "nrpc-serving-internals.h"
+#include "nrpc-internals.h"
+#include "nrpc-calls.h"
 
 struct rrd_function_inflight {
     RRDHOST *host;

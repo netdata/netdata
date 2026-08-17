@@ -4,7 +4,7 @@
 #define NETDATA_PLUGINSD_FUNCTIONS_H
 
 #include "pluginsd_internals.h"
-#include "database/rrdfunctions-transport.h"
+#include "database/nrpc-transport.h"
 
 struct inflight_function {
     nd_uuid_t transaction;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdfunctions-inline.h"
+#include "nrpc-builtin.h"
 
 static int rrd_function_run_inline(struct rrd_function_execute *rfe, void *data) {
 

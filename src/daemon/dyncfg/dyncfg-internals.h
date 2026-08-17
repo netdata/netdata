@@ -5,9 +5,9 @@
 
 #include "../common.h"
 #include "database/rrd.h"
-#include "database/rrdfunctions.h"
-#include "database/rrdfunctions-internals.h"
-#include "database/rrdfunctions-provider-internals.h"
+#include "database/nrpc.h"
+#include "database/nrpc-internals.h"
+#include "database/nrpc-serving-internals.h"
 
 typedef struct dyncfg {
     ND_UUID host_uuid;

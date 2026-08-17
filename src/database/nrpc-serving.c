@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrdfunctions-provider.h"
-#include "rrdfunctions-provider-internals.h"
+#include "nrpc-serving.h"
+#include "nrpc-serving-internals.h"
 
 // Each function points to this provider structure
 // so that when the provider thread exits, all of them will

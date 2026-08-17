@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrd.h"
-#include "rrdfunctions-internals.h"
+#include "nrpc-internals.h"
 
 #define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
 
@@ -505,7 +505,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, RRD_FUNCTION_
     // queue on the next flag poll or reconnect push. Ordering contract: insert
     // BEFORE setting the flag - the renderer clears the flag first and then
     // snapshots the set, so a del can never be stranded (see the struct
-    // comment in rrdfunctions-internals.h). Not populated when the host has no
+    // comment in nrpc-internals.h). Not populated when the host has no
     // sender configured, else it would grow for the process lifetime on
     // never-streaming hosts. dyncfg global deletes keep their quirk: they set
     // the flag but never emit FUNCTION_DEL.
