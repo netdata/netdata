@@ -47,9 +47,9 @@ pub struct PluginConfig {
     /// storage (global).
     pub logs: SignalConfig,
     /// Per-signal tuning for traces. Same shape as `logs`, but optional in
-    /// YAML: traces are under active development and the shipped stock config
-    /// does not list them, so an absent section falls back to code defaults
-    /// mirroring the shipped logs tuning.
+    /// YAML (the shipped stock config documents it since the phase-3 cutover);
+    /// an absent section falls back to code defaults mirroring the shipped
+    /// logs tuning.
     #[serde(default)]
     pub traces: SignalConfig,
     /// Socket path for WAL event IPC between ingestor and ledger.
@@ -258,16 +258,14 @@ impl Default for CatalogTuning {
     }
 }
 
-/// Ingestion time-bounds for one signal (P3). Records whose RESOLVED timestamp
-/// is older than `max_age` or more than `future_skew` in the future are rejected
-/// per-record at ingestion and reported via OTLP `partial_success`. Global for
-/// the signal — not per-tenant.
+/// Ingestion time-bounds for one signal (P3). Out-of-window data is rejected
+/// at ingestion and reported via OTLP `partial_success`. Global for the
+/// signal — not per-tenant.
 ///
-/// Enforced for the LOGS signal only. Traces is a summary-only scaffold with no
-/// per-record ingestion path, so `traces.ingest.future_skew` is accepted but
-/// inert, and `traces.ingest.max_age` influences only the traces startup
-/// reconcile window (not record acceptance). Both take effect for traces once
-/// real traces ingestion lands.
+/// Logs judge each record's RESOLVED timestamp against the window; traces
+/// judge the span's whole `[start, effective end]` interval (see
+/// `ng_flatten::normalize_trace_request` — synthesized starts are exempt,
+/// and only a raw client end faces the future bound).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct IngestConfig {
@@ -543,11 +541,10 @@ impl RotationPolicy {
     }
 }
 
-/// Default rotation `max_file_duration`: 15 minutes, so idle logs streams seal
-/// promptly (the logs ingestor's idle-rotation sweep enforces this even with no
-/// new frames). Also backs the traces signal, which has no sweep yet, so an
-/// idle traces file rotates only on its next write. Hidden from the stock file;
-/// a rotation `default` entry that omits it inherits this value.
+/// Default rotation `max_file_duration`: 15 minutes, so idle streams seal
+/// promptly (each signal's ingestor idle-rotation sweep enforces this even
+/// with no new frames). Hidden from the stock file; a rotation `default`
+/// entry that omits it inherits this value.
 fn default_rotation_max_file_duration() -> Duration {
     Duration::from_secs(15 * 60)
 }

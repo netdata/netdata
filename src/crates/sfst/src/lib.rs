@@ -59,13 +59,21 @@ pub mod query;
 mod reader;
 mod row_index;
 mod schema;
+mod span_extras;
+mod trace_rollup;
+mod trace_bloom;
+pub mod trace_combine;
 mod trace_index;
 mod writer;
 
 pub mod registry;
 
 pub use error::Error;
-pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceSpan};
+pub use index_reader::{
+    BitmapFilter, CompiledTracePlan, GroupCondition, IdColumnKind, IndexReader, NumberCmp,
+    PlanMatcher, PlanTerm, RollupRefOutcome, RollupRootResolver, ScanWork, Trace, TraceEvent,
+    TraceFileSession, TraceLink, TracePlan, TraceSpan, numeric_token_matches,
+};
 pub use index_writer::IndexWriter;
 pub use kv_interner::KvSlot;
 pub(crate) use prefix_map::{BuildError, PrefixMap};
@@ -73,9 +81,17 @@ pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
     compile_pattern, compile_query,
 };
-pub use reader::read_summary;
+pub use reader::{read_summary, read_summary_path};
 pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
+pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
+pub use trace_rollup::{
+    ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, TraceRollup,
+    TraceRollupRows,
+};
+pub use schema::join_value_kinds;
+pub use trace_bloom::TraceIdBloom;
+pub use trace_combine::{CombineOutcome, SpanRef, SpanSource};
 pub use trace_index::TraceIdIndex;
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an
@@ -151,6 +167,23 @@ const CHUNK_DURATION: chunk_file::ChunkId = *b"DURN";
 // reader that ignores it reads the rest unchanged, so its presence needs no
 // version bump.
 const CHUNK_TRACE_INDEX: chunk_file::ChunkId = *b"TIDX";
+// Optional span event / link structures (cold region, after TIDX): per-row
+// prefix-sum skeletons whose token refs point at the same interned KvIds the
+// rows carry — grouping/order/per-item scalars for OTLP `Span.events[]` /
+// `Span.links[]`. Same additive TOC-indexed contract as TIDX (see
+// `span_extras`).
+const CHUNK_EVENTS: chunk_file::ChunkId = *b"EVNB";
+const CHUNK_LINKS: chunk_file::ChunkId = *b"LNKB";
+// Optional per-file trace rollup (cold region, after the span structures —
+// matching the writer stage order): one row per distinct set trace id — the
+// trace-level aggregate for overview/slowest/facet folds without assembly.
+// Same additive TOC-indexed contract as TIDX (see `trace_rollup`).
+const CHUNK_TRACE_ROLLUP: chunk_file::ChunkId = *b"TRSU";
+// Optional per-file trace-id bloom (cold region, after TIDX): a serialized
+// fastbloom filter over the file's distinct set trace ids — "definitely not in
+// this file" for cross-file trace-by-id, at a 5% build-time FP target. Same
+// additive TOC-indexed contract as TIDX (see `trace_bloom`).
+const CHUNK_TRACE_BLOOM: chunk_file::ChunkId = *b"TBLM";
 
 /// Minimum number of logs in each stream batch. Files with fewer than
 /// `MIN_LOGS_PER_BATCH` total logs use a single batch; otherwise the

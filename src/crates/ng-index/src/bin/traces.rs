@@ -211,18 +211,43 @@ fn reconstruct(sfst_path: &Path, trace_id_hex: &str) -> ExitCode {
             .find(|(k, _)| k == "name")
             .map(|(_, v)| v.as_str())
             .unwrap_or("");
+        // Structured extras: counts inline, one line per event/link below.
+        let extras = match (s.events.len(), s.links.len()) {
+            (0, 0) => String::new(),
+            (e, 0) => format!("  [{e} event(s)]"),
+            (0, l) => format!("  [{l} link(s)]"),
+            (e, l) => format!("  [{e} event(s), {l} link(s)]"),
+        };
         println!(
-            "{:indent$}{}  {}  ({} ns)",
+            "{:indent$}{}  {}  ({} ns){}",
             "",
             s.span_id,
             name,
             s.duration_ns,
+            extras,
             indent = depth * 2,
         );
-        if let Some(kids) = trace.children.get(&s.span_id) {
-            for &c in kids.iter().rev() {
-                stack.push((c, depth + 1));
-            }
+        for ev in &s.events {
+            println!(
+                "{:indent$}· event {} @{} ({} attr(s))",
+                "",
+                ev.name,
+                ev.time_unix_nano,
+                ev.attributes.len(),
+                indent = depth * 2 + 2,
+            );
+        }
+        for link in &s.links {
+            println!(
+                "{:indent$}· link → trace {} span {}",
+                "",
+                link.trace_id,
+                link.span_id,
+                indent = depth * 2 + 2,
+            );
+        }
+        for &c in trace.children[i].iter().rev() {
+            stack.push((c, depth + 1));
         }
     }
     ExitCode::SUCCESS

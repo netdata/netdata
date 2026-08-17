@@ -18,6 +18,15 @@ fn sid(b: u8) -> SpanId {
 /// of `(span_id, parent_span_id)` pairs in chronological (row) order. Fields are
 /// empty (the tree logic under test reads ids/timestamps, not attributes).
 fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
+    trace_file_with_bloom(rows, None)
+}
+
+/// Like [`trace_file`], optionally carrying a caller-supplied `TBLM` payload
+/// (which may be deliberately malformed — the writer packs, it does not vet).
+fn trace_file_with_bloom(
+    rows: &[(SpanId, SpanId)],
+    bloom: Option<&crate::TraceIdBloom>,
+) -> Vec<u8> {
     let n = rows.len();
     let mut trace = TraceIds::with_capacity(n);
     let mut span = SpanIds::with_capacity(n);
@@ -44,6 +53,10 @@ fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
     let counts = ChunkCounts {
         columns,
         trace_id_index: true,
+        trace_id_bloom: bloom.is_some(),
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -108,9 +121,36 @@ fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
     w.parent_span_ids(&parent).unwrap();
     w.durations(&durations).unwrap();
     w.trace_id_index(&index).unwrap();
+    if let Some(b) = bloom {
+        w.trace_id_bloom(b).unwrap();
+    }
     w.add_stream_batch(&StreamBatch::for_write(&vec![Vec::<KvId>::new(); n]))
         .unwrap();
     w.finish().unwrap().into_inner()
+}
+
+#[test]
+fn corrupt_bloom_degrades_to_the_exact_lookup() {
+    // The bloom is a skip hint: a TBLM that decodes but fails validation
+    // (absurd hash count here) must NOT make a findable trace unfindable —
+    // trace_by_id falls through to TIDX. The accessor itself still errors,
+    // so cross-file callers can observe the corruption.
+    let hostile = crate::TraceIdBloom::raw_for_tests(
+        1,
+        fastbloom::BloomFilter::from_vec(vec![0u64; 4])
+            .seed(&1)
+            .hashes(1_000),
+    );
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::from([0; 8]))], Some(&hostile));
+    let reader = IndexReader::open(&buf).unwrap();
+
+    assert!(reader.has_trace_id_bloom());
+    assert!(
+        reader.trace_id_bloom().is_err(),
+        "accessor surfaces corruption"
+    );
+    let trace = reader.trace_by_id(TraceId::from(TRACE)).unwrap();
+    assert_eq!(trace.spans.len(), 1, "lookup degraded to TIDX and resolved");
 }
 
 #[test]
@@ -133,7 +173,8 @@ fn duplicate_span_id_is_collapsed_to_first() {
     // The two A rows collapse to one span; B remains → 2 spans, both roots.
     assert_eq!(trace.spans.len(), 2);
     assert_eq!(trace.roots.len(), 2);
-    assert!(trace.children.is_empty());
+    // `children` is parallel to `spans` — no edges means all-empty lists.
+    assert!(trace.children.iter().all(|kids| kids.is_empty()));
 }
 
 #[test]
@@ -158,11 +199,11 @@ fn parent_edges_and_missing_parent_root() {
     assert_eq!(trace.spans.len(), 3);
     // A and C are roots; B is A's child.
     assert_eq!(trace.roots.len(), 2);
-    let a_children = trace.children.get(&sid(1)).expect("A has children");
+    let a_idx = trace.spans.iter().position(|s| s.span_id == sid(1)).unwrap();
+    let a_children = &trace.children[a_idx];
     assert_eq!(a_children.len(), 1);
     // The edge points at B.
-    let child_idx = a_children[0];
-    assert_eq!(trace.spans[child_idx].span_id, sid(2));
+    assert_eq!(trace.spans[a_children[0]].span_id, sid(2));
 }
 
 #[test]
@@ -186,9 +227,7 @@ fn parent_cycle_stays_a_forest_and_terminates() {
             continue;
         }
         seen[i] = true;
-        if let Some(kids) = trace.children.get(&trace.spans[i].span_id) {
-            stack.extend(kids.iter().copied().filter(|&c| !seen[c]));
-        }
+        stack.extend(trace.children[i].iter().copied().filter(|&c| !seen[c]));
     }
     assert!(seen.iter().all(|&s| s), "every span reachable from a root");
 }

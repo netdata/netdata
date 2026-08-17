@@ -12,8 +12,9 @@
 //! shape — the request/response types and the response envelope — lives
 //! in [`super::wire`], and the mapping to and from the engine in
 //! [`super::adapter`]. What stays here is the netdata-plugin glue: the
-//! `FunctionHandler` impl, the capability declaration, the rt-level
-//! args→payload shim, and the lock/scheduling dance.
+//! `FunctionHandler` impl, the capability declaration, and the
+//! lock/scheduling dance. (The LOGS-ONLY GET args→payload shim lives in
+//! the parent `rpc` module; traces installs its own.)
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -637,37 +638,6 @@ impl FunctionHandler for OtelLogsHandler {
 /// `default` stays nameable (unlike ingest's strict validation).
 fn resolve_query_tenant(raw: Option<&str>) -> TenantId {
     TenantId::resolve_query(raw)
-}
-
-/// Replicate the rt-level GET shim (`netdata-plugin/rt/src/lib.rs`):
-/// when args carry `after:N` / `before:N` tokens, synthesize a JSON
-/// payload with the parsed window plus an `info` flag determined by
-/// whether the literal `info` token is in the args. Returns `None`
-/// when no synthesis happened (no args, or the upstream rt shim
-/// already produced a payload), in which case the caller falls back
-/// to the original payload.
-pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -> Option<Vec<u8>> {
-    if args.is_empty() || payload.is_some() {
-        return None;
-    }
-
-    let info = args.iter().any(|a| a == "info");
-    let mut map = serde_json::Map::new();
-    map.insert("info".into(), serde_json::json!(info));
-
-    for arg in args {
-        if let Some(rest) = arg.strip_prefix("after:") {
-            if let Ok(v) = rest.parse::<u64>() {
-                map.insert("after".into(), serde_json::json!(v));
-            }
-        } else if let Some(rest) = arg.strip_prefix("before:") {
-            if let Ok(v) = rest.parse::<u64>() {
-                map.insert("before".into(), serde_json::json!(v));
-            }
-        }
-    }
-
-    serde_json::to_vec(&serde_json::Value::Object(map)).ok()
 }
 
 /// Convert a remote-read failure into the `anyhow::Error` handed to the

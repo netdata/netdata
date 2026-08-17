@@ -16,8 +16,12 @@ path = "src/lib.rs"
 sfst = { workspace = true }
 wal = { workspace = true }
 file-registry = { workspace = true }
-# Active-WAL tail scan of ng-flatten frames (`WalScan::scan_flattened`).
+# Active-WAL tail scan of ng-flatten frames (`WalScan::scan_flattened`,
+# `traces::TraceWalScan`); ng-index for the canonical frame-tree -> sfst-tree
+# conversion the traces tail's field-kind map derives through (kept identical
+# to the sealed path by construction).
 ng-flatten = { workspace = true }
+ng-index = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
@@ -28,9 +32,13 @@ regex = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true }
+# test-util exposes the chunk-level writer: the overview suite hand-builds a
+# pre-rollup ("legacy") traces SFST to pin the D10 exclusion partial.
+sfst = { workspace = true, features = ["test-util"] }
+# The gate suite corrupts sealed chunks in place (CRC flips located via
+# the container TOC) to pin the skip-and-surface behavior.
+chunk-file = { workspace = true }
+treight = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
 uuid = { workspace = true }
-# ng-flatten tail-scan equivalence harness (tests/ng_wal_equivalence.rs): builds
-# the sealed ng SFST via ng-index::build_sfst to compare against scan_flattened.
-ng-index = { workspace = true }

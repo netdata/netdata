@@ -281,15 +281,10 @@ fn range_overlaps(summary: &Summary, q: &Range<u32>) -> bool {
 /// suppresses readahead so the kernel doesn't speculatively pull
 /// neighbouring pages either.
 fn read_summary(path: &Path) -> Result<Summary, String> {
-    let file = std::fs::File::open(path).map_err(|e| format!("open: {e}"))?;
-    // SAFETY: recovery runs before the indexer and cleaner are spawned, so
-    // the file is not concurrently truncated or rewritten while mapped.
-    let mmap = unsafe { memmap2::Mmap::map(&file) }.map_err(|e| format!("mmap: {e}"))?;
-    // `madvise` is a POSIX API; memmap2 only exposes `advise`/`Advice` on Unix.
-    #[cfg(unix)]
-    let _ = mmap.advise(memmap2::Advice::Random);
-    let reader = crate::reader::ChunkReader::open(&mmap).map_err(|e| format!("parse: {e}"))?;
-    reader.summary().map_err(|e| format!("summary: {e}"))
+    // The mmap-and-touch-only-SUMR mechanics moved to the public
+    // `crate::read_summary_path` (query tools need the same cheap read);
+    // this wrapper keeps recovery's string-error shape.
+    crate::reader::read_summary_path(path).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
