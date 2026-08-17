@@ -118,8 +118,8 @@ retains the stable normalized families. Unknown suffixes are not silently classi
 - Raw process-start epoch cannot be transformed into age, so it is excluded while CPU, memory, and file descriptors remain.
 - Writer-ineligible information families retain their lost metadata questions in the source contract rather than being
   presented as numeric state.
-- Hardware firmware information remains a metadata-only constant-one carrier. Its labels are retained for future metadata
-  consumers but are not presented as a numeric chart.
+- Hardware firmware information remains a metadata-only constant-one carrier. Its labels remain documented in the source
+  contract but the writer-ineligible info family is not presented as a numeric chart.
 - Duplicate aliases are excluded only when source proves the canonical family represents the same observation.
 - Address-bearing objecter families are not discarded: the profile extracts their address identity and charts the finite
   operation branches.
