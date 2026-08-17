@@ -818,9 +818,12 @@ int rrdfunctions_manifest_pacer_unittest(void) {
 //      can_function_del verdict discards the snapshot without emitting;
 //   3. the concurrent del-during-drain race: under the insert-before-flag /
 //      clear-flag-before-snapshot protocol no DEL is ever lost or duplicated;
-//   4. re-add cancellation: a global re-add removes a queued-but-unrendered
-//      FUNCTION_DEL for the same key, so a del(f) -> add(f) sequence never
-//      makes the parent drop the live function on the next drain.
+//   4. re-add survival + payload healing: a global re-add does NOT cancel a
+//      queued FUNCTION_DEL - the DEL renders, and the SAME payload's re-list
+//      re-affirms the function (DEL lines precede the re-list), so the parent
+//      nets to the correct state within one commit. Cancelling instead could
+//      swallow the only prune signal when a concurrent del outruns the add in
+//      the registry (see the comment in rrd_function_add's global branch).
 
 struct fndel_race_ctx {
     RRDHOST *host;
@@ -1103,7 +1106,12 @@ int rrdfunctions_del_unittest(void) {
         freez(seen);
     }
 
-    // 4. re-add cancels a queued-but-unrendered FUNCTION_DEL
+    // 4. a queued FUNCTION_DEL survives a re-add, and one payload heals it:
+    // the DEL renders first and the SAME payload's re-list re-affirms the
+    // function, so the parent deletes-then-re-adds within one commit. The
+    // re-add must NOT cancel the queued DEL - a cancellation can swallow the
+    // only prune signal when a concurrent del outruns the add in the registry
+    // (see the comment in rrd_function_add's global branch).
     {
         int readd_errors_before = errors;
 
@@ -1121,8 +1129,8 @@ int rrdfunctions_del_unittest(void) {
                          HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
                          rrdfunctions_unittest_noop_cb, NULL);
 
-        if(fndel_queued(host, "tt-readd-fn")) {
-            fprintf(stderr, "  FAILED re-add: the queued FUNCTION_DEL survived the re-add\n");
+        if(!fndel_queued(host, "tt-readd-fn")) {
+            fprintf(stderr, "  FAILED re-add: the re-add cancelled the queued FUNCTION_DEL\n");
             errors++;
         }
 
@@ -1131,12 +1139,23 @@ int rrdfunctions_del_unittest(void) {
             stream_sender_send_global_rrdhost_functions(host, wb, false, true);
             const char *out = buffer_tostring(wb);
 
-            if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-readd-fn\"")) {
-                fprintf(stderr, "  FAILED re-add: FUNCTION_DEL emitted for the live re-added function\n");
+            const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-readd-fn\"");
+            const char *fn_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"tt-readd-fn\"");
+
+            if(!del_line) {
+                fprintf(stderr, "  FAILED re-add: queued FUNCTION_DEL missing from the payload\n");
                 errors++;
             }
-            if(!strstr(out, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"tt-readd-fn\"")) {
+            if(!fn_line) {
                 fprintf(stderr, "  FAILED re-add: re-added function missing from the re-list\n");
+                errors++;
+            }
+            if(del_line && fn_line && del_line > fn_line) {
+                fprintf(stderr, "  FAILED re-add: FUNCTION_DEL rendered after the re-list line - the payload would not heal\n");
+                errors++;
+            }
+            if(fndel_queued(host, "tt-readd-fn")) {
+                fprintf(stderr, "  FAILED re-add: queue not drained by the renderer\n");
                 errors++;
             }
         }
@@ -1144,7 +1163,7 @@ int rrdfunctions_del_unittest(void) {
         rrd_function_del(host, NULL, "tt-readd-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
 
         if(errors == readd_errors_before)
-            fprintf(stderr, "  OK re-add: a global re-add cancels the queued FUNCTION_DEL\n");
+            fprintf(stderr, "  OK re-add: the queued FUNCTION_DEL survives and the payload heals (DEL before the re-affirming re-list)\n");
     }
 
     // restore localhost exactly as found

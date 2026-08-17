@@ -411,19 +411,16 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     if(st)
         dictionary_view_set(st->functions_view, key, item);
     else {
-        // A re-add cancels a queued-but-not-yet-rendered FUNCTION_DEL for the
-        // same key: without this, a del(f) -> add(f) sequence whose del is
-        // still queued would emit "FUNCTION_DEL f" on the next drain and the
-        // parent would drop the just re-added live function. Removed BEFORE
-        // setting the flag, mirroring the del path's insert-before-flag
-        // ordering (see the pending_dels comment in rrdfunctions-internals.h).
-        // Gated like the del path: dyncfg entries never queue, and hosts
-        // without a sender have nothing queued.
-        if(!(options & RRD_FUNCTION_DYNCFG) && rrdhost_has_stream_sender_enabled(host)) {
-            spinlock_lock(&host->functions->pending_dels.spinlock);
-            dictionary_del(host->functions->pending_dels.dict, key);
-            spinlock_unlock(&host->functions->pending_dels.spinlock);
-        }
+        // Deliberately NO cancellation of a queued pending_dels entry here:
+        // the queue is a change-log and the renderer's full re-list is the
+        // ground truth in the same committed payload, so a stale DEL for a
+        // re-added function heals within one drain (DEL lines render first,
+        // then the re-list re-affirms it). Cancelling here can swallow the
+        // ONLY prune signal the parent will ever get: a concurrent del can
+        // land its registry delete AFTER this insert while its queue insert
+        // lands BEFORE the cancellation, leaving the function absent from the
+        // registry with no DEL queued - and parents prune only on
+        // FUNCTION_DEL, never on a re-list.
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
     }
 
