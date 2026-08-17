@@ -22,6 +22,12 @@
                                             // Dropped so the caller reconnects; distinct from
                                             // MQTT_WSS_ERR_CONN_DROP so the cause is visible in
                                             // status and logs.
+#define MQTT_WSS_ERR_CONNECT_TIMEOUT -12    // the connection setup budget expired before CONNACK
+                                            // arrived. Distinct from MQTT_WSS_ERR_NO_IO_PROGRESS:
+                                            // there the socket keeps reporting readiness, here
+                                            // poll() times out cleanly because the peer completed
+                                            // the TCP connection and then went quiet, so the I/O
+                                            // watchdog never fires.
 
 typedef struct mqtt_wss_client_struct *mqtt_wss_client;
 
@@ -49,7 +55,10 @@ struct mqtt_wss_proxy;
 #define MQTT_WSS_SSL_ALLOW_SELF_SIGNED 0x01
 #define MQTT_WSS_SSL_DONT_CHECK_CERTS  0x08
 
-/* Will block until the MQTT over WSS connection is established or return error
+/* Will block until the MQTT over WSS connection is established or return error. The blocking is
+ * bounded: the setup phase has an overall budget (see MQTT_WSS_CONNECT_BUDGET_SECS) so a peer that
+ * completes the TCP connection and then goes quiet fails the attempt instead of hanging, and a
+ * shutdown of SERVICE_ACLK interrupts the wait.
  * @param client mqtt_wss_client which should connect
  * @param host to connect to (where MQTT over WSS server is listening)
  * @param port to connect to (where MQTT over WSS server is listening)

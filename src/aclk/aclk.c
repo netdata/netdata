@@ -318,6 +318,7 @@ ACLK_STATUS aclk_status_from_mqtt_wss_rc(int rc)
         case MQTT_WSS_ERR_MSG_TOO_BIG:     return ACLK_STATUS_OFFLINE_MESSAGE_TOO_BIG;
         case MQTT_WSS_ERR_POLL_FAILED:     return ACLK_STATUS_OFFLINE_POLL_ERROR;
         case MQTT_WSS_ERR_NO_IO_PROGRESS:  return ACLK_STATUS_OFFLINE_NO_IO_PROGRESS;
+        case MQTT_WSS_ERR_CONNECT_TIMEOUT: return ACLK_STATUS_OFFLINE_CONNECT_TIMEOUT;
         default:                           return ACLK_STATUS_OFFLINE_SOCKET_ERROR;
     }
 }
@@ -594,6 +595,9 @@ const char *aclk_status_to_string(void) {
 
         case ACLK_STATUS_OFFLINE_NO_IO_PROGRESS:
             return "disconnected, no I/O progress on a ready socket";
+
+        case ACLK_STATUS_OFFLINE_CONNECT_TIMEOUT:
+            return "disconnected, timed out waiting for CONNACK";
 
         case ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE:
             return "disconnected, closed by remote end";

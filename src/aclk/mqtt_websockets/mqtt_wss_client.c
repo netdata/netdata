@@ -25,7 +25,8 @@ time_t ping_timeout = 0;
 // progress for this long, force a reconnect. This breaks a no-progress one-core 100% CPU spin
 // whatever its cause (e.g. a runtime poll()/SSL readiness quirk). It bounds spins only, not a
 // quiet hang: a clean poll() timeout counts as progress, so a peer that goes silent is not
-// caught here.
+// caught here. Before CONNACK that gap is closed by MQTT_WSS_CONNECT_BUDGET_SECS below; on an
+// established connection the keepalive/ping path is what notices a silent peer.
 //
 // A clean poll() timeout always counts as progress. On top of that, before CONNACK wire bytes
 // count too, read from the BIO counters, because the handshake gives SSL_read()/SSL_write()
@@ -33,6 +34,13 @@ time_t ping_timeout = 0;
 // plaintext counts, so a peer streaming records that yield no plaintext cannot refresh progress
 // forever. See mqtt_wss_note_wire_progress().
 #define MQTT_WSS_IO_WATCHDOG_SECS (2 * PING_TIMEOUT)
+
+// Overall budget for one connection setup attempt, covering the TLS handshake, the WebSocket
+// upgrade and the wait for CONNACK together. MQTT_WSS_IO_WATCHDOG_SECS cannot bound this phase:
+// a clean poll() timeout counts as progress, so a peer that completes the TCP connection and then
+// goes quiet would keep the setup loop servicing 60s at a time forever, with the ACLK thread stuck
+// inside mqtt_wss_connect() and its caller unable to retry or notice a shutdown.
+#define MQTT_WSS_CONNECT_BUDGET_SECS (2 * PING_TIMEOUT)
 
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
 #include <openssl/conf.h>
@@ -605,9 +613,34 @@ int mqtt_wss_connect(
         client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
 
     client->last_io_progress_ut = now_monotonic_usec();
+    const usec_t connect_start_ut = client->last_io_progress_ut;
+
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
-        int rc = mqtt_wss_service(client, 60 * MSEC_PER_SEC);
+        // The outer retry loop in aclk_attempt_to_connect() can only test service_running()
+        // between attempts, so a shutdown while the peer is quiet would otherwise wait out the
+        // whole budget below. Not a failure to report: leave service_rc at 0 and let the caller
+        // see the same generic setup failure it gets from the paths above.
+        if (unlikely(!service_running(SERVICE_ACLK))) {
+            mqtt_wss_close_sockfd(client);
+            return 1;
+        }
+
+        // One call gives both the expiry check and the poll cap, so the budget cannot be
+        // overshot by a full service timeout on the last iteration.
+        int budget_ms = aclk_timeout_remaining_ms(connect_start_ut,
+                                                  MQTT_WSS_CONNECT_BUDGET_SECS * (int)MSEC_PER_SEC);
+        if (unlikely(!budget_ms)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Timed out after %d seconds waiting for CONNACK from MQTT WSS server \"%s\", port %d",
+                   MQTT_WSS_CONNECT_BUDGET_SECS, host, port);
+            mqtt_wss_close_sockfd(client);
+            if (service_rc)
+                *service_rc = MQTT_WSS_ERR_CONNECT_TIMEOUT;
+            return 2;
+        }
+
+        int rc = mqtt_wss_service(client, MIN(budget_ms, 60 * (int)MSEC_PER_SEC));
         if(rc) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Error connecting to MQTT WSS server \"%s\", port %d. Code: %d", host, port, rc);
             mqtt_wss_close_sockfd(client);
@@ -648,6 +681,8 @@ static const char *mqtt_wss_error_tos(int ec)
             return "closed by remote end";
         case MQTT_WSS_ERR_NO_IO_PROGRESS:
             return "no I/O progress on a ready socket";
+        case MQTT_WSS_ERR_CONNECT_TIMEOUT:
+            return "the connection setup budget expired before CONNACK";
 
         default:
             return "unknown error code";
@@ -979,6 +1014,20 @@ int mqtt_wss_client_timeout_unittest(void) {
     MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_CONN_DROP) ==
                       ACLK_STATUS_OFFLINE_SOCKET_ERROR,
                   "a connection drop is not reported as a socket error");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_CONNECT_TIMEOUT) ==
+                      ACLK_STATUS_OFFLINE_CONNECT_TIMEOUT,
+                  "a CONNACK timeout is not reported as its own status");
+
+    // The setup budget is a separate window from the watchdog: the watchdog cannot bound the
+    // pre-CONNACK phase at all, because a clean poll() timeout refreshes progress. Pin the
+    // derivation and non-degeneracy the same way, and pin the poll cap - the remaining budget is
+    // what stops the last mqtt_wss_service() call from overshooting it.
+    const int connect_budget_ms = MQTT_WSS_CONNECT_BUDGET_SECS * (int)MSEC_PER_SEC;
+    MQTT_WSS_TEST(connect_budget_ms == (2 * PING_TIMEOUT) * (int)MSEC_PER_SEC,
+                  "connect budget is no longer derived from PING_TIMEOUT");
+    MQTT_WSS_TEST(connect_budget_ms > 0, "connect budget is degenerate");
+    MQTT_WSS_TEST(aclk_timeout_remaining_ms(now_monotonic_usec(), connect_budget_ms) > 0,
+                  "a fresh connect budget reports no time remaining");
 
     if (errors)
         fprintf(stderr, "mqtt wss timeout unittest: %d ERROR(S)\n", errors);
