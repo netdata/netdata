@@ -545,6 +545,60 @@ func TestCollector_EmitsOnlyChartBackedAttributeMetrics(t *testing.T) {
 	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 	assert.NotContains(t, mx, "device_sda_type_sat_attr_unknown_attribute_normalized")
 	assert.NotContains(t, mx, "device_sda_type_sat_attr_power_on_hours_raw")
+
+	chartDims := make(map[string]bool)
+	for _, chart := range *collr.Charts() {
+		for _, dim := range chart.Dims {
+			chartDims[dim.ID] = true
+		}
+	}
+	for metric := range mx {
+		if strings.Contains(metric, "_attr_") {
+			assert.True(t, chartDims[metric], "attribute metric has no chart dimension: %s", metric)
+		}
+	}
+}
+
+func TestCollector_RetriesUnresolvedScsiTypeThroughForcedScan(t *testing.T) {
+	const deviceName = "/dev/sda"
+
+	satCalls := 0
+	scsiCalls := 0
+	collr := New()
+	collr.ScanEvery = 0
+	collr.PollDevicesEvery = confopt.Duration(time.Hour)
+	collr.exec = &mockSmartctlCliExec{
+		scanData: deviceScanData(t, "scsi", "SCSI", deviceName),
+		deviceDataFunc: func(name, deviceType, _ string) ([]byte, error) {
+			require.Equal(t, deviceName, name)
+			switch deviceType {
+			case "sat":
+				satCalls++
+				if satCalls == 1 {
+					return nil, fmt.Errorf("transient SAT probe failure")
+				}
+				return dataTypeSataDeviceHDDSda, nil
+			case "scsi":
+				scsiCalls++
+				return []byte(`{"smartctl":{"exit_status":2,"messages":[{"string":"open failed: No such device"}]}}`), fmt.Errorf("exit status 2")
+			default:
+				return nil, fmt.Errorf("unexpected device type %q", deviceType)
+			}
+		},
+	}
+
+	assert.Empty(t, collr.Collect(context.Background()))
+	assert.True(t, collr.forceScan)
+	require.Contains(t, collr.scannedDevices, deviceName+"|scsi")
+	assert.True(t, collr.scannedDevices[deviceName+"|scsi"].typeUnresolved)
+
+	mx := collr.Collect(context.Background())
+	require.NotEmpty(t, mx)
+	assert.Equal(t, 3, satCalls)
+	assert.Equal(t, 1, scsiCalls)
+	assert.Contains(t, collr.scannedDevices, deviceName+"|sat")
+	assert.NotContains(t, collr.scannedDevices, deviceName+"|scsi")
+	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
 func TestCollector_RetriesUnresolvedScsiTypeWithScanEveryDisabled(t *testing.T) {
