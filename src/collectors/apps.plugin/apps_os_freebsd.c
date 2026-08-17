@@ -319,9 +319,10 @@ cleanup:
     return false;
 }
 
-// FreeBSD maintains ki_stat for every process; SSLEEP covers both
+// FreeBSD maintains ki_stat for every process. SSLEEP covers both
 // interruptible and uninterruptible sleep, distinguished by TDF_SINTR in
-// ki_tdflags (ps shows uninterruptible sleep as 'D'). Zombies are present in
+// ki_tdflags (ps shows uninterruptible sleep as 'D'); SWAIT and SLOCK are
+// interruptible wait states (ps shows 'W' and 'L'). Zombies are present in
 // the KERN_PROC_PROC data and are counted like any other process.
 static inline void update_proc_state_count_freebsd(char ki_stat, long ki_tdflags) {
     switch (ki_stat) {
@@ -333,6 +334,13 @@ static inline void update_proc_state_count_freebsd(char ki_stat, long ki_tdflags
                 proc_state_count[PROC_STATUS_SLEEPING] += 1;
             else
                 proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
+            break;
+        case SWAIT:
+        case SLOCK:
+            // freebsd wait states (ps shows 'W' and 'L'); they are not
+            // uninterruptible sleep (that is SSLEEP without TDF_SINTR, shown as
+            // 'D'), so count them as interruptible sleep instead of dropping them.
+            proc_state_count[PROC_STATUS_SLEEPING] += 1;
             break;
         case SZOMB:
             proc_state_count[PROC_STATUS_ZOMBIE] += 1;

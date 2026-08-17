@@ -431,6 +431,8 @@ bool apps_os_read_pid_stat_macos(struct pid_stat *p, void *ptr) {
 // sleeping, so "running" counts all live (non-zombie, non-stopped) processes
 // and SSLEEP never fires. Zombies must be counted here, because they are
 // skipped from per-process metrics (they have no Mach task).
+// Counts one process into proc_state_count[] according to its kinfo_proc
+// p_stat value. Called once per collected process, before per-process metrics.
 static inline void update_proc_state_count_macos(char p_stat) {
     switch (p_stat) {
         case SRUN:
