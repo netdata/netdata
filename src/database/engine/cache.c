@@ -990,6 +990,31 @@ static ALWAYS_INLINE void page_release(PGC *cache, PGC_PAGE *page, bool evict_if
     }
 }
 
+#define PGC_PAGE_IDENTITY_MAX 512
+
+// Renders a page's full identity for fatal messages.
+// Without the cache name a field crash report cannot tell MAIN_PGC from OPEN_PGC or
+// EXTENT_PGC, and without both partitions it cannot tell a corrupted indexing key from
+// a page that was simply removed twice.
+static const char *page_identity(PGC *cache, PGC_PAGE *page, size_t partition) {
+    static __thread char buf[PGC_PAGE_IDENTITY_MAX];
+
+    snprintfz(buf, sizeof(buf),
+              "cache '%s', partition %zu (metric_id maps to %zu), section %p, metric_id %p, "
+              "start_time %ld, end_time %ld, update_every %u, assumed_size %u, "
+              "flags 0x%02x, refcount %d, page %p, data %p",
+              cache->config.name, partition, pgc_indexing_partition(cache, page->metric_id),
+              (void *)page->section, (void *)page->metric_id,
+              (long)page->start_time_s,
+              (long)__atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
+              (unsigned)page->update_every_s, (unsigned)page->assumed_size,
+              (unsigned)__atomic_load_n(&page->flags, __ATOMIC_RELAXED),
+              (int)__atomic_load_n(&page->refcount, __ATOMIC_RELAXED),
+              (void *)page, page->data);
+
+    return buf;
+}
+
 static ALWAYS_INLINE bool non_acquired_page_get_for_deletion___while_having_clean_locked(PGC *cache __maybe_unused, PGC_PAGE *page) {
     __atomic_add_fetch(&cache->stats.acquires_for_deletion, 1, __ATOMIC_RELAXED);
 
@@ -999,7 +1024,8 @@ static ALWAYS_INLINE bool non_acquired_page_get_for_deletion___while_having_clea
     if(refcount_acquire_for_deletion(&page->refcount)) {
         // we can delete this page
         internal_fatal(page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
-                       "DBENGINE CACHE: page is already being deleted");
+                       "DBENGINE CACHE: page is already being deleted - %s",
+                       page_identity(cache, page, pgc_indexing_partition(cache, page->metric_id)));
 
         page_flag_set(page, PGC_PAGE_IS_BEING_DELETED);
 
@@ -1019,7 +1045,8 @@ static ALWAYS_INLINE bool acquired_page_get_for_deletion_or_release_it(PGC *cach
 
         // we can delete this page
         internal_fatal(page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
-                       "DBENGINE CACHE: page is already being deleted");
+                       "DBENGINE CACHE: page is already being deleted - %s",
+                       page_identity(cache, page, pgc_indexing_partition(cache, page->metric_id)));
 
         page_flag_set(page, PGC_PAGE_IS_BEING_DELETED);
 
@@ -1076,47 +1103,57 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
     pointer_check(cache, page);
 
     internal_fatal(page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN),
-                   "DBENGINE CACHE: page to be removed from the cache is still in the linked-list");
+                   "DBENGINE CACHE: page to be removed from the cache is still in the linked-list - %s",
+                   page_identity(cache, page, partition));
 
     internal_fatal(!page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
-                   "DBENGINE CACHE: page to be removed from the index, is not marked for deletion");
+                   "DBENGINE CACHE: page to be removed from the index, is not marked for deletion - %s",
+                   page_identity(cache, page, partition));
 
     internal_fatal(partition != pgc_indexing_partition(cache, page->metric_id),
-                   "DBENGINE CACHE: attempted to remove this page from the wrong partition of the cache");
+                   "DBENGINE CACHE: attempted to remove this page from the wrong partition of the cache - %s",
+                   page_identity(cache, page, partition));
 
     Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, page->section, PJE0);
-    if(unlikely(!metrics_judy_pptr))
-        fatal("DBENGINE CACHE: section '%p' should exist, but it does not.", (void *)page->section);
+    if(unlikely(!metrics_judy_pptr)) {
+        fatal("DBENGINE CACHE: section should exist in the index, but it does not - %s",
+              page_identity(cache, page, partition));
+    }
 
     Pvoid_t *pages_judy_pptr = JudyLGet(*metrics_judy_pptr, page->metric_id, PJE0);
-    if(unlikely(!pages_judy_pptr))
-        fatal("DBENGINE CACHE: metric '%p' in section '%p' should exist, but it does not.",
-              (void *)page->metric_id, (void *)page->section);
+    if(unlikely(!pages_judy_pptr)) {
+        fatal("DBENGINE CACHE: metric should exist in its section, but it does not - %s",
+              page_identity(cache, page, partition));
+    }
 
     Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, page->start_time_s, PJE0);
-    if(unlikely(!page_ptr))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' should exist, but it does not.",
-              page->start_time_s, (void *)page->metric_id, (void *)page->section);
+    if(unlikely(!page_ptr)) {
+        fatal("DBENGINE CACHE: page should exist in its metric, but it does not - %s",
+              page_identity(cache, page, partition));
+    }
 
     PGC_PAGE *found_page = *page_ptr;
-    if(unlikely(found_page != page))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' should exist, "
-              "but the index returned a different address (expected %p, got %p).",
-              page->start_time_s, (void *)page->metric_id, (void *)page->section,
-              page, found_page);
+    if(unlikely(found_page != page)) {
+        fatal("DBENGINE CACHE: the index returned a different page address (got %p) - %s",
+              found_page, page_identity(cache, page, partition));
+    }
 
     JudyAllocThreadPulseReset();
 
-    if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_s, PJE0)))
-        fatal("DBENGINE CACHE: page with start time '%ld' of metric '%p' in section '%p' exists, but cannot be deleted.",
-              page->start_time_s, (void *)page->metric_id, (void *)page->section);
+    if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_s, PJE0))) {
+        fatal("DBENGINE CACHE: page exists in its metric, but cannot be deleted - %s",
+              page_identity(cache, page, partition));
+    }
 
-    if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
-        fatal("DBENGINE CACHE: metric '%p' in section '%p' exists and is empty, but cannot be deleted.",
-              (void *)page->metric_id, (void *)page->section);
+    if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0)) {
+        fatal("DBENGINE CACHE: metric exists and is empty, but cannot be deleted - %s",
+              page_identity(cache, page, partition));
+    }
 
-    if(!*metrics_judy_pptr && !JudyLDel(&cache->index[partition].sections_judy, page->section, PJE0))
-        fatal("DBENGINE CACHE: section '%p' exists and is empty, but cannot be deleted.", (void *)page->section);
+    if(!*metrics_judy_pptr && !JudyLDel(&cache->index[partition].sections_judy, page->section, PJE0)) {
+        fatal("DBENGINE CACHE: section exists and is empty, but cannot be deleted - %s",
+              page_identity(cache, page, partition));
+    }
 
     pgc_stats_index_judy_change(cache, JudyAllocThreadPulseGetAndReset());
 
@@ -1502,18 +1539,19 @@ static PGC_PAGE *pgc_page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
         Pvoid_t *metrics_judy_pptr = JudyLIns(&cache->index[partition].sections_judy, entry->section, PJE0);
         if(unlikely(!metrics_judy_pptr || metrics_judy_pptr == PJERR))
-            fatal("DBENGINE CACHE: JudyLIns(sections_judy, 0x%lx) failed, sections_judy = %p, result = %p",
-                  (long unsigned)entry->section, cache->index[partition].sections_judy, metrics_judy_pptr);
+            fatal("DBENGINE CACHE: cache '%s': JudyLIns(sections_judy, 0x%lx) failed, sections_judy = %p, result = %p",
+                  cache->config.name, (long unsigned)entry->section,
+                  cache->index[partition].sections_judy, metrics_judy_pptr);
 
         Pvoid_t *pages_judy_pptr = JudyLIns(metrics_judy_pptr, entry->metric_id, PJE0);
         if(unlikely(!pages_judy_pptr || pages_judy_pptr == PJERR))
-            fatal("DBENGINE CACHE: JudyLIns(metrics_judy, 0x%lx) failed, metrics_judy = %p, result = %p",
-                  (long unsigned)entry->metric_id, metrics_judy_pptr, pages_judy_pptr);
+            fatal("DBENGINE CACHE: cache '%s': JudyLIns(metrics_judy, 0x%lx) failed, metrics_judy = %p, result = %p",
+                  cache->config.name, (long unsigned)entry->metric_id, *metrics_judy_pptr, pages_judy_pptr);
 
         Pvoid_t *page_ptr = JudyLIns(pages_judy_pptr, entry->start_time_s, PJE0);
         if(unlikely(!page_ptr || page_ptr == PJERR))
-            fatal("DBENGINE CACHE: JudyLIns(pages_judy, %ld) failed, pages_judy = %p, result = %p",
-                  (long)entry->start_time_s, pages_judy_pptr, page_ptr);
+            fatal("DBENGINE CACHE: cache '%s': JudyLIns(pages_judy, %ld) failed, pages_judy = %p, result = %p",
+                  cache->config.name, (long)entry->start_time_s, *pages_judy_pptr, page_ptr);
 
         pgc_stats_index_judy_change(cache, JudyAllocThreadPulseGetAndReset());
 
@@ -1591,7 +1629,7 @@ static ALWAYS_INLINE PGC_PAGE *page_find_and_acquire_exact_unsafe(PGC *cache, Pv
         return NULL;
 
     if (unlikely(page_ptr == PJERR))
-        fatal("DBENGINE CACHE: corrupted page in pages judy array");
+        fatal("DBENGINE CACHE: cache '%s': corrupted page in pages judy array", cache->config.name);
 
     PGC_PAGE *page = *page_ptr;
     if(page && page_acquire(cache, page))
@@ -1608,7 +1646,7 @@ static ALWAYS_INLINE PGC_PAGE *page_find_and_acquire_first_unsafe(PGC *cache, Pv
          page_ptr = JudyLNext(*pages_judy_pptr, &time, PJE0)) {
 
         if (unlikely(page_ptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted page in pages judy array");
+            fatal("DBENGINE CACHE: cache '%s': corrupted page in pages judy array", cache->config.name);
 
         PGC_PAGE *page = *page_ptr;
         if(page && page_acquire(cache, page))
@@ -1626,7 +1664,7 @@ static ALWAYS_INLINE PGC_PAGE *page_find_and_acquire_next_unsafe(PGC *cache, Pvo
          page_ptr = JudyLNext(*pages_judy_pptr, &time, PJE0)) {
 
         if (unlikely(page_ptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted page in pages judy array");
+            fatal("DBENGINE CACHE: cache '%s': corrupted page in pages judy array", cache->config.name);
 
         PGC_PAGE *page = *page_ptr;
         if(page && page_acquire(cache, page))
@@ -1644,7 +1682,7 @@ static ALWAYS_INLINE PGC_PAGE *page_find_and_acquire_last_unsafe(PGC *cache, Pvo
          page_ptr = JudyLPrev(*pages_judy_pptr, &time, PJE0)) {
 
         if (unlikely(page_ptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted page in pages judy array");
+            fatal("DBENGINE CACHE: cache '%s': corrupted page in pages judy array", cache->config.name);
 
         PGC_PAGE *page = *page_ptr;
         if(page && page_acquire(cache, page))
@@ -1662,7 +1700,7 @@ static ALWAYS_INLINE PGC_PAGE *page_find_and_acquire_prev_unsafe(PGC *cache, Pvo
          page_ptr = JudyLPrev(*pages_judy_pptr, &time, PJE0)) {
 
         if (unlikely(page_ptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted page in pages judy array");
+            fatal("DBENGINE CACHE: cache '%s': corrupted page in pages judy array", cache->config.name);
 
         PGC_PAGE *page = *page_ptr;
         if(page && page_acquire(cache, page))
