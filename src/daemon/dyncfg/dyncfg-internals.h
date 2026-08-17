@@ -56,19 +56,19 @@ typedef struct dyncfg {
     // invocation and the template fan-out) can snapshot-and-pin without
     // racing a conflict transfer's displaced release.
     SPINLOCK transport_spinlock;
-    struct rrd_function_transport *transport;
+    struct nrpc_transport *transport;
 } DYNCFG;
 
 // snapshot the node's execute pair and entry-pin its transport (if any) under
 // the node's leaf spinlock; the returned pin (may be NULL) must be released
-// with rrd_function_transport_entry_release() after the pair is used
-static inline struct rrd_function_transport *dyncfg_node_execute_snapshot(
+// with nrpc_transport_entry_release() after the pair is used
+static inline struct nrpc_transport *dyncfg_node_execute_snapshot(
         DYNCFG *df, rrd_function_execute_cb_t *out_cb, void **out_cb_data) {
     spinlock_lock(&df->transport_spinlock);
     if(out_cb) *out_cb = df->execute_cb;
     if(out_cb_data) *out_cb_data = df->execute_cb_data;
-    struct rrd_function_transport *pin =
-        df->transport ? rrd_function_transport_entry_acquire(df->transport) : NULL;
+    struct nrpc_transport *pin =
+        df->transport ? nrpc_transport_entry_acquire(df->transport) : NULL;
     spinlock_unlock(&df->transport_spinlock);
     return pin;
 }
@@ -108,7 +108,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
                                            usec_t created_ut, usec_t modified_ut,
                                            bool sync, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
                                            rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
-                                           struct rrd_function_transport *transport,
+                                           struct nrpc_transport *transport,
                                            bool overwrite_cb);
 
 int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data);

@@ -50,7 +50,7 @@ struct rrd_host_function {
     void *execute_cb_data;
 
     OBJECT_STATE_ID rrdhost_state_id;
-    struct rrd_function_provider *provider;
+    struct nrpc_serving_handle *serving;
 
     // LEAF spinlock guarding the entry's SWAPPED fields: the (source,
     // execute_cb_data) pair, execute_cb, and the help/tags STRINGs. The
@@ -76,13 +76,13 @@ static inline bool rrd_function_source_has_transport(RRD_FUNCTION_REG_SOURCE sou
 struct rrd_function_capture {
     rrd_function_execute_cb_t execute_cb;
     void *execute_cb_data;
-    struct rrd_function_transport *transport_pin;   // entry-pinned; NULL for INTERNAL sources
+    struct nrpc_transport *transport_pin;   // entry-pinned; NULL for INTERNAL sources
 };
 
 void rrd_function_acquired_capture(RRD_FUNCTION_ACQUIRED *rfa, struct rrd_function_capture *out);
 
 static inline void rrd_function_capture_release(struct rrd_function_capture *c) {
-    rrd_function_transport_entry_release(c->transport_pin);
+    nrpc_transport_entry_release(c->transport_pin);
     c->transport_pin = NULL;
 }
 

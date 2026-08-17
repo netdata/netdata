@@ -104,9 +104,9 @@ static void rrd_functions_inflight_cleanup(struct rrd_function_inflight *r) {
     // pinned at registration - BOTH released here, no dedup (an async record
     // can hold two). NULL-safe, so cleanup on a never-inserted record (the
     // early error paths) releases nothing.
-    rrd_function_transport_entry_release(r->canceller.data);
+    nrpc_transport_entry_release(r->canceller.data);
     r->canceller.data = NULL;
-    rrd_function_transport_entry_release(r->progresser.data);
+    nrpc_transport_entry_release(r->progresser.data);
     r->progresser.data = NULL;
 
     r->payload = NULL;
@@ -195,30 +195,30 @@ static void rrd_inflight_async_function_register_canceller_cb(void *register_can
     // shaped the same way (dyncfg_insert_cb, dyncfg_conflict_cb). The registry
     // entry sites store the transport as execute_cb_data itself, so they have
     // no separate field to fill.
-    struct rrd_function_transport *pinned = rrd_function_transport_entry_acquire(canceller_cb_data);
+    struct nrpc_transport *pinned = nrpc_transport_entry_acquire(canceller_cb_data);
 
     spinlock_lock(&r->callbacks.spinlock);
-    struct rrd_function_transport *previous = r->canceller.data;
+    struct nrpc_transport *previous = r->canceller.data;
     r->canceller.cb = canceller_cb;
     r->canceller.data = pinned;
     spinlock_unlock(&r->callbacks.spinlock);
 
-    rrd_function_transport_entry_release(previous);
+    nrpc_transport_entry_release(previous);
 }
 
 static void rrd_inflight_async_function_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
     struct rrd_function_inflight *r = register_progresser_cb_data;
 
     // same contract, pin and re-registration handling as the canceller above
-    struct rrd_function_transport *pinned = rrd_function_transport_entry_acquire(progresser_cb_data);
+    struct nrpc_transport *pinned = nrpc_transport_entry_acquire(progresser_cb_data);
 
     spinlock_lock(&r->callbacks.spinlock);
-    struct rrd_function_transport *previous = r->progresser.data;
+    struct nrpc_transport *previous = r->progresser.data;
     r->progresser.cb = progresser_cb;
     r->progresser.data = pinned;
     spinlock_unlock(&r->callbacks.spinlock);
 
-    rrd_function_transport_entry_release(previous);
+    nrpc_transport_entry_release(previous);
 }
 
 // ----------------------------------------------------------------------------
@@ -760,7 +760,7 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
 
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
-    if(!rrd_function_provider_dispatcher_acquire(r->rdcf->provider)) {
+    if(!nrpc_serving_dispatcher_acquire(r->rdcf->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a CANCEL request for transaction '%s', but the collector is not running.",
                r->transaction);
@@ -778,7 +778,7 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
     if(canceller_cb)
         canceller_cb(r->transaction, canceller_cb_data);
 
-    rrd_function_provider_dispatcher_release(r->rdcf->provider);
+    nrpc_serving_dispatcher_release(r->rdcf->serving);
 }
 
 void rrd_function_cancel(const char *transaction) {
@@ -808,7 +808,7 @@ void rrd_function_progress(const char *transaction) {
 
     struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
 
-    if(!rrd_function_provider_dispatcher_acquire(r->rdcf->provider)) {
+    if(!nrpc_serving_dispatcher_acquire(r->rdcf->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a PROGRESS request for transaction '%s', but the collector is not running.",
                transaction);
@@ -828,7 +828,7 @@ void rrd_function_progress(const char *transaction) {
     if(progresser_cb)
         progresser_cb(transaction, progresser_cb_data);
 
-    rrd_function_provider_dispatcher_release(r->rdcf->provider);
+    nrpc_serving_dispatcher_release(r->rdcf->serving);
 
 cleanup:
     dictionary_acquired_item_release(rrd_function_transactions.dict, item);

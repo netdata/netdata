@@ -30,7 +30,7 @@ void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int ti
                              const char *help, const char *tags,
                              HTTP_ACCESS access, rrd_function_execute_inline_cb_t execute_cb) {
 
-    rrd_function_provider_started(); // this creates a collector that runs for as long as netdata runs
+    nrpc_serving_started(); // this creates a collector that runs for as long as netdata runs
 
     rrd_function_add(host, st, name, timeout, priority, version,
                      help, tags, access, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,

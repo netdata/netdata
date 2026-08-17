@@ -58,7 +58,7 @@ static void dyncfg_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *v
     // held a pin), and dyncfg_shutdown_low_level()'s dictionary_destroy fires
     // this callback per node - an explicit release there would double-release
     if(df->transport) {
-        rrd_function_transport_entry_release(df->transport);
+        nrpc_transport_entry_release(df->transport);
         df->transport = NULL;
     }
 
@@ -77,7 +77,7 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
     // argument (NULL-safe, fatals on use-after-release); storing the returned
     // pointer keeps the sites that fill a dedicated transport field shaped the
     // same way (dyncfg_conflict_cb, the inflight canceller/progresser pins)
-    df->transport = rrd_function_transport_entry_acquire(df->transport);
+    df->transport = nrpc_transport_entry_acquire(df->transport);
 
     const char *id = dictionary_acquired_item_name(item);
     size_t buf_size = strlen(id) + 20;
@@ -192,8 +192,8 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         spinlock_lock(&v->transport_spinlock);
 
         if(v->transport)
-            rrd_function_transport_entry_release(v->transport);
-        v->transport = nv->transport ? rrd_function_transport_entry_acquire(nv->transport) : NULL;
+            nrpc_transport_entry_release(v->transport);
+        v->transport = nv->transport ? nrpc_transport_entry_acquire(nv->transport) : NULL;
 
         v->sync = nv->sync,
         v->execute_cb = nv->execute_cb;
@@ -251,7 +251,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
                                            usec_t created_ut, usec_t modified_ut,
                                            bool sync, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
                                            rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
-                                           struct rrd_function_transport *transport,
+                                           struct nrpc_transport *transport,
                                            bool overwrite_cb) {
     DYNCFG tmp = {
         .host_uuid = host->host_id,
@@ -394,7 +394,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
                           DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync,
                           HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
                           rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
-                          struct rrd_function_transport *transport) {
+                          struct nrpc_transport *transport) {
 
     if(view_access == HTTP_ACCESS_NONE)
         view_access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG;
@@ -441,7 +441,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
 //        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
 
-    rrd_function_provider_started();
+    nrpc_serving_started();
     rrd_function_add(
         host,
         NULL,

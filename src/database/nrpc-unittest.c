@@ -1627,7 +1627,7 @@ static int reg_execute_cb_b(struct rrd_function_execute *rfe, void *data __maybe
 }
 
 // a delete attempted from a thread that never registered anything, so its
-// thread_rrd_function_provider is NULL - the COLLECTOR ownership check must
+// nrpc_thread_serving is NULL - the COLLECTOR ownership check must
 // refuse it
 struct reg_del_ctx {
     RRDHOST *host;
@@ -1645,11 +1645,11 @@ static void reg_del_worker(void *arg) {
 // thread that exits while its functions are still in the registry
 static void reg_provider_worker(void *arg) {
     RRDHOST *host = arg;
-    rrd_function_provider_started();
+    nrpc_serving_started();
     rrd_function_add(host, NULL, "reg-provider-fn", 10, 0, 1, "provider", "top",
                      HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
                      rrdfunctions_unittest_noop_cb, NULL);
-    rrd_function_provider_finished();
+    nrpc_serving_finished();
 }
 
 #define REG_RACE_N 20000

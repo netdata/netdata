@@ -868,7 +868,7 @@ static void diskspace_main_cleanup(void *ptr) {
     simple_pattern_free(excluded_zfs_datasets_pattern);
     excluded_zfs_datasets_pattern = NULL;
 
-    rrd_function_provider_finished();
+    nrpc_serving_finished();
     worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;

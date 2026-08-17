@@ -127,7 +127,7 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
         // job node's insert callback takes its own; released below.
         rrd_function_execute_cb_t template_cb;
         void *template_cb_data;
-        struct rrd_function_transport *template_transport_pin =
+        struct nrpc_transport *template_transport_pin =
             dyncfg_node_execute_snapshot(df_template, &template_cb, &template_cb_data);
 
         const DICTIONARY_ITEM *item = dyncfg_add_internal(
@@ -150,7 +150,7 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
             template_transport_pin,
             false);
 
-        rrd_function_transport_entry_release(template_transport_pin);
+        nrpc_transport_entry_release(template_transport_pin);
 
         if(unlikely(!item)) {
             // the nodes dictionary is destroyed - the job node cannot be
@@ -559,12 +559,12 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         // our read and the callback's own acquire-or-503
         rrd_function_execute_cb_t execute_cb;
         void *execute_cb_data;
-        struct rrd_function_transport *transport_pin =
+        struct nrpc_transport *transport_pin =
             dyncfg_node_execute_snapshot(df, &execute_cb, &execute_cb_data);
 
         rc = execute_cb(rfe, execute_cb_data);
 
-        rrd_function_transport_entry_release(transport_pin);
+        nrpc_transport_entry_release(transport_pin);
     }
     else if(rfe->result.cb)
         rfe->result.cb(rfe->result.wb, rc, rfe->result.data);

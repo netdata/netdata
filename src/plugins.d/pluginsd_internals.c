@@ -85,7 +85,7 @@ void parser_destroy(PARSER *parser) {
     //    future send path taking the receiver lock would deadlock this drain.
     //    Both directions are constraints.
     if(parser->inflight.transport)
-        rrd_function_transport_mark_dead_and_drain(parser->inflight.transport);
+        nrpc_transport_mark_dead_and_drain(parser->inflight.transport);
 
     // 3. destroy the container: pre-destroy drain + the destroy-time 503
     //    sweep answer every caller still waiting on this plugin
@@ -95,13 +95,13 @@ void parser_destroy(PARSER *parser) {
     //    (registry entries, dyncfg nodes, broker pins) keep holding a valid
     //    but dead transport until they release it; its destructor never
     //    touches the parser
-    struct rrd_function_transport *transport = parser->inflight.transport;
+    struct nrpc_transport *transport = parser->inflight.transport;
     parser->inflight.transport = NULL;
 
     freez(parser);
 
     if(transport)
-        rrd_function_transport_owner_release(transport);
+        nrpc_transport_owner_release(transport);
 }
 
 

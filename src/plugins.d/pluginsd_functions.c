@@ -116,7 +116,7 @@ void pluginsd_inflight_functions_init(PARSER *parser) {
     // stores (registry entries, cancellers/progressers, dyncfg nodes); the
     // base entry ref created here is dropped by parser_destroy() after the
     // parser is freed
-    parser->inflight.transport = rrd_function_transport_create(parser);
+    parser->inflight.transport = nrpc_transport_create(parser);
 
     parser->inflight.functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions, 0);
     dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
@@ -302,9 +302,9 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
 // guards the whole send (UAF-D class): once the parser starts tearing down,
 // the acquire fails and we bail cleanly.
 static void pluginsd_function_cancel(const char *transaction, void *data) {
-    struct rrd_function_transport *t = data;
+    struct nrpc_transport *t = data;
 
-    if(!rrd_function_transport_dispatcher_acquire(t)) {
+    if(!nrpc_transport_dispatcher_acquire(t)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: FUNCTION_CANCEL for transaction '%s', but the plugin is not running.",
                transaction ? transaction : "(unset)");
@@ -332,14 +332,14 @@ static void pluginsd_function_cancel(const char *transaction, void *data) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: FUNCTION_CANCEL request didn't match any pending function requests in pluginsd.d.");
 
-    rrd_function_transport_dispatcher_release(t);
+    nrpc_transport_dispatcher_release(t);
 }
 
 // `data` is the transport; the dispatcher ref guards the whole send (UAF-A/D
 // class). The keyed lookup in THIS parser's dictionary is the validation - a
 // transaction belonging to another parser simply misses.
 static void pluginsd_function_progress_to_plugin(const char *transaction, void *data) {
-    struct rrd_function_transport *t = data;
+    struct nrpc_transport *t = data;
 
     if(!transaction || !*transaction) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -347,7 +347,7 @@ static void pluginsd_function_progress_to_plugin(const char *transaction, void *
         return;
     }
 
-    if(!rrd_function_transport_dispatcher_acquire(t)) {
+    if(!nrpc_transport_dispatcher_acquire(t)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: FUNCTION_PROGRESS for transaction '%s', but the plugin is not running.", transaction);
         return;
@@ -360,7 +360,7 @@ static void pluginsd_function_progress_to_plugin(const char *transaction, void *
     if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: FUNCTION_PROGRESS request for transaction '%s' that is not in progress!", transaction);
-        rrd_function_transport_dispatcher_release(t);
+        nrpc_transport_dispatcher_release(t);
         return;
     }
 
@@ -377,7 +377,7 @@ static void pluginsd_function_progress_to_plugin(const char *transaction, void *
     }
 
     dictionary_acquired_item_release(dict, item);
-    rrd_function_transport_dispatcher_release(t);
+    nrpc_transport_dispatcher_release(t);
 }
 
 // this is the function called from
@@ -390,9 +390,9 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
     // under a dispatcher ref - once the parser starts tearing down the
     // acquire fails and the caller gets a clean 503 instead of a
     // check-then-use race on freed parser memory
-    struct rrd_function_transport *transport = data;
+    struct nrpc_transport *transport = data;
 
-    if(!rrd_function_transport_dispatcher_acquire(transport)) {
+    if(!nrpc_transport_dispatcher_acquire(transport)) {
         int code = HTTP_RESP_SERVICE_UNAVAILABLE;
         rrd_call_function_error(rfe->result.wb, "The plugin that offered this function is not available.", code);
         if(rfe->result.cb)
@@ -448,7 +448,7 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
         buffer_free(tmp.payload);
         freez((void *)tmp.source);
 
-        rrd_function_transport_dispatcher_release(transport);
+        nrpc_transport_dispatcher_release(transport);
         return code;
     }
 
@@ -462,7 +462,7 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
         // phase is locked on this path too (the old shape ran it unlocked
         // here, racing the locked readers of the timeout field)
         pluginsd_inflight_functions_garbage_collect(parser, now_ut);
-        rrd_function_transport_dispatcher_release(transport);
+        nrpc_transport_dispatcher_release(transport);
         return code;
     }
     else {
@@ -494,7 +494,7 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
         if (gc_needed)
             pluginsd_inflight_functions_garbage_collect(parser, now_ut);
 
-        rrd_function_transport_dispatcher_release(transport);
+        nrpc_transport_dispatcher_release(transport);
         return HTTP_RESP_OK;
     }
 }

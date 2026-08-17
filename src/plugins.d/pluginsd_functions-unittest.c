@@ -36,25 +36,25 @@ struct c6ut_result {
 // entry-pins the transport, per the rrd_function_cancel_cb_t contract
 struct c6ut_canceller {
     rrd_function_cancel_cb_t cb;
-    struct rrd_function_transport *transport; // entry-pinned
+    struct nrpc_transport *transport; // entry-pinned
 };
 
 static void c6ut_register_canceller_cb(void *register_cancel_cb_data, rrd_function_cancel_cb_t cancel_cb, void *cancel_cb_data) {
     struct c6ut_canceller *c = register_cancel_cb_data;
     c->cb = cancel_cb;
-    c->transport = rrd_function_transport_entry_acquire(cancel_cb_data);
+    c->transport = nrpc_transport_entry_acquire(cancel_cb_data);
 }
 
 // same, for the progresser half of the registration contract
 struct c6ut_progresser {
     rrd_function_progresser_cb_t cb;
-    struct rrd_function_transport *transport; // entry-pinned
+    struct nrpc_transport *transport; // entry-pinned
 };
 
 static void c6ut_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
     struct c6ut_progresser *p = register_progresser_cb_data;
     p->cb = progresser_cb;
-    p->transport = rrd_function_transport_entry_acquire(progresser_cb_data);
+    p->transport = nrpc_transport_entry_acquire(progresser_cb_data);
 }
 
 static void c6ut_result_cb(BUFFER *wb __maybe_unused, int code, void *data) {
@@ -107,8 +107,8 @@ static int c5b_async_execute_cb(struct rrd_function_execute *rfe, void *data __m
 // transports of the test's choosing, so the record's registration PINS can be
 // counted (and a re-registration's release verified)
 static struct {
-    struct rrd_function_transport *first;
-    struct rrd_function_transport *second;
+    struct nrpc_transport *first;
+    struct nrpc_transport *second;
     size_t cancels;
     size_t progresses;
     char tx[UUID_COMPACT_STR_LEN];
@@ -314,7 +314,7 @@ int pluginsd_functions_unittest(void) {
                 errors++;
             }
         }
-        rrd_function_transport_entry_release(canceller.transport);
+        nrpc_transport_entry_release(canceller.transport);
 
         if(res.calls != 1) {
             fprintf(stderr, "  FAILED truncation: result delivered %zu times, expected exactly once\n", res.calls);
@@ -333,7 +333,7 @@ int pluginsd_functions_unittest(void) {
     //        the equal-pointer conflict
     {
         int before = errors;
-        struct rrd_function_transport *tr = rrd_function_transport_create(NULL);
+        struct nrpc_transport *tr = nrpc_transport_create(NULL);
         // base ref == 1
 
         // COLLECTOR with transport: insert acquires -> 2
@@ -380,8 +380,8 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_transport_mark_dead_and_drain(tr);
-        rrd_function_transport_owner_release(tr); // frees it; ASAN verifies no leak
+        nrpc_transport_mark_dead_and_drain(tr);
+        nrpc_transport_owner_release(tr); // frees it; ASAN verifies no leak
 
         if(errors == before)
             fprintf(stderr, "  OK refs: mixed-source re-registration and equal-pointer conflict net the right refs\n");
@@ -475,7 +475,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
         else {
-            struct rrd_function_transport *tr = rrd_function_transport_create(NULL);
+            struct nrpc_transport *tr = nrpc_transport_create(NULL);
             // base ref == 1
 
             // mimics the pluginsd CONFIG path: execute_cb_data IS the transport
@@ -511,7 +511,7 @@ int pluginsd_functions_unittest(void) {
             // its parser - and therefore its transport - is a new one): the
             // conflict transfer branch must release the displaced pin and take
             // one on the installed transport, as ONE swap under the node lock
-            struct rrd_function_transport *tr2 = rrd_function_transport_create(NULL);
+            struct nrpc_transport *tr2 = nrpc_transport_create(NULL);
 
             dyncfg_add_low_level(host, "c6test:node", "/c6test",
                                  DYNCFG_STATUS_RUNNING, DYNCFG_TYPE_SINGLE, DYNCFG_SOURCE_TYPE_INTERNAL, "unittest",
@@ -539,10 +539,10 @@ int pluginsd_functions_unittest(void) {
                 errors++;
             }
 
-            rrd_function_transport_mark_dead_and_drain(tr);
-            rrd_function_transport_owner_release(tr);
-            rrd_function_transport_mark_dead_and_drain(tr2);
-            rrd_function_transport_owner_release(tr2);
+            nrpc_transport_mark_dead_and_drain(tr);
+            nrpc_transport_owner_release(tr);
+            nrpc_transport_mark_dead_and_drain(tr2);
+            nrpc_transport_owner_release(tr2);
         }
 
         if(errors == before)
@@ -678,7 +678,7 @@ int pluginsd_functions_unittest(void) {
     //    dereferencing the parser.
     {
         int before = errors;
-        struct rrd_function_transport *tr = rrd_function_transport_create(NULL);
+        struct nrpc_transport *tr = nrpc_transport_create(NULL);
 
         rrd_function_transactions_create(); // idempotent
 
@@ -688,7 +688,7 @@ int pluginsd_functions_unittest(void) {
 
         // the owner tears down: dispatchers drained and `data` invalidated,
         // while the registry entry keeps holding the (dead) transport
-        rrd_function_transport_mark_dead_and_drain(tr);
+        nrpc_transport_mark_dead_and_drain(tr);
 
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -712,7 +712,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         rrd_function_del(host, NULL, "c7-dead-transport-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-        rrd_function_transport_owner_release(tr); // frees it; ASAN verifies the accounting
+        nrpc_transport_owner_release(tr); // frees it; ASAN verifies the accounting
 
         if(errors == before)
             fprintf(stderr, "  OK dead-transport: an entry of a dead plugin answers exactly one clean 503\n");
@@ -784,8 +784,8 @@ int pluginsd_functions_unittest(void) {
 
         parser_destroy(pa);
         parser_destroy(pb);
-        rrd_function_transport_entry_release(can_a.transport);
-        rrd_function_transport_entry_release(prg_a.transport);
+        nrpc_transport_entry_release(can_a.transport);
+        nrpc_transport_entry_release(prg_a.transport);
 
         if(errors == before)
             fprintf(stderr, "  OK keyed: cancel/progress reach only the plugin that owns the transaction\n");
@@ -1053,8 +1053,8 @@ int pluginsd_functions_unittest(void) {
         rrd_function_transactions_create(); // idempotent
 
         memset(&c7_pin, 0, sizeof(c7_pin));
-        c7_pin.first = rrd_function_transport_create(NULL);
-        c7_pin.second = rrd_function_transport_create(NULL);
+        c7_pin.first = nrpc_transport_create(NULL);
+        c7_pin.second = nrpc_transport_create(NULL);
 
         rrd_function_add(host, NULL, "c7-pin-fn", 10, 0, 1, "pin", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
@@ -1120,10 +1120,10 @@ int pluginsd_functions_unittest(void) {
         }
 
         rrd_function_del(host, NULL, "c7-pin-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-        rrd_function_transport_mark_dead_and_drain(c7_pin.first);
-        rrd_function_transport_owner_release(c7_pin.first);
-        rrd_function_transport_mark_dead_and_drain(c7_pin.second);
-        rrd_function_transport_owner_release(c7_pin.second);
+        nrpc_transport_mark_dead_and_drain(c7_pin.first);
+        nrpc_transport_owner_release(c7_pin.first);
+        nrpc_transport_mark_dead_and_drain(c7_pin.second);
+        nrpc_transport_owner_release(c7_pin.second);
 
         if(errors == before)
             fprintf(stderr, "  OK pins: registration pins are taken, re-taken and released; CANCEL is idempotent\n");

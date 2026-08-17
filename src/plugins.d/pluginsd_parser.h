@@ -107,7 +107,7 @@ typedef struct parser_user_object {
 
 typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
 struct parser;
-struct rrd_function_transport;
+struct nrpc_transport;
 typedef ssize_t (*send_to_plugin_callback_t)(const char *txt, void *data, STREAM_TRAFFIC_TYPE type);
 
 struct parser {
@@ -145,7 +145,7 @@ struct parser {
         // the refcounted lifetime shell handed to everyone who may need to
         // reach this parser later (registry entries, cancellers, progressers,
         // dyncfg nodes); see parser_destroy() for the teardown protocol
-        struct rrd_function_transport *transport;
+        struct nrpc_transport *transport;
     } inflight;
 
     struct {

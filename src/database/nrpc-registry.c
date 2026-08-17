@@ -18,8 +18,8 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
     RRDHOST *host = functions->host;
     struct rrd_host_function *rdcf = func;
 
-    rrd_function_provider_started();
-    rdcf->provider = rrd_function_provider_acquire_current_thread();
+    nrpc_serving_started();
+    rdcf->serving = nrpc_serving_current_thread_acquire();
     rdcf->rrdhost_state_id = object_state_id(&host->state_id);
     rdcf->unregistered = false;
 
@@ -29,25 +29,25 @@ static void rrd_functions_insert_callback(const DICTIONARY_ITEM *item __maybe_un
     // sources - take the entry ref this storage owns; released by
     // rrd_functions_cleanup() under the stored tag
     if(rrd_function_source_has_transport(rdcf->source) && rdcf->execute_cb_data)
-        rrd_function_transport_entry_acquire(rdcf->execute_cb_data);
+        nrpc_transport_entry_acquire(rdcf->execute_cb_data);
 
     if(!rdcf->priority)
         rdcf->priority = RRDFUNCTIONS_PRIORITY_DEFAULT;
 
 //    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
-//                   rdcf->provider->tid, rdcf->provider->running ? "running" : "NOT running");
+//                   rdcf->serving->tid, rdcf->serving->running ? "running" : "NOT running");
 }
 
 static void rrd_functions_cleanup(struct rrd_host_function *rdcf) {
-    rrd_function_provider_release(rdcf->provider);
+    nrpc_serving_release(rdcf->serving);
 
     // release the transport ref this (tag, data) pair owns - keyed on the tag
     // the struct actually HOLDS (the conflict callback swaps them as one pair,
     // so the displaced pair always lands here together). NULL-safe; INTERNAL
     // data is caller-owned and never released.
     if(rrd_function_source_has_transport(rdcf->source))
-        rrd_function_transport_entry_release(rdcf->execute_cb_data);
+        nrpc_transport_entry_release(rdcf->execute_cb_data);
 
     string_freez(rdcf->help);
     string_freez(rdcf->tags);
@@ -66,7 +66,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     struct rrd_host_function *rdcf = func;
     struct rrd_host_function *new_rdcf = new_func;
 
-    rrd_function_provider_started();
+    nrpc_serving_started();
 
     bool changed = false;
 
@@ -75,14 +75,14 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    if(rdcf->provider != thread_rrd_function_provider) {
+    if(rdcf->serving != nrpc_thread_serving) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: function '%s' of host '%s' changed collector from %d to %d",
                dictionary_acquired_item_name(item), rrdhost_hostname(host),
-               rrd_function_provider_tid(rdcf->provider), rrd_function_provider_tid(thread_rrd_function_provider));
+               nrpc_serving_tid(rdcf->serving), nrpc_serving_tid(nrpc_thread_serving));
 
-        new_rdcf->provider = rdcf->provider;
-        rdcf->provider = rrd_function_provider_acquire_current_thread();
+        new_rdcf->serving = rdcf->serving;
+        rdcf->serving = nrpc_serving_current_thread_acquire();
         changed = true;
     }
 
@@ -196,7 +196,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     // keys on the ownership tag matching the data it actually holds.
     //
     // Transport accounting (the collector pattern in this same callback, see
-    // new_rdcf->provider above): when a DIFFERENT pair is installed, acquire
+    // new_rdcf->serving above): when a DIFFERENT pair is installed, acquire
     // an entry ref iff the INSTALLED tag is transport-bearing; the displaced
     // pair lands in new_rdcf for rrd_functions_cleanup(new_rdcf) below to
     // release under the DISPLACED tag. When NO swap occurs (equal pair -
@@ -212,7 +212,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         if(rrd_function_source_has_transport(new_rdcf->source) && new_rdcf->execute_cb_data)
-            rrd_function_transport_entry_acquire(new_rdcf->execute_cb_data);
+            nrpc_transport_entry_acquire(new_rdcf->execute_cb_data);
 
         SWAP(rdcf->execute_cb_data, new_rdcf->execute_cb_data);
         SWAP(rdcf->source, new_rdcf->source);
@@ -225,7 +225,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 
 //    internal_error(true, "FUNCTIONS: adding function '%s' on host '%s', collection tid %d, %s",
 //                   dictionary_acquired_item_name(item), rrdhost_hostname(host),
-//                   rdcf->provider->tid, rdcf->provider->running ? "running" : "NOT running");
+//                   rdcf->serving->tid, rdcf->serving->running ? "running" : "NOT running");
 
     // under the leaf lock: frees the DISPLACED strings/transport ref, which a
     // concurrent leaf-locked reader may otherwise still be copying
@@ -284,7 +284,7 @@ void rrd_function_acquired_capture(RRD_FUNCTION_ACQUIRED *rfa, struct rrd_functi
     out->execute_cb = rdcf->execute_cb;
     out->execute_cb_data = rdcf->execute_cb_data;
     out->transport_pin = (rrd_function_source_has_transport(rdcf->source) && rdcf->execute_cb_data)
-                             ? rrd_function_transport_entry_acquire(rdcf->execute_cb_data)
+                             ? nrpc_transport_entry_acquire(rdcf->execute_cb_data)
                              : NULL;
     spinlock_unlock(&rdcf->leaf_spinlock);
 }
@@ -385,7 +385,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     RRD_FUNCTION_OPTIONS options = get_function_options(st, key, tags);
 
     struct rrd_host_function tmp = {
-        .provider = NULL,
+        .serving = NULL,
         .sync = sync,
         .timeout = timeout,
         .version = version,
@@ -450,13 +450,13 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, RRD_FUNCTION_
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(item);
 
     if(source == RRD_FUNCTION_REG_SOURCE_COLLECTOR) {
-        if(!thread_rrd_function_provider || rdcf->provider != thread_rrd_function_provider) {
+        if(!nrpc_thread_serving || rdcf->serving != nrpc_thread_serving) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "FUNCTIONS: refusing to unregister function '%s' - "
                    "collector mismatch (registered by %s, unregister requested by %s)",
                    name,
-                   rdcf->provider ? "another collector" : "unknown",
-                   thread_rrd_function_provider ? "current collector" : "non-collector thread");
+                   rdcf->serving ? "another collector" : "unknown",
+                   nrpc_thread_serving ? "current collector" : "non-collector thread");
             dictionary_acquired_item_release(host->functions->dict, item);
             return false;
         }
@@ -531,7 +531,7 @@ bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host) {
     if(__atomic_load_n(&rdcf->unregistered, __ATOMIC_ACQUIRE))
         return false;
 
-    if(!rrd_function_provider_running(rdcf->provider))
+    if(!nrpc_serving_running(rdcf->serving))
         return false;
 
     if(host && rdcf->rrdhost_state_id != object_state_id(&host->state_id))
@@ -567,8 +567,8 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                            "host '%s', collector = { tid: %d, running: %s }, host tid { rcv: %d, snd: %d }, host state { id: %u, expected %u }, hops: %d",
                            name,
                            rrdhost_hostname(host),
-                           rrd_function_provider_tid(rdcf->provider),
-                           rrd_function_provider_running(rdcf->provider) ? "yes" : "no",
+                           nrpc_serving_tid(rdcf->serving),
+                           nrpc_serving_running(rdcf->serving) ? "yes" : "no",
                            host->stream.rcv.status.tid, host->stream.snd.status.tid,
                            state_id, rdcf->rrdhost_state_id,
                            rrdhost_ingestion_hops(host)

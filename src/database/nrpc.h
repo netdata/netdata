@@ -25,7 +25,7 @@ typedef bool (*rrd_function_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 // implementer is the pluginsd transport; plugin-side functions_evloop cancels
 // via a polled flag and registers no canceller). CONTRACT: cancellers and
 // progressers are registered ONLY by function transports - their `data` is a
-// struct rrd_function_transport, and the broker entry-pins it for the record's
+// struct nrpc_transport, and the broker entry-pins it for the record's
 // lifetime.
 typedef void (*rrd_function_cancel_cb_t)(const char *transaction, void *data);
 typedef void (*rrd_function_register_canceller_cb_t)(void *register_cancel_cb_data, rrd_function_cancel_cb_t cancel_cb, void *cancel_cb_data);

@@ -8,7 +8,7 @@
 // ----------------------------------------------------------------------------
 // public API
 
-void rrd_function_provider_started(void);
-void rrd_function_provider_finished(void);
+void nrpc_serving_started(void);
+void nrpc_serving_finished(void);
 
 #endif //NETDATA_NRPC_SERVING_H

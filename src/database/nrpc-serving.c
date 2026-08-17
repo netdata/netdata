@@ -3,67 +3,67 @@
 #include "nrpc-serving.h"
 #include "nrpc-serving-internals.h"
 
-// Each function points to this provider structure
-// so that when the provider thread exits, all of them will
+// Each function points to this serving handle
+// so that when the serving thread exits, all of them will
 // be invalidated (running == false)
-// The last function using this provider
-// frees the structure too (or when the provider thread calls
-// rrd_function_provider_finished()).
+// The last function using this serving handle
+// frees the structure too (or when the serving thread calls
+// nrpc_serving_finished()).
 
-struct rrd_function_provider {
-    REFCOUNT refcount;
-    REFCOUNT refcount_dispatcher;
+struct nrpc_serving_handle {
+    REFCOUNT entry_refcount;
+    REFCOUNT dispatcher_refcount;
     pid_t tid;
     bool running;
 };
 
 // Each thread that registers functions has to call
-// rrd_function_provider_started() and rrd_function_provider_finished()
-// to create and tear down the provider structure.
+// nrpc_serving_started() and nrpc_serving_finished()
+// to create and tear down the serving handle.
 
-__thread struct rrd_function_provider *thread_rrd_function_provider = NULL;
+__thread struct nrpc_serving_handle *nrpc_thread_serving = NULL;
 
-inline bool rrd_function_provider_running(struct rrd_function_provider *rdc) {
-    return __atomic_load_n(&rdc->running, __ATOMIC_RELAXED);
+inline bool nrpc_serving_running(struct nrpc_serving_handle *serving) {
+    return __atomic_load_n(&serving->running, __ATOMIC_RELAXED);
 }
 
-inline pid_t rrd_function_provider_tid(struct rrd_function_provider *rdc) {
-    return rdc->tid;
+inline pid_t nrpc_serving_tid(struct nrpc_serving_handle *serving) {
+    return serving->tid;
 }
 
-bool rrd_function_provider_dispatcher_acquire(struct rrd_function_provider *rdc) {
-    return refcount_acquire(&rdc->refcount_dispatcher);
+bool nrpc_serving_dispatcher_acquire(struct nrpc_serving_handle *serving) {
+    return refcount_acquire(&serving->dispatcher_refcount);
 }
 
-void rrd_function_provider_dispatcher_release(struct rrd_function_provider *rdc) {
-    refcount_release(&rdc->refcount_dispatcher);
+void nrpc_serving_dispatcher_release(struct nrpc_serving_handle *serving) {
+    refcount_release(&serving->dispatcher_refcount);
 }
 
-static void rrd_function_provider_free(struct rrd_function_provider *rdc) {
-    if(rrd_function_provider_running(rdc) || !refcount_acquire_for_deletion(&rdc->refcount))
+static void nrpc_serving_free(struct nrpc_serving_handle *serving) {
+    if(nrpc_serving_running(serving) || !refcount_acquire_for_deletion(&serving->entry_refcount))
         // the collector is still referenced by charts.
         // leave it hanging there, the last chart will actually free it.
         return;
 
     // we can free it now
-    freez(rdc);
+    freez(serving);
 }
 
 // called once per collector
-void rrd_function_provider_started(void) {
-    if(!thread_rrd_function_provider)
-        thread_rrd_function_provider = callocz(1, sizeof(struct rrd_function_provider));
+void nrpc_serving_started(void) {
+    if(!nrpc_thread_serving)
+        nrpc_thread_serving = callocz(1, sizeof(struct nrpc_serving_handle));
 
-    thread_rrd_function_provider->tid = gettid_cached();
-    __atomic_store_n(&thread_rrd_function_provider->running, true, __ATOMIC_RELAXED);
+    nrpc_thread_serving->tid = gettid_cached();
+    __atomic_store_n(&nrpc_thread_serving->running, true, __ATOMIC_RELAXED);
 }
 
 // called once per collector
-void rrd_function_provider_finished(void) {
-    if(!thread_rrd_function_provider)
+void nrpc_serving_finished(void) {
+    if(!nrpc_thread_serving)
         return;
 
-    __atomic_store_n(&thread_rrd_function_provider->running, false, __ATOMIC_RELAXED);
+    __atomic_store_n(&nrpc_thread_serving->running, false, __ATOMIC_RELAXED);
 
     // wait for any cancellation requests to be dispatched;
     // the problem is that cancellation requests require a structure allocated by the collector,
@@ -74,31 +74,31 @@ void rrd_function_provider_finished(void) {
     // from the CAS on, so the drain cannot be extended by new dispatches (the
     // old 1ms-sleep retry loop left the count at 0 between retries, letting
     // new dispatchers in indefinitely)
-    (void)refcount_acquire_for_deletion_and_wait(&thread_rrd_function_provider->refcount_dispatcher);
+    (void)refcount_acquire_for_deletion_and_wait(&nrpc_thread_serving->dispatcher_refcount);
 
-    rrd_function_provider_free(thread_rrd_function_provider);
-    thread_rrd_function_provider = NULL;
+    nrpc_serving_free(nrpc_thread_serving);
+    nrpc_thread_serving = NULL;
 }
 
-static bool rrd_function_provider_acquire(struct rrd_function_provider *rdc) {
-    if(!rdc || !rrd_function_provider_running(rdc))
+static bool nrpc_serving_acquire(struct nrpc_serving_handle *serving) {
+    if(!serving || !nrpc_serving_running(serving))
         return false;
 
-    return refcount_acquire(&rdc->refcount);
+    return refcount_acquire(&serving->entry_refcount);
 }
 
-struct rrd_function_provider *rrd_function_provider_acquire_current_thread(void) {
-    rrd_function_provider_started();
+struct nrpc_serving_handle *nrpc_serving_current_thread_acquire(void) {
+    nrpc_serving_started();
 
-    if(!rrd_function_provider_acquire(thread_rrd_function_provider))
+    if(!nrpc_serving_acquire(nrpc_thread_serving))
         internal_fatal(true, "FUNCTIONS: Trying to acquire a the current thread collector, that is currently exiting.");
 
-    return thread_rrd_function_provider;
+    return nrpc_thread_serving;
 }
 
-void rrd_function_provider_release(struct rrd_function_provider *rdc) {
-    if(unlikely(!rdc)) return;
+void nrpc_serving_release(struct nrpc_serving_handle *serving) {
+    if(unlikely(!serving)) return;
 
-    if(refcount_release(&rdc->refcount) == 0)
-        rrd_function_provider_free(rdc);
+    if(refcount_release(&serving->entry_refcount) == 0)
+        nrpc_serving_free(serving);
 }
