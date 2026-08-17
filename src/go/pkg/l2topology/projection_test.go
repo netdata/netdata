@@ -133,3 +133,67 @@ func TestProjectionDoesNotCollapseSelectedIPOwnerWithConflictingARPAlias(t *test
 
 	require.Len(t, projection.Graph.Actors, 2)
 }
+
+func TestProjectionDoesNotReintroduceRejectedCDPAddressAsEndpointIdentity(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID: "target-a",
+			Hostname: "target-a",
+		},
+		{
+			DeviceID:     "target-b",
+			Hostname:     "target-b",
+			ManagementIP: "192.0.2.2",
+		},
+		{
+			DeviceID:     "observer",
+			Hostname:     "observer",
+			ManagementIP: "192.0.2.3",
+			Interfaces: []ObservedInterface{{
+				IfIndex: 1,
+				IfName:  "Gi0/1",
+			}},
+			CDPRemotes: []CDPRemoteObservation{{
+				LocalIfIndex: 1,
+				LocalIfName:  "Gi0/1",
+				DeviceID:     "target-a",
+				SysName:      "target-a",
+				DevicePort:   "Gi0/2",
+				Address:      "192.0.2.2",
+			}},
+		},
+	}, DiscoverOptions{EnableCDP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{
+		SchemaVersion: "1.0.0",
+		Source:        "snmp",
+		Layer:         "2",
+		AgentID:       "agent-1",
+		LocalDeviceID: "observer",
+	})
+
+	var targetAID, targetBID, observerID string
+	for _, actor := range projection.Graph.Actors {
+		switch actor.Match.SysName {
+		case "target-a":
+			targetAID = actor.ActorID
+		case "target-b":
+			targetBID = actor.ActorID
+		case "observer":
+			observerID = actor.ActorID
+		}
+	}
+	require.NotEmpty(t, targetAID)
+	require.NotEmpty(t, targetBID)
+	require.NotEqual(t, targetAID, targetBID)
+	require.Len(t, projection.Graph.Links, 1)
+	require.Equal(t, targetAID, projection.Graph.Links[0].DstActorID)
+	require.Empty(t, projection.Graph.Links[0].Dst.Match.IPAddresses)
+	require.Empty(t, projection.Graph.Links[0].Dst.ManagementIP)
+
+	observerDetail := projection.ActorDetails[observerID].Device
+	require.Len(t, observerDetail.Ports, 1)
+	require.Len(t, observerDetail.Ports[0].Neighbors, 1)
+	require.Empty(t, observerDetail.Ports[0].Neighbors[0].RemoteIP)
+}

@@ -680,18 +680,17 @@ func TestTopologyRegistry_DefaultSnapshotSuppressesInferredNeighborWithOnlyIneli
 		portID:        "Gi0/1",
 		portIDSubtype: "interfaceName",
 	}
-	cache.lldpRemotes["1:1"] = &lldpRemote{
-		localPortNum:     "1",
-		remIndex:         "1",
-		chassisID:        "aa:bb:cc:dd:ee:ff",
-		chassisIDSubtype: "macAddress",
-		portID:           "Gi0/2",
-		portIDSubtype:    "interfaceName",
-		sysName:          "switch-b",
-		managementAddrs: []topologymodel.ManagementAddress{{
-			Address: "169.254.0.1", AddressType: "ipv4", Source: "lldp_remote",
-		}},
-	}
+	cache.updateLldpRemote(map[string]string{
+		tagLldpLocPortNum:          "1",
+		tagLldpRemIndex:            "1",
+		tagLldpRemChassisID:        "aa:bb:cc:dd:ee:ff",
+		tagLldpRemChassisIDSubtype: "macAddress",
+		tagLldpRemPortID:           "Gi0/2",
+		tagLldpRemPortIDSubtype:    "interfaceName",
+		tagLldpRemSysName:          "switch-b",
+		tagLldpRemMgmtAddr:         "169.254.0.1",
+		tagLldpRemMgmtAddrSubtype:  "1",
+	})
 	cache.finalizeTopologyCache()
 	registry.register(cache)
 
@@ -701,7 +700,7 @@ func TestTopologyRegistry_DefaultSnapshotSuppressesInferredNeighborWithOnlyIneli
 	require.NotNil(t, findDeviceActorBySysName(data, "switch-a"))
 	require.Nil(t, findDeviceActorBySysName(data, "switch-b"))
 	require.Empty(t, data.Links)
-	require.Equal(t, "169.254.0.1", cache.lldpRemotes["1:1"].managementAddrs[0].Address)
+	require.Empty(t, cache.lldpRemotes["1:1"].managementAddrs)
 }
 
 func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManagedOverlapPruning(t *testing.T) {

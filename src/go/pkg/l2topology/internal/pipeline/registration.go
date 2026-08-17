@@ -17,6 +17,7 @@ func (s *l2BuildState) registerObservations(observations []model.L2Observation) 
 			return err
 		}
 	}
+	s.finalizeDirectIPIndex()
 	return nil
 }
 
@@ -41,7 +42,9 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	if device.Hostname == "" {
 		device.Hostname = device.ID
 	}
-	if addr := parseAddr(obs.ManagementIP); addr.IsValid() {
+	managementAddr := canonicalAddr(obs.ManagementIP)
+	if incomingManaged && managementAddr.IsValid() {
+		addr := managementAddr
 		device.ManagementIP = addr
 		device.Addresses = []netip.Addr{addr}
 	}
@@ -79,12 +82,16 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 		device.Labels["protocols_observed"] = setToCSV(observedProtocols)
 	}
 	s.devices[device.ID] = device
+	if managementAddr.IsValid() {
+		if incomingManaged {
+			s.recordDirectManagementAddress(device.ID, managementAddr)
+		} else {
+			s.recordRemoteManagementAddress(device.ID, managementAddr.String())
+		}
+	}
 
 	if host := canonicalHost(device.Hostname); host != "" {
 		s.hostToID[host] = device.ID
-	}
-	if ip := canonicalIP(obs.ManagementIP); ip != "" {
-		s.ipToID[ip] = device.ID
 	}
 	if mac := primaryL2MACIdentity(device.ChassisID, ""); mac != "" {
 		if _, exists := s.macToID[mac]; !exists {
@@ -175,6 +182,33 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	}
 
 	return nil
+}
+
+func (s *l2BuildState) recordDirectManagementAddress(deviceID string, addr netip.Addr) {
+	deviceID = strings.TrimSpace(deviceID)
+	addr = addr.Unmap()
+	if deviceID == "" || !addr.IsValid() {
+		return
+	}
+
+	ip := addr.String()
+	owner := s.directIPOwners[ip]
+	if owner.deviceID == "" {
+		owner.deviceID = deviceID
+	} else if owner.deviceID != deviceID {
+		owner.ambiguous = true
+	}
+	s.directIPOwners[ip] = owner
+}
+
+func (s *l2BuildState) finalizeDirectIPIndex() {
+	s.directIPToID = make(map[string]string, len(s.directIPOwners))
+	for ip, owner := range s.directIPOwners {
+		if !owner.ambiguous && owner.deviceID != "" {
+			s.directIPToID[ip] = owner.deviceID
+		}
+	}
+	s.directIPOwners = nil
 }
 
 func mergeObservedDevice(existing, incoming model.Device) model.Device {

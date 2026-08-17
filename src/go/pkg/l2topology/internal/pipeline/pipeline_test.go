@@ -927,6 +927,187 @@ func TestBuildL2ResultFromObservations_SelectsRemotePrimaryWhenDirectObservation
 	}
 }
 
+func TestBuildL2ResultFromObservations_PairedLinksRetainRemoteManagementEvidence(t *testing.T) {
+	t.Run("lldp", func(t *testing.T) {
+		observations := []model.L2Observation{
+			{
+				DeviceID:  "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "00:11:22:33:44:55",
+				LLDPRemotes: []model.LLDPRemoteObservation{{
+					LocalPortID:        "Gi0/1",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "aa:bb:cc:dd:ee:ff",
+					SysName:            "switch-b",
+					PortID:             "Gi0/2",
+					PortIDSubtype:      "interfaceName",
+					ManagementIP:       "192.0.2.2",
+				}},
+			},
+			{
+				DeviceID:  "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "aa:bb:cc:dd:ee:ff",
+				LLDPRemotes: []model.LLDPRemoteObservation{{
+					LocalPortID:        "Gi0/2",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "00:11:22:33:44:55",
+					SysName:            "switch-a",
+					PortID:             "Gi0/1",
+					PortIDSubtype:      "interfaceName",
+					ManagementIP:       "192.0.2.1",
+				}},
+			},
+		}
+		for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+			result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{EnableLLDP: true})
+			require.NoError(t, err)
+			require.Len(t, result.Adjacencies, 2)
+			require.Equal(t, "192.0.2.1", findDeviceByID(result.Devices, "switch-a").ManagementIP.String())
+			require.Equal(t, "192.0.2.2", findDeviceByID(result.Devices, "switch-b").ManagementIP.String())
+		}
+	})
+
+	t.Run("cdp", func(t *testing.T) {
+		observations := []model.L2Observation{
+			{
+				DeviceID: "switch-a",
+				Hostname: "A-GID",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/1",
+					DeviceID:    "B-GID",
+					SysName:     "B-GID",
+					DevicePort:  "Gi0/2",
+					Address:     "192.0.2.2",
+				}},
+			},
+			{
+				DeviceID: "switch-b",
+				Hostname: "B-GID",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/2",
+					DeviceID:    "A-GID",
+					SysName:     "A-GID",
+					DevicePort:  "Gi0/1",
+					Address:     "192.0.2.1",
+				}},
+			},
+		}
+		for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+			result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{EnableCDP: true})
+			require.NoError(t, err)
+			require.Len(t, result.Adjacencies, 2)
+			require.Equal(t, "192.0.2.1", findDeviceByID(result.Devices, "switch-a").ManagementIP.String())
+			require.Equal(t, "192.0.2.2", findDeviceByID(result.Devices, "switch-b").ManagementIP.String())
+		}
+	})
+}
+
+func TestBuildL2ResultFromObservations_RetainsEvidenceFromDeduplicatedAdjacencies(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{{
+		DeviceID:     "switch-a",
+		ManagementIP: "192.0.2.1",
+		LLDPRemotes: []model.LLDPRemoteObservation{
+			{
+				LocalPortID:  "Gi0/1",
+				ChassisID:    "aa:bb:cc:dd:ee:ff",
+				SysName:      "remote",
+				PortID:       "Gi0/2",
+				ManagementIP: "10.0.0.10",
+			},
+			{
+				LocalPortID:  "Gi0/1",
+				ChassisID:    "aa:bb:cc:dd:ee:ff",
+				SysName:      "remote",
+				PortID:       "Gi0/2",
+				ManagementIP: "10.0.0.2",
+			},
+		},
+	}}, model.DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 1)
+
+	remote := findDeviceByHostname(result.Devices, "remote")
+	require.NotNil(t, remote)
+	require.Equal(t, "10.0.0.2", remote.ManagementIP.String())
+	require.ElementsMatch(t, []string{"10.0.0.2", "10.0.0.10"}, deviceAddressStrings(*remote))
+}
+
+func TestBuildL2ResultFromObservations_ResolvesOnlyUniqueDirectManagementAddresses(t *testing.T) {
+	t.Run("every address from repeated direct observations resolves to its owner", func(t *testing.T) {
+		observations := []model.L2Observation{
+			{DeviceID: "target", Hostname: "managed-target", ManagementIP: "10.0.0.10"},
+			{DeviceID: "target", Hostname: "managed-target", ManagementIP: "10.0.0.2"},
+			{
+				DeviceID:     "observer",
+				ManagementIP: "192.0.2.1",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/1",
+					Address:     "10.0.0.10",
+				}},
+			},
+		}
+
+		for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+			result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{EnableCDP: true})
+			require.NoError(t, err)
+			require.Len(t, result.Adjacencies, 1)
+			require.Equal(t, "target", result.Adjacencies[0].TargetID)
+			target := findDeviceByID(result.Devices, "target")
+			require.NotNil(t, target)
+			require.Equal(t, "10.0.0.2", target.ManagementIP.String())
+			require.ElementsMatch(t, []string{"10.0.0.2", "10.0.0.10"}, deviceAddressStrings(*target))
+		}
+	})
+
+	t.Run("an address claimed by multiple direct devices resolves to neither", func(t *testing.T) {
+		observations := []model.L2Observation{
+			{DeviceID: "target-a", Hostname: "target-a", ManagementIP: "10.0.0.50"},
+			{DeviceID: "target-b", Hostname: "target-b", ManagementIP: "10.0.0.50"},
+			{
+				DeviceID:     "observer",
+				ManagementIP: "192.0.2.1",
+				CDPRemotes: []model.CDPRemoteObservation{{
+					LocalIfName: "Gi0/1",
+					Address:     "10.0.0.50",
+				}},
+			},
+		}
+
+		for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+			result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{EnableCDP: true})
+			require.NoError(t, err)
+			require.Len(t, result.Adjacencies, 1)
+			targetID := result.Adjacencies[0].TargetID
+			require.NotEqual(t, "target-a", targetID)
+			require.NotEqual(t, "target-b", targetID)
+			inferred := findDeviceByID(result.Devices, targetID)
+			require.NotNil(t, inferred)
+			require.False(t, inferred.ManagementIP.IsValid())
+			require.Empty(t, inferred.Addresses)
+		}
+	})
+}
+
+func TestBuildL2ResultFromObservations_ReconcilesTopLevelInferredAddressClaims(t *testing.T) {
+	observations := []model.L2Observation{
+		{DeviceID: "remote-a", Hostname: "remote-a", Inferred: true, ManagementIP: "10.0.0.50"},
+		{DeviceID: "remote-b", Hostname: "remote-b", Inferred: true, ManagementIP: "10.0.0.50"},
+	}
+
+	for _, input := range [][]model.L2Observation{observations, reverseObservations(observations)} {
+		result, err := BuildL2ResultFromObservations(input, model.DiscoverOptions{})
+		require.NoError(t, err)
+		require.Len(t, result.Devices, 2)
+		for _, deviceID := range []string{"remote-a", "remote-b"} {
+			device := findDeviceByID(result.Devices, deviceID)
+			require.NotNil(t, device)
+			require.False(t, device.ManagementIP.IsValid())
+			require.Empty(t, device.Addresses)
+		}
+	}
+}
+
 func TestBuildL2ResultFromObservations_SkipsRemoteAliasOwnedByAnotherDevice(t *testing.T) {
 	result, err := BuildL2ResultFromObservations([]model.L2Observation{
 		{
@@ -991,6 +1172,76 @@ func TestBuildL2ResultFromObservations_SkipsRemoteAddressClaimedByDifferentDevic
 			require.Empty(t, remote.Addresses)
 		}
 	}
+}
+
+func TestBuildL2ResultFromObservations_KeepsDistinctNonMACRemotesClaimingSameAddress(t *testing.T) {
+	remotes := []model.LLDPRemoteObservation{
+		{ChassisID: "chassis-a", SysName: "remote-a", ManagementIP: "10.0.0.50"},
+		{ChassisID: "chassis-b", SysName: "remote-b", ManagementIP: "10.0.0.50"},
+	}
+	for _, input := range [][]model.LLDPRemoteObservation{remotes, {remotes[1], remotes[0]}} {
+		result, err := BuildL2ResultFromObservations([]model.L2Observation{{
+			DeviceID:     "switch-a",
+			ManagementIP: "192.0.2.1",
+			LLDPRemotes:  input,
+		}}, model.DiscoverOptions{EnableLLDP: true})
+		require.NoError(t, err)
+
+		remoteA := findDeviceByHostname(result.Devices, "remote-a")
+		remoteB := findDeviceByHostname(result.Devices, "remote-b")
+		require.NotNil(t, remoteA)
+		require.NotNil(t, remoteB)
+		require.NotEqual(t, remoteA.ID, remoteB.ID)
+		require.Empty(t, remoteA.Addresses)
+		require.Empty(t, remoteB.Addresses)
+	}
+}
+
+func TestBuildL2ResultFromObservations_ReusesDeterministicIPOnlyRemoteIdentity(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{{
+		DeviceID:     "switch-a",
+		ManagementIP: "192.0.2.1",
+		CDPRemotes: []model.CDPRemoteObservation{
+			{LocalIfName: "Gi0/1", Address: "10.0.0.50"},
+			{LocalIfName: "Gi0/2", Address: "10.0.0.50"},
+		},
+	}}, model.DiscoverOptions{EnableCDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 2)
+	require.Equal(t, result.Adjacencies[0].TargetID, result.Adjacencies[1].TargetID)
+
+	remote := findDeviceByID(result.Devices, result.Adjacencies[0].TargetID)
+	require.NotNil(t, remote)
+	require.Equal(t, "10.0.0.50", remote.ManagementIP.String())
+	require.Equal(t, []string{"10.0.0.50"}, deviceAddressStrings(*remote))
+}
+
+func TestBuildL2ResultFromObservations_DoesNotCorrelateDifferentStrongIdentitiesBySharedInferredAddress(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{{
+		DeviceID:     "switch-a",
+		ManagementIP: "192.0.2.1",
+		LLDPRemotes: []model.LLDPRemoteObservation{{
+			ChassisID:    "lldp-chassis",
+			SysName:      "lldp-remote",
+			ManagementIP: "10.0.0.50",
+		}},
+		CDPRemotes: []model.CDPRemoteObservation{{
+			DeviceID: "cdp-chassis",
+			SysName:  "cdp-remote",
+			Address:  "10.0.0.50",
+		}},
+	}}, model.DiscoverOptions{EnableLLDP: true, EnableCDP: true})
+	require.NoError(t, err)
+
+	lldpRemote := findDeviceByHostname(result.Devices, "lldp-remote")
+	cdpRemote := findDeviceByHostname(result.Devices, "cdp-remote")
+	require.NotNil(t, lldpRemote)
+	require.NotNil(t, cdpRemote)
+	require.NotEqual(t, lldpRemote.ID, cdpRemote.ID)
+	require.False(t, lldpRemote.ManagementIP.IsValid())
+	require.False(t, cdpRemote.ManagementIP.IsValid())
+	require.Empty(t, lldpRemote.Addresses)
+	require.Empty(t, cdpRemote.Addresses)
 }
 
 func TestBuildL2ResultFromObservations_KeepsSpecialUseARPAliasAsEvidenceOnly(t *testing.T) {

@@ -41,9 +41,6 @@ func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, devic
 
 	remote, ok := deviceByID[targetID]
 	if !ok {
-		if protocol == "cdp" {
-			neighbor.RemoteIP = canonicalIP(adj.Labels[adjacencyLabelRemoteManagementIP])
-		}
 		return neighbor
 	}
 
@@ -53,9 +50,6 @@ func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, devic
 	neighbor.RemoteIP = selectedDeviceManagementIP(remote)
 	neighbor.RemoteChassisID = strings.TrimSpace(remote.ChassisID)
 	neighbor.RemoteCapabilities = topologyNeighborCapabilitiesFromLabels(remote.Labels)
-	if neighbor.RemoteIP == "" && protocol == "cdp" {
-		neighbor.RemoteIP = canonicalIP(adj.Labels[adjacencyLabelRemoteManagementIP])
-	}
 	return neighbor
 }
 

@@ -1436,23 +1436,6 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 	assert.Equal(t, expectedLinkOrder, linkOrder)
 }
 
-func TestTopologyObservationIdentityResolver_ReusesStableRemoteIdentityAcrossSignals(t *testing.T) {
-	resolver := newTopologyObservationIdentityResolver(topologyengine.L2Observation{
-		DeviceID:     "macAddress:00:11:22:33:44:55",
-		Hostname:     "sw-a",
-		ManagementIP: "10.0.0.1",
-		ChassisID:    "00:11:22:33:44:55",
-	})
-
-	idFromLLDP := resolver.resolve([]string{"sw-b"}, "AA-BB-CC-DD-EE-FF", "macAddress", "10.0.0.2")
-	idFromCDP := resolver.resolve([]string{"switch-b", "sw-b"}, "", "", "10.0.0.2")
-	idFromMgmtIP := resolver.resolve([]string{"switch-b"}, "", "", "10.0.0.2")
-
-	require.Equal(t, "macAddress:aa:bb:cc:dd:ee:ff", idFromLLDP)
-	require.Equal(t, idFromLLDP, idFromCDP)
-	require.Equal(t, idFromLLDP, idFromMgmtIP)
-}
-
 func TestDecodePrintableASCII_HumanReadableHex(t *testing.T) {
 	bs, err := topologyutil.DecodeHexString("766d7831")
 	require.NoError(t, err)

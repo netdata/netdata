@@ -43,7 +43,7 @@ func (s *l2BuildState) resolveKnownRemote(hostname, chassisID, mgmtIP, remoteMAC
 	candidates := []string{
 		s.hostToID[canonicalHost(hostname)],
 		s.chassisToID[canonicalToken(chassisID)],
-		s.ipToID[remoteIP],
+		s.directIPToID[remoteIP],
 	}
 	for _, candidateID := range candidates {
 		candidateID = strings.TrimSpace(candidateID)
@@ -67,10 +67,6 @@ func (s *l2BuildState) resolveRemoteEnforcingHostnameMACGuard(hostname, chassisI
 }
 
 func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mgmtIP, fallbackID string, enforceHostnameMACGuard bool) string {
-	finish := func(deviceID string) string {
-		s.recordRemoteManagementAddress(deviceID, mgmtIP)
-		return deviceID
-	}
 	remoteMAC := primaryL2MACIdentity(chassisID, "")
 	if knownID := s.resolveKnownRemote(hostname, chassisID, mgmtIP, remoteMAC); knownID != "" {
 		if remoteMAC != "" {
@@ -81,12 +77,12 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 				s.devices[knownID] = device
 			}
 		}
-		return finish(knownID)
+		return knownID
 	}
 
 	if remoteMAC != "" {
 		if id := s.macToID[remoteMAC]; id != "" {
-			return finish(id)
+			return id
 		}
 
 		generatedID := deriveRemoteDeviceID(hostname, remoteMAC, mgmtIP, fallbackID)
@@ -117,22 +113,17 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 				s.hostToID[host] = generatedID
 			}
 		}
-		if ip := canonicalIP(mgmtIP); ip != "" {
-			if existingID := strings.TrimSpace(s.ipToID[ip]); existingID == "" || s.isMACCompatibleWithDevice(existingID, remoteMAC) {
-				s.ipToID[ip] = generatedID
-			}
-		}
-		return finish(generatedID)
+		return generatedID
 	}
 
 	if id := s.hostToID[canonicalHost(hostname)]; id != "" {
-		return finish(id)
+		return id
 	}
 	if id := s.chassisToID[canonicalToken(chassisID)]; id != "" {
-		return finish(id)
+		return id
 	}
-	if id := s.ipToID[canonicalIP(mgmtIP)]; id != "" {
-		return finish(id)
+	if id := s.directIPToID[canonicalIP(mgmtIP)]; id != "" {
+		return id
 	}
 
 	generatedID := deriveRemoteDeviceID(hostname, chassisID, mgmtIP, fallbackID)
@@ -158,17 +149,12 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 			s.chassisToID[chassis] = generatedID
 		}
 	}
-	if ip := canonicalIP(mgmtIP); ip != "" {
-		if _, exists := s.ipToID[ip]; !exists {
-			s.ipToID[ip] = generatedID
-		}
-	}
-	return finish(generatedID)
+	return generatedID
 }
 
 func (s *l2BuildState) recordRemoteManagementAddress(deviceID, value string) {
 	deviceID = strings.TrimSpace(deviceID)
-	addr := parseAddr(value).Unmap()
+	addr := canonicalAddr(value)
 	if deviceID == "" || !addr.IsValid() {
 		return
 	}

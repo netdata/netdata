@@ -216,9 +216,6 @@ func adjacencyToTopologyLink(
 ) graph.Link {
 	src := adjacencySideToEndpoint(deviceByID[adj.SourceID], adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
 	dst := adjacencySideToEndpoint(deviceByID[adj.TargetID], adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
-	if managementIP := canonicalIP(adj.Labels[adjacencyLabelRemoteManagementIP]); managementIP != "" {
-		dst.Match.IPAddresses = uniqueTopologyStrings(append(dst.Match.IPAddresses, managementIP))
-	}
 
 	link := graph.Link{
 		Layer:        layer,

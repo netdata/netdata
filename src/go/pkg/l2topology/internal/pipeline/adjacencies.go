@@ -10,7 +10,7 @@ import (
 
 func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 	lldpLinks := buildLLDPMatchLinks(observations)
-	annotateLLDPLinkMatchIdentities(lldpLinks, s.hostToID, s.chassisToID, s.ipToID)
+	annotateLLDPLinkMatchIdentities(lldpLinks, s.hostToID, s.chassisToID, s.directIPToID)
 	lldpPairs := matchLLDPLinksEnlinkdPassOrder(lldpLinks)
 	lldpTargetOverrides := buildLLDPTargetOverrides(lldpLinks, lldpPairs)
 	lldpPairMetadata := buildLLDPPairMetadata(lldpLinks, lldpPairs)
@@ -20,6 +20,7 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 		if targetID == "" {
 			targetID = s.resolveRemote(link.remoteSysName, link.remoteChassisID, link.remoteManagement, link.remoteFallbackID)
 		}
+		s.recordRemoteManagementAddress(targetID, link.remoteManagement)
 
 		adj := model.Adjacency{
 			Protocol:   "lldp",
@@ -48,6 +49,7 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 		if targetID == "" {
 			targetID = s.resolveRemoteEnforcingHostnameMACGuard(link.remoteHost, link.remoteDeviceID, managementIP, link.remoteDeviceID)
 		}
+		s.recordRemoteManagementAddress(targetID, managementIP)
 
 		adj := model.Adjacency{
 			Protocol:   "cdp",

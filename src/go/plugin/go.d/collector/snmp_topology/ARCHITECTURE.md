@@ -175,6 +175,24 @@ Each cache snapshot is converted into:
   peers;
 - local device detail used to enrich the selected local actor.
 
+The generic L2 builder keeps direct management identity separate from inferred
+neighbor evidence:
+
+- every selected address from a direct device observation participates in an
+  immutable unique-owner lookup built before neighbor resolution;
+- an address claimed by more than one direct device cannot resolve a neighbor;
+- addresses from inferred observations and LLDP/CDP neighbors are accumulated
+  as claims and enter device identity only after the complete claim set proves
+  exclusive ownership;
+- adjacency `remote_management_ip` and `remote_address_raw` labels remain
+  internal evidence and never bypass the reconciled device when projecting
+  public match or `RemoteIP` fields.
+
+Consequently, remote-only observations with different hostname or chassis
+identities do not merge solely because they advertise the same IP. They still
+correlate through matching strong identity or a uniquely owned direct-device
+address.
+
 The aggregate also carries the producer scope id read from the parent Agent
 registry id. L3 subnet segment actor ids use that scope so identical private
 subnets observed by different Agents do not collide after Cloud aggregation.
