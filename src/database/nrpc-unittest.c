@@ -22,7 +22,7 @@
 // the gate ever regresses, every caller that relies on it — including MCP —
 // regresses with it.
 
-static int rrdfunctions_unittest_noop_cb(struct rrd_function_execute *rfe __maybe_unused, void *data __maybe_unused) {
+static int rrdfunctions_unittest_noop_cb(struct nrpc_request *req __maybe_unused, void *data __maybe_unused) {
     // never reached: verify_access authorizes without executing
     return HTTP_RESP_OK;
 }
@@ -37,17 +37,17 @@ int rrdfunctions_verify_access_unittest(void) {
     }
 
     // A protected function mirroring systemd-journal's requirements.
-    rrd_function_add(host, NULL, "protected-fn", 10, 0, 1, "protected", "logs",
+    nrpc_method_register(host, NULL, "protected-fn", 10, 0, 1, "protected", "logs",
                      HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                     true, RRD_FUNCTION_REG_SOURCE_INTERNAL, rrdfunctions_unittest_noop_cb, NULL);
+                     true, NRPC_SOURCE_DAEMON, rrdfunctions_unittest_noop_cb, NULL);
 
-    // A restricted function: name starting with "__" flags RRD_FUNCTION_RESTRICTED.
-    rrd_function_add(host, NULL, "__restricted-fn", 10, 0, 1, "restricted", "top",
-                     HTTP_ACCESS_NONE, true, RRD_FUNCTION_REG_SOURCE_INTERNAL, rrdfunctions_unittest_noop_cb, NULL);
+    // A restricted function: name starting with "__" flags NRPC_METHOD_FLAG_RESTRICTED.
+    nrpc_method_register(host, NULL, "__restricted-fn", 10, 0, 1, "restricted", "top",
+                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, rrdfunctions_unittest_noop_cb, NULL);
 
     // A public function requiring nothing — baseline that the gate does not over-block.
-    rrd_function_add(host, NULL, "public-fn", 10, 0, 1, "public", "top",
-                     HTTP_ACCESS_NONE, true, RRD_FUNCTION_REG_SOURCE_INTERNAL, rrdfunctions_unittest_noop_cb, NULL);
+    nrpc_method_register(host, NULL, "public-fn", 10, 0, 1, "public", "top",
+                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, rrdfunctions_unittest_noop_cb, NULL);
 
     struct {
         RRDHOST *host;
@@ -89,7 +89,7 @@ int rrdfunctions_verify_access_unittest(void) {
     int errors = 0;
     for(size_t i = 0; i < _countof(cases); i++) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        RRD_FUNCTION_ACQUIRED *item = (RRD_FUNCTION_ACQUIRED *)(uintptr_t)0x1; // poison: verify it is reset
+        NRPC_METHOD_ACQUIRED *item = (NRPC_METHOD_ACQUIRED *)(uintptr_t)0x1; // poison: verify it is reset
 
         int code = rrd_function_verify_access(cases[i].host, wb, cases[i].fn,
                                               cases[i].user_access, cases[i].allow_restricted, &item);
@@ -133,16 +133,16 @@ int rrdfunctions_verify_access_unittest(void) {
             body_ok = true;
 
         if(item)
-            rrd_function_acquired_release(cases[i].host, item);
+            nrpc_method_acquired_release(cases[i].host, item);
 
         if(ok && item_ok && body_ok)
             fprintf(stderr, "  OK case %zu: %s (access 0x%x, allow_restricted=%d) -> %d\n",
                     i, cases[i].fn, (unsigned)cases[i].user_access, cases[i].allow_restricted, code);
     }
 
-    rrd_function_del(host, NULL, "protected-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-    rrd_function_del(host, NULL, "__restricted-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-    rrd_function_del(host, NULL, "public-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    nrpc_method_unregister(host, NULL, "protected-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, NULL, "__restricted-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, NULL, "public-fn", NRPC_SOURCE_DAEMON);
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
@@ -158,7 +158,7 @@ int rrdfunctions_verify_access_unittest(void) {
 //
 //   - dyncfg functions. They are an internal configuration transport, not
 //     user-facing, and the cloud must never be offered them. The exclusion is
-//     by RRD_FUNCTION_DYNCFG, which get_function_options() derives from the
+//     by NRPC_METHOD_FLAG_DYNCFG, which nrpc_method_flags_for() derives from the
 //     SANITIZED KEY, so the classifier is pinned directly below against every
 //     name shape the tree actually produces.
 //
@@ -199,7 +199,7 @@ int rrdfunctions_manifest_unittest(void) {
     for(size_t i = 0; i < _countof(names); i++) {
         char key[PLUGINSD_LINE_MAX];
         rrd_functions_sanitize(key, names[i].raw, sizeof(key));
-        bool got = rrd_function_name_is_dyncfg(key);
+        bool got = nrpc_method_name_is_dyncfg(key);
 
         if(got != names[i].expected_dyncfg) {
             fprintf(stderr, "  FAILED classifier: '%s' -> key '%s' -> dyncfg=%s, expected %s\n",
@@ -213,15 +213,15 @@ int rrdfunctions_manifest_unittest(void) {
     }
 
     // 1b. Registry-side enforcement of the dyncfg namespace: a COLLECTOR registration of a
-    //     reserved name must be rejected by rrd_function_add() itself (the caller-side pluginsd
+    //     reserved name must be rejected by nrpc_method_register() itself (the caller-side pluginsd
     //     guard was removed - the registry is now the only gate). The bare "config" name is the
     //     LIVE dyncfg function on localhost, so the assertions also pin that a rejected
-    //     registration leaves the live entry untouched (no execute_cb hijack via conflict swap).
+    //     registration leaves the live entry untouched (no handler hijack via conflict swap).
     {
         int enforce_errors_before = errors;
 
-        struct rrd_host_function *live = dictionary_get(host->functions->dict, "config");
-        rrd_function_execute_cb_t live_cb = live ? live->execute_cb : NULL;
+        struct nrpc_method *live = dictionary_get(host->rpc_registry->dict, "config");
+        nrpc_handler_cb_t live_cb = live ? live->handler : NULL;
 
         const char *rejected[] = {
             "config",               // exact reserved name
@@ -230,31 +230,31 @@ int rrdfunctions_manifest_unittest(void) {
         };
 
         for(size_t i = 0; i < _countof(rejected); i++)
-            rrd_function_add(host, NULL, rejected[i], 10, 0, 1, "hijack attempt", "top",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+            nrpc_method_register(host, NULL, rejected[i], 10, 0, 1, "hijack attempt", "top",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_PLUGIN,
                              rrdfunctions_unittest_noop_cb, NULL);
 
-        if(dictionary_get(host->functions->dict, "config c2-reject:job")) {
+        if(dictionary_get(host->rpc_registry->dict, "config c2-reject:job")) {
             fprintf(stderr, "  FAILED enforcement: COLLECTOR registered reserved name 'config c2-reject:job'\n");
             errors++;
-            rrd_function_del(host, NULL, "config c2-reject:job", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+            nrpc_method_unregister(host, NULL, "config c2-reject:job", NRPC_SOURCE_DAEMON);
         }
 
         // fixed-size dictionary slots keep the value pointer stable across conflicts, so a
-        // hijack is visible only through the swapped execute_cb - compare against the capture
-        struct rrd_host_function *live_after = dictionary_get(host->functions->dict, "config");
-        if(live && (!live_after || live_after->execute_cb != live_cb ||
-                    live_after->execute_cb == rrdfunctions_unittest_noop_cb)) {
+        // hijack is visible only through the swapped handler - compare against the capture
+        struct nrpc_method *live_after = dictionary_get(host->rpc_registry->dict, "config");
+        if(live && (!live_after || live_after->handler != live_cb ||
+                    live_after->handler == rrdfunctions_unittest_noop_cb)) {
             fprintf(stderr, "  FAILED enforcement: COLLECTOR registration of 'config' touched the live dyncfg entry\n");
             errors++;
         }
 
         // if there is NO live "config" in this environment, the rejected registrations must
         // not have created one
-        if(!live && dictionary_get(host->functions->dict, "config")) {
+        if(!live && dictionary_get(host->rpc_registry->dict, "config")) {
             fprintf(stderr, "  FAILED enforcement: COLLECTOR registration created reserved name 'config'\n");
             errors++;
-            rrd_function_del(host, NULL, "config", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+            nrpc_method_unregister(host, NULL, "config", NRPC_SOURCE_DAEMON);
         }
 
         if(errors == enforce_errors_before)
@@ -269,14 +269,14 @@ int rrdfunctions_manifest_unittest(void) {
     } fns[] = {
         { "config manifest-test:job",  "config",                false },  // dyncfg -> excluded
         { "__manifest-hidden-fn",      "top",                   false },  // "__" -> restricted
-        { "manifest-tagged-fn",        RRDFUNCTIONS_TAG_HIDDEN, false },  // hidden tag -> restricted
+        { "manifest-tagged-fn",        NRPC_TAG_HIDDEN, false },  // hidden tag -> restricted
         { "manifest-visible-fn",       "top",                   true  },
         { "manifest-logs-fn",          "logs",                  true  },
     };
 
     for(size_t i = 0; i < _countof(fns); i++)
-        rrd_function_add(host, NULL, fns[i].name, 10, 0, 1, "manifest help text", fns[i].tags,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, fns[i].name, 10, 0, 1, "manifest help text", fns[i].tags,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
 
     DICTIONARY *manifest = host_functions_to_manifest_dict(host);
@@ -308,7 +308,7 @@ int rrdfunctions_manifest_unittest(void) {
         (void)v;
         char key[PLUGINSD_LINE_MAX];
         rrd_functions_sanitize(key, v_dfe.name, sizeof(key));
-        if(rrd_function_name_is_dyncfg(key)) {
+        if(nrpc_method_name_is_dyncfg(key)) {
             fprintf(stderr, "  FAILED: dyncfg function '%s' present in the manifest\n", v_dfe.name);
             errors++;
         }
@@ -318,7 +318,7 @@ int rrdfunctions_manifest_unittest(void) {
     dictionary_destroy(manifest);
 
     for(size_t i = 0; i < _countof(fns); i++)
-        rrd_function_del(host, NULL, fns[i].name, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, fns[i].name, NRPC_SOURCE_DAEMON);
 
     // 4. The suppression hash. build_node_manifest() publishes only when manifest_dict_hash()
     //    differs from the last sent hash, so the hash must be: deterministic for identical
@@ -803,7 +803,7 @@ int rrdfunctions_manifest_pacer_unittest(void) {
 // ----------------------------------------------------------------------------
 // The streaming delete-path queue (C3).
 //
-// rrd_function_del() no longer sends FUNCTION_DEL synchronously; it queues the
+// nrpc_method_unregister() no longer sends FUNCTION_DEL synchronously; it queues the
 // sanitized name in the registry's pending_dels set (only when the host has a
 // stream sender configured) and sets RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED.
 // The renderer (stream_sender_send_global_rrdhost_functions) clears the flag,
@@ -823,7 +823,7 @@ int rrdfunctions_manifest_pacer_unittest(void) {
 //      re-affirms the function (DEL lines precede the re-list), so the parent
 //      nets to the correct state within one commit. Cancelling instead could
 //      swallow the only prune signal when a concurrent del outruns the add in
-//      the registry (see the comment in rrd_function_add's global branch).
+//      the registry (see the comment in nrpc_method_register's global branch).
 
 struct fndel_race_ctx {
     RRDHOST *host;
@@ -837,10 +837,10 @@ static void fndel_race_worker(void *arg) {
     char name[64];
     for(size_t i = 0; i < FNDEL_RACE_N; i++) {
         snprintfz(name, sizeof(name), "tt-race-fn-%zu", i);
-        rrd_function_add(ctx->host, NULL, name, 10, 0, 1, "race", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(ctx->host, NULL, name, 10, 0, 1, "race", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
-        rrd_function_del(ctx->host, NULL, name, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(ctx->host, NULL, name, NRPC_SOURCE_DAEMON);
     }
     __atomic_store_n(&ctx->done, true, __ATOMIC_RELEASE);
 }
@@ -848,26 +848,26 @@ static void fndel_race_worker(void *arg) {
 static bool fndel_queued(RRDHOST *host, const char *name) {
     // set entries carry no value, so dictionary_get() would return NULL for
     // present entries too - test membership through the item instead
-    spinlock_lock(&host->functions->pending_dels.spinlock);
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions->pending_dels.dict, name);
+    spinlock_lock(&host->rpc_registry->pending_dels.spinlock);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rpc_registry->pending_dels.dict, name);
     bool ret = (item != NULL);
     if(item)
-        dictionary_acquired_item_release(host->functions->pending_dels.dict, item);
-    spinlock_unlock(&host->functions->pending_dels.spinlock);
+        dictionary_acquired_item_release(host->rpc_registry->pending_dels.dict, item);
+    spinlock_unlock(&host->rpc_registry->pending_dels.spinlock);
     return ret;
 }
 
 static void fndel_flush_queue(RRDHOST *host) {
-    spinlock_lock(&host->functions->pending_dels.spinlock);
-    dictionary_flush(host->functions->pending_dels.dict);
-    spinlock_unlock(&host->functions->pending_dels.spinlock);
+    spinlock_lock(&host->rpc_registry->pending_dels.spinlock);
+    dictionary_flush(host->rpc_registry->pending_dels.dict);
+    spinlock_unlock(&host->rpc_registry->pending_dels.spinlock);
 }
 
 int rrdfunctions_del_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
-    if(!host || !host->functions) {
+    if(!host || !host->rpc_registry) {
         fprintf(stderr, "  FAILED: localhost (or its functions registry) is NULL\n");
         return 1;
     }
@@ -910,7 +910,7 @@ int rrdfunctions_del_unittest(void) {
             // restricted function: streams (queued) but is not in the manifest.
             // NOTE: add still arms - a re-registration ADDING the restricted
             // flag drops the function OUT of the manifest, and that transition
-            // must be reported (see the arm-site comment in rrd_function_add);
+            // must be reported (see the arm-site comment in nrpc_method_register);
             // only the del skips arming (the entry was never in the manifest)
             { "__tt-hidden-fn",  true,  true,  true,  false },
         };
@@ -930,8 +930,8 @@ int rrdfunctions_del_unittest(void) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
             aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
 
-            rrd_function_add(host, NULL, cases[i].fn, 10, 0, 1, "truth table", "top",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+            nrpc_method_register(host, NULL, cases[i].fn, 10, 0, 1, "truth table", "top",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                              rrdfunctions_unittest_noop_cb, NULL);
 
             if(!rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
@@ -950,7 +950,7 @@ int rrdfunctions_del_unittest(void) {
             aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
             fndel_flush_queue(host);
 
-            rrd_function_del(host, NULL, cases[i].fn, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+            nrpc_method_unregister(host, NULL, cases[i].fn, NRPC_SOURCE_DAEMON);
 
             if(!rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
                 fprintf(stderr, "  FAILED tt '%s': del did not set the flag\n", cases[i].fn);
@@ -984,13 +984,13 @@ int rrdfunctions_del_unittest(void) {
     {
         int drain_errors_before = errors;
 
-        rrd_function_add(host, NULL, "tt-keep-fn", 10, 0, 1, "keep", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "tt-keep-fn", 10, 0, 1, "keep", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
-        rrd_function_add(host, NULL, "tt-del-fn", 10, 0, 1, "del", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "tt-del-fn", 10, 0, 1, "del", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
-        rrd_function_del(host, NULL, "tt-del-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "tt-del-fn", NRPC_SOURCE_DAEMON);
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1027,7 +1027,7 @@ int rrdfunctions_del_unittest(void) {
 
         // discard: a parent without FUNCDEL support gets no DEL lines, and the
         // queue is still emptied (matches the old silent drop)
-        rrd_function_del(host, NULL, "tt-keep-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "tt-keep-fn", NRPC_SOURCE_DAEMON);
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             stream_sender_send_global_rrdhost_functions(host, wb, false, false);
@@ -1111,22 +1111,22 @@ int rrdfunctions_del_unittest(void) {
     // function, so the parent deletes-then-re-adds within one commit. The
     // re-add must NOT cancel the queued DEL - a cancellation can swallow the
     // only prune signal when a concurrent del outruns the add in the registry
-    // (see the comment in rrd_function_add's global branch).
+    // (see the comment in nrpc_method_register's global branch).
     {
         int readd_errors_before = errors;
 
-        rrd_function_add(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
-        rrd_function_del(host, NULL, "tt-readd-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "tt-readd-fn", NRPC_SOURCE_DAEMON);
 
         if(!fndel_queued(host, "tt-readd-fn")) {
             fprintf(stderr, "  FAILED re-add: del did not queue the FUNCTION_DEL\n");
             errors++;
         }
 
-        rrd_function_add(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
 
         if(!fndel_queued(host, "tt-readd-fn")) {
@@ -1160,7 +1160,7 @@ int rrdfunctions_del_unittest(void) {
             }
         }
 
-        rrd_function_del(host, NULL, "tt-readd-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "tt-readd-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == readd_errors_before)
             fprintf(stderr, "  OK re-add: the queued FUNCTION_DEL survives and the payload heals (DEL before the re-affirming re-list)\n");
@@ -1233,7 +1233,7 @@ int rrdfunctions_emitters_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
-    if(!host || !host->functions) {
+    if(!host || !host->rpc_registry) {
         fprintf(stderr, "  FAILED: localhost (or its functions registry) is NULL\n");
         return 1;
     }
@@ -1250,25 +1250,25 @@ int rrdfunctions_emitters_unittest(void) {
     // ------------------------------------------------------------------ fixtures
     // registered in FIXED order; the registry dict preserves insertion order,
     // so the fixture lines appear in this relative order in the output
-    rrd_function_add(host, NULL, "c4-global-fn", 11, 42, 3, "c4 global help", "top",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+    nrpc_method_register(host, NULL, "c4-global-fn", 11, 42, 3, "c4 global help", "top",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                      rrdfunctions_unittest_noop_cb, NULL);
-    rrd_function_add(host, NULL, "__c4-restricted-fn", 12, 43, 4, "c4 restricted", "top",
-                     HTTP_ACCESS_NONE, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+    nrpc_method_register(host, NULL, "__c4-restricted-fn", 12, 43, 4, "c4 restricted", "top",
+                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON,
                      rrdfunctions_unittest_noop_cb, NULL);
-    rrd_function_add(host, NULL, "config c4test:job", 120, 1000, 1, "Dynamic configuration", "config",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+    nrpc_method_register(host, NULL, "config c4test:job", 120, 1000, 1, "Dynamic configuration", "config",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                      rrdfunctions_unittest_noop_cb, NULL);
 
     // one plain global delete (queued) and one dyncfg delete (flag only - the quirk)
-    rrd_function_add(host, NULL, "c4-deleted-fn", 14, 45, 6, "c4 deleted", "top",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+    nrpc_method_register(host, NULL, "c4-deleted-fn", 14, 45, 6, "c4 deleted", "top",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                      rrdfunctions_unittest_noop_cb, NULL);
-    rrd_function_add(host, NULL, "config c4del:job", 120, 1000, 1, "Dynamic configuration", "config",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+    nrpc_method_register(host, NULL, "config c4del:job", 120, 1000, 1, "Dynamic configuration", "config",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                      rrdfunctions_unittest_noop_cb, NULL);
-    rrd_function_del(host, NULL, "c4-deleted-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-    rrd_function_del(host, NULL, "config c4del:job", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    nrpc_method_unregister(host, NULL, "c4-deleted-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, NULL, "config c4del:job", NRPC_SOURCE_DAEMON);
 
     // a chart with one LOCAL function - the chart emitter's whole output
     RRDSET *st = rrdset_create_localhost("c4test", "c4chart", NULL, "c4fam", "c4test.ctx",
@@ -1279,8 +1279,8 @@ int rrdfunctions_emitters_unittest(void) {
         errors++;
     }
     else
-        rrd_function_add(host, st, "c4-chart-fn", 13, 44, 5, "c4 chart help", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, st, "c4-chart-fn", 13, 44, 5, "c4 chart help", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
 
     // ------------------------------------------------------- expected line bytes
@@ -1500,9 +1500,9 @@ int rrdfunctions_emitters_unittest(void) {
     // flag is cleared (so the poll does not spin) and nothing is emitted.
     {
         int before = errors;
-        struct rrd_functions *saved_functions = host->functions;
+        struct nrpc_registry *saved_registry = host->rpc_registry;
 
-        host->functions = NULL;
+        host->rpc_registry = NULL;
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1517,7 +1517,7 @@ int rrdfunctions_emitters_unittest(void) {
             errors++;
         }
 
-        host->functions = saved_functions;
+        host->rpc_registry = saved_registry;
 
         if(errors == before)
             fprintf(stderr, "  OK null-registry: the flag is cleared and nothing is emitted\n");
@@ -1525,10 +1525,10 @@ int rrdfunctions_emitters_unittest(void) {
 
     // -------------------------------------------------------------------- cleanup
     if(st)
-        rrd_function_del(host, st, "c4-chart-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-    rrd_function_del(host, NULL, "c4-global-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-    rrd_function_del(host, NULL, "__c4-restricted-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-    rrd_function_del(host, NULL, "config c4test:job", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, st, "c4-chart-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, NULL, "c4-global-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, NULL, "__c4-restricted-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, NULL, "config c4test:job", NRPC_SOURCE_DAEMON);
     fndel_flush_queue(host);
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
@@ -1585,7 +1585,7 @@ struct reg_probe {
     int priority;
     uint32_t version;
     HTTP_ACCESS access;
-    RRD_FUNCTION_OPTIONS options;
+    NRPC_METHOD_FLAGS options;
 };
 
 static void reg_probe_cb(const struct rrd_function_view *v, void *data) {
@@ -1603,7 +1603,7 @@ static void reg_probe_cb(const struct rrd_function_view *v, void *data) {
     p->options = v->options;
 }
 
-static bool reg_probe_run(RRDHOST *host, RRD_FUNCTIONS_FILTER filter, const char *name, struct reg_probe *out) {
+static bool reg_probe_run(RRDHOST *host, NRPC_CATALOG_FILTER filter, const char *name, struct reg_probe *out) {
     memset(out, 0, sizeof(*out));
     out->want = name;
     rrd_functions_host_foreach(host, filter, reg_probe_cb, out);
@@ -1612,17 +1612,17 @@ static bool reg_probe_run(RRDHOST *host, RRD_FUNCTIONS_FILTER filter, const char
 
 static size_t reg_cb_a_calls = 0, reg_cb_b_calls = 0;
 
-static int reg_execute_cb_a(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+static int reg_execute_cb_a(struct nrpc_request *req, void *data __maybe_unused) {
     reg_cb_a_calls++;
-    if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, HTTP_RESP_OK, rfe->result.data);
+    if(req->result.cb)
+        req->result.cb(req->result.wb, HTTP_RESP_OK, req->result.data);
     return HTTP_RESP_OK;
 }
 
-static int reg_execute_cb_b(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+static int reg_execute_cb_b(struct nrpc_request *req, void *data __maybe_unused) {
     reg_cb_b_calls++;
-    if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, HTTP_RESP_OK, rfe->result.data);
+    if(req->result.cb)
+        req->result.cb(req->result.wb, HTTP_RESP_OK, req->result.data);
     return HTTP_RESP_OK;
 }
 
@@ -1638,7 +1638,7 @@ struct reg_del_ctx {
 
 static void reg_del_worker(void *arg) {
     struct reg_del_ctx *c = arg;
-    c->collector_del = rrd_function_del(c->host, NULL, c->name, RRD_FUNCTION_REG_SOURCE_COLLECTOR);
+    c->collector_del = nrpc_method_unregister(c->host, NULL, c->name, NRPC_SOURCE_PLUGIN);
 }
 
 // registers a function and then ends its provider, exactly like a plugin
@@ -1646,8 +1646,8 @@ static void reg_del_worker(void *arg) {
 static void reg_provider_worker(void *arg) {
     RRDHOST *host = arg;
     nrpc_serving_started();
-    rrd_function_add(host, NULL, "reg-provider-fn", 10, 0, 1, "provider", "top",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+    nrpc_method_register(host, NULL, "reg-provider-fn", 10, 0, 1, "provider", "top",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                      rrdfunctions_unittest_noop_cb, NULL);
     nrpc_serving_finished();
 }
@@ -1666,10 +1666,10 @@ struct reg_race_ctx {
 static void reg_race_worker(void *arg) {
     struct reg_race_ctx *c = arg;
     for(size_t i = 0; i < REG_RACE_N; i++)
-        rrd_function_add(c->host, NULL, "reg-race-fn", 10, 0, 1,
+        nrpc_method_register(c->host, NULL, "reg-race-fn", 10, 0, 1,
                          (i & 1) ? REG_RACE_HELP_A : REG_RACE_HELP_B,
                          (i & 1) ? REG_RACE_TAGS_A : REG_RACE_TAGS_B,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
 
     __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
@@ -1700,7 +1700,7 @@ int rrdfunctions_registry_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
-    if(!host || !host->functions) {
+    if(!host || !host->rpc_registry) {
         fprintf(stderr, "  FAILED: localhost (or its functions registry) is NULL\n");
         return 1;
     }
@@ -1719,13 +1719,13 @@ int rrdfunctions_registry_unittest(void) {
         // text_sanitize() wipes an all-underscore result and strips leading
         // whitespace/control characters, so all of these sanitize to ""
         const char *empty_names[] = { "__", "____", "   ", "\t\n\r", "\x01\x02" };
-        size_t entries_before = dictionary_entries(host->functions->dict);
+        size_t entries_before = dictionary_entries(host->rpc_registry->dict);
 
         for(size_t i = 0; i < _countof(empty_names); i++) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
-            rrd_function_add(host, NULL, empty_names[i], 10, 0, 1, "empty", "top",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+            nrpc_method_register(host, NULL, empty_names[i], 10, 0, 1, "empty", "top",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                              rrdfunctions_unittest_noop_cb, NULL);
 
             // the refusal happens before anything is announced
@@ -1735,34 +1735,34 @@ int rrdfunctions_registry_unittest(void) {
             }
         }
 
-        if(dictionary_entries(host->functions->dict) != entries_before) {
+        if(dictionary_entries(host->rpc_registry->dict) != entries_before) {
             fprintf(stderr, "  FAILED key: a name that sanitizes to an empty string created an entry\n");
             errors++;
         }
-        if(dictionary_get(host->functions->dict, "")) {
+        if(dictionary_get(host->rpc_registry->dict, "")) {
             fprintf(stderr, "  FAILED key: an empty key is present in the registry\n");
             errors++;
         }
 
         // everything else lands on its collapsed key: leading/trailing spaces
         // dropped, runs of whitespace folded to one, '"' mapped to '\''
-        rrd_function_add(host, NULL, "  reg-key   edge\"case  ", 10, 0, 1, "key", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "  reg-key   edge\"case  ", 10, 0, 1, "key", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
 
-        if(!dictionary_get(host->functions->dict, "reg-key edge'case")) {
+        if(!dictionary_get(host->rpc_registry->dict, "reg-key edge'case")) {
             fprintf(stderr, "  FAILED key: a name was not indexed by its sanitized form\n");
             errors++;
         }
 
         // execution lookups strip words from the end until they hit a
         // registered function, so arguments resolve to their function...
-        rrd_function_add(host, NULL, "reg-args-fn", 10, 0, 1, "args", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "reg-args-fn", 10, 0, 1, "args", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            RRD_FUNCTION_ACQUIRED *item = NULL;
+            NRPC_METHOD_ACQUIRED *item = NULL;
             int code = rrd_function_verify_access(host, wb, "reg-args-fn arg1 arg2",
                                                   HTTP_ACCESS_ANONYMOUS_DATA, false, &item);
             if(code != HTTP_RESP_OK || !item) {
@@ -1770,21 +1770,21 @@ int rrdfunctions_registry_unittest(void) {
                 errors++;
             }
             if(item)
-                rrd_function_acquired_release(host, item);
+                nrpc_method_acquired_release(host, item);
         }
 
         // ... while the availability probe is an exact-name lookup
-        if(!rrd_function_available(host, "reg-args-fn")) {
-            fprintf(stderr, "  FAILED key: rrd_function_available() missed a live function\n");
+        if(!nrpc_method_available(host, "reg-args-fn")) {
+            fprintf(stderr, "  FAILED key: nrpc_method_available() missed a live function\n");
             errors++;
         }
-        if(rrd_function_available(host, "reg-args-fn arg1")) {
-            fprintf(stderr, "  FAILED key: rrd_function_available() must not strip arguments\n");
+        if(nrpc_method_available(host, "reg-args-fn arg1")) {
+            fprintf(stderr, "  FAILED key: nrpc_method_available() must not strip arguments\n");
             errors++;
         }
 
-        rrd_function_del(host, NULL, "  reg-key   edge\"case  ", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-        rrd_function_del(host, NULL, "reg-args-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "  reg-key   edge\"case  ", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, NULL, "reg-args-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK key: empty-sanitizing names refused, sanitized indexing, argument stripping\n");
@@ -1797,48 +1797,48 @@ int rrdfunctions_registry_unittest(void) {
 
         // a streaming child's synthetic config proxy: allowed, and classified
         // as DYNCFG from the sanitized key
-        rrd_function_add(host, NULL, fn, 10, 0, 1, "streamed config", "config",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_STREAMING,
+        nrpc_method_register(host, NULL, fn, 10, 0, 1, "streamed config", "config",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_STREAM,
                          reg_execute_cb_a, NULL);
 
-        struct rrd_host_function *entry = dictionary_get(host->functions->dict, fn);
+        struct nrpc_method *entry = dictionary_get(host->rpc_registry->dict, fn);
         if(!entry) {
             fprintf(stderr, "  FAILED namespace: a STREAMING registration of a reserved name was rejected\n");
             errors++;
         }
         else {
-            if(!(entry->options & RRD_FUNCTION_DYNCFG)) {
+            if(!(entry->options & NRPC_METHOD_FLAG_DYNCFG)) {
                 fprintf(stderr, "  FAILED namespace: a reserved name was not classified as DYNCFG\n");
                 errors++;
             }
 
             // a collector cannot take it over - the rejection must not reach
             // the conflict callback, so the installed execute callback stays
-            rrd_function_add(host, NULL, fn, 10, 0, 1, "hijack", "config",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+            nrpc_method_register(host, NULL, fn, 10, 0, 1, "hijack", "config",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_PLUGIN,
                              reg_execute_cb_b, NULL);
 
-            struct rrd_host_function *after = dictionary_get(host->functions->dict, fn);
-            if(!after || after->execute_cb != reg_execute_cb_a) {
+            struct nrpc_method *after = dictionary_get(host->rpc_registry->dict, fn);
+            if(!after || after->handler != reg_execute_cb_a) {
                 fprintf(stderr, "  FAILED namespace: a COLLECTOR registration hijacked a reserved name\n");
                 errors++;
             }
         }
 
         // 3. FUNCTION_DEL can never remove a dyncfg entry
-        if(rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_STREAMING)) {
+        if(nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_STREAM)) {
             fprintf(stderr, "  FAILED namespace: STREAMING FUNCTION_DEL removed a dyncfg function\n");
             errors++;
         }
-        if(rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_COLLECTOR)) {
+        if(nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_PLUGIN)) {
             fprintf(stderr, "  FAILED namespace: COLLECTOR FUNCTION_DEL removed a dyncfg function\n");
             errors++;
         }
-        if(!dictionary_get(host->functions->dict, fn)) {
+        if(!dictionary_get(host->rpc_registry->dict, fn)) {
             fprintf(stderr, "  FAILED namespace: a refused FUNCTION_DEL removed the entry anyway\n");
             errors++;
         }
-        if(!rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+        if(!nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_DAEMON)) {
             fprintf(stderr, "  FAILED namespace: the dyncfg subsystem could not remove its own function\n");
             errors++;
         }
@@ -1851,18 +1851,18 @@ int rrdfunctions_registry_unittest(void) {
     {
         int before = errors;
 
-        if(rrd_function_del(host, NULL, "reg-does-not-exist-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+        if(nrpc_method_unregister(host, NULL, "reg-does-not-exist-fn", NRPC_SOURCE_DAEMON)) {
             fprintf(stderr, "  FAILED del: deleting an unknown function reported success\n");
             errors++;
         }
-        if(rrd_function_del(host, NULL, "", RRD_FUNCTION_REG_SOURCE_INTERNAL) ||
-           rrd_function_del(host, NULL, NULL, RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+        if(nrpc_method_unregister(host, NULL, "", NRPC_SOURCE_DAEMON) ||
+           nrpc_method_unregister(host, NULL, NULL, NRPC_SOURCE_DAEMON)) {
             fprintf(stderr, "  FAILED del: deleting an empty name reported success\n");
             errors++;
         }
 
-        rrd_function_add(host, NULL, "reg-owned-fn", 10, 0, 1, "owned", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "reg-owned-fn", 10, 0, 1, "owned", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
 
         struct reg_del_ctx ctx = { .host = host, .name = "reg-owned-fn" };
@@ -1878,14 +1878,14 @@ int rrdfunctions_registry_unittest(void) {
                 fprintf(stderr, "  FAILED del: a foreign collector removed a function it did not register\n");
                 errors++;
             }
-            if(!dictionary_get(host->functions->dict, "reg-owned-fn")) {
+            if(!dictionary_get(host->rpc_registry->dict, "reg-owned-fn")) {
                 fprintf(stderr, "  FAILED del: a refused COLLECTOR delete removed the entry anyway\n");
                 errors++;
             }
         }
 
         // the registering thread (this one) may remove it as a COLLECTOR
-        if(!rrd_function_del(host, NULL, "reg-owned-fn", RRD_FUNCTION_REG_SOURCE_COLLECTOR)) {
+        if(!nrpc_method_unregister(host, NULL, "reg-owned-fn", NRPC_SOURCE_PLUGIN)) {
             fprintf(stderr, "  FAILED del: the registering collector could not remove its own function\n");
             errors++;
         }
@@ -1901,18 +1901,18 @@ int rrdfunctions_registry_unittest(void) {
         const char *fn = "reg-swap-fn";
         struct reg_probe p;
 
-        rrd_function_add(host, NULL, fn, 11, 42, 3, "swap help one", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, fn, 11, 42, 3, "swap help one", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          reg_execute_cb_a, NULL);
 
-        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, fn, &p)) {
+        if(!reg_probe_run(host, NRPC_CATALOG_FILTER_USER, fn, &p)) {
             fprintf(stderr, "  FAILED swap: the function is not visible after registration\n");
             errors++;
         }
         else if(strcmp(p.help, "swap help one") != 0 || strcmp(p.tags, "top") != 0 ||
                 p.timeout != 11 || p.priority != 42 || p.version != 3 ||
                 p.access != HTTP_ACCESS_ANONYMOUS_DATA ||
-                (p.options & RRD_FUNCTION_RESTRICTED) || !(p.options & RRD_FUNCTION_GLOBAL)) {
+                (p.options & NRPC_METHOD_FLAG_RESTRICTED) || !(p.options & NRPC_METHOD_FLAG_GLOBAL)) {
             fprintf(stderr, "  FAILED swap: the initial registration is not reported as registered\n");
             errors++;
         }
@@ -1931,24 +1931,24 @@ int rrdfunctions_registry_unittest(void) {
         // re-registration: every field changes, and the "hidden" tag must
         // actually restrict the function (options are derived from the tags
         // and swapped with them)
-        rrd_function_add(host, NULL, fn, 22, 43, 4, "swap help two", "logs " RRDFUNCTIONS_TAG_HIDDEN,
-                         HTTP_ACCESS_SIGNED_ID, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, fn, 22, 43, 4, "swap help two", "logs " NRPC_TAG_HIDDEN,
+                         HTTP_ACCESS_SIGNED_ID, true, NRPC_SOURCE_DAEMON,
                          reg_execute_cb_b, NULL);
 
-        if(reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, fn, &p)) {
+        if(reg_probe_run(host, NRPC_CATALOG_FILTER_USER, fn, &p)) {
             fprintf(stderr, "  FAILED swap: a re-registration with the hidden tag stayed user-visible\n");
             errors++;
         }
         // restricted functions still stream to a parent
-        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL, fn, &p)) {
+        if(!reg_probe_run(host, NRPC_CATALOG_FILTER_STREAM_GLOBAL, fn, &p)) {
             fprintf(stderr, "  FAILED swap: a restricted function stopped streaming\n");
             errors++;
         }
         else if(strcmp(p.help, "swap help two") != 0 ||
-                strcmp(p.tags, "logs " RRDFUNCTIONS_TAG_HIDDEN) != 0 ||
+                strcmp(p.tags, "logs " NRPC_TAG_HIDDEN) != 0 ||
                 p.timeout != 22 || p.priority != 43 || p.version != 4 ||
                 p.access != HTTP_ACCESS_SIGNED_ID ||
-                !(p.options & RRD_FUNCTION_RESTRICTED)) {
+                !(p.options & NRPC_METHOD_FLAG_RESTRICTED)) {
             fprintf(stderr, "  FAILED swap: help=%s tags=%s timeout=%d priority=%d version=%u access=0x%x options=0x%x"
                             " - a field was not swapped\n",
                     p.help, p.tags, p.timeout, p.priority, p.version, (unsigned)p.access, (unsigned)p.options);
@@ -1967,31 +1967,31 @@ int rrdfunctions_registry_unittest(void) {
         }
 
         // and back: dropping the tag un-restricts it
-        rrd_function_add(host, NULL, fn, 11, 42, 3, "swap help one", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, fn, 11, 42, 3, "swap help one", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          reg_execute_cb_a, NULL);
 
-        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, fn, &p)) {
+        if(!reg_probe_run(host, NRPC_CATALOG_FILTER_USER, fn, &p)) {
             fprintf(stderr, "  FAILED swap: dropping the hidden tag did not un-restrict the function\n");
             errors++;
         }
-        else if(p.options & RRD_FUNCTION_RESTRICTED) {
+        else if(p.options & NRPC_METHOD_FLAG_RESTRICTED) {
             fprintf(stderr, "  FAILED swap: the RESTRICTED option survived the tag removal\n");
             errors++;
         }
 
         // a registration without tags gets the default "top"
-        rrd_function_add(host, NULL, "reg-notags-fn", 10, 0, 1, "no tags", NULL,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "reg-notags-fn", 10, 0, 1, "no tags", NULL,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
-        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, "reg-notags-fn", &p) ||
+        if(!reg_probe_run(host, NRPC_CATALOG_FILTER_USER, "reg-notags-fn", &p) ||
            strcmp(p.tags, "top") != 0) {
             fprintf(stderr, "  FAILED swap: a registration without tags did not default to 'top'\n");
             errors++;
         }
 
-        rrd_function_del(host, NULL, "reg-notags-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
-        rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "reg-notags-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK swap: every field swaps, tags drive the RESTRICTED option both ways, cb takes over\n");
@@ -2012,16 +2012,16 @@ int rrdfunctions_registry_unittest(void) {
 
             struct reg_probe p;
 
-            if(!dictionary_get(host->functions->dict, "reg-provider-fn")) {
+            if(!dictionary_get(host->rpc_registry->dict, "reg-provider-fn")) {
                 fprintf(stderr, "  FAILED provider: the entry was removed when its provider stopped\n");
                 errors++;
             }
-            if(rrd_function_available(host, "reg-provider-fn")) {
+            if(nrpc_method_available(host, "reg-provider-fn")) {
                 fprintf(stderr, "  FAILED provider: a function of a stopped provider is still available\n");
                 errors++;
             }
-            if(reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, "reg-provider-fn", &p) ||
-               reg_probe_run(host, RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL, "reg-provider-fn", &p)) {
+            if(reg_probe_run(host, NRPC_CATALOG_FILTER_USER, "reg-provider-fn", &p) ||
+               reg_probe_run(host, NRPC_CATALOG_FILTER_STREAM_GLOBAL, "reg-provider-fn", &p)) {
                 fprintf(stderr, "  FAILED provider: a function of a stopped provider is still exported\n");
                 errors++;
             }
@@ -2041,7 +2041,7 @@ int rrdfunctions_registry_unittest(void) {
             // the provider structure itself is released only when the last
             // entry referencing it goes away (ASAN verifies there is no leak
             // and no use-after-free here)
-            if(!rrd_function_del(host, NULL, "reg-provider-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+            if(!nrpc_method_unregister(host, NULL, "reg-provider-fn", NRPC_SOURCE_DAEMON)) {
                 fprintf(stderr, "  FAILED provider: could not delete the orphaned function\n");
                 errors++;
             }
@@ -2059,8 +2059,8 @@ int rrdfunctions_registry_unittest(void) {
         struct reg_race_ctx ctx = { .host = host, .done = false };
         struct reg_race_check check = { 0 };
 
-        rrd_function_add(host, NULL, "reg-race-fn", 10, 0, 1, REG_RACE_HELP_A, REG_RACE_TAGS_A,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "reg-race-fn", 10, 0, 1, REG_RACE_HELP_A, REG_RACE_TAGS_A,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
                          rrdfunctions_unittest_noop_cb, NULL);
 
         ND_THREAD *t = nd_thread_create("reg-race", NETDATA_THREAD_OPTION_DONT_LOG, reg_race_worker, &ctx);
@@ -2070,7 +2070,7 @@ int rrdfunctions_registry_unittest(void) {
         }
         else {
             while(!__atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE))
-                rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, reg_race_check_cb, &check);
+                rrd_functions_host_foreach(host, NRPC_CATALOG_FILTER_USER, reg_race_check_cb, &check);
 
             nd_thread_join(t);
 
@@ -2085,7 +2085,7 @@ int rrdfunctions_registry_unittest(void) {
             }
         }
 
-        rrd_function_del(host, NULL, "reg-race-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "reg-race-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK race: %zu consistent help/tags observations against %d re-registrations\n",

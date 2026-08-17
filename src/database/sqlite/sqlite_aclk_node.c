@@ -179,7 +179,7 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
 
     // rrd_rdlock() for the same reason build_node_info() takes it: an archived host keeps its
     // aclk config, so it is still reached by this loop, and rrdhost_cleanup_data_collection_and_health()
-    // destroys host->functions. This excludes the orphan-cleanup path, which does that under
+    // destroys host->rpc_registry. This excludes the orphan-cleanup path, which does that under
     // rrd_wrlock() (service.c). It does NOT cover
     // rrdhost_free___consume_metadata_lifetime_writelock(), which drops rrd_wrlock() before
     // rrdhost_free_unlinked() - that exposure is pre-existing and identical for build_node_info()

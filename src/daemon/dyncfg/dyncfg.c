@@ -182,8 +182,8 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     // because conflict callbacks are serialized by the dictionary index write
     // lock (the only writers of these fields), and the concurrent
     // snapshot-readers only read
-    if(!v->execute_cb || (overwrite_cb && nv->execute_cb && (v->execute_cb != nv->execute_cb || v->execute_cb_data != nv->execute_cb_data))) {
-        // the transfer branch - including the !v->execute_cb rescue arm, where
+    if(!v->handler || (overwrite_cb && nv->handler && (v->handler != nv->handler || v->handler_data != nv->handler_data))) {
+        // the transfer branch - including the !v->handler rescue arm, where
         // the displaced pin is provably NULL. Under the node's leaf spinlock so
         // a concurrent reader (intercept invocation, template fan-out) either
         // snapshots the old consistent triple or the new one; the DISPLACED
@@ -196,8 +196,8 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         v->transport = nv->transport ? nrpc_transport_entry_acquire(nv->transport) : NULL;
 
         v->sync = nv->sync,
-        v->execute_cb = nv->execute_cb;
-        v->execute_cb_data = nv->execute_cb_data;
+        v->handler = nv->handler;
+        v->handler_data = nv->handler_data;
 
         spinlock_unlock(&v->transport_spinlock);
         changes++;
@@ -250,7 +250,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
                                            const char *source, DYNCFG_CMDS cmds,
                                            usec_t created_ut, usec_t modified_ut,
                                            bool sync, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
-                                           rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
+                                           nrpc_handler_cb_t handler, void *handler_data,
                                            struct nrpc_transport *transport,
                                            bool overwrite_cb) {
     DYNCFG tmp = {
@@ -269,8 +269,8 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
         },
         .sync = sync,
         .dyncfg = { 0 },
-        .execute_cb = execute_cb,
-        .execute_cb_data = execute_cb_data,
+        .handler = handler,
+        .handler_data = handler_data,
         .transport = transport,     // RAW - the insert/transfer callbacks pin it
     };
 
@@ -279,7 +279,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
     if(unlikely(!item)) {
         // dictionary destroyed - neither the insert nor the conflict callback
         // ran, so tmp's STRINGs are still ours and the RAW transport was never
-        // pinned; unwind cleanly (same shape as rrd_function_add)
+        // pinned; unwind cleanly (same shape as nrpc_method_register)
         string_freez(tmp.path);
         string_freez(tmp.current.source);
     }
@@ -393,7 +393,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
                           DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source,
                           DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync,
                           HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
-                          rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
+                          nrpc_handler_cb_t handler, void *handler_data,
                           struct nrpc_transport *transport) {
 
     if(view_access == HTTP_ACCESS_NONE)
@@ -426,7 +426,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
 
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds,
                                                       created_ut, modified_ut, sync, view_access, edit_access,
-                                                      execute_cb, execute_cb_data, transport, true);
+                                                      handler, handler_data, transport, true);
     if(unlikely(!item)) {
         // the nodes dictionary is destroyed - no callback ran, so the RAW
         // `transport` was never pinned, and dyncfg_add_internal() already
@@ -442,7 +442,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
 //        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
 
     nrpc_serving_started();
-    rrd_function_add(
+    nrpc_method_register(
         host,
         NULL,
         string2str(df->function),
@@ -453,7 +453,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
         "config",
         (view_access & edit_access),
         sync,
-        RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        NRPC_SOURCE_DAEMON,
         dyncfg_function_intercept_cb,
         NULL);
 
@@ -484,7 +484,7 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(item) {
         DYNCFG *df = dictionary_acquired_item_value(item);
-        rrd_function_del(host, NULL, string2str(df->function), RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, string2str(df->function), NRPC_SOURCE_DAEMON);
 
         bool garbage_collect = false;
         if(df->dyncfg.saves == 0) {
@@ -539,7 +539,7 @@ bool dyncfg_available_for_rrdhost(RRDHOST *host) {
     if(host == localhost)
         return true;
 
-    return rrd_function_available(host, PLUGINSD_FUNCTION_CONFIG);
+    return nrpc_method_available(host, PLUGINSD_FUNCTION_CONFIG);
 }
 
 // ----------------------------------------------------------------------------

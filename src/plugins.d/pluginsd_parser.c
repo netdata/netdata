@@ -1538,7 +1538,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     nrpc_serving_finished();
     pluginsd_process_cleanup(parser);
 
-    // the functions this plugin registered are still in host->functions, but their collector
+    // the functions this plugin registered are still in host->rpc_registry, but their collector
     // is no longer running, so they must drop out of the cloud manifest
     aclk_arm_node_manifest(host);
     for (size_t i = 0; i < vnodes_used; i++)

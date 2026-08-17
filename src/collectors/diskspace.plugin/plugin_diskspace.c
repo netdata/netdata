@@ -9,7 +9,7 @@
 #define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
 
-#define RRDFUNCTIONS_DISKSPACE_HELP "Displays filesystem mount points with space utilization, available capacity, and inode usage statistics."
+#define FUNCTION_DISKSPACE_HELP "Displays filesystem mount points with space utilization, available capacity, and inode usage statistics."
 
 #define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5
@@ -894,7 +894,7 @@ static int diskspace_function_mount_points(BUFFER *wb, const char *function __ma
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_DISKSPACE_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_DISKSPACE_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_space_util = 0.0;
@@ -1105,9 +1105,9 @@ void diskspace_main(void *ptr) {
     netdata_mutex_init(&slow_mountinfo_mutex);
     diskspace_mountpoints_init();
 
-    rrd_function_add_inline(localhost, NULL, "mount-points", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_DISKSPACE_HELP,
+    nrpc_method_register_builtin(localhost, NULL, "mount-points", 10,
+                            NRPC_PRIORITY_DEFAULT, NRPC_VERSION_DEFAULT,
+                            FUNCTION_DISKSPACE_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             diskspace_function_mount_points);
 

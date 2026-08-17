@@ -4,26 +4,26 @@
 
 static DICTIONARY *dyncfg_nodes = NULL;
 
-static int dyncfg_inline_callback(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+static int dyncfg_inline_callback(struct nrpc_request *req, void *data __maybe_unused) {
     char tr[UUID_COMPACT_STR_LEN];
-    uuid_unparse_lower_compact(*rfe->transaction, tr);
+    uuid_unparse_lower_compact(*req->transaction, tr);
 
-    bool cancelled = rfe->is_cancelled.cb ? rfe->is_cancelled.cb(rfe->is_cancelled.data) : false;
+    bool cancelled = req->is_cancelled.cb ? req->is_cancelled.cb(req->is_cancelled.data) : false;
 
     int code;
     if(cancelled)
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     else
-        code = dyncfg_node_find_and_call(dyncfg_nodes, tr, rfe->function, rfe->stop_monotonic_ut, &cancelled,
-                                         rfe->payload, rfe->user_access, rfe->source, rfe->result.wb);
+        code = dyncfg_node_find_and_call(dyncfg_nodes, tr, req->function, req->stop_monotonic_ut, &cancelled,
+                                         req->payload, req->user_access, req->source, req->result.wb);
 
-    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))) {
-        buffer_flush(rfe->result.wb);
+    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (req->is_cancelled.cb && req->is_cancelled.cb(req->is_cancelled.data))) {
+        buffer_flush(req->result.wb);
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
-    if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, code, rfe->result.data);
+    if(req->result.cb)
+        req->result.cb(req->result.wb, code, req->result.data);
 
     return code;
 }

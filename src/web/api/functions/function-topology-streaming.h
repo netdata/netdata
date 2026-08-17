@@ -5,7 +5,7 @@
 
 #include "database/rrd.h"
 
-#define RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP "Shows streaming topology relations across Netdata agents, including directional parent/child links and transport metadata."
+#define FUNCTION_STREAMING_TOPOLOGY_HELP "Shows streaming topology relations across Netdata agents, including directional parent/child links and transport metadata."
 
 int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 

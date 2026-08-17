@@ -675,7 +675,7 @@ int main(int argc, char **argv) {
             MACOS_LOGS_DEFAULT_TIMEOUT,
             MACOS_LOGS_FUNCTION_DESCRIPTION,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
-            RRDFUNCTIONS_PRIORITY_DEFAULT);
+            NRPC_PRIORITY_DEFAULT);
     fflush(stdout);
     netdata_mutex_unlock(&stdout_mutex);
 

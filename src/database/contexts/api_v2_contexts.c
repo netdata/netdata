@@ -693,8 +693,8 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             .help = NULL,
             .tags = NULL,
             .access = HTTP_ACCESS_ALL,
-            .priority = RRDFUNCTIONS_PRIORITY_DEFAULT,
-            .version = RRDFUNCTIONS_VERSION_DEFAULT,
+            .priority = NRPC_PRIORITY_DEFAULT,
+            .version = NRPC_VERSION_DEFAULT,
         };
         host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority, &t.version);
     }
@@ -1485,9 +1485,9 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                 dfe_start_read(ctl.functions.dict, t) {
                     buffer_json_add_array_item_object(wb);
                     {
-                        const char *name = t_dfe.name ? strstr(t_dfe.name, RRDFUNCTIONS_VERSION_SEPARATOR) : NULL;
+                        const char *name = t_dfe.name ? strstr(t_dfe.name, NRPC_VERSION_SEPARATOR) : NULL;
                         if(name)
-                            name += sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) - 1;
+                            name += sizeof(NRPC_VERSION_SEPARATOR) - 1;
                         else
                             name = t_dfe.name;
 

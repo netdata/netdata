@@ -5,7 +5,7 @@
 
 #include "rrd.h"
 
-#define RRDFUNCTIONS_VERSION_SEPARATOR "|"
+#define NRPC_VERSION_SEPARATOR "|"
 
 // ----------------------------------------------------------------------------
 // the iteration/visibility API: every consumer that renders or exports the
@@ -15,11 +15,11 @@
 // which functions a traversal visits; EVERY filter includes the availability
 // check (collector running, host state current, not unregistered)
 typedef enum {
-    RRD_FUNCTIONS_FILTER_EXPORTABLE,        // + skip DYNCFG and RESTRICTED (user-facing lists, cloud)
-    RRD_FUNCTIONS_FILTER_STREAMABLE_CHART,  // + skip DYNCFG (chart functions stream, RESTRICTED included)
-    RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL, // + skip LOCAL and DYNCFG; DYNCFG entries are COUNTED
+    NRPC_CATALOG_FILTER_USER,        // + skip DYNCFG and RESTRICTED (user-facing lists, cloud)
+    NRPC_CATALOG_FILTER_STREAM_CHART,  // + skip DYNCFG (chart functions stream, RESTRICTED included)
+    NRPC_CATALOG_FILTER_STREAM_GLOBAL, // + skip LOCAL and DYNCFG; DYNCFG entries are COUNTED
                                             //   (the return value) for dyncfg_add_streaming()
-} RRD_FUNCTIONS_FILTER;
+} NRPC_CATALOG_FILTER;
 
 // The view handed to the callback. help/tags are BYTE COPIES valid only for
 // the duration of the callback - the underlying STRINGs can be swapped and
@@ -33,15 +33,15 @@ struct rrd_function_view {
     HTTP_ACCESS access;
     int priority;
     uint32_t version;
-    RRD_FUNCTION_OPTIONS options;
+    NRPC_METHOD_FLAGS options;
 };
 
 typedef void (*rrd_function_view_cb_t)(const struct rrd_function_view *v, void *data);
 
 // both return the number of DYNCFG entries encountered (meaningful for
-// RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL, zero otherwise)
-size_t rrd_functions_host_foreach(RRDHOST *host, RRD_FUNCTIONS_FILTER filter, rrd_function_view_cb_t cb, void *data);
-size_t rrd_functions_rrdset_foreach(RRDSET *st, RRD_FUNCTIONS_FILTER filter, rrd_function_view_cb_t cb, void *data);
+// NRPC_CATALOG_FILTER_STREAM_GLOBAL, zero otherwise)
+size_t rrd_functions_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, rrd_function_view_cb_t cb, void *data);
+size_t rrd_functions_rrdset_foreach(RRDSET *st, NRPC_CATALOG_FILTER filter, rrd_function_view_cb_t cb, void *data);
 
 // destroy the per-chart view of the registry (rrdset teardown)
 void rrd_functions_rrdset_view_destroy(RRDSET *st);

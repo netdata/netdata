@@ -2,37 +2,37 @@
 
 #include "nrpc-builtin.h"
 
-static int rrd_function_run_inline(struct rrd_function_execute *rfe, void *data) {
+static int nrpc_builtin_handler(struct nrpc_request *req, void *data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    rrd_function_execute_inline_cb_t execute_cb = data;
+    nrpc_builtin_handler_cb_t handler = data;
 
     int code;
 
-    if(rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))
+    if(req->is_cancelled.cb && req->is_cancelled.cb(req->is_cancelled.data))
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     else
-        code = execute_cb(rfe->result.wb, rfe->function, rfe->payload, rfe->source);
+        code = handler(req->result.wb, req->function, req->payload, req->source);
 
-    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))) {
-        buffer_flush(rfe->result.wb);
+    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (req->is_cancelled.cb && req->is_cancelled.cb(req->is_cancelled.data))) {
+        buffer_flush(req->result.wb);
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
-    if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, code, rfe->result.data);
+    if(req->result.cb)
+        req->result.cb(req->result.wb, code, req->result.data);
 
     return code;
 }
 
-void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version,
+void nrpc_method_register_builtin(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version,
                              const char *help, const char *tags,
-                             HTTP_ACCESS access, rrd_function_execute_inline_cb_t execute_cb) {
+                             HTTP_ACCESS access, nrpc_builtin_handler_cb_t handler) {
 
     nrpc_serving_started(); // this creates a collector that runs for as long as netdata runs
 
-    rrd_function_add(host, st, name, timeout, priority, version,
-                     help, tags, access, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
-                     rrd_function_run_inline, execute_cb);
+    nrpc_method_register(host, st, name, timeout, priority, version,
+                     help, tags, access, true, NRPC_SOURCE_DAEMON,
+                     nrpc_builtin_handler, handler);
 }

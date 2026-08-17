@@ -33,13 +33,13 @@ struct c6ut_result {
 };
 
 // mimics the broker's registration callbacks: stores the (cb, data) pair and
-// entry-pins the transport, per the rrd_function_cancel_cb_t contract
+// entry-pins the transport, per the nrpc_cancel_hook_cb_t contract
 struct c6ut_canceller {
-    rrd_function_cancel_cb_t cb;
+    nrpc_cancel_hook_cb_t cb;
     struct nrpc_transport *transport; // entry-pinned
 };
 
-static void c6ut_register_canceller_cb(void *register_cancel_cb_data, rrd_function_cancel_cb_t cancel_cb, void *cancel_cb_data) {
+static void c6ut_register_canceller_cb(void *register_cancel_cb_data, nrpc_cancel_hook_cb_t cancel_cb, void *cancel_cb_data) {
     struct c6ut_canceller *c = register_cancel_cb_data;
     c->cb = cancel_cb;
     c->transport = nrpc_transport_entry_acquire(cancel_cb_data);
@@ -47,11 +47,11 @@ static void c6ut_register_canceller_cb(void *register_cancel_cb_data, rrd_functi
 
 // same, for the progresser half of the registration contract
 struct c6ut_progresser {
-    rrd_function_progresser_cb_t cb;
+    nrpc_progress_hook_cb_t cb;
     struct nrpc_transport *transport; // entry-pinned
 };
 
-static void c6ut_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
+static void c6ut_register_progresser_cb(void *register_progresser_cb_data, nrpc_progress_hook_cb_t progresser_cb, void *progresser_cb_data) {
     struct c6ut_progresser *p = register_progresser_cb_data;
     p->cb = progresser_cb;
     p->transport = nrpc_transport_entry_acquire(progresser_cb_data);
@@ -82,7 +82,7 @@ static ssize_t c6ut_send_cb(const char *txt, void *data, STREAM_TRAFFIC_TYPE typ
     return (ssize_t)strlen(txt);
 }
 
-static int c6ut_noop_execute_cb(struct rrd_function_execute *rfe __maybe_unused, void *data __maybe_unused) {
+static int c6ut_noop_execute_cb(struct nrpc_request *req __maybe_unused, void *data __maybe_unused) {
     return HTTP_RESP_OK;
 }
 
@@ -91,15 +91,15 @@ static int c6ut_noop_execute_cb(struct rrd_function_execute *rfe __maybe_unused,
 static struct {
     char tx[UUID_COMPACT_STR_LEN];
     BUFFER *result_wb;
-    rrd_function_result_callback_t result_cb;
+    nrpc_result_cb_t result_cb;
     void *result_cb_data;
 } c5b_capture;
 
-static int c5b_async_execute_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
-    uuid_unparse_lower_compact(*rfe->transaction, c5b_capture.tx);
-    c5b_capture.result_wb = rfe->result.wb;
-    c5b_capture.result_cb = rfe->result.cb;
-    c5b_capture.result_cb_data = rfe->result.data;
+static int c5b_async_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
+    uuid_unparse_lower_compact(*req->transaction, c5b_capture.tx);
+    c5b_capture.result_wb = req->result.wb;
+    c5b_capture.result_cb = req->result.cb;
+    c5b_capture.result_cb_data = req->result.data;
     return HTTP_RESP_OK;
 }
 
@@ -113,7 +113,7 @@ static struct {
     size_t progresses;
     char tx[UUID_COMPACT_STR_LEN];
     BUFFER *result_wb;
-    rrd_function_result_callback_t result_cb;
+    nrpc_result_cb_t result_cb;
     void *result_cb_data;
 } c7_pin;
 
@@ -125,21 +125,21 @@ static void c7_pin_progresser(const char *transaction __maybe_unused, void *data
     c7_pin.progresses++;
 }
 
-static int c7_pin_execute_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
-    uuid_unparse_lower_compact(*rfe->transaction, c7_pin.tx);
-    c7_pin.result_wb = rfe->result.wb;
-    c7_pin.result_cb = rfe->result.cb;
-    c7_pin.result_cb_data = rfe->result.data;
+static int c7_pin_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
+    uuid_unparse_lower_compact(*req->transaction, c7_pin.tx);
+    c7_pin.result_wb = req->result.wb;
+    c7_pin.result_cb = req->result.cb;
+    c7_pin.result_cb_data = req->result.data;
 
-    if(rfe->register_canceller.cb) {
+    if(req->register_cancel_hook.cb) {
         // registering twice: the second registration must release the pin the
         // first one took, or the first transport leaks a ref forever
-        rfe->register_canceller.cb(rfe->register_canceller.data, c7_pin_canceller, c7_pin.first);
-        rfe->register_canceller.cb(rfe->register_canceller.data, c7_pin_canceller, c7_pin.second);
+        req->register_cancel_hook.cb(req->register_cancel_hook.data, c7_pin_canceller, c7_pin.first);
+        req->register_cancel_hook.cb(req->register_cancel_hook.data, c7_pin_canceller, c7_pin.second);
     }
 
-    if(rfe->register_progresser.cb)
-        rfe->register_progresser.cb(rfe->register_progresser.data, c7_pin_progresser, c7_pin.second);
+    if(req->register_progress_hook.cb)
+        req->register_progress_hook.cb(req->register_progress_hook.data, c7_pin_progresser, c7_pin.second);
 
     return HTTP_RESP_OK;
 }
@@ -153,16 +153,16 @@ static struct {
     bool deadline_visible;
 } c7_sync;
 
-static int c7_sync_execute_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
-    uuid_unparse_lower_compact(*rfe->transaction, c7_sync.tx);
-    c7_sync.has_canceller = (rfe->register_canceller.cb != NULL);
-    c7_sync.has_progresser = (rfe->register_progresser.cb != NULL);
+static int c7_sync_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
+    uuid_unparse_lower_compact(*req->transaction, c7_sync.tx);
+    c7_sync.has_canceller = (req->register_cancel_hook.cb != NULL);
+    c7_sync.has_progresser = (req->register_progress_hook.cb != NULL);
 
     usec_t d = 0;
     c7_sync.deadline_visible = rrd_function_transaction_deadline(c7_sync.tx, &d);
 
-    if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, HTTP_RESP_OK, rfe->result.data);
+    if(req->result.cb)
+        req->result.cb(req->result.wb, HTTP_RESP_OK, req->result.data);
 
     return HTTP_RESP_OK;
 }
@@ -194,7 +194,7 @@ static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec
                            BUFFER *wb, struct c6ut_result *res,
                            struct c6ut_canceller *canceller,
                            struct c6ut_progresser *progresser) {
-    struct rrd_function_execute rfe = {
+    struct nrpc_request req = {
         .transaction = uuid,
         .function = fn,
         .payload = NULL,
@@ -206,17 +206,17 @@ static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec
             .cb = c6ut_result_cb,
             .data = res,
         },
-        .register_canceller = {
+        .register_cancel_hook = {
             .cb = canceller ? c6ut_register_canceller_cb : NULL,
             .data = canceller,
         },
-        .register_progresser = {
+        .register_progress_hook = {
             .cb = progresser ? c6ut_register_progresser_cb : NULL,
             .data = progresser,
         },
     };
 
-    return pluginsd_function_execute_cb(&rfe, parser->inflight.transport);
+    return pluginsd_function_execute_cb(&req, parser->inflight.transport);
 }
 
 // drive one function call into the parser's transport, returning the compact
@@ -257,7 +257,7 @@ int pluginsd_functions_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
-    if(!host || !host->functions) {
+    if(!host || !host->rpc_registry) {
         fprintf(stderr, "  FAILED: localhost (or its functions registry) is NULL\n");
         return 1;
     }
@@ -337,8 +337,8 @@ int pluginsd_functions_unittest(void) {
         // base ref == 1
 
         // COLLECTOR with transport: insert acquires -> 2
-        rrd_function_add(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, RRD_FUNCTION_REG_SOURCE_COLLECTOR, c6ut_noop_execute_cb, tr);
+        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                         true, NRPC_SOURCE_PLUGIN, c6ut_noop_execute_cb, tr);
         if(refcount_references(&tr->entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: after COLLECTOR add, entry refs %d != 2\n",
                     refcount_references(&tr->entry_refcount));
@@ -346,8 +346,8 @@ int pluginsd_functions_unittest(void) {
         }
 
         // INTERNAL displaces it: displaced pair released under COLLECTOR tag -> 1
-        rrd_function_add(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, RRD_FUNCTION_REG_SOURCE_INTERNAL, c6ut_noop_execute_cb, NULL);
+        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                         true, NRPC_SOURCE_DAEMON, c6ut_noop_execute_cb, NULL);
         if(refcount_references(&tr->entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after INTERNAL re-add, entry refs %d != 1\n",
                     refcount_references(&tr->entry_refcount));
@@ -355,8 +355,8 @@ int pluginsd_functions_unittest(void) {
         }
 
         // and back to COLLECTOR: installed pair acquired -> 2
-        rrd_function_add(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, RRD_FUNCTION_REG_SOURCE_COLLECTOR, c6ut_noop_execute_cb, tr);
+        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                         true, NRPC_SOURCE_PLUGIN, c6ut_noop_execute_cb, tr);
         if(refcount_references(&tr->entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: after COLLECTOR re-add, entry refs %d != 2\n",
                     refcount_references(&tr->entry_refcount));
@@ -364,8 +364,8 @@ int pluginsd_functions_unittest(void) {
         }
 
         // equal-pointer conflict (a re-sent function list): nets ZERO refs
-        rrd_function_add(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, RRD_FUNCTION_REG_SOURCE_COLLECTOR, c6ut_noop_execute_cb, tr);
+        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                         true, NRPC_SOURCE_PLUGIN, c6ut_noop_execute_cb, tr);
         if(refcount_references(&tr->entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: equal-pointer conflict changed entry refs to %d (expected 2 - must net zero)\n",
                     refcount_references(&tr->entry_refcount));
@@ -373,7 +373,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         // delete: the stored pair released under its stored tag -> 1
-        rrd_function_del(host, NULL, "c6-mixed-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c6-mixed-fn", NRPC_SOURCE_DAEMON);
         if(refcount_references(&tr->entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after del, entry refs %d != 1\n",
                     refcount_references(&tr->entry_refcount));
@@ -400,8 +400,8 @@ int pluginsd_functions_unittest(void) {
         rrd_function_transactions_create(); // idempotent
 
         // the function is served by the pluginsd transport, as in production
-        rrd_function_add(host, NULL, "c6-gc-mid-defer-fn", 1, 0, 1, "gc", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+        nrpc_method_register(host, NULL, "c6-gc-mid-defer-fn", 1, 0, 1, "gc", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
                          pluginsd_function_execute_cb, parser->inflight.transport);
 
         // our own transaction id, so RESULT_BEGIN can reference it
@@ -455,7 +455,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_del(host, NULL, "c6-gc-mid-defer-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c6-gc-mid-defer-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK gc-mid-defer: GC delete mid-defer delivered exactly once, at RESULT_END\n");
@@ -478,7 +478,7 @@ int pluginsd_functions_unittest(void) {
             struct nrpc_transport *tr = nrpc_transport_create(NULL);
             // base ref == 1
 
-            // mimics the pluginsd CONFIG path: execute_cb_data IS the transport
+            // mimics the pluginsd CONFIG path: handler_data IS the transport
             dyncfg_add_low_level(host, "c6test:node", "/c6test",
                                  DYNCFG_STATUS_RUNNING, DYNCFG_TYPE_SINGLE, DYNCFG_SOURCE_TYPE_INTERNAL, "unittest",
                                  DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET, 0, 0, false,
@@ -562,8 +562,8 @@ int pluginsd_functions_unittest(void) {
 
         rrd_function_transactions_create(); // idempotent
 
-        rrd_function_add(host, NULL, "c6-gc-race-fn", 1, 0, 1, "gc", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+        nrpc_method_register(host, NULL, "c6-gc-race-fn", 1, 0, 1, "gc", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
                          pluginsd_function_execute_cb, parser->inflight.transport);
 
         for(size_t i = 0; i < 50 && errors == before; i++) {
@@ -610,7 +610,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         parser_destroy(parser);
-        rrd_function_del(host, NULL, "c6-gc-race-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c6-gc-race-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK gc-race: concurrent GC passes cancel and deliver exactly once\n");
@@ -626,8 +626,8 @@ int pluginsd_functions_unittest(void) {
         // a SHORT timeout, so a PROGRESS actually extends it (the extension
         // fires only when less than FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT
         // remains)
-        rrd_function_add(host, NULL, "c5b-deadline-fn", 5, 0, 1, "deadline", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "c5b-deadline-fn", 5, 0, 1, "deadline", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
                          c5b_async_execute_cb, NULL);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -665,7 +665,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_del(host, NULL, "c5b-deadline-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c5b-deadline-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK deadline: accessor sees the deadline, the progress extension, and the completion\n");
@@ -682,8 +682,8 @@ int pluginsd_functions_unittest(void) {
 
         rrd_function_transactions_create(); // idempotent
 
-        rrd_function_add(host, NULL, "c7-dead-transport-fn", 10, 0, 1, "dead", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+        nrpc_method_register(host, NULL, "c7-dead-transport-fn", 10, 0, 1, "dead", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
                          pluginsd_function_execute_cb, tr);
 
         // the owner tears down: dispatchers drained and `data` invalidated,
@@ -711,7 +711,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_del(host, NULL, "c7-dead-transport-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c7-dead-transport-fn", NRPC_SOURCE_DAEMON);
         nrpc_transport_owner_release(tr); // frees it; ASAN verifies the accounting
 
         if(errors == before)
@@ -801,8 +801,8 @@ int pluginsd_functions_unittest(void) {
 
         rrd_function_transactions_create(); // idempotent
 
-        rrd_function_add(host, NULL, "c7-dup-fn", 10, 0, 1, "dup", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "c7-dup-fn", 10, 0, 1, "dup", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
                          c5b_async_execute_cb, NULL);
 
         nd_uuid_t uuid;
@@ -850,7 +850,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_del(host, NULL, "c7-dup-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c7-dup-fn", NRPC_SOURCE_DAEMON);
 
         // the same collision inside the parser's own dictionary
         {
@@ -949,12 +949,12 @@ int pluginsd_functions_unittest(void) {
 
         c6ut_execute(parser, "c7-orphan-fn", &stop_ut, wb, &res, tx, NULL);
 
-        // execute_cb itself runs the GC when the deadline is already behind us
+        // handler itself runs the GC when the deadline is already behind us
         if(res.calls) {
             fprintf(stderr, "  FAILED gc-skip: a record without a broker entry was reaped at submission\n");
             errors++;
         }
-        if(parser->inflight.smaller_monotonic_timeout_ut <= rrd_function_effective_deadline_ut(stop_ut)) {
+        if(parser->inflight.smaller_monotonic_timeout_ut <= nrpc_effective_deadline_ut(stop_ut)) {
             fprintf(stderr, "  FAILED gc-skip: the all-skipped guard did not push the next attempt forward\n");
             errors++;
         }
@@ -988,8 +988,8 @@ int pluginsd_functions_unittest(void) {
     }
 
     // 13. the grace extension is real: every deadline gets
-    //     RRDFUNCTIONS_TIMEOUT_EXTENSION_UT before the GC enforces it, and the
-    //     GC applies it through rrd_function_effective_deadline_ut() only - so
+    //     NRPC_DEADLINE_GRACE_UT before the GC enforces it, and the
+    //     GC applies it through nrpc_effective_deadline_ut() only - so
     //     a transaction inside the grace window is never cancelled early.
     {
         int before = errors;
@@ -999,8 +999,8 @@ int pluginsd_functions_unittest(void) {
 
         rrd_function_transactions_create(); // idempotent
 
-        rrd_function_add(host, NULL, "c7-grace-fn", 10, 0, 1, "grace", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+        nrpc_method_register(host, NULL, "c7-grace-fn", 10, 0, 1, "grace", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
                          pluginsd_function_execute_cb, parser->inflight.transport);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1035,7 +1035,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         parser_destroy(parser);
-        rrd_function_del(host, NULL, "c7-grace-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c7-grace-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK grace: the deadline is enforced one extension late, and exactly once\n");
@@ -1056,8 +1056,8 @@ int pluginsd_functions_unittest(void) {
         c7_pin.first = nrpc_transport_create(NULL);
         c7_pin.second = nrpc_transport_create(NULL);
 
-        rrd_function_add(host, NULL, "c7-pin-fn", 10, 0, 1, "pin", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "c7-pin-fn", 10, 0, 1, "pin", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
                          c7_pin_execute_cb, NULL);
 
         struct c6ut_result res = { 0 };
@@ -1119,7 +1119,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_del(host, NULL, "c7-pin-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c7-pin-fn", NRPC_SOURCE_DAEMON);
         nrpc_transport_mark_dead_and_drain(c7_pin.first);
         nrpc_transport_owner_release(c7_pin.first);
         nrpc_transport_mark_dead_and_drain(c7_pin.second);
@@ -1139,8 +1139,8 @@ int pluginsd_functions_unittest(void) {
 
         rrd_function_transactions_create(); // idempotent
 
-        rrd_function_add(host, NULL, "c7-timeout-fn", 7, 0, 1, "timeout", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "c7-timeout-fn", 7, 0, 1, "timeout", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
                          c5b_async_execute_cb, NULL);
 
         struct { int ask; usec_t expect_s; } t[] = {
@@ -1174,11 +1174,11 @@ int pluginsd_functions_unittest(void) {
             c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
         }
 
-        rrd_function_del(host, NULL, "c7-timeout-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c7-timeout-fn", NRPC_SOURCE_DAEMON);
 
         memset(&c7_sync, 0, sizeof(c7_sync));
-        rrd_function_add(host, NULL, "c7-sync-fn", 10, 0, 1, "sync", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true /* sync */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+        nrpc_method_register(host, NULL, "c7-sync-fn", 10, 0, 1, "sync", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true /* sync */, NRPC_SOURCE_DAEMON,
                          c7_sync_execute_cb, NULL);
 
         struct c6ut_result sres = { 0 };
@@ -1210,7 +1210,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        rrd_function_del(host, NULL, "c7-sync-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        nrpc_method_unregister(host, NULL, "c7-sync-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK deadline/sync: the registered timeout is the fallback; a sync call leaves no transaction\n");

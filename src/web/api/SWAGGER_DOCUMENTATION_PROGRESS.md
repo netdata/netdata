@@ -3281,7 +3281,7 @@ Per dimension:
 ### REMOTE HOST HANDLING
 
 - If `host != localhost`, delegates to `call_function_bearer_get_token()`
-- Converts to function call via `rrd_function_run()` with function name `RRDFUNCTIONS_BEARER_GET_TOKEN`
+- Converts to function call via `rrd_function_run()` with function name `FUNCTION_BEARER_GET_TOKEN`
 - Passes all auth context via JSON payload including user_role, access array, cloud_account_id, client_name
 
 ### VERIFICATION SUMMARY

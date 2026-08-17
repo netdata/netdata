@@ -20,7 +20,7 @@
 //   streaming: registry entries survive disconnect). The destructor is
 //   owner-independent: it never touches `data`.
 //
-// - dispatcher refcount: transient holders around every send (execute_cb,
+// - dispatcher refcount: transient holders around every send (handler,
 //   canceller, progresser, GC sends): acquire-or-fail. The owner's teardown
 //   marks the transport dead, drains this counter with
 //   refcount_acquire_for_deletion_and_wait() (deadlock-free: entry refs live

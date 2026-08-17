@@ -109,7 +109,7 @@ int mcp_execute_function_access_unittest(void) {
     rrd_function_transactions_create();
 
     // A protected function mirroring systemd-journal's access requirements.
-    rrd_function_add_inline(host, NULL, MCP_UT_FN, 10, 0, 1,
+    nrpc_method_register_builtin(host, NULL, MCP_UT_FN, 10, 0, 1,
                             "unittest protected function", "logs",
                             HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
                             mcp_ut_protected_cb);
@@ -185,7 +185,7 @@ int mcp_execute_function_access_unittest(void) {
         mcp_free_client(mcpc);
     }
 
-    rrd_function_del(host, NULL, MCP_UT_FN, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    nrpc_method_unregister(host, NULL, MCP_UT_FN, NRPC_SOURCE_DAEMON);
     mcp_functions_registry_cleanup();
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

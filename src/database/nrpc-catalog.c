@@ -17,15 +17,15 @@
 // swapped contents, and the conflict callback frees displaced STRINGs under
 // that same lock, so a copy taken outside it could read freed bytes.
 static size_t rrd_functions_view_foreach(DICTIONARY *dict, RRDHOST *availability_host,
-                                         RRD_FUNCTIONS_FILTER filter,
+                                         NRPC_CATALOG_FILTER filter,
                                          rrd_function_view_cb_t cb, void *data) {
     if(!dict) return 0;
 
     size_t dyncfg_count = 0;
 
-    struct rrd_host_function *t;
+    struct nrpc_method *t;
     dfe_start_read(dict, t) {
-        if(!rrd_function_is_available(t, availability_host)) continue;
+        if(!nrpc_method_is_available(availability_host, t)) continue;
 
         struct rrd_function_view v = { .name = t_dfe.name };
         char *help = NULL, *tags = NULL;
@@ -36,18 +36,18 @@ static size_t rrd_functions_view_foreach(DICTIONARY *dict, RRDHOST *availability
         v.options = t->options;
 
         switch(filter) {
-            case RRD_FUNCTIONS_FILTER_EXPORTABLE:
-                visit = !(v.options & (RRD_FUNCTION_DYNCFG | RRD_FUNCTION_RESTRICTED));
+            case NRPC_CATALOG_FILTER_USER:
+                visit = !(v.options & (NRPC_METHOD_FLAG_DYNCFG | NRPC_METHOD_FLAG_RESTRICTED));
                 break;
 
-            case RRD_FUNCTIONS_FILTER_STREAMABLE_CHART:
-                visit = !(v.options & RRD_FUNCTION_DYNCFG);
+            case NRPC_CATALOG_FILTER_STREAM_CHART:
+                visit = !(v.options & NRPC_METHOD_FLAG_DYNCFG);
                 break;
 
-            case RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL:
-                if(v.options & RRD_FUNCTION_DYNCFG)
+            case NRPC_CATALOG_FILTER_STREAM_GLOBAL:
+                if(v.options & NRPC_METHOD_FLAG_DYNCFG)
                     dyncfg_count++;
-                visit = !(v.options & (RRD_FUNCTION_LOCAL | RRD_FUNCTION_DYNCFG));
+                visit = !(v.options & (NRPC_METHOD_FLAG_LOCAL | NRPC_METHOD_FLAG_DYNCFG));
                 break;
         }
 
@@ -75,12 +75,12 @@ static size_t rrd_functions_view_foreach(DICTIONARY *dict, RRDHOST *availability
     return dyncfg_count;
 }
 
-size_t rrd_functions_host_foreach(RRDHOST *host, RRD_FUNCTIONS_FILTER filter, rrd_function_view_cb_t cb, void *data) {
-    if(!host || !host->functions) return 0;
-    return rrd_functions_view_foreach(host->functions->dict, host, filter, cb, data);
+size_t rrd_functions_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, rrd_function_view_cb_t cb, void *data) {
+    if(!host || !host->rpc_registry) return 0;
+    return rrd_functions_view_foreach(host->rpc_registry->dict, host, filter, cb, data);
 }
 
-size_t rrd_functions_rrdset_foreach(RRDSET *st, RRD_FUNCTIONS_FILTER filter, rrd_function_view_cb_t cb, void *data) {
+size_t rrd_functions_rrdset_foreach(RRDSET *st, NRPC_CATALOG_FILTER filter, rrd_function_view_cb_t cb, void *data) {
     if(!st || !st->functions_view) return 0;
     return rrd_functions_view_foreach(st->functions_view, st->rrdhost, filter, cb, data);
 }
@@ -109,7 +109,7 @@ static void stream_chart_function_cb(const struct rrd_function_view *v, void *da
 }
 
 void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb) {
-    rrd_functions_rrdset_foreach(st, RRD_FUNCTIONS_FILTER_STREAMABLE_CHART, stream_chart_function_cb, wb);
+    rrd_functions_rrdset_foreach(st, NRPC_CATALOG_FILTER_STREAM_CHART, stream_chart_function_cb, wb);
 }
 
 static void stream_global_function_cb(const struct rrd_function_view *v, void *data) {
@@ -135,7 +135,7 @@ static void stream_global_function_cb(const struct rrd_function_view *v, void *d
 // DISCARDED, matching the old silent drop and preventing unbounded growth on
 // parents without FUNCDEL support.
 void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool dyncfg, bool can_function_del) {
-    // Ordering contract with rrd_function_del(): clear the flag FIRST, then
+    // Ordering contract with nrpc_method_unregister(): clear the flag FIRST, then
     // snapshot-and-clear the pending set under its lock. The deleter inserts
     // into the set BEFORE setting the flag, so a del landing after our
     // snapshot re-sets the flag with its entry already queued - the next poll
@@ -152,24 +152,24 @@ void stream_sender_send_global_rrdhost_functions(RRDHOST *host, BUFFER *wb, bool
     // after the flag clear, so a NULL registry (archived host racing the sender's
     // flag poll) behaves exactly like the old NULL-tolerant dictionary traversal:
     // flag cleared, nothing emitted
-    if(!host->functions)
+    if(!host->rpc_registry)
         return;
 
-    struct rrd_functions *functions = host->functions;
-    spinlock_lock(&functions->pending_dels.spinlock);
-    if(dictionary_entries(functions->pending_dels.dict)) {
+    struct nrpc_registry *registry = host->rpc_registry;
+    spinlock_lock(&registry->pending_dels.spinlock);
+    if(dictionary_entries(registry->pending_dels.dict)) {
         if(can_function_del) {
             void *t;
-            dfe_start_read(functions->pending_dels.dict, t) {
+            dfe_start_read(registry->pending_dels.dict, t) {
                 buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"%s\"\n", t_dfe.name);
             }
             dfe_done(t);
         }
-        dictionary_flush(functions->pending_dels.dict);
+        dictionary_flush(registry->pending_dels.dict);
     }
-    spinlock_unlock(&functions->pending_dels.spinlock);
+    spinlock_unlock(&registry->pending_dels.spinlock);
 
-    size_t configs = rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL,
+    size_t configs = rrd_functions_host_foreach(host, NRPC_CATALOG_FILTER_STREAM_GLOBAL,
                                                 stream_global_function_cb, wb);
 
     if(dyncfg && configs)
@@ -192,8 +192,8 @@ static void chart_function2json_cb(const struct rrd_function_view *v, void *data
         snprintfz(
             options, 64
             , "%s%s"
-            , (v->options & RRD_FUNCTION_LOCAL) ? "LOCAL " : ""
-            , (v->options & RRD_FUNCTION_GLOBAL) ? "GLOBAL" : ""
+            , (v->options & NRPC_METHOD_FLAG_LOCAL) ? "LOCAL " : ""
+            , (v->options & NRPC_METHOD_FLAG_GLOBAL) ? "GLOBAL" : ""
         );
 
         buffer_json_member_add_string_or_empty(wb, "options", options);
@@ -205,7 +205,7 @@ static void chart_function2json_cb(const struct rrd_function_view *v, void *data
 }
 
 void chart_functions2json(RRDSET *st, BUFFER *wb) {
-    rrd_functions_rrdset_foreach(st, RRD_FUNCTIONS_FILTER_EXPORTABLE, chart_function2json_cb, wb);
+    rrd_functions_rrdset_foreach(st, NRPC_CATALOG_FILTER_USER, chart_function2json_cb, wb);
 }
 
 static void host_function2json_cb(const struct rrd_function_view *v, void *data) {
@@ -218,9 +218,9 @@ static void host_function2json_cb(const struct rrd_function_view *v, void *data)
         buffer_json_member_add_uint64(wb, "version", (uint64_t)v->version);
         buffer_json_member_add_array(wb, "options");
         {
-            if (v->options & RRD_FUNCTION_GLOBAL)
+            if (v->options & NRPC_METHOD_FLAG_GLOBAL)
                 buffer_json_add_array_item_string(wb, "GLOBAL");
-            if (v->options & RRD_FUNCTION_LOCAL)
+            if (v->options & NRPC_METHOD_FLAG_LOCAL)
                 buffer_json_add_array_item_string(wb, "LOCAL");
         }
         buffer_json_array_close(wb);
@@ -232,11 +232,11 @@ static void host_function2json_cb(const struct rrd_function_view *v, void *data)
 }
 
 void host_functions2json(RRDHOST *host, BUFFER *wb) {
-    if(!host || !host->functions) return;
+    if(!host || !host->rpc_registry) return;
 
     buffer_json_member_add_object(wb, "functions");
 
-    rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, host_function2json_cb, wb);
+    rrd_functions_host_foreach(host, NRPC_CATALOG_FILTER_USER, host_function2json_cb, wb);
 
     buffer_json_object_close(wb);
 }
@@ -262,7 +262,7 @@ void chart_functions_to_dict(RRDSET *st, DICTIONARY *dst, void *value, size_t va
 
     // host==NULL availability semantics preserved: instances resolved through
     // the contexts index skip the host-state check
-    rrd_functions_view_foreach(st->functions_view, NULL, RRD_FUNCTIONS_FILTER_EXPORTABLE,
+    rrd_functions_view_foreach(st->functions_view, NULL, NRPC_CATALOG_FILTER_USER,
                                chart_function_to_dict_cb, &ctx);
 }
 
@@ -297,13 +297,13 @@ static void host_function_to_dict_cb(const struct rrd_function_view *v, void *da
     if(ctx->version)
         *ctx->version = v->version;
 
-    size_t function_name_len = rrd_functions_strlen_bounded(v->name, PLUGINSD_LINE_MAX);
-    if(unlikely(function_name_len > SIZE_MAX - UINT64_MAX_LENGTH - sizeof(RRDFUNCTIONS_VERSION_SEPARATOR)))
+    size_t function_name_len = nrpc_strlen_bounded(v->name, PLUGINSD_LINE_MAX);
+    if(unlikely(function_name_len > SIZE_MAX - UINT64_MAX_LENGTH - sizeof(NRPC_VERSION_SEPARATOR)))
         fatal("RRDFUNCTIONS: function key is too large.");
 
-    size_t key_size = UINT64_MAX_LENGTH + sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) + function_name_len;
+    size_t key_size = UINT64_MAX_LENGTH + sizeof(NRPC_VERSION_SEPARATOR) + function_name_len;
     CLEAN_CHAR_P *key = mallocz(key_size);
-    snprintfz(key, key_size, "%"PRIu32 RRDFUNCTIONS_VERSION_SEPARATOR "%s",
+    snprintfz(key, key_size, "%"PRIu32 NRPC_VERSION_SEPARATOR "%s",
               v->version, v->name);
 
     dictionary_set(ctx->dst, key, ctx->value, ctx->value_size);
@@ -311,7 +311,7 @@ static void host_function_to_dict_cb(const struct rrd_function_view *v, void *da
 
 void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size,
                             const char **help, const char **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
-    if(!host || !host->functions || !dictionary_entries(host->functions->dict) || !dst) return;
+    if(!host || !host->rpc_registry || !dictionary_entries(host->rpc_registry->dict) || !dst) return;
 
     struct host_functions_to_dict_ctx ctx = {
         .dst = dst,
@@ -324,7 +324,7 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
         .version = version,
     };
 
-    rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, host_function_to_dict_cb, &ctx);
+    rrd_functions_host_foreach(host, NRPC_CATALOG_FILTER_USER, host_function_to_dict_cb, &ctx);
 }
 
 // ----------------------------------------------------------------------------
@@ -355,9 +355,9 @@ DICTIONARY *host_functions_to_manifest_dict(RRDHOST *host) {
     DICTIONARY *dst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_register_delete_callback(dst, manifest_entry_delete_cb, NULL);
 
-    if(!host || !host->functions || !dictionary_entries(host->functions->dict)) return dst;
+    if(!host || !host->rpc_registry || !dictionary_entries(host->rpc_registry->dict)) return dst;
 
-    rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, manifest_entry_cb, dst);
+    rrd_functions_host_foreach(host, NRPC_CATALOG_FILTER_USER, manifest_entry_cb, dst);
 
     return dst;
 }
@@ -407,7 +407,7 @@ uint64_t manifest_dict_hash(DICTIONARY *dict, const char *node_id, const char *c
                 .access = (uint32_t)e->access,
                 // the value the proto transmits: a non-positive priority is published as the
                 // default (see generate_update_node_instance_manifest_message())
-                .priority = e->priority > 0 ? (uint32_t)e->priority : RRDFUNCTIONS_PRIORITY_DEFAULT,
+                .priority = e->priority > 0 ? (uint32_t)e->priority : NRPC_PRIORITY_DEFAULT,
                 .version = e->version,
             };
 

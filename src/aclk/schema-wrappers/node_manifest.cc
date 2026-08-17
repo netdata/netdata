@@ -124,7 +124,7 @@ char *generate_update_node_instance_manifest_message(size_t *len, struct update_
             set_function_tags(f, fn->tags);
             // the proto field is unsigned; a negative priority would wrap, so fall back to the
             // default the way pluginsd already does for its own input
-            f->set_priority(fn->priority > 0 ? (uint32_t)fn->priority : RRDFUNCTIONS_PRIORITY_DEFAULT);
+            f->set_priority(fn->priority > 0 ? (uint32_t)fn->priority : NRPC_PRIORITY_DEFAULT);
             f->set_version(fn->version);
             set_function_access(f, fn->access);
         }

@@ -1369,7 +1369,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" "HTTP_ACCESS_FORMAT" %d\n",
             WEVT_FUNCTION_NAME, WINDOWS_EVENTS_DEFAULT_TIMEOUT, WEVT_FUNCTION_DESCRIPTION,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
-            RRDFUNCTIONS_PRIORITY_DEFAULT);
+            NRPC_PRIORITY_DEFAULT);
 
     fflush(stdout);
     netdata_mutex_unlock(&stdout_mutex);

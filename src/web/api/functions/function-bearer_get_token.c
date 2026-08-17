@@ -74,7 +74,7 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction_str);
     return rrd_function_run(host, w->response.data, 10,
-                            w->user_auth.access, RRDFUNCTIONS_BEARER_GET_TOKEN, true,
+                            w->user_auth.access, FUNCTION_BEARER_GET_TOKEN, true,
                             transaction_str, NULL, NULL,
                             NULL, NULL,
                             NULL, NULL,

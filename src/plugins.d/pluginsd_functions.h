@@ -33,12 +33,12 @@ struct inflight_function {
     bool gc_collected;
 
     struct {
-        rrd_function_result_callback_t cb;
+        nrpc_result_cb_t cb;
         void *data;
     } result;
 
     struct {
-        rrd_function_progress_cb_t cb;
+        nrpc_progress_cb_t cb;
         void *data;
     } progress;
 };
@@ -53,6 +53,6 @@ void pluginsd_inflight_functions_cleanup(PARSER *parser);
 void pluginsd_inflight_functions_release_deferred(PARSER *parser);
 void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut);
 
-int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data);
+int pluginsd_function_execute_cb(struct nrpc_request *req, void *data);
 
 #endif //NETDATA_PLUGINSD_FUNCTIONS_H

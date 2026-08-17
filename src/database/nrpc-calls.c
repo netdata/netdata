@@ -20,26 +20,26 @@ struct rrd_function_inflight {
 
     BUFFER *payload;
 
-    RRD_FUNCTION_ACQUIRED *host_function_acquired;
+    NRPC_METHOD_ACQUIRED *host_function_acquired;
 
     // the collector
     // we acquire this structure at the beginning,
     // and we release it at the end
-    struct rrd_host_function *rdcf;
+    struct nrpc_method *method;
 
-    // capture-at-find (see rrd_function_acquired_capture): executors use THIS
-    // pair, never rdcf->execute_cb / execute_cb_data re-read at call time - a
+    // capture-at-find (see nrpc_method_capture): executors use THIS
+    // pair, never method->handler / handler_data re-read at call time - a
     // concurrent re-registration swaps those and frees the displaced
     // transport; the captured pin keeps ours alive and a stale capture
     // degrades to a clean 503 via the transport's acquire-or-fail
-    struct rrd_function_capture captured;
+    struct nrpc_capture captured;
 
     struct {
         BUFFER *wb;
 
         // in async mode,
         // the function to call to send the result back
-        rrd_function_result_callback_t cb;
+        nrpc_result_cb_t cb;
         void *data;
     } result;
 
@@ -51,27 +51,27 @@ struct rrd_function_inflight {
         // to be called in sync mode
         // while the function is running
         // to check if the function has been canceled
-        rrd_function_is_cancelled_cb_t cb;
+        nrpc_is_cancelled_cb_t cb;
         void *data;
     } is_cancelled;
 
     struct {
         // to be registered by the function itself
         // used to signal the function to cancel
-        rrd_function_cancel_cb_t cb;
+        nrpc_cancel_hook_cb_t cb;
         void *data;
     } canceller;
 
     struct {
         // callback to receive progress reports from function
-        rrd_function_progress_cb_t cb;
+        nrpc_progress_cb_t cb;
         void *data;
     } progress;
 
     struct {
         // to be registered by the function itself
         // used to send progress requests to function
-        rrd_function_progresser_cb_t cb;
+        nrpc_progress_hook_cb_t cb;
         void *data;
     } progresser;
 };
@@ -97,10 +97,10 @@ static void rrd_functions_inflight_cleanup(struct rrd_function_inflight *r) {
     freez((void *)r->source);
 
     // the execute capture's transport pin (NULL for INTERNAL sources)
-    rrd_function_capture_release(&r->captured);
+    nrpc_capture_release(&r->captured);
 
     // the canceller/progresser registration pins: per the
-    // rrd_function_cancel_cb_t contract their data is a transport, entry-
+    // nrpc_cancel_hook_cb_t contract their data is a transport, entry-
     // pinned at registration - BOTH released here, no dedup (an async record
     // can hold two). NULL-safe, so cleanup on a never-inserted record (the
     // early error paths) releases nothing.
@@ -121,7 +121,7 @@ static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe
     // internal_error(true, "FUNCTIONS: transaction '%s' finished", r->transaction);
 
     rrd_functions_inflight_cleanup(r);
-    rrd_function_acquired_release(r->host, r->host_function_acquired);
+    nrpc_method_acquired_release(r->host, r->host_function_acquired);
 }
 
 static void rrd_functions_inflight_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -181,10 +181,10 @@ void rrd_function_transactions_destroy(void) {
     rrd_function_transactions.dict = NULL;
 }
 
-static void rrd_inflight_async_function_register_canceller_cb(void *register_canceller_cb_data, rrd_function_cancel_cb_t canceller_cb, void *canceller_cb_data) {
+static void rrd_inflight_async_function_register_canceller_cb(void *register_canceller_cb_data, nrpc_cancel_hook_cb_t canceller_cb, void *canceller_cb_data) {
     struct rrd_function_inflight *r = register_canceller_cb_data;
 
-    // per the rrd_function_cancel_cb_t contract, canceller_cb_data is the
+    // per the nrpc_cancel_hook_cb_t contract, canceller_cb_data is the
     // registrar's transport: entry-pin it for the record's lifetime, so a late
     // cancel after the transport's owner died acquire-fails on a valid (dead)
     // transport instead of chasing a freed pointer. Released in
@@ -193,7 +193,7 @@ static void rrd_inflight_async_function_register_canceller_cb(void *register_can
     // on a legally held pointer (it fatals on use-after-release); storing its
     // returned pointer keeps the sites that fill a dedicated transport field
     // shaped the same way (dyncfg_insert_cb, dyncfg_conflict_cb). The registry
-    // entry sites store the transport as execute_cb_data itself, so they have
+    // entry sites store the transport as handler_data itself, so they have
     // no separate field to fill.
     struct nrpc_transport *pinned = nrpc_transport_entry_acquire(canceller_cb_data);
 
@@ -206,7 +206,7 @@ static void rrd_inflight_async_function_register_canceller_cb(void *register_can
     nrpc_transport_entry_release(previous);
 }
 
-static void rrd_inflight_async_function_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
+static void rrd_inflight_async_function_register_progresser_cb(void *register_progresser_cb_data, nrpc_progress_hook_cb_t progresser_cb, void *progresser_cb_data) {
     struct rrd_function_inflight *r = register_progresser_cb_data;
 
     // same contract, pin and re-registration handling as the canceller above
@@ -290,7 +290,7 @@ static bool rrd_inflight_async_function_is_cancelled(void *data) {
 }
 
 static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_inflight *r) {
-    struct rrd_function_execute rfe = {
+    struct nrpc_request req = {
         .transaction = &r->transaction_uuid,
         .function = r->sanitized_cmd,
         .payload = r->payload,
@@ -310,16 +310,16 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
             .cb = rrd_inflight_async_function_is_cancelled,
             .data = r,
         },
-        .register_canceller = {
+        .register_cancel_hook = {
             .cb = rrd_inflight_async_function_register_canceller_cb,
             .data = r,
         },
-        .register_progresser = {
+        .register_progress_hook = {
             .cb = rrd_inflight_async_function_register_progresser_cb,
             .data = r,
         },
     };
-    int code = r->captured.execute_cb(&rfe, r->captured.execute_cb_data);
+    int code = r->captured.handler(&req, r->captured.handler_data);
 
     return code;
 }
@@ -340,7 +340,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     BUFFER *temp_wb  = buffer_create(1024, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = r->result.wb->content_type;
 
-    struct rrd_function_execute rfe = {
+    struct nrpc_request req = {
         .transaction = &r->transaction_uuid,
         .function = r->sanitized_cmd,
         .payload = r->payload,
@@ -363,16 +363,16 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
             .cb = rrd_inflight_async_function_is_cancelled,
             .data = r,
         },
-        .register_canceller = {
+        .register_cancel_hook = {
             .cb = rrd_inflight_async_function_register_canceller_cb,
             .data = r,
         },
-        .register_progresser = {
+        .register_progress_hook = {
             .cb = rrd_inflight_async_function_register_progresser_cb,
             .data = r,
         },
     };
-    int code = r->captured.execute_cb(&rfe, r->captured.execute_cb_data);
+    int code = r->captured.handler(&req, r->captured.handler_data);
 
     // this has to happen after we execute the callback
     // because if an async call is responded in sync mode, there will be a deadlock.
@@ -383,7 +383,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
         int rc = 0;
         while (rc == 0 && !cancelled && !tmp->data_are_ready) {
             usec_t now_mono_ut = now_monotonic_usec();
-            usec_t stop_mono_ut = rrd_function_effective_deadline_ut(__atomic_load_n(&r->stop_monotonic_ut, __ATOMIC_RELAXED));
+            usec_t stop_mono_ut = nrpc_effective_deadline_ut(__atomic_load_n(&r->stop_monotonic_ut, __ATOMIC_RELAXED));
             if(now_mono_ut > stop_mono_ut) {
                 rc = UV_ETIMEDOUT;
                 break;
@@ -479,7 +479,7 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 
 int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
-                              RRD_FUNCTION_ACQUIRED **out_acquired) {
+                              NRPC_METHOD_ACQUIRED **out_acquired) {
 
     if(out_acquired)
         *out_acquired = NULL;
@@ -491,37 +491,37 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
 
-    RRD_FUNCTION_ACQUIRED *host_function_acquired = NULL;
-    int code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
+    NRPC_METHOD_ACQUIRED *host_function_acquired = NULL;
+    int code = nrpc_registry_find(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
     if(code != HTTP_RESP_OK)
         return code;
 
-    struct rrd_host_function *rdcf = rrd_function_acquired_value(host_function_acquired);
+    struct nrpc_method *method = nrpc_method_acquired_value(host_function_acquired);
 
-    if((rdcf->options & RRD_FUNCTION_RESTRICTED) && !allow_restricted) {
+    if((method->options & NRPC_METHOD_FLAG_RESTRICTED) && !allow_restricted) {
         code = rrd_call_function_error(result_wb,
                                        "This feature is not available via this API.",
                                        HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
-        rrd_function_acquired_release(host, host_function_acquired);
+        nrpc_method_acquired_release(host, host_function_acquired);
         return code;
     }
 
-    if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
+    if(!http_access_user_has_enough_access_level_for_endpoint(user_access, method->access)) {
 
-        if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
+        if((method->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
             code = rrd_call_function_error(result_wb,
                                            "You need to be authenticated via Netdata Cloud Single-Sign-On (SSO) "
                                            "to access this feature. Sign-in on this dashboard, "
                                            "or access your Netdata via https://app.netdata.cloud.",
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
-        else if((rdcf->access & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
+        else if((method->access & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
             code = rrd_call_function_error(result_wb,
                                            "You need to login to the Netdata Cloud space this agent is claimed to, "
                                            "to access this feature.",
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
-        else if((rdcf->access & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
+        else if((method->access & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
             code = rrd_call_function_error(result_wb,
                                            "This feature is only available for commercial users and supporters "
                                            "of Netdata. To use it, please upgrade your space. "
@@ -529,7 +529,7 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
         else {
-            HTTP_ACCESS missing_access = (~user_access) & rdcf->access;
+            HTTP_ACCESS missing_access = (~user_access) & method->access;
             char perms_str[1024];
             http_access2txt(perms_str, sizeof(perms_str), ", ", missing_access);
 
@@ -540,14 +540,14 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
         }
 
-        rrd_function_acquired_release(host, host_function_acquired);
+        nrpc_method_acquired_release(host, host_function_acquired);
         return code;
     }
 
     if(out_acquired)
         *out_acquired = host_function_acquired;
     else
-        rrd_function_acquired_release(host, host_function_acquired);
+        nrpc_method_acquired_release(host, host_function_acquired);
 
     return HTTP_RESP_OK;
 }
@@ -555,17 +555,17 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      HTTP_ACCESS user_access, const char *cmd,
                      bool wait, const char *transaction,
-                     rrd_function_result_callback_t result_cb, void *result_cb_data,
-                     rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                     nrpc_result_cb_t result_cb, void *result_cb_data,
+                     nrpc_progress_cb_t progress_cb, void *progress_cb_data,
+                     nrpc_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
                      BUFFER *payload, const char *source, bool allow_restricted) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
-    RRD_FUNCTION_ACQUIRED *host_function_acquired = NULL;
+    NRPC_METHOD_ACQUIRED *host_function_acquired = NULL;
 
     const char *source_to_sanitize = source ? source : "";
-    size_t sanitized_source_size = rrd_functions_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
+    size_t sanitized_source_size = nrpc_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *sanitized_source = mallocz(sanitized_source_size);
     rrd_functions_sanitize(sanitized_source, source_to_sanitize, sanitized_source_size);
 
@@ -596,10 +596,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         return code;
     }
 
-    struct rrd_host_function *rdcf = rrd_function_acquired_value(host_function_acquired);
+    struct nrpc_method *method = nrpc_method_acquired_value(host_function_acquired);
 
     if(timeout_s <= 0)
-        timeout_s = rdcf->timeout;
+        timeout_s = method->timeout;
 
     // ------------------------------------------------------------------------
     // validate and parse the transaction, or generate a new transaction id
@@ -630,7 +630,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         .cancelled = false,
         .stop_monotonic_ut = now_monotonic_usec() + timeout_s * USEC_PER_SEC,
         .host_function_acquired = host_function_acquired,
-        .rdcf = rdcf,
+        .method = method,
         .result = {
             .wb = result_wb,
             .cb = result_cb,
@@ -649,10 +649,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     uuid_copy(t.transaction_uuid, uuid);
 
     // capture the execute pair NOW, under the entry's leaf lock, pinning the
-    // transport - executors must never re-read rdcf's pair at call time (see
+    // transport - executors must never re-read method's pair at call time (see
     // struct rrd_function_inflight.captured). The early error paths below
     // release the pin via rrd_functions_inflight_cleanup(&t).
-    rrd_function_acquired_capture(host_function_acquired, &t.captured);
+    nrpc_method_capture(host_function_acquired, &t.captured);
 
     bool duplicate_transaction = false;
     struct rrd_function_inflight *r = dictionary_set_advanced(
@@ -662,7 +662,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         code = rrd_call_function_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
 
         rrd_functions_inflight_cleanup(&t);
-        rrd_function_acquired_release(host, t.host_function_acquired);
+        nrpc_method_acquired_release(host, t.host_function_acquired);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);
@@ -678,7 +678,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         code = rrd_call_function_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
 
         rrd_functions_inflight_cleanup(&t);
-        rrd_function_acquired_release(host, t.host_function_acquired);
+        nrpc_method_acquired_release(host, t.host_function_acquired);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);
@@ -687,10 +687,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     }
     // internal_error(true, "FUNCTIONS: transaction '%s' started", r->transaction);
 
-    if(r->rdcf->sync) {
+    if(r->method->sync) {
         // the caller has to wait
 
-        struct rrd_function_execute rfe = {
+        struct nrpc_request req = {
             .transaction = &r->transaction_uuid,
             .function = r->sanitized_cmd,
             .payload = r->payload,
@@ -713,16 +713,16 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                 .cb = r->is_cancelled.cb,
                 .data = r->is_cancelled.data,
             },
-            .register_canceller = {
+            .register_cancel_hook = {
                 .cb = NULL,
                 .data = NULL,
             },
-            .register_progresser = {
+            .register_progress_hook = {
                 .cb = NULL,
                 .data = NULL,
             },
         };
-        code = r->captured.execute_cb(&rfe, r->captured.execute_cb_data);
+        code = r->captured.handler(&req, r->captured.handler_data);
 
         rrd_inflight_function_cleanup(host, r->transaction);
         return code;
@@ -731,7 +731,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     return rrd_call_function_async(r, wait);
 }
 
-bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_function_result_callback_t cb) {
+bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, nrpc_result_cb_t cb) {
     bool ret = false;
     char str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(*transaction, str);
@@ -760,14 +760,14 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
 
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
-    if(!nrpc_serving_dispatcher_acquire(r->rdcf->serving)) {
+    if(!nrpc_serving_dispatcher_acquire(r->method->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a CANCEL request for transaction '%s', but the collector is not running.",
                r->transaction);
         return;
     }
 
-    rrd_function_cancel_cb_t canceller_cb;
+    nrpc_cancel_hook_cb_t canceller_cb;
     void *canceller_cb_data;
 
     spinlock_lock(&r->callbacks.spinlock);
@@ -778,7 +778,7 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
     if(canceller_cb)
         canceller_cb(r->transaction, canceller_cb_data);
 
-    nrpc_serving_dispatcher_release(r->rdcf->serving);
+    nrpc_serving_dispatcher_release(r->method->serving);
 }
 
 void rrd_function_cancel(const char *transaction) {
@@ -808,7 +808,7 @@ void rrd_function_progress(const char *transaction) {
 
     struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
 
-    if(!nrpc_serving_dispatcher_acquire(r->rdcf->serving)) {
+    if(!nrpc_serving_dispatcher_acquire(r->method->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: received a PROGRESS request for transaction '%s', but the collector is not running.",
                transaction);
@@ -817,7 +817,7 @@ void rrd_function_progress(const char *transaction) {
 
     functions_stop_monotonic_update_on_progress(&r->stop_monotonic_ut);
 
-    rrd_function_progresser_cb_t progresser_cb;
+    nrpc_progress_hook_cb_t progresser_cb;
     void *progresser_cb_data;
 
     spinlock_lock(&r->callbacks.spinlock);
@@ -828,7 +828,7 @@ void rrd_function_progress(const char *transaction) {
     if(progresser_cb)
         progresser_cb(transaction, progresser_cb_data);
 
-    nrpc_serving_dispatcher_release(r->rdcf->serving);
+    nrpc_serving_dispatcher_release(r->method->serving);
 
 cleanup:
     dictionary_acquired_item_release(rrd_function_transactions.dict, item);

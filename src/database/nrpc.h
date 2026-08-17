@@ -6,20 +6,20 @@
 
 #include "libnetdata/libnetdata.h"
 
-#define RRDFUNCTIONS_PRIORITY_DEFAULT 100
-#define RRDFUNCTIONS_VERSION_DEFAULT 0
-#define RRDFUNCTIONS_TAG_HIDDEN "hidden"
+#define NRPC_PRIORITY_DEFAULT 100
+#define NRPC_VERSION_DEFAULT 0
+#define NRPC_TAG_HIDDEN "hidden"
 
-#define RRDFUNCTIONS_TIMEOUT_EXTENSION_UT (1 * USEC_PER_SEC)
+#define NRPC_DEADLINE_GRACE_UT (1 * USEC_PER_SEC)
 
 // the broker grants every deadline a grace extension before enforcing it;
 // apply it through this helper only, so the policy lives in one place
-static inline usec_t rrd_function_effective_deadline_ut(usec_t stop_monotonic_ut) {
-    return stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
+static inline usec_t nrpc_effective_deadline_ut(usec_t stop_monotonic_ut) {
+    return stop_monotonic_ut + NRPC_DEADLINE_GRACE_UT;
 }
 
-typedef void (*rrd_function_result_callback_t)(BUFFER *wb, int code, void *result_cb_data);
-typedef bool (*rrd_function_is_cancelled_cb_t)(void *is_cancelled_cb_data);
+typedef void (*nrpc_result_cb_t)(BUFFER *wb, int code, void *result_cb_data);
+typedef bool (*nrpc_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 
 // The canceller is keyed by transaction (daemon-internal contract: the sole
 // implementer is the pluginsd transport; plugin-side functions_evloop cancels
@@ -27,13 +27,13 @@ typedef bool (*rrd_function_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 // progressers are registered ONLY by function transports - their `data` is a
 // struct nrpc_transport, and the broker entry-pins it for the record's
 // lifetime.
-typedef void (*rrd_function_cancel_cb_t)(const char *transaction, void *data);
-typedef void (*rrd_function_register_canceller_cb_t)(void *register_cancel_cb_data, rrd_function_cancel_cb_t cancel_cb, void *cancel_cb_data);
-typedef void (*rrd_function_progress_cb_t)(nd_uuid_t *transaction, void *data, size_t done, size_t all);
-typedef void (*rrd_function_progresser_cb_t)(const char *transaction, void *data);
-typedef void (*rrd_function_register_progresser_cb_t)(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data);
+typedef void (*nrpc_cancel_hook_cb_t)(const char *transaction, void *data);
+typedef void (*nrpc_register_cancel_hook_cb_t)(void *register_cancel_cb_data, nrpc_cancel_hook_cb_t cancel_cb, void *cancel_cb_data);
+typedef void (*nrpc_progress_cb_t)(nd_uuid_t *transaction, void *data, size_t done, size_t all);
+typedef void (*nrpc_progress_hook_cb_t)(const char *transaction, void *data);
+typedef void (*nrpc_register_progress_hook_cb_t)(void *register_progresser_cb_data, nrpc_progress_hook_cb_t progresser_cb, void *progresser_cb_data);
 
-struct rrd_function_execute {
+struct nrpc_request {
     nd_uuid_t *transaction;
     const char *function;
     BUFFER *payload;
@@ -42,103 +42,103 @@ struct rrd_function_execute {
     HTTP_ACCESS user_access;
 
     // points into the broker record: valid ONLY for the duration of the
-    // execute_cb invocation - executors must not stash it; later deadline
+    // handler invocation - executors must not stash it; later deadline
     // reads go through rrd_function_transaction_deadline()
     usec_t *stop_monotonic_ut;
 
     struct {
         BUFFER *wb; // the response should be written here
-        rrd_function_result_callback_t cb;
+        nrpc_result_cb_t cb;
         void *data;
     } result;
 
     struct {
-        rrd_function_progress_cb_t cb;
+        nrpc_progress_cb_t cb;
         void *data;
     } progress;
 
     struct {
-        rrd_function_is_cancelled_cb_t cb;
+        nrpc_is_cancelled_cb_t cb;
         void *data;
     } is_cancelled;
 
     struct {
-        rrd_function_register_canceller_cb_t cb;
+        nrpc_register_cancel_hook_cb_t cb;
         void *data;
-    } register_canceller;
+    } register_cancel_hook;
 
     struct {
-        rrd_function_register_progresser_cb_t cb;
+        nrpc_register_progress_hook_cb_t cb;
         void *data;
-    } register_progresser;
+    } register_progress_hook;
 };
 
-typedef int (*rrd_function_execute_cb_t)(struct rrd_function_execute *rfe, void *data);
+typedef int (*nrpc_handler_cb_t)(struct nrpc_request *req, void *data);
 
 
 // ----------------------------------------------------------------------------
 
 #include "rrd.h"
 
-struct rrd_host_function;
+struct nrpc_method;
 
 // opaque handle to an acquired function registry entry - the entry cannot be
 // freed while the handle is held (idiom: RRDSET_ACQUIRED, RRDHOST_ACQUIRED)
-typedef struct rrd_function_acquired RRD_FUNCTION_ACQUIRED;
+typedef struct nrpc_method_acquired NRPC_METHOD_ACQUIRED;
 
 typedef enum __attribute__((packed)) {
-    RRD_FUNCTION_LOCAL  = (1 << 0),
-    RRD_FUNCTION_GLOBAL = (1 << 1),
-    RRD_FUNCTION_DYNCFG = (1 << 2),
-    RRD_FUNCTION_RESTRICTED = (1 << 3), // this function is restricted (hidden from user)
+    NRPC_METHOD_FLAG_LOCAL  = (1 << 0),
+    NRPC_METHOD_FLAG_GLOBAL = (1 << 1),
+    NRPC_METHOD_FLAG_DYNCFG = (1 << 2),
+    NRPC_METHOD_FLAG_RESTRICTED = (1 << 3), // this function is restricted (hidden from user)
 
     // this is 8-bit
-} RRD_FUNCTION_OPTIONS;
+} NRPC_METHOD_FLAGS;
 
 // who is registering (or unregistering) a function - the registry enforces
 // per-source rules (e.g. only the dyncfg subsystem and streaming children may
 // register dyncfg-reserved names) and, on delete, who may remove what
 typedef enum __attribute__((packed)) {
-    RRD_FUNCTION_REG_SOURCE_COLLECTOR = 0,  // a local plugin / collector thread (pluginsd FUNCTION)
-    RRD_FUNCTION_REG_SOURCE_STREAMING,      // a streaming child's advertisement on this parent
-    RRD_FUNCTION_REG_SOURCE_INTERNAL,       // daemon-internal registration (inline functions, dyncfg)
-} RRD_FUNCTION_REG_SOURCE;
+    NRPC_SOURCE_PLUGIN = 0,  // a local plugin / collector thread (pluginsd FUNCTION)
+    NRPC_SOURCE_STREAM,      // a streaming child's advertisement on this parent
+    NRPC_SOURCE_DAEMON,       // daemon-internal registration (inline functions, dyncfg)
+} NRPC_SOURCE;
 
-void rrd_functions_host_init(RRDHOST *host);
-void rrd_functions_host_destroy(RRDHOST *host);
+void nrpc_registry_init(RRDHOST *host);
+void nrpc_registry_destroy(RRDHOST *host);
 
 // release a handle acquired via rrd_function_verify_access()
-void rrd_function_acquired_release(RRDHOST *host, RRD_FUNCTION_ACQUIRED *rfa);
+void nrpc_method_acquired_release(RRDHOST *host, NRPC_METHOD_ACQUIRED *acquired);
 
 // add a function, to be run from the collector
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
-                      HTTP_ACCESS access, bool sync, RRD_FUNCTION_REG_SOURCE source,
-                      rrd_function_execute_cb_t execute_cb, void *execute_cb_data);
+void nrpc_method_register(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
+                      HTTP_ACCESS access, bool sync, NRPC_SOURCE source,
+                      nrpc_handler_cb_t handler, void *handler_data);
 
-bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, RRD_FUNCTION_REG_SOURCE source);
+bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SOURCE source);
 
 // true if name is a reserved dynamic-configuration function name ("config" or "config <id>")
-bool rrd_function_name_is_dyncfg(const char *name);
+bool nrpc_method_name_is_dyncfg(const char *name);
 
 // call a function, to be run from anywhere
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      HTTP_ACCESS user_access, const char *cmd,
                      bool wait, const char *transaction,
-                     rrd_function_result_callback_t result_cb, void *result_cb_data,
-                     rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                     nrpc_result_cb_t result_cb, void *result_cb_data,
+                     nrpc_progress_cb_t progress_cb, void *progress_cb_data,
+                     nrpc_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
                      BUFFER *payload, const char *source, bool allow_restricted);
 
 // Verify the caller may invoke `cmd` on `host`, applying the same RESTRICTED and access-level
 // checks rrd_function_run() enforces, WITHOUT executing the function. This lets non-execution
 // paths (e.g. MCP metadata/help generation) authorize a caller before disclosing anything.
 // On success returns HTTP_RESP_OK; if out_acquired != NULL it receives an acquired registry
-// handle the caller MUST release with rrd_function_acquired_release(host, *out_acquired),
+// handle the caller MUST release with nrpc_method_acquired_release(host, *out_acquired),
 // otherwise the handle is released internally. On failure it writes the error into result_wb,
 // releases any acquired handle, sets *out_acquired (if any) to NULL, and returns the HTTP code.
 int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
-                              RRD_FUNCTION_ACQUIRED **out_acquired);
+                              NRPC_METHOD_ACQUIRED **out_acquired);
 
 // Regression test for rrd_function_verify_access() access gating (GHSA-6628-vxm3-4g8g).
 // Requires a prepared RRD (localhost). Returns the number of failures (0 = pass).
@@ -148,10 +148,10 @@ int rrdfunctions_del_unittest(void);
 int rrdfunctions_registry_unittest(void);
 int rrdfunctions_emitters_unittest(void);
 
-bool rrd_function_available(RRDHOST *host, const char *function);
-bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
+bool nrpc_method_available(RRDHOST *host, const char *function);
+bool nrpc_method_is_available(RRDHOST *host, struct nrpc_method *method);
 
-bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_function_result_callback_t cb);
+bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, nrpc_result_cb_t cb);
 
 #include "nrpc-builtin.h"
 #include "nrpc-calls.h"

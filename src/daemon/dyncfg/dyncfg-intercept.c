@@ -11,7 +11,7 @@ struct dyncfg_call {
     const char *add_name;
     const char *source;
     DYNCFG_CMDS cmd;
-    rrd_function_result_callback_t result_cb;
+    nrpc_result_cb_t result_cb;
     void *result_cb_data;
     bool from_dyncfg_echo;
 };
@@ -125,7 +125,7 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
         // conflict-transfer's displaced release (plugin restart) and hand the
         // new job node a freed transport. Our pin covers the window until the
         // job node's insert callback takes its own; released below.
-        rrd_function_execute_cb_t template_cb;
+        nrpc_handler_cb_t template_cb;
         void *template_cb_data;
         struct nrpc_transport *template_transport_pin =
             dyncfg_node_execute_snapshot(df_template, &template_cb, &template_cb_data);
@@ -251,7 +251,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
 
 // ----------------------------------------------------------------------------
 
-static void dyncfg_apply_action_on_all_template_jobs(struct rrd_function_execute *rfe, const char *template_id, DYNCFG_CMDS c) {
+static void dyncfg_apply_action_on_all_template_jobs(struct nrpc_request *req, const char *template_id, DYNCFG_CMDS c) {
     STRING *template = string_strdupz(template_id);
     DYNCFG *df;
 
@@ -262,8 +262,8 @@ static void dyncfg_apply_action_on_all_template_jobs(struct rrd_function_execute
     }
     dfe_done(df);
 
-    if(rfe->progress.cb)
-        rfe->progress.cb(rfe->transaction, rfe->progress.data, done, all);
+    if(req->progress.cb)
+        req->progress.cb(req->transaction, req->progress.data, done, all);
 
     dfe_start_reentrant(dyncfg_globals.nodes, df) {
         if(df->template == template && df->type == DYNCFG_TYPE_JOB) {
@@ -276,8 +276,8 @@ static void dyncfg_apply_action_on_all_template_jobs(struct rrd_function_execute
 
             dyncfg_echo(df_dfe.item, df, df_dfe.name, cmd_to_send_to_plugin);
 
-            if(rfe->progress.cb)
-                rfe->progress.cb(rfe->transaction, rfe->progress.data, ++done, all);
+            if(req->progress.cb)
+                req->progress.cb(req->transaction, req->progress.data, ++done, all);
         }
     }
     dfe_done(df);
@@ -288,11 +288,11 @@ static void dyncfg_apply_action_on_all_template_jobs(struct rrd_function_execute
 // ----------------------------------------------------------------------------
 // the callback for all config functions
 
-static int dyncfg_intercept_early_error(struct rrd_function_execute *rfe, int rc, const char *msg) {
-    rc = dyncfg_default_response(rfe->result.wb, rc, msg);
+static int dyncfg_intercept_early_error(struct nrpc_request *req, int rc, const char *msg) {
+    rc = dyncfg_default_response(req->result.wb, rc, msg);
 
-    if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, rc, rfe->result.data);
+    if(req->result.cb)
+        req->result.cb(req->result.wb, rc, req->result.data);
 
     return rc;
 }
@@ -316,19 +316,19 @@ const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
     return item;
 }
 
-int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+int dyncfg_function_intercept_cb(struct nrpc_request *req, void *data __maybe_unused) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    bool called_from_dyncfg_echo = rrd_function_has_this_original_result_callback(rfe->transaction, dyncfg_echo_cb);
-    bool has_payload = rfe->payload && buffer_strlen(rfe->payload) ? true : false;
+    bool called_from_dyncfg_echo = rrd_function_has_this_original_result_callback(req->transaction, dyncfg_echo_cb);
+    bool has_payload = req->payload && buffer_strlen(req->payload) ? true : false;
     bool make_the_call_to_plugin = true;
 
     int rc = HTTP_RESP_INTERNAL_SERVER_ERROR;
     DYNCFG_CMDS cmd;
     const DICTIONARY_ITEM *item = NULL;
 
-    CLEAN_CHAR_P *buf = strdupz(rfe->function);
+    CLEAN_CHAR_P *buf = strdupz(req->function);
 
     char *words[20];
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, 20);
@@ -341,13 +341,13 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0)
         return dyncfg_intercept_early_error(
-            rfe, HTTP_RESP_BAD_REQUEST,
+            req, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this is not a dyncfg request");
 
     cmd = dyncfg_cmds2id(cmd_str);
     if(cmd == DYNCFG_CMD_NONE)
         return dyncfg_intercept_early_error(
-            rfe, HTTP_RESP_BAD_REQUEST,
+            req, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: invalid command received");
 
     if(cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) {
@@ -364,7 +364,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
         if(!add_name || !*add_name)
             return dyncfg_intercept_early_error(
-                rfe, HTTP_RESP_BAD_REQUEST,
+                req, HTTP_RESP_BAD_REQUEST,
                 "dyncfg functions intercept: this action requires a name");
 
         if(!called_from_dyncfg_echo) {
@@ -374,19 +374,19 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
             if (cmd == DYNCFG_CMD_ADD && dictionary_get(dyncfg_globals.nodes, nid))
                 return dyncfg_intercept_early_error(
-                    rfe, HTTP_RESP_BAD_REQUEST,
+                    req, HTTP_RESP_BAD_REQUEST,
                     "dyncfg functions intercept: a configuration with this name already exists");
         }
     }
 
     if((cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_UPDATE || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) && !has_payload)
         return dyncfg_intercept_early_error(
-            rfe, HTTP_RESP_BAD_REQUEST,
+            req, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this action requires a payload");
 
     if((cmd != DYNCFG_CMD_ADD && cmd != DYNCFG_CMD_UPDATE && cmd != DYNCFG_CMD_TEST && cmd != DYNCFG_CMD_USERCONFIG) && has_payload)
         return dyncfg_intercept_early_error(
-            rfe, HTTP_RESP_BAD_REQUEST,
+            req, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this action does not require a payload");
 
     item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
@@ -398,7 +398,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
         if(!item)
             return dyncfg_intercept_early_error(
-                rfe, HTTP_RESP_NOT_FOUND,
+                req, HTTP_RESP_NOT_FOUND,
                 "dyncfg functions intercept: id is not found");
     }
 
@@ -410,10 +410,10 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         case DYNCFG_CMD_GET:
         case DYNCFG_CMD_SCHEMA:
         case DYNCFG_CMD_USERCONFIG:
-            if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->view_access)) {
+            if(!http_access_user_has_enough_access_level_for_endpoint(req->user_access, df->view_access)) {
                 make_the_call_to_plugin = false;
                 rc = dyncfg_default_response(
-                    rfe->result.wb, HTTP_RESP_FORBIDDEN,
+                    req->result.wb, HTTP_RESP_FORBIDDEN,
                     "dyncfg: you don't have enough view permissions to execute this command");
             }
             break;
@@ -425,10 +425,10 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         case DYNCFG_CMD_UPDATE:
         case DYNCFG_CMD_REMOVE:
         case DYNCFG_CMD_RESTART:
-            if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->edit_access)) {
+            if(!http_access_user_has_enough_access_level_for_endpoint(req->user_access, df->edit_access)) {
                 make_the_call_to_plugin = false;
                 rc = dyncfg_default_response(
-                    rfe->result.wb, HTTP_RESP_FORBIDDEN,
+                    req->result.wb, HTTP_RESP_FORBIDDEN,
                     "dyncfg: you don't have enough edit permissions to execute this command");
             }
             break;
@@ -436,7 +436,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         default: {
             make_the_call_to_plugin = false;
             rc = dyncfg_default_response(
-                rfe->result.wb, HTTP_RESP_INTERNAL_SERVER_ERROR,
+                req->result.wb, HTTP_RESP_INTERNAL_SERVER_ERROR,
                 "dyncfg: permissions for this command are not set");
         }
         break;
@@ -447,23 +447,23 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     if(make_the_call_to_plugin) {
         if (!(df->cmds & cmd)) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "DYNCFG: this command is not supported by the configuration node: %s", rfe->function);
+                   "DYNCFG: this command is not supported by the configuration node: %s", req->function);
 
             make_the_call_to_plugin = false;
             rc = dyncfg_default_response(
-                rfe->result.wb, HTTP_RESP_BAD_REQUEST,
+                req->result.wb, HTTP_RESP_BAD_REQUEST,
                 "dyncfg functions intercept: this command is not supported by this configuration node");
         }
         else if (cmd == DYNCFG_CMD_ADD) {
             if (df->type != DYNCFG_TYPE_TEMPLATE) {
                 make_the_call_to_plugin = false;
                 rc = dyncfg_default_response(
-                    rfe->result.wb, HTTP_RESP_BAD_REQUEST,
+                    req->result.wb, HTTP_RESP_BAD_REQUEST,
                     "dyncfg functions intercept: add command is only allowed in templates");
 
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "DYNCFG: add command can only be applied on templates, not %s: %s",
-                       dyncfg_id2type(df->type), rfe->function);
+                       dyncfg_id2type(df->type), req->function);
             }
         }
         else if (
@@ -471,11 +471,11 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
             dyncfg_is_user_disabled(string2str(df->template))) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "DYNCFG: cannot enable a job of a disabled template: %s",
-                   rfe->function);
+                   req->function);
 
             make_the_call_to_plugin = false;
             rc = dyncfg_default_response(
-                rfe->result.wb, HTTP_RESP_BAD_REQUEST,
+                req->result.wb, HTTP_RESP_BAD_REQUEST,
                 "dyncfg functions intercept: this job belongs to disabled template");
         }
     }
@@ -497,38 +497,38 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
                 // log it
                 {
                     struct dyncfg_call dc = {
-                        .function = rfe->function,
+                        .function = req->function,
                         .id = id,
-                        .source = rfe->source,
+                        .source = req->source,
                         .add_name = add_name,
                         .cmd = cmd,
                         .result_cb = NULL,
                         .result_cb_data = NULL,
-                        .payload = rfe->payload,
+                        .payload = req->payload,
                         .from_dyncfg_echo = called_from_dyncfg_echo,
                     };
-                    uuid_copy(dc.transaction.uuid, *rfe->transaction);
+                    uuid_copy(dc.transaction.uuid, *req->transaction);
 
                     dyncfg_log_user_action(df, &dc);
                 }
             }
 
-            dyncfg_apply_action_on_all_template_jobs(rfe, id, cmd);
+            dyncfg_apply_action_on_all_template_jobs(req, id, cmd);
 
-            rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_OK, "applied to all template job");
+            rc = dyncfg_default_response(req->result.wb, HTTP_RESP_OK, "applied to all template job");
             make_the_call_to_plugin = false;
         }
         else if (cmd == DYNCFG_CMD_SCHEMA) {
             bool loaded = false;
             if (df->type == DYNCFG_TYPE_JOB) {
                 if (df->template)
-                    loaded = dyncfg_get_schema(string2str(df->template), rfe->result.wb);
+                    loaded = dyncfg_get_schema(string2str(df->template), req->result.wb);
             } else
-                loaded = dyncfg_get_schema(id, rfe->result.wb);
+                loaded = dyncfg_get_schema(id, req->result.wb);
 
             if (loaded) {
-                rfe->result.wb->content_type = CT_APPLICATION_JSON;
-                rfe->result.wb->expires = now_realtime_sec();
+                req->result.wb->content_type = CT_APPLICATION_JSON;
+                req->result.wb->expires = now_realtime_sec();
                 rc = HTTP_RESP_OK;
                 make_the_call_to_plugin = false;
             }
@@ -539,35 +539,35 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
     if(make_the_call_to_plugin) {
         struct dyncfg_call *dc = callocz(1, sizeof(*dc));
-        uuid_copy(dc->transaction.uuid, *rfe->transaction);
-        dc->function = strdupz(rfe->function);
+        uuid_copy(dc->transaction.uuid, *req->transaction);
+        dc->function = strdupz(req->function);
         dc->id = strdupz(id);
-        dc->source = rfe->source ? strdupz(rfe->source) : NULL;
+        dc->source = req->source ? strdupz(req->source) : NULL;
         dc->add_name = (add_name) ? strdupz(add_name) : NULL;
         dc->cmd = cmd;
-        dc->result_cb = rfe->result.cb;
-        dc->result_cb_data = rfe->result.data;
-        dc->payload = buffer_dup(rfe->payload);
+        dc->result_cb = req->result.cb;
+        dc->result_cb_data = req->result.data;
+        dc->payload = buffer_dup(req->payload);
         dc->from_dyncfg_echo = called_from_dyncfg_echo;
 
-        rfe->result.cb = dyncfg_function_intercept_result_cb;
-        rfe->result.data = dc;
+        req->result.cb = dyncfg_function_intercept_result_cb;
+        req->result.data = dc;
 
         // snapshot the execute pair and pin the transport under the node's
         // leaf lock: without the pin, a concurrent conflict-transfer (plugin
         // restart re-CREATE) could release the displaced transport between
         // our read and the callback's own acquire-or-503
-        rrd_function_execute_cb_t execute_cb;
-        void *execute_cb_data;
+        nrpc_handler_cb_t handler;
+        void *handler_data;
         struct nrpc_transport *transport_pin =
-            dyncfg_node_execute_snapshot(df, &execute_cb, &execute_cb_data);
+            dyncfg_node_execute_snapshot(df, &handler, &handler_data);
 
-        rc = execute_cb(rfe, execute_cb_data);
+        rc = handler(req, handler_data);
 
         nrpc_transport_entry_release(transport_pin);
     }
-    else if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, rc, rfe->result.data);
+    else if(req->result.cb)
+        req->result.cb(req->result.wb, rc, req->result.data);
 
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     return rc;

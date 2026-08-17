@@ -467,7 +467,7 @@ RRDHOST *rrdhost_create(
     spinlock_init(&host->aclk.spinlock);
 
     if (likely(!archived)) {
-        rrd_functions_host_init(host);
+        nrpc_registry_init(host);
         host->stream.snd.status.last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
         stream_sender_structures_init(host, stream, parents, api_key, send_charts_matching);
@@ -726,7 +726,7 @@ static void rrdhost_update(RRDHOST *host
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
 
-        rrd_functions_host_init(host);
+        nrpc_registry_init(host);
 
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
@@ -927,7 +927,7 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     // ORDERING (both directions load-bearing):
     // - the registry MUST be destroyed AFTER stream_sender_structures_free():
     //   until the sender thread is joined there, it can still run the global-
-    //   functions renderer, which locks host->functions->pending_dels.spinlock
+    //   functions renderer, which locks host->rpc_registry->pending_dels.spinlock
     //   and traverses its dictionary - destroying earlier is a use-after-free
     //   on the sender thread. (The receiver stop at the top of this function
     //   is a BOUNDED ~2s wait that can give up on a stalled receiver thread -
@@ -937,7 +937,7 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     // - it MUST be destroyed BEFORE destroy_aclk_config() in
     //   rrdhost_free_unlinked() - the ACLK teardown contract documented in
     //   sqlite_aclk.c (aclk_arm_node_manifest).
-    rrd_functions_host_destroy(host);
+    nrpc_registry_destroy(host);
 
     // an archived host keeps its aclk config, so it is still reached by the manifest send loop -
     // tell it the function list is now empty (arming is a single atomic CAS, safe under rrd_wrlock)

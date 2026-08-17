@@ -8,10 +8,10 @@
 #include "nrpc-serving-internals.h"
 #include "nrpc-transport.h"
 
-// The per-host function registry behind the opaque RRD_FUNCTIONS handle.
+// The per-host function registry behind the opaque NRPC_REGISTRY handle.
 // It owns the definitions dictionary; the host back-pointer is what the
 // dictionary callbacks use to reach the host they serve.
-struct rrd_functions {
+struct nrpc_registry {
     RRDHOST *host;                  // back-pointer for the dictionary callbacks
     DICTIONARY *dict;               // the function definitions, keyed by sanitized name
 
@@ -28,16 +28,16 @@ struct rrd_functions {
     } pending_dels;
 };
 
-struct rrd_host_function {
+struct nrpc_method {
     bool sync;                      // when true, the function is called synchronously
     bool unregistered;              // when true, the function is unavailable
-    RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
+    NRPC_METHOD_FLAGS options;   // NRPC_METHOD_FLAGS
 
-    // who registered this entry. Swapped together with execute_cb_data as ONE
+    // who registered this entry. Swapped together with handler_data as ONE
     // pair by the conflict callback, so ownership decisions (who may overwrite,
     // and later who releases the transport) always key on the value the entry
     // actually holds.
-    RRD_FUNCTION_REG_SOURCE source;
+    NRPC_SOURCE source;
 
     HTTP_ACCESS access;
     STRING *help;
@@ -46,14 +46,14 @@ struct rrd_host_function {
     int priority;
     uint32_t version;
 
-    rrd_function_execute_cb_t execute_cb;
-    void *execute_cb_data;
+    nrpc_handler_cb_t handler;
+    void *handler_data;
 
     OBJECT_STATE_ID rrdhost_state_id;
     struct nrpc_serving_handle *serving;
 
     // LEAF spinlock guarding the entry's SWAPPED fields: the (source,
-    // execute_cb_data) pair, execute_cb, and the help/tags STRINGs. The
+    // handler_data) pair, handler, and the help/tags STRINGs. The
     // conflict callback takes it (inside the dictionary index write lock)
     // around the swaps and the displaced releases/frees; readers take it
     // standalone AFTER the standard item acquire (the item ref pins the
@@ -63,30 +63,30 @@ struct rrd_host_function {
     SPINLOCK leaf_spinlock;
 };
 
-// does the registration source store a transport in execute_cb_data?
+// does the registration source store a transport in handler_data?
 // (INTERNAL data is caller-owned and never a transport)
-static inline bool rrd_function_source_has_transport(RRD_FUNCTION_REG_SOURCE source) {
-    return source == RRD_FUNCTION_REG_SOURCE_COLLECTOR || source == RRD_FUNCTION_REG_SOURCE_STREAMING;
+static inline bool nrpc_source_has_transport(NRPC_SOURCE source) {
+    return source == NRPC_SOURCE_PLUGIN || source == NRPC_SOURCE_STREAM;
 }
 
 // Capture-at-find: the execute pair captured under the leaf spinlock, with the
 // transport entry-pinned iff the source is transport-bearing. Executors NEVER
-// re-read rdcf->execute_cb / execute_cb_data at call time - a stale capture
+// re-read method->handler / handler_data at call time - a stale capture
 // degrades to a clean 503 via the transport's acquire-or-fail.
-struct rrd_function_capture {
-    rrd_function_execute_cb_t execute_cb;
-    void *execute_cb_data;
+struct nrpc_capture {
+    nrpc_handler_cb_t handler;
+    void *handler_data;
     struct nrpc_transport *transport_pin;   // entry-pinned; NULL for INTERNAL sources
 };
 
-void rrd_function_acquired_capture(RRD_FUNCTION_ACQUIRED *rfa, struct rrd_function_capture *out);
+void nrpc_method_capture(NRPC_METHOD_ACQUIRED *acquired, struct nrpc_capture *out);
 
-static inline void rrd_function_capture_release(struct rrd_function_capture *c) {
+static inline void nrpc_capture_release(struct nrpc_capture *c) {
     nrpc_transport_entry_release(c->transport_pin);
     c->transport_pin = NULL;
 }
 
-static inline size_t rrd_functions_strlen_bounded(const char *s, size_t max) {
+static inline size_t nrpc_strlen_bounded(const char *s, size_t max) {
     size_t len = strnlen(s, max + 1);
     if(unlikely(len > max))
         fatal("RRDFUNCTIONS: string exceeds maximum supported length.");
@@ -94,13 +94,13 @@ static inline size_t rrd_functions_strlen_bounded(const char *s, size_t max) {
     return len;
 }
 
-// RRD_FUNCTION_ACQUIRED is an acquired item of the registry dictionary - the
+// NRPC_METHOD_ACQUIRED is an acquired item of the registry dictionary - the
 // handle type is opaque outside the module, these helpers unwrap it inside.
-static inline struct rrd_host_function *rrd_function_acquired_value(RRD_FUNCTION_ACQUIRED *rfa) {
-    return dictionary_acquired_item_value((const DICTIONARY_ITEM *)rfa);
+static inline struct nrpc_method *nrpc_method_acquired_value(NRPC_METHOD_ACQUIRED *acquired) {
+    return dictionary_acquired_item_value((const DICTIONARY_ITEM *)acquired);
 }
 
-bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
-int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, RRD_FUNCTION_ACQUIRED **out_acquired);
+bool nrpc_method_is_available(RRDHOST *host, struct nrpc_method *method);
+int nrpc_registry_find(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, NRPC_METHOD_ACQUIRED **out_acquired);
 
 #endif //NETDATA_NRPC_INTERNALS_H

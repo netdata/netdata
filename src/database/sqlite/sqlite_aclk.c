@@ -1405,9 +1405,9 @@ void aclk_arm_node_manifest(RRDHOST *host)
     //   2. stream_receiver_signal_to_stop_and_wait() - waits for host->receiver to become NULL,
     //      but the wait is BOUNDED (~2s) and gives up on a stalled receiver thread, so step 2 is
     //      best-effort, not a guarantee (pre-existing residual, tracked separately)
-    //   3. rrd_functions_host_destroy()         - host->functions becomes NULL
+    //   3. nrpc_registry_destroy()         - host->rpc_registry becomes NULL
     //   4. destroy_aclk_config()                - only now is the config freed
-    // So the function-registry callers (which must first mutate host->functions) and
+    // So the function-registry callers (which must first mutate host->rpc_registry) and
     // rrdhost_clear_receiver() (which runs before host->receiver is cleared) cannot still be
     // running here, and a caller that reached this host through rrdhost_find_by_guid() did so
     // before step 1. Do NOT "fix" this by routing the arm back through the ACLK event loop: that

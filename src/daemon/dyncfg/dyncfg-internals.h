@@ -42,17 +42,17 @@ typedef struct dyncfg {
     } dyncfg;
 
     bool sync;
-    rrd_function_execute_cb_t execute_cb;
-    void *execute_cb_data;
+    nrpc_handler_cb_t handler;
+    void *handler_data;
 
-    // The transport pin (UAF-C fix): for plugin-backed nodes, execute_cb_data
+    // The transport pin (UAF-C fix): for plugin-backed nodes, handler_data
     // IS the plugin's transport and this field holds the SAME pointer with an
-    // entry ref - the pin exists iff this field is set (execute_cb_data alone
+    // entry ref - the pin exists iff this field is set (handler_data alone
     // is NOT a discriminator: it is NULL for health/inline/registry-intercept
     // adds and a raw struct pointer in dyncfg-unittest). Pinned ONLY inside
     // the nodes-dict callbacks (insert, and the conflict transfer branch);
     // released ONLY in the delete callback. The spinlock is a LEAF guarding
-    // (execute_cb, execute_cb_data, transport) so readers (the intercept
+    // (handler, handler_data, transport) so readers (the intercept
     // invocation and the template fan-out) can snapshot-and-pin without
     // racing a conflict transfer's displaced release.
     SPINLOCK transport_spinlock;
@@ -63,10 +63,10 @@ typedef struct dyncfg {
 // the node's leaf spinlock; the returned pin (may be NULL) must be released
 // with nrpc_transport_entry_release() after the pair is used
 static inline struct nrpc_transport *dyncfg_node_execute_snapshot(
-        DYNCFG *df, rrd_function_execute_cb_t *out_cb, void **out_cb_data) {
+        DYNCFG *df, nrpc_handler_cb_t *out_cb, void **out_cb_data) {
     spinlock_lock(&df->transport_spinlock);
-    if(out_cb) *out_cb = df->execute_cb;
-    if(out_cb_data) *out_cb_data = df->execute_cb_data;
+    if(out_cb) *out_cb = df->handler;
+    if(out_cb_data) *out_cb_data = df->handler_data;
     struct nrpc_transport *pin =
         df->transport ? nrpc_transport_entry_acquire(df->transport) : NULL;
     spinlock_unlock(&df->transport_spinlock);
@@ -100,18 +100,18 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, DYNCFG
 void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id);
 void dyncfg_echo_add(const DICTIONARY_ITEM *item_template, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *template_id, const char *job_name);
 
-// `transport` must be the plugin transport when execute_cb_data is one (the
+// `transport` must be the plugin transport when handler_data is one (the
 // pluginsd path and the template fan-out), NULL for every other caller
 const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path,
                                            DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type,
                                            const char *source, DYNCFG_CMDS cmds,
                                            usec_t created_ut, usec_t modified_ut,
                                            bool sync, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
-                                           rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
+                                           nrpc_handler_cb_t handler, void *handler_data,
                                            struct nrpc_transport *transport,
                                            bool overwrite_cb);
 
-int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data);
+int dyncfg_function_intercept_cb(struct nrpc_request *req, void *data);
 void dyncfg_cleanup(DYNCFG *v);
 
 const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id);

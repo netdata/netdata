@@ -1430,8 +1430,8 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
     // function workers are the only other readers and they take the mutex
     static bool function_registered = false;
     if (unlikely(!function_registered && sensor_charts_root)) {
-        rrd_function_add_inline(localhost, NULL, "sensors", 10,
-                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
+        nrpc_method_register_builtin(localhost, NULL, "sensors", 10,
+                                NRPC_PRIORITY_DEFAULT, NRPC_VERSION_DEFAULT,
                                 MACOS_SENSORS_FUNCTION_HELP,
                                 "top", HTTP_ACCESS_ANONYMOUS_DATA,
                                 macos_sensors_function);
