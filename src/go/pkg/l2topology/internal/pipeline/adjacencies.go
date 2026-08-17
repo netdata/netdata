@@ -42,11 +42,11 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 	cdpPairMetadata := buildCDPPairMetadata(cdpLinks, cdpPairs)
 
 	for _, link := range cdpLinks {
-		rawAddress := strings.TrimSpace(link.remoteAddressRaw)
+		managementIP := canonicalIP(link.remoteManagementIP)
+		rawAddress := link.remoteAddressRaw
 		targetID := strings.TrimSpace(cdpTargetOverrides[link.index])
 		if targetID == "" {
-			targetIP := canonicalIP(rawAddress)
-			targetID = s.resolveRemoteEnforcingHostnameMACGuard(link.remoteHost, link.remoteDeviceID, targetIP, link.remoteDeviceID)
+			targetID = s.resolveRemoteEnforcingHostnameMACGuard(link.remoteHost, link.remoteDeviceID, managementIP, link.remoteDeviceID)
 		}
 
 		adj := model.Adjacency{
@@ -56,9 +56,13 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 			TargetID:   targetID,
 			TargetPort: link.remoteDevicePort,
 		}
-		if rawAddress != "" {
-			adj.Labels = map[string]string{
-				"remote_address_raw": strings.ToLower(rawAddress),
+		if managementIP != "" || strings.TrimSpace(rawAddress) != "" {
+			adj.Labels = make(map[string]string, 2)
+			if managementIP != "" {
+				adj.Labels[adjacencyLabelRemoteManagementIP] = managementIP
+			}
+			if strings.TrimSpace(rawAddress) != "" {
+				adj.Labels[adjacencyLabelRemoteAddressRaw] = rawAddress
 			}
 		}
 		applyAdjacencyPairMetadata(&adj, cdpPairMetadata[link.index])

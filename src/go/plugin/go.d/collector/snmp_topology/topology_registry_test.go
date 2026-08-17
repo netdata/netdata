@@ -296,6 +296,36 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["links_total"])
 }
 
+func TestTopologyRegistry_WeakDevicesUseSelectedManagementIPIdentity(t *testing.T) {
+	registry := newTopologyRegistry()
+	for i, ip := range []string{"192.0.2.10", "198.51.100.10"} {
+		cache := newTopologyCache()
+		cache.updateTime = time.Now().Add(time.Duration(i) * time.Millisecond)
+		cache.updateIfIndexByIP(map[string]string{
+			tagTopoIfIndex: "1",
+			tagTopoIPAddr:  ip,
+			tagTopoIPMask:  "255.255.255.0",
+		})
+		cache.finalizeTopologyCache()
+		registry.register(cache)
+	}
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 2)
+
+	got := make(map[string]struct{}, 2)
+	for _, actor := range data.Actors {
+		for _, ip := range actor.Match.IPAddresses {
+			got[ip] = struct{}{}
+		}
+	}
+	require.Equal(t, map[string]struct{}{
+		"192.0.2.10":    {},
+		"198.51.100.10": {},
+	}, got)
+}
+
 func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *testing.T) {
 	registry := newTopologyRegistry()
 	registry.producerScopeID = "producer-a"

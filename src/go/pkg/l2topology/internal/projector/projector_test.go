@@ -1044,7 +1044,7 @@ func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
 	require.Equal(t, 0, stats.LinksUnidirectional)
 }
 
-func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
+func TestToGraph_MergesPairedAdjacenciesDoesNotProjectRawAddressEvidence(t *testing.T) {
 	result := model.Result{
 		Devices: []model.Device{
 			{
@@ -1070,7 +1070,8 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "cdp:pair-a-b",
 					adjacencyLabelPairPass: cdpMatchPassDefault,
-					"remote_address_raw":   "edge-sw3.mgmt.local",
+					"remote_management_ip": "10.0.0.2",
+					"remote_address_raw":   "10.0.0.1",
 				},
 			},
 			{
@@ -1082,7 +1083,8 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "cdp:pair-a-b",
 					adjacencyLabelPairPass: cdpMatchPassDefault,
-					"remote_address_raw":   "10.0.0.1",
+					"remote_management_ip": "10.0.0.1",
+					"remote_address_raw":   "10.0.0.2",
 				},
 			},
 		},
@@ -1098,7 +1100,9 @@ func TestToGraph_MergesPairedAdjacenciesPreservesRawAddressHints(t *testing.T) {
 	link := data.Links[0]
 	require.Equal(t, "cdp", link.Protocol)
 	require.Equal(t, "bidirectional", link.Direction)
-	require.Contains(t, link.Dst.Match.IPAddresses, "edge-sw3.mgmt.local")
+	require.NotContains(t, link.Dst.Match.IPAddresses, "10.0.0.1")
+	require.NotContains(t, link.Src.Match.IPAddresses, "10.0.0.2")
+	require.Contains(t, link.Dst.Match.IPAddresses, "10.0.0.2")
 	require.Contains(t, link.Src.Match.IPAddresses, "10.0.0.1")
 }
 

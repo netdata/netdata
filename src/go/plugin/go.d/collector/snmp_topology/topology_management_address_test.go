@@ -9,22 +9,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalizeManagementAddress_DecodesHexAndASCIIIPs(t *testing.T) {
+func TestNormalizeManagementAddressHonorsProtocolFamilies(t *testing.T) {
 	tests := map[string]struct {
-		addr     string
-		addrType string
-		wantAddr string
-		wantType string
+		normalize func(string, string) (string, string)
+		addr      string
+		addrType  string
+		wantAddr  string
+		wantType  string
 	}{
-		"hex-ipv4":        {addr: "0A14043C", addrType: "1", wantAddr: "10.20.4.60", wantType: "ipv4"},
-		"ascii-ipv4":      {addr: "31302E32302E342E323035", wantAddr: "10.20.4.205", wantType: "ipv4"},
-		"mapped-ipv4":     {addr: "::ffff:192.0.2.1", addrType: "2", wantAddr: "192.0.2.1", wantType: "ipv4"},
-		"mapped-ipv4-hex": {addr: "00000000000000000000ffffc0000201", addrType: "2", wantAddr: "192.0.2.1", wantType: "ipv4"},
+		"LLDP IPv4":                   {normalize: normalizeLLDPManagementAddress, addr: "0A14043C", addrType: "1", wantAddr: "10.20.4.60", wantType: "ipv4"},
+		"LLDP IPv6":                   {normalize: normalizeLLDPManagementAddress, addr: "20010db8000000000000000000000001", addrType: "2", wantAddr: "2001:db8::1", wantType: "ipv6"},
+		"LLDP IPv4 family mismatch":   {normalize: normalizeLLDPManagementAddress, addr: "20010db8000000000000000000000001", addrType: "1", wantAddr: "20010db8000000000000000000000001", wantType: "1"},
+		"LLDP IPv6 family mismatch":   {normalize: normalizeLLDPManagementAddress, addr: "0A14043C", addrType: "2", wantAddr: "0A14043C", wantType: "2"},
+		"LLDP explicit DNS family":    {normalize: normalizeLLDPManagementAddress, addr: "636f7265", addrType: "16", wantAddr: "636f7265", wantType: "16"},
+		"CDP IPv4":                    {normalize: normalizeCDPManagementAddress, addr: "0A14043C", addrType: "1", wantAddr: "10.20.4.60", wantType: "ipv4"},
+		"CDP IPv6":                    {normalize: normalizeCDPManagementAddress, addr: "20010db8000000000000000000000001", addrType: "20", wantAddr: "2001:db8::1", wantType: "ipv6"},
+		"CDP DECnet bytes":            {normalize: normalizeCDPManagementAddress, addr: "0a000003", addrType: "2", wantAddr: "0a000003", wantType: "2"},
+		"CDP DECnet IP-looking text":  {normalize: normalizeCDPManagementAddress, addr: "10.0.0.3", addrType: "2", wantAddr: "10.0.0.3", wantType: "2"},
+		"CDP explicit unknown family": {normalize: normalizeCDPManagementAddress, addr: "0a000003", addrType: "999", wantAddr: "0a000003", wantType: "999"},
+		"missing family inference":    {normalize: normalizeCDPManagementAddress, addr: "31302E32302E342E323035", wantAddr: "10.20.4.205", wantType: "ipv4"},
+		"mapped IPv4 text":            {normalize: normalizeLLDPManagementAddress, addr: "::ffff:192.0.2.1", addrType: "2", wantAddr: "192.0.2.1", wantType: "ipv4"},
+		"mapped IPv4 hex":             {normalize: normalizeLLDPManagementAddress, addr: "00000000000000000000ffffc0000201", addrType: "2", wantAddr: "192.0.2.1", wantType: "ipv4"},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			addr, addrType := normalizeManagementAddress(tc.addr, tc.addrType)
+			addr, addrType := tc.normalize(tc.addr, tc.addrType)
 			require.Equal(t, tc.wantAddr, addr)
 			require.Equal(t, tc.wantType, addrType)
 		})

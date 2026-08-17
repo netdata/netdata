@@ -98,6 +98,73 @@ func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
 	require.Equal(t, 1, result.Stats.LinksCDP)
 }
 
+func TestBuildL2ResultFromObservations_SeparatesSelectedAndRawCDPAddresses(t *testing.T) {
+	observations := []model.L2Observation{
+		{
+			DeviceID:     "switch-a",
+			Hostname:     "switch-a",
+			ManagementIP: "10.0.0.1",
+			CDPRemotes: []model.CDPRemoteObservation{{
+				LocalIfIndex: 8,
+				DeviceIndex:  "1",
+				DeviceID:     "switch-b",
+				Address:      "10.0.0.2",
+				RawAddress:   "RAW-CDP-EVIDENCE",
+			}},
+		},
+		{
+			DeviceID:     "switch-b",
+			Hostname:     "switch-b",
+			ManagementIP: "10.0.0.2",
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableCDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 1)
+	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
+	require.Equal(t, "10.0.0.2", result.Adjacencies[0].Labels["remote_management_ip"])
+	require.Equal(t, "RAW-CDP-EVIDENCE", result.Adjacencies[0].Labels["remote_address_raw"])
+}
+
+func TestBuildL2ResultFromObservations_UsesDeterministicRawCDPEvidenceForDuplicates(t *testing.T) {
+	remotes := []model.CDPRemoteObservation{
+		{
+			LocalIfIndex: 8,
+			DeviceIndex:  "1",
+			DeviceID:     "switch-b",
+			Address:      "10.0.0.2",
+			RawAddress:   "RAW-B",
+		},
+		{
+			LocalIfIndex: 8,
+			DeviceIndex:  "1",
+			DeviceID:     "switch-b",
+			Address:      "10.0.0.2",
+			RawAddress:   "RAW-A",
+		},
+	}
+
+	for _, input := range [][]model.CDPRemoteObservation{remotes, {remotes[1], remotes[0]}} {
+		result, err := BuildL2ResultFromObservations([]model.L2Observation{
+			{
+				DeviceID:     "switch-a",
+				Hostname:     "switch-a",
+				ManagementIP: "10.0.0.1",
+				CDPRemotes:   input,
+			},
+			{
+				DeviceID:     "switch-b",
+				Hostname:     "switch-b",
+				ManagementIP: "10.0.0.2",
+			},
+		}, model.DiscoverOptions{EnableCDP: true})
+		require.NoError(t, err)
+		require.Len(t, result.Adjacencies, 1)
+		require.Equal(t, "RAW-A", result.Adjacencies[0].Labels["remote_address_raw"])
+	}
+}
+
 func TestBuildL2ResultFromObservations_UsesProvidedCollectedAt(t *testing.T) {
 	collectedAt := time.Date(2026, time.April, 2, 0, 0, 0, 0, time.UTC)
 

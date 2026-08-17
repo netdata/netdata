@@ -325,6 +325,157 @@ func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources
 	}
 }
 
+func TestTopologyCache_LLDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+	}
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIPAddr:  "192.0.2.10",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+	cache.updateLldpLocManAddr(map[string]string{
+		tagLldpLocMgmtAddrSubtype: "16",
+		tagLldpLocMgmtAddr:        "636f7265", // IANA AFN 16 (DNS), bytes "core".
+	})
+	cache.finalizeTopologyCache()
+
+	snapshot, ok := cache.snapshotEngineObservations()
+	require.True(t, ok)
+	require.Len(t, snapshot.L2Observations, 1)
+	require.Equal(t, "192.0.2.10", snapshot.L2Observations[0].ManagementIP)
+	require.Contains(t, cache.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
+		Address:     "636f7265",
+		AddressType: "16",
+		Source:      "lldp_local",
+	})
+}
+
+func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testing.T) {
+	tests := map[string]struct {
+		update func(*topologyCache)
+		addrs  func(*topologyCache) []topologymodel.ManagementAddress
+	}{
+		"local management table": {
+			update: func(cache *topologyCache) {
+				cache.updateLldpLocManAddr(map[string]string{
+					tagLldpLocMgmtAddrSubtype: "16",
+					tagLldpLocMgmtAddr:        "636f7265",
+				})
+			},
+			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
+				return cache.localDevice.ManagementAddresses
+			},
+		},
+		"inline remote": {
+			update: func(cache *topologyCache) {
+				cache.updateLldpRemote(map[string]string{
+					tagLldpLocPortNum:         "1",
+					tagLldpRemIndex:           "1",
+					tagLldpRemMgmtAddrSubtype: "16",
+					tagLldpRemMgmtAddr:        "636f7265",
+				})
+			},
+			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
+				return cache.lldpRemotes["1:1"].managementAddrs
+			},
+		},
+		"remote management table": {
+			update: func(cache *topologyCache) {
+				cache.updateLldpRemManAddr(map[string]string{
+					tagLldpLocPortNum:         "1",
+					tagLldpRemIndex:           "1",
+					tagLldpRemMgmtAddrSubtype: "16",
+					tagLldpRemMgmtAddr:        "636f7265",
+				})
+			},
+			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
+				return cache.lldpRemotes["1:1"].managementAddrs
+			},
+		},
+		"reconstructed remote index": {
+			update: func(cache *topologyCache) {
+				cache.updateLldpRemManAddr(map[string]string{
+					tagLldpLocPortNum:                 "1",
+					tagLldpRemIndex:                   "1",
+					tagLldpRemMgmtAddrSubtype:         "16",
+					tagLldpRemMgmtAddrLen:             "4",
+					tagLldpRemMgmtAddrOctetPref + "1": "99",
+					tagLldpRemMgmtAddrOctetPref + "2": "111",
+					tagLldpRemMgmtAddrOctetPref + "3": "114",
+					tagLldpRemMgmtAddrOctetPref + "4": "101",
+				})
+			},
+			addrs: func(cache *topologyCache) []topologymodel.ManagementAddress {
+				return cache.lldpRemotes["1:1"].managementAddrs
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyCache()
+			tc.update(cache)
+			addrs := tc.addrs(cache)
+			require.Len(t, addrs, 1)
+			require.Equal(t, "636f7265", addrs[0].Address)
+			require.Equal(t, "16", addrs[0].AddressType)
+			require.Empty(t, pickManagementIP(addrs))
+		})
+	}
+}
+
+func TestTopologyCache_CDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testing.T) {
+	for name, raw := range map[string]string{
+		"four encoded bytes": "0a000003",
+		"IP-looking text":    "10.0.0.3",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyCache()
+			cache.updateCdpRemote(map[string]string{
+				tagCdpIfIndex:             "2",
+				tagCdpDeviceIndex:         "1",
+				tagCdpDeviceID:            "sw3",
+				tagCdpPrimaryMgmtAddrType: "1",
+				tagCdpPrimaryMgmtAddr:     "0a000004",
+				tagCdpAddressType:         "2", // CiscoNetworkProtocol DECnet.
+				tagCdpAddress:             raw,
+			})
+
+			obs := cache.buildEngineObservation(topologymodel.Device{ManagementIP: "192.0.2.1"})
+			require.Len(t, obs.CDPRemotes, 1)
+			require.Equal(t, "10.0.0.4", obs.CDPRemotes[0].Address)
+		})
+	}
+}
+
+func TestTopologyCache_CDPManagementAddressFamiliesAcrossSources(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateCdpRemote(map[string]string{
+		tagCdpIfIndex:               "2",
+		tagCdpDeviceIndex:           "1",
+		tagCdpDeviceID:              "sw3",
+		tagCdpPrimaryMgmtAddrType:   "1",
+		tagCdpPrimaryMgmtAddr:       "0a000004",
+		tagCdpSecondaryMgmtAddrType: "2", // CiscoNetworkProtocol DECnet.
+		tagCdpSecondaryMgmtAddr:     "10.0.0.3",
+		tagCdpAddressType:           "20",
+		tagCdpAddress:               "20010db8000000000000000000000001",
+	})
+
+	remote := cache.cdpRemotes["2:1"]
+	require.NotNil(t, remote)
+	require.Equal(t, []topologymodel.ManagementAddress{
+		{Address: "10.0.0.4", AddressType: "ipv4", Source: "cdp_primary_mgmt"},
+		{Address: "10.0.0.3", AddressType: "2", Source: "cdp_secondary_mgmt"},
+		{Address: "2001:db8::1", AddressType: "ipv6", Source: "cdp_cache_address"},
+	}, remote.managementAddrs)
+	require.Equal(t, "10.0.0.4", pickManagementIP(remote.managementAddrs))
+}
+
 func TestTopologyCache_UpdateTopologyProfileTags_LLDPDoesNotOverrideExistingSNMPIdentity(t *testing.T) {
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "10.20.4.2"})
 	cache.localDevice.ChassisID = "18:fd:74:33:1a:9c"
@@ -363,8 +514,15 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 		tagCdpDeviceID:    "sw3",
 		tagCdpSysName:     "sw3",
 		tagCdpDevicePort:  "Gi0/3",
-		tagCdpAddress:     "0a000003",
+		tagCdpAddressType: "1",
+		tagCdpAddress:     "0A000003",
 	})
+	observations, observationsOK := cache.snapshotEngineObservations()
+	require.True(t, observationsOK)
+	require.Len(t, observations.L2Observations, 1)
+	require.Len(t, observations.L2Observations[0].CDPRemotes, 1)
+	require.Equal(t, "10.0.0.3", observations.L2Observations[0].CDPRemotes[0].Address)
+	require.Equal(t, "0A000003", observations.L2Observations[0].CDPRemotes[0].RawAddress)
 
 	data, ok := snapshotTopologyCacheForTest(cache)
 
@@ -372,7 +530,7 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "unidirectional", data.Links[0].Direction)
-	assert.False(t, linkHasRawAddressHint(data.Links[0], "0a000003"))
+	assert.False(t, linkHasRawAddressHint(data.Links[0], "0A000003"))
 
 	remote := findDeviceActorBySysName(data, "sw3")
 	require.NotNil(t, remote)
@@ -409,8 +567,15 @@ func TestTopologyCache_CdpSnapshotIgnoresRawAddressWithoutIP(t *testing.T) {
 		tagCdpDeviceID:    "edge-sw3",
 		tagCdpSysName:     "edge-sw3",
 		tagCdpDevicePort:  "Gi0/3",
+		tagCdpAddressType: "2",
 		tagCdpAddress:     "edge-sw3.mgmt.local",
 	})
+	observations, observationsOK := cache.snapshotEngineObservations()
+	require.True(t, observationsOK)
+	require.Len(t, observations.L2Observations, 1)
+	require.Len(t, observations.L2Observations[0].CDPRemotes, 1)
+	require.Empty(t, observations.L2Observations[0].CDPRemotes[0].Address)
+	require.Equal(t, "edge-sw3.mgmt.local", observations.L2Observations[0].CDPRemotes[0].RawAddress)
 
 	options := defaultTopologyQueryOptionsForTest()
 	options.EliminateNonIPInferred = false
@@ -576,7 +741,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	cache.updateTopologyCacheEntry(ddsnmp.Metric{
 		TopologyKind: ddsnmp.KindLldpLocManAddr,
 		Tags: map[string]string{
-			tagLldpLocMgmtAddrSubtype: "2",
+			tagLldpLocMgmtAddrSubtype: "1",
 			tagLldpLocMgmtAddr:        "0a000001",
 			tagLldpLocMgmtAddrIfID:    "1",
 		},
@@ -586,7 +751,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
 			tagLldpRemIndex:           "1",
-			tagLldpRemMgmtAddrSubtype: "2",
+			tagLldpRemMgmtAddrSubtype: "1",
 			tagLldpRemMgmtAddr:        "0a000002",
 		},
 	})
@@ -604,7 +769,7 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		Tags: map[string]string{
 			tagLldpLocPortNum:         "1",
 			tagLldpRemIndex:           "1",
-			tagLldpRemMgmtAddrSubtype: "1",
+			tagLldpRemMgmtAddrSubtype: "2",
 			tagLldpRemMgmtAddr:        "666330303a663835333a6363643a653739333a3a31", // "fc00:f853:ccd:e793::1" ASCII-hex
 		},
 	})

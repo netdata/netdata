@@ -10,8 +10,9 @@ import (
 const keySep = keyutil.Sep
 
 const (
-	adjacencyLabelPairID   = model.AdjacencyLabelPairID
-	adjacencyLabelPairPass = model.AdjacencyLabelPairPass
+	adjacencyLabelPairID             = model.AdjacencyLabelPairID
+	adjacencyLabelPairPass           = model.AdjacencyLabelPairPass
+	adjacencyLabelRemoteManagementIP = model.AdjacencyLabelRemoteManagementIP
 )
 
 func deviceIfIndexKey(deviceID string, ifIndex int) string {

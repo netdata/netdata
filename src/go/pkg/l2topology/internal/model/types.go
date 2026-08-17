@@ -137,7 +137,10 @@ type CDPRemoteObservation struct {
 	DeviceID     string
 	SysName      string
 	DevicePort   string
-	Address      string
+	// Address is the normalized management identity selected for matching.
+	Address string
+	// RawAddress is the exact cdpCacheAddress observation for diagnostics.
+	RawAddress string
 }
 
 // BridgePortObservation maps one bridge base port to an interface index.

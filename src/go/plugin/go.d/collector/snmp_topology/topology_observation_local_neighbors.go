@@ -96,6 +96,7 @@ func (c *topologyCache) appendObservedCDPRemotes(observation *topologyengine.L2O
 			SysName:      sysName,
 			DevicePort:   strings.TrimSpace(remote.devicePort),
 			Address:      address,
+			RawAddress:   remote.rawAddress,
 		})
 	}
 }

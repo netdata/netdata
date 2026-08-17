@@ -124,6 +124,45 @@ func TestBuildL2ResultFromWalks_CDP_NMS8000(t *testing.T) {
 	}
 }
 
+func TestParsedFixtureToCDPRemotesSeparatesSelectedAndRawAddress(t *testing.T) {
+	parsed := parsedFixture{cdpRemotes: map[string]cdpRemoteObs{
+		"8|1": {
+			ifIndex:     "8",
+			deviceIndex: "1",
+			deviceID:    "switch-b",
+			addressType: "1",
+			address:     "0A000002",
+		},
+	}}
+
+	remotes := parsed.toCDPRemotes()
+
+	require.Len(t, remotes, 1)
+	require.Equal(t, "10.0.0.2", remotes[0].Address)
+	require.Equal(t, "0A000002", remotes[0].RawAddress)
+}
+
+func TestNormalizeCDPFixtureAddressHonorsCiscoNetworkProtocol(t *testing.T) {
+	tests := map[string]struct {
+		value       string
+		addressType string
+		want        string
+	}{
+		"IPv4":                  {value: "0A000002", addressType: "1", want: "10.0.0.2"},
+		"IPv6":                  {value: "20010db8000000000000000000000001", addressType: "20", want: "2001:db8::1"},
+		"DECnet bytes":          {value: "0A000002", addressType: "2"},
+		"DECnet IP-like text":   {value: "10.0.0.2", addressType: "2"},
+		"family mismatch":       {value: "20010db8000000000000000000000001", addressType: "1"},
+		"missing family legacy": {value: "0A000002", want: "10.0.0.2"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, normalizeCDPFixtureAddress(tc.value, tc.addressType))
+		})
+	}
+}
+
 func TestBuildL2ResultFromWalks_LLDP_NMS8000(t *testing.T) {
 	manifestPath := "../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)

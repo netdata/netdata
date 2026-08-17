@@ -71,6 +71,7 @@ flowchart TD
     Tick["initial refresh, then every update_every"]
     Devices["read devices from DeviceStore"]
     Fresh{"new or refresh_every elapsed?"}
+    Resolve["resolve DNS targets<br/>up to 8 workers, shared 5s budget"]
     Walk["SNMP walk topology profiles"]
     Next["build fresh topologyCache off-registry"]
     Swap["swap fresh cache into registered cache"]
@@ -79,7 +80,7 @@ flowchart TD
     Metrics["write internal metrics only"]
 
     Run --> Publish --> Tick --> Devices --> Fresh
-    Fresh -->|"yes"| Walk --> Next --> Swap --> Prune --> Tick
+    Fresh -->|"yes"| Resolve --> Walk --> Next --> Swap --> Prune --> Tick
     Fresh -->|"no"| Prune
     Collect --> Metrics
 ```
@@ -93,16 +94,18 @@ Run(ctx)
 
 refreshTopology(ctx)
   read registered SNMP devices from ddsnmp.DeviceStore
-  for each new or stale device:
-    refreshDeviceTopology(ctx, key, device)
+  build a stable plan of new or stale devices
+  resolve planned DNS targets with up to eight workers under one shared 5s budget
+  for each planned device, in registration order:
+    refreshDeviceTopology(ctx, key, device, selectedManagementIP)
   prune caches for devices no longer registered
 
-refreshDeviceTopology(ctx, key, device)
+refreshDeviceTopology(ctx, key, device, selectedManagementIP)
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector
   query sysUpTime
-  build a fresh per-device topologyCache off-registry
+  build a fresh per-device topologyCache off-registry with the selected management IP
   ingest topology metrics into the fresh cache
   collect VTP VLAN contexts when needed
   finalize diagnostics
@@ -111,6 +114,11 @@ refreshDeviceTopology(ctx, key, device)
 
 The refresh loop checks devices every `update_every` seconds, but a device is
 fully refreshed only when it is new or older than `refresh_every`.
+
+Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
+The workers are joined before SNMP collection begins, stop with the refresh
+context, and use a lookup-only child context, so expiry of the shared lookup
+budget does not cancel the parent refresh or the subsequent serial SNMP walks.
 
 The important safety property is that a device refresh builds the next cache
 off-registry and only swaps it into the registered cache after ingestion

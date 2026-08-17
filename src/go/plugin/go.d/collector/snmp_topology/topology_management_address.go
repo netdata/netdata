@@ -16,6 +16,15 @@ import (
 
 const managementAddressSourceCollectorTarget = "collector_target"
 
+type managementAddressFamily uint8
+
+const (
+	managementAddressFamilyUnspecified managementAddressFamily = iota
+	managementAddressFamilyIPv4
+	managementAddressFamilyIPv6
+	managementAddressFamilyNonIP
+)
+
 type managementIPCandidate struct {
 	addr       netip.Addr
 	sourceRank int
@@ -25,23 +34,6 @@ type managementIPCandidate struct {
 type managementIPSelector struct {
 	best    managementIPCandidate
 	hasBest bool
-}
-
-func normalizeAddressType(rawType, addr string) string {
-	if ip := net.ParseIP(addr); ip != nil {
-		if ip.To4() != nil {
-			return "ipv4"
-		}
-		return "ipv6"
-	}
-
-	switch rawType {
-	case "1":
-		return "ipv4"
-	case "2":
-		return "ipv6"
-	}
-	return rawType
 }
 
 func managementAddressTypeFromIP(ip string) string {
@@ -57,10 +49,11 @@ func managementAddressTypeFromIP(ip string) string {
 
 func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
 	addr.Address = strings.TrimSpace(addr.Address)
+	addr.AddressType = strings.TrimSpace(addr.AddressType)
 	if addr.Address == "" {
 		return addrs
 	}
-	if ip, ok := parseTopologyIPAddress(addr.Address); ok {
+	if ip, ok := managementAddressIP(addr); ok {
 		if !isEligibleTopologyIPAddress(ip) {
 			return addrs
 		}
@@ -78,7 +71,7 @@ func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topol
 func appendCdpManagementAddresses(tags map[string]string, current []topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
 	addrs := current
 	if raw := tags[tagCdpPrimaryMgmtAddr]; raw != "" {
-		addr, addrType := normalizeManagementAddress(raw, tags[tagCdpPrimaryMgmtAddrType])
+		addr, addrType := normalizeCDPManagementAddress(raw, tags[tagCdpPrimaryMgmtAddrType])
 		if addr != "" {
 			addrs = appendManagementAddress(addrs, topologymodel.ManagementAddress{
 				Address:     addr,
@@ -88,7 +81,7 @@ func appendCdpManagementAddresses(tags map[string]string, current []topologymode
 		}
 	}
 	if raw := tags[tagCdpSecondaryMgmtAddr]; raw != "" {
-		addr, addrType := normalizeManagementAddress(raw, tags[tagCdpSecondaryMgmtAddrType])
+		addr, addrType := normalizeCDPManagementAddress(raw, tags[tagCdpSecondaryMgmtAddrType])
 		if addr != "" {
 			addrs = appendManagementAddress(addrs, topologymodel.ManagementAddress{
 				Address:     addr,
@@ -98,7 +91,7 @@ func appendCdpManagementAddresses(tags map[string]string, current []topologymode
 		}
 	}
 	if raw := tags[tagCdpAddress]; raw != "" {
-		addr, addrType := normalizeManagementAddress(raw, tags[tagCdpAddressType])
+		addr, addrType := normalizeCDPManagementAddress(raw, tags[tagCdpAddressType])
 		if addr != "" {
 			addrs = appendManagementAddress(addrs, topologymodel.ManagementAddress{
 				Address:     addr,
@@ -113,7 +106,7 @@ func appendCdpManagementAddresses(tags map[string]string, current []topologymode
 func pickManagementIP(addrs []topologymodel.ManagementAddress) string {
 	var selector managementIPSelector
 	for _, addr := range addrs {
-		ip, ok := parseTopologyIPAddress(addr.Address)
+		ip, ok := managementAddressIP(addr)
 		if !ok {
 			continue
 		}
@@ -250,7 +243,7 @@ func finalizeLocalManagementAddresses(device *topologymodel.Device, netmasks map
 	addrs := device.ManagementAddresses
 	filtered := addrs[:0]
 	for _, addr := range addrs {
-		ip, ok := parseTopologyIPAddress(addr.Address)
+		ip, ok := managementAddressIP(addr)
 		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmasks[ip.String()]) {
 			continue
 		}
@@ -284,15 +277,103 @@ func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
 	return hex.EncodeToString(addr)
 }
 
-func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
+func normalizeLLDPManagementAddress(rawAddr, rawType string) (string, string) {
+	rawType = strings.TrimSpace(rawType)
+	var family managementAddressFamily
+	switch rawType {
+	case "":
+		family = managementAddressFamilyUnspecified
+	case "1":
+		family = managementAddressFamilyIPv4
+	case "2":
+		family = managementAddressFamilyIPv6
+	default:
+		family = managementAddressFamilyNonIP
+	}
+	return normalizeTypedManagementAddress(rawAddr, rawType, family)
+}
+
+func normalizeCDPManagementAddress(rawAddr, rawType string) (string, string) {
+	rawType = strings.TrimSpace(rawType)
+	var family managementAddressFamily
+	switch rawType {
+	case "":
+		family = managementAddressFamilyUnspecified
+	case "1":
+		family = managementAddressFamilyIPv4
+	case "20":
+		family = managementAddressFamilyIPv6
+	default:
+		family = managementAddressFamilyNonIP
+	}
+	return normalizeTypedManagementAddress(rawAddr, rawType, family)
+}
+
+func normalizeTypedManagementAddress(rawAddr, rawType string, family managementAddressFamily) (string, string) {
 	rawAddr = strings.TrimSpace(rawAddr)
 	if rawAddr == "" {
-		return "", normalizeAddressType(rawType, "")
+		return "", strings.TrimSpace(rawType)
+	}
+	if family == managementAddressFamilyNonIP {
+		return rawAddr, strings.TrimSpace(rawType)
 	}
 
-	if ip := topologyutil.NormalizeIPAddress(rawAddr); ip != "" {
-		return ip, normalizeAddressType(rawType, ip)
+	ip, encodedFamily, ok := decodeManagementIPAddress(rawAddr)
+	if !ok || family != managementAddressFamilyUnspecified && family != encodedFamily {
+		return rawAddr, strings.TrimSpace(rawType)
+	}
+	value := ip.Unmap().String()
+	return value, managementAddressTypeFromIP(value)
+}
+
+func decodeManagementIPAddress(rawAddr string) (netip.Addr, managementAddressFamily, bool) {
+	rawAddr = strings.TrimSpace(rawAddr)
+	if addr, err := netip.ParseAddr(rawAddr); err == nil && addr.IsValid() {
+		family := managementAddressFamilyIPv6
+		if addr.Is4() {
+			family = managementAddressFamilyIPv4
+		}
+		return addr.Unmap(), family, true
 	}
 
-	return rawAddr, normalizeAddressType(rawType, rawAddr)
+	decoded, err := topologyutil.DecodeHexString(rawAddr)
+	if err != nil {
+		return netip.Addr{}, managementAddressFamilyUnspecified, false
+	}
+	switch len(decoded) {
+	case net.IPv4len:
+		if addr, ok := netip.AddrFromSlice(decoded); ok {
+			return addr.Unmap(), managementAddressFamilyIPv4, true
+		}
+	case net.IPv6len:
+		if addr, ok := netip.AddrFromSlice(decoded); ok {
+			return addr.Unmap(), managementAddressFamilyIPv6, true
+		}
+	default:
+		if addr, err := netip.ParseAddr(topologyutil.DecodePrintableASCII(decoded)); err == nil && addr.IsValid() {
+			family := managementAddressFamilyIPv6
+			if addr.Is4() {
+				family = managementAddressFamilyIPv4
+			}
+			return addr.Unmap(), family, true
+		}
+	}
+	return netip.Addr{}, managementAddressFamilyUnspecified, false
+}
+
+func managementAddressIP(addr topologymodel.ManagementAddress) (netip.Addr, bool) {
+	ip, ok := parseTopologyIPAddress(addr.Address)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	switch strings.ToLower(strings.TrimSpace(addr.AddressType)) {
+	case "":
+		return ip, true
+	case "ipv4":
+		return ip, ip.Is4()
+	case "ipv6":
+		return ip, ip.Is6()
+	default:
+		return netip.Addr{}, false
+	}
 }

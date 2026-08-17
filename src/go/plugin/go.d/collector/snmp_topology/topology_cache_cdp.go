@@ -32,6 +32,9 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 	if v := tags[tagCdpDeviceID]; v != "" {
 		entry.deviceID = v
 	}
+	if v := tags[tagCdpAddress]; v != "" {
+		entry.rawAddress = v
+	}
 	if v := tags[tagCdpDevicePort]; v != "" {
 		entry.devicePort = v
 	}

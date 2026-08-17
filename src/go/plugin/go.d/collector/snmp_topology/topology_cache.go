@@ -94,6 +94,7 @@ type cdpRemote struct {
 	sysObjectID      string
 	physicalLocation string
 	lastChange       string
+	rawAddress       string
 	managementAddrs  []topologymodel.ManagementAddress
 }
 
