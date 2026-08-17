@@ -872,7 +872,7 @@ func TestCollector_DisambiguatesConflictingAttributeNames(t *testing.T) {
 
 			mx := collr.Collect(context.Background())
 			require.NotEmpty(t, mx)
-			require.NotEmpty(t, *collr.Charts())
+			require.Len(t, *collr.Charts(), 39)
 			require.Len(t, collr.attachedDevices, 1)
 			collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 
@@ -889,8 +889,15 @@ func TestCollector_DisambiguatesConflictingAttributeNames(t *testing.T) {
 				}
 			}
 			assert.NotContains(t, mx, "device_sda_type_sat_attr_duplicate_name_normalized")
-			assert.NotNil(t, collr.Charts().Get("device_sda_type_sat_smart_attr_duplicate_name_id_1"))
-			assert.NotNil(t, collr.Charts().Get("device_sda_type_sat_smart_attr_duplicate_name_id_2"))
+			for _, chartID := range []string{
+				"device_sda_type_sat_smart_attr_duplicate_name_id_1",
+				"device_sda_type_sat_smart_attr_duplicate_name_id_1_normalized",
+				"device_sda_type_sat_smart_attr_duplicate_name_id_2",
+				"device_sda_type_sat_smart_attr_duplicate_name_id_2_normalized",
+				"device_sda_type_sat_smart_attr_spin_up_time",
+			} {
+				assert.NotNil(t, collr.Charts().Get(chartID), chartID)
+			}
 		})
 	}
 }
