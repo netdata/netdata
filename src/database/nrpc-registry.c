@@ -463,7 +463,7 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
     }
 
     // dyncfg config functions are intentionally never streamed to parents
-    // (stream_sender_send_global_rrdhost_functions skips NRPC_METHOD_FLAG_DYNCFG),
+    // (stream_sender_send_host_functions skips NRPC_METHOD_FLAG_DYNCFG),
     // so their removals must not be streamed either. Capture this before releasing.
     bool is_dyncfg = (method->options & NRPC_METHOD_FLAG_DYNCFG);
 

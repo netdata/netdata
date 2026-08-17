@@ -103,6 +103,6 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     buffer_json_object_close(wb);
 
     buffer_json_member_add_object(wb, "functions");
-    chart_functions2json(st, wb);
+    nrpc_catalog_chart2json(st, wb);
     buffer_json_object_close(wb);
 }

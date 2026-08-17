@@ -52,7 +52,7 @@ ALWAYS_INLINE RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t w
         // the global_functions_spinlock comment in stream-sender-internals.h
         spinlock_lock(&host->sender->global_functions_spinlock);
         BUFFER *wb = preferred_sender_buffer(host);
-        stream_sender_send_global_rrdhost_functions(host, wb,
+        stream_sender_send_host_functions(host, wb,
                                                     stream_has_capability(host->sender, STREAM_CAP_DYNCFG),
                                                     stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                         rrdhost_can_stream_metadata_to_parent(host));

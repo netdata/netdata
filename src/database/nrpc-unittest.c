@@ -22,12 +22,12 @@
 // the gate ever regresses, every caller that relies on it — including MCP —
 // regresses with it.
 
-static int rrdfunctions_unittest_noop_cb(struct nrpc_request *req __maybe_unused, void *data __maybe_unused) {
+static int nrpc_unittest_noop_cb(struct nrpc_request *req __maybe_unused, void *data __maybe_unused) {
     // never reached: verify_access authorizes without executing
     return HTTP_RESP_OK;
 }
 
-int rrdfunctions_verify_access_unittest(void) {
+int nrpc_access_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
@@ -39,15 +39,15 @@ int rrdfunctions_verify_access_unittest(void) {
     // A protected function mirroring systemd-journal's requirements.
     nrpc_method_register(host, NULL, "protected-fn", 10, 0, 1, "protected", "logs",
                      HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                     true, NRPC_SOURCE_DAEMON, rrdfunctions_unittest_noop_cb, NULL);
+                     true, NRPC_SOURCE_DAEMON, nrpc_unittest_noop_cb, NULL);
 
     // A restricted function: name starting with "__" flags NRPC_METHOD_FLAG_RESTRICTED.
     nrpc_method_register(host, NULL, "__restricted-fn", 10, 0, 1, "restricted", "top",
-                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, rrdfunctions_unittest_noop_cb, NULL);
+                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, nrpc_unittest_noop_cb, NULL);
 
     // A public function requiring nothing — baseline that the gate does not over-block.
     nrpc_method_register(host, NULL, "public-fn", 10, 0, 1, "public", "top",
-                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, rrdfunctions_unittest_noop_cb, NULL);
+                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, nrpc_unittest_noop_cb, NULL);
 
     struct {
         RRDHOST *host;
@@ -153,7 +153,7 @@ int rrdfunctions_verify_access_unittest(void) {
 // ----------------------------------------------------------------------------
 // Pins the contents of the ACLK node instance manifest.
 //
-// host_functions_to_manifest_dict() decides what the agent tells Netdata Cloud
+// nrpc_catalog_manifest_dict() decides what the agent tells Netdata Cloud
 // about this node's functions. Two exclusions are contractual:
 //
 //   - dyncfg functions. They are an internal configuration transport, not
@@ -172,7 +172,7 @@ int rrdfunctions_verify_access_unittest(void) {
 // would tear down real dyncfg state for the tests that follow. The bare and
 // leading-space shapes are covered by the classifier assertions instead.
 
-int rrdfunctions_manifest_unittest(void) {
+int nrpc_manifest_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
@@ -232,7 +232,7 @@ int rrdfunctions_manifest_unittest(void) {
         for(size_t i = 0; i < _countof(rejected); i++)
             nrpc_method_register(host, NULL, rejected[i], 10, 0, 1, "hijack attempt", "top",
                              HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_PLUGIN,
-                             rrdfunctions_unittest_noop_cb, NULL);
+                             nrpc_unittest_noop_cb, NULL);
 
         if(dictionary_get(host->rpc_registry->dict, "config c2-reject:job")) {
             fprintf(stderr, "  FAILED enforcement: COLLECTOR registered reserved name 'config c2-reject:job'\n");
@@ -244,7 +244,7 @@ int rrdfunctions_manifest_unittest(void) {
         // hijack is visible only through the swapped handler - compare against the capture
         struct nrpc_method *live_after = dictionary_get(host->rpc_registry->dict, "config");
         if(live && (!live_after || live_after->handler != live_cb ||
-                    live_after->handler == rrdfunctions_unittest_noop_cb)) {
+                    live_after->handler == nrpc_unittest_noop_cb)) {
             fprintf(stderr, "  FAILED enforcement: COLLECTOR registration of 'config' touched the live dyncfg entry\n");
             errors++;
         }
@@ -277,12 +277,12 @@ int rrdfunctions_manifest_unittest(void) {
     for(size_t i = 0; i < _countof(fns); i++)
         nrpc_method_register(host, NULL, fns[i].name, 10, 0, 1, "manifest help text", fns[i].tags,
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
 
-    DICTIONARY *manifest = host_functions_to_manifest_dict(host);
+    DICTIONARY *manifest = nrpc_catalog_manifest_dict(host);
 
     for(size_t i = 0; i < _countof(fns); i++) {
-        struct rrd_function_manifest_entry *e = dictionary_get(manifest, fns[i].name);
+        struct nrpc_manifest_entry *e = dictionary_get(manifest, fns[i].name);
         bool present = (e != NULL);
 
         if(present != fns[i].expected_in_manifest) {
@@ -303,7 +303,7 @@ int rrdfunctions_manifest_unittest(void) {
 
     // 3. No dyncfg function of any kind may appear, including the live ones this test did not
     //    register - a belt-and-braces sweep over whatever the running agent has.
-    struct rrd_function_manifest_entry *v;
+    struct nrpc_manifest_entry *v;
     dfe_start_read(manifest, v) {
         (void)v;
         char key[PLUGINSD_LINE_MAX];
@@ -320,7 +320,7 @@ int rrdfunctions_manifest_unittest(void) {
     for(size_t i = 0; i < _countof(fns); i++)
         nrpc_method_unregister(host, NULL, fns[i].name, NRPC_SOURCE_DAEMON);
 
-    // 4. The suppression hash. build_node_manifest() publishes only when manifest_dict_hash()
+    // 4. The suppression hash. build_node_manifest() publishes only when nrpc_catalog_manifest_hash()
     //    differs from the last sent hash, so the hash must be: deterministic for identical
     //    content, independent of dictionary traversal order, and sensitive to every transmitted
     //    field including the node_id and claim_id the manifest is keyed under at the cloud. Local
@@ -342,9 +342,9 @@ int rrdfunctions_manifest_unittest(void) {
         const char *node2 = "66666666-7777-8888-9999-aaaaaaaaaaaa";
         const char *claim = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff";
 
-        struct rrd_function_manifest_entry e1 = { .help = "help one", .tags = "top",
+        struct nrpc_manifest_entry e1 = { .help = "help one", .tags = "top",
                                                   .access = HTTP_ACCESS_ANONYMOUS_DATA, .priority = 0, .version = 1 };
-        struct rrd_function_manifest_entry e2 = { .help = "help two", .tags = "logs",
+        struct nrpc_manifest_entry e2 = { .help = "help two", .tags = "logs",
                                                   .access = HTTP_ACCESS_SAME_SPACE, .priority = 50, .version = 2 };
 
         DICTIONARY *a = dictionary_create(DICT_OPTION_SINGLE_THREADED);
@@ -355,8 +355,8 @@ int rrdfunctions_manifest_unittest(void) {
         dictionary_set(b, "fn-two", &e2, sizeof(e2));
         dictionary_set(b, "fn-one", &e1, sizeof(e1));
 
-        uint64_t ha = manifest_dict_hash(a, node1, claim);
-        uint64_t hb = manifest_dict_hash(b, node1, claim);
+        uint64_t ha = nrpc_catalog_manifest_hash(a, node1, claim);
+        uint64_t hb = nrpc_catalog_manifest_hash(b, node1, claim);
         if(ha != hb) {
             fprintf(stderr, "  FAILED hash: identical content in different insertion order hashed differently\n");
             errors++;
@@ -364,15 +364,15 @@ int rrdfunctions_manifest_unittest(void) {
 
         // every transmitted field must change the hash - one mutation of e1 per field, applied to
         // b's "fn-one" and reverted, so each case is compared against the unchanged content hash
-        struct rrd_function_manifest_entry m_help = e1;     m_help.help = "help one modified";
-        struct rrd_function_manifest_entry m_tags = e1;     m_tags.tags = "top other";
-        struct rrd_function_manifest_entry m_access = e1;   m_access.access = HTTP_ACCESS_SIGNED_ID;
-        struct rrd_function_manifest_entry m_priority = e1; m_priority.priority = 42;
-        struct rrd_function_manifest_entry m_version = e1;  m_version.version = 2;
+        struct nrpc_manifest_entry m_help = e1;     m_help.help = "help one modified";
+        struct nrpc_manifest_entry m_tags = e1;     m_tags.tags = "top other";
+        struct nrpc_manifest_entry m_access = e1;   m_access.access = HTTP_ACCESS_SIGNED_ID;
+        struct nrpc_manifest_entry m_priority = e1; m_priority.priority = 42;
+        struct nrpc_manifest_entry m_version = e1;  m_version.version = 2;
 
         struct {
             const char *field;
-            struct rrd_function_manifest_entry *mutated;
+            struct nrpc_manifest_entry *mutated;
         } mutations[] = {
             { "help",     &m_help },
             { "tags",     &m_tags },
@@ -383,7 +383,7 @@ int rrdfunctions_manifest_unittest(void) {
 
         for(size_t i = 0; i < _countof(mutations); i++) {
             dictionary_set(b, "fn-one", mutations[i].mutated, sizeof(e1));
-            if(manifest_dict_hash(b, node1, claim) == ha) {
+            if(nrpc_catalog_manifest_hash(b, node1, claim) == ha) {
                 fprintf(stderr, "  FAILED hash: modified %s did not change the hash\n", mutations[i].field);
                 errors++;
             }
@@ -393,35 +393,35 @@ int rrdfunctions_manifest_unittest(void) {
         // removing a function must change the hash. The entry count is not hashed on its own -
         // per-entry hashes are XOR-combined - so this pins that a dropped entry is still visible.
         dictionary_del(b, "fn-two");
-        if(manifest_dict_hash(b, node1, claim) == ha) {
+        if(nrpc_catalog_manifest_hash(b, node1, claim) == ha) {
             fprintf(stderr, "  FAILED hash: removing a function did not change the hash\n");
             errors++;
         }
         dictionary_set(b, "fn-two", &e2, sizeof(e2));
-        if(manifest_dict_hash(b, node1, claim) != ha) {
+        if(nrpc_catalog_manifest_hash(b, node1, claim) != ha) {
             fprintf(stderr, "  FAILED hash: restoring a removed function did not restore the hash\n");
             errors++;
         }
 
         // a non-positive priority is transmitted as the default - hashing the raw value would
         // see a "change" the cloud never sees, so both must hash identically
-        struct rrd_function_manifest_entry e1p = e1;
+        struct nrpc_manifest_entry e1p = e1;
         e1p.priority = -5;
         dictionary_set(b, "fn-one", &e1p, sizeof(e1p));
-        if(manifest_dict_hash(b, node1, claim) != ha) {
+        if(nrpc_catalog_manifest_hash(b, node1, claim) != ha) {
             fprintf(stderr, "  FAILED hash: negative priority hashed differently from the transmitted default\n");
             errors++;
         }
         dictionary_set(b, "fn-one", &e1, sizeof(e1));
 
         // same functions under a different node_id is a different manifest at the cloud
-        if(manifest_dict_hash(a, node2, claim) == ha) {
+        if(nrpc_catalog_manifest_hash(a, node2, claim) == ha) {
             fprintf(stderr, "  FAILED hash: node_id change did not change the hash\n");
             errors++;
         }
 
         // the claim_id is transmitted too, and a re-claim must re-publish
-        if(manifest_dict_hash(a, node1, "cccccccc-dddd-eeee-ffff-000000000000") == ha) {
+        if(nrpc_catalog_manifest_hash(a, node1, "cccccccc-dddd-eeee-ffff-000000000000") == ha) {
             fprintf(stderr, "  FAILED hash: claim_id change did not change the hash\n");
             errors++;
         }
@@ -429,11 +429,11 @@ int rrdfunctions_manifest_unittest(void) {
         // an empty manifest is still content (means "no functions" to the cloud) and must
         // differ from a non-empty one; an absent dict hashes like an empty one
         DICTIONARY *empty = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-        if(manifest_dict_hash(empty, node1, claim) == ha) {
+        if(nrpc_catalog_manifest_hash(empty, node1, claim) == ha) {
             fprintf(stderr, "  FAILED hash: empty manifest hashed like a non-empty one\n");
             errors++;
         }
-        if(manifest_dict_hash(NULL, node1, claim) != manifest_dict_hash(empty, node1, claim)) {
+        if(nrpc_catalog_manifest_hash(NULL, node1, claim) != nrpc_catalog_manifest_hash(empty, node1, claim)) {
             fprintf(stderr, "  FAILED hash: NULL dict and empty dict hashed differently\n");
             errors++;
         }
@@ -441,11 +441,11 @@ int rrdfunctions_manifest_unittest(void) {
         // field concatenation ambiguity: "ab"+"c" must not hash like "a"+"bc"
         DICTIONARY *c1 = dictionary_create(DICT_OPTION_SINGLE_THREADED);
         DICTIONARY *c2 = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-        struct rrd_function_manifest_entry x1 = { .help = "ab", .tags = "c", .access = 0, .priority = 1, .version = 1 };
-        struct rrd_function_manifest_entry x2 = { .help = "a",  .tags = "bc", .access = 0, .priority = 1, .version = 1 };
+        struct nrpc_manifest_entry x1 = { .help = "ab", .tags = "c", .access = 0, .priority = 1, .version = 1 };
+        struct nrpc_manifest_entry x2 = { .help = "a",  .tags = "bc", .access = 0, .priority = 1, .version = 1 };
         dictionary_set(c1, "fn", &x1, sizeof(x1));
         dictionary_set(c2, "fn", &x2, sizeof(x2));
-        if(manifest_dict_hash(c1, node1, claim) == manifest_dict_hash(c2, node1, claim)) {
+        if(nrpc_catalog_manifest_hash(c1, node1, claim) == nrpc_catalog_manifest_hash(c2, node1, claim)) {
             fprintf(stderr, "  FAILED hash: field concatenation ambiguity\n");
             errors++;
         }
@@ -458,7 +458,7 @@ int rrdfunctions_manifest_unittest(void) {
             fprintf(stderr, "  FAILED key: a new ACLK session did not change the key\n");
             errors++;
         }
-        if(manifest_publication_key(ha, s1) == manifest_publication_key(manifest_dict_hash(empty, node1, claim), s1)) {
+        if(manifest_publication_key(ha, s1) == manifest_publication_key(nrpc_catalog_manifest_hash(empty, node1, claim), s1)) {
             fprintf(stderr, "  FAILED key: content change did not survive folding the session in\n");
             errors++;
         }
@@ -612,7 +612,7 @@ int rrdfunctions_manifest_unittest(void) {
 //
 // This pins the pacer directly, because the scan it lives in needs a live fleet and an ACLK
 // connection to exercise.
-int rrdfunctions_manifest_pacer_unittest(void) {
+int nrpc_manifest_pacer_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     int errors = 0;
@@ -806,7 +806,7 @@ int rrdfunctions_manifest_pacer_unittest(void) {
 // nrpc_method_unregister() no longer sends FUNCTION_DEL synchronously; it queues the
 // sanitized name in the registry's pending_dels set (only when the host has a
 // stream sender configured) and sets RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED.
-// The renderer (stream_sender_send_global_rrdhost_functions) clears the flag,
+// The renderer (stream_sender_send_host_functions) clears the flag,
 // snapshots-and-clears the set, emits the FUNCTION_DEL lines and then the full
 // re-list - one buffer. This pins:
 //
@@ -839,7 +839,7 @@ static void fndel_race_worker(void *arg) {
         snprintfz(name, sizeof(name), "tt-race-fn-%zu", i);
         nrpc_method_register(ctx->host, NULL, name, 10, 0, 1, "race", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
         nrpc_method_unregister(ctx->host, NULL, name, NRPC_SOURCE_DAEMON);
     }
     __atomic_store_n(&ctx->done, true, __ATOMIC_RELEASE);
@@ -863,7 +863,7 @@ static void fndel_flush_queue(RRDHOST *host) {
     spinlock_unlock(&host->rpc_registry->pending_dels.spinlock);
 }
 
-int rrdfunctions_del_unittest(void) {
+int nrpc_del_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
@@ -881,7 +881,7 @@ int rrdfunctions_del_unittest(void) {
     struct sender_state *saved_sender = host->sender;
     bool saved_option = rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED);
 
-    // manifest arming is observed exactly like rrdfunctions_manifest_unittest()
+    // manifest arming is observed exactly like nrpc_manifest_unittest()
     // does: through the host's ACLK config send-time timestamp
     bool config_created_here = (__atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE) == NULL);
     create_aclk_config(host, &host->host_id.uuid, NULL);
@@ -932,7 +932,7 @@ int rrdfunctions_del_unittest(void) {
 
             nrpc_method_register(host, NULL, cases[i].fn, 10, 0, 1, "truth table", "top",
                              HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                             rrdfunctions_unittest_noop_cb, NULL);
+                             nrpc_unittest_noop_cb, NULL);
 
             if(!rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
                 fprintf(stderr, "  FAILED tt '%s': add did not set the flag\n", cases[i].fn);
@@ -986,15 +986,15 @@ int rrdfunctions_del_unittest(void) {
 
         nrpc_method_register(host, NULL, "tt-keep-fn", 10, 0, 1, "keep", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
         nrpc_method_register(host, NULL, "tt-del-fn", 10, 0, 1, "del", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
         nrpc_method_unregister(host, NULL, "tt-del-fn", NRPC_SOURCE_DAEMON);
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_global_rrdhost_functions(host, wb, false, true);
+            stream_sender_send_host_functions(host, wb, false, true);
             const char *out = buffer_tostring(wb);
 
             const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-del-fn\"");
@@ -1030,7 +1030,7 @@ int rrdfunctions_del_unittest(void) {
         nrpc_method_unregister(host, NULL, "tt-keep-fn", NRPC_SOURCE_DAEMON);
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_global_rrdhost_functions(host, wb, false, false);
+            stream_sender_send_host_functions(host, wb, false, false);
             const char *out = buffer_tostring(wb);
 
             if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL)) {
@@ -1069,7 +1069,7 @@ int rrdfunctions_del_unittest(void) {
                 worker_done = __atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE);
 
                 CLEAN_BUFFER *wb = buffer_create(0, NULL);
-                stream_sender_send_global_rrdhost_functions(host, wb, false, true);
+                stream_sender_send_host_functions(host, wb, false, true);
                 const char *out = buffer_tostring(wb);
 
                 for(size_t i = 0; i < FNDEL_RACE_N; i++) {
@@ -1117,7 +1117,7 @@ int rrdfunctions_del_unittest(void) {
 
         nrpc_method_register(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
         nrpc_method_unregister(host, NULL, "tt-readd-fn", NRPC_SOURCE_DAEMON);
 
         if(!fndel_queued(host, "tt-readd-fn")) {
@@ -1127,7 +1127,7 @@ int rrdfunctions_del_unittest(void) {
 
         nrpc_method_register(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
 
         if(!fndel_queued(host, "tt-readd-fn")) {
             fprintf(stderr, "  FAILED re-add: the re-add cancelled the queued FUNCTION_DEL\n");
@@ -1136,7 +1136,7 @@ int rrdfunctions_del_unittest(void) {
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_global_rrdhost_functions(host, wb, false, true);
+            stream_sender_send_host_functions(host, wb, false, true);
             const char *out = buffer_tostring(wb);
 
             const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-readd-fn\"");
@@ -1206,7 +1206,7 @@ int rrdfunctions_del_unittest(void) {
 // the copies) that nothing else pins.
 
 // mirrors struct function_v2_entry in api_v2_contexts.c: the destination
-// dictionary owns the help/tags copies host_functions_to_dict() writes
+// dictionary owns the help/tags copies nrpc_catalog_host_to_dict() writes
 struct e4_fn_entry {
     const char *help;
     const char *tags;
@@ -1229,7 +1229,7 @@ static void e4_fn_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
     freez((void *)t->tags);
 }
 
-int rrdfunctions_emitters_unittest(void) {
+int nrpc_catalog_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
@@ -1240,7 +1240,7 @@ int rrdfunctions_emitters_unittest(void) {
 
     int errors = 0;
 
-    // fake a configured sender so deletes queue (see rrdfunctions_del_unittest)
+    // fake a configured sender so deletes queue (see nrpc_del_unittest)
     struct sender_state *saved_sender = host->sender;
     bool saved_option = rrdhost_option_check(host, RRDHOST_OPTION_SENDER_ENABLED);
     rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
@@ -1252,21 +1252,21 @@ int rrdfunctions_emitters_unittest(void) {
     // so the fixture lines appear in this relative order in the output
     nrpc_method_register(host, NULL, "c4-global-fn", 11, 42, 3, "c4 global help", "top",
                      HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     rrdfunctions_unittest_noop_cb, NULL);
+                     nrpc_unittest_noop_cb, NULL);
     nrpc_method_register(host, NULL, "__c4-restricted-fn", 12, 43, 4, "c4 restricted", "top",
                      HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON,
-                     rrdfunctions_unittest_noop_cb, NULL);
+                     nrpc_unittest_noop_cb, NULL);
     nrpc_method_register(host, NULL, "config c4test:job", 120, 1000, 1, "Dynamic configuration", "config",
                      HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     rrdfunctions_unittest_noop_cb, NULL);
+                     nrpc_unittest_noop_cb, NULL);
 
     // one plain global delete (queued) and one dyncfg delete (flag only - the quirk)
     nrpc_method_register(host, NULL, "c4-deleted-fn", 14, 45, 6, "c4 deleted", "top",
                      HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     rrdfunctions_unittest_noop_cb, NULL);
+                     nrpc_unittest_noop_cb, NULL);
     nrpc_method_register(host, NULL, "config c4del:job", 120, 1000, 1, "Dynamic configuration", "config",
                      HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     rrdfunctions_unittest_noop_cb, NULL);
+                     nrpc_unittest_noop_cb, NULL);
     nrpc_method_unregister(host, NULL, "c4-deleted-fn", NRPC_SOURCE_DAEMON);
     nrpc_method_unregister(host, NULL, "config c4del:job", NRPC_SOURCE_DAEMON);
 
@@ -1281,7 +1281,7 @@ int rrdfunctions_emitters_unittest(void) {
     else
         nrpc_method_register(host, st, "c4-chart-fn", 13, 44, 5, "c4 chart help", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
 
     // ------------------------------------------------------- expected line bytes
     CLEAN_BUFFER *exp_global = buffer_create(0, NULL);
@@ -1314,7 +1314,7 @@ int rrdfunctions_emitters_unittest(void) {
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_global_rrdhost_functions(host, wb, true /* dyncfg */, true /* can_function_del */);
+        stream_sender_send_host_functions(host, wb, true /* dyncfg */, true /* can_function_del */);
         const char *out = buffer_tostring(wb);
 
         const char *p_del        = strstr(out, buffer_tostring(exp_del));
@@ -1351,7 +1351,7 @@ int rrdfunctions_emitters_unittest(void) {
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_global_rrdhost_functions(host, wb, false /* dyncfg */, true);
+        stream_sender_send_host_functions(host, wb, false /* dyncfg */, true);
         if(strstr(buffer_tostring(wb), buffer_tostring(exp_dyncfg))) {
             fprintf(stderr, "  FAILED global: synthetic config line emitted without DYNCFG capability\n");
             errors++;
@@ -1382,7 +1382,7 @@ int rrdfunctions_emitters_unittest(void) {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-        host_functions2json(host, wb);
+        nrpc_catalog_host2json(host, wb);
         buffer_json_finalize(wb);
         const char *out = buffer_tostring(wb);
 
@@ -1406,7 +1406,7 @@ int rrdfunctions_emitters_unittest(void) {
             CLEAN_BUFFER *cwb = buffer_create(0, NULL);
             buffer_json_initialize(cwb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
             buffer_json_member_add_object(cwb, "functions");
-            chart_functions2json(st, cwb);
+            nrpc_catalog_chart2json(st, cwb);
             buffer_json_object_close(cwb);
             buffer_json_finalize(cwb);
             const char *cout = buffer_tostring(cwb);
@@ -1424,7 +1424,7 @@ int rrdfunctions_emitters_unittest(void) {
     }
 
     // ----------------------------------------------------- dictionary exporters
-    // host_functions_to_dict() is what api/v2 contexts aggregates by: the key
+    // nrpc_catalog_host_to_dict() is what api/v2 contexts aggregates by: the key
     // carries the version ("<version>|<name>") so two nodes offering different
     // versions of the same function do not merge, and help/tags are OWNED
     // copies the destination dictionary frees.
@@ -1439,7 +1439,7 @@ int rrdfunctions_emitters_unittest(void) {
         dictionary_register_delete_callback(dst, e4_fn_delete_cb, NULL);
 
         struct e4_fn_entry tmp = { 0 };
-        host_functions_to_dict(host, dst, &tmp, sizeof(tmp),
+        nrpc_catalog_host_to_dict(host, dst, &tmp, sizeof(tmp),
                                &tmp.help, &tmp.tags, &tmp.access, &tmp.priority, &tmp.version);
 
         struct e4_fn_entry *e = dictionary_get(dst, "3|c4-global-fn");
@@ -1470,7 +1470,7 @@ int rrdfunctions_emitters_unittest(void) {
 
         if(st) {
             DICTIONARY *cdst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-            chart_functions_to_dict(st, cdst, NULL, 0);
+            nrpc_catalog_chart_to_dict(st, cdst, NULL, 0);
 
             // the entries carry no value, so membership is tested through the item
             const DICTIONARY_ITEM *ci = dictionary_get_and_acquire_item(cdst, "c4-chart-fn");
@@ -1506,7 +1506,7 @@ int rrdfunctions_emitters_unittest(void) {
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_global_rrdhost_functions(host, wb, true, true);
+        stream_sender_send_host_functions(host, wb, true, true);
 
         if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
             fprintf(stderr, "  FAILED null-registry: the flag was not cleared, the poll would spin forever\n");
@@ -1588,7 +1588,7 @@ struct reg_probe {
     NRPC_METHOD_FLAGS options;
 };
 
-static void reg_probe_cb(const struct rrd_function_view *v, void *data) {
+static void reg_probe_cb(const struct nrpc_method_view *v, void *data) {
     struct reg_probe *p = data;
     if(!v->name || strcmp(v->name, p->want) != 0) return;
 
@@ -1606,7 +1606,7 @@ static void reg_probe_cb(const struct rrd_function_view *v, void *data) {
 static bool reg_probe_run(RRDHOST *host, NRPC_CATALOG_FILTER filter, const char *name, struct reg_probe *out) {
     memset(out, 0, sizeof(*out));
     out->want = name;
-    rrd_functions_host_foreach(host, filter, reg_probe_cb, out);
+    nrpc_catalog_host_foreach(host, filter, reg_probe_cb, out);
     return out->found;
 }
 
@@ -1648,7 +1648,7 @@ static void reg_provider_worker(void *arg) {
     nrpc_serving_started();
     nrpc_method_register(host, NULL, "reg-provider-fn", 10, 0, 1, "provider", "top",
                      HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     rrdfunctions_unittest_noop_cb, NULL);
+                     nrpc_unittest_noop_cb, NULL);
     nrpc_serving_finished();
 }
 
@@ -1670,7 +1670,7 @@ static void reg_race_worker(void *arg) {
                          (i & 1) ? REG_RACE_HELP_A : REG_RACE_HELP_B,
                          (i & 1) ? REG_RACE_TAGS_A : REG_RACE_TAGS_B,
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
 
     __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
 }
@@ -1680,7 +1680,7 @@ struct reg_race_check {
     size_t mismatches;
 };
 
-static void reg_race_check_cb(const struct rrd_function_view *v, void *data) {
+static void reg_race_check_cb(const struct nrpc_method_view *v, void *data) {
     struct reg_race_check *k = data;
     if(!v->name || strcmp(v->name, "reg-race-fn") != 0) return;
 
@@ -1696,7 +1696,7 @@ static void reg_race_check_cb(const struct rrd_function_view *v, void *data) {
         k->mismatches++;
 }
 
-int rrdfunctions_registry_unittest(void) {
+int nrpc_registry_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
     RRDHOST *host = localhost;
@@ -1726,7 +1726,7 @@ int rrdfunctions_registry_unittest(void) {
 
             nrpc_method_register(host, NULL, empty_names[i], 10, 0, 1, "empty", "top",
                              HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                             rrdfunctions_unittest_noop_cb, NULL);
+                             nrpc_unittest_noop_cb, NULL);
 
             // the refusal happens before anything is announced
             if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
@@ -1748,7 +1748,7 @@ int rrdfunctions_registry_unittest(void) {
         // dropped, runs of whitespace folded to one, '"' mapped to '\''
         nrpc_method_register(host, NULL, "  reg-key   edge\"case  ", 10, 0, 1, "key", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
 
         if(!dictionary_get(host->rpc_registry->dict, "reg-key edge'case")) {
             fprintf(stderr, "  FAILED key: a name was not indexed by its sanitized form\n");
@@ -1759,7 +1759,7 @@ int rrdfunctions_registry_unittest(void) {
         // registered function, so arguments resolve to their function...
         nrpc_method_register(host, NULL, "reg-args-fn", 10, 0, 1, "args", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             NRPC_METHOD_ACQUIRED *item = NULL;
@@ -1863,7 +1863,7 @@ int rrdfunctions_registry_unittest(void) {
 
         nrpc_method_register(host, NULL, "reg-owned-fn", 10, 0, 1, "owned", "top",
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
 
         struct reg_del_ctx ctx = { .host = host, .name = "reg-owned-fn" };
         ND_THREAD *t = nd_thread_create("reg-del", NETDATA_THREAD_OPTION_DONT_LOG, reg_del_worker, &ctx);
@@ -1983,7 +1983,7 @@ int rrdfunctions_registry_unittest(void) {
         // a registration without tags gets the default "top"
         nrpc_method_register(host, NULL, "reg-notags-fn", 10, 0, 1, "no tags", NULL,
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
         if(!reg_probe_run(host, NRPC_CATALOG_FILTER_USER, "reg-notags-fn", &p) ||
            strcmp(p.tags, "top") != 0) {
             fprintf(stderr, "  FAILED swap: a registration without tags did not default to 'top'\n");
@@ -2061,7 +2061,7 @@ int rrdfunctions_registry_unittest(void) {
 
         nrpc_method_register(host, NULL, "reg-race-fn", 10, 0, 1, REG_RACE_HELP_A, REG_RACE_TAGS_A,
                          HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         rrdfunctions_unittest_noop_cb, NULL);
+                         nrpc_unittest_noop_cb, NULL);
 
         ND_THREAD *t = nd_thread_create("reg-race", NETDATA_THREAD_OPTION_DONT_LOG, reg_race_worker, &ctx);
         if(!t) {
@@ -2070,7 +2070,7 @@ int rrdfunctions_registry_unittest(void) {
         }
         else {
             while(!__atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE))
-                rrd_functions_host_foreach(host, NRPC_CATALOG_FILTER_USER, reg_race_check_cb, &check);
+                nrpc_catalog_host_foreach(host, NRPC_CATALOG_FILTER_USER, reg_race_check_cb, &check);
 
             nd_thread_join(t);
 

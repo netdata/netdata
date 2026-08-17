@@ -142,11 +142,12 @@ int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
 
 // Regression test for nrpc_method_authorize() access gating (GHSA-6628-vxm3-4g8g).
 // Requires a prepared RRD (localhost). Returns the number of failures (0 = pass).
-int rrdfunctions_verify_access_unittest(void);
-int rrdfunctions_manifest_unittest(void);
-int rrdfunctions_del_unittest(void);
-int rrdfunctions_registry_unittest(void);
-int rrdfunctions_emitters_unittest(void);
+int nrpc_access_unittest(void);
+int nrpc_manifest_unittest(void);
+int nrpc_manifest_pacer_unittest(void);
+int nrpc_del_unittest(void);
+int nrpc_registry_unittest(void);
+int nrpc_catalog_unittest(void);
 
 bool nrpc_method_available(RRDHOST *host, const char *function);
 bool nrpc_method_is_available(RRDHOST *host, struct nrpc_method *method);

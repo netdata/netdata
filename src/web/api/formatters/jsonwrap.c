@@ -54,7 +54,7 @@ void query_target_functions(BUFFER *wb, const char *key, RRDR *r) {
             continue;
 
         ria = qi->ria;
-        chart_functions_to_dict(rrdinstance_acquired_rrdset(ria), funcs, NULL, 0);
+        nrpc_catalog_chart_to_dict(rrdinstance_acquired_rrdset(ria), funcs, NULL, 0);
     }
 
     buffer_json_member_add_array(wb, key);

@@ -115,7 +115,7 @@ char *generate_update_node_instance_manifest_message(size_t *len, struct update_
     if (manifest->functions) {
         void *fn_value;
         dfe_start_read(manifest->functions, fn_value) {
-            struct rrd_function_manifest_entry *fn = (struct rrd_function_manifest_entry *)fn_value;
+            struct nrpc_manifest_entry *fn = (struct nrpc_manifest_entry *)fn_value;
 
             manifestpb::Function *f = functions->add_items();
             f->set_name(fn_value_dfe.name);
