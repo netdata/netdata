@@ -184,7 +184,7 @@ int mcp_execute_function_access_unittest(void) {
         mcp_free_client(mcpc);
     }
 
-    rrd_function_del(host, NULL, MCP_UT_FN, false, true);
+    rrd_function_del(host, NULL, MCP_UT_FN, RRD_FUNCTION_REG_SOURCE_INTERNAL);
     mcp_functions_registry_cleanup();
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

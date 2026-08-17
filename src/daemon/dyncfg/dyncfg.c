@@ -394,6 +394,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
         "config",
         (view_access & edit_access),
         sync,
+        RRD_FUNCTION_REG_SOURCE_INTERNAL,
         dyncfg_function_intercept_cb,
         NULL);
 
@@ -424,7 +425,7 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(item) {
         DYNCFG *df = dictionary_acquired_item_value(item);
-        rrd_function_del(host, NULL, string2str(df->function), false, true);
+        rrd_function_del(host, NULL, string2str(df->function), RRD_FUNCTION_REG_SOURCE_INTERNAL);
 
         bool garbage_collect = false;
         if(df->dyncfg.saves == 0) {

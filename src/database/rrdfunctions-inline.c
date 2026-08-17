@@ -33,6 +33,6 @@ void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int ti
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
 
     rrd_function_add(host, st, name, timeout, priority, version,
-                     help, tags, access, true,
+                     help, tags, access, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
                      rrd_function_run_inline, execute_cb);
 }

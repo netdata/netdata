@@ -39,15 +39,15 @@ int rrdfunctions_verify_access_unittest(void) {
     // A protected function mirroring systemd-journal's requirements.
     rrd_function_add(host, NULL, "protected-fn", 10, 0, 1, "protected", "logs",
                      HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                     true, rrdfunctions_unittest_noop_cb, NULL);
+                     true, RRD_FUNCTION_REG_SOURCE_INTERNAL, rrdfunctions_unittest_noop_cb, NULL);
 
     // A restricted function: name starting with "__" flags RRD_FUNCTION_RESTRICTED.
     rrd_function_add(host, NULL, "__restricted-fn", 10, 0, 1, "restricted", "top",
-                     HTTP_ACCESS_NONE, true, rrdfunctions_unittest_noop_cb, NULL);
+                     HTTP_ACCESS_NONE, true, RRD_FUNCTION_REG_SOURCE_INTERNAL, rrdfunctions_unittest_noop_cb, NULL);
 
     // A public function requiring nothing — baseline that the gate does not over-block.
     rrd_function_add(host, NULL, "public-fn", 10, 0, 1, "public", "top",
-                     HTTP_ACCESS_NONE, true, rrdfunctions_unittest_noop_cb, NULL);
+                     HTTP_ACCESS_NONE, true, RRD_FUNCTION_REG_SOURCE_INTERNAL, rrdfunctions_unittest_noop_cb, NULL);
 
     struct {
         RRDHOST *host;
@@ -140,9 +140,9 @@ int rrdfunctions_verify_access_unittest(void) {
                     i, cases[i].fn, (unsigned)cases[i].user_access, cases[i].allow_restricted, code);
     }
 
-    rrd_function_del(host, NULL, "protected-fn", false, true);
-    rrd_function_del(host, NULL, "__restricted-fn", false, true);
-    rrd_function_del(host, NULL, "public-fn", false, true);
+    rrd_function_del(host, NULL, "protected-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    rrd_function_del(host, NULL, "__restricted-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+    rrd_function_del(host, NULL, "public-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
@@ -212,6 +212,55 @@ int rrdfunctions_manifest_unittest(void) {
                     names[i].raw, key, got ? "true" : "false");
     }
 
+    // 1b. Registry-side enforcement of the dyncfg namespace: a COLLECTOR registration of a
+    //     reserved name must be rejected by rrd_function_add() itself (the caller-side pluginsd
+    //     guard was removed - the registry is now the only gate). The bare "config" name is the
+    //     LIVE dyncfg function on localhost, so the assertions also pin that a rejected
+    //     registration leaves the live entry untouched (no execute_cb hijack via conflict swap).
+    {
+        int enforce_errors_before = errors;
+
+        struct rrd_host_function *live = dictionary_get(host->functions->dict, "config");
+        rrd_function_execute_cb_t live_cb = live ? live->execute_cb : NULL;
+
+        const char *rejected[] = {
+            "config",               // exact reserved name
+            " config",              // sanitizes to "config" - must classify on the sanitized key
+            "config c2-reject:job", // per-id reserved name
+        };
+
+        for(size_t i = 0; i < _countof(rejected); i++)
+            rrd_function_add(host, NULL, rejected[i], 10, 0, 1, "hijack attempt", "top",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+                             rrdfunctions_unittest_noop_cb, NULL);
+
+        if(dictionary_get(host->functions->dict, "config c2-reject:job")) {
+            fprintf(stderr, "  FAILED enforcement: COLLECTOR registered reserved name 'config c2-reject:job'\n");
+            errors++;
+            rrd_function_del(host, NULL, "config c2-reject:job", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        }
+
+        // fixed-size dictionary slots keep the value pointer stable across conflicts, so a
+        // hijack is visible only through the swapped execute_cb - compare against the capture
+        struct rrd_host_function *live_after = dictionary_get(host->functions->dict, "config");
+        if(live && (!live_after || live_after->execute_cb != live_cb ||
+                    live_after->execute_cb == rrdfunctions_unittest_noop_cb)) {
+            fprintf(stderr, "  FAILED enforcement: COLLECTOR registration of 'config' touched the live dyncfg entry\n");
+            errors++;
+        }
+
+        // if there is NO live "config" in this environment, the rejected registrations must
+        // not have created one
+        if(!live && dictionary_get(host->functions->dict, "config")) {
+            fprintf(stderr, "  FAILED enforcement: COLLECTOR registration created reserved name 'config'\n");
+            errors++;
+            rrd_function_del(host, NULL, "config", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        }
+
+        if(errors == enforce_errors_before)
+            fprintf(stderr, "  OK enforcement: COLLECTOR registrations of 'config', ' config' and 'config <id>' rejected\n");
+    }
+
     // 2. The manifest dictionary itself, using names that cannot collide with live functions.
     struct {
         const char *name;
@@ -227,7 +276,8 @@ int rrdfunctions_manifest_unittest(void) {
 
     for(size_t i = 0; i < _countof(fns); i++)
         rrd_function_add(host, NULL, fns[i].name, 10, 0, 1, "manifest help text", fns[i].tags,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, rrdfunctions_unittest_noop_cb, NULL);
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
 
     DICTIONARY *manifest = host_functions_to_manifest_dict(host);
 
@@ -268,7 +318,7 @@ int rrdfunctions_manifest_unittest(void) {
     dictionary_destroy(manifest);
 
     for(size_t i = 0; i < _countof(fns); i++)
-        rrd_function_del(host, NULL, fns[i].name, false, true);
+        rrd_function_del(host, NULL, fns[i].name, RRD_FUNCTION_REG_SOURCE_INTERNAL);
 
     // 4. The suppression hash. build_node_manifest() publishes only when manifest_dict_hash()
     //    differs from the last sent hash, so the hash must be: deterministic for identical

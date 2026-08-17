@@ -168,12 +168,16 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    if(rdcf->execute_cb_data != new_rdcf->execute_cb_data) {
+    // (source, execute_cb_data) swap as ONE pair inside one conditional - never
+    // as two independently-conditional swaps - so a later cleanup/release always
+    // keys on the ownership tag matching the data it actually holds
+    if(rdcf->execute_cb_data != new_rdcf->execute_cb_data || rdcf->source != new_rdcf->source) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "FUNCTIONS: function '%s' of host '%s' changed execute callback data",
+               "FUNCTIONS: function '%s' of host '%s' changed execute callback data or registration source",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         SWAP(rdcf->execute_cb_data, new_rdcf->execute_cb_data);
+        SWAP(rdcf->source, new_rdcf->source);
         changed = true;
     }
 
@@ -249,21 +253,14 @@ static inline RRD_FUNCTION_OPTIONS get_function_options(RRDSET *st, const char *
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version,
                       const char *help, const char *tags,
-                      HTTP_ACCESS access, bool sync,
+                      HTTP_ACCESS access, bool sync, RRD_FUNCTION_REG_SOURCE source,
                       rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function
     // to create a GLOBAL function
 
-    if(!tags || !*tags) {
-        if(strcmp(name, "systemd-journal") == 0)
-            tags = "logs";
-        else
-            tags = "top";
-    }
-
-    if(st && !st->functions_view)
-        st->functions_view = dictionary_create_view(host->functions->dict);
+    if(!tags || !*tags)
+        tags = "top";
 
     size_t key_size = rrd_functions_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
@@ -278,6 +275,36 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
                name, rrdhost_hostname(host));
         return;
     }
+
+    // Reserved dynamic-configuration function names ("config", "config <id>") are
+    // owned exclusively by the dyncfg subsystem. A local plugin (COLLECTOR)
+    // registering one would collide in the registry and make
+    // rrd_functions_conflict_callback() swap the built-in dyncfg execute callback
+    // out, hijacking the config tree. Local plugins do dyncfg via the DYNCFG
+    // protocol (not FUNCTION), so no legitimate COLLECTOR registration uses these
+    // names.
+    //
+    // Streaming is the exception and MUST be preserved: a child streams a single
+    // synthetic "config" proxy (dyncfg_add_streaming()) so the parent can forward
+    // config commands to it. That registration targets the child's host (never the
+    // parent's localhost built-in), so it cannot hijack anything. INTERNAL
+    // registrations ARE the dyncfg subsystem (dyncfg.c, dyncfg-tree.c).
+    //
+    // Enforced on the SANITIZED key: the registry is indexed by the sanitized
+    // form, which strips leading spaces/control chars, so a raw name like
+    // " config" or "\tconfig" classifies exactly like the key it would land on.
+    if(source == RRD_FUNCTION_REG_SOURCE_COLLECTOR && rrd_function_name_is_dyncfg(key)) {
+        // Log the sanitized name (what we actually classify on), not the raw name:
+        // a raw name with leading whitespace/control chars or embedded newlines
+        // would make this log line misleading or malformed.
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "FUNCTIONS: 'host:%s' attempted to register reserved dynamic-configuration function '%s' from a collector. Ignoring it.",
+               rrdhost_hostname(host), key);
+        return;
+    }
+
+    if(st && !st->functions_view)
+        st->functions_view = dictionary_create_view(host->functions->dict);
 
     // Classify from the sanitized key, not the raw name: the key is what the dictionary is
     // indexed by, so classifying the raw name lets " config" land on the "config" key without
@@ -294,6 +321,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .priority = priority,
         .options = options,
         .access = access,
+        .source = source,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
         .help = string_strdupz(help),
@@ -317,7 +345,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         aclk_arm_node_manifest(host);
 }
 
-bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal) {
+bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, RRD_FUNCTION_REG_SOURCE source) {
     if(unlikely(!name || !*name))
         return false;
 
@@ -331,7 +359,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(item);
 
-    if(!from_streaming && !internal) {
+    if(source == RRD_FUNCTION_REG_SOURCE_COLLECTOR) {
         if(!thread_rrd_collector || rdcf->collector != thread_rrd_collector) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "FUNCTIONS: refusing to unregister function '%s' - "
@@ -355,8 +383,8 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
 
     // The FUNCTION_DEL protocol command (from external plugins or streaming
     // children) must never remove dyncfg config functions; those are owned and
-    // removed exclusively by the dyncfg subsystem (internal deletes).
-    if(!internal && is_dyncfg) {
+    // removed exclusively by the dyncfg subsystem (INTERNAL deletes).
+    if(source != RRD_FUNCTION_REG_SOURCE_INTERNAL && is_dyncfg) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "FUNCTIONS: refusing to unregister dyncfg function '%s' via FUNCTION_DEL", name);
         dictionary_acquired_item_release(host->functions->dict, item);

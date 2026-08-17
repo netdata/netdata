@@ -28,6 +28,13 @@ struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
     bool unregistered;              // when true, the function is unavailable
     RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
+
+    // who registered this entry. Swapped together with execute_cb_data as ONE
+    // pair by the conflict callback, so ownership decisions (who may overwrite,
+    // and later who releases the transport) always key on the value the entry
+    // actually holds.
+    RRD_FUNCTION_REG_SOURCE source;
+
     HTTP_ACCESS access;
     STRING *help;
     STRING *tags;

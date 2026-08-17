@@ -70,6 +70,15 @@ struct rrd_host_function;
 // freed while the handle is held (idiom: RRDSET_ACQUIRED, RRDHOST_ACQUIRED)
 typedef struct rrd_function_acquired RRD_FUNCTION_ACQUIRED;
 
+// who is registering (or unregistering) a function - the registry enforces
+// per-source rules (e.g. only the dyncfg subsystem and streaming children may
+// register dyncfg-reserved names) and, on delete, who may remove what
+typedef enum __attribute__((packed)) {
+    RRD_FUNCTION_REG_SOURCE_COLLECTOR = 0,  // a local plugin / collector thread (pluginsd FUNCTION)
+    RRD_FUNCTION_REG_SOURCE_STREAMING,      // a streaming child's advertisement on this parent
+    RRD_FUNCTION_REG_SOURCE_INTERNAL,       // daemon-internal registration (inline functions, dyncfg)
+} RRD_FUNCTION_REG_SOURCE;
+
 void rrd_functions_host_init(RRDHOST *host);
 void rrd_functions_host_destroy(RRDHOST *host);
 
@@ -78,10 +87,10 @@ void rrd_function_acquired_release(RRDHOST *host, RRD_FUNCTION_ACQUIRED *rfa);
 
 // add a function, to be run from the collector
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
-                      HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
-                      void *execute_cb_data);
+                      HTTP_ACCESS access, bool sync, RRD_FUNCTION_REG_SOURCE source,
+                      rrd_function_execute_cb_t execute_cb, void *execute_cb_data);
 
-bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal);
+bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, RRD_FUNCTION_REG_SOURCE source);
 
 // true if name is a reserved dynamic-configuration function name ("config" or "config <id>")
 bool rrd_function_name_is_dyncfg(const char *name);

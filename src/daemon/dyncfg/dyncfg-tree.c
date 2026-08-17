@@ -293,5 +293,5 @@ void dyncfg_host_init(RRDHOST *host) {
 
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120, 1000, DYNCFG_FUNCTIONS_VERSION,
                      "Dynamic configuration", "config", HTTP_ACCESS_ANONYMOUS_DATA,
-                     false, dyncfg_config_execute_cb, host);
+                     false, RRD_FUNCTION_REG_SOURCE_INTERNAL, dyncfg_config_execute_cb, host);
 }
