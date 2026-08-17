@@ -4,7 +4,6 @@ package smartctl
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -172,161 +171,35 @@ var (
 	}
 )
 
-func buildDeviceCharts(dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) (collectorapi.Charts, error) {
-	var charts collectorapi.Charts
-	for _, group := range []*collectorapi.Charts{
-		newDeviceCharts(dev, id),
-		newDeviceSmartAttrCharts(dev, id, smartAttrs),
-		newDeviceScsiErrorLogCharts(dev, id),
-	} {
-		if group != nil {
-			charts = append(charts, (*group)...)
+func (c *Collector) addDeviceCharts(dev *smartDevice, id deviceIdentity) (collectorapi.Charts, error) {
+	charts := collectorapi.Charts{}
+
+	if cs := c.newDeviceCharts(dev, id); cs != nil && len(*cs) > 0 {
+		if err := charts.Add(*cs...); err != nil {
+			return nil, err
+		}
+	}
+	cs, err := c.newDeviceSmartAttrCharts(dev, id)
+	if err != nil {
+		return nil, err
+	}
+	if cs != nil && len(*cs) > 0 {
+		if err := charts.Add(*cs...); err != nil {
+			return nil, err
+		}
+	}
+	if cs := c.newDeviceScsiErrorLogCharts(dev, id); cs != nil && len(*cs) > 0 {
+		if err := charts.Add(*cs...); err != nil {
+			return nil, err
 		}
 	}
 
-	validated := collectorapi.Charts{}
-	if err := validated.Add(charts...); err != nil {
-		return nil, err
-	}
-	return validated, nil
-}
-
-func (c *Collector) addDeviceCharts(charts collectorapi.Charts) error {
 	candidate := append(collectorapi.Charts(nil), (*c.Charts())...)
 	if err := candidate.Add(charts...); err != nil {
-		return err
+		return nil, err
 	}
 	*c.Charts() = candidate
-	return nil
-}
-
-func (c *Collector) reconcileDeviceCharts(current, desired collectorapi.Charts) (collectorapi.Charts, error) {
-	if sameDeviceCharts(current, desired) {
-		return current, nil
-	}
-
-	owned := make(map[*collectorapi.Chart]bool, len(current))
-	for _, chart := range current {
-		owned[chart] = true
-	}
-	candidate := make(collectorapi.Charts, 0, len(*c.Charts())-len(current)+len(desired))
-	for _, chart := range *c.Charts() {
-		if !owned[chart] {
-			candidate = append(candidate, chart)
-		}
-	}
-	if err := candidate.Add(desired...); err != nil {
-		return nil, err
-	}
-
-	currentByID := make(map[string]*collectorapi.Chart, len(current))
-	for _, chart := range current {
-		currentByID[chart.ID] = chart
-	}
-
-	active := make(collectorapi.Charts, 0, len(desired))
-	var additions collectorapi.Charts
-	for _, chart := range desired {
-		if existing, ok := currentByID[chart.ID]; ok {
-			// Preserve the chart object when its public ID survives the attachment refresh.
-			if !sameChartSpec(existing, chart) {
-				updateChartSpec(existing, chart)
-			}
-			active = append(active, existing)
-			delete(currentByID, chart.ID)
-		} else {
-			active = append(active, chart)
-			additions = append(additions, chart)
-		}
-	}
-
-	for _, chart := range currentByID {
-		chart.MarkRemove()
-		chart.MarkNotCreated()
-	}
-	if err := c.Charts().Add(additions...); err != nil {
-		return nil, err
-	}
-	return active, nil
-}
-
-func sameDeviceCharts(left, right collectorapi.Charts) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	byID := make(map[string]*collectorapi.Chart, len(left))
-	for _, chart := range left {
-		byID[chart.ID] = chart
-	}
-	for _, chart := range right {
-		if existing, ok := byID[chart.ID]; !ok || !sameChartSpec(existing, chart) {
-			return false
-		}
-	}
-	return true
-}
-
-func sameChartSpec(left, right *collectorapi.Chart) bool {
-	return left.OverModule == right.OverModule &&
-		left.IDSep == right.IDSep &&
-		left.ID == right.ID &&
-		left.OverID == right.OverID &&
-		left.Title == right.Title &&
-		left.Units == right.Units &&
-		left.Fam == right.Fam &&
-		left.Ctx == right.Ctx &&
-		left.Type == right.Type &&
-		left.Priority == right.Priority &&
-		left.UpdateEvery == right.UpdateEvery &&
-		left.SkipGaps == right.SkipGaps &&
-		left.Opts == right.Opts &&
-		slices.Equal(left.Labels, right.Labels) &&
-		sameDims(left.Dims, right.Dims) &&
-		sameVars(left.Vars, right.Vars)
-}
-
-func sameDims(left, right collectorapi.Dims) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i := range left {
-		if *left[i] != *right[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func sameVars(left, right collectorapi.Vars) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i := range left {
-		if *left[i] != *right[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func updateChartSpec(dst, src *collectorapi.Chart) {
-	dst.OverModule = src.OverModule
-	dst.IDSep = src.IDSep
-	dst.ID = src.ID
-	dst.OverID = src.OverID
-	dst.Title = src.Title
-	dst.Units = src.Units
-	dst.Fam = src.Fam
-	dst.Ctx = src.Ctx
-	dst.Type = src.Type
-	dst.Priority = src.Priority
-	dst.UpdateEvery = src.UpdateEvery
-	dst.SkipGaps = src.SkipGaps
-	dst.Opts = src.Opts
-	dst.Labels = src.Labels
-	dst.Dims = src.Dims
-	dst.Vars = src.Vars
-	dst.MarkNotCreated()
+	return charts, nil
 }
 
 func removeDeviceCharts(charts collectorapi.Charts) {
@@ -336,7 +209,8 @@ func removeDeviceCharts(charts collectorapi.Charts) {
 	}
 }
 
-func newDeviceCharts(dev *smartDevice, id deviceIdentity) *collectorapi.Charts {
+func (c *Collector) newDeviceCharts(dev *smartDevice, id deviceIdentity) *collectorapi.Charts {
+
 	charts := deviceChartsTmpl.Copy()
 
 	if _, ok := dev.powerOnTime(); !ok {
@@ -357,7 +231,12 @@ func newDeviceCharts(dev *smartDevice, id deviceIdentity) *collectorapi.Charts {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id.name, id.typ)
-		chart.Labels = deviceChartLabels(dev)
+		chart.Labels = []collectorapi.Label{
+			{Key: "device_name", Value: dev.deviceName()},
+			{Key: "device_type", Value: dev.deviceType()},
+			{Key: "model_name", Value: dev.modelName()},
+			{Key: "serial_number", Value: dev.serialNumber()},
+		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ)
 		}
@@ -366,15 +245,17 @@ func newDeviceCharts(dev *smartDevice, id deviceIdentity) *collectorapi.Charts {
 	return charts
 }
 
-func newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) *collectorapi.Charts {
+func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity) (*collectorapi.Charts, error) {
 	attrs, ok := dev.ataSmartAttributeTable()
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	charts := collectorapi.Charts{}
 
 	for _, attr := range attrs {
-		if !isSmartAttrChartable(attr) {
+		if !isSmartAttrValid(attr) ||
+			strings.HasPrefix(attr.name(), "Unknown") ||
+			strings.HasPrefix(attr.name(), "Not_In_Use") {
 			continue
 		}
 
@@ -383,9 +264,8 @@ func newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity, smartAttrs sm
 			deviceSmartAttributeNormalizedChartTmpl.Copy(),
 		}
 
-		attrName := attr.name()
-		identity := smartAttrs.resolve(attr)
-		cleanAttrName := identity.name
+		attrName := attributeNameMap(attr.name())
+		cleanAttrName := cleanAttributeName(attrName)
 
 		for _, chart := range cs {
 			if chart.ID == deviceSmartAttributeDecodedChartTmpl.ID {
@@ -395,20 +275,27 @@ func newDeviceSmartAttrCharts(dev *smartDevice, id deviceIdentity, smartAttrs sm
 			chart.Title = fmt.Sprintf(chart.Title, attrName)
 			chart.Fam = fmt.Sprintf(chart.Fam, cleanAttrName)
 			chart.Ctx = fmt.Sprintf(chart.Ctx, cleanAttrName)
-			chart.Labels = deviceChartLabels(dev)
+			chart.Labels = []collectorapi.Label{
+				{Key: "device_name", Value: dev.deviceName()},
+				{Key: "device_type", Value: dev.deviceType()},
+				{Key: "model_name", Value: dev.modelName()},
+				{Key: "serial_number", Value: dev.serialNumber()},
+			}
 			for _, dim := range chart.Dims {
 				dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ, cleanAttrName)
 				dim.Name = fmt.Sprintf(dim.Name, cleanAttrName)
 			}
 		}
 
-		charts = append(charts, cs...)
+		if err := charts.Add(cs...); err != nil {
+			return nil, err
+		}
 	}
 
-	return &charts
+	return &charts, nil
 }
 
-func newDeviceScsiErrorLogCharts(dev *smartDevice, id deviceIdentity) *collectorapi.Charts {
+func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice, id deviceIdentity) *collectorapi.Charts {
 	if dev.deviceType() != "scsi" || !dev.data.Get("scsi_error_counter_log").Exists() {
 		return nil
 	}
@@ -417,33 +304,18 @@ func newDeviceScsiErrorLogCharts(dev *smartDevice, id deviceIdentity) *collector
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id.name, id.typ)
-		chart.Labels = deviceChartLabels(dev)
+		chart.Labels = []collectorapi.Label{
+			{Key: "device_name", Value: dev.deviceName()},
+			{Key: "device_type", Value: dev.deviceType()},
+			{Key: "model_name", Value: dev.modelName()},
+			{Key: "serial_number", Value: dev.serialNumber()},
+		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, id.name, id.typ)
 		}
 	}
 
 	return charts
-}
-
-func (c *Collector) warnSmartAttributeCollisions(dev *smartDevice, smartAttrs smartAttributeIdentities) {
-	warned := make(map[string]bool)
-	for _, identity := range smartAttrs {
-		if identity.name == identity.baseName || warned[identity.baseName] {
-			continue
-		}
-		c.Warningf("device '%s' type '%s': SMART attributes normalize to '%s'; using attribute IDs to disambiguate", dev.deviceName(), dev.deviceType(), identity.baseName)
-		warned[identity.baseName] = true
-	}
-}
-
-func deviceChartLabels(dev *smartDevice) []collectorapi.Label {
-	return []collectorapi.Label{
-		{Key: "device_name", Value: dev.deviceName()},
-		{Key: "device_type", Value: dev.deviceType()},
-		{Key: "model_name", Value: dev.modelName()},
-		{Key: "serial_number", Value: dev.serialNumber()},
-	}
 }
 
 var attrNameReplacer = strings.NewReplacer("/", "_")
@@ -453,30 +325,30 @@ func cleanAttributeName(attrName string) string {
 	return strings.ToLower(attrName)
 }
 
-var smartAttributeUnits = map[string]string{
-	"Airflow_Temperature_Cel": "Celsius",
-	"Case_Temperature":        "Celsius",
-	"Drive_Temperature":       "Celsius",
-	"Temperature_Case":        "Celsius",
-	"Temperature_Celsius":     "Celsius",
-	"Temperature_Internal":    "Celsius",
-	"Power_On_Hours":          "hours",
-	"Spin_Up_Time":            "milliseconds",
-	"Media_Wearout_Indicator": "percent",
-	"Percent_Life_Remaining":  "percent",
-	"Percent_Lifetime_Remain": "percent",
-	"Total_LBAs_Read":         "sectors",
-	"Total_LBAs_Written":      "sectors",
-	"Offline_Uncorrectable":   "sectors",
-	"Pending_Sector_Count":    "sectors",
-	"Reallocated_Sector_Ct":   "sectors",
-	"Current_Pending_Sector":  "sectors",
-	"Reported_Uncorrect":      "errors",
-	"Command_Timeout":         "events",
-}
-
 func attributeUnit(attrName string) string {
-	if unit, ok := smartAttributeUnits[attrName]; ok {
+	units := map[string]string{
+		"Airflow_Temperature_Cel": "Celsius",
+		"Case_Temperature":        "Celsius",
+		"Drive_Temperature":       "Celsius",
+		"Temperature_Case":        "Celsius",
+		"Temperature_Celsius":     "Celsius",
+		"Temperature_Internal":    "Celsius",
+		"Power_On_Hours":          "hours",
+		"Spin_Up_Time":            "milliseconds",
+		"Media_Wearout_Indicator": "percent",
+		"Percent_Life_Remaining":  "percent",
+		"Percent_Lifetime_Remain": "percent",
+		"Total_LBAs_Read":         "sectors",
+		"Total_LBAs_Written":      "sectors",
+		"Offline_Uncorrectable":   "sectors",
+		"Pending_Sector_Count":    "sectors",
+		"Reallocated_Sector_Ct":   "sectors",
+		"Current_Pending_Sector":  "sectors",
+		"Reported_Uncorrect":      "errors",
+		"Command_Timeout":         "events",
+	}
+
+	if unit, ok := units[attrName]; ok {
 		return unit
 	}
 
@@ -501,4 +373,11 @@ func attributeUnit(attrName string) string {
 	}
 
 	return "value"
+}
+
+func attributeNameMap(attrName string) string {
+	// TODO: Handle Vendor-Specific S.M.A.R.T. Attribute Naming
+	// S.M.A.R.T. attribute names can vary slightly between vendors (e.g., "Thermal_Throttle_St" vs. "Thermal_Throttle_Status").
+	// This function ensures consistent naming.
+	return attrName
 }

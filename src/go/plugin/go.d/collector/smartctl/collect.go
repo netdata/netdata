@@ -22,12 +22,10 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if err != nil {
 			return nil, err
 		}
-		devicesChanged := !maps.EqualFunc(c.scannedDevices, devices, func(left, right *scanDevice) bool {
-			return *left == *right
-		})
 
 		for k := range c.scannedDevices {
 			if _, ok := devices[k]; !ok {
+				delete(c.scannedDevices, k)
 				if attached, ok := c.attachedDevices[k]; ok {
 					delete(c.attachedDevices, k)
 					removeDeviceCharts(attached.charts)
@@ -35,7 +33,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			}
 		}
 
-		c.forceDevicePoll = devicesChanged
+		c.forceDevicePoll = !maps.Equal(c.scannedDevices, devices)
 		c.scannedDevices = devices
 		c.lastScanTime = now
 		c.forceScan = false
@@ -53,10 +51,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	return c.mx, nil
 }
-
 func (c *Collector) collectDevices(mx map[string]int64) {
 	if c.ConcurrentScans > 0 && len(c.scannedDevices) > 1 {
-		c.collectDevicesConcurrently(mx)
+		if err := c.collectDevicesConcurrently(mx); err != nil {
+			c.Warning(err)
+		}
 		return
 	}
 
@@ -74,13 +73,14 @@ type deviceInfoResult struct {
 	err        error
 }
 
-func (c *Collector) collectDevicesConcurrently(mx map[string]int64) {
-	p := pool.NewWithResults[deviceInfoResult]().WithMaxGoroutines(c.ConcurrentScans)
+func (c *Collector) collectDevicesConcurrently(mx map[string]int64) error {
+	p := pool.New().WithMaxGoroutines(c.ConcurrentScans)
+	resultsChan := make(chan deviceInfoResult, len(c.scannedDevices))
 
 	for _, dev := range c.scannedDevices {
-		p.Go(func() deviceInfoResult {
+		p.Go(func() {
 			resp, err := c.exec.deviceInfo(dev.name, dev.typ, c.NoCheckPowerMode)
-			return deviceInfoResult{
+			resultsChan <- deviceInfoResult{
 				scanDevice: dev,
 				response:   resp,
 				err:        err,
@@ -88,11 +88,17 @@ func (c *Collector) collectDevicesConcurrently(mx map[string]int64) {
 		})
 	}
 
-	for _, r := range p.Wait() {
+	p.Wait()
+	close(resultsChan)
+
+	for r := range resultsChan {
 		if err := c.processDeviceResult(mx, r); err != nil {
 			c.Warning(err)
+			continue
 		}
 	}
+
+	return nil
 }
 
 func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoResult) error {
@@ -116,7 +122,7 @@ func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoRe
 			}
 		}
 		if err != nil {
-			return fmt.Errorf("failed to get device info for '%s' type '%s': %w", scanDev.name, scanDev.typ, err)
+			return fmt.Errorf("failed to get device info for '%s' type '%s': %v", scanDev.name, scanDev.typ, err)
 		}
 	}
 
@@ -132,12 +138,6 @@ func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoRe
 
 	key := scanDev.key()
 	id := newDeviceIdentity(dev.deviceName(), dev.deviceType())
-	smartAttrs := newSmartAttributeIdentities(dev)
-	desiredCharts, err := buildDeviceCharts(dev, id, smartAttrs)
-	if err != nil {
-		return fmt.Errorf("failed to build charts for device '%s' type '%s': %w", scanDev.name, scanDev.typ, err)
-	}
-
 	attached, seen := c.attachedDevices[key]
 	if !seen || attached.id != id {
 		for otherKey, other := range c.attachedDevices {
@@ -145,29 +145,17 @@ func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoRe
 				return fmt.Errorf("device identity collides with already attached device '%s'", otherKey)
 			}
 		}
-		if err := c.addDeviceCharts(desiredCharts); err != nil {
+		charts, err := c.addDeviceCharts(dev, id)
+		if err != nil {
 			return fmt.Errorf("failed to add charts for device '%s' type '%s': %w", scanDev.name, scanDev.typ, err)
 		}
 		if seen {
 			removeDeviceCharts(attached.charts)
 		}
-		c.warnSmartAttributeCollisions(dev, smartAttrs)
-		attached = attachedDevice{id: id, charts: desiredCharts, smartAttrs: smartAttrs}
-		c.attachedDevices[key] = attached
-	} else {
-		charts, err := c.reconcileDeviceCharts(attached.charts, desiredCharts)
-		if err != nil {
-			return fmt.Errorf("failed to reconcile charts for device '%s' type '%s': %w", scanDev.name, scanDev.typ, err)
-		}
-		if !maps.Equal(attached.smartAttrs, smartAttrs) {
-			c.warnSmartAttributeCollisions(dev, smartAttrs)
-		}
-		attached.charts = charts
-		attached.smartAttrs = smartAttrs
-		c.attachedDevices[key] = attached
+		c.attachedDevices[key] = attachedDevice{id: id, charts: charts}
 	}
 
-	c.collectSmartDevice(mx, dev, id, smartAttrs)
+	c.collectSmartDevice(mx, dev, id)
 
 	return nil
 }
@@ -181,7 +169,7 @@ func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevic
 	})
 }
 
-func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) {
+func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id deviceIdentity) {
 	px := id.prefix
 
 	if v, ok := dev.powerOnTime(); ok {
@@ -208,14 +196,18 @@ func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id
 
 	if attrs, ok := dev.ataSmartAttributeTable(); ok {
 		for _, attr := range attrs {
-			if !isSmartAttrChartable(attr) {
+			if !isSmartAttrValid(attr) {
 				continue
 			}
-			n := smartAttrs.resolve(attr).name
+			n := cleanAttributeName(attributeNameMap(attr.name()))
 			px := fmt.Sprintf("%sattr_%s_", px, n)
 
 			if v, err := strconv.ParseInt(attr.value(), 10, 64); err == nil {
 				mx[px+"normalized"] = v
+			}
+
+			if v, err := strconv.ParseInt(attr.rawValue(), 10, 64); err == nil {
+				mx[px+"raw"] = v
 			}
 
 			rs := strings.TrimSpace(attr.rawString())
@@ -254,11 +246,12 @@ func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id
 }
 
 func (c *Collector) isTimeToScan(now time.Time) bool {
-	return c.ScanEvery.Duration() > 0 && now.After(c.lastScanTime.Add(c.ScanEvery.Duration()))
+	return c.ScanEvery.Duration().Seconds() != 0 && now.After(c.lastScanTime.Add(c.ScanEvery.Duration()))
 }
 
 func (c *Collector) isTimeToPollDevices(now time.Time) bool {
 	return now.After(c.lastDevicePollTime.Add(c.PollDevicesEvery.Duration()))
+
 }
 
 func isSmartDeviceValid(d *smartDevice) bool {
@@ -299,10 +292,7 @@ func isExitStatusHasAnyBit(r *gjson.Result, bit int, bits ...int) bool {
 	// https://manpages.debian.org/bullseye/smartmontools/smartctl.8.en.html#EXIT_STATUS
 	status := int(r.Get("smartctl.exit_status").Int())
 
-	if status&(1<<bit) != 0 {
-		return true
-	}
-	for _, b := range bits {
+	for _, b := range append([]int{bit}, bits...) {
 		mask := 1 << b
 		if (status & mask) != 0 {
 			return true

@@ -24,12 +24,13 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors the health status of storage devices by analyzing S.M.A.R.T. (Self-Monitoring, Analysis, and Reporting Technology) counters.
-          It relies on the `smartctl` CLI tool from smartmontools. On Unix-like systems, it uses `ndsudo`, a Netdata helper designed to run privileged commands securely without configuring `sudo`. On Windows, the collector executes `smartctl` directly.
+          It relies on the `smartctl` CLI tool from smartmontools but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
 
           Executed commands:
           -  `smartctl --json --scan`
-          -  `smartctl --json --scan-open`
-          -  `smartctl --json --xall --device {deviceType} --nocheck {powerMode} {deviceName}`
+          -  `smartctl --json --all {deviceName} --device {deviceType} --nocheck {powerMode}`
         method_description: ""
       supported_platforms:
         include: [Linux, BSD, Windows, macOS]
@@ -94,27 +95,44 @@ modules:
               description: Netdata chart update interval (seconds). Collector may use cached data if this is less than **poll_devices_every**.
               default_value: 10
               required: false
-              group: Base
+              group: Collection
             - name: timeout
               description: "`smartctl` binary execution timeout (seconds)."
               default_value: 5
               required: false
-              group: Base
+              group: Collection
             - name: scan_every
               description: Device discovery interval using `smartctl --scan` (seconds). Set 0 to scan only once at startup.
               default_value: 900
               required: false
-              group: Base
+              group: Collection
             - name: poll_devices_every
               description: Device polling interval (seconds). Data is cached for this interval.
               default_value: 300
               required: false
-              group: Base
+              group: Collection
+
+            - name: device_selector
+              description: "Pattern to match the 'info name' of devices as reported by `smartctl --scan --json`."
+              default_value: "*"
+              required: false
+              group: Target
+            - name: extra_devices
+              description: "Manually specify devices not auto-detected by `smartctl --scan`. Each entry must include both a name and a type."
+              default_value: "[]"
+              required: false
+              group: Target
+
+            - name: concurrent_scans
+              description: "Number of devices to scan concurrently. Set 0 for sequential scanning (default). Helps performance when monitoring many devices."
+              default_value: 0
+              required: false
+              group: Performance
             - name: no_check_power_mode
               description: "Skip data collection when device is in low-power mode (avoids unnecessary spin-up)."
               default_value: standby
               required: false
-              group: Base
+              group: Performance
               detailed_description: |
                 Valid arguments:
 
@@ -124,22 +142,6 @@ modules:
                 | sleep   | Skip check if device is in SLEEP mode.                                                                                                                                                 |
                 | standby | Skip check if device is in SLEEP or STANDBY mode (prevents spin-up).                                                                                                                   |
                 | idle    | Skip check if device is in SLEEP, STANDBY, or IDLE mode (not recommended since disks may still be spinning).                                                                           |
-            - name: concurrent_scans
-              description: "Number of devices to poll concurrently. Set 0 for sequential polling (default)."
-              default_value: 0
-              required: false
-              group: Base
-
-            - name: device_selector
-              description: "Pattern to match the 'info name' of devices as reported by `smartctl --scan --json`."
-              default_value: "*"
-              required: false
-              group: Devices
-            - name: extra_devices
-              description: "Manually specify devices not auto-detected by `smartctl --scan`. Each entry must include both a name and a type."
-              default_value: "[]"
-              required: false
-              group: Devices
         examples:
           folding:
             title: Config
@@ -151,13 +153,13 @@ modules:
                 jobs:
                   - name: smartctl
                     poll_devices_every: 60  # Collect S.M.A.R.T statistics every 60 seconds
-            - name: Concurrent polling for multiple devices
+            - name: Concurrent scanning for multiple devices
               description: |
-                This example enables concurrent device polling when monitoring many devices.
+                This example demonstrates enabling concurrent scanning to improve performance when monitoring many devices.
               config: |
                 jobs:
                   - name: smartctl
-                    concurrent_scans: 4  # Poll up to 4 devices concurrently
+                    concurrent_scans: 4  # Scan up to 4 devices concurrently
             - name: Extra devices
               description: |
                 This example demonstrates using `extra_devices` to manually add a storage device (`/dev/sdc`) not automatically detected by `smartctl --scan`.

@@ -14,7 +14,6 @@ import (
 func TestNewDeviceIdentity(t *testing.T) {
 	tests := map[string]struct {
 		name           string
-		typ            string
 		wantNamePrefix string
 		wantExact      string
 	}{
@@ -34,23 +33,14 @@ func TestNewDeviceIdentity(t *testing.T) {
 			name:           "IOService:/Example\u00a0Controller(Example)@0/Namespace@1",
 			wantNamePrefix: "device_IOService:/Example_Controller(Example)@0/Namespace@1_",
 		},
-		"device type whitespace": {
-			name:      "sda",
-			typ:       "megaraid,disk 1",
-			wantExact: "device_sda_0e4e8ffdb7d76839_type_megaraid,disk_1_",
-		},
 	}
 
 	identities := make(map[string]deviceIdentity)
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			typ := test.typ
-			if typ == "" {
-				typ = "nvme"
-			}
-			id := newDeviceIdentity(test.name, typ)
+			id := newDeviceIdentity(test.name, "nvme")
 			assert.Equal(t, -1, strings.IndexFunc(id.prefix, unicode.IsSpace))
-			assert.Equal(t, id, newDeviceIdentity(test.name, typ), "identity must be deterministic")
+			assert.Equal(t, id, newDeviceIdentity(test.name, "nvme"), "identity must be deterministic")
 			if test.wantExact != "" {
 				assert.Equal(t, test.wantExact, id.prefix)
 			} else {

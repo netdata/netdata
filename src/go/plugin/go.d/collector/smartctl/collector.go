@@ -84,9 +84,8 @@ type Collector struct {
 }
 
 type attachedDevice struct {
-	id         deviceIdentity
-	charts     collectorapi.Charts
-	smartAttrs smartAttributeIdentities
+	id     deviceIdentity
+	charts collectorapi.Charts
 }
 
 func (c *Collector) Configuration() any {
@@ -95,18 +94,18 @@ func (c *Collector) Configuration() any {
 
 func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation: %w", err)
+		return fmt.Errorf("config validation: %s", err)
 	}
 
 	sr, err := c.initDeviceSelector()
 	if err != nil {
-		return fmt.Errorf("device selector initialization: %w", err)
+		return fmt.Errorf("device selector initialization: %v", err)
 	}
 	c.deviceSr = sr
 
 	smartctlExec, err := c.initSmartctlCli()
 	if err != nil {
-		return fmt.Errorf("smartctl exec initialization: %w", err)
+		return fmt.Errorf("smartctl exec initialization: %v", err)
 	}
 	c.exec = smartctlExec
 
