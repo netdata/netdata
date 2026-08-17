@@ -81,7 +81,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.35.5
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.5
 	github.com/aws/smithy-go v1.27.7
-	github.com/catonetworks/cato-go-sdk v0.3.2
+	github.com/catonetworks/cato-go-sdk v0.3.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
