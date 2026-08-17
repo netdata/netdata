@@ -230,6 +230,7 @@ int rrdfunctions_verify_access_unittest(void);
 int rrdfunctions_manifest_unittest(void);
 int rrdfunctions_manifest_pacer_unittest(void);
 int rrdfunctions_del_unittest(void);
+int rrdfunctions_registry_unittest(void);
 int pluginsd_functions_unittest(void);
 int rrdfunctions_emitters_unittest(void);
 int mcp_execute_function_access_unittest(void);
@@ -515,6 +516,7 @@ int netdata_main(int argc, char **argv) {
                             if (rrdfunctions_manifest_unittest()) return 1;
                             if (rrdfunctions_manifest_pacer_unittest()) return 1;
                             if (rrdfunctions_del_unittest()) return 1;
+                            if (rrdfunctions_registry_unittest()) return 1;
                             if (pluginsd_functions_unittest()) return 1;
                             if (rrdfunctions_emitters_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
@@ -735,6 +737,8 @@ int netdata_main(int argc, char **argv) {
                             return unittest_run_with_rrd(rrdfunctions_manifest_pacer_unittest);
                         else if(strcmp(optarg, "functionsdeltest") == 0)
                             return unittest_run_with_rrd(rrdfunctions_del_unittest);
+                        else if(strcmp(optarg, "functionsregistrytest") == 0)
+                            return unittest_run_with_rrd(rrdfunctions_registry_unittest);
                         else if(strcmp(optarg, "functionstransporttest") == 0)
                             return unittest_run_with_rrd(pluginsd_functions_unittest);
                         else if(strcmp(optarg, "functionsemitterstest") == 0)

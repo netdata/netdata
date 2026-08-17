@@ -145,6 +145,7 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
 int rrdfunctions_verify_access_unittest(void);
 int rrdfunctions_manifest_unittest(void);
 int rrdfunctions_del_unittest(void);
+int rrdfunctions_registry_unittest(void);
 int rrdfunctions_emitters_unittest(void);
 
 bool rrd_function_available(RRDHOST *host, const char *function);

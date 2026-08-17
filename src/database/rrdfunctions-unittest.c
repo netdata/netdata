@@ -1178,6 +1178,37 @@ int rrdfunctions_del_unittest(void) {
 // the parent supports DYNCFG), RESTRICTED functions DO stream, DYNCFG and
 // LOCAL functions do not appear in the global list, and the chart emitter's
 // exact full output.
+//
+// It also covers the OTHER consumers of the iteration API - the two JSON
+// renderers and the two dictionary exporters - because they share the same
+// visibility filter and the same "the view is a byte copy" contract, and
+// because the api/v2 contexts exporter additionally owns a key format
+// ("<version>|<name>") and an ownership rule (the destination dictionary frees
+// the copies) that nothing else pins.
+
+// mirrors struct function_v2_entry in api_v2_contexts.c: the destination
+// dictionary owns the help/tags copies host_functions_to_dict() writes
+struct e4_fn_entry {
+    const char *help;
+    const char *tags;
+    HTTP_ACCESS access;
+    int priority;
+    uint32_t version;
+};
+
+static bool e4_fn_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused,
+                              void *new_value, void *data __maybe_unused) {
+    struct e4_fn_entry *n = new_value;
+    freez((void *)n->help);
+    freez((void *)n->tags);
+    return false;
+}
+
+static void e4_fn_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct e4_fn_entry *t = value;
+    freez((void *)t->help);
+    freez((void *)t->tags);
+}
 
 int rrdfunctions_emitters_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
@@ -1324,6 +1355,155 @@ int rrdfunctions_emitters_unittest(void) {
             fprintf(stderr, "  OK chart emitter: byte-identical output\n");
     }
 
+    // --------------------------------------------------------------- JSON renderers
+    // same EXPORTABLE filter as the manifest: dyncfg and restricted functions
+    // must never reach a user-facing list. The host list is the whole registry,
+    // so it DOES include the chart (LOCAL) functions, tagged as such.
+    {
+        int before = errors;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+        host_functions2json(host, wb);
+        buffer_json_finalize(wb);
+        const char *out = buffer_tostring(wb);
+
+        if(!strstr(out, "\"c4-global-fn\"") || !strstr(out, "\"c4 global help\"")) {
+            fprintf(stderr, "  FAILED host json: the global function or its help is missing\n"); errors++;
+        }
+        if(strstr(out, "\"__c4-restricted-fn\"")) {
+            fprintf(stderr, "  FAILED host json: a restricted function was exported\n"); errors++;
+        }
+        if(strstr(out, "\"config c4test:job\"")) {
+            fprintf(stderr, "  FAILED host json: a dyncfg function was exported\n"); errors++;
+        }
+        if(st && !strstr(out, "\"c4-chart-fn\"")) {
+            fprintf(stderr, "  FAILED host json: chart functions must be part of the host list\n"); errors++;
+        }
+        if(!strstr(out, "\"LOCAL\"") || !strstr(out, "\"GLOBAL\"")) {
+            fprintf(stderr, "  FAILED host json: the LOCAL/GLOBAL options array is not rendered\n"); errors++;
+        }
+
+        if(st) {
+            CLEAN_BUFFER *cwb = buffer_create(0, NULL);
+            buffer_json_initialize(cwb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+            buffer_json_member_add_object(cwb, "functions");
+            chart_functions2json(st, cwb);
+            buffer_json_object_close(cwb);
+            buffer_json_finalize(cwb);
+            const char *cout = buffer_tostring(cwb);
+
+            if(!strstr(cout, "\"c4-chart-fn\"") || !strstr(cout, "\"c4 chart help\"")) {
+                fprintf(stderr, "  FAILED chart json: the chart function or its help is missing\n"); errors++;
+            }
+            if(strstr(cout, "\"c4-global-fn\"")) {
+                fprintf(stderr, "  FAILED chart json: a host-global function leaked into the chart list\n"); errors++;
+            }
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK json renderers: host list includes LOCAL, excludes dyncfg/restricted; chart list is scoped\n");
+    }
+
+    // ----------------------------------------------------- dictionary exporters
+    // host_functions_to_dict() is what api/v2 contexts aggregates by: the key
+    // carries the version ("<version>|<name>") so two nodes offering different
+    // versions of the same function do not merge, and help/tags are OWNED
+    // copies the destination dictionary frees.
+    {
+        int before = errors;
+
+        // exactly how api_v2_contexts.c creates ctl.functions.dict
+        DICTIONARY *dst = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(struct e4_fn_entry));
+        dictionary_register_conflict_callback(dst, e4_fn_conflict_cb, NULL);
+        dictionary_register_delete_callback(dst, e4_fn_delete_cb, NULL);
+
+        struct e4_fn_entry tmp = { 0 };
+        host_functions_to_dict(host, dst, &tmp, sizeof(tmp),
+                               &tmp.help, &tmp.tags, &tmp.access, &tmp.priority, &tmp.version);
+
+        struct e4_fn_entry *e = dictionary_get(dst, "3|c4-global-fn");
+        if(!e) {
+            fprintf(stderr, "  FAILED to_dict: '3|c4-global-fn' is missing - the version|name key changed\n");
+            errors++;
+        }
+        else {
+            if(!e->help || strcmp(e->help, "c4 global help") != 0 || !e->tags || strcmp(e->tags, "top") != 0) {
+                fprintf(stderr, "  FAILED to_dict: help/tags were not copied into the destination entry\n");
+                errors++;
+            }
+            if(e->priority != 42 || e->version != 3 || e->access != HTTP_ACCESS_ANONYMOUS_DATA) {
+                fprintf(stderr, "  FAILED to_dict: priority/version/access were not exported\n");
+                errors++;
+            }
+        }
+        if(dictionary_get(dst, "c4-global-fn")) {
+            fprintf(stderr, "  FAILED to_dict: an unversioned key was produced\n");
+            errors++;
+        }
+        if(dictionary_get(dst, "4|__c4-restricted-fn") || dictionary_get(dst, "1|config c4test:job")) {
+            fprintf(stderr, "  FAILED to_dict: a restricted or dyncfg function was exported\n");
+            errors++;
+        }
+
+        dictionary_destroy(dst);  // frees every copy; ASAN verifies the ownership rule
+
+        if(st) {
+            DICTIONARY *cdst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+            chart_functions_to_dict(st, cdst, NULL, 0);
+
+            // the entries carry no value, so membership is tested through the item
+            const DICTIONARY_ITEM *ci = dictionary_get_and_acquire_item(cdst, "c4-chart-fn");
+            if(!ci) {
+                fprintf(stderr, "  FAILED to_dict: the chart function is missing from the chart dictionary\n");
+                errors++;
+            }
+            else
+                dictionary_acquired_item_release(cdst, ci);
+
+            ci = dictionary_get_and_acquire_item(cdst, "c4-global-fn");
+            if(ci) {
+                fprintf(stderr, "  FAILED to_dict: a host-global function leaked into the chart dictionary\n");
+                errors++;
+                dictionary_acquired_item_release(cdst, ci);
+            }
+            dictionary_destroy(cdst);
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK dictionary exporters: version|name keys, owned copies, filters\n");
+    }
+
+    // --------------------------------------------------- the NULL-registry path
+    // An archived host racing the sender's flag poll has no registry left. The
+    // renderer must behave exactly like the old NULL-tolerant traversal: the
+    // flag is cleared (so the poll does not spin) and nothing is emitted.
+    {
+        int before = errors;
+        struct rrd_functions *saved_functions = host->functions;
+
+        host->functions = NULL;
+        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        stream_sender_send_global_rrdhost_functions(host, wb, true, true);
+
+        if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
+            fprintf(stderr, "  FAILED null-registry: the flag was not cleared, the poll would spin forever\n");
+            errors++;
+        }
+        if(buffer_strlen(wb)) {
+            fprintf(stderr, "  FAILED null-registry: something was emitted for a host with no registry\n");
+            errors++;
+        }
+
+        host->functions = saved_functions;
+
+        if(errors == before)
+            fprintf(stderr, "  OK null-registry: the flag is cleared and nothing is emitted\n");
+    }
+
     // -------------------------------------------------------------------- cleanup
     if(st)
         rrd_function_del(host, st, "c4-chart-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
@@ -1338,6 +1518,566 @@ int rrdfunctions_emitters_unittest(void) {
         rrdhost_option_set(host, RRDHOST_OPTION_SENDER_ENABLED);
     else
         rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
+
+    fprintf(stderr, "%s() %s (%d error%s)\n\n",
+            __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+
+    return errors;
+}
+
+// ----------------------------------------------------------------------------
+// The registry itself (C1/C2): what may be registered, what may be deleted and
+// by whom, what the conflict callback swaps, and how a provider (collector)
+// that goes away takes its functions out of every view.
+//
+// These are the contracts every other consumer sits on top of, and none of
+// them is observable from the streaming or manifest output the other suites
+// pin:
+//
+//   1. the registry is indexed by the SANITIZED key - a name that sanitizes to
+//      an empty string is refused outright (it could never be looked up, and
+//      it would defeat the "__" restricted-prefix check), and everything else
+//      lands on its collapsed key; lookups for execution strip trailing words,
+//      lookups for availability do not;
+//   2. the dyncfg namespace is per-SOURCE: STREAMING (a child's synthetic
+//      "config" proxy) and INTERNAL (the dyncfg subsystem) may register
+//      reserved names, a COLLECTOR may not - and a rejected COLLECTOR
+//      registration must not disturb the entry that is already there;
+//   3. deletion is gated the same way: FUNCTION_DEL (COLLECTOR/STREAMING) can
+//      never remove a dyncfg entry, and a COLLECTOR may only remove what its
+//      OWN provider registered;
+//   4. the conflict callback swaps every changed field of an existing entry -
+//      including options, which are derived from the tags, so a
+//      re-registration that adds the "hidden" tag actually restricts the
+//      function (and removing it un-restricts it);
+//   5. a function whose provider stopped stays in the registry but disappears
+//      from every view and answers 503;
+//   6. help/tags are handed to consumers as byte copies taken under the
+//      entry's leaf lock, so a concurrent re-registration can never hand out a
+//      mixed or freed pair.
+
+struct reg_probe {
+    const char *want;
+    bool found;
+    size_t seen;
+    char help[256];
+    char tags[256];
+    int timeout;
+    int priority;
+    uint32_t version;
+    HTTP_ACCESS access;
+    RRD_FUNCTION_OPTIONS options;
+};
+
+static void reg_probe_cb(const struct rrd_function_view *v, void *data) {
+    struct reg_probe *p = data;
+    if(!v->name || strcmp(v->name, p->want) != 0) return;
+
+    p->found = true;
+    p->seen++;
+    strncpyz(p->help, v->help ? v->help : "", sizeof(p->help) - 1);
+    strncpyz(p->tags, v->tags ? v->tags : "", sizeof(p->tags) - 1);
+    p->timeout = v->timeout;
+    p->priority = v->priority;
+    p->version = v->version;
+    p->access = v->access;
+    p->options = v->options;
+}
+
+static bool reg_probe_run(RRDHOST *host, RRD_FUNCTIONS_FILTER filter, const char *name, struct reg_probe *out) {
+    memset(out, 0, sizeof(*out));
+    out->want = name;
+    rrd_functions_host_foreach(host, filter, reg_probe_cb, out);
+    return out->found;
+}
+
+static size_t reg_cb_a_calls = 0, reg_cb_b_calls = 0;
+
+static int reg_execute_cb_a(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+    reg_cb_a_calls++;
+    if(rfe->result.cb)
+        rfe->result.cb(rfe->result.wb, HTTP_RESP_OK, rfe->result.data);
+    return HTTP_RESP_OK;
+}
+
+static int reg_execute_cb_b(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+    reg_cb_b_calls++;
+    if(rfe->result.cb)
+        rfe->result.cb(rfe->result.wb, HTTP_RESP_OK, rfe->result.data);
+    return HTTP_RESP_OK;
+}
+
+// a delete attempted from a thread that never registered anything, so its
+// thread_rrd_function_provider is NULL - the COLLECTOR ownership check must
+// refuse it
+struct reg_del_ctx {
+    RRDHOST *host;
+    const char *name;
+    bool collector_del;
+    bool internal_del;
+};
+
+static void reg_del_worker(void *arg) {
+    struct reg_del_ctx *c = arg;
+    c->collector_del = rrd_function_del(c->host, NULL, c->name, RRD_FUNCTION_REG_SOURCE_COLLECTOR);
+}
+
+// registers a function and then ends its provider, exactly like a plugin
+// thread that exits while its functions are still in the registry
+static void reg_provider_worker(void *arg) {
+    RRDHOST *host = arg;
+    rrd_function_provider_started();
+    rrd_function_add(host, NULL, "reg-provider-fn", 10, 0, 1, "provider", "top",
+                     HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                     rrdfunctions_unittest_noop_cb, NULL);
+    rrd_function_provider_finished();
+}
+
+#define REG_RACE_N 20000
+#define REG_RACE_HELP_A "reg race help A"
+#define REG_RACE_TAGS_A "top"
+#define REG_RACE_HELP_B "reg race help B, deliberately much longer than A"
+#define REG_RACE_TAGS_B "logs troubleshooting"
+
+struct reg_race_ctx {
+    RRDHOST *host;
+    bool done;
+};
+
+static void reg_race_worker(void *arg) {
+    struct reg_race_ctx *c = arg;
+    for(size_t i = 0; i < REG_RACE_N; i++)
+        rrd_function_add(c->host, NULL, "reg-race-fn", 10, 0, 1,
+                         (i & 1) ? REG_RACE_HELP_A : REG_RACE_HELP_B,
+                         (i & 1) ? REG_RACE_TAGS_A : REG_RACE_TAGS_B,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+
+    __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
+}
+
+struct reg_race_check {
+    size_t observations;
+    size_t mismatches;
+};
+
+static void reg_race_check_cb(const struct rrd_function_view *v, void *data) {
+    struct reg_race_check *k = data;
+    if(!v->name || strcmp(v->name, "reg-race-fn") != 0) return;
+
+    k->observations++;
+
+    // help and tags are swapped as a pair under the entry's leaf lock and
+    // copied under that same lock, so a consumer must never see one field of
+    // one registration next to the other field of the other one (and must
+    // never see freed bytes - that half is what ASAN builds catch here)
+    bool a = (strcmp(v->help, REG_RACE_HELP_A) == 0 && strcmp(v->tags, REG_RACE_TAGS_A) == 0);
+    bool b = (strcmp(v->help, REG_RACE_HELP_B) == 0 && strcmp(v->tags, REG_RACE_TAGS_B) == 0);
+    if(!a && !b)
+        k->mismatches++;
+}
+
+int rrdfunctions_registry_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    RRDHOST *host = localhost;
+    if(!host || !host->functions) {
+        fprintf(stderr, "  FAILED: localhost (or its functions registry) is NULL\n");
+        return 1;
+    }
+
+    int errors = 0;
+
+    // the standalone -W environment does not start the daemon, so the
+    // transaction broker the run paths below need is not there yet (create is
+    // idempotent)
+    rrd_function_transactions_create();
+
+    // 1. the key is the sanitized name; a name that sanitizes to empty is refused
+    {
+        int before = errors;
+
+        // text_sanitize() wipes an all-underscore result and strips leading
+        // whitespace/control characters, so all of these sanitize to ""
+        const char *empty_names[] = { "__", "____", "   ", "\t\n\r", "\x01\x02" };
+        size_t entries_before = dictionary_entries(host->functions->dict);
+
+        for(size_t i = 0; i < _countof(empty_names); i++) {
+            rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
+            rrd_function_add(host, NULL, empty_names[i], 10, 0, 1, "empty", "top",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                             rrdfunctions_unittest_noop_cb, NULL);
+
+            // the refusal happens before anything is announced
+            if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
+                fprintf(stderr, "  FAILED key: a refused registration set the global-functions flag\n");
+                errors++;
+            }
+        }
+
+        if(dictionary_entries(host->functions->dict) != entries_before) {
+            fprintf(stderr, "  FAILED key: a name that sanitizes to an empty string created an entry\n");
+            errors++;
+        }
+        if(dictionary_get(host->functions->dict, "")) {
+            fprintf(stderr, "  FAILED key: an empty key is present in the registry\n");
+            errors++;
+        }
+
+        // everything else lands on its collapsed key: leading/trailing spaces
+        // dropped, runs of whitespace folded to one, '"' mapped to '\''
+        rrd_function_add(host, NULL, "  reg-key   edge\"case  ", 10, 0, 1, "key", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+
+        if(!dictionary_get(host->functions->dict, "reg-key edge'case")) {
+            fprintf(stderr, "  FAILED key: a name was not indexed by its sanitized form\n");
+            errors++;
+        }
+
+        // execution lookups strip words from the end until they hit a
+        // registered function, so arguments resolve to their function...
+        rrd_function_add(host, NULL, "reg-args-fn", 10, 0, 1, "args", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+        {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            RRD_FUNCTION_ACQUIRED *item = NULL;
+            int code = rrd_function_verify_access(host, wb, "reg-args-fn arg1 arg2",
+                                                  HTTP_ACCESS_ANONYMOUS_DATA, false, &item);
+            if(code != HTTP_RESP_OK || !item) {
+                fprintf(stderr, "  FAILED key: '<function> <args>' did not resolve to the function (code %d)\n", code);
+                errors++;
+            }
+            if(item)
+                rrd_function_acquired_release(host, item);
+        }
+
+        // ... while the availability probe is an exact-name lookup
+        if(!rrd_function_available(host, "reg-args-fn")) {
+            fprintf(stderr, "  FAILED key: rrd_function_available() missed a live function\n");
+            errors++;
+        }
+        if(rrd_function_available(host, "reg-args-fn arg1")) {
+            fprintf(stderr, "  FAILED key: rrd_function_available() must not strip arguments\n");
+            errors++;
+        }
+
+        rrd_function_del(host, NULL, "  reg-key   edge\"case  ", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        rrd_function_del(host, NULL, "reg-args-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(errors == before)
+            fprintf(stderr, "  OK key: empty-sanitizing names refused, sanitized indexing, argument stripping\n");
+    }
+
+    // 2. the dyncfg namespace is per registration source
+    {
+        int before = errors;
+        const char *fn = "config reg-stream:job";
+
+        // a streaming child's synthetic config proxy: allowed, and classified
+        // as DYNCFG from the sanitized key
+        rrd_function_add(host, NULL, fn, 10, 0, 1, "streamed config", "config",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_STREAMING,
+                         reg_execute_cb_a, NULL);
+
+        struct rrd_host_function *entry = dictionary_get(host->functions->dict, fn);
+        if(!entry) {
+            fprintf(stderr, "  FAILED namespace: a STREAMING registration of a reserved name was rejected\n");
+            errors++;
+        }
+        else {
+            if(!(entry->options & RRD_FUNCTION_DYNCFG)) {
+                fprintf(stderr, "  FAILED namespace: a reserved name was not classified as DYNCFG\n");
+                errors++;
+            }
+
+            // a collector cannot take it over - the rejection must not reach
+            // the conflict callback, so the installed execute callback stays
+            rrd_function_add(host, NULL, fn, 10, 0, 1, "hijack", "config",
+                             HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+                             reg_execute_cb_b, NULL);
+
+            struct rrd_host_function *after = dictionary_get(host->functions->dict, fn);
+            if(!after || after->execute_cb != reg_execute_cb_a) {
+                fprintf(stderr, "  FAILED namespace: a COLLECTOR registration hijacked a reserved name\n");
+                errors++;
+            }
+        }
+
+        // 3. FUNCTION_DEL can never remove a dyncfg entry
+        if(rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_STREAMING)) {
+            fprintf(stderr, "  FAILED namespace: STREAMING FUNCTION_DEL removed a dyncfg function\n");
+            errors++;
+        }
+        if(rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_COLLECTOR)) {
+            fprintf(stderr, "  FAILED namespace: COLLECTOR FUNCTION_DEL removed a dyncfg function\n");
+            errors++;
+        }
+        if(!dictionary_get(host->functions->dict, fn)) {
+            fprintf(stderr, "  FAILED namespace: a refused FUNCTION_DEL removed the entry anyway\n");
+            errors++;
+        }
+        if(!rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+            fprintf(stderr, "  FAILED namespace: the dyncfg subsystem could not remove its own function\n");
+            errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK namespace: STREAMING/INTERNAL own the dyncfg namespace, COLLECTOR is locked out\n");
+    }
+
+    // 3b. deleting what is not there, and deleting what another collector owns
+    {
+        int before = errors;
+
+        if(rrd_function_del(host, NULL, "reg-does-not-exist-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+            fprintf(stderr, "  FAILED del: deleting an unknown function reported success\n");
+            errors++;
+        }
+        if(rrd_function_del(host, NULL, "", RRD_FUNCTION_REG_SOURCE_INTERNAL) ||
+           rrd_function_del(host, NULL, NULL, RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+            fprintf(stderr, "  FAILED del: deleting an empty name reported success\n");
+            errors++;
+        }
+
+        rrd_function_add(host, NULL, "reg-owned-fn", 10, 0, 1, "owned", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+
+        struct reg_del_ctx ctx = { .host = host, .name = "reg-owned-fn" };
+        ND_THREAD *t = nd_thread_create("reg-del", NETDATA_THREAD_OPTION_DONT_LOG, reg_del_worker, &ctx);
+        if(!t) {
+            fprintf(stderr, "  FAILED del: could not create the worker thread\n");
+            errors++;
+        }
+        else {
+            nd_thread_join(t);
+
+            if(ctx.collector_del) {
+                fprintf(stderr, "  FAILED del: a foreign collector removed a function it did not register\n");
+                errors++;
+            }
+            if(!dictionary_get(host->functions->dict, "reg-owned-fn")) {
+                fprintf(stderr, "  FAILED del: a refused COLLECTOR delete removed the entry anyway\n");
+                errors++;
+            }
+        }
+
+        // the registering thread (this one) may remove it as a COLLECTOR
+        if(!rrd_function_del(host, NULL, "reg-owned-fn", RRD_FUNCTION_REG_SOURCE_COLLECTOR)) {
+            fprintf(stderr, "  FAILED del: the registering collector could not remove its own function\n");
+            errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK del: unknown/empty names, and COLLECTOR deletes are scoped to the registering provider\n");
+    }
+
+    // 4. the conflict callback swaps every changed field - including the
+    //    options derived from the tags
+    {
+        int before = errors;
+        const char *fn = "reg-swap-fn";
+        struct reg_probe p;
+
+        rrd_function_add(host, NULL, fn, 11, 42, 3, "swap help one", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         reg_execute_cb_a, NULL);
+
+        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, fn, &p)) {
+            fprintf(stderr, "  FAILED swap: the function is not visible after registration\n");
+            errors++;
+        }
+        else if(strcmp(p.help, "swap help one") != 0 || strcmp(p.tags, "top") != 0 ||
+                p.timeout != 11 || p.priority != 42 || p.version != 3 ||
+                p.access != HTTP_ACCESS_ANONYMOUS_DATA ||
+                (p.options & RRD_FUNCTION_RESTRICTED) || !(p.options & RRD_FUNCTION_GLOBAL)) {
+            fprintf(stderr, "  FAILED swap: the initial registration is not reported as registered\n");
+            errors++;
+        }
+
+        size_t a_before = reg_cb_a_calls, b_before = reg_cb_b_calls;
+        {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
+                             NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+        }
+        if(reg_cb_a_calls != a_before + 1 || reg_cb_b_calls != b_before) {
+            fprintf(stderr, "  FAILED swap: the registered execute callback did not run\n");
+            errors++;
+        }
+
+        // re-registration: every field changes, and the "hidden" tag must
+        // actually restrict the function (options are derived from the tags
+        // and swapped with them)
+        rrd_function_add(host, NULL, fn, 22, 43, 4, "swap help two", "logs " RRDFUNCTIONS_TAG_HIDDEN,
+                         HTTP_ACCESS_SIGNED_ID, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         reg_execute_cb_b, NULL);
+
+        if(reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, fn, &p)) {
+            fprintf(stderr, "  FAILED swap: a re-registration with the hidden tag stayed user-visible\n");
+            errors++;
+        }
+        // restricted functions still stream to a parent
+        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL, fn, &p)) {
+            fprintf(stderr, "  FAILED swap: a restricted function stopped streaming\n");
+            errors++;
+        }
+        else if(strcmp(p.help, "swap help two") != 0 ||
+                strcmp(p.tags, "logs " RRDFUNCTIONS_TAG_HIDDEN) != 0 ||
+                p.timeout != 22 || p.priority != 43 || p.version != 4 ||
+                p.access != HTTP_ACCESS_SIGNED_ID ||
+                !(p.options & RRD_FUNCTION_RESTRICTED)) {
+            fprintf(stderr, "  FAILED swap: help=%s tags=%s timeout=%d priority=%d version=%u access=0x%x options=0x%x"
+                            " - a field was not swapped\n",
+                    p.help, p.tags, p.timeout, p.priority, p.version, (unsigned)p.access, (unsigned)p.options);
+            errors++;
+        }
+
+        a_before = reg_cb_a_calls; b_before = reg_cb_b_calls;
+        {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
+                             NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", true /* allow restricted */);
+        }
+        if(reg_cb_b_calls != b_before + 1 || reg_cb_a_calls != a_before) {
+            fprintf(stderr, "  FAILED swap: the swapped execute callback did not take over\n");
+            errors++;
+        }
+
+        // and back: dropping the tag un-restricts it
+        rrd_function_add(host, NULL, fn, 11, 42, 3, "swap help one", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         reg_execute_cb_a, NULL);
+
+        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, fn, &p)) {
+            fprintf(stderr, "  FAILED swap: dropping the hidden tag did not un-restrict the function\n");
+            errors++;
+        }
+        else if(p.options & RRD_FUNCTION_RESTRICTED) {
+            fprintf(stderr, "  FAILED swap: the RESTRICTED option survived the tag removal\n");
+            errors++;
+        }
+
+        // a registration without tags gets the default "top"
+        rrd_function_add(host, NULL, "reg-notags-fn", 10, 0, 1, "no tags", NULL,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+        if(!reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, "reg-notags-fn", &p) ||
+           strcmp(p.tags, "top") != 0) {
+            fprintf(stderr, "  FAILED swap: a registration without tags did not default to 'top'\n");
+            errors++;
+        }
+
+        rrd_function_del(host, NULL, "reg-notags-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        rrd_function_del(host, NULL, fn, RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(errors == before)
+            fprintf(stderr, "  OK swap: every field swaps, tags drive the RESTRICTED option both ways, cb takes over\n");
+    }
+
+    // 5. a provider that stopped takes its functions out of every view, but
+    //    the entries stay in the registry until they are deleted
+    {
+        int before = errors;
+
+        ND_THREAD *t = nd_thread_create("reg-provider", NETDATA_THREAD_OPTION_DONT_LOG, reg_provider_worker, host);
+        if(!t) {
+            fprintf(stderr, "  FAILED provider: could not create the worker thread\n");
+            errors++;
+        }
+        else {
+            nd_thread_join(t);
+
+            struct reg_probe p;
+
+            if(!dictionary_get(host->functions->dict, "reg-provider-fn")) {
+                fprintf(stderr, "  FAILED provider: the entry was removed when its provider stopped\n");
+                errors++;
+            }
+            if(rrd_function_available(host, "reg-provider-fn")) {
+                fprintf(stderr, "  FAILED provider: a function of a stopped provider is still available\n");
+                errors++;
+            }
+            if(reg_probe_run(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, "reg-provider-fn", &p) ||
+               reg_probe_run(host, RRD_FUNCTIONS_FILTER_STREAMABLE_GLOBAL, "reg-provider-fn", &p)) {
+                fprintf(stderr, "  FAILED provider: a function of a stopped provider is still exported\n");
+                errors++;
+            }
+
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "reg-provider-fn", true, NULL,
+                                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+            if(code != HTTP_RESP_SERVICE_UNAVAILABLE) {
+                fprintf(stderr, "  FAILED provider: running it returned %d, expected 503\n", code);
+                errors++;
+            }
+            if(!strstr(buffer_tostring(wb), "not currently running")) {
+                fprintf(stderr, "  FAILED provider: the 503 does not say the plugin is not running\n");
+                errors++;
+            }
+
+            // the provider structure itself is released only when the last
+            // entry referencing it goes away (ASAN verifies there is no leak
+            // and no use-after-free here)
+            if(!rrd_function_del(host, NULL, "reg-provider-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL)) {
+                fprintf(stderr, "  FAILED provider: could not delete the orphaned function\n");
+                errors++;
+            }
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK provider: a stopped provider hides its functions everywhere and answers 503\n");
+    }
+
+    // 6. help/tags are byte copies taken under the entry's leaf lock: a
+    //    consumer iterating while another thread re-registers must never see a
+    //    mixed pair (nor freed bytes)
+    {
+        int before = errors;
+        struct reg_race_ctx ctx = { .host = host, .done = false };
+        struct reg_race_check check = { 0 };
+
+        rrd_function_add(host, NULL, "reg-race-fn", 10, 0, 1, REG_RACE_HELP_A, REG_RACE_TAGS_A,
+                         HTTP_ACCESS_ANONYMOUS_DATA, true, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         rrdfunctions_unittest_noop_cb, NULL);
+
+        ND_THREAD *t = nd_thread_create("reg-race", NETDATA_THREAD_OPTION_DONT_LOG, reg_race_worker, &ctx);
+        if(!t) {
+            fprintf(stderr, "  FAILED race: could not create the worker thread\n");
+            errors++;
+        }
+        else {
+            while(!__atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE))
+                rrd_functions_host_foreach(host, RRD_FUNCTIONS_FILTER_EXPORTABLE, reg_race_check_cb, &check);
+
+            nd_thread_join(t);
+
+            if(!check.observations) {
+                fprintf(stderr, "  FAILED race: the function was never observed during the race\n");
+                errors++;
+            }
+            if(check.mismatches) {
+                fprintf(stderr, "  FAILED race: %zu of %zu observations saw a mixed help/tags pair\n",
+                        check.mismatches, check.observations);
+                errors++;
+            }
+        }
+
+        rrd_function_del(host, NULL, "reg-race-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(errors == before)
+            fprintf(stderr, "  OK race: %zu consistent help/tags observations against %d re-registrations\n",
+                    check.observations, REG_RACE_N);
+    }
+
+    // leave localhost as found: every fixture above was deleted in its own
+    // section, so only the flag and (if this binary ever runs with a sender
+    // configured) the pending-del queue our deletes may have filled are left
+    rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+    fndel_flush_queue(host);
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");

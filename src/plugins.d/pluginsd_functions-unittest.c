@@ -45,6 +45,18 @@ static void c6ut_register_canceller_cb(void *register_cancel_cb_data, rrd_functi
     c->transport = rrd_function_transport_entry_acquire(cancel_cb_data);
 }
 
+// same, for the progresser half of the registration contract
+struct c6ut_progresser {
+    rrd_function_progresser_cb_t cb;
+    struct rrd_function_transport *transport; // entry-pinned
+};
+
+static void c6ut_register_progresser_cb(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data) {
+    struct c6ut_progresser *p = register_progresser_cb_data;
+    p->cb = progresser_cb;
+    p->transport = rrd_function_transport_entry_acquire(progresser_cb_data);
+}
+
 static void c6ut_result_cb(BUFFER *wb __maybe_unused, int code, void *data) {
     struct c6ut_result *r = data;
     r->calls++;
@@ -54,6 +66,8 @@ static void c6ut_result_cb(BUFFER *wb __maybe_unused, int code, void *data) {
 struct c6ut_sends {
     size_t total;
     size_t cancels;
+    size_t progresses;
+    bool fail;              // simulate a plugin whose pipe is already gone
 };
 
 static ssize_t c6ut_send_cb(const char *txt, void *data, STREAM_TRAFFIC_TYPE type __maybe_unused) {
@@ -61,6 +75,10 @@ static ssize_t c6ut_send_cb(const char *txt, void *data, STREAM_TRAFFIC_TYPE typ
     s->total++;
     if(strstr(txt, PLUGINSD_CALL_FUNCTION_CANCEL))
         s->cancels++;
+    if(strstr(txt, PLUGINSD_CALL_FUNCTION_PROGRESS))
+        s->progresses++;
+    if(s->fail)
+        return -1;
     return (ssize_t)strlen(txt);
 }
 
@@ -85,6 +103,70 @@ static int c5b_async_execute_cb(struct rrd_function_execute *rfe, void *data __m
     return HTTP_RESP_OK;
 }
 
+// an async function that registers a canceller and a progresser with
+// transports of the test's choosing, so the record's registration PINS can be
+// counted (and a re-registration's release verified)
+static struct {
+    struct rrd_function_transport *first;
+    struct rrd_function_transport *second;
+    size_t cancels;
+    size_t progresses;
+    char tx[UUID_COMPACT_STR_LEN];
+    BUFFER *result_wb;
+    rrd_function_result_callback_t result_cb;
+    void *result_cb_data;
+} c7_pin;
+
+static void c7_pin_canceller(const char *transaction __maybe_unused, void *data __maybe_unused) {
+    c7_pin.cancels++;
+}
+
+static void c7_pin_progresser(const char *transaction __maybe_unused, void *data __maybe_unused) {
+    c7_pin.progresses++;
+}
+
+static int c7_pin_execute_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+    uuid_unparse_lower_compact(*rfe->transaction, c7_pin.tx);
+    c7_pin.result_wb = rfe->result.wb;
+    c7_pin.result_cb = rfe->result.cb;
+    c7_pin.result_cb_data = rfe->result.data;
+
+    if(rfe->register_canceller.cb) {
+        // registering twice: the second registration must release the pin the
+        // first one took, or the first transport leaks a ref forever
+        rfe->register_canceller.cb(rfe->register_canceller.data, c7_pin_canceller, c7_pin.first);
+        rfe->register_canceller.cb(rfe->register_canceller.data, c7_pin_canceller, c7_pin.second);
+    }
+
+    if(rfe->register_progresser.cb)
+        rfe->register_progresser.cb(rfe->register_progresser.data, c7_pin_progresser, c7_pin.second);
+
+    return HTTP_RESP_OK;
+}
+
+// a SYNC function: it must be executed inline, with no canceller/progresser
+// registration hooks, and must leave no broker record behind
+static struct {
+    char tx[UUID_COMPACT_STR_LEN];
+    bool has_canceller;
+    bool has_progresser;
+    bool deadline_visible;
+} c7_sync;
+
+static int c7_sync_execute_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
+    uuid_unparse_lower_compact(*rfe->transaction, c7_sync.tx);
+    c7_sync.has_canceller = (rfe->register_canceller.cb != NULL);
+    c7_sync.has_progresser = (rfe->register_progresser.cb != NULL);
+
+    usec_t d = 0;
+    c7_sync.deadline_visible = rrd_function_transaction_deadline(c7_sync.tx, &d);
+
+    if(rfe->result.cb)
+        rfe->result.cb(rfe->result.wb, HTTP_RESP_OK, rfe->result.data);
+
+    return HTTP_RESP_OK;
+}
+
 // two of these race on the same parser to exercise the window between a GC
 // pass's unlock and its deferred dels (see gc_collected)
 struct c6ut_gc_race {
@@ -106,18 +188,14 @@ static PARSER *c6ut_parser_create(struct c6ut_sends *sends) {
     return parser;
 }
 
-// drive one function call into the parser's transport, returning the compact
-// transaction id in tx
-static int c6ut_execute(PARSER *parser, const char *fn, usec_t *stop_ut,
-                        BUFFER *wb, struct c6ut_result *res,
-                        char tx[UUID_COMPACT_STR_LEN],
-                        struct c6ut_canceller *canceller) {
-    nd_uuid_t uuid;
-    uuid_generate_random(uuid);
-    uuid_unparse_lower_compact(uuid, tx);
-
+// drive one function call into the parser's transport with a caller-chosen
+// transaction id (so duplicates can be forced)
+static int c6ut_execute_tx(PARSER *parser, const char *fn, nd_uuid_t *uuid, usec_t *stop_ut,
+                           BUFFER *wb, struct c6ut_result *res,
+                           struct c6ut_canceller *canceller,
+                           struct c6ut_progresser *progresser) {
     struct rrd_function_execute rfe = {
-        .transaction = &uuid,
+        .transaction = uuid,
         .function = fn,
         .payload = NULL,
         .source = "unittest",
@@ -132,9 +210,26 @@ static int c6ut_execute(PARSER *parser, const char *fn, usec_t *stop_ut,
             .cb = canceller ? c6ut_register_canceller_cb : NULL,
             .data = canceller,
         },
+        .register_progresser = {
+            .cb = progresser ? c6ut_register_progresser_cb : NULL,
+            .data = progresser,
+        },
     };
 
     return pluginsd_function_execute_cb(&rfe, parser->inflight.transport);
+}
+
+// drive one function call into the parser's transport, returning the compact
+// transaction id in tx
+static int c6ut_execute(PARSER *parser, const char *fn, usec_t *stop_ut,
+                        BUFFER *wb, struct c6ut_result *res,
+                        char tx[UUID_COMPACT_STR_LEN],
+                        struct c6ut_canceller *canceller) {
+    nd_uuid_t uuid;
+    uuid_generate_random(uuid);
+    uuid_unparse_lower_compact(uuid, tx);
+
+    return c6ut_execute_tx(parser, fn, &uuid, stop_ut, wb, res, canceller, NULL);
 }
 
 static void c6ut_result_begin(PARSER *parser, const char *tx, const char *status) {
@@ -412,20 +507,47 @@ int pluginsd_functions_unittest(void) {
                 errors++;
             }
 
-            dyncfg_del_low_level(host, "c6test:node");
+            // a re-CREATE from a DIFFERENT connection (the plugin restarted and
+            // its parser - and therefore its transport - is a new one): the
+            // conflict transfer branch must release the displaced pin and take
+            // one on the installed transport, as ONE swap under the node lock
+            struct rrd_function_transport *tr2 = rrd_function_transport_create(NULL);
+
+            dyncfg_add_low_level(host, "c6test:node", "/c6test",
+                                 DYNCFG_STATUS_RUNNING, DYNCFG_TYPE_SINGLE, DYNCFG_SOURCE_TYPE_INTERNAL, "unittest",
+                                 DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET, 0, 0, false,
+                                 HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
+                                 c6ut_noop_execute_cb, tr2, tr2);
 
             if(refcount_references(&tr->entry_refcount) != 1) {
-                fprintf(stderr, "  FAILED dyncfg-pin: after DELETE, entry refs %d != 1\n",
+                fprintf(stderr, "  FAILED dyncfg-pin: the displaced transport was not released (entry refs %d != 1)\n",
                         refcount_references(&tr->entry_refcount));
+                errors++;
+            }
+            if(refcount_references(&tr2->entry_refcount) != 2) {
+                fprintf(stderr, "  FAILED dyncfg-pin: the installed transport was not pinned (entry refs %d != 2)\n",
+                        refcount_references(&tr2->entry_refcount));
+                errors++;
+            }
+
+            dyncfg_del_low_level(host, "c6test:node");
+
+            if(refcount_references(&tr->entry_refcount) != 1 ||
+               refcount_references(&tr2->entry_refcount) != 1) {
+                fprintf(stderr, "  FAILED dyncfg-pin: after DELETE, entry refs %d/%d != 1/1\n",
+                        refcount_references(&tr->entry_refcount), refcount_references(&tr2->entry_refcount));
                 errors++;
             }
 
             rrd_function_transport_mark_dead_and_drain(tr);
             rrd_function_transport_owner_release(tr);
+            rrd_function_transport_mark_dead_and_drain(tr2);
+            rrd_function_transport_owner_release(tr2);
         }
 
         if(errors == before)
-            fprintf(stderr, "  OK dyncfg-pin: CREATE pins once, re-CREATE nets zero, DELETE releases\n");
+            fprintf(stderr, "  OK dyncfg-pin: CREATE pins once, an equal re-CREATE nets zero, "
+                            "a re-CREATE from another connection transfers the pin, DELETE releases\n");
     }
 
     // 6. concurrent GC passes cancel an expired transaction exactly once.
@@ -547,6 +669,551 @@ int pluginsd_functions_unittest(void) {
 
         if(errors == before)
             fprintf(stderr, "  OK deadline: accessor sees the deadline, the progress extension, and the completion\n");
+    }
+
+    // 8. a registry entry whose transport is already dead answers a clean 503.
+    //    This is the UAF-C gate: the registry keeps entries of plugins that
+    //    died (streaming entries survive disconnect by design), so every
+    //    execute has to go through the transport's acquire-or-fail instead of
+    //    dereferencing the parser.
+    {
+        int before = errors;
+        struct rrd_function_transport *tr = rrd_function_transport_create(NULL);
+
+        rrd_function_transactions_create(); // idempotent
+
+        rrd_function_add(host, NULL, "c7-dead-transport-fn", 10, 0, 1, "dead", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+                         pluginsd_function_execute_cb, tr);
+
+        // the owner tears down: dispatchers drained and `data` invalidated,
+        // while the registry entry keeps holding the (dead) transport
+        rrd_function_transport_mark_dead_and_drain(tr);
+
+        struct c6ut_result res = { 0 };
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "c7-dead-transport-fn",
+                                    false /* don't wait */, NULL,
+                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
+                                    NULL, "unittest", false);
+
+        if(code != HTTP_RESP_SERVICE_UNAVAILABLE) {
+            fprintf(stderr, "  FAILED dead-transport: run returned %d, expected 503\n", code);
+            errors++;
+        }
+        if(res.calls != 1 || res.code != HTTP_RESP_SERVICE_UNAVAILABLE) {
+            fprintf(stderr, "  FAILED dead-transport: delivered %zu times with code %d, expected exactly one 503\n",
+                    res.calls, res.code);
+            errors++;
+        }
+        if(!buffer_strlen(wb)) {
+            fprintf(stderr, "  FAILED dead-transport: the 503 has an empty body\n");
+            errors++;
+        }
+
+        rrd_function_del(host, NULL, "c7-dead-transport-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        rrd_function_transport_owner_release(tr); // frees it; ASAN verifies the accounting
+
+        if(errors == before)
+            fprintf(stderr, "  OK dead-transport: an entry of a dead plugin answers exactly one clean 503\n");
+    }
+
+    // 9. cancellers and progressers are KEYED, not pointer-identity matched
+    //    (UAF-A): a request carrying one plugin's transport and another
+    //    plugin's transaction must reach neither plugin. Before the refactor
+    //    this was a scan over recyclable records, where a recycled record
+    //    could false-match and cancel the wrong transaction.
+    {
+        int before = errors;
+        struct c6ut_sends sends_a = { 0 }, sends_b = { 0 };
+        struct c6ut_result res_a = { 0 }, res_b = { 0 };
+        PARSER *pa = c6ut_parser_create(&sends_a);
+        PARSER *pb = c6ut_parser_create(&sends_b);
+
+        usec_t stop_ut = now_monotonic_usec() + 60 * USEC_PER_SEC;
+        CLEAN_BUFFER *wba = buffer_create(0, NULL);
+        CLEAN_BUFFER *wbb = buffer_create(0, NULL);
+        char txa[UUID_COMPACT_STR_LEN], txb[UUID_COMPACT_STR_LEN];
+        struct c6ut_canceller can_a = { 0 };
+        struct c6ut_progresser prg_a = { 0 };
+
+        nd_uuid_t ua, ub;
+        uuid_generate_random(ua); uuid_unparse_lower_compact(ua, txa);
+        uuid_generate_random(ub); uuid_unparse_lower_compact(ub, txb);
+
+        c6ut_execute_tx(pa, "c7-keyed-a", &ua, &stop_ut, wba, &res_a, &can_a, &prg_a);
+        c6ut_execute_tx(pb, "c7-keyed-b", &ub, &stop_ut, wbb, &res_b, NULL, NULL);
+
+        if(!can_a.cb || !prg_a.cb) {
+            fprintf(stderr, "  FAILED keyed: no canceller/progresser was registered\n");
+            errors++;
+        }
+        else {
+            // A's transport + B's transaction: A misses in its own dictionary,
+            // and B is never reached at all
+            can_a.cb(txb, can_a.transport);
+            prg_a.cb(txb, prg_a.transport);
+            if(sends_a.cancels || sends_a.progresses || sends_b.cancels || sends_b.progresses) {
+                fprintf(stderr, "  FAILED keyed: a foreign transaction reached a plugin "
+                                "(a: %zu cancels %zu progresses, b: %zu cancels %zu progresses)\n",
+                        sends_a.cancels, sends_a.progresses, sends_b.cancels, sends_b.progresses);
+                errors++;
+            }
+
+            // the matching pair reaches exactly one plugin, exactly once
+            can_a.cb(txa, can_a.transport);
+            prg_a.cb(txa, prg_a.transport);
+            if(sends_a.cancels != 1 || sends_a.progresses != 1) {
+                fprintf(stderr, "  FAILED keyed: the owning plugin got %zu cancels and %zu progresses, expected 1 and 1\n",
+                        sends_a.cancels, sends_a.progresses);
+                errors++;
+            }
+            if(sends_b.cancels || sends_b.progresses) {
+                fprintf(stderr, "  FAILED keyed: the other plugin was disturbed\n");
+                errors++;
+            }
+
+            // an empty transaction is refused before anything is sent
+            can_a.cb("", can_a.transport);
+            prg_a.cb(NULL, prg_a.transport);
+            if(sends_a.cancels != 1 || sends_a.progresses != 1) {
+                fprintf(stderr, "  FAILED keyed: an empty transaction produced a send\n");
+                errors++;
+            }
+        }
+
+        parser_destroy(pa);
+        parser_destroy(pb);
+        rrd_function_transport_entry_release(can_a.transport);
+        rrd_function_transport_entry_release(prg_a.transport);
+
+        if(errors == before)
+            fprintf(stderr, "  OK keyed: cancel/progress reach only the plugin that owns the transaction\n");
+    }
+
+    // 10. duplicate transaction ids, on both sides of the transport.
+    //     The broker rejects the second caller with 400 and must leave the
+    //     first (still running) transaction completely untouched; the parser's
+    //     own conflict callback does the same for its dictionary, and frees
+    //     the loser's payload/source/function (ASAN checks that half).
+    {
+        int before = errors;
+
+        rrd_function_transactions_create(); // idempotent
+
+        rrd_function_add(host, NULL, "c7-dup-fn", 10, 0, 1, "dup", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         c5b_async_execute_cb, NULL);
+
+        nd_uuid_t uuid;
+        uuid_generate_random(uuid);
+        char tx[UUID_COMPACT_STR_LEN];
+        uuid_unparse_lower_compact(uuid, tx);
+
+        struct c6ut_result r1 = { 0 }, r2 = { 0 };
+        CLEAN_BUFFER *wb1 = buffer_create(0, NULL);
+        CLEAN_BUFFER *wb2 = buffer_create(0, NULL);
+
+        int c1 = rrd_function_run(host, wb1, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
+                                  c6ut_result_cb, &r1, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+        int c2 = rrd_function_run(host, wb2, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
+                                  c6ut_result_cb, &r2, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+
+        if(c1 != HTTP_RESP_OK || r1.calls != 0) {
+            fprintf(stderr, "  FAILED duplicate: the first call returned %d and was delivered %zu times\n",
+                    c1, r1.calls);
+            errors++;
+        }
+        if(c2 != HTTP_RESP_BAD_REQUEST || r2.calls != 1 || r2.code != HTTP_RESP_BAD_REQUEST) {
+            fprintf(stderr, "  FAILED duplicate: the second call returned %d and was delivered %zu times with code %d,"
+                            " expected one 400\n", c2, r2.calls, r2.code);
+            errors++;
+        }
+
+        // the rejection must not have touched the transaction already in flight
+        usec_t d = 0;
+        if(!rrd_function_transaction_deadline(tx, &d)) {
+            fprintf(stderr, "  FAILED duplicate: the rejection removed the running transaction from the broker\n");
+            errors++;
+        }
+
+        // finish the first call
+        c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
+
+        if(r1.calls != 1 || r1.code != HTTP_RESP_OK) {
+            fprintf(stderr, "  FAILED duplicate: the first call finished with %zu deliveries, code %d\n",
+                    r1.calls, r1.code);
+            errors++;
+        }
+        if(rrd_function_transaction_deadline(tx, &d)) {
+            fprintf(stderr, "  FAILED duplicate: the completed transaction is still in the broker\n");
+            errors++;
+        }
+
+        rrd_function_del(host, NULL, "c7-dup-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        // the same collision inside the parser's own dictionary
+        {
+            struct c6ut_sends sends = { 0 };
+            struct c6ut_result p1 = { 0 }, p2 = { 0 };
+            PARSER *parser = c6ut_parser_create(&sends);
+            usec_t stop_ut = now_monotonic_usec() + 60 * USEC_PER_SEC;
+            CLEAN_BUFFER *pwb1 = buffer_create(0, NULL);
+            CLEAN_BUFFER *pwb2 = buffer_create(0, NULL);
+
+            nd_uuid_t pu;
+            uuid_generate_random(pu);
+
+            c6ut_execute_tx(parser, "c7-dup-parser-fn", &pu, &stop_ut, pwb1, &p1, NULL, NULL);
+            c6ut_execute_tx(parser, "c7-dup-parser-fn", &pu, &stop_ut, pwb2, &p2, NULL, NULL);
+
+            if(p2.calls != 1 || p2.code != HTTP_RESP_BAD_REQUEST) {
+                fprintf(stderr, "  FAILED duplicate: the parser's duplicate was delivered %zu times with code %d,"
+                                " expected one 400\n", p2.calls, p2.code);
+                errors++;
+            }
+            if(p1.calls != 0) {
+                fprintf(stderr, "  FAILED duplicate: the parser's first record was delivered by the collision\n");
+                errors++;
+            }
+
+            parser_destroy(parser);
+
+            if(p1.calls != 1 || p2.calls != 1) {
+                fprintf(stderr, "  FAILED duplicate: after destroy, deliveries are %zu/%zu, expected 1/1\n",
+                        p1.calls, p2.calls);
+                errors++;
+            }
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK duplicate: both the broker and the parser reject a duplicate without disturbing the original\n");
+    }
+
+    // 11. a request that cannot even be written to the plugin is answered
+    //     immediately, exactly once, and leaves no record behind
+    {
+        int before = errors;
+        struct c6ut_sends sends = { .fail = true };
+        struct c6ut_result res = { 0 };
+        PARSER *parser = c6ut_parser_create(&sends);
+
+        usec_t stop_ut = now_monotonic_usec() + 60 * USEC_PER_SEC;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        char tx[UUID_COMPACT_STR_LEN];
+
+        int code = c6ut_execute(parser, "c7-sendfail-fn", &stop_ut, wb, &res, tx, NULL);
+
+        if(code != HTTP_RESP_SERVICE_UNAVAILABLE) {
+            fprintf(stderr, "  FAILED send-fail: execute returned %d, expected 503\n", code);
+            errors++;
+        }
+        if(res.calls != 1 || res.code != HTTP_RESP_SERVICE_UNAVAILABLE) {
+            fprintf(stderr, "  FAILED send-fail: delivered %zu times with code %d, expected exactly one 503\n",
+                    res.calls, res.code);
+            errors++;
+        }
+        if(dictionary_entries(parser->inflight.functions) != 0) {
+            fprintf(stderr, "  FAILED send-fail: the record survived a failed send\n");
+            errors++;
+        }
+
+        parser_destroy(parser);
+
+        if(res.calls != 1) {
+            fprintf(stderr, "  FAILED send-fail: destroy re-delivered the failed request (calls %zu)\n", res.calls);
+            errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK send-fail: an unsendable request is answered once and leaves nothing behind\n");
+    }
+
+    // 12. GC invariant: a parser record with no broker record is SKIPPED, never
+    //     reaped - reaping would run the delete-callback chain into memory
+    //     whose invariant already failed. The all-skipped guard must also push
+    //     the next GC attempt one extension away, or every later submission
+    //     re-runs the GC and re-logs the misses.
+    {
+        int before = errors;
+        struct c6ut_sends sends = { 0 };
+        struct c6ut_result res = { 0 };
+        PARSER *parser = c6ut_parser_create(&sends);
+
+        rrd_function_transactions_create(); // idempotent - the record we make has no entry in it
+
+        // already past its deadline, so the GC would reap it if it could read one
+        usec_t stop_ut = now_monotonic_usec() - 10 * USEC_PER_SEC;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        char tx[UUID_COMPACT_STR_LEN];
+
+        c6ut_execute(parser, "c7-orphan-fn", &stop_ut, wb, &res, tx, NULL);
+
+        // execute_cb itself runs the GC when the deadline is already behind us
+        if(res.calls) {
+            fprintf(stderr, "  FAILED gc-skip: a record without a broker entry was reaped at submission\n");
+            errors++;
+        }
+        if(parser->inflight.smaller_monotonic_timeout_ut <= rrd_function_effective_deadline_ut(stop_ut)) {
+            fprintf(stderr, "  FAILED gc-skip: the all-skipped guard did not push the next attempt forward\n");
+            errors++;
+        }
+
+        pluginsd_inflight_functions_garbage_collect(parser, now_monotonic_usec() + 3600 * USEC_PER_SEC);
+
+        if(res.calls) {
+            fprintf(stderr, "  FAILED gc-skip: an explicit GC pass reaped the record anyway (calls %zu)\n", res.calls);
+            errors++;
+        }
+        if(sends.cancels) {
+            fprintf(stderr, "  FAILED gc-skip: a CANCEL was sent for a record the GC must not touch\n");
+            errors++;
+        }
+        if(dictionary_entries(parser->inflight.functions) != 1) {
+            fprintf(stderr, "  FAILED gc-skip: the skipped record left the dictionary\n");
+            errors++;
+        }
+
+        // the plugin's death is what finally answers it
+        parser_destroy(parser);
+
+        if(res.calls != 1 || res.code != HTTP_RESP_SERVICE_UNAVAILABLE) {
+            fprintf(stderr, "  FAILED gc-skip: destroy delivered %zu times with code %d, expected one 503\n",
+                    res.calls, res.code);
+            errors++;
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK gc-skip: a record with no broker entry is skipped, never reaped, and answered at destroy\n");
+    }
+
+    // 13. the grace extension is real: every deadline gets
+    //     RRDFUNCTIONS_TIMEOUT_EXTENSION_UT before the GC enforces it, and the
+    //     GC applies it through rrd_function_effective_deadline_ut() only - so
+    //     a transaction inside the grace window is never cancelled early.
+    {
+        int before = errors;
+        struct c6ut_sends sends = { 0 };
+        struct c6ut_result res = { 0 };
+        PARSER *parser = c6ut_parser_create(&sends);
+
+        rrd_function_transactions_create(); // idempotent
+
+        rrd_function_add(host, NULL, "c7-grace-fn", 10, 0, 1, "grace", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_COLLECTOR,
+                         pluginsd_function_execute_cb, parser->inflight.transport);
+
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        usec_t t0 = now_monotonic_usec();
+        int code = rrd_function_run(host, wb, 10 /* seconds */, HTTP_ACCESS_ALL, "c7-grace-fn",
+                                    false /* don't wait */, NULL,
+                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
+                                    NULL, "unittest", false);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "  FAILED grace: async run returned %d\n", code);
+            errors++;
+        }
+
+        // 100ms before the deadline+grace: nothing may happen
+        pluginsd_inflight_functions_garbage_collect(parser, t0 + 10 * USEC_PER_SEC + 900 * USEC_PER_MS);
+        if(sends.cancels || res.calls) {
+            fprintf(stderr, "  FAILED grace: a transaction inside the grace window was cancelled"
+                            " (%zu cancels, %zu deliveries)\n", sends.cancels, res.calls);
+            errors++;
+        }
+
+        // 500ms past it: cancelled once and timed out
+        pluginsd_inflight_functions_garbage_collect(parser, t0 + 11 * USEC_PER_SEC + 500 * USEC_PER_MS);
+        if(sends.cancels != 1) {
+            fprintf(stderr, "  FAILED grace: %zu CANCELs past the grace window, expected 1\n", sends.cancels);
+            errors++;
+        }
+        if(res.calls != 1 || res.code != HTTP_RESP_GATEWAY_TIMEOUT) {
+            fprintf(stderr, "  FAILED grace: delivered %zu times with code %d, expected one 504\n",
+                    res.calls, res.code);
+            errors++;
+        }
+
+        parser_destroy(parser);
+        rrd_function_del(host, NULL, "c7-grace-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(errors == before)
+            fprintf(stderr, "  OK grace: the deadline is enforced one extension late, and exactly once\n");
+    }
+
+    // 14. the broker's registration pins and the cancel protocol:
+    //     a canceller/progresser registration entry-pins its transport for the
+    //     record's lifetime (so a late cancel finds a valid, dead transport
+    //     instead of freed memory), a re-registration releases the previous
+    //     pin, completion releases both, and a second CANCEL for the same
+    //     transaction is dropped by the `cancelled` flag.
+    {
+        int before = errors;
+
+        rrd_function_transactions_create(); // idempotent
+
+        memset(&c7_pin, 0, sizeof(c7_pin));
+        c7_pin.first = rrd_function_transport_create(NULL);
+        c7_pin.second = rrd_function_transport_create(NULL);
+
+        rrd_function_add(host, NULL, "c7-pin-fn", 10, 0, 1, "pin", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         c7_pin_execute_cb, NULL);
+
+        struct c6ut_result res = { 0 };
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "c7-pin-fn", false, NULL,
+                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "  FAILED pins: async run returned %d\n", code);
+            errors++;
+        }
+
+        // first: base ref only (the canceller re-registration released its pin)
+        if(refcount_references(&c7_pin.first->entry_refcount) != 1) {
+            fprintf(stderr, "  FAILED pins: a canceller re-registration leaked the previous pin (refs %d != 1)\n",
+                    refcount_references(&c7_pin.first->entry_refcount));
+            errors++;
+        }
+        // second: base + the canceller pin + the progresser pin
+        if(refcount_references(&c7_pin.second->entry_refcount) != 3) {
+            fprintf(stderr, "  FAILED pins: the canceller/progresser pins are %d, expected 3 (base + 2)\n",
+                    refcount_references(&c7_pin.second->entry_refcount));
+            errors++;
+        }
+
+        rrd_function_cancel(c7_pin.tx);
+        if(c7_pin.cancels != 1) {
+            fprintf(stderr, "  FAILED pins: CANCEL dispatched %zu times, expected 1\n", c7_pin.cancels);
+            errors++;
+        }
+
+        // the `cancelled` flag makes a repeat a no-op
+        rrd_function_cancel(c7_pin.tx);
+        if(c7_pin.cancels != 1) {
+            fprintf(stderr, "  FAILED pins: a repeated CANCEL was dispatched again (%zu)\n", c7_pin.cancels);
+            errors++;
+        }
+
+        // an unknown transaction is a no-op, not a crash
+        rrd_function_cancel("0123456789abcdef0123456789abcdef");
+
+        rrd_function_progress(c7_pin.tx);
+        if(c7_pin.progresses != 1) {
+            fprintf(stderr, "  FAILED pins: PROGRESS dispatched %zu times, expected 1\n", c7_pin.progresses);
+            errors++;
+        }
+
+        // completion tears the record down and releases both pins
+        c7_pin.result_cb(c7_pin.result_wb, HTTP_RESP_OK, c7_pin.result_cb_data);
+
+        if(res.calls != 1) {
+            fprintf(stderr, "  FAILED pins: the caller was delivered %zu times, expected once\n", res.calls);
+            errors++;
+        }
+        if(refcount_references(&c7_pin.second->entry_refcount) != 1 ||
+           refcount_references(&c7_pin.first->entry_refcount) != 1) {
+            fprintf(stderr, "  FAILED pins: after completion the pins are %d/%d, expected 1/1\n",
+                    refcount_references(&c7_pin.first->entry_refcount),
+                    refcount_references(&c7_pin.second->entry_refcount));
+            errors++;
+        }
+
+        rrd_function_del(host, NULL, "c7-pin-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+        rrd_function_transport_mark_dead_and_drain(c7_pin.first);
+        rrd_function_transport_owner_release(c7_pin.first);
+        rrd_function_transport_mark_dead_and_drain(c7_pin.second);
+        rrd_function_transport_owner_release(c7_pin.second);
+
+        if(errors == before)
+            fprintf(stderr, "  OK pins: registration pins are taken, re-taken and released; CANCEL is idempotent\n");
+    }
+
+    // 15. the deadline the broker records, and the sync shortcut.
+    //     A caller that gives no timeout gets the one the function was
+    //     registered with; a sync function is executed inline, is visible in
+    //     the broker only for the duration of the call, and is offered no
+    //     canceller/progresser (there is nothing to cancel after it returns).
+    {
+        int before = errors;
+
+        rrd_function_transactions_create(); // idempotent
+
+        rrd_function_add(host, NULL, "c7-timeout-fn", 7, 0, 1, "timeout", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         c5b_async_execute_cb, NULL);
+
+        struct { int ask; usec_t expect_s; } t[] = {
+            { 0,  7 },   // no timeout given -> the registered one
+            { -1, 7 },   // a negative timeout is the same "not given"
+            { 3,  3 },   // an explicit timeout wins
+        };
+
+        for(size_t i = 0; i < _countof(t); i++) {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            usec_t t0 = now_monotonic_usec();
+            int code = rrd_function_run(host, wb, t[i].ask, HTTP_ACCESS_ALL, "c7-timeout-fn", false, NULL,
+                                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+            if(code != HTTP_RESP_OK) {
+                fprintf(stderr, "  FAILED timeout: run returned %d\n", code);
+                errors++;
+                continue;
+            }
+
+            usec_t d = 0;
+            if(!rrd_function_transaction_deadline(c5b_capture.tx, &d)) {
+                fprintf(stderr, "  FAILED timeout: the transaction is not in the broker\n");
+                errors++;
+            }
+            else if(d < t0 + t[i].expect_s * USEC_PER_SEC || d >= t0 + (t[i].expect_s + 1) * USEC_PER_SEC) {
+                fprintf(stderr, "  FAILED timeout: asked for %d, expected a ~%"PRIu64"s deadline, got %"PRIu64" usec away\n",
+                        t[i].ask, t[i].expect_s, d - t0);
+                errors++;
+            }
+
+            c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
+        }
+
+        rrd_function_del(host, NULL, "c7-timeout-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        memset(&c7_sync, 0, sizeof(c7_sync));
+        rrd_function_add(host, NULL, "c7-sync-fn", 10, 0, 1, "sync", "top",
+                         HTTP_ACCESS_ANONYMOUS_DATA, true /* sync */, RRD_FUNCTION_REG_SOURCE_INTERNAL,
+                         c7_sync_execute_cb, NULL);
+
+        struct c6ut_result sres = { 0 };
+        {
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            int code = rrd_function_run(host, wb, 10, HTTP_ACCESS_ALL, "c7-sync-fn", true, NULL,
+                                        c6ut_result_cb, &sres, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+            if(code != HTTP_RESP_OK) {
+                fprintf(stderr, "  FAILED sync: run returned %d\n", code);
+                errors++;
+            }
+        }
+
+        if(sres.calls != 1) {
+            fprintf(stderr, "  FAILED sync: delivered %zu times, expected once\n", sres.calls);
+            errors++;
+        }
+        if(!c7_sync.deadline_visible) {
+            fprintf(stderr, "  FAILED sync: the transaction was not in the broker during the call\n");
+            errors++;
+        }
+        if(c7_sync.has_canceller || c7_sync.has_progresser) {
+            fprintf(stderr, "  FAILED sync: a sync call was offered a canceller/progresser registration\n");
+            errors++;
+        }
+        usec_t d = 0;
+        if(rrd_function_transaction_deadline(c7_sync.tx, &d)) {
+            fprintf(stderr, "  FAILED sync: the transaction survived the call\n");
+            errors++;
+        }
+
+        rrd_function_del(host, NULL, "c7-sync-fn", RRD_FUNCTION_REG_SOURCE_INTERNAL);
+
+        if(errors == before)
+            fprintf(stderr, "  OK deadline/sync: the registered timeout is the fallback; a sync call leaves no transaction\n");
     }
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
