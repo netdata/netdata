@@ -571,6 +571,10 @@ restart:
                 if(unlikely(!hrm->populated)) {
                     rw_spinlock_read_unlock(&host->health_log.spinlock);
                     alerts_raised_summary_populate(hrm);
+
+                    // re-sample: building the summary walks and sorts the host's
+                    // whole alert list, so entries can become due while it runs
+                    now = now_realtime_sec();
                     goto restart;
                 }
 
