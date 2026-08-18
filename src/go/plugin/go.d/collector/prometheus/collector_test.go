@@ -9,11 +9,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1242,6 +1244,97 @@ func TestCollector_CephMGRClusterSummaries(t *testing.T) {
 	requireChartValues(creates[osdSummary][0], map[string]float64{"total": 10, "up": 9})
 }
 
+func TestCollector_CephHardwareProfileReleaseGating(t *testing.T) {
+	fixtures := []string{
+		"prometheus/profiles/ceph/fixtures/ceph_reef_mgr_limit11.prom",
+		"prometheus/profiles/ceph/fixtures/ceph_squid_mgr_limit11.prom",
+		"prometheus/profiles/ceph/fixtures/ceph_tentacle_mgr_limit11.prom",
+	}
+
+	for _, fixturePath := range fixtures {
+		t.Run(filepath.Base(fixturePath), func(t *testing.T) {
+			input, err := os.ReadFile(promtestutil.Require(t, fixturePath))
+			require.NoError(t, err)
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write(input)
+			}))
+			defer srv.Close()
+
+			collr := New()
+			collr.URL = srv.URL
+			collr.Profiles = ProfilesConfig{Mode: "auto"}
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+			defer collr.Cleanup(context.Background())
+
+			cc := cycle(t, collr.MetricStore())
+			cc.BeginCycle()
+			require.NoError(t, collr.Collect(context.Background()))
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			eng, err := chartengine.New()
+			require.NoError(t, err)
+			require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+			attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+			require.NoError(t, err)
+			defer attempt.Abort()
+			plan := attempt.Plan()
+			require.NoError(t, attempt.Commit())
+
+			healthIDs := make(map[string]chartengine.CreateChartAction)
+			temperatureIDs := make(map[string]chartengine.CreateChartAction)
+			for _, action := range plan.Actions {
+				create, ok := action.(chartengine.CreateChartAction)
+				if !ok {
+					continue
+				}
+				switch create.Meta.Context {
+				case "prometheus.ceph.node_hardware.health.state":
+					healthIDs[create.ChartID] = create
+				case "prometheus.ceph.node_hardware.temperature.temperature":
+					temperatureIDs[create.ChartID] = create
+				}
+			}
+
+			isTentacle := strings.Contains(fixturePath, "_tentacle_")
+			if !isTentacle {
+				assert.Empty(t, healthIDs, "Reef/Squid must not materialize Tentacle-only hardware charts")
+				assert.Empty(t, temperatureIDs, "Reef/Squid must not materialize Tentacle-only temperature charts")
+				return
+			}
+
+			assert.Len(t, healthIDs, 9, "each collision-bearing health component remains a separate instance")
+			assert.Len(t, temperatureIDs, 8, "each collision-bearing temperature sensor remains a separate instance")
+
+			wantHealth := []string{
+				"prometheus_ceph_node_hardware_health_state_node-a_storage_drive-0",
+				"prometheus_ceph_node_hardware_health_state_node-a_processors_cpu-0",
+				"prometheus_ceph_node_hardware_health_state_node-a_memory_dimm-0",
+				"prometheus_ceph_node_hardware_health_state_node-a_power_psu-0",
+				"prometheus_ceph_node_hardware_health_state_node-a_network_nic-0",
+				"prometheus_ceph_node_hardware_health_state_node-a_fans_fan-0",
+				"prometheus_ceph_node_hardware_health_state_node-a_temperatures_temp-0",
+				"prometheus_ceph_node_hardware_health_state_node-b_storage_drive-0",
+				"prometheus_ceph_node_hardware_health_state_node-b_storage_drive-1",
+			}
+			assert.ElementsMatch(t, wantHealth, slices.Collect(maps.Keys(healthIDs)))
+
+			wantTemperature := []string{
+				"prometheus_ceph_node_hardware_temperature_temperature_node-a_MB_TEMP_0",
+				"prometheus_ceph_node_hardware_temperature_temperature_node-a_DIMM_0_TEMP",
+				"prometheus_ceph_node_hardware_temperature_temperature_node-a_CPU_TEMP_0",
+				"prometheus_ceph_node_hardware_temperature_temperature_node-a_NVME_0_TEMP",
+				"prometheus_ceph_node_hardware_temperature_temperature_node-b_MB_TEMP_0",
+				"prometheus_ceph_node_hardware_temperature_temperature_node-b_DIMM_0_TEMP",
+				"prometheus_ceph_node_hardware_temperature_temperature_node-b_CPU_TEMP_0",
+				"prometheus_ceph_node_hardware_temperature_temperature_node-b_NVME_0_TEMP",
+			}
+			assert.ElementsMatch(t, wantTemperature, slices.Collect(maps.Keys(temperatureIDs)))
+		})
+	}
+}
+
 func TestCollector_CephMGRClusterAlertBoundaries(t *testing.T) {
 	monState := func(total, inQuorum float64) (down, atRisk float64) {
 		if math.IsNaN(total) || math.IsInf(total, 0) || math.IsNaN(inQuorum) || math.IsInf(inQuorum, 0) ||
@@ -1352,7 +1445,10 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		"CEPH-001", "CEPH-002", "CEPH-003", "CEPH-004", "CEPH-005", "CEPH-013", "CEPH-014", "CEPH-015",
 		"CEPH-016", "CEPH-017", "CEPH-018", "CEPH-019", "CEPH-020", "CEPH-021", "CEPH-025", "CEPH-027",
 		"CEPH-028", "CEPH-029", "CEPH-030", "CEPH-032", "CEPH-033", "CEPH-034", "CEPH-035", "CEPH-036",
-		"CEPH-037", "CEPH-038", "CEPH-039", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
+		"CEPH-037", "CEPH-038", "CEPH-039", "CEPH-063", "CEPH-064", "CEPH-065", "CEPH-066", "CEPH-067",
+		"CEPH-068", "CEPH-069", "CEPH-070", "CEPH-071", "CEPH-072", "CEPH-073", "CEPH-074", "CEPH-075",
+		"CEPH-076", "CEPH-077", "CEPH-098", "CEPH-099", "CEPH-100", "CEPH-101", "CEPH-102", "CEPH-103",
+		"CEPH-104", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
 	}, cephManifestSOWIDs(manifest.Alerts))
 	require.ElementsMatch(t, []string{"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02"},
 		cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
@@ -1372,21 +1468,19 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		hasExpressions := len(mapping.Source.Expressions) > 0
 		require.NotEqualf(t, hasExpression, hasExpressions,
 			"%s must define exactly one of source expression or release expressions", name)
-		if hasExpressions {
-			require.Lenf(t, mapping.Source.Expressions, 3, "%s source expressions do not cover the supported releases", name)
-			for _, release := range []string{"reef", "squid", "tentacle"} {
+		require.NotEmptyf(t, mapping.Source.Releases, "%s has no supported-release set", name)
+		for _, release := range []string{"reef", "squid", "tentacle"} {
+			supported := slices.Contains(mapping.Source.Releases, release)
+			require.Equalf(t, supported, mapping.Source.Lines[release] > 0,
+				"%s release availability and line pin disagree for %s", name, release)
+			require.Equalf(t, supported, mapping.Source.DefinitionSHA256[release] != "",
+				"%s release availability and definition pin disagree for %s", name, release)
+			if hasExpressions {
 				require.Containsf(t, mapping.Source.Expressions, release,
 					"%s has no source expression for %s", name, release)
 			}
 		}
 		require.NotEmpty(t, mapping.Source.Severity)
-		require.Positive(t, mapping.Source.Lines["reef"])
-		require.Positive(t, mapping.Source.Lines["squid"])
-		require.Positive(t, mapping.Source.Lines["tentacle"])
-		for _, release := range []string{"reef", "squid", "tentacle"} {
-			digest := mapping.Source.DefinitionSHA256[release]
-			require.NotEmptyf(t, digest, "%s has no source-definition pin for %s", name, release)
-		}
 		adaptation, ok := manifest.AdaptationContracts[mapping.Netdata.Adaptation]
 		require.Truef(t, ok, "%s references unknown adaptation %q", name, mapping.Netdata.Adaptation)
 		require.NotEmpty(t, adaptation.Preserved)
@@ -1466,6 +1560,11 @@ func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
 
 			rules := parseCephSourceAlertRules(t, content)
 			for name, mapping := range manifest.Alerts {
+				if !slices.Contains(mapping.Source.Releases, release) {
+					require.NotContainsf(t, rules, mapping.SourceAlert,
+						"%s is incorrectly present in %s", mapping.SourceAlert, release)
+					continue
+				}
 				t.Run(name, func(t *testing.T) {
 					rule, ok := rules[mapping.SourceAlert]
 					require.Truef(t, ok, "source alert %q is absent", mapping.SourceAlert)
@@ -1889,6 +1988,7 @@ type cephAlertMapping struct {
 	Source      struct {
 		Expression       string            `yaml:"expression"`
 		Expressions      map[string]string `yaml:"expressions"`
+		Releases         []string          `yaml:"releases"`
 		Persistence      string            `yaml:"persistence"`
 		Severity         string            `yaml:"severity"`
 		Lines            map[string]int    `yaml:"lines"`

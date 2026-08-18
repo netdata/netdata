@@ -184,6 +184,21 @@ cases:
       expected:
         verdict: PASS
       observations:
+        node_hardware.health.state#value:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        placement_groups_and_recovery.healthy_state.pg_state#active:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        placement_groups_and_recovery.healthy_state.pg_state#clean:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        placement_groups_and_recovery.healthy_state.pg_state#pg_total:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        node_hardware.temperature.temperature#value:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
         control_plane.monitor.cluster_summary#total:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
