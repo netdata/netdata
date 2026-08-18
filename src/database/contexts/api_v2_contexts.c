@@ -562,7 +562,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
 
                 rrdhost_health_to_json_v2(wb, "health", &s);
 
-                nrpc_catalog_host2json(host, wb); // functions
+                nrpc_catalog_host2json(host->host_id, wb); // functions
                 agent_capabilities_to_json(wb, host, "capabilities");
 
                 host_dyncfg_to_json_v2(wb, "dyncfg", &s);
@@ -696,7 +696,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
             .priority = NRPC_PRIORITY_DEFAULT,
             .version = NRPC_VERSION_DEFAULT,
         };
-        nrpc_catalog_host_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority, &t.version);
+        nrpc_catalog_host_to_dict(host->host_id, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority, &t.version);
     }
 
     if(ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS)) {

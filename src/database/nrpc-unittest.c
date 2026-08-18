@@ -38,6 +38,31 @@ static struct nrpc_registry *nrpc_ut_registry(RRDHOST *host) {
     return registry;
 }
 
+// A fake registry owner: observes the owner protocol (changed calls with the
+// component's manifest verdict, wants_del_journal queries) without any
+// RRDHOST at all - the registry is host-agnostic, so a whole lifecycle can
+// run against it.
+struct nrpc_ut_owner_probe {
+    size_t changed_calls;
+    size_t arm_manifest_calls;
+    size_t wants_del_calls;
+    bool wants_del;
+    OBJECT_STATE epoch;
+};
+
+static void nrpc_ut_owner_changed(void *data, bool arm_manifest) {
+    struct nrpc_ut_owner_probe *probe = data;
+    probe->changed_calls++;
+    if(arm_manifest)
+        probe->arm_manifest_calls++;
+}
+
+static bool nrpc_ut_owner_wants_del(void *data) {
+    struct nrpc_ut_owner_probe *probe = data;
+    probe->wants_del_calls++;
+    return probe->wants_del;
+}
+
 int nrpc_access_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
@@ -343,7 +368,7 @@ int nrpc_manifest_unittest(void) {
             .handler = nrpc_unittest_noop_cb,
         });
 
-    DICTIONARY *manifest = nrpc_catalog_manifest_dict(host);
+    DICTIONARY *manifest = nrpc_catalog_manifest_dict(host->host_id);
 
     for(size_t i = 0; i < _countof(fns); i++) {
         struct nrpc_manifest_entry *e = dictionary_get(manifest, fns[i].name);
@@ -868,11 +893,14 @@ int nrpc_manifest_pacer_unittest(void) {
 // The streaming delete-path queue (C3).
 //
 // nrpc_method_unregister() no longer sends FUNCTION_DEL synchronously; it queues the
-// sanitized name in the registry's pending_dels set (only when the host has a
-// stream sender configured) and sets RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED.
-// The renderer (stream_sender_send_host_functions) clears the flag,
-// snapshots-and-clears the set, emits the FUNCTION_DEL lines and then the full
-// re-list - one buffer. This pins:
+// sanitized name in the registry's pending_dels set (only when the owner's
+// wants_del_journal callback answers true) and reports the change through the
+// owner's changed callback (which sets RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED).
+// The streaming CALLER clears that flag first (its half of the protocol -
+// these tests play the caller role); the renderer
+// (stream_sender_send_host_functions) then snapshots-and-clears the set,
+// emits the FUNCTION_DEL lines and then the full re-list - one buffer.
+// This pins:
 //
 //   1. the add/del truth table: which operations set the flag, queue a
 //      FUNCTION_DEL, and arm the cloud manifest - including the dyncfg quirk
@@ -1098,7 +1126,11 @@ int nrpc_del_unittest(void) {
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_host_functions(host, wb, false, true);
+            // the streaming caller's half of the protocol: clear the changed
+            // flag FIRST, then render (since the inversion the renderer no
+            // longer touches the owner's flag)
+            rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+            stream_sender_send_host_functions(host->host_id, wb, false, true);
             const char *out = buffer_tostring(wb);
 
             const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-del-fn\"");
@@ -1120,7 +1152,7 @@ int nrpc_del_unittest(void) {
                 errors++;
             }
             if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
-                fprintf(stderr, "  FAILED drain: flag not cleared by the renderer\n");
+                fprintf(stderr, "  FAILED drain: the flag re-appeared during the drain (renderer must not set it)\n");
                 errors++;
             }
             if(fndel_queued(host, "tt-del-fn")) {
@@ -1134,7 +1166,7 @@ int nrpc_del_unittest(void) {
         nrpc_method_unregister(host->host_id, "tt-keep-fn", NRPC_SOURCE_DAEMON);
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_host_functions(host, wb, false, false);
+            stream_sender_send_host_functions(host->host_id, wb, false, false);
             const char *out = buffer_tostring(wb);
 
             if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL)) {
@@ -1173,7 +1205,7 @@ int nrpc_del_unittest(void) {
                 worker_done = __atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE);
 
                 CLEAN_BUFFER *wb = buffer_create(0, NULL);
-                stream_sender_send_host_functions(host, wb, false, true);
+                stream_sender_send_host_functions(host->host_id, wb, false, true);
                 const char *out = buffer_tostring(wb);
 
                 for(size_t i = 0; i < FNDEL_RACE_N; i++) {
@@ -1260,7 +1292,7 @@ int nrpc_del_unittest(void) {
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_host_functions(host, wb, false, true);
+            stream_sender_send_host_functions(host->host_id, wb, false, true);
             const char *out = buffer_tostring(wb);
 
             const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-readd-fn\"");
@@ -1468,7 +1500,7 @@ int nrpc_catalog_unittest(void) {
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_host_functions(host, wb, true /* dyncfg */, true /* can_function_del */);
+        stream_sender_send_host_functions(host->host_id, wb, true /* dyncfg */, true /* can_function_del */);
         const char *out = buffer_tostring(wb);
 
         const char *p_del        = strstr(out, buffer_tostring(exp_del));
@@ -1502,7 +1534,7 @@ int nrpc_catalog_unittest(void) {
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_host_functions(host, wb, false /* dyncfg */, true);
+        stream_sender_send_host_functions(host->host_id, wb, false /* dyncfg */, true);
         if(strstr(buffer_tostring(wb), buffer_tostring(exp_dyncfg))) {
             fprintf(stderr, "  FAILED global: synthetic config line emitted without DYNCFG capability\n");
             errors++;
@@ -1518,7 +1550,7 @@ int nrpc_catalog_unittest(void) {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-        nrpc_catalog_host2json(host, wb);
+        nrpc_catalog_host2json(host->host_id, wb);
         buffer_json_finalize(wb);
         const char *out = buffer_tostring(wb);
 
@@ -1560,7 +1592,7 @@ int nrpc_catalog_unittest(void) {
         dictionary_register_delete_callback(dst, e4_fn_delete_cb, NULL);
 
         struct e4_fn_entry tmp = { 0 };
-        nrpc_catalog_host_to_dict(host, dst, &tmp, sizeof(tmp),
+        nrpc_catalog_host_to_dict(host->host_id, dst, &tmp, sizeof(tmp),
                                &tmp.help, &tmp.tags, &tmp.access, &tmp.priority, &tmp.version);
 
         struct e4_fn_entry *e = dictionary_get(dst, "3|c4-global-fn");
@@ -1601,19 +1633,27 @@ int nrpc_catalog_unittest(void) {
     // which also smokes an archive/un-archive registry cycle; the fixtures
     // die with the destroyed registry, so this runs right before cleanup and
     // the cleanup unregisters below simply find nothing.
+    //
+    // CROSS-SUITE ISOLATION: this is the only block in any suite that
+    // destroys localhost's registry entry. It MUST leave the entry
+    // re-initialized and host-owned before returning - the suites run
+    // sequentially from one process (main.c dispatch and the aggregate
+    // unittest) and every later suite registers its fixtures into this
+    // same entry.
     {
         int before = errors;
 
-        nrpc_registry_destroy(host);
+        nrpc_registry_destroy(host->host_id, host);
+
+        // emulate the streaming caller: since the inversion, the caller owns
+        // the changed-flag clear (the streaming side's half of the ordering
+        // protocol) and the renderer only snapshots
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+        rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_host_functions(host, wb, true, true);
+        stream_sender_send_host_functions(host->host_id, wb, true, true);
 
-        if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
-            fprintf(stderr, "  FAILED absent-registry: the flag was not cleared, the poll would spin forever\n");
-            errors++;
-        }
         if(buffer_strlen(wb)) {
             fprintf(stderr, "  FAILED absent-registry: something was emitted for a host with no registry\n");
             errors++;
@@ -1625,7 +1665,7 @@ int nrpc_catalog_unittest(void) {
         {
             CLEAN_BUFFER *jwb = buffer_create(0, NULL);
             buffer_json_initialize(jwb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-            nrpc_catalog_host2json(host, jwb);
+            nrpc_catalog_host2json(host->host_id, jwb);
             buffer_json_finalize(jwb);
             if(strstr(buffer_tostring(jwb), "\"functions\"")) {
                 fprintf(stderr, "  FAILED absent-registry: host2json emitted the functions key for a host with no registry\n");
@@ -1636,7 +1676,9 @@ int nrpc_catalog_unittest(void) {
         // ownership guard: a host that shares this identity but does not own
         // the entry (the LOSER of a machine-guid index collision) must not be
         // able to destroy it once re-initialized
-        nrpc_registry_init(host);
+        struct nrpc_registry_owner host_owner;
+        rrdhost_nrpc_owner(host, &host_owner);
+        nrpc_registry_init(host->host_id, &host_owner);
         if(!nrpc_ut_registry(host)) {
             fprintf(stderr, "  FAILED absent-registry: the registry did not re-initialize\n");
             errors++;
@@ -1644,11 +1686,11 @@ int nrpc_catalog_unittest(void) {
         else {
             RRDHOST *impostor = callocz(1, sizeof(RRDHOST));
             impostor->host_id = host->host_id;
-            nrpc_registry_destroy(impostor);
+            nrpc_registry_destroy(impostor->host_id, impostor);
             if(!nrpc_ut_registry(host)) {
                 fprintf(stderr, "  FAILED absent-registry: a same-identity impostor host destroyed the owner's entry\n");
                 errors++;
-                nrpc_registry_init(host); // restore for the tests that follow
+                nrpc_registry_init(host->host_id, &host_owner); // restore for the tests that follow
             }
 
             // takeover: a same-identity successor's init claims the entry of
@@ -1676,9 +1718,12 @@ int nrpc_catalog_unittest(void) {
                 dictionary_set(pre->pending_dels.dict, "takeover-stale-del", NULL, 0);
                 spinlock_unlock(&pre->pending_dels.spinlock);
             }
-            nrpc_registry_init(impostor);
+            struct nrpc_registry_owner impostor_owner;
+            rrdhost_nrpc_owner(impostor, &impostor_owner);
+            impostor_owner.name = "takeover-impostor"; // the zeroed fake host has no hostname STRING
+            nrpc_registry_init(impostor->host_id, &impostor_owner);
             struct nrpc_registry *r = nrpc_ut_registry(host);
-            if(!r || r->host != impostor) {
+            if(!r || r->owner.data != impostor) {
                 fprintf(stderr, "  FAILED absent-registry: the successor's init did not take the entry over\n");
                 errors++;
             }
@@ -1686,18 +1731,18 @@ int nrpc_catalog_unittest(void) {
                 fprintf(stderr, "  FAILED absent-registry: the takeover did not flush the predecessor's methods/pending dels\n");
                 errors++;
             }
-            nrpc_registry_destroy(host); // the "predecessor" now - must be refused
+            nrpc_registry_destroy(host->host_id, host); // the "predecessor" now - must be refused
             r = nrpc_ut_registry(host);
             if(!r) {
                 fprintf(stderr, "  FAILED absent-registry: the predecessor's destroy removed a taken-over entry\n");
                 errors++;
-                nrpc_registry_init(host);
+                nrpc_registry_init(host->host_id, &host_owner);
             }
             else {
                 // take it back so the host owns its entry again
-                nrpc_registry_init(host);
+                nrpc_registry_init(host->host_id, &host_owner);
                 r = nrpc_ut_registry(host);
-                if(!r || r->host != host) {
+                if(!r || r->owner.data != host) {
                     fprintf(stderr, "  FAILED absent-registry: the owner could not take its entry back\n");
                     errors++;
                 }
@@ -1707,6 +1752,147 @@ int nrpc_catalog_unittest(void) {
 
         if(errors == before)
             fprintf(stderr, "  OK absent-registry: flag cleared, nothing emitted, functions key omitted, re-init works, impostor destroy refused, takeover works\n");
+    }
+
+    // -------------------------------------- the owner vtable (pure component)
+    // The registry is host-agnostic: drive a whole lifecycle against a FAKE
+    // owner keyed by a synthetic identity and observe the owner protocol -
+    // the changed callback fires once per visible change carrying the
+    // component's manifest verdict (register arms unless DYNCFG; unregister
+    // arms only for manifest members), wants_del_journal gates the
+    // FUNCTION_DEL queue as a LIVE question, and destroy DISARMS the entry:
+    // a handle held across destroy finds it absent from the index and every
+    // vtable access degraded to a no-op.
+    {
+        int before = errors;
+
+        struct nrpc_ut_owner_probe probe = { .wants_del = true };
+        ND_UUID synth_id;
+        uuid_generate_random(synth_id.uuid);
+
+        struct nrpc_registry_owner fake = {
+            .name = "fake-owner",
+            .epoch = &probe.epoch,
+            .data = &probe,
+            .changed = nrpc_ut_owner_changed,
+            .wants_del_journal = nrpc_ut_owner_wants_del,
+        };
+        nrpc_registry_init(synth_id, &fake);
+
+        struct nrpc_method_desc desc = {
+            .host_id = synth_id,
+            .help = "fake owner test",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 100,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        };
+
+        desc.name = "fo-plain-fn";
+        nrpc_method_register(&desc);
+        if(probe.changed_calls != 1 || probe.arm_manifest_calls != 1) {
+            fprintf(stderr, "  FAILED fake-owner: plain register expected changed=1 arm=1, got %zu/%zu\n",
+                    probe.changed_calls, probe.arm_manifest_calls);
+            errors++;
+        }
+
+        desc.name = "__fo-restricted-fn";
+        nrpc_method_register(&desc);
+        if(probe.changed_calls != 2 || probe.arm_manifest_calls != 2) {
+            // register arms even for RESTRICTED: a re-registration can flip
+            // the restriction and that transition must be reported
+            fprintf(stderr, "  FAILED fake-owner: restricted register expected changed=2 arm=2, got %zu/%zu\n",
+                    probe.changed_calls, probe.arm_manifest_calls);
+            errors++;
+        }
+
+        desc.name = "config fo:job";
+        desc.tags = "config";
+        nrpc_method_register(&desc);
+        if(probe.changed_calls != 3 || probe.arm_manifest_calls != 2) {
+            // DYNCFG entries can never be in the manifest - no arm
+            fprintf(stderr, "  FAILED fake-owner: dyncfg register expected changed=3 arm=2, got %zu/%zu\n",
+                    probe.changed_calls, probe.arm_manifest_calls);
+            errors++;
+        }
+
+        size_t wants_before = probe.wants_del_calls;
+        nrpc_method_unregister(synth_id, "fo-plain-fn", NRPC_SOURCE_DAEMON);
+        if(probe.changed_calls != 4 || probe.arm_manifest_calls != 3 || probe.wants_del_calls != wants_before + 1) {
+            fprintf(stderr, "  FAILED fake-owner: plain unregister expected changed=4 arm=3 wants_del+1, got %zu/%zu/%zu\n",
+                    probe.changed_calls, probe.arm_manifest_calls, probe.wants_del_calls);
+            errors++;
+        }
+
+        nrpc_method_unregister(synth_id, "__fo-restricted-fn", NRPC_SOURCE_DAEMON);
+        if(probe.changed_calls != 5 || probe.arm_manifest_calls != 3) {
+            // restricted entries are not manifest members - no arm on delete
+            fprintf(stderr, "  FAILED fake-owner: restricted unregister expected changed=5 arm=3, got %zu/%zu\n",
+                    probe.changed_calls, probe.arm_manifest_calls);
+            errors++;
+        }
+
+        // wants_del_journal is a LIVE question: flip the answer and verify
+        // the queue reflects it (the dyncfg delete is flag-only either way)
+        probe.wants_del = false;
+        nrpc_method_unregister(synth_id, "config fo:job", NRPC_SOURCE_DAEMON);
+        if(probe.changed_calls != 6 || probe.arm_manifest_calls != 3) {
+            fprintf(stderr, "  FAILED fake-owner: dyncfg unregister expected changed=6 arm=3, got %zu/%zu\n",
+                    probe.changed_calls, probe.arm_manifest_calls);
+            errors++;
+        }
+
+        // DISARM: hold the entry across destroy - it must be ABSENT from the
+        // index, and every vtable access through the held handle must be a
+        // safe no-op (the two assertions the old NULL-registry contract
+        // became)
+        const DICTIONARY_ITEM *held_item;
+        struct nrpc_registry *held = nrpc_registry_acquire(synth_id, &held_item);
+        if(!held) {
+            fprintf(stderr, "  FAILED fake-owner: could not hold the entry before destroy\n");
+            errors++;
+        }
+        else {
+            size_t changed_before_destroy = probe.changed_calls;
+            nrpc_registry_destroy(synth_id, &probe);
+
+            const DICTIONARY_ITEM *absent_item;
+            if(nrpc_registry_acquire(synth_id, &absent_item)) {
+                fprintf(stderr, "  FAILED fake-owner: the entry is still in the index after destroy\n");
+                errors++;
+                nrpc_registry_release(absent_item);
+            }
+
+            OBJECT_STATE_ID id;
+            if(nrpc_registry_owner_epoch(held, &id)) {
+                fprintf(stderr, "  FAILED fake-owner: the held entry still has an epoch after disarm\n");
+                errors++;
+            }
+            STRING *name = nrpc_registry_owner_name_dup(held);
+            if(name) {
+                fprintf(stderr, "  FAILED fake-owner: the held entry still has a name after disarm\n");
+                errors++;
+                string_freez(name);
+            }
+            nrpc_registry_owner_changed(held, true);
+            if(probe.changed_calls != changed_before_destroy) {
+                fprintf(stderr, "  FAILED fake-owner: the disarmed changed callback still reached the owner\n");
+                errors++;
+            }
+            if(nrpc_registry_owner_wants_del_journal(held)) {
+                fprintf(stderr, "  FAILED fake-owner: the disarmed wants_del_journal answered true\n");
+                errors++;
+            }
+
+            nrpc_registry_release(held_item);
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK fake-owner: changed/arm truth table, live wants_del gate, absent + disarmed after destroy\n");
     }
 
     // -------------------------------------------------------------------- cleanup
@@ -1790,7 +1976,7 @@ static void reg_probe_cb(const struct nrpc_method_view *v, void *data) {
 static bool reg_probe_run(RRDHOST *host, NRPC_CATALOG_FILTER filter, const char *name, struct reg_probe *out) {
     memset(out, 0, sizeof(*out));
     out->want = name;
-    nrpc_catalog_host_foreach(host, filter, reg_probe_cb, out);
+    nrpc_catalog_host_foreach(host->host_id, filter, reg_probe_cb, out);
     return out->found;
 }
 
@@ -2006,11 +2192,11 @@ int nrpc_registry_unittest(void) {
         }
 
         // ... while the availability probe is an exact-name lookup
-        if(!nrpc_method_available(host, "reg-args-fn")) {
+        if(!nrpc_method_available(host->host_id, "reg-args-fn")) {
             fprintf(stderr, "  FAILED key: nrpc_method_available() missed a live function\n");
             errors++;
         }
-        if(nrpc_method_available(host, "reg-args-fn arg1")) {
+        if(nrpc_method_available(host->host_id, "reg-args-fn arg1")) {
             fprintf(stderr, "  FAILED key: nrpc_method_available() must not strip arguments\n");
             errors++;
         }
@@ -2334,7 +2520,7 @@ int nrpc_registry_unittest(void) {
                 fprintf(stderr, "  FAILED serving: the entry was removed when its serving thread stopped\n");
                 errors++;
             }
-            if(nrpc_method_available(host, "reg-serving-fn")) {
+            if(nrpc_method_available(host->host_id, "reg-serving-fn")) {
                 fprintf(stderr, "  FAILED serving: a method of a stopped serving thread is still available\n");
                 errors++;
             }
@@ -2406,7 +2592,7 @@ int nrpc_registry_unittest(void) {
         }
         else {
             while(!__atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE))
-                nrpc_catalog_host_foreach(host, NRPC_CATALOG_FILTER_USER, reg_race_check_cb, &check);
+                nrpc_catalog_host_foreach(host->host_id, NRPC_CATALOG_FILTER_USER, reg_race_check_cb, &check);
 
             nd_thread_join(t);
 

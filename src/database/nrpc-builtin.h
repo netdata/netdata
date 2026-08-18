@@ -3,7 +3,7 @@
 #ifndef NETDATA_NRPC_BUILTIN_H
 #define NETDATA_NRPC_BUILTIN_H
 
-#include "rrd.h"
+#include "libnetdata/libnetdata.h"
 
 typedef int (*nrpc_builtin_handler_cb_t)(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 

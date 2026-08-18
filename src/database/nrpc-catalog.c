@@ -15,12 +15,19 @@
 // that same lock, so a copy taken outside it could read freed bytes.
 static size_t nrpc_catalog_registry_foreach(struct nrpc_registry *registry, NRPC_CATALOG_FILTER filter,
                                             nrpc_method_view_cb_t cb, void *data) {
-    RRDHOST *host = __atomic_load_n(&registry->host, __ATOMIC_ACQUIRE);
     size_t dyncfg_count = 0;
+
+    // Snapshot the owner's epoch ONCE, before the traversal: dfe holds the
+    // inner items read lock for the whole loop, and taking owner_spinlock
+    // under it would invert against the takeover's owner -> inner flush (the
+    // LOCK RULE at the registry's insert callback). One consistent epoch for
+    // the whole pass is also the correct visibility semantics.
+    OBJECT_STATE_ID epoch_id = 0;
+    bool armed = nrpc_registry_owner_epoch(registry, &epoch_id);
 
     struct nrpc_method *t;
     dfe_start_read(registry->dict, t) {
-        if(!nrpc_method_is_available(host, t)) continue;
+        if(!nrpc_method_is_available_at(t, armed, epoch_id)) continue;
 
         struct nrpc_method_view v = { .name = t_dfe.name };
         char *help = NULL, *tags = NULL;
@@ -66,11 +73,9 @@ static size_t nrpc_catalog_registry_foreach(struct nrpc_registry *registry, NRPC
     return dyncfg_count;
 }
 
-size_t nrpc_catalog_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
-    if(!host) return 0;
-
+size_t nrpc_catalog_host_foreach(ND_UUID host_id, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
     if(!registry) return 0;
 
     size_t dyncfg_count = nrpc_catalog_registry_foreach(registry, filter, cb, data);
@@ -104,26 +109,27 @@ static void stream_global_function_cb(const struct nrpc_method_view *v, void *da
 // knows nothing about streaming; when the verdict is false the snapshot is
 // DISCARDED, matching the old silent drop and preventing unbounded growth on
 // parents without FUNCDEL support.
-void stream_sender_send_host_functions(RRDHOST *host, BUFFER *wb, bool dyncfg, bool can_function_del) {
-    // Ordering contract with nrpc_method_unregister(): clear the flag FIRST, then
-    // snapshot-and-clear the pending set under its lock. The deleter inserts
-    // into the set BEFORE setting the flag, so a del landing after our
-    // snapshot re-sets the flag with its entry already queued - the next poll
-    // drains it; nothing is ever lost. NOTE: the two streaming callers run on
-    // DIFFERENT threads (the flag poll on collection/receiver threads, the
-    // reconnect push on the sender thread) and can race each other too - the
-    // flag/spinlock protocol keeps the QUEUE lossless, but the callers must
-    // additionally hold the sender's global_functions_spinlock across
-    // {render + commit}, or a stale rendered buffer could commit its
-    // FUNCTION_DEL lines after a fresh re-list (see the lock's comment in
-    // stream-sender-internals.h).
-    rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
-
-    // after the flag clear, so a host without a live registry entry (an
-    // archived host racing the sender's flag poll) behaves exactly like the
-    // old NULL-tolerant dictionary traversal: flag cleared, nothing emitted
+// Ordering contract with nrpc_method_unregister(): the CALLER clears the
+// changed flag FIRST (that clear is the streaming side's half of the
+// protocol and stays with the host flag, outside this component), then this
+// renderer snapshots-and-clears the pending set under its lock. The deleter
+// inserts into the set BEFORE the owner's changed callback re-sets the flag,
+// so a del landing after our snapshot re-sets the flag with its entry
+// already queued - the next poll drains it; nothing is ever lost. NOTE: the
+// two streaming callers run on DIFFERENT threads (the flag poll on
+// collection/receiver threads, the reconnect push on the sender thread) and
+// can race each other too - the flag/spinlock protocol keeps the QUEUE
+// lossless, but the callers must additionally hold the sender's
+// global_functions_spinlock across {render + commit}, or a stale rendered
+// buffer could commit its FUNCTION_DEL lines after a fresh re-list (see the
+// lock's comment in stream-sender-internals.h).
+void stream_sender_send_host_functions(ND_UUID host_id, BUFFER *wb, bool dyncfg, bool can_function_del) {
+    // a host identity without a live registry entry (an archived host racing
+    // the sender's flag poll) behaves exactly like the old NULL-tolerant
+    // dictionary traversal: the caller already cleared the flag, nothing is
+    // emitted here
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
     if(!registry)
         return;
 
@@ -174,13 +180,11 @@ static void host_function2json_cb(const struct nrpc_method_view *v, void *data) 
     buffer_json_object_close(wb);
 }
 
-void nrpc_catalog_host2json(RRDHOST *host, BUFFER *wb) {
-    if(!host) return;
-
+void nrpc_catalog_host2json(ND_UUID host_id, BUFFER *wb) {
     // the "functions" key is OMITTED entirely when the host has no live
     // registry entry - the historical NULL-registry payload shape
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
     if(!registry) return;
 
     buffer_json_member_add_object(wb, "functions");
@@ -238,12 +242,12 @@ static void host_function_to_dict_cb(const struct nrpc_method_view *v, void *dat
     dictionary_set(ctx->dst, key, ctx->value, ctx->value_size);
 }
 
-void nrpc_catalog_host_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size,
+void nrpc_catalog_host_to_dict(ND_UUID host_id, DICTIONARY *dst, void *value, size_t value_size,
                             const char **help, const char **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
-    if(!host || !dst) return;
+    if(!dst) return;
 
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
     if(!registry) return;
 
     if(!dictionary_entries(registry->dict)) {
@@ -291,14 +295,12 @@ static void manifest_entry_cb(const struct nrpc_method_view *v, void *data) {
     dictionary_set(dst, v->name, &e, sizeof(e));
 }
 
-DICTIONARY *nrpc_catalog_manifest_dict(RRDHOST *host) {
+DICTIONARY *nrpc_catalog_manifest_dict(ND_UUID host_id) {
     DICTIONARY *dst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_register_delete_callback(dst, manifest_entry_delete_cb, NULL);
 
-    if(!host) return dst;
-
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
     if(!registry) return dst;
 
     if(dictionary_entries(registry->dict))

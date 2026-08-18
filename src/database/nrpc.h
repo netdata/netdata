@@ -18,7 +18,7 @@
 //   is its DESCRIPTOR - never "metadata", which RPC reserves for per-call
 //   headers. Registration takes a caller-filled desc struct
 //   (struct nrpc_method_desc, struct nrpc_builtin_desc) that extends the
-//   attribute bundle with the method's owner (host) and handler.
+//   attribute bundle with the owning host identity and the handler.
 // - call: one invocation of a method, tracked in the in-flight calls table
 //   (struct nrpc_inflight_calls) and correlated by a call_id. Calls carry a
 //   deadline and support cancel and progress.
@@ -117,12 +117,10 @@ typedef int (*nrpc_handler_cb_t)(struct nrpc_request *req, void *data);
 
 // ----------------------------------------------------------------------------
 
-#include "rrd.h"
-
 struct nrpc_method;
 
 // opaque handle to an acquired method entry - the entry cannot be
-// freed while the handle is held (idiom: RRDSET_ACQUIRED, RRDHOST_ACQUIRED)
+// freed while the handle is held
 typedef struct nrpc_method_acquired NRPC_METHOD_ACQUIRED;
 
 typedef enum __attribute__((packed)) {
@@ -144,14 +142,35 @@ typedef enum __attribute__((packed)) {
     NRPC_SOURCE_DAEMON,      // daemon-internal registration (builtin methods, dyncfg)
 } NRPC_SOURCE;
 
-// Registry entry lifecycle - called from the host lifecycle (rrdhost.c) with
-// a live host: init creates the host's entry in the component-global
-// registries index (keyed by host->host_id; a zero host_id is refused with an
-// ERROR), destroy unlinks it. Both verify entry OWNERSHIP against the calling
-// host, so the losing host of a machine-guid index collision can never touch
-// the winner's live entry.
-void nrpc_registry_init(RRDHOST *host);
-void nrpc_registry_destroy(RRDHOST *host);
+// The owner vtable: everything the component may need from whoever owns a
+// registry entry, supplied at entry creation. The component copies `name`
+// (it keeps its own STRING, so an owner-side rename cannot free bytes under
+// a concurrent log line) and stores the rest verbatim. `epoch` is a LIVE
+// pointer, valid exactly while the entry is armed - entry disarm (inside
+// destroy) precedes owner teardown on every path. The callbacks receive
+// `data` back; `changed` reports that the host-wide visible function set
+// changed (`arm_manifest` is true when the change affects the cloud
+// manifest - the flag-update and the manifest-arm fire under different
+// per-entry conditions, so the component passes the verdict);
+// `wants_del_journal` answers whether deleted names should be queued for a
+// parent (a LIVE question - the owner's sender can appear and disappear).
+struct nrpc_registry_owner {
+    const char *name;                               // copied at entry creation
+    OBJECT_STATE *epoch;                            // live epoch pointer (see above)
+    void *data;                                     // opaque owner identity, passed to the callbacks
+    void (*changed)(void *data, bool arm_manifest); // the visible function set changed
+    bool (*wants_del_journal)(void *data);          // queue FUNCTION_DELs towards a parent?
+};
+
+// Registry entry lifecycle - called from the owner's lifecycle (rrdhost.c)
+// with a live owner: init creates the entry in the component-global
+// registries index (a zero host_id is refused with an ERROR), destroy
+// disarms and unlinks it. Both verify entry OWNERSHIP against owner `data`,
+// so the losing host of a machine-guid index collision can never touch the
+// winner's live entry, while a same-identity successor takes a dying
+// predecessor's entry over.
+void nrpc_registry_init(ND_UUID host_id, const struct nrpc_registry_owner *owner);
+void nrpc_registry_destroy(ND_UUID host_id, void *owner_data);
 
 // destroy the (by then empty) component-global registries index at daemon
 // shutdown, after rrdhost_free_all(), so leak checking sees a clean heap
@@ -242,8 +261,7 @@ int nrpc_del_unittest(void);
 int nrpc_registry_unittest(void);
 int nrpc_catalog_unittest(void);
 
-bool nrpc_method_available(RRDHOST *host, const char *function);
-bool nrpc_method_is_available(RRDHOST *host, struct nrpc_method *method);
+bool nrpc_method_available(ND_UUID host_id, const char *function);
 
 bool nrpc_call_has_result_cb(nd_uuid_t *call_id, nrpc_result_cb_t cb);
 

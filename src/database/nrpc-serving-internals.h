@@ -3,7 +3,7 @@
 #ifndef NETDATA_NRPC_SERVING_INTERNALS_H
 #define NETDATA_NRPC_SERVING_INTERNALS_H
 
-#include "rrd.h"
+#include "libnetdata/libnetdata.h"
 
 struct nrpc_serving_handle;
 struct nrpc_serving_handle *nrpc_serving_current_thread_acquire(void);

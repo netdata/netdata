@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "nrpc-builtin.h"
+#include "nrpc.h"
+#include "nrpc-serving.h"
 
 static int nrpc_builtin_handler(struct nrpc_request *req, void *data) {
 

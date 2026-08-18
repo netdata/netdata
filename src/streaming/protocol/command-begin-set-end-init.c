@@ -52,7 +52,10 @@ ALWAYS_INLINE RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t w
         // the global_functions_spinlock comment in stream-sender-internals.h
         spinlock_lock(&host->sender->global_functions_spinlock);
         BUFFER *wb = preferred_sender_buffer(host);
-        stream_sender_send_host_functions(host, wb,
+        // clear the flag FIRST, then render: the streaming side's half of the
+        // pending-dels ordering protocol (see stream_send_global_functions)
+        rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+        stream_sender_send_host_functions(host->host_id, wb,
                                                     stream_has_capability(host->sender, STREAM_CAP_DYNCFG),
                                                     stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                         rrdhost_can_stream_metadata_to_parent(host));

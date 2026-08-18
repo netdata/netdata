@@ -3,46 +3,60 @@
 #ifndef NETDATA_NRPC_INTERNALS_H
 #define NETDATA_NRPC_INTERNALS_H
 
-#include "rrd.h"
+#include "libnetdata/libnetdata.h"
 
+#include "nrpc.h"
 #include "nrpc-serving-internals.h"
 #include "nrpc-transport.h"
+#include "daemon/pulse/pulse-dictionary.h"
 
 // The per-host function registry: the value of one entry of the
 // component-global registries index (see nrpc_registry_acquire), keyed by the
-// host's ND_UUID identity. It owns the definitions dictionary; the host
-// back-pointer is transitional (stage 3 replaces it with an owner vtable) and
-// is what the dictionary callbacks use to reach the host they serve. The
-// back-pointer is valid while the entry is IN the index (the entry leaves the
-// index before the host is freed on every teardown path) - but a held outer
-// HANDLE deliberately outlives the entry (that is the point of the in-flight
-// held pair), so a path reached through such a handle after the entry left
-// the index must not touch `host`; release_pair only reads `dict`. Stage 3's
-// synchronous disarm is what closes this window for every field.
+// host's ND_UUID identity. It owns the definitions dictionary; everything it
+// may need from its owner lives in the embedded owner vtable, written only
+// under owner_spinlock (init, takeover, DISARM) and snapshotted under the
+// same lock by every reader. A held outer HANDLE deliberately outlives the
+// entry (that is the point of the in-flight held pair): a path reached
+// through such a handle after destroy finds the vtable DISARMED (name freed,
+// epoch NULL, callbacks NULL) and degrades to a no-op instead of calling
+// into a dying owner.
 struct nrpc_registry {
     ND_UUID host_id;                // the entry's own identity (the index key, parsed back)
 
-    // Serializes ownership transitions: nrpc_registry_init()'s takeover of a
-    // dying predecessor's entry vs nrpc_registry_destroy()'s owner check and
-    // index delete. Taken standalone only (never inside dictionary callbacks);
-    // order: this -> the outer index locks (destroy deletes while holding it).
-    // READERS of `host` are NOT part of this serialization - they use plain
-    // atomic loads and may latch a dying predecessor across a takeover; that
-    // residual is the same handle-outlives-entry window described above,
-    // closed by stage 3's disarm.
+    // Serializes ownership transitions and every vtable access:
+    // nrpc_registry_init()'s takeover of a dying predecessor's entry,
+    // nrpc_registry_destroy()'s owner check + index delete + DISARM, and the
+    // reader snapshots (nrpc_registry_owner_*). LOCK RULE: order is this ->
+    // the outer index locks (destroy deletes while holding it) and this ->
+    // the inner dictionary locks (takeover flushes while holding it) - so it
+    // is NEVER taken while any inner dictionary lock is held: not in the
+    // inner insert/conflict callbacks (the epoch id is pre-stamped through
+    // the value bytes instead) and not inside a dfe traversal (the catalog
+    // snapshots the epoch once before iterating).
     SPINLOCK owner_spinlock;
     bool dead;                      // set under owner_spinlock when destroy unlinked the entry
 
-    RRDHOST *host;                  // TRANSITIONAL back-pointer for the dictionary callbacks (see above)
+    // the owner vtable (see struct nrpc_registry_owner). name is the
+    // component's OWN copy; epoch/data/callbacks are the owner's, valid
+    // while armed. Disarm clears every field.
+    struct {
+        STRING *name;
+        OBJECT_STATE *epoch;
+        void *data;
+        void (*changed)(void *data, bool arm_manifest);
+        bool (*wants_del_journal)(void *data);
+    } owner;
+
     DICTIONARY *dict;               // the function definitions, keyed by sanitized name
 
     // Pending FUNCTION_DEL queue towards the parent. Deleters (any thread)
-    // insert the sanitized name here BEFORE setting
-    // RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED; the streaming renderer clears the
-    // flag FIRST and then snapshots-and-clears this set under the spinlock, so
-    // a del landing after the snapshot re-sets the flag with its entry already
-    // queued and nothing is ever stranded. Only populated when the host has a
-    // stream sender configured (never-streaming hosts must not grow it).
+    // insert the sanitized name here BEFORE the owner's changed callback
+    // updates the owner's changed flag; the streaming caller clears that flag
+    // FIRST and the renderer then snapshots-and-clears this set under the
+    // spinlock, so a del landing after the snapshot re-sets the flag with its
+    // entry already queued and nothing is ever stranded. Only populated when
+    // the owner's wants_del_journal callback answers true (never-streaming
+    // hosts must not grow it).
     struct {
         SPINLOCK spinlock;
         DICTIONARY *dict;           // keyed by sanitized name, no value (a set)
@@ -70,7 +84,7 @@ struct nrpc_method {
     nrpc_handler_cb_t handler;
     void *handler_data;
 
-    OBJECT_STATE_ID rrdhost_state_id;
+    OBJECT_STATE_ID epoch_id;
     struct nrpc_serving_handle *serving;
 
     // LEAF spinlock guarding the entry's SWAPPED fields: the (source,
@@ -150,8 +164,27 @@ static inline struct nrpc_registry *nrpc_method_acquired_registry(NRPC_METHOD_AC
 // release the held pair WITHOUT freeing the struct (for by-value holders)
 void nrpc_method_acquired_release_pair(struct nrpc_method_acquired *acquired);
 
-bool nrpc_method_is_available(RRDHOST *host, struct nrpc_method *method);
+// _at() is PURE (no locks) - the form for traversals holding inner
+// dictionary locks; the registry form snapshots the epoch itself and MUST
+// NOT be called under inner dictionary locks (LOCK RULE: owner_spinlock is
+// never taken inner-side, because the takeover holds it across the inner
+// flush)
+bool nrpc_method_is_available_at(struct nrpc_method *method, bool armed, OBJECT_STATE_ID epoch_id);
+bool nrpc_method_is_available(struct nrpc_registry *registry, struct nrpc_method *method);
 int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name, size_t key_length,
                        const DICTIONARY_ITEM **out_inner_item);
+
+// vtable snapshots - each takes owner_spinlock, copies what it needs,
+// releases, then acts; a DISARMED entry answers the safe default
+void nrpc_registry_owner_changed(struct nrpc_registry *registry, bool arm_manifest);
+bool nrpc_registry_owner_wants_del_journal(struct nrpc_registry *registry);
+// returns false when the entry is DISARMED - and then substitutes id 0,
+// which is indistinguishable from a live epoch at id 0, so callers MUST
+// consult the return value, never the id alone. ONE deliberate exception:
+// the register path discards it, because a method stamped with the
+// substituted 0 on a disarmed entry can never become available (disarmed is
+// terminal) - do not "fix" that site into taking extra locks.
+bool nrpc_registry_owner_epoch(struct nrpc_registry *registry, OBJECT_STATE_ID *out_id);
+STRING *nrpc_registry_owner_name_dup(struct nrpc_registry *registry); // caller string_freez()s; NULL if disarmed
 
 #endif //NETDATA_NRPC_INTERNALS_H

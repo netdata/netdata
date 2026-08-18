@@ -313,10 +313,40 @@ void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity) {
 }
 
 // ----------------------------------------------------------------------------
+// the host's nRPC function-registry owner vtable
+//
+// The nRPC component is host-agnostic: everything it needs from an RRDHOST is
+// supplied here at registry-entry creation, and the component's synchronous
+// disarm (inside nrpc_registry_destroy) guarantees none of it is used after
+// the entry left the component index.
+
+static void rrdhost_nrpc_changed(void *data, bool arm_manifest) {
+    RRDHOST *host = data;
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
+    if(arm_manifest)
+        aclk_arm_node_manifest(host);
+}
+
+static bool rrdhost_nrpc_wants_del_journal(void *data) {
+    return rrdhost_has_stream_sender_enabled((RRDHOST *)data);
+}
+
+void rrdhost_nrpc_owner(RRDHOST *host, struct nrpc_registry_owner *owner) {
+    *owner = (struct nrpc_registry_owner) {
+        .name = rrdhost_hostname(host),
+        .epoch = &host->state_id,
+        .data = host,
+        .changed = rrdhost_nrpc_changed,
+        .wants_del_journal = rrdhost_nrpc_wants_del_journal,
+    };
+}
+
+// ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
 #ifdef ENABLE_DBENGINE
-//
 //  true on success
 //
 static bool create_dbengine_directory(RRDHOST *host, const char *dbenginepath)
@@ -574,8 +604,11 @@ RRDHOST *rrdhost_create(
     // membership atomically - which is what the ACLK teardown ordering keys
     // on. (A dying same-identity predecessor already unlinked from the index
     // may still hold the entry; init takes it over - see nrpc_registry_init.)
-    if (likely(!archived))
-        nrpc_registry_init(host);
+    if (likely(!archived)) {
+        struct nrpc_registry_owner owner;
+        rrdhost_nrpc_owner(host, &owner);
+        nrpc_registry_init(host->host_id, &owner);
+    }
 
     rrd_wrunlock();
 
@@ -735,7 +768,11 @@ static void rrdhost_update(RRDHOST *host
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
 
-        nrpc_registry_init(host);
+        {
+            struct nrpc_registry_owner owner;
+            rrdhost_nrpc_owner(host, &owner);
+            nrpc_registry_init(host->host_id, &owner);
+        }
 
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
@@ -934,19 +971,24 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     stream_sender_structures_free(host);
 
     // ORDERING (both directions load-bearing):
-    // - the registry MUST be destroyed AFTER stream_sender_structures_free():
-    //   until the sender thread is joined there, it can still run the global-
-    //   functions renderer, which locks the registry's pending_dels.spinlock
-    //   and traverses its dictionary - destroying earlier is a use-after-free
-    //   on the sender thread. (The receiver stop at the top of this function
-    //   is a BOUNDED ~2s wait that can give up on a stalled receiver thread -
-    //   see stream_receiver_signal_to_stop_and_wait() - so the receiver side
-    //   is best-effort, not a guarantee; that pre-existing residual is
-    //   tracked separately and is not widened by this ordering.)
+    // - the registry entry MUST be destroyed AFTER
+    //   stream_sender_structures_free(): until the sender thread is joined
+    //   there, it can still resolve the entry and run the global-functions
+    //   renderer against it. Destroy synchronously DISARMS the entry (owner
+    //   callbacks, epoch and name cleared under the entry's lock), so from
+    //   that point the component can no longer call back into this host or
+    //   read its epoch - anything still holding the entry degrades to
+    //   no-ops. (The receiver stop at the top of this function is a BOUNDED
+    //   ~2s wait that can give up on a stalled receiver thread - see
+    //   stream_receiver_signal_to_stop_and_wait() - so the receiver side is
+    //   best-effort, not a guarantee; that pre-existing residual is tracked
+    //   separately and is not widened by this ordering.)
     // - it MUST be destroyed BEFORE destroy_aclk_config() in
-    //   rrdhost_free_unlinked() - the ACLK teardown contract documented in
-    //   sqlite_aclk.c (aclk_arm_node_manifest).
-    nrpc_registry_destroy(host);
+    //   rrdhost_free_unlinked() - the disarm is what guarantees the
+    //   component cannot arm the manifest after the config is freed; the
+    //   full ACLK teardown contract is documented in sqlite_aclk.c
+    //   (aclk_arm_node_manifest).
+    nrpc_registry_destroy(host->host_id, host);
 
     // an archived host keeps its aclk config, so it is still reached by the manifest send loop -
     // tell it the function list is now empty (arming is a single atomic CAS, safe under rrd_wrlock)

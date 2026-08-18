@@ -506,6 +506,11 @@ RRDHOST *rrdhost_create(
 void rrdhost_init(void);
 #endif
 
+// fill the host's nRPC function-registry owner vtable (see rrdhost.c); also
+// used by the nRPC unittests to re-init localhost's registry identically
+struct nrpc_registry_owner;
+void rrdhost_nrpc_owner(RRDHOST *host, struct nrpc_registry_owner *owner);
+
 RRDHOST *rrdhost_find_or_create(
     const char *hostname,
     const char *registry_hostname,

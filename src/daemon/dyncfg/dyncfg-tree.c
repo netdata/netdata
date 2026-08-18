@@ -80,7 +80,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
         if(strncmp(string2str(df->path), path, path_len) != 0)
             continue;
 
-        if(!nrpc_method_available(host, string2str(df->function)))
+        if(!nrpc_method_available(host->host_id, string2str(df->function)))
             df->current.status = DYNCFG_STATUS_ORPHAN;
 
         if((id && strcmp(id, df_dfe.name) != 0) && (template && df->template != template))
@@ -219,7 +219,7 @@ static int dyncfg_config_execute_cb(struct nrpc_request *req, void *data) {
         if(item) {
             DYNCFG *df = dictionary_acquired_item_value(item);
 
-            if(!nrpc_method_available(host, string2str(df->function)))
+            if(!nrpc_method_available(host->host_id, string2str(df->function)))
                 df->current.status = DYNCFG_STATUS_ORPHAN;
 
             if(cmd == DYNCFG_CMD_REMOVE) {

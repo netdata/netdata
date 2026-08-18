@@ -18,10 +18,17 @@ void stream_send_global_functions(RRDHOST *host) {
     // in stream-sender-internals.h
     spinlock_lock(&host->sender->global_functions_spinlock);
 
+    // Clear the changed flag FIRST, then let the renderer snapshot the
+    // pending FUNCTION_DEL queue - the deleters queue before re-setting the
+    // flag, so a del landing after the snapshot re-sets the flag with its
+    // entry already queued and nothing is ever stranded. The clear is the
+    // streaming side's half of that protocol; the renderer owns the rest.
+    rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
     // the renderer drains the pending FUNCTION_DEL queue too; it needs our
     // verdict on whether the parent can accept FUNCTION_DEL (absorbed from the
     // old stream_send_function_del gate)
-    stream_sender_send_host_functions(host, wb,
+    stream_sender_send_host_functions(host->host_id, wb,
                                                 stream_has_capability(host->sender, STREAM_CAP_DYNCFG),
                                                 stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                     rrdhost_can_stream_metadata_to_parent(host));

@@ -3,7 +3,7 @@
 #ifndef NETDATA_NRPC_CALLS_H
 #define NETDATA_NRPC_CALLS_H
 
-#include "rrd.h"
+#include "libnetdata/libnetdata.h"
 
 // the in-flight calls table: create at startup; destroy exists only for the
 // ASAN-gated shutdown path (see nrpc_inflight_calls_destroy)

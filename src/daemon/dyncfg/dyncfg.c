@@ -532,7 +532,7 @@ bool dyncfg_available_for_rrdhost(RRDHOST *host) {
     if(host == localhost)
         return true;
 
-    return nrpc_method_available(host, PLUGINSD_FUNCTION_CONFIG);
+    return nrpc_method_available(host->host_id, PLUGINSD_FUNCTION_CONFIG);
 }
 
 // ----------------------------------------------------------------------------
