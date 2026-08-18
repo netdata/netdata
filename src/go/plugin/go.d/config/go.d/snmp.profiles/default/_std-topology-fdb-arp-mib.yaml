@@ -168,9 +168,11 @@ topology:
           format: hex
       - tag: fdb_mac
         symbol:
-          OID: 1.3.6.1.2.1.17.4.3.1.1
           name: dot1dTpFdbAddress
-          format: hex
+          format: mac_address
+        index_transform:
+          - start: 0
+            end: 5
       - tag: fdb_bridge_port
         symbol:
           OID: 1.3.6.1.2.1.17.4.3.1.2

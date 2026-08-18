@@ -129,7 +129,7 @@ func collectBridgeMacLinkRecords(
 
 	for _, attachment := range attachmentsSorted {
 		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
-		portKey := bridgePortRefKey(port, false, false)
+		portKey := bridgePortRefKey(port, false, true)
 		endpointID := strings.TrimSpace(attachment.EndpointID)
 		if portKey == "" || endpointID == "" {
 			continue

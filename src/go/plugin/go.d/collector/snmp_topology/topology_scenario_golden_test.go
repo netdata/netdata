@@ -60,6 +60,10 @@ func topologyScenarioCases() map[string]topologyScenarioCase {
 			scenario: newManagedFabricFDBMACIdentityScenario(),
 			assert:   assertManagedFabricFDBDefaultScenario,
 		},
+		"managed_fabric_stp_default": {
+			scenario: newManagedFabricSTPDefaultScenario(),
+			assert:   assertManagedFabricSTPDefaultScenario,
+		},
 		"focus_depth_l2": {
 			scenario: newFocusDepthL2Scenario(),
 			assert:   assertFocusDepthL2Scenario,
@@ -279,12 +283,23 @@ func newManagedFabricFDBDefaultScenario() *topologyScenario {
 }
 
 func newManagedFabricFDBMACIdentityScenario() *topologyScenario {
-	s := newManagedFabricFDBDefaultScenario()
-	s.name = "managed_fabric_fdb_mac_identity"
-	return s.WithOptions(func(options *topologyoptions.QueryOptions) {
+	s := newTopologyScenario("managed_fabric_fdb_mac_identity").WithOptions(func(options *topologyoptions.QueryOptions) {
 		options.CollapseActorsByIP = false
 		options.EliminateNonIPInferred = false
 	})
+	switchA := s.Switch("switch-a", "192.0.2.21", "02:00:00:00:03:01")
+	switchB := s.Switch("switch-b", "192.0.2.22", "02:00:00:00:03:02")
+	s.FDB(switchA.Port("uplink-a", 1), switchB.chassisMAC)
+	s.FDB(switchB.Port("uplink-b", 1), switchA.chassisMAC)
+	return s
+}
+
+func newManagedFabricSTPDefaultScenario() *topologyScenario {
+	s := newTopologyScenario("managed_fabric_stp_default")
+	switchA := s.Switch("default-stp-switch-a", "192.0.2.53", "02:00:00:00:06:03")
+	switchB := s.Switch("default-stp-switch-b", "192.0.2.54", "02:00:00:00:06:04")
+	s.STP(switchA.Port("a-b", 1), switchB.Port("b-a", 1))
+	return s
 }
 
 func newFocusDepthL2Scenario() *topologyScenario {
@@ -547,6 +562,20 @@ func assertManagedFabricFDBDefaultScenario(t testing.TB, data topologyv1test.Nor
 	})
 	assertScenarioStatEquals(t, data, "map_type", topologyoptions.MapTypeManagedFabric)
 	assertScenarioStatEquals(t, data, "links_total", 4)
+}
+
+func assertManagedFabricSTPDefaultScenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "default-stp-switch-a", Type: "switch", ManagementIP: "192.0.2.53"},
+		{Name: "default-stp-switch-b", Type: "switch", ManagementIP: "192.0.2.54"},
+	})
+	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
+		{Type: "stp", Src: "default-stp-switch-a", Dst: "default-stp-switch-b", Direction: "unidirectional", Protocol: "stp", SrcPort: "a-b", DstPort: "b-a"},
+		{Type: "stp", Src: "default-stp-switch-b", Dst: "default-stp-switch-a", Direction: "unidirectional", Protocol: "stp", SrcPort: "b-a", DstPort: "a-b"},
+	})
+	assertScenarioStatEquals(t, data, "map_type", topologyoptions.MapTypeManagedFabric)
+	assertScenarioStatEquals(t, data, "links_stp", 2)
 }
 
 func assertFocusDepthL2Scenario(t testing.TB, data topologyv1test.NormalizedData) {

@@ -53,3 +53,25 @@ func TestBridgePortFromAttachment_PreservesForwardingDomainWithoutDisplayingVLAN
 	require.Empty(t, second.vlanID)
 	require.NotEqual(t, bridgePortObservationVLANKey(first), bridgePortObservationVLANKey(second))
 }
+
+func TestCollectBridgeMacLinkRecords_KeepsSameEndpointAcrossRawForwardingDomains(t *testing.T) {
+	records := collectBridgeMacLinkRecords([]model.Attachment{
+		{
+			DeviceID:   "switch-a",
+			IfIndex:    7,
+			EndpointID: "mac:00:11:22:33:44:55",
+			Method:     "fdb",
+			Labels:     map[string]string{"bridge_port": "7", "fdb_domain_id": "fdb:100"},
+		},
+		{
+			DeviceID:   "switch-a",
+			IfIndex:    7,
+			EndpointID: "mac:00:11:22:33:44:55",
+			Method:     "fdb",
+			Labels:     map[string]string{"bridge_port": "7", "fdb_domain_id": "fdb:200"},
+		},
+	}, nil, nil)
+
+	require.Len(t, records, 2)
+	require.NotEqual(t, bridgePortForwardingDomain(records[0].port), bridgePortForwardingDomain(records[1].port))
+}

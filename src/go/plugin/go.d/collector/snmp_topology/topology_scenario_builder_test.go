@@ -206,6 +206,10 @@ func (s *topologyScenario) FDBARP(port *topologyScenarioPort, mac, ip string) *t
 	return s
 }
 
+func (s *topologyScenario) FDB(port *topologyScenarioPort, mac string) *topologyScenario {
+	return s.FDBARP(port, mac, "")
+}
+
 func (s *topologyScenario) render(t testing.TB) topologyapi.Data {
 	t.Helper()
 
@@ -337,21 +341,21 @@ func (s *topologyScenario) topologyMetricsForDevice(dev *topologyScenarioDevice)
 	}
 	for _, attachment := range s.fdbARP {
 		if attachment.port.device == dev {
-			metrics = append(metrics,
-				topologyScenarioMetric(ddsnmp.KindFdbEntry, map[string]string{
-					tagBridgeBaseAddress: dev.chassisMAC,
-					tagFdbMac:            attachment.mac,
-					tagFdbBridgePort:     attachment.port.bridgePort,
-					tagFdbStatus:         "learned",
-				}),
-				topologyScenarioMetric(ddsnmp.KindArpEntry, map[string]string{
+			metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindFdbEntry, map[string]string{
+				tagBridgeBaseAddress: dev.chassisMAC,
+				tagFdbMac:            attachment.mac,
+				tagFdbBridgePort:     attachment.port.bridgePort,
+				tagFdbStatus:         "learned",
+			}))
+			if attachment.ip != "" {
+				metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindArpEntry, map[string]string{
 					tagArpIfIndex: strconv.Itoa(attachment.port.ifIndex),
 					tagArpIfName:  attachment.port.name,
 					tagArpIP:      attachment.ip,
 					tagArpMac:     attachment.mac,
 					tagArpState:   "reachable",
-				}),
-			)
+				}))
+			}
 		}
 	}
 	return metrics

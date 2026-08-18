@@ -31,6 +31,11 @@ type bridgeDomainSegment struct {
 	methods        map[string]struct{}
 }
 
+type bridgeDomainSegmentIndex struct {
+	byPort   map[string]*bridgeDomainSegment
+	position map[*bridgeDomainSegment]int
+}
+
 type bridgeBridgeLinkRecord struct {
 	port           bridgePortRef
 	designatedPort bridgePortRef
@@ -63,6 +68,7 @@ func buildBridgeDomainModel(
 	}
 
 	bblSegments := make([]*bridgeDomainSegment, 0)
+	bblIndex := newBridgeDomainSegmentIndex()
 	rootToNodes := make(map[string]bridgeNodeSet)
 
 	for _, link := range bridgeLinks {
@@ -72,57 +78,43 @@ func buildBridgeDomainModel(
 			continue
 		}
 
-		added := false
-		for _, segment := range bblSegments {
-			if segment.containsPort(link.designatedPort) {
-				segment.addPort(link.port)
-				added = true
-				break
-			}
-		}
-		if !added {
+		if segment := bblIndex.segmentForPort(link.designatedPort); segment != nil {
+			bblIndex.addPort(segment, link.port)
+		} else {
 			segment := newBridgeDomainSegment(link.designatedPort)
 			segment.addPort(link.port)
 			bblSegments = append(bblSegments, segment)
+			bblIndex.addSegment(segment)
 		}
 
 		mergeRootDomainSets(rootToNodes, designatedNodeID, nodeID)
 	}
 
 	bmlSegments := make([]*bridgeDomainSegment, 0)
+	bmlIndex := newBridgeDomainSegmentIndex()
 	for _, link := range macLinks {
 		if strings.TrimSpace(link.port.deviceID) == "" || strings.TrimSpace(link.endpointID) == "" {
 			continue
 		}
 
-		added := false
-		for _, segment := range bblSegments {
-			if segment.containsPort(link.port) {
-				segment.addEndpoint(link.endpointID, link.method)
-				added = true
-				break
-			}
-		}
-		if added {
+		if segment := bblIndex.segmentForPort(link.port); segment != nil {
+			segment.addEndpoint(link.endpointID, link.method)
 			continue
 		}
-		for _, segment := range bmlSegments {
-			if segment.containsPort(link.port) {
-				segment.addEndpoint(link.endpointID, link.method)
-				added = true
-				break
-			}
-		}
-		if added {
+		if segment := bmlIndex.segmentForPort(link.port); segment != nil {
+			segment.addEndpoint(link.endpointID, link.method)
 			continue
 		}
 
 		segment := newBridgeDomainSegment(link.port)
 		segment.addEndpoint(link.endpointID, link.method)
 		bmlSegments = append(bmlSegments, segment)
+		bmlIndex.addSegment(segment)
 	}
 
 	rootIDs := sortedStringKeys(rootToNodes)
+	domainByBridge := make(map[string]*bridgeBroadcastDomain)
+	domainPosition := make(map[*bridgeBroadcastDomain]int)
 	for _, rootID := range rootIDs {
 		domain := &bridgeBroadcastDomain{
 			bridges:  make(map[string]*bridgeDomainBridge),
@@ -133,25 +125,19 @@ func buildBridgeDomainModel(
 			domain.bridges[nodeID] = &bridgeDomainBridge{nodeID: nodeID, root: false}
 		}
 		model.domains = append(model.domains, domain)
+		domainPosition[domain] = len(model.domains) - 1
+		indexBridgeDomain(domainByBridge, domain)
 	}
 
 	for _, segment := range bblSegments {
-		for _, domain := range model.domains {
-			if domain.loadSegment(segment) {
-				break
-			}
+		if domain := bridgeDomainForSegment(domainByBridge, domainPosition, segment); domain != nil {
+			domain.segments = append(domain.segments, segment)
 		}
 	}
 
 	for _, segment := range bmlSegments {
-		inserted := false
-		for _, domain := range model.domains {
-			if domain.loadSegment(segment) {
-				inserted = true
-				break
-			}
-		}
-		if inserted {
+		if domain := bridgeDomainForSegment(domainByBridge, domainPosition, segment); domain != nil {
+			domain.segments = append(domain.segments, segment)
 			continue
 		}
 
@@ -165,8 +151,10 @@ func buildBridgeDomainModel(
 			},
 			segments: make([]*bridgeDomainSegment, 0, 1),
 		}
-		domain.loadSegment(segment)
+		domain.segments = append(domain.segments, segment)
 		model.domains = append(model.domains, domain)
+		domainPosition[domain] = len(model.domains) - 1
+		indexBridgeDomain(domainByBridge, domain)
 	}
 
 	sort.SliceStable(model.domains, func(i, j int) bool {
@@ -177,6 +165,40 @@ func buildBridgeDomainModel(
 	}
 
 	return model
+}
+
+func indexBridgeDomain(index map[string]*bridgeBroadcastDomain, domain *bridgeBroadcastDomain) {
+	if domain == nil {
+		return
+	}
+	for deviceID := range domain.bridges {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" || index[deviceID] != nil {
+			continue
+		}
+		index[deviceID] = domain
+	}
+}
+
+func bridgeDomainForSegment(
+	index map[string]*bridgeBroadcastDomain,
+	position map[*bridgeBroadcastDomain]int,
+	segment *bridgeDomainSegment,
+) *bridgeBroadcastDomain {
+	if segment == nil {
+		return nil
+	}
+	var selected *bridgeBroadcastDomain
+	for _, port := range segment.ports {
+		domain := index[strings.TrimSpace(port.deviceID)]
+		if domain == nil {
+			continue
+		}
+		if selected == nil || position[domain] < position[selected] {
+			selected = domain
+		}
+	}
+	return selected
 }
 
 func mergeRootDomainSets(rootToNodes map[string]bridgeNodeSet, designatedNodeID, nodeID string) {
@@ -249,12 +271,49 @@ func newBridgeDomainSegment(designatedPort bridgePortRef) *bridgeDomainSegment {
 	return seg
 }
 
-func (s *bridgeDomainSegment) containsPort(port bridgePortRef) bool {
-	if s == nil {
-		return false
+func newBridgeDomainSegmentIndex() *bridgeDomainSegmentIndex {
+	return &bridgeDomainSegmentIndex{
+		byPort:   make(map[string]*bridgeDomainSegment),
+		position: make(map[*bridgeDomainSegment]int),
 	}
-	_, ok := s.ports[s.portIdentityKey(port)]
-	return ok
+}
+
+func (i *bridgeDomainSegmentIndex) addSegment(segment *bridgeDomainSegment) {
+	if i == nil || segment == nil {
+		return
+	}
+	if _, ok := i.position[segment]; !ok {
+		i.position[segment] = len(i.position)
+	}
+	for _, port := range segment.ports {
+		i.indexPort(segment, port)
+	}
+}
+
+func (i *bridgeDomainSegmentIndex) addPort(segment *bridgeDomainSegment, port bridgePortRef) {
+	if i == nil || segment == nil {
+		return
+	}
+	segment.addPort(port)
+	i.indexPort(segment, port)
+}
+
+func (i *bridgeDomainSegmentIndex) segmentForPort(port bridgePortRef) *bridgeDomainSegment {
+	if i == nil {
+		return nil
+	}
+	return i.byPort[bridgeDomainPortIdentityKey(port)]
+}
+
+func (i *bridgeDomainSegmentIndex) indexPort(segment *bridgeDomainSegment, port bridgePortRef) {
+	key := bridgeDomainPortIdentityKey(port)
+	if key == "" {
+		return
+	}
+	existing := i.byPort[key]
+	if existing == nil || i.position[segment] < i.position[existing] {
+		i.byPort[key] = segment
+	}
 }
 
 func (s *bridgeDomainSegment) addPort(port bridgePortRef) {
@@ -303,6 +362,10 @@ func (s *bridgeDomainSegment) addEndpoint(endpointID, method string) {
 }
 
 func (s *bridgeDomainSegment) portIdentityKey(port bridgePortRef) string {
+	return bridgeDomainPortIdentityKey(port)
+}
+
+func bridgeDomainPortIdentityKey(port bridgePortRef) string {
 	nodeID := strings.TrimSpace(port.deviceID)
 	bridgePort := strings.TrimSpace(port.bridgePort)
 	if bridgePort == "" {
@@ -315,24 +378,15 @@ func (s *bridgeDomainSegment) portIdentityKey(port bridgePortRef) string {
 	if nodeID == "" || bridgePort == "" {
 		return ""
 	}
-	return nodeID + keySep + strings.ToLower(bridgePort)
+	return strings.Join([]string{
+		nodeID,
+		strings.ToLower(bridgePort),
+		strings.ToLower(bridgePortForwardingDomain(port)),
+	}, keySep)
 }
 
 func (s *bridgeDomainSegment) sortKey() string {
 	return portSortKey(s.designatedPort) + keySep + strings.Join(sortedBridgePortSet(s.ports), ",")
-}
-
-func (d *bridgeBroadcastDomain) loadSegment(segment *bridgeDomainSegment) bool {
-	if d == nil || segment == nil {
-		return false
-	}
-	for _, port := range segment.ports {
-		if _, ok := d.bridges[strings.TrimSpace(port.deviceID)]; ok {
-			d.segments = append(d.segments, segment)
-			return true
-		}
-	}
-	return false
 }
 
 func (d *bridgeBroadcastDomain) sortKey() string {

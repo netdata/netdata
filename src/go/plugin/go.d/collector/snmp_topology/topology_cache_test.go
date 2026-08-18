@@ -1009,8 +1009,8 @@ func TestTopologyCache_Dot1qAmbiguousFDBMappingKeepsDomainWithoutFalseVLAN(t *te
 	})
 	cache.updateDot1qVlanMap(map[string]string{tagDot1qVlanID: "10", tagDot1qVlanFdbID: "100"})
 	cache.updateDot1qVlanMap(map[string]string{tagDot1qVlanID: "20", tagDot1qVlanFdbID: "100"})
-	cache.vlanIDToName["10"] = "users"
-	cache.vlanIDToName["20"] = "servers"
+	cache.vlanNameByID["10"] = vlanNameMapping{name: "users"}
+	cache.vlanNameByID["20"] = vlanNameMapping{name: "servers"}
 
 	cache.finalizeTopologyCache()
 	cache.finalizeTopologyCache()
@@ -1124,31 +1124,78 @@ func TestTopologyCache_FDBVLANFinalizationPreservesExplicitContext(t *testing.T)
 	require.Equal(t, "explicit-name", obs.FDBEntries[0].VLANName)
 }
 
-func BenchmarkTopologyCache_FinalizeFDBVLANs_4095VLANs323FDBEntries(b *testing.B) {
-	b.ReportAllocs()
-	published := newTopologyCache()
-	for b.Loop() {
-		cache := newTopologyCache()
-		for index := 1; index <= 323; index++ {
-			cache.updateFdbEntry(map[string]string{
-				tagDot1qFdbID:     strconv.Itoa(index),
-				tagDot1qFdbMac:    fmt.Sprintf("02:00:00:00:%02x:%02x", index/256, index%256),
-				tagDot1qFdbPort:   strconv.Itoa(index),
-				tagDot1qFdbStatus: "learned",
-			})
-		}
-		for vlanID := 1; vlanID <= 4095; vlanID++ {
-			cache.updateDot1qVlanMap(map[string]string{
-				tagDot1qVlanID:    strconv.Itoa(vlanID),
-				tagDot1qVlanFdbID: strconv.Itoa((vlanID-1)%323 + 1),
-			})
-		}
-		cache.finalizeTopologyCache()
-		published.mu.Lock()
-		published.replaceWith(cache)
-		published.mu.Unlock()
+func TestTopologyCache_VTPVLANNameConflictRemainsUnresolved(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.updateVtpVlanEntry(map[string]string{
+		tagVtpVlanIndex: "200",
+		tagVtpVlanState: "operational",
+		tagVtpVlanType:  "ethernet",
+		tagVtpVlanName:  "servers",
+	})
+	cache.updateVtpVlanEntry(map[string]string{
+		tagVtpVlanIndex: "200",
+		tagVtpVlanState: "operational",
+		tagVtpVlanType:  "ethernet",
+		tagVtpVlanName:  "storage",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+	require.Empty(t, obs.FDBEntries[0].VLANName)
+	require.Equal(t, []topologyVLANContext{{vlanID: "200"}}, cache.vtpVLANContexts())
+}
+
+func BenchmarkTopologyCache_FinalizeFDBVLANsScaling(b *testing.B) {
+	for _, tc := range []struct {
+		vlans      int
+		fdbEntries int
+	}{
+		{vlans: 16, fdbEntries: 16},
+		{vlans: 256, fdbEntries: 64},
+		{vlans: 4095, fdbEntries: 323},
+		{vlans: 4095, fdbEntries: 4095},
+	} {
+		b.Run(fmt.Sprintf("vlans=%d/fdb_entries=%d", tc.vlans, tc.fdbEntries), func(b *testing.B) {
+			published := newTopologyCache()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				cache := newTopologyCache()
+				for index := 1; index <= tc.fdbEntries; index++ {
+					cache.updateFdbEntry(map[string]string{
+						tagDot1qFdbID:     strconv.Itoa((index-1)%tc.vlans + 1),
+						tagDot1qFdbMac:    fmt.Sprintf("02:00:00:%02x:%02x:%02x", (index>>16)&0xff, (index>>8)&0xff, index&0xff),
+						tagDot1qFdbPort:   strconv.Itoa(index),
+						tagDot1qFdbStatus: "learned",
+					})
+				}
+				for vlanID := 1; vlanID <= tc.vlans; vlanID++ {
+					cache.updateDot1qVlanMap(map[string]string{
+						tagDot1qVlanID:    strconv.Itoa(vlanID),
+						tagDot1qVlanFdbID: strconv.Itoa(vlanID),
+					})
+				}
+				cache.finalizeTopologyCache()
+				published.mu.Lock()
+				published.replaceWith(cache)
+				published.mu.Unlock()
+			}
+			runtime.KeepAlive(published)
+		})
 	}
-	runtime.KeepAlive(published)
 }
 
 func TestTopologyCache_FDBDiagnostics(t *testing.T) {
@@ -1384,10 +1431,10 @@ func TestStpBridgeAddressToMAC_ParsesAndRejectsSentinels(t *testing.T) {
 
 func TestTopologyCache_VTPVLANContexts_SortedAndValidated(t *testing.T) {
 	cache := newTopologyCache()
-	cache.vlanIDToName["200"] = "servers"
-	cache.vlanIDToName["10"] = "users"
-	cache.vlanIDToName["abc"] = "invalid"
-	cache.vlanIDToName[""] = "invalid-empty"
+	cache.vlanNameByID["200"] = vlanNameMapping{name: "servers"}
+	cache.vlanNameByID["10"] = vlanNameMapping{name: "users"}
+	cache.vlanNameByID["abc"] = vlanNameMapping{name: "invalid"}
+	cache.vlanNameByID[""] = vlanNameMapping{name: "invalid-empty"}
 
 	contexts := cache.vtpVLANContexts()
 	require.Len(t, contexts, 2)

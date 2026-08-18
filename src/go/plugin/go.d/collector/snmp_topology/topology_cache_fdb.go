@@ -101,7 +101,14 @@ func (c *topologyCache) updateVtpVlanEntry(tags map[string]string) {
 		return
 	}
 
-	c.vlanIDToName[vlanID] = vlanName
+	mapping, ok := c.vlanNameByID[vlanID]
+	if !ok {
+		c.vlanNameByID[vlanID] = vlanNameMapping{name: vlanName}
+		return
+	}
+	if !mapping.ambiguous && mapping.name != vlanName {
+		c.vlanNameByID[vlanID] = vlanNameMapping{ambiguous: true}
+	}
 }
 
 func (c *topologyCache) finalizeFDBVLANs() {
@@ -121,7 +128,10 @@ func (c *topologyCache) finalizeFDBVLANs() {
 		if !entry.vlanNameExplicit {
 			entry.vlanName = ""
 			if vlanID := strings.TrimSpace(entry.vlanID); vlanID != "" {
-				entry.vlanName = strings.TrimSpace(c.vlanIDToName[vlanID])
+				mapping := c.vlanNameByID[vlanID]
+				if !mapping.ambiguous {
+					entry.vlanName = strings.TrimSpace(mapping.name)
+				}
 			}
 		}
 	}

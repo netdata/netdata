@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -265,6 +267,59 @@ func BenchmarkSNMPTopologyFDBSnapshotMapTypeScaling(b *testing.B) {
 	}
 }
 
+func BenchmarkSNMPTopologyFDBFunctionRenderingScaling(b *testing.B) {
+	tests := []struct {
+		devices             int
+		fdbEntriesPerDevice int
+		sharedEndpoints     bool
+	}{
+		{devices: 8, fdbEntriesPerDevice: 128},
+		{devices: 8, fdbEntriesPerDevice: 128, sharedEndpoints: true},
+		{devices: 40, fdbEntriesPerDevice: 1600},
+		{devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true},
+	}
+
+	for _, tc := range tests {
+		name := fmt.Sprintf(
+			"devices=%d/fdb_entries_per_device=%d/shared_endpoints=%t",
+			tc.devices,
+			tc.fdbEntriesPerDevice,
+			tc.sharedEndpoints,
+		)
+		b.Run(name, func(b *testing.B) {
+			registry := benchmarkManagedFabricFDBTopologyRegistry(tc.devices, tc.fdbEntriesPerDevice, tc.sharedEndpoints)
+			deps := funcDepsAdapter{registry: registry}
+			options := topologyoptions.DefaultQueryOptions()
+
+			probe, ok, err := deps.Snapshot(options)
+			if err != nil || !ok || probe.Links.Rows == 0 {
+				b.Fatalf("Function probe links=%d ok=%t err=%v", probe.Links.Rows, ok, err)
+			}
+			encoded, err := json.Marshal(probe)
+			if err != nil {
+				b.Fatalf("encode Function probe: %v", err)
+			}
+			b.ReportMetric(float64(probe.Actors.Rows), "actors/op")
+			b.ReportMetric(float64(probe.Links.Rows), "links/op")
+			b.ReportMetric(float64(len(encoded)), "payload-B")
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				payload, ok, err := deps.Snapshot(options)
+				if err != nil || !ok {
+					b.Fatalf("Function snapshot ok=%t err=%v", ok, err)
+				}
+				encoded, err := json.Marshal(payload)
+				if err != nil {
+					b.Fatalf("encode Function payload: %v", err)
+				}
+				runtime.KeepAlive(encoded)
+			}
+		})
+	}
+}
+
 func benchmarkTopologyPayloadSizes(b *testing.B, registry *topologyRegistry, options topologyoptions.QueryOptions) (int, int) {
 	b.Helper()
 	payload, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(options)
@@ -321,15 +376,72 @@ func BenchmarkSNMPTopologyFunctionDefaultManagedFabricConcurrent(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+	var failureOnce sync.Once
+	var failure string
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			payload, ok, err := deps.Snapshot(options)
 			if err != nil || !ok {
-				b.Fatalf("concurrent Function snapshot ok=%t err=%v", ok, err)
+				failureOnce.Do(func() {
+					failure = fmt.Sprintf("concurrent Function snapshot ok=%t err=%v", ok, err)
+				})
+				return
 			}
 			runtime.KeepAlive(payload)
 		}
 	})
+	if failure != "" {
+		b.Fatal(failure)
+	}
+}
+
+func BenchmarkSNMPTopologyFunctionDefaultManagedFabricMixedReadPublish(b *testing.B) {
+	registry := benchmarkManagedFabricFDBTopologyRegistry(8, 128, true)
+	deps := funcDepsAdapter{registry: registry}
+	options := topologyoptions.DefaultQueryOptions()
+	var published *topologyCache
+	for cache := range registry.caches {
+		published = cache
+		break
+	}
+	if published == nil {
+		b.Fatal("benchmark cache is missing")
+	}
+	replacement := newTopologyCache()
+	replacement.replaceWith(published)
+
+	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Links.Rows == 0 {
+		b.Fatalf("default managed-fabric Function probe rows=%d ok=%t err=%v", payload.Links.Rows, ok, err)
+	}
+
+	var operations atomic.Uint64
+	var publications atomic.Uint64
+	var failureOnce sync.Once
+	var failure string
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if operations.Add(1)%128 == 0 {
+				published.mu.Lock()
+				published.replaceWith(replacement)
+				published.mu.Unlock()
+				publications.Add(1)
+			}
+			payload, ok, err := deps.Snapshot(options)
+			if err != nil || !ok {
+				failureOnce.Do(func() {
+					failure = fmt.Sprintf("mixed Function snapshot ok=%t err=%v", ok, err)
+				})
+				return
+			}
+			runtime.KeepAlive(payload)
+		}
+	})
+	if failure != "" {
+		b.Fatal(failure)
+	}
+	b.ReportMetric(float64(publications.Load()), "publications")
 }
 
 func benchmarkManagedFabricFDBTopologyRegistry(deviceCount, fdbEntriesPerDevice int, sharedEndpoints bool) *topologyRegistry {

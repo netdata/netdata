@@ -17,6 +17,7 @@ func TestManagedFabricMapPolicyKeepsQualifiedManagedFabric(t *testing.T) {
 		Actors: []topologymodel.Actor{
 			{ActorID: "managed-a", ActorType: "switch", Source: "snmp"},
 			{ActorID: "managed-b", ActorType: "switch", Source: "snmp"},
+			{ActorID: "managed-c", ActorType: "switch", Source: "snmp"},
 			{ActorID: "managed-isolated", ActorType: "switch", Source: "snmp"},
 			{
 				ActorID:   "lldp-neighbor",
@@ -43,6 +44,7 @@ func TestManagedFabricMapPolicyKeepsQualifiedManagedFabric(t *testing.T) {
 		{Protocol: "bridge", SrcActorHandle: h["managed-a"], DstActorHandle: h["qualified-segment"]},
 		{Protocol: "bridge", SrcActorHandle: h["managed-a"], DstActorHandle: h["qualified-segment"]},
 		{Protocol: "fdb", SrcActorHandle: h["qualified-segment"], DstActorHandle: h["managed-b"]},
+		{Protocol: "fdb", SrcActorHandle: h["qualified-segment"], DstActorHandle: h["managed-c"]},
 		{Protocol: "fdb", SrcActorHandle: h["qualified-segment"], DstActorHandle: h["endpoint"]},
 		{Protocol: "bridge", SrcActorHandle: h["managed-isolated"], DstActorHandle: h["sparse-segment"]},
 		{Protocol: "fdb", SrcActorHandle: h["sparse-segment"], DstActorHandle: h["endpoint"]},
@@ -52,8 +54,8 @@ func TestManagedFabricMapPolicyKeepsQualifiedManagedFabric(t *testing.T) {
 
 	removed := applyMapTypePolicy(data, topologyoptions.MapTypeManagedFabric)
 	require.Equal(t, 2, removed)
-	require.Equal(t, []string{"lldp-neighbor", "managed-a", "managed-b", "managed-isolated", "qualified-segment"}, actorIDs(data.Actors))
-	require.Equal(t, []string{"bridge", "bridge", "cdp", "fdb", "lldp", "stp"}, linkProtocols(data.Links))
+	require.Equal(t, []string{"lldp-neighbor", "managed-a", "managed-b", "managed-c", "managed-isolated", "qualified-segment"}, actorIDs(data.Actors))
+	require.Equal(t, []string{"bridge", "bridge", "cdp", "fdb", "fdb", "lldp", "stp"}, linkProtocols(data.Links))
 }
 
 func actorIDs(actors []topologymodel.Actor) []string {

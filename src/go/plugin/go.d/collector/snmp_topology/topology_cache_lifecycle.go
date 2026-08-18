@@ -23,7 +23,7 @@ func newTopologyCache() *topologyCache {
 		bridgePortToIf:     make(map[string]string),
 		fdbEntries:         make(map[string]*fdbEntry),
 		vlanByFDBID:        make(map[string]fdbVLANMapping),
-		vlanIDToName:       make(map[string]string),
+		vlanNameByID:       make(map[string]vlanNameMapping),
 		stpPorts:           make(map[string]*stpPortEntry),
 		arpEntries:         make(map[string]*arpEntry),
 		ospfNeighborsByKey: make(map[string]topologymodel.OSPFNeighbor),
@@ -53,7 +53,7 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.bridgePortToIf = src.bridgePortToIf
 	c.fdbEntries = src.fdbEntries
 	c.vlanByFDBID = src.vlanByFDBID
-	c.vlanIDToName = src.vlanIDToName
+	c.vlanNameByID = src.vlanNameByID
 	c.fdbRowsDroppedNoMAC = src.fdbRowsDroppedNoMAC
 	c.fdbRowsUnmappedPort = src.fdbRowsUnmappedPort
 	c.vtpVersion = src.vtpVersion

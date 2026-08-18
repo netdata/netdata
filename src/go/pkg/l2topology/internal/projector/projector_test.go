@@ -1295,6 +1295,80 @@ func TestToGraph_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
 	require.Equal(t, 2, stats.SegmentsSuppressed)
 }
 
+func TestToGraph_KeepsSameTrunkEndpointInDistinctRawForwardingDomains(t *testing.T) {
+	result := model.Result{
+		Devices: []model.Device{{
+			ID:        "switch-a",
+			Hostname:  "switch-a",
+			ChassisID: "aa:aa:aa:aa:aa:aa",
+		}},
+		Interfaces: []model.Interface{{
+			DeviceID: "switch-a",
+			IfIndex:  7,
+			IfName:   "Gi0/7",
+			IfDescr:  "Gi0/7",
+		}},
+		Attachments: []model.Attachment{
+			{
+				DeviceID:   "switch-a",
+				IfIndex:    7,
+				EndpointID: "mac:70:49:a2:65:72:cd",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"bridge_port":   "7",
+					"fdb_domain_id": "fdb:100",
+				},
+			},
+			{
+				DeviceID:   "switch-a",
+				IfIndex:    7,
+				EndpointID: "mac:70:49:a2:65:72:cd",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"bridge_port":   "7",
+					"fdb_domain_id": "fdb:200",
+				},
+			},
+			{
+				DeviceID:   "switch-a",
+				IfIndex:    7,
+				EndpointID: "mac:70:49:a2:65:72:ce",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"bridge_port":   "7",
+					"fdb_domain_id": "fdb:100",
+				},
+			},
+			{
+				DeviceID:   "switch-a",
+				IfIndex:    7,
+				EndpointID: "mac:70:49:a2:65:72:cf",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"bridge_port":   "7",
+					"fdb_domain_id": "fdb:200",
+				},
+			},
+		},
+	}
+
+	projection := ToGraph(result, model.GraphOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	segmentIDs := make([]string, 0, 2)
+	for _, detail := range projection.ActorDetails {
+		if detail.Segment.SegmentID != "" {
+			segmentIDs = append(segmentIDs, detail.Segment.SegmentID)
+		}
+	}
+	require.Len(t, segmentIDs, 2)
+	require.Contains(t, strings.Join(segmentIDs, "\n"), "fdb:100")
+	require.Contains(t, strings.Join(segmentIDs, "\n"), "fdb:200")
+}
+
 func TestToGraph_ProbableConnectivityConnectsAmbiguousEndpoint(t *testing.T) {
 	result := model.Result{
 		Devices: []model.Device{

@@ -34,7 +34,7 @@ type topologyCache struct {
 	bridgePortToIf       map[string]string
 	fdbEntries           map[string]*fdbEntry
 	vlanByFDBID          map[string]fdbVLANMapping
-	vlanIDToName         map[string]string
+	vlanNameByID         map[string]vlanNameMapping
 	fdbRowsDroppedNoMAC  int
 	fdbRowsUnmappedPort  int
 	vtpVersion           string
@@ -115,6 +115,11 @@ type fdbEntry struct {
 
 type fdbVLANMapping struct {
 	vlanID    string
+	ambiguous bool
+}
+
+type vlanNameMapping struct {
+	name      string
 	ambiguous bool
 }
 
