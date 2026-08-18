@@ -118,6 +118,39 @@ func TestCachestatSharedMemoryStoreNoFlagWhenCtAdvances(t *testing.T) {
 	}
 }
 
+func TestCachestatStoreRemovesDeletedPIDBaseline(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ct: 10, MarkPageAccessed: 100}})
+	store.RemoveCachestatPIDs([]uint32{10})
+
+	// A reused PID starts with lower counters and must not inherit the exited
+	// process's baseline.
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ct: 1, MarkPageAccessed: 5}})
+	snap := store.Snapshot()
+	if len(snap) != 1 || snap[0].cachestat.Prev != (netdataCachestat{}) {
+		t.Fatalf("reused PID did not start from a fresh cachestat baseline: %+v", snap)
+	}
+}
+
+func TestClearCachestatAppsDropsRowsAndFlag(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ct: 10, MarkPageAccessed: 100}})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 10, CacheAccess: 10}}, 10)
+
+	store.ClearCachestatApps()
+
+	if store.activeModules&ebpfgoSHMFlagCachestat != 0 {
+		t.Fatal("ClearCachestatApps did not clear the CACHESTAT flag")
+	}
+	if store.activeModules&ebpfgoSHMFlagDCStat == 0 {
+		t.Fatal("ClearCachestatApps cleared another module's flag")
+	}
+	snap := store.Snapshot()
+	if len(snap) != 1 || snap[0].cachestat != (netdataPublishCachestat{}) || snap[0].dc.Curr.CacheAccess != 10 {
+		t.Fatalf("ClearCachestatApps preserved stale data or removed dcstat: %+v", snap)
+	}
+}
+
 func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
 	store := NewEbpfSharedMemoryStore()
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{

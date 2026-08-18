@@ -388,15 +388,13 @@ static const struct apps_ebpf_chart apps_cachestat_charts[] = {
  * resolving.  Two ids need the id_suffix override because the C module did not
  * derive them from the context.
  *
- * The UNITS deliberately differ: C published pre-computed interval totals as
- * `files` with the `absolute` algorithm, while ebpf-go publishes the raw
- * cumulative counters as `files/s` with `incremental` and lets the database
- * derive the rate.  See the module metadata for the operator-facing note. */
+ * Values are pre-computed interval totals, matching the C collector's `files`
+ * units and `absolute` algorithm. */
 static const struct apps_ebpf_chart apps_dcstat_charts[] = {
     { "ebpf_dc_hit",       "Percentage of directory lookups resolved by the cache.", "%",       "line",    20265, "ratio", "absolute",    NULL },
-    { "ebpf_dc_reference", "Count file access.",                          "files/s", "stacked", 20266, "files", "incremental", NULL },
-    { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files/s", "stacked", 20267, "files", "incremental", "ebpf_not_cache" },
-    { "ebpf_dc_not_found", "Files not found.",                            "files/s", "stacked", 20268, "files", "incremental", "ebpf_not_found" },
+    { "ebpf_dc_reference", "Count file access.",                          "files", "stacked", 20266, "files", "absolute", NULL },
+    { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files", "stacked", 20267, "files", "absolute", "ebpf_not_cache" },
+    { "ebpf_dc_not_found", "Files not found.",                            "files", "stacked", 20268, "files", "absolute", "ebpf_not_found" },
 };
 
 static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {

@@ -168,6 +168,8 @@ struct nd_ebpf_acc_table {
     size_t tgid_offset;  /* offsetof(item_type, tgid) */
     size_t count;
     size_t cap;
+    size_t max_entries; /* 0 = no limit; set from the configured PID table size */
+    uint64_t dropped;   /* new TGIDs rejected after reaching max_entries */
     /* slot stores (index + 1), 0 = empty.  Rebuilt from scratch on every
      * structural change, so no tombstones are needed. */
     uint32_t *htable;
@@ -179,6 +181,11 @@ static inline void nd_ebpf_acc_init(struct nd_ebpf_acc_table *t, size_t item_siz
     memset(t, 0, sizeof(*t));
     t->item_size = item_size;
     t->tgid_offset = tgid_offset;
+}
+
+static inline void nd_ebpf_acc_set_max_entries(struct nd_ebpf_acc_table *t, size_t max_entries)
+{
+    t->max_entries = max_entries;
 }
 
 static inline void *nd_ebpf_acc_item(const struct nd_ebpf_acc_table *t, size_t index)
@@ -240,8 +247,8 @@ static inline void *nd_ebpf_acc_find_or_add(struct nd_ebpf_acc_table *t, uint32_
         return NULL;
     }
 
-    /* Rebuild or initialise the table when load would exceed 0.5. */
-    if (!t->htable || t->count + 1 > t->htable_sz / 2)
+    /* Initialise the index before looking for an existing TGID. */
+    if (!t->htable)
         nd_ebpf_acc_rebuild(t);
 
     size_t cap = t->htable_sz;
@@ -252,6 +259,24 @@ static inline void *nd_ebpf_acc_find_or_add(struct nd_ebpf_acc_table *t, uint32_
         if (nd_ebpf_acc_tgid(t, idx) == tgid)
             return nd_ebpf_acc_item(t, idx);
         h = (h + 1) & (cap - 1);
+    }
+
+    if (t->max_entries && t->count >= t->max_entries) {
+        t->dropped++;
+        if (t->dropped == 1 || !(t->dropped & 1023))
+            fprintf(stderr, "ebpf-go: per-TGID accumulator is full (%zu entries); dropped %llu new TGIDs\n",
+                    t->max_entries, (unsigned long long)t->dropped);
+        return NULL;
+    }
+
+    /* Grow only after confirming this is a new accepted TGID.  In particular,
+     * rejected TGIDs at the configured limit must not make the hash table grow. */
+    if (t->count + 1 > t->htable_sz / 2) {
+        nd_ebpf_acc_rebuild(t);
+        cap = t->htable_sz;
+        h = nd_ebpf_acc_slot(tgid, cap);
+        while (t->htable[h])
+            h = (h + 1) & (cap - 1);
     }
 
     if (t->count >= t->cap) {

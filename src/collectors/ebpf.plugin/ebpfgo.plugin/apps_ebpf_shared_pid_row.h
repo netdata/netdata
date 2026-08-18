@@ -13,10 +13,8 @@
 #define TASK_COMM_LEN 16
 #endif
 
-/* v5: dcstat_update_every_s added to ebpf_publish_dcstat.  Consumers divide the
- *     dcstat deltas by the interval that produced them, which is the dcstat
- *     module's own and not necessarily the publishing module's; see
- *     cgroup_ebpfgo_dcstat.c.
+/* v5: dcstat_update_every_s added to ebpf_publish_dcstat.  It is retained for
+ *     shared-memory ABI compatibility; dcstat consumers publish interval totals.
  * v4: socket_update_every_s added to ebpf_socket_publish_apps.
  * v3: live_count added at offset 16; header is now 24 bytes; entries start
  *     at offset 24 (still 8-byte aligned for the uint64_t fields in ebpf_pid_stat).
@@ -73,7 +71,7 @@ struct ebpf_publish_dcstat {
     int64_t cache_access;
     struct ebpf_publish_dcstat_pid curr;
     struct ebpf_publish_dcstat_pid prev;
-    uint32_t dcstat_update_every_s; /* dcstat collection interval for these deltas */
+    uint32_t dcstat_update_every_s; /* retained v5 field; 0 = unknown */
 };
 
 struct ebpf_publish_fd_stat {

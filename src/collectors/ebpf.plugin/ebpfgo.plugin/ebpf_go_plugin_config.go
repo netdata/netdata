@@ -268,11 +268,10 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			found = true
 		case "ebpf load mode":
 			switch strings.ToLower(strings.TrimSpace(value)) {
-			case "entry":
-				// Supported legacy default; eBPFGo object flavor controls the
-				// actual attachment path.
-			case "return":
-				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: ebpf load mode %q is not supported by eBPFGo, using entry-compatible objects\n", path, value)
+			case "entry", "return":
+				// The legacy switch did not change dcstat's probes: it always used
+				// lookup_fast entry and d_lookup return instrumentation. Keep both
+				// values as compatibility no-ops; object flavor chooses the runtime.
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf load mode %q, using default\n", path, value)
 			}

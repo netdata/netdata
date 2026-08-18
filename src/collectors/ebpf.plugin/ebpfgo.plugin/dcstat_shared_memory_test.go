@@ -164,6 +164,26 @@ func TestDCStatStoreEvictsExitedPIDs(t *testing.T) {
 	}
 }
 
+func TestDCStatStoreRemovesDeletedPIDBaseline(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 10, CacheAccess: 1000, NotFound: 100}}, 10)
+	store.RemoveDCStatPIDs([]uint32{10})
+
+	// PID 10 has been reused by a new process with lower counters. It must be
+	// self-baselined rather than clamped forever against the exited process.
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 10, CacheAccess: 5, NotFound: 1}}, 10)
+	snap := store.Snapshot()
+	if len(snap) != 1 || snap[0].dc.Prev != snap[0].dc.Curr {
+		t.Fatalf("reused PID was not self-baselined: %+v", snap)
+	}
+
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 10, CacheAccess: 15, NotFound: 2}}, 10)
+	snap = store.Snapshot()
+	if snap[0].dc.CacheAccess != 10 || snap[0].dc.Ratio != 90 {
+		t.Fatalf("reused PID interval = %+v, want delta 10 and ratio 90", snap[0].dc)
+	}
+}
+
 // TestSharedStoreMergesAllThreeModules verifies that cachestat, dcstat, and
 // socket rows land on the same PID row, and that PIDs seen by only one module
 // still appear.

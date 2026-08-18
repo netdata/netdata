@@ -371,6 +371,7 @@ int netdata_dcstat_runtime_prepare(
     if (dcstat_update_map_types(obj, maps_per_core) != 0)
         return -1;
     dcstat_update_map_sizes(obj, pid_table_size);
+    nd_ebpf_acc_set_max_entries(&rt->acc, pid_table_size);
 
     nd_ebpf_alloc_percpu_buffers(
         &rt->percpu_u64, &rt->percpu_u64_cap,
@@ -428,10 +429,11 @@ static int dcstat_rb_callback(void *ctx, void *data, size_t data_sz)
     return 0;
 }
 
-static void dcstat_setup_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
+static int dcstat_setup_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
 {
     rt->rb = nd_ebpf_ring_buffer_open(
         dcstat_runtime_object(rt), "dc_events", dcstat_rb_callback, rt, "dcstat");
+    return rt->rb ? 0 : -1;
 }
 
 static void dcstat_destroy_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
@@ -516,8 +518,8 @@ int netdata_dcstat_runtime_load(struct netdata_ebpf_dcstat_runtime *rt)
         int rc = dcstat_runtime_load_core(rt);
         if (rc != 0)
             return rc;
-        if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER)
-            dcstat_setup_ring_buffer(rt);
+        if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER && dcstat_setup_ring_buffer(rt) != 0)
+            return -1;
         else if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_ARENA)
             dcstat_setup_arena(rt);
         return 0;

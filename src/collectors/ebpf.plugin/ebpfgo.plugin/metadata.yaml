@@ -76,7 +76,7 @@ modules:
               default_value: 10
               required: false
             - name: ebpf load mode
-              description: "Legacy compatibility option. eBPFGo accepts `entry`; `return` is not supported and is ignored with a warning."
+              description: "Legacy compatibility option. `entry` and `return` are accepted as no-ops; object flavor selects the eBPF runtime."
               default_value: entry
               required: false
             - name: apps
@@ -239,7 +239,7 @@ modules:
               default_value: 10
               required: false
             - name: ebpf load mode
-              description: "Legacy compatibility option. eBPFGo accepts `entry`; `return` is not supported and is ignored with a warning."
+              description: "Legacy compatibility option. `entry` and `return` are accepted as no-ops; object flavor selects the eBPF runtime."
               default_value: entry
               required: false
             - name: apps
@@ -309,8 +309,8 @@ modules:
               dimensions:
                 - name: ratio
             - name: filesystem.dc_reference
-              description: "Variables used to calculate hit ratio. Published as cumulative kernel counters with the `incremental` algorithm, so the database derives the rate. The C implementation of this collector published per-interval totals with the `absolute` algorithm in `files`."
-              unit: "files/s"
+              description: "Variables used to calculate hit ratio. Published as per-interval totals with the `absolute` algorithm, preserving the legacy dcstat metric contract."
+              unit: "files"
               chart_type: line
               dimensions:
                 - name: reference

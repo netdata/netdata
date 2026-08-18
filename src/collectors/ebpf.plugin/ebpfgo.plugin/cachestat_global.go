@@ -244,6 +244,12 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 			if err != nil {
 				logPluginErr("cachestat.snapshot_apps", "cachestat", "snapshot-apps", err)
+				store.ClearCachestatApps()
+				if handle.SharedMemory != nil {
+					if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagCachestat); perr != nil {
+						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", perr)
+					}
+				}
 			} else {
 				staleCandidates := store.UpdateApps(apps)
 				if len(staleCandidates) > 0 {
@@ -264,6 +270,8 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 							rateLimitedStderr("cachestat.delete_pids",
 								"ebpf-go.plugin: failed to delete %d stale PIDs from cstat_pid: %v\n",
 								len(deadPIDs), err)
+						} else {
+							store.RemoveCachestatPIDs(deadPIDs)
 						}
 					}
 				}

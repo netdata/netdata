@@ -13,14 +13,13 @@ func TestDCStatGlobalStateUpdate(t *testing.T) {
 		updates []dcstatGlobalCounters
 		want    dcstatGlobalPublish
 	}{
-		"first sample publishes raw counters with no ratio": {
-			// No previous sample means no interval to derive a ratio from; the
-			// counters themselves are still published because the chart uses the
-			// incremental algorithm.
+		"first sample self-baselines": {
+			// No previous sample means no interval to derive. Publishing zero
+			// avoids attributing all pre-existing kernel activity to one cycle.
 			updates: []dcstatGlobalCounters{
 				{Reference: 1000, Slow: 200, Miss: 50},
 			},
-			want: dcstatGlobalPublish{Ratio: 0, Reference: 1000, Slow: 200, Miss: 50},
+			want: dcstatGlobalPublish{},
 		},
 		"ratio uses this interval only": {
 			updates: []dcstatGlobalCounters{
@@ -28,7 +27,7 @@ func TestDCStatGlobalStateUpdate(t *testing.T) {
 				// interval: reference +100, miss +10 => 90% hits
 				{Reference: 1100, Slow: 260, Miss: 60},
 			},
-			want: dcstatGlobalPublish{Ratio: 90, Reference: 1100, Slow: 260, Miss: 60},
+			want: dcstatGlobalPublish{Ratio: 90, Reference: 100, Slow: 60, Miss: 10},
 		},
 		"idle interval reports ratio 0": {
 			// C dcstat convention: no lookups this interval => ratio 0 (cachestat
@@ -37,21 +36,21 @@ func TestDCStatGlobalStateUpdate(t *testing.T) {
 				{Reference: 1000, Slow: 200, Miss: 50},
 				{Reference: 1000, Slow: 200, Miss: 50},
 			},
-			want: dcstatGlobalPublish{Ratio: 0, Reference: 1000, Slow: 200, Miss: 50},
+			want: dcstatGlobalPublish{},
 		},
 		"misses above references clamp the ratio to zero": {
 			updates: []dcstatGlobalCounters{
 				{Reference: 1000, Slow: 200, Miss: 50},
 				{Reference: 1010, Slow: 260, Miss: 90},
 			},
-			want: dcstatGlobalPublish{Ratio: 0, Reference: 1010, Slow: 260, Miss: 90},
+			want: dcstatGlobalPublish{Ratio: 0, Reference: 10, Slow: 60, Miss: 40},
 		},
 		"counter reset is clamped instead of going negative": {
 			updates: []dcstatGlobalCounters{
 				{Reference: 1000, Slow: 200, Miss: 50},
 				{Reference: 10, Slow: 2, Miss: 1},
 			},
-			want: dcstatGlobalPublish{Ratio: 0, Reference: 10, Slow: 2, Miss: 1},
+			want: dcstatGlobalPublish{},
 		},
 	}
 
@@ -86,13 +85,11 @@ func TestFormatDCStatGlobalCharts(t *testing.T) {
 	}
 
 	reference := formatDCStatGlobalChart(dcstatGlobalCharts[1], updateEvery)
-	// The counters are published cumulatively with the incremental algorithm, so
-	// the unit must name a rate.
-	if !strings.Contains(reference, "'files/s'") {
-		t.Fatalf("dc_reference chart = %q, want unit 'files/s'", reference)
+	if !strings.Contains(reference, "'files'") {
+		t.Fatalf("dc_reference chart = %q, want unit 'files'", reference)
 	}
 	for _, dim := range []string{"reference", "slow", "miss"} {
-		want := "DIMENSION '" + dim + "' '" + dim + "' 'incremental' '1' '1' ''\n"
+		want := "DIMENSION '" + dim + "' '" + dim + "' 'absolute' '1' '1' ''\n"
 		if !strings.Contains(reference, want) {
 			t.Fatalf("dc_reference chart = %q, want substring %q", reference, want)
 		}
@@ -122,8 +119,8 @@ func TestDCStatGlobalStateUpdateIndependentRegression(t *testing.T) {
 	if got.Ratio != 0 {
 		t.Fatalf("ratio = %d, want 0 when the reference counter regressed", got.Ratio)
 	}
-	if got.Reference != 500 || got.Slow != 300 || got.Miss != 60 {
-		t.Fatalf("counters = %+v, want the raw values published verbatim", got)
+	if got.Reference != 0 || got.Slow != 100 || got.Miss != 10 {
+		t.Fatalf("counters = %+v, want independently clamped interval deltas", got)
 	}
 }
 

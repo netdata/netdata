@@ -129,16 +129,14 @@ bool apps_ebpf_cachestat_is_available(void)
 }
 
 /* Sums the per-PID directory-cache deltas the Go plugin published into each
- * target.  reference/slow/not_found stay monotonic (the charts use the
- * incremental algorithm); ratio is recomputed from this interval's deltas so it
- * reflects current behaviour rather than lifetime averages. */
+ * target. All values are interval totals, matching the absolute chart contract
+ * used by the C dcstat collector. */
 void apps_ebpf_accumulate_dcstat(void)
 {
-    // reference/slow/not_found are monotonic accumulators that only grow; do not
-    // zero them.  Only the per-interval fields are reset.
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
-        w->dcstat_totals.reference_delta = 0;
-        w->dcstat_totals.not_found_delta = 0;
+        w->dcstat_totals.reference = 0;
+        w->dcstat_totals.slow = 0;
+        w->dcstat_totals.not_found = 0;
         w->dcstat_totals.ratio = 0;
     }
 
@@ -169,18 +167,15 @@ void apps_ebpf_accumulate_dcstat(void)
         w->dcstat_totals.slow += (uint64_t)slow;
         w->dcstat_totals.not_found += (uint64_t)not_found;
 
-        w->dcstat_totals.reference_delta += (uint64_t)reference;
-        w->dcstat_totals.not_found_delta += (uint64_t)not_found;
-
         p->ebpf_dcstat_ct = p->ebpf.dc.ct;
     }
 
     for (struct target *w = apps_groups_root_target; w; w = w->next) {
-        uint64_t reference = w->dcstat_totals.reference_delta;
+        uint64_t reference = w->dcstat_totals.reference;
         if (!reference)
             continue; // no lookups this interval: ratio stays 0 (C collector convention)
 
-        uint64_t not_found = w->dcstat_totals.not_found_delta;
+        uint64_t not_found = w->dcstat_totals.not_found;
         uint64_t successful = (reference > not_found) ? reference - not_found : 0;
         w->dcstat_totals.ratio = (int64_t)((successful * 100) / reference);
     }

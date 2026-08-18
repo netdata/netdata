@@ -22,12 +22,7 @@ func main() {
 	// host that is ~130 threads and ~1 GB of stack RSS for no benefit.
 	runtime.GOMAXPROCS(6)
 
-	updateEvery := 0
-	if len(os.Args) > 1 {
-		if parsed, err := strconv.Atoi(os.Args[1]); err == nil && parsed > 0 {
-			updateEvery = parsed
-		}
-	}
+	updateEvery, dcstatOnly := parsePluginArgs(os.Args[1:])
 
 	cachestatCfg, err := resolveCachestatLegacyConfig()
 	if err != nil {
@@ -51,6 +46,14 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns config load failed: %v\n", err)
 		os.Exit(1)
+	}
+	if dcstatOnly {
+		// The legacy C plugin treated --dcstat as a module-selection flag: it
+		// disabled every other collector and enabled dcstat regardless of config.
+		cachestatCfg.Enabled = false
+		socketCfg.Enabled = false
+		dnsCfg.Enabled = false
+		dcstatCfg.Enabled = true
 	}
 
 	if !anyProgramEnabled(cachestatCfg, dcstatCfg, socketCfg, dnsCfg) {
@@ -221,9 +224,26 @@ func main() {
 	wg.Wait()
 }
 
+// parsePluginArgs keeps the legacy numeric pluginsd interval and dcstat's
+// module-selection flag. Unknown arguments remain ignored as they were before
+// this compatibility parser was added.
+func parsePluginArgs(args []string) (updateEvery int, dcstatOnly bool) {
+	for _, arg := range args {
+		switch arg {
+		case "--dcstat", "-dcstat":
+			dcstatOnly = true
+		default:
+			if parsed, err := strconv.Atoi(arg); err == nil && parsed > 0 && updateEvery == 0 {
+				updateEvery = parsed
+			}
+		}
+	}
+	return updateEvery, dcstatOnly
+}
+
 // resolveUpdateEvery returns the first positive value from: config file, CLI arg, fallback.
-// Config is the operator-controlled source of truth. argv[1] is only a fallback
-// when no config value is set.
+// Config is the operator-controlled source of truth. The legacy numeric CLI
+// interval is only a fallback when no config value is set.
 func resolveUpdateEvery(cliArg, cfgVal, fallback int) int {
 	if cfgVal > 0 {
 		return cfgVal

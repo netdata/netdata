@@ -47,14 +47,8 @@ type dcstatGlobalChart struct {
 	dimensions []dcstatGlobalDimension
 }
 
-// Chart ids, contexts, and priorities are the ones the C dcstat module published,
-// so existing dashboards and alarms keep resolving.  The units and algorithms of
-// dc_reference deliberately do NOT match C: it published pre-computed interval
-// totals as `files` with the `absolute` algorithm, while this collector publishes
-// the raw cumulative counters as `files/s` with `incremental` and lets the
-// database derive the rate.  At the stock update_every of 10s that renders values
-// roughly 10x smaller, because they are now a rate rather than a per-interval
-// total.  See the module metadata for the operator-facing note.
+// Chart ids, contexts, units, algorithms, and values match the C dcstat module
+// so existing dashboards and alarms retain their established interval semantics.
 var dcstatGlobalCharts = []dcstatGlobalChart{
 	{
 		id:      "dc_hit_ratio",
@@ -67,17 +61,15 @@ var dcstatGlobalCharts = []dcstatGlobalChart{
 		},
 	},
 	{
-		id:    "dc_reference",
-		title: "Variables used to calculate hit ratio.",
-		// The dimensions are cumulative counters published with the incremental
-		// algorithm, so the database renders them as a rate.
-		units:   "files/s",
+		id:      "dc_reference",
+		title:   "Variables used to calculate hit ratio.",
+		units:   "files",
 		context: "filesystem.dc_reference",
 		order:   21201,
 		dimensions: []dcstatGlobalDimension{
-			{id: "reference", algorithm: "incremental"},
-			{id: "slow", algorithm: "incremental"},
-			{id: "miss", algorithm: "incremental"},
+			{id: "reference", algorithm: "absolute"},
+			{id: "slow", algorithm: "absolute"},
+			{id: "miss", algorithm: "absolute"},
 		},
 	},
 }
@@ -103,29 +95,16 @@ func dcstatHitRatio(reference, notFound int64) int64 {
 
 // Update computes the publish values for one collection cycle.
 //
-// reference/slow/miss are published as the raw cumulative BPF counters with the
-// `incremental` algorithm, so the database derives the rate.  The ratio is a
-// per-interval value (the C collector divided lifetime totals, which barely
-// moves after a few hours of uptime and disagrees with the per-app and
-// per-cgroup ratios computed from interval deltas).
-//
-// The first sample has no previous reading, so it reports the idle ratio of 0
-// rather than a lifetime-derived figure — the same self-baselining rule
-// buildDCStatPublish applies per PID.  cachestat's global state deliberately
-// lacks this gate and derives its first ratio from lifetime totals; that code is
-// already shipped, so the two are not unified here.
+// Every value is an interval delta, published with the `absolute` algorithm.
+// The first sample self-baselines to avoid presenting all pre-existing kernel
+// activity as one collection interval.
 func (s *dcstatGlobalState) Update(current dcstatGlobalCounters) (dcstatGlobalPublish, bool) {
-	publish := dcstatGlobalPublish{
-		Reference: int64(current.Reference),
-		Slow:      int64(current.Slow),
-		Miss:      int64(current.Miss),
-	}
-
+	publish := dcstatGlobalPublish{}
 	if s.initialized {
-		publish.Ratio = dcstatHitRatio(
-			diffCounters(current.Reference, s.prev.Reference),
-			diffCounters(current.Miss, s.prev.Miss),
-		)
+		publish.Reference = diffCounters(current.Reference, s.prev.Reference)
+		publish.Slow = diffCounters(current.Slow, s.prev.Slow)
+		publish.Miss = diffCounters(current.Miss, s.prev.Miss)
+		publish.Ratio = dcstatHitRatio(publish.Reference, publish.Miss)
 	}
 
 	s.prev = current
@@ -278,6 +257,8 @@ func runDCStatGlobalCollector(
 					rateLimitedStderr("dcstat.delete_pids",
 						"ebpf-go.plugin: failed to delete %d stale PIDs from dcstat_pid: %v\n",
 						len(deadPIDs), err)
+				} else {
+					store.RemoveDCStatPIDs(deadPIDs)
 				}
 			}
 		}

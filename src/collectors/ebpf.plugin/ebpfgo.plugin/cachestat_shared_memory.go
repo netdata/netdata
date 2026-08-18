@@ -147,3 +147,32 @@ func (s *ebpfSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatAppSnaps
 	s.rebuildEntriesLocked()
 	return stalePIDs
 }
+
+// ClearCachestatApps invalidates cachestat's contribution after a failed app
+// snapshot so consumers cannot continue treating a previous payload as current.
+func (s *ebpfSharedMemoryStore) ClearCachestatApps() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	clear(s.cachestatData)
+	clear(s.cachestatIdent)
+	s.cachestatPIDs = s.cachestatPIDs[:0]
+	s.activeModules &^= ebpfgoSHMFlagCachestat
+	s.rebuildEntriesLocked()
+}
+
+// RemoveCachestatPIDs drops baseline state after successful runtime deletion so
+// a reused PID cannot inherit an exited process's counters.
+func (s *ebpfSharedMemoryStore) RemoveCachestatPIDs(pids []uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, pid := range pids {
+		delete(s.cachestatData, pid)
+		delete(s.cachestatIdent, pid)
+		delete(s.cachestatPrev, pid)
+		delete(s.cachestatPrevCt, pid)
+		delete(s.cachestatMiss, pid)
+	}
+	s.rebuildEntriesLocked()
+}

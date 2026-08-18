@@ -19,16 +19,13 @@ struct apps_ebpf_cachestat_totals {
     uint64_t mark_page_accessed;
 };
 
-/* Per-target directory-cache accumulators.  reference/slow/not_found are
- * monotonic sums of the per-PID interval deltas the Go plugin publishes, so the
- * charts can use the incremental algorithm.  The *_delta fields hold only this
- * interval's contribution and exist to compute a current-interval hit ratio. */
+/* Per-target directory-cache totals for the most recent Go-plugin interval.
+ * The charts use the absolute algorithm, and the ratio is computed from the
+ * same interval. */
 struct apps_ebpf_dcstat_totals {
     uint64_t reference;
     uint64_t slow;
     uint64_t not_found;
-    uint64_t reference_delta;
-    uint64_t not_found_delta;
     int64_t ratio;
 };
 #endif

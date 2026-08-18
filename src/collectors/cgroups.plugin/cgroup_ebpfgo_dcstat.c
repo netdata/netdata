@@ -47,7 +47,6 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
     uint64_t reference = 0;
     uint64_t slow = 0;
     uint64_t not_found = 0;
-    uint32_t producer_interval = 0;
 
     for (size_t i = 0; i < cg->ebpf_pids_count; i++) {
         pid_t pid = cg->ebpf_pids[i];
@@ -68,11 +67,6 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
         slow += cgroup_ebpfgo_dcstat_delta(dc->curr.file_system, dc->prev.file_system);
         not_found += cgroup_ebpfgo_dcstat_delta(dc->curr.not_found, dc->prev.not_found);
 
-        /* Every contributing row carries the same dcstat interval; take the
-         * largest seen so a row from an older writer (0 = unknown) cannot
-         * shrink the divisor. */
-        if (dc->dcstat_update_every_s > producer_interval)
-            producer_interval = dc->dcstat_update_every_s;
     }
 
     /* The consumed marker is a watermark and must only move forward.  It is the
@@ -83,7 +77,6 @@ static void cgroup_ebpfgo_dcstat_sum_pids(struct cgroup *cg)
      * zeroes this field anyway. */
     if (ct > cg->dcstat.ct)
         cg->dcstat.ct = ct;
-    cg->dcstat.update_every_s = producer_interval;
     cg->dcstat.reference = (long long)reference;
     cg->dcstat.slow = (long long)slow;
     cg->dcstat.not_found = (long long)not_found;
@@ -145,15 +138,6 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
     const char *not_found_context = is_service ? "systemd.service.dc_not_found" : "cgroup.dc_not_found";
     const int prio = (is_service ? NETDATA_CHART_PRIO_CGROUPS_SYSTEMD : NETDATA_CHART_PRIO_CGROUPS_CONTAINERS) + 5700;
 
-    /* The deltas below span one dcstat collection interval, which is dcstat's own
-     * (10s by default) and NOT this plugin's tick rate.  Dividing by
-     * cgroup_update_every would scale a 10s total as if it were one second and
-     * inflate the published rate.  The header's update_every_s belongs to whichever
-     * module owns the segment, which need not be dcstat, so the interval travels
-     * per row.  Mirrors cgroup_ebpfgo_socket.c. */
-    const long ebpf_divisor = (cg->dcstat.update_every_s > 0) ?
-        (long)cg->dcstat.update_every_s : (long)cgroup_update_every;
-
     cgroup_ebpfgo_update_single_chart(
         cg,
         &cg->st_dcstat_ratio,
@@ -175,9 +159,9 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
         "directory_cache",
         reference_context,
         "reference",
-        "files/s",
+        "files",
         prio + 1,
-        ebpf_divisor,
+        1,
         (collected_number)cg->dcstat.reference);
 
     cgroup_ebpfgo_update_single_chart(
@@ -188,9 +172,9 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
         "directory_cache",
         not_cache_context,
         "slow",
-        "files/s",
+        "files",
         prio + 2,
-        ebpf_divisor,
+        1,
         (collected_number)cg->dcstat.slow);
 
     cgroup_ebpfgo_update_single_chart(
@@ -201,9 +185,9 @@ void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg)
         "directory_cache",
         not_found_context,
         "miss",
-        "files/s",
+        "files",
         prio + 3,
-        ebpf_divisor,
+        1,
         (collected_number)cg->dcstat.not_found);
 }
 

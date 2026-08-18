@@ -116,20 +116,31 @@ int netdata_ebpf_acc_selftest(void)
         goto cleanup;
     }
 
+    nd_ebpf_acc_set_max_entries(&t, t.count);
+    struct nd_ebpf_acc_selftest_entry *existing = nd_ebpf_acc_find_or_add(&t, 2);
+    if (!existing || existing->counter != 2 || t.count != total - 3 || t.dropped != 0) {
+        rc = 14;
+        goto cleanup;
+    }
+    if (nd_ebpf_acc_find_or_add(&t, total + 1) != NULL || t.count != total - 3 || t.dropped != 1) {
+        rc = 15;
+        goto cleanup;
+    }
+
 cleanup:
     nd_ebpf_acc_free(&t);
     if (rc)
         return rc;
 
     if (t.items != NULL || t.htable != NULL || t.count != 0)
-        return 14;
+        return 16;
 
     /* The regression itself: an uninitialised table must refuse the write
      * instead of corrupting the heap. */
     struct nd_ebpf_acc_table uninit;
     memset(&uninit, 0, sizeof(uninit));
     if (nd_ebpf_acc_find_or_add(&uninit, 1234) != NULL)
-        return 15;
+        return 17;
 
     return 0;
 }

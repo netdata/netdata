@@ -402,6 +402,7 @@ int netdata_cachestat_runtime_prepare(
     if (cachestat_update_map_types(obj, maps_per_core) != 0)
         return -1;
     cachestat_update_map_sizes(obj, pid_table_size);
+    nd_ebpf_acc_set_max_entries(&rt->acc, pid_table_size);
 
     nd_ebpf_alloc_percpu_buffers(
         &rt->percpu_u64, &rt->percpu_u64_cap,
@@ -451,10 +452,11 @@ static int cachestat_rb_callback(void *ctx, void *data, size_t data_sz)
     return 0;
 }
 
-static void cachestat_setup_ring_buffer(struct netdata_ebpf_cachestat_runtime *rt)
+static int cachestat_setup_ring_buffer(struct netdata_ebpf_cachestat_runtime *rt)
 {
     rt->rb = nd_ebpf_ring_buffer_open(
         cachestat_runtime_object(rt), "cachestat_events", cachestat_rb_callback, rt, "cachestat");
+    return rt->rb ? 0 : -1;
 }
 
 static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime *rt)
@@ -540,8 +542,8 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
         int rc = cachestat_runtime_load_core(rt);
         if (rc != 0)
             return rc;
-        if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER)
-            cachestat_setup_ring_buffer(rt);
+        if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER && cachestat_setup_ring_buffer(rt) != 0)
+            return -1;
         else if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA)
             cachestat_setup_arena(rt);
         return 0;

@@ -60,10 +60,6 @@ typedef struct cgroup_ebpfgo_publish_dcstat {
     long long reference;
     long long slow;
     long long not_found;
-    /* dcstat collection interval that produced the deltas above, from the SHM
-     * row.  0 = unknown (older writer); the consumer then falls back to
-     * cgroup_update_every. */
-    uint32_t update_every_s;
 } cgroup_ebpfgo_publish_dcstat_t;
 
 typedef struct cgroup_ebpfgo_socket {

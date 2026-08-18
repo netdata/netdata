@@ -64,6 +64,23 @@ func (s *ebpfSharedMemoryStore) ClearDCStatApps() {
 	s.rebuildEntriesLocked()
 }
 
+// RemoveDCStatPIDs drops state only after the runtime has successfully removed
+// the same PIDs. A reused PID must self-baseline instead of inheriting counters
+// from the exited process.
+func (s *ebpfSharedMemoryStore) RemoveDCStatPIDs(pids []uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, pid := range pids {
+		delete(s.dcstatData, pid)
+		delete(s.dcstatIdent, pid)
+		delete(s.dcstatPrev, pid)
+		delete(s.dcstatPrevCt, pid)
+		delete(s.dcstatMiss, pid)
+	}
+	s.rebuildEntriesLocked()
+}
+
 // UpdateDCStatApps updates the in-memory snapshot from the latest dcstat BPF
 // snapshot.  It returns the PIDs whose ct has not advanced for ebpfStaleCycles
 // consecutive cycles; the caller performs the authoritative liveness check
