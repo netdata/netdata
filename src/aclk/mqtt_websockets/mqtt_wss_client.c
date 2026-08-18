@@ -21,13 +21,26 @@
 #define PING_TIMEOUT    (60)  //Expect a ping response within this time (seconds)
 time_t ping_timeout = 0;
 
-// If mqtt_wss_service() keeps being entered with poll() reporting readiness but makes no
-// forward progress (no bytes moved and no clean poll() timeout) for this long, force a
-// reconnect. This breaks a no-progress one-core 100% CPU spin regardless of its cause (e.g.
-// a runtime poll()/SSL readiness quirk). The caller polls every ~1s and a healthy link
-// refreshes progress on every poll() timeout or byte moved, so this can only elapse during a
-// real spin, never on a quiet-but-healthy connection.
+// If mqtt_wss_service() keeps being entered with poll() reporting readiness but makes no forward
+// progress for this long, force a reconnect. This breaks a no-progress one-core 100% CPU spin
+// whatever its cause (e.g. a runtime poll()/SSL readiness quirk). It bounds spins only, not a
+// quiet hang: a clean poll() timeout counts as progress, so a peer that goes silent is not
+// caught here. Before CONNACK that gap is closed by MQTT_WSS_CONNECT_BUDGET_SECS below; on an
+// established connection the keepalive/ping path is what notices a silent peer.
+//
+// A clean poll() timeout always counts as progress. On top of that, before CONNACK wire bytes
+// count too, read from the BIO counters, because the handshake gives SSL_read()/SSL_write()
+// nothing but WANT_READ/WANT_WRITE while records are really flowing. Once established only
+// plaintext counts, so a peer streaming records that yield no plaintext cannot refresh progress
+// forever. See mqtt_wss_note_wire_progress().
 #define MQTT_WSS_IO_WATCHDOG_SECS (2 * PING_TIMEOUT)
+
+// Overall budget for one connection setup attempt, covering the TLS handshake, the WebSocket
+// upgrade and the wait for CONNACK together. MQTT_WSS_IO_WATCHDOG_SECS cannot bound this phase:
+// a clean poll() timeout counts as progress, so a peer that completes the TCP connection and then
+// goes quiet would keep the setup loop servicing 60s at a time forever, with the ACLK thread stuck
+// inside mqtt_wss_connect() and its caller unable to retry or notice a shutdown.
+#define MQTT_WSS_CONNECT_BUDGET_SECS (2 * PING_TIMEOUT)
 
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
 #include <openssl/conf.h>
@@ -97,9 +110,15 @@ struct mqtt_wss_client_struct {
     int write_notif_pipe[2];
     struct pollfd poll_fds[2];
 
-// monotonic time of the last forward progress (bytes moved or a clean poll() timeout);
-// drives the no-progress watchdog in mqtt_wss_service() (see MQTT_WSS_IO_WATCHDOG_SECS)
+// monotonic time of the last forward progress (plaintext moved, a clean poll() timeout, or -
+// before CONNACK only - wire bytes moved); drives the no-progress watchdog in
+// mqtt_wss_service() (see MQTT_WSS_IO_WATCHDOG_SECS)
     usec_t last_io_progress_ut;
+
+// last observed BIO byte counters, used to detect wire progress that produces no plaintext
+// (TLS/WebSocket handshake records). Reset on every connect: a new SSL object restarts them.
+    uint64_t last_bio_rx_bytes;
+    uint64_t last_bio_tx_bytes;
 
     SSL_CTX *ssl_ctx;
     SSL *ssl;
@@ -116,6 +135,13 @@ struct mqtt_wss_client_struct {
 
     unsigned int mqtt_connected:1;
     unsigned int mqtt_disconnecting:1;
+
+// SSL_write() returned WANT_READ (TLS renegotiation or a post-handshake message): the write cannot
+// proceed until the socket is readable, so queued output must NOT arm POLLOUT while this is set.
+// Cleared when a write actually makes progress, or on the next connect attempt.
+// Invariant: set implies buf_write is non-empty - it is only assigned inside the write block, and
+// the only paths that empty buf_write also clear it.
+    unsigned int write_wants_read:1;
 
 // Application layer callback pointers
     void (*msg_callback)(const char *, const void *, size_t, int);
@@ -177,6 +203,11 @@ mqtt_wss_client mqtt_wss_new(
     spinlock_init(&client->stat_lock);
     client->sockfd = -1;
     client->poll_fds[POLLFD_SOCKET].fd = -1;
+
+    // Defensive: mqtt_wss_connect() re-arms this per attempt and is the only path to a serviced
+    // connection, so a 0 here is not reachable today. Seeded anyway because the watchdog check is
+    // no longer gated on mqtt_connected, and a 0 would read as the machine's uptime.
+    client->last_io_progress_ut = now_monotonic_usec();
 
     client->msg_callback = msg_callback;
     client->puback_callback = puback_callback;
@@ -312,8 +343,12 @@ int mqtt_wss_connect(
     struct mqtt_connect_params *mqtt_params,
     int ssl_flags,
     const struct mqtt_wss_proxy *proxy,
-    bool *fallback_ipv4)
+    bool *fallback_ipv4,
+    int *service_rc)
 {
+    if (service_rc)
+        *service_rc = 0;
+
     if (!mqtt_params) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "mqtt_params can't be null!");
         return -1;
@@ -323,7 +358,25 @@ int mqtt_wss_connect(
     client->mqtt_didnt_finish_write = 0;
     client->mqtt_connected = 0;
     client->mqtt_disconnecting = 0;
+    client->write_wants_read = 0;
     ws_client_reset(client->ws_client);
+
+    // A stale ping_timeout suppresses keepalive management and then fires a bogus PING timeout
+    // on the new connection, so it must not outlive the connection it belonged to.
+    ping_timeout = 0;
+
+    // aclk.c consumes disconnect_req before tearing down, but the teardown keeps servicing the
+    // link, so a PING timeout can re-arm it for a connection that no longer exists and tear the
+    // next one down on its first iteration. That is the reachable path. ACLK_CLOUD_DISCONNECT is
+    // covered too because it is equally connection-scoped, though during a normal teardown
+    // msg_callback() drops inbound messages once mqtt_shutdown_msg_id is set, so it can only
+    // re-arm if sending the app-layer disconnect failed. Clear only connection-scoped values -
+    // the compare-exchange fails if another thread stored something else meanwhile, so a
+    // concurrent reclaim is never lost.
+    ACLK_DISCONNECT_ACTION stale = __atomic_load_n(&disconnect_req, __ATOMIC_RELAXED);
+    if (aclk_disconnect_action_is_connection_scoped(stale))
+        __atomic_compare_exchange_n(&disconnect_req, &stale, ACLK_NO_DISCONNECT,
+                                    false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 
     if (client->target_host == client->host)
         client->target_host = NULL;
@@ -432,14 +485,26 @@ int mqtt_wss_connect(
     };
 #endif
 
-    // free SSL structs from possible previous connections
-    if (client->ssl)
+    // Free SSL structs from possible previous connections. Clear the pointers as we go: the
+    // allocations below can fail and return early, and a stale non-NULL pointer here would be
+    // freed again on the next attempt or by mqtt_wss_destroy().
+    if (client->ssl) {
         SSL_free(client->ssl);
+        client->ssl = NULL;
+    }
 
-    if (client->ssl_ctx)
+    if (client->ssl_ctx) {
         SSL_CTX_free(client->ssl_ctx);
+        client->ssl_ctx = NULL;
+    }
 
     client->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
+    if (!client->ssl_ctx) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't allocate SSL context");
+        mqtt_wss_close_sockfd(client);
+        return -1;
+    }
+
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
         SSL_CTX_set_default_verify_paths(client->ssl_ctx);
         SSL_CTX_set_verify(client->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
@@ -452,6 +517,17 @@ int mqtt_wss_connect(
 #endif
 
     client->ssl = SSL_new(client->ssl_ctx);
+    if (!client->ssl) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't allocate SSL object");
+        mqtt_wss_close_sockfd(client);
+        return -1;
+    }
+
+    // paired with the SSL object above: its BIO counters start at 0, so a surviving snapshot
+    // would read as wire progress on the first service call
+    client->last_bio_rx_bytes = 0;
+    client->last_bio_tx_bytes = 0;
+
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
         if (!SSL_set_ex_data(client->ssl, 0, client)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Could not SSL_set_ex_data");
@@ -491,9 +567,10 @@ int mqtt_wss_connect(
         return -5;
     }
 
+    int ssl_connect_ec = SSL_ERROR_NONE;
     if (result == -1) {
-        int ec = SSL_get_error(client->ssl, result);
-        if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
+        ssl_connect_ec = SSL_get_error(client->ssl, result);
+        if (ssl_connect_ec != SSL_ERROR_WANT_READ && ssl_connect_ec != SSL_ERROR_WANT_WRITE) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to start SSL connection");
             mqtt_wss_close_sockfd(client);
             return -6;
@@ -528,12 +605,50 @@ int mqtt_wss_connect(
 
     client->poll_fds[POLLFD_PIPE].events = POLLIN;
     client->poll_fds[POLLFD_SOCKET].events = POLLIN;
+
+    // Honour the direction SSL_connect() asked for. A handshake blocked on WANT_WRITE needs
+    // POLLOUT, and nothing else arms it before CONNACK: buf_write is still empty (the WebSocket
+    // upgrade request is only generated later, inside ws_client_process()).
+    if (ssl_connect_ec == SSL_ERROR_WANT_WRITE)
+        client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
+
+    client->last_io_progress_ut = now_monotonic_usec();
+    const usec_t connect_start_ut = client->last_io_progress_ut;
+
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
-        int rc = mqtt_wss_service(client, 60 * MSEC_PER_SEC);
+        // The outer retry loop in aclk_attempt_to_connect() can only test service_running()
+        // between attempts, so a shutdown while the peer is quiet would otherwise wait out the
+        // whole budget below. Not a failure to report: leave service_rc at 0 and let the caller
+        // see the same generic setup failure it gets from the paths above.
+        if (unlikely(!service_running(SERVICE_ACLK))) {
+            mqtt_wss_close_sockfd(client);
+            return 1;
+        }
+
+        // One call gives both the expiry check and the poll cap, so the budget cannot be
+        // overshot by a full service timeout on the last iteration.
+        int budget_ms = aclk_timeout_remaining_ms(connect_start_ut,
+                                                  MQTT_WSS_CONNECT_BUDGET_SECS * (int)MSEC_PER_SEC);
+        if (unlikely(!budget_ms)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "Timed out after %d seconds waiting for CONNACK from MQTT WSS server \"%s\", port %d",
+                   MQTT_WSS_CONNECT_BUDGET_SECS, host, port);
+            mqtt_wss_close_sockfd(client);
+            if (service_rc)
+                *service_rc = MQTT_WSS_ERR_CONNECT_TIMEOUT;
+            return 2;
+        }
+
+        int rc = mqtt_wss_service(client, MIN(budget_ms, 60 * (int)MSEC_PER_SEC));
         if(rc) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Error connecting to MQTT WSS server \"%s\", port %d. Code: %d", host, port, rc);
             mqtt_wss_close_sockfd(client);
+            // Report the service code separately rather than as our return value: our own error
+            // codes above overlap the MQTT_WSS_ERR_* space (-1, -3, -6 and -8 all collide), so
+            // the caller could not tell a TCP failure from a WebSocket protocol error.
+            if (service_rc)
+                *service_rc = rc;
             return 2;
         }
     }
@@ -541,32 +656,108 @@ int mqtt_wss_connect(
     return 0;
 }
 
-#define MWS_TIMED_OUT 1
-#define MWS_ERROR 2
+#define MWS_TIMED_OUT 2
 #define MWS_OK 0
 static const char *mqtt_wss_error_tos(int ec)
 {
     switch(ec) {
+        // mqtt_wss_service_all()'s own codes
         case MWS_TIMED_OUT:
-            return "Error: Operation was not able to finish in time";
-        case MWS_ERROR:
-            return "Unspecified Error";
+            return "the flush budget expired with data still queued";
+        // propagated from mqtt_wss_service(), so a teardown failure names its real cause
+        case MQTT_WSS_ERR_CONN_DROP:
+            return "connection dropped";
+        case MQTT_WSS_ERR_PROTO_MQTT:
+            return "MQTT protocol error";
+        case MQTT_WSS_ERR_PROTO_WS:
+            return "WebSocket protocol error";
+        case MQTT_WSS_ERR_MSG_TOO_BIG:
+            return "message too big";
+        case MQTT_WSS_ERR_CANT_DO:
+            return "unsupported operation";
+        case MQTT_WSS_ERR_POLL_FAILED:
+            return "poll() failed";
+        case MQTT_WSS_ERR_REMOTE_CLOSED:
+            return "closed by remote end";
+        case MQTT_WSS_ERR_NO_IO_PROGRESS:
+            return "no I/O progress on a ready socket";
+        case MQTT_WSS_ERR_CONNECT_TIMEOUT:
+            return "the connection setup budget expired before CONNACK";
+
         default:
-            return "Unknown Error Code!";
+            return "unknown error code";
+    }
+}
+
+#define MQTT_WSS_IO_WATCHDOG_UT ((usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC)
+
+typedef enum {
+    MQTT_WSS_DROP_NONE = 0,
+    MQTT_WSS_DROP_POLL_ERROR,
+    MQTT_WSS_DROP_NO_IO_PROGRESS,
+} MQTT_WSS_DROP_REASON;
+
+// POLLERR/POLLNVAL are unrecoverable -> drop now. POLLHUP is intentionally NOT a drop: it can
+// accompany still-readable data (a graceful close carrying a final frame), so the caller lets
+// it fall through to SSL_read(), which drains the remaining bytes and then reports the close
+// cleanly (SSL_ERROR_ZERO_RETURN). A dead socket that keeps signalling readiness without
+// progress is caught by the watchdog instead.
+static MQTT_WSS_DROP_REASON mqtt_wss_drop_reason(short revents, usec_t last_io_progress_ut, usec_t now_ut) {
+    if (unlikely(revents & (POLLERR | POLLNVAL)))
+        return MQTT_WSS_DROP_POLL_ERROR;
+
+    if (unlikely(aclk_usec_budget_spent(last_io_progress_ut, MQTT_WSS_IO_WATCHDOG_UT, now_ut)))
+        return MQTT_WSS_DROP_NO_IO_PROGRESS;
+
+    return MQTT_WSS_DROP_NONE;
+}
+
+// Separate from the logging switch so the drop -> error-code mapping is pinned by a test: this is
+// what makes a watchdog drop distinguishable from a socket error in status and logs. A poll error
+// keeps reporting as MQTT_WSS_ERR_CONN_DROP (and therefore ACLK_STATUS_OFFLINE_SOCKET_ERROR);
+// MQTT_WSS_ERR_POLL_FAILED is reserved for the poll() syscall itself failing.
+static int mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_REASON reason) {
+    switch (reason) {
+        case MQTT_WSS_DROP_POLL_ERROR:
+            return MQTT_WSS_ERR_CONN_DROP;
+
+        case MQTT_WSS_DROP_NO_IO_PROGRESS:
+            return MQTT_WSS_ERR_NO_IO_PROGRESS;
+
+        case MQTT_WSS_DROP_NONE:
+            return MQTT_WSS_OK;
     }
 
+    return MQTT_WSS_OK;
+}
+
+// Queued output wants writability, unless OpenSSL is waiting on readability to let the write
+// proceed - arming POLLOUT then would make poll() return instantly on every retry.
+static bool mqtt_wss_should_arm_pollout(bool bytes_queued, bool write_wants_read) {
+    return bytes_queued && !write_wants_read;
 }
 
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
-    uint64_t exit_by_us = now_boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
-    client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
+    const usec_t start_ut = now_monotonic_usec();
     while (rbuf_bytes_available(client->ws_client->buf_write)) {
-        const uint64_t now_us = now_boottime_usec();
-        if (now_us >= exit_by_us)
+        // shared with the other ACLK deadlines, so a sub-millisecond remainder still yields 1ms
+        // rather than degenerating into a non-blocking poll() spin
+        const int remaining_ms = aclk_timeout_remaining_ms(start_ut, timeout_ms);
+        if (remaining_ms <= 0)
             return MWS_TIMED_OUT;
-        if (mqtt_wss_service(client, (exit_by_us - now_us) / USEC_PER_SEC))
-            return MWS_ERROR;
+
+        // Cap each attempt so a congested socket gets many tries within the phase instead of
+        // spending the whole budget inside one poll(). mqtt_wss_service() arms POLLOUT itself
+        // from the write buffer, so nothing needs re-arming here.
+        // Return the underlying cause rather than a generic error: every teardown failure used to
+        // log as "Unspecified Error". MQTT_WSS_ERR_* are negative and MWS_* are 0/2, so the caller
+        // can stringify either. MWS_TIMED_OUT deliberately avoids 1, which mqtt_wss_client.h
+        // assigns to MQTT_WSS_OK_TO - a documented (currently unused) success return of
+        // mqtt_wss_service() that would otherwise be misread here as a failure.
+        const int rc = mqtt_wss_service(client, MIN(remaining_ms, 100));
+        if (rc)
+            return rc;
     }
     return MWS_OK;
 }
@@ -579,10 +770,8 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
     // send whatever was left at the time of calling this function
     int ret = mqtt_wss_service_all(client, timeout_ms / 4);
     if(ret)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-                  "Error while trying to send all remaining data in an attempt "
-                  "to gracefully disconnect! EC=%d Desc:\"%s\"",
-                  ret,
+        nd_log(NDLS_DAEMON, ret == MWS_TIMED_OUT ? NDLP_WARNING : NDLP_ERR,
+                  "Could not send all remaining data while gracefully disconnecting: %s",
                   mqtt_wss_error_tos(ret));
 
     // schedule and send MQTT disconnect
@@ -591,10 +780,8 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
 
     ret = mqtt_wss_service_all(client, timeout_ms / 4);
     if(ret)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-                  "Error while trying to send MQTT disconnect message in an attempt "
-                  "to gracefully disconnect! EC=%d Desc:\"%s\"",
-                  ret,
+        nd_log(NDLS_DAEMON, ret == MWS_TIMED_OUT ? NDLP_WARNING : NDLP_ERR,
+                  "Could not send the MQTT disconnect message while gracefully disconnecting: %s",
                   mqtt_wss_error_tos(ret));
 
     // send WebSockets close message
@@ -605,14 +792,13 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
         // Some MQTT/WSS servers will close socket on receipt of MQTT disconnect and
         // do not wait for WebSocket to be closed properly
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-                 "Error while trying to send WebSocket disconnect message in an attempt "
-                 "to gracefully disconnect! EC=%d Desc:\"%s\".",
-                 ret,
+                 "Could not send the WebSocket close message while gracefully disconnecting: %s",
                  mqtt_wss_error_tos(ret));
     }
 
-    // Service WSS connection until remote closes connection (usual)
-    // or timeout happens (unusual) in which case we close
+    // Final flush of anything the close frame left queued. This does not wait for the remote to
+    // close: mqtt_wss_service_all() is gated on the write buffer, so it returns immediately once
+    // that is empty.
     mqtt_wss_service_all(client, timeout_ms / 4);
 
     mqtt_wss_close_sockfd(client);
@@ -630,12 +816,229 @@ static void util_clear_pipe(int fd)
     if(read(fd, throwaway, THROWAWAY_BUF_SIZE) <= 0)  { ; }
 }
 
+// Did either wire counter move? Split out so the comparison is unit-testable.
+static bool mqtt_wss_bio_advanced(uint64_t rx, uint64_t tx, uint64_t last_rx, uint64_t last_tx) {
+    return rx != last_rx || tx != last_tx;
+}
+
+// Credit wire-level progress to the watchdog, but only before CONNACK: the handshake produces no
+// plaintext for SSL_read()/SSL_write() to report, so without this a healthy slow setup could be
+// killed. Once established the watchdog must demand plaintext or a clean poll() timeout again -
+// crediting raw bytes there would let a peer streaming records that yield no plaintext (a
+// KeyUpdate/NewSessionTicket flood) refresh progress forever and spin a core undetected.
+typedef enum {
+    MQTT_WSS_WIRE_NO_CHANGE = 0,   // counters did not move
+    MQTT_WSS_WIRE_SNAPSHOT_ONLY,   // record the new counters, but do not credit the watchdog
+    MQTT_WSS_WIRE_CREDIT,          // record and credit the watchdog
+} MQTT_WSS_WIRE_ACTION;
+
+// Pure so the phase rule is testable. The snapshot has to track in both phases or it goes stale
+// behind a distant reset and a later comparison lies, but only the pre-CONNACK phase may credit
+// the watchdog - see the phase note at the top of this file.
+static MQTT_WSS_WIRE_ACTION mqtt_wss_wire_progress_action(bool advanced, bool mqtt_connected) {
+    if (!advanced)
+        return MQTT_WSS_WIRE_NO_CHANGE;
+
+    return mqtt_connected ? MQTT_WSS_WIRE_SNAPSHOT_ONLY : MQTT_WSS_WIRE_CREDIT;
+}
+
+static void mqtt_wss_note_wire_progress(mqtt_wss_client client) {
+    if (unlikely(!client->ssl))
+        return;
+
+    BIO *rbio = SSL_get_rbio(client->ssl);
+    BIO *wbio = SSL_get_wbio(client->ssl);
+
+    // Both exist from SSL_set_fd() onwards. If either is missing we have no usable reading:
+    // substituting 0 for the absent side would compare against a non-zero snapshot and fake
+    // movement, while treating it as progress outright would silently disable the watchdog.
+    if (unlikely(!rbio || !wbio))
+        return;
+
+    const uint64_t rx = (uint64_t)BIO_number_read(rbio);
+    const uint64_t tx = (uint64_t)BIO_number_written(wbio);
+
+    const bool advanced =
+        mqtt_wss_bio_advanced(rx, tx, client->last_bio_rx_bytes, client->last_bio_tx_bytes);
+
+    const MQTT_WSS_WIRE_ACTION action =
+        mqtt_wss_wire_progress_action(advanced, client->mqtt_connected);
+
+    if (action == MQTT_WSS_WIRE_NO_CHANGE)
+        return;
+
+    if (action == MQTT_WSS_WIRE_CREDIT)
+        client->last_io_progress_ut = now_monotonic_usec();
+
+    client->last_bio_rx_bytes = rx;
+    client->last_bio_tx_bytes = tx;
+}
+
 static void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
     if (ssl_ret == SSL_ERROR_WANT_WRITE)
         client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
     if (ssl_ret == SSL_ERROR_WANT_READ)
         client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
 }
+
+#define MQTT_WSS_TEST(condition, msg) do {                                       \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "mqtt wss timeout unittest FAILED: %s (%s:%d)\n",    \
+                    (msg), __FUNCTION__, __LINE__);                              \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+int mqtt_wss_client_timeout_unittest(void) {
+    int errors = 0;
+    const usec_t watchdog_ut = (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC;
+    const usec_t progress_ut = 100 * USEC_PER_SEC;
+
+    fprintf(stderr, "\nrunning mqtt wss timeout unittest\n");
+
+    // Pin the derivation and non-degeneracy, not the literal: the boundary assertions below hold
+    // for any value including 0, so something must reject a degenerate window - but hardcoding
+    // 120s would fail this test for a legitimate PING_TIMEOUT retune rather than for a defect.
+    MQTT_WSS_TEST(watchdog_ut == (usec_t)(2 * PING_TIMEOUT) * USEC_PER_SEC,
+                  "watchdog window is no longer derived from PING_TIMEOUT");
+    MQTT_WSS_TEST(watchdog_ut > 0, "watchdog window is degenerate");
+
+    // the boundary is inclusive, the same convention as every other ACLK budget: the window is
+    // spent once exactly that much has elapsed
+    MQTT_WSS_TEST(!aclk_usec_budget_spent(progress_ut, watchdog_ut, progress_ut + watchdog_ut - 1),
+                  "expired 1us short of the watchdog window");
+    MQTT_WSS_TEST(aclk_usec_budget_spent(progress_ut, watchdog_ut, progress_ut + watchdog_ut),
+                  "did not expire exactly at the watchdog window boundary");
+
+    // a backward monotonic reading must never be treated as elapsed time
+    MQTT_WSS_TEST(!aclk_usec_budget_spent(progress_ut, watchdog_ut, progress_ut - 1),
+                  "backward clock reading expired the watchdog");
+
+    // The drop decision must use the watchdog window itself, not just any budget: these two pin
+    // MQTT_WSS_IO_WATCHDOG_UT, which the generic aclk_usec_budget_spent() assertions above cannot.
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLIN, progress_ut, progress_ut + watchdog_ut - 1) ==
+                      MQTT_WSS_DROP_NONE,
+                  "dropped 1us short of the watchdog window");
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLIN, progress_ut, progress_ut + watchdog_ut) ==
+                      MQTT_WSS_DROP_NO_IO_PROGRESS,
+                  "did not drop exactly at the watchdog window boundary");
+
+    // POLLOUT arming rule, all four combinations.
+    MQTT_WSS_TEST(mqtt_wss_should_arm_pollout(true, false),
+                  "queued output did not arm POLLOUT");
+    MQTT_WSS_TEST(!mqtt_wss_should_arm_pollout(true, true),
+                  "queued output armed POLLOUT while the write was blocked on readability");
+    MQTT_WSS_TEST(!mqtt_wss_should_arm_pollout(false, false),
+                  "an empty write buffer armed POLLOUT");
+    MQTT_WSS_TEST(!mqtt_wss_should_arm_pollout(false, true),
+                  "an empty write buffer armed POLLOUT while blocked on readability");
+
+    // Drop decision: dispatch and precedence.
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLIN, progress_ut, progress_ut) == MQTT_WSS_DROP_NONE,
+                  "healthy readable socket was dropped");
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLERR, progress_ut, progress_ut) == MQTT_WSS_DROP_POLL_ERROR,
+                  "POLLERR did not drop");
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLNVAL, progress_ut, progress_ut) == MQTT_WSS_DROP_POLL_ERROR,
+                  "POLLNVAL did not drop");
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLHUP, progress_ut, progress_ut) == MQTT_WSS_DROP_NONE,
+                  "POLLHUP dropped instead of falling through to SSL_read()");
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLIN, progress_ut, progress_ut + watchdog_ut + 1) ==
+                      MQTT_WSS_DROP_NO_IO_PROGRESS,
+                  "ready-without-progress spin did not trip the watchdog");
+
+    // an unrecoverable socket error outranks the watchdog, so the log names the real cause
+    MQTT_WSS_TEST(mqtt_wss_drop_reason(POLLERR, progress_ut, progress_ut + watchdog_ut + 1) ==
+                      MQTT_WSS_DROP_POLL_ERROR,
+                  "watchdog outranked POLLERR when both conditions held");
+
+    // wire progress: either counter moving counts, and neither moving does not. A stalled
+    // handshake must not be credited just because one direction was already non-zero.
+    MQTT_WSS_TEST(!mqtt_wss_bio_advanced(500, 300, 500, 300), "idle wire counters reported progress");
+    MQTT_WSS_TEST(mqtt_wss_bio_advanced(501, 300, 500, 300), "inbound wire progress was missed");
+    MQTT_WSS_TEST(mqtt_wss_bio_advanced(500, 301, 500, 300), "outbound wire progress was missed");
+    MQTT_WSS_TEST(mqtt_wss_bio_advanced(0, 0, 0, 1), "a counter reset was not treated as movement");
+
+    // The phase rule. Deleting the !mqtt_connected gate would let a peer streaming records that
+    // yield no plaintext refresh progress forever and spin a core undetected; dropping the
+    // snapshot update in the established phase would leave it stale behind a distant reset.
+    MQTT_WSS_TEST(mqtt_wss_wire_progress_action(false, false) == MQTT_WSS_WIRE_NO_CHANGE,
+                  "idle wire counters produced an action before CONNACK");
+    MQTT_WSS_TEST(mqtt_wss_wire_progress_action(false, true) == MQTT_WSS_WIRE_NO_CHANGE,
+                  "idle wire counters produced an action after CONNACK");
+    MQTT_WSS_TEST(mqtt_wss_wire_progress_action(true, false) == MQTT_WSS_WIRE_CREDIT,
+                  "wire progress during the handshake was not credited to the watchdog");
+    MQTT_WSS_TEST(mqtt_wss_wire_progress_action(true, true) == MQTT_WSS_WIRE_SNAPSHOT_ONLY,
+                  "wire progress after CONNACK was credited instead of only snapshotted");
+
+    // Classification only. This does NOT cover the reset in mqtt_wss_connect(): deleting that
+    // block leaves every assertion here passing. It pins which values the reset is allowed to
+    // clear, which is where the round-three regression was (ACLK_RELOAD_CONF must be preserved).
+    MQTT_WSS_TEST(aclk_disconnect_action_is_connection_scoped(ACLK_PING_TIMEOUT),
+                  "ACLK_PING_TIMEOUT not classified as connection-scoped");
+    MQTT_WSS_TEST(aclk_disconnect_action_is_connection_scoped(ACLK_CLOUD_DISCONNECT),
+                  "ACLK_CLOUD_DISCONNECT not classified as connection-scoped");
+    MQTT_WSS_TEST(!aclk_disconnect_action_is_connection_scoped(ACLK_RELOAD_CONF),
+                  "ACLK_RELOAD_CONF classified as connection-scoped - a reclaim would be dropped");
+    MQTT_WSS_TEST(!aclk_disconnect_action_is_connection_scoped(ACLK_NO_DISCONNECT),
+                  "ACLK_NO_DISCONNECT classified as a pending request");
+
+    // The drop -> error-code -> status chain. This is the deliverable: without it a watchdog drop
+    // is indistinguishable from a socket error to an operator. Swapping either mapping's arms
+    // used to leave the whole suite green.
+    MQTT_WSS_TEST(mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_NO_IO_PROGRESS) ==
+                      MQTT_WSS_ERR_NO_IO_PROGRESS,
+                  "a watchdog drop did not map to MQTT_WSS_ERR_NO_IO_PROGRESS");
+    MQTT_WSS_TEST(mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_POLL_ERROR) == MQTT_WSS_ERR_CONN_DROP,
+                  "a poll-error drop did not map to MQTT_WSS_ERR_CONN_DROP");
+    MQTT_WSS_TEST(mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_NONE) == MQTT_WSS_OK,
+                  "no drop did not map to MQTT_WSS_OK");
+
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_NO_IO_PROGRESS) ==
+                      ACLK_STATUS_OFFLINE_NO_IO_PROGRESS,
+                  "a watchdog drop is not reported as its own status");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_REMOTE_CLOSED) ==
+                      ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE,
+                  "remote close is not reported as closed-by-remote");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_PROTO_MQTT) ==
+                      ACLK_STATUS_OFFLINE_MQTT_PROTOCOL_ERROR,
+                  "an MQTT protocol error is not reported as such");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_PROTO_WS) ==
+                      ACLK_STATUS_OFFLINE_WS_PROTOCOL_ERROR,
+                  "a WebSocket protocol error is not reported as such");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_MSG_TOO_BIG) ==
+                      ACLK_STATUS_OFFLINE_MESSAGE_TOO_BIG,
+                  "an oversized message is not reported as such");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_POLL_FAILED) ==
+                      ACLK_STATUS_OFFLINE_POLL_ERROR,
+                  "a failed poll() syscall is not reported as a poll error");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_CONN_DROP) ==
+                      ACLK_STATUS_OFFLINE_SOCKET_ERROR,
+                  "a connection drop is not reported as a socket error");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_CONNECT_TIMEOUT) ==
+                      ACLK_STATUS_OFFLINE_CONNECT_TIMEOUT,
+                  "a CONNACK timeout is not reported as its own status");
+
+    // The setup budget is a separate window from the watchdog: the watchdog cannot bound the
+    // pre-CONNACK phase at all, because a clean poll() timeout refreshes progress. Pin the
+    // derivation and non-degeneracy the same way, and pin the poll cap - the remaining budget is
+    // what stops the last mqtt_wss_service() call from overshooting it.
+    const int connect_budget_ms = MQTT_WSS_CONNECT_BUDGET_SECS * (int)MSEC_PER_SEC;
+    MQTT_WSS_TEST(connect_budget_ms == (2 * PING_TIMEOUT) * (int)MSEC_PER_SEC,
+                  "connect budget is no longer derived from PING_TIMEOUT");
+    MQTT_WSS_TEST(connect_budget_ms > 0, "connect budget is degenerate");
+    MQTT_WSS_TEST(aclk_timeout_remaining_ms(now_monotonic_usec(), connect_budget_ms) > 0,
+                  "a fresh connect budget reports no time remaining");
+
+    if (errors)
+        fprintf(stderr, "mqtt wss timeout unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "mqtt wss timeout unittest: OK\n");
+
+
+    return errors;
+}
+
+#undef MQTT_WSS_TEST
 
 static int handle_mqtt_internal(mqtt_wss_client client)
 {
@@ -690,6 +1093,19 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         }
     }
 
+    // Arm POLLOUT from the write buffer, not from the last SSL error. SSL_write() can report a
+    // short count while still returning success - it completes a previously pending fragment, and
+    // buf_write (128KiB) is larger than OpenSSL's 16KiB max_send_fragment - and that leaves no
+    // WANT_WRITE for set_socket_pollfds() to re-arm from. Keying off the error would strand those
+    // bytes until the poll timeout. (This is not SSL_MODE_ENABLE_PARTIAL_WRITE, which is not set.)
+    //
+    // Except while the write is blocked on readability: OpenSSL requires the retry to wait for
+    // POLLIN there, and arming POLLOUT on an already-writable socket would make poll() return
+    // instantly on every retry - a busy loop that credits no progress and ends in a watchdog drop.
+    if (mqtt_wss_should_arm_pollout(rbuf_bytes_available(client->ws_client->buf_write) > 0,
+                                    client->write_wants_read))
+        client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
+
 #ifdef MQTT_WSS_CPUSTATS
     t2 = now_monotonic_usec();
     client->stats.time_keepalive += t2 - t1;
@@ -713,9 +1129,15 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #endif
 
     if (ret == 0) {
-        // a clean poll() timeout means the loop blocked rather than spun: that is forward
-        // progress for the watchdog (a healthy idle link reaches here at the caller cadence)
-        client->last_io_progress_ut = now_monotonic_usec();
+        // A clean poll() timeout means the loop blocked rather than spun: that is forward progress
+        // for the watchdog (a healthy idle link reaches here at the caller cadence).
+        //
+        // Except while a write is blocked on readability with bytes still queued. That is a
+        // stalled write, not an idle link: crediting it would hide the stall from the watchdog and
+        // leave recovery to the much slower keepalive path, reported as a ping timeout rather than
+        // as the lack of I/O progress it actually is.
+        if (!(client->write_wants_read && rbuf_bytes_available(client->ws_client->buf_write)))
+            client->last_io_progress_ut = now_monotonic_usec();
         time_t now = now_realtime_sec();
         if (send_keepalive) {
             // otherwise we shortened the timeout ourselves to take care of
@@ -742,26 +1164,37 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     // Tear the connection down if the socket reports an unrecoverable error, or if we keep
     // being re-entered with poll() reporting readiness but making no forward progress (a
     // spin). In either case drop so the outer loop reconnects, rather than burning a core
-    // indefinitely. Guarded to an established connection (the handshake has its own timeouts).
-    if (client->mqtt_connected) {
-        // POLLERR/POLLNVAL are unrecoverable -> drop now. POLLHUP is intentionally NOT an
-        // immediate drop: it can accompany still-readable data (a graceful close carrying a
-        // final frame), so we let it fall through to SSL_read below, which drains the
-        // remaining bytes and then reports the close cleanly (SSL_ERROR_ZERO_RETURN). A dead
-        // socket that keeps signalling readiness without progress is caught by the watchdog.
-        if (unlikely(client->poll_fds[POLLFD_SOCKET].revents & (POLLERR | POLLNVAL))) {
+    // indefinitely. This applies during TLS/WebSocket/MQTT setup too: the connect loop uses
+    // this same service function before CONNACK, and is equally vulnerable to ready-without-
+    // progress spins. Which is why progress has to be accounted at the wire level first: the
+    // previous iteration's SSL calls may have moved handshake records without ever producing
+    // plaintext, and that is genuine progress the watchdog must not mistake for a spin.
+    mqtt_wss_note_wire_progress(client);
+
+    const MQTT_WSS_DROP_REASON drop =
+        mqtt_wss_drop_reason(client->poll_fds[POLLFD_SOCKET].revents,
+                             client->last_io_progress_ut, now_monotonic_usec());
+
+    switch (drop) {
+        case MQTT_WSS_DROP_POLL_ERROR:
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "ACLK: socket poll() reported error (revents=0x%x); dropping connection",
                    (unsigned)client->poll_fds[POLLFD_SOCKET].revents);
-            return MQTT_WSS_ERR_CONN_DROP;
-        }
-        if (unlikely(now_monotonic_usec() - client->last_io_progress_ut >
-                     (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC)) {
+            return mqtt_wss_err_from_drop_reason(drop);
+
+        case MQTT_WSS_DROP_NO_IO_PROGRESS:
+            // report both revents: this branch is reached whenever poll() returned for *either*
+            // fd, so the socket may show 0 here and the wakeup pipe alone be responsible
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "ACLK: no I/O progress for %d seconds while poll() kept reporting readiness; "
-                   "dropping connection to break a CPU spin", MQTT_WSS_IO_WATCHDOG_SECS);
-            return MQTT_WSS_ERR_CONN_DROP;
-        }
+                   "ACLK: no I/O progress for %d seconds while poll() kept returning "
+                   "(socket revents=0x%x, pipe revents=0x%x); dropping connection to break a "
+                   "CPU spin", MQTT_WSS_IO_WATCHDOG_SECS,
+                   (unsigned)client->poll_fds[POLLFD_SOCKET].revents,
+                   (unsigned)client->poll_fds[POLLFD_PIPE].revents);
+            return mqtt_wss_err_from_drop_reason(drop);
+
+        case MQTT_WSS_DROP_NONE:
+            break;
     }
 
     client->poll_fds[POLLFD_SOCKET].events = 0;
@@ -856,10 +1289,22 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             spinlock_unlock(&client->stat_lock);
             rbuf_bump_tail(client->ws_client->buf_write, ret);
             client->last_io_progress_ut = now_monotonic_usec();
+            client->write_wants_read = 0;
         } else {
             int errnobkp = errno;
             ret = SSL_get_error(client->ssl, ret);
             set_socket_pollfds(client, ret);
+
+            client->write_wants_read = (ret == SSL_ERROR_WANT_READ);
+            if (client->write_wants_read) {
+                // Drop any POLLOUT armed earlier in this same iteration - by
+                // mqtt_didnt_finish_write above, or by a WANT_WRITE from SSL_read(). events is not
+                // cleared again until after the next poll(), so a stale POLLOUT would make it
+                // return instantly on writability and spin. Such a POLLOUT is provably stale:
+                // SSL_write() retries any pending flush first, so it cannot report WANT_READ
+                // until writability is no longer what OpenSSL is waiting for.
+                client->poll_fds[POLLFD_SOCKET].events &= ~POLLOUT;
+            }
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
                 worker_is_busy(WORKER_ACLK_TX_ERROR);

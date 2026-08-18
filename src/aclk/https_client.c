@@ -474,16 +474,92 @@ typedef struct https_req_ctx {
 
     http_parse_ctx parse_ctx;
 
-    time_t req_start_time;
+    usec_t req_start_ut;
+    usec_t req_timeout_ut;
 } https_req_ctx_t;
 
+// Converts a request timeout into a monotonic budget. A non-positive timeout_s yields a zero
+// budget, which aclk_usec_budget_spent() treats as "already expired" - i.e. no time is granted
+// at all, so the first check fails the request.
+//
+// Note this is deliberately NOT the reading used for the proxy timeout in https_request(), which
+// substitutes a 30s default when timeout_s is out of range (non-positive or above its 2000000s
+// ceiling) because it must produce a concrete poll budget. The two disagree for a non-positive
+// timeout_s. That is unreachable today - every https_req_t comes from HTTPS_REQ_T_INITIALIZER
+// with .timeout_s = 30 - but a future caller doing `https_req_t req = {0}` would get a request
+// that fails before its first poll() while still granting the proxy 30s.
+static usec_t https_req_timeout_to_usec(time_t timeout_s) {
+    if (timeout_s <= 0)
+        return 0;
+
+    if ((uint64_t)timeout_s > UINT64_MAX / USEC_PER_SEC)
+        return UINT64_MAX;
+
+    return (usec_t)timeout_s * USEC_PER_SEC;
+}
+
 static int https_req_check_timedout(https_req_ctx_t *ctx) {
-    if (now_realtime_sec() > ctx->req_start_time + ctx->request->timeout_s) {
+    if (aclk_usec_budget_spent(ctx->req_start_ut, ctx->req_timeout_ut, now_monotonic_usec())) {
         netdata_log_error("ACLK: request timed out");
         return 1;
     }
     return 0;
 }
+
+#define HTTPS_TIMEOUT_TEST(condition, msg) do {                                  \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "https client timeout unittest FAILED: %s (%s:%d)\n",\
+                    (msg), __FUNCTION__, __LINE__);                              \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+int https_client_timeout_unittest(void) {
+    int errors = 0;
+    const usec_t start_ut = 100 * USEC_PER_SEC;
+
+    fprintf(stderr, "\nrunning https client timeout unittest\n");
+
+    // a request budget must be honoured to the microsecond. 30 mirrors HTTPS_REQ_T_INITIALIZER's
+    // default, but is spelled out here so this tests the arithmetic, not the header's value.
+    const usec_t budget_ut = https_req_timeout_to_usec(30);
+    HTTPS_TIMEOUT_TEST(budget_ut == 30 * USEC_PER_SEC, "30s did not convert to 30s of usec");
+    HTTPS_TIMEOUT_TEST(!aclk_usec_budget_spent(start_ut, budget_ut, start_ut + budget_ut - 1),
+                       "expired before the monotonic deadline");
+    HTTPS_TIMEOUT_TEST(aclk_usec_budget_spent(start_ut, budget_ut, start_ut + budget_ut),
+                       "did not expire at the monotonic deadline");
+
+    // a backward monotonic reading must not be mistaken for elapsed time
+    HTTPS_TIMEOUT_TEST(!aclk_usec_budget_spent(start_ut, budget_ut, start_ut - 1),
+                       "backward clock reading expired the request");
+
+    // non-positive timeouts grant no time at all (see https_req_timeout_to_usec)
+    HTTPS_TIMEOUT_TEST(https_req_timeout_to_usec(0) == 0, "zero timeout did not yield a zero budget");
+    HTTPS_TIMEOUT_TEST(https_req_timeout_to_usec(-1) == 0,
+                       "negative timeout did not yield a zero budget");
+    HTTPS_TIMEOUT_TEST(aclk_usec_budget_spent(start_ut, 0, start_ut),
+                       "zero budget did not expire immediately");
+
+    // an absurd timeout must saturate rather than wrap into a short deadline. Only reachable
+    // where time_t is wide enough to hold a value that overflows the usec conversion.
+    if (sizeof(time_t) >= sizeof(uint64_t)) {
+        const time_t overflowing_s = (time_t)(UINT64_MAX / USEC_PER_SEC) + 1;
+        HTTPS_TIMEOUT_TEST(https_req_timeout_to_usec(overflowing_s) == UINT64_MAX,
+                           "overflowing timeout did not saturate");
+    }
+    HTTPS_TIMEOUT_TEST(!aclk_usec_budget_spent(start_ut, UINT64_MAX, start_ut + USEC_PER_SEC),
+                       "saturated budget expired early");
+
+    if (errors)
+        fprintf(stderr, "https client timeout unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "https client timeout unittest: OK\n");
+
+
+    return errors;
+}
+
+#undef HTTPS_TIMEOUT_TEST
 
 static char *_ssl_err_tos(int err)
 {
@@ -803,7 +879,9 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     }
 
     https_req_ctx_t *ctx = callocz(1, sizeof(https_req_ctx_t));
-    ctx->req_start_time = now_realtime_sec();
+    ctx->request = request;
+    ctx->req_start_ut = now_monotonic_usec();
+    ctx->req_timeout_ut = https_req_timeout_to_usec(request->timeout_s);
 
     ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE, RX_BUFFER_SIZE);
     if (!ctx->buf_rx) {
@@ -861,8 +939,6 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
             goto exit_sock;
         }
     }
-    ctx->request = request;
-
     ctx->ssl_ctx = netdata_ssl_create_client_ctx(0);
     if (ctx->ssl_ctx==NULL) {
         rc = HTTPS_CLIENT_RESP_NO_SSL_CTX;
