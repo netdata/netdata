@@ -28,23 +28,32 @@ static int dyncfg_inline_callback(struct nrpc_request *req, void *data __maybe_u
     return code;
 }
 
-bool dyncfg_add(RRDHOST *host, const char *id, const char *path,
-                DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source,
-                DYNCFG_CMDS cmds, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
-                dyncfg_cb_t cb, void *data) {
+bool dyncfg_add(const struct dyncfg_add_inline_spec *spec) {
+    internal_fatal(!spec->cb, "DYNCFG: inline node addition without a callback");
 
     struct dyncfg_node tmp = {
-        .cmds = cmds,
-        .type = type,
-        .cb = cb,
-        .data = data,
+        .cmds = spec->cmds,
+        .type = spec->type,
+        .cb = spec->cb,
+        .data = spec->data,
     };
-    dictionary_set(dyncfg_nodes, id, &tmp, sizeof(tmp));
+    dictionary_set(dyncfg_nodes, spec->id, &tmp, sizeof(tmp));
 
-    if(!dyncfg_add_low_level(host, id, path, status, type, source_type, source, cmds,
-                             0, 0, true, view_access, edit_access,
-                             dyncfg_inline_callback, NULL, NULL)) {
-        dictionary_del(dyncfg_nodes, id);
+    if(!dyncfg_add_low_level(&(struct dyncfg_add_spec) {
+        .host = spec->host,
+        .id = spec->id,
+        .path = spec->path,
+        .status = spec->status,
+        .type = spec->type,
+        .source_type = spec->source_type,
+        .source = spec->source,
+        .cmds = spec->cmds,
+        .sync = true,
+        .view_access = spec->view_access,
+        .edit_access = spec->edit_access,
+        .handler = dyncfg_inline_callback,
+    })) {
+        dictionary_del(dyncfg_nodes, spec->id);
         return false;
     }
 

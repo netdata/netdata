@@ -100,16 +100,14 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, DYNCFG
 void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id);
 void dyncfg_echo_add(const DICTIONARY_ITEM *item_template, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *template_id, const char *job_name);
 
-// `transport` must be the plugin transport when handler_data is one (the
-// pluginsd path and the template fan-out), NULL for every other caller
-const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path,
-                                           DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type,
-                                           const char *source, DYNCFG_CMDS cmds,
-                                           usec_t created_ut, usec_t modified_ut,
-                                           bool sync, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
-                                           nrpc_handler_cb_t handler, void *handler_data,
-                                           struct nrpc_transport *transport,
-                                           bool overwrite_cb);
+// spec->transport must be the plugin transport when spec->handler_data is one
+// (the pluginsd path and the template fan-out), NULL for every other caller.
+// overwrite_cb stays a separate positional parameter because it discriminates
+// the two call sites rather than describing the node: true (dyncfg_add_low_level)
+// ARMS the conflict callback's execute-pair transfer - what lets a restarted
+// plugin's re-registration take over the callback - while false (the template
+// fan-out) suppresses it. No public wrapper exposes it.
+const DICTIONARY_ITEM *dyncfg_add_internal(const struct dyncfg_add_spec *spec, bool overwrite_cb);
 
 int dyncfg_function_intercept_cb(struct nrpc_request *req, void *data);
 void dyncfg_cleanup(DYNCFG *v);

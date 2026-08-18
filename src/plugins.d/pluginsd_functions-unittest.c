@@ -546,11 +546,22 @@ int pluginsd_functions_unittest(void) {
             // base ref == 1
 
             // mimics the pluginsd CONFIG path: handler_data IS the transport
-            dyncfg_add_low_level(host, "c6test:node", "/c6test",
-                                 DYNCFG_STATUS_RUNNING, DYNCFG_TYPE_SINGLE, DYNCFG_SOURCE_TYPE_INTERNAL, "unittest",
-                                 DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET, 0, 0, false,
-                                 HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
-                                 c6ut_noop_execute_cb, tr, tr);
+            dyncfg_add_low_level(&(struct dyncfg_add_spec) {
+                .host = host,
+                .id = "c6test:node",
+                .path = "/c6test",
+                .status = DYNCFG_STATUS_RUNNING,
+                .type = DYNCFG_TYPE_SINGLE,
+                .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+                .source = "unittest",
+                .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET,
+                .sync = false,
+                .view_access = HTTP_ACCESS_NONE,
+                .edit_access = HTTP_ACCESS_NONE,
+                .handler = c6ut_noop_execute_cb,
+                .handler_data = tr,
+                .transport = tr,
+            });
 
             // node pin (+1) - the registry "config c6test:node" entry is
             // INTERNAL with data NULL and takes no ref
@@ -562,11 +573,22 @@ int pluginsd_functions_unittest(void) {
 
             // same-parser re-CREATE with equal cb/data: the transfer condition
             // is false, so no pin churn
-            dyncfg_add_low_level(host, "c6test:node", "/c6test",
-                                 DYNCFG_STATUS_RUNNING, DYNCFG_TYPE_SINGLE, DYNCFG_SOURCE_TYPE_INTERNAL, "unittest",
-                                 DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET, 0, 0, false,
-                                 HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
-                                 c6ut_noop_execute_cb, tr, tr);
+            dyncfg_add_low_level(&(struct dyncfg_add_spec) {
+                .host = host,
+                .id = "c6test:node",
+                .path = "/c6test",
+                .status = DYNCFG_STATUS_RUNNING,
+                .type = DYNCFG_TYPE_SINGLE,
+                .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+                .source = "unittest",
+                .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET,
+                .sync = false,
+                .view_access = HTTP_ACCESS_NONE,
+                .edit_access = HTTP_ACCESS_NONE,
+                .handler = c6ut_noop_execute_cb,
+                .handler_data = tr,
+                .transport = tr,
+            });
 
             if(refcount_references(&tr->entry_refcount) != 2) {
                 fprintf(stderr, "  FAILED dyncfg-pin: re-CREATE changed entry refs to %d (expected 2 - must net zero)\n",
@@ -580,11 +602,22 @@ int pluginsd_functions_unittest(void) {
             // one on the installed transport, as ONE swap under the node lock
             struct nrpc_transport *tr2 = nrpc_transport_create(NULL);
 
-            dyncfg_add_low_level(host, "c6test:node", "/c6test",
-                                 DYNCFG_STATUS_RUNNING, DYNCFG_TYPE_SINGLE, DYNCFG_SOURCE_TYPE_INTERNAL, "unittest",
-                                 DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET, 0, 0, false,
-                                 HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
-                                 c6ut_noop_execute_cb, tr2, tr2);
+            dyncfg_add_low_level(&(struct dyncfg_add_spec) {
+                .host = host,
+                .id = "c6test:node",
+                .path = "/c6test",
+                .status = DYNCFG_STATUS_RUNNING,
+                .type = DYNCFG_TYPE_SINGLE,
+                .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+                .source = "unittest",
+                .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET,
+                .sync = false,
+                .view_access = HTTP_ACCESS_NONE,
+                .edit_access = HTTP_ACCESS_NONE,
+                .handler = c6ut_noop_execute_cb,
+                .handler_data = tr2,
+                .transport = tr2,
+            });
 
             if(refcount_references(&tr->entry_refcount) != 1) {
                 fprintf(stderr, "  FAILED dyncfg-pin: the displaced transport was not released (entry refs %d != 1)\n",

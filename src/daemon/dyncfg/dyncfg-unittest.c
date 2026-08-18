@@ -123,11 +123,21 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
         TEST *t2 = dictionary_acquired_item_value(item);
         dictionary_acquired_item_release(dyncfg_unittest_data.nodes, item);
 
-        dyncfg_add_low_level(localhost, t2->id, "/unittests",
-                             DYNCFG_STATUS_RUNNING, t2->type, t2->source_type, t2->source,
-                             t2->cmds, 0, 0, t2->sync,
-                             HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
-                             dyncfg_unittest_execute_cb, t2, NULL);
+        dyncfg_add_low_level(&(struct dyncfg_add_spec) {
+            .host = localhost,
+            .id = t2->id,
+            .path = "/unittests",
+            .status = DYNCFG_STATUS_RUNNING,
+            .type = t2->type,
+            .source_type = t2->source_type,
+            .source = t2->source,
+            .cmds = t2->cmds,
+            .sync = t2->sync,
+            .view_access = HTTP_ACCESS_NONE,
+            .edit_access = HTTP_ACCESS_NONE,
+            .handler = dyncfg_unittest_execute_cb,
+            .handler_data = t2,
+        });
     }
     else {
         dyncfg_unittest_register_error(t->id, "invalid command received to parse payload");
@@ -564,11 +574,21 @@ static TEST *dyncfg_unittest_add(TEST t) {
 
     TEST *ret = dictionary_set(dyncfg_unittest_data.nodes, t.id, &t, sizeof(t));
 
-    if(!dyncfg_add_low_level(localhost, t.id, "/unittests", DYNCFG_STATUS_RUNNING, t.type,
-                              t.source_type, t.source,
-                              t.cmds, 0, 0, t.sync,
-                              HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
-                              dyncfg_unittest_execute_cb, ret, NULL)) {
+    if(!dyncfg_add_low_level(&(struct dyncfg_add_spec) {
+        .host = localhost,
+        .id = t.id,
+        .path = "/unittests",
+        .status = DYNCFG_STATUS_RUNNING,
+        .type = t.type,
+        .source_type = t.source_type,
+        .source = t.source,
+        .cmds = t.cmds,
+        .sync = t.sync,
+        .view_access = HTTP_ACCESS_NONE,
+        .edit_access = HTTP_ACCESS_NONE,
+        .handler = dyncfg_unittest_execute_cb,
+        .handler_data = ret,
+    })) {
         dyncfg_unittest_register_error(t.id, "addition of job failed");
     }
 

@@ -130,25 +130,23 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
         struct nrpc_transport *template_transport_pin =
             dyncfg_node_execute_snapshot(df_template, &template_cb, &template_cb_data);
 
-        const DICTIONARY_ITEM *item = dyncfg_add_internal(
-            host,
-            id,
-            string2str(df_template->path),
-            dyncfg_status_from_successful_response(code),
-            DYNCFG_TYPE_JOB,
-            DYNCFG_SOURCE_TYPE_DYNCFG,
-            dc->source,
-            (df_template->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
-                DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
-            0,
-            0,
-            df_template->sync,
-            df_template->view_access,
-            df_template->edit_access,
-            template_cb,
-            template_cb_data,
-            template_transport_pin,
-            false);
+        const DICTIONARY_ITEM *item = dyncfg_add_internal(&(struct dyncfg_add_spec) {
+            .host = host,
+            .id = id,
+            .path = string2str(df_template->path),
+            .status = dyncfg_status_from_successful_response(code),
+            .type = DYNCFG_TYPE_JOB,
+            .source_type = DYNCFG_SOURCE_TYPE_DYNCFG,
+            .source = dc->source,
+            .cmds = (df_template->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
+                    DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
+            .sync = df_template->sync,
+            .view_access = df_template->view_access,
+            .edit_access = df_template->edit_access,
+            .handler = template_cb,
+            .handler_data = template_cb_data,
+            .transport = template_transport_pin,
+        }, false);
 
         nrpc_transport_entry_release(template_transport_pin);
 
