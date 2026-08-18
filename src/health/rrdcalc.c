@@ -568,12 +568,28 @@ void rrdcalc_delete_all(RRDHOST *host) {
 void rrdcalc_child_disconnected(RRDHOST *host) {
     rrdcalc_delete_all(host);
 
-    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    // We just deleted every alert of this host, so we must also ask health to re-create them when
+    // the child comes back. We cannot rely on chart re-registration to do it: rrdset_conflict_callback()
+    // only raises these flags when a chart definition actually changed, and a reconnecting child
+    // normally re-sends identical definitions. RRDHOST_FLAG_INITIALIZED_HEALTH is never cleared, so
+    // health_initialize_rrdhost() will not re-apply the prototypes either.
+    //
+    // This is the initialization flag rather than the label-recheck one on purpose: the alert lists
+    // are now empty, so the incremental apply path is correct and cheaper than detach-and-reattach.
+    //
+    // The flags stay pending, inert, for as long as the child is away: our caller sets
+    // host->health.enabled = false right after us, so rrdhost_should_run_health() is false and
+    // nothing consumes them. They are consumed on the first health pass after the host is online
+    // again, whichever path brings it back.
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
     rrdset_foreach_done(st);
+
+    // last: health_execute_delayed_initializations() consumes the host flag before walking the
+    // charts, so raising it first would let a pass slip through with the chart flags still unset
+    rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 }
 
 void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
