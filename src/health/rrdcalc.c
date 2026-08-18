@@ -577,10 +577,11 @@ void rrdcalc_child_disconnected(RRDHOST *host) {
     // This is the initialization flag rather than the label-recheck one on purpose: the alert lists
     // are now empty, so the incremental apply path is correct and cheaper than detach-and-reattach.
     //
-    // The flags stay pending, inert, for as long as the child is away: our caller sets
-    // host->health.enabled = false right after us, so rrdhost_should_run_health() is false and
-    // nothing consumes them. They are consumed on the first health pass after the host is online
-    // again, whichever path brings it back.
+    // The flags stay pending, inert, for as long as the child is away: our caller clears
+    // RRDHOST_FLAG_COLLECTOR_ONLINE before calling us, so rrdhost_should_run_health() is already
+    // false by the time we raise them and nothing consumes them (health.enabled = false, set later
+    // in the same caller, only reinforces this). They are consumed on the first health pass after
+    // the host is online again, whichever path brings it back.
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
