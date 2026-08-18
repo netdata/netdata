@@ -2,7 +2,7 @@ module github.com/netdata/netdata/go/plugins
 
 go 1.26.2
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.311.3
 
 replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e
 
@@ -43,7 +43,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/prometheus/common v0.70.1
-	github.com/prometheus/prometheus v2.55.1+incompatible
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8
@@ -179,6 +178,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.27 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/prometheus/prometheus v0.311.3
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
