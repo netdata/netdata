@@ -99,71 +99,12 @@ func (c *Collector) finalizeTopologyCache(cache *topologyCache) {
 	}
 
 	stats := cache.finalizeTopologyCache()
-	c.logTemporaryTopologyAliasEvidence(cache)
 
 	if stats.droppedNoMAC > 0 {
 		c.Warningf("device '%s': dropped %d topology FDB row(s) with empty MAC", stats.agentID, stats.droppedNoMAC)
 	}
 	if stats.unmappedPort > 0 {
 		c.Warningf("device '%s': observed %d topology FDB row(s) with bridge ports missing ifIndex mapping", stats.agentID, stats.unmappedPort)
-	}
-}
-
-const temporaryTopologyAliasTraceIP = "8.8.8.8"
-
-func (c *Collector) logTemporaryTopologyAliasEvidence(cache *topologyCache) {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
-	reporter := strings.TrimSpace(cache.agentID)
-	sysName := strings.TrimSpace(cache.localDevice.SysName)
-	trace := func(source, ip, mac, detail string) {
-		c.Warningf(
-			"TEMP topology alias trace: reporter=%q sys_name=%q source=%q ip=%q mac=%q detail=%q",
-			reporter,
-			sysName,
-			source,
-			ip,
-			mac,
-			detail,
-		)
-	}
-
-	if topologyutil.NormalizeIPAddress(cache.localDevice.ManagementIP) == temporaryTopologyAliasTraceIP {
-		trace("selected_management", temporaryTopologyAliasTraceIP, "", "")
-	}
-	for _, address := range cache.localDevice.ManagementAddresses {
-		if addr, ok := topologymodel.ParseManagementAddressIP(address); ok && addr.String() == temporaryTopologyAliasTraceIP {
-			trace("management_address", addr.String(), "", address.Source)
-		}
-	}
-	if ifIndex, ok := cache.ifIndexByIP[temporaryTopologyAliasTraceIP]; ok {
-		trace("ip_mib", temporaryTopologyAliasTraceIP, "", ifIndex)
-	}
-	for _, entry := range cache.arpEntries {
-		if entry != nil && topologyutil.NormalizeIPAddress(entry.ip) == temporaryTopologyAliasTraceIP {
-			trace("arp", temporaryTopologyAliasTraceIP, topologyutil.NormalizeMAC(entry.mac), entry.ifIndex+"|"+entry.ifName)
-		}
-	}
-	for _, remote := range cache.lldpRemotes {
-		if remote == nil {
-			continue
-		}
-		for _, address := range remote.managementAddrs {
-			if addr, ok := topologymodel.ParseManagementAddressIP(address); ok && addr.String() == temporaryTopologyAliasTraceIP {
-				trace("lldp", addr.String(), topologyutil.NormalizeMAC(remote.chassisID), remote.sysName)
-			}
-		}
-	}
-	for _, remote := range cache.cdpRemotes {
-		if remote == nil {
-			continue
-		}
-		for _, address := range remote.managementAddrs {
-			if addr, ok := topologymodel.ParseManagementAddressIP(address); ok && addr.String() == temporaryTopologyAliasTraceIP {
-				trace("cdp", addr.String(), "", remote.deviceID+"|"+remote.sysName)
-			}
-		}
 	}
 }
 
