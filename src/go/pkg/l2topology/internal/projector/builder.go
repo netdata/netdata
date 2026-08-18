@@ -105,7 +105,11 @@ func (b *graphBuilder) prepareIndexes() {
 			b.ifIndexByDeviceName[deviceIfNameKey(iface.DeviceID, alias)] = iface.IfIndex
 		}
 	}
-	b.bridgePortAliases = buildBridgePortAliasIndex(b.result.Attachments)
+	b.bridgePortAliases = buildBridgePortAliasIndex(
+		b.result.Attachments,
+		b.result.Adjacencies,
+		b.ifIndexByDeviceName,
+	)
 }
 
 func (b *graphBuilder) collectBridgeTopologyInputs() {
@@ -217,6 +221,7 @@ func (b *graphBuilder) buildSegmentTopology() {
 		b.deviceLinkMatchByID,
 		b.ifaceByDeviceIndex,
 		b.ifIndexByDeviceName,
+		b.bridgePortAliases,
 		b.bridgeLinks,
 		b.reporterAliases,
 		b.endpointActors.matchByEndpointID,

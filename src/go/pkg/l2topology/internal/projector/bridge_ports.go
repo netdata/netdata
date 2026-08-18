@@ -71,6 +71,7 @@ func bridgePortsFromAdjacency(
 		sourceBridgePort,
 		vlanID,
 		protocol == "stp",
+		false,
 		ifIndexByDeviceName,
 		ifaceByDeviceIndex,
 		aliases,
@@ -81,6 +82,7 @@ func bridgePortsFromAdjacency(
 		targetBridgePort,
 		vlanID,
 		protocol == "stp",
+		protocol == "stp",
 		ifIndexByDeviceName,
 		ifaceByDeviceIndex,
 		aliases,
@@ -90,7 +92,7 @@ func bridgePortsFromAdjacency(
 
 func bridgePortFromAdjacencySide(
 	deviceID, port, bridgePort, vlanID string,
-	stpSide bool,
+	stpSide, encodedPortID bool,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
 	aliases bridgePortAliasIndex,
@@ -111,7 +113,7 @@ func bridgePortFromAdjacencySide(
 	}
 
 	ifName := port
-	if stpSide && bridgePort != "" && ifIndex <= 0 {
+	if encodedPortID {
 		// A raw STP port ID is not an interface name. Keep its decoded bridge
 		// base-port in its own namespace until an observed alias resolves it.
 		ifName = ""

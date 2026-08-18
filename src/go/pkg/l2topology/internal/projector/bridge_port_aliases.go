@@ -14,7 +14,11 @@ type bridgePortAliasIndex struct {
 	ambiguous         map[string]struct{}
 }
 
-func buildBridgePortAliasIndex(attachments []model.Attachment) bridgePortAliasIndex {
+func buildBridgePortAliasIndex(
+	attachments []model.Attachment,
+	adjacencies []model.Adjacency,
+	ifIndexByDeviceName map[string]int,
+) bridgePortAliasIndex {
 	index := bridgePortAliasIndex{
 		ifIndexByBasePort: make(map[string]int),
 		ambiguous:         make(map[string]struct{}),
@@ -25,18 +29,37 @@ func buildBridgePortAliasIndex(attachments []model.Attachment) bridgePortAliasIn
 		if deviceID == "" || basePort == "" || attachment.IfIndex <= 0 {
 			continue
 		}
-		key := bridgeBasePortAliasKey(deviceID, basePort)
-		if _, ambiguous := index.ambiguous[key]; ambiguous {
+		index.add(deviceID, basePort, attachment.IfIndex)
+	}
+	for _, adjacency := range adjacencies {
+		if !strings.EqualFold(strings.TrimSpace(adjacency.Protocol), "stp") {
 			continue
 		}
-		if existing := index.ifIndexByBasePort[key]; existing > 0 && existing != attachment.IfIndex {
-			delete(index.ifIndexByBasePort, key)
-			index.ambiguous[key] = struct{}{}
+		deviceID := strings.TrimSpace(adjacency.SourceID)
+		basePort := strings.TrimSpace(adjacency.Labels["stp_port"])
+		ifIndex := resolveIfIndexByInterfaceName(deviceID, adjacency.SourcePort, ifIndexByDeviceName)
+		if deviceID == "" || basePort == "" || ifIndex <= 0 {
 			continue
 		}
-		index.ifIndexByBasePort[key] = attachment.IfIndex
+		index.add(deviceID, basePort, ifIndex)
 	}
 	return index
+}
+
+func (i bridgePortAliasIndex) add(deviceID, basePort string, ifIndex int) {
+	key := bridgeBasePortAliasKey(deviceID, basePort)
+	if key == "" || ifIndex <= 0 {
+		return
+	}
+	if _, ambiguous := i.ambiguous[key]; ambiguous {
+		return
+	}
+	if existing := i.ifIndexByBasePort[key]; existing > 0 && existing != ifIndex {
+		delete(i.ifIndexByBasePort, key)
+		i.ambiguous[key] = struct{}{}
+		return
+	}
+	i.ifIndexByBasePort[key] = ifIndex
 }
 
 func (i bridgePortAliasIndex) resolveIfIndex(deviceID, basePort string) int {
@@ -72,6 +95,7 @@ func stpBridgePortFromPortID(value string) string {
 			if port := n & 0x0fff; port > 0 {
 				return strconv.FormatUint(port, 10)
 			}
+			return ""
 		}
 	}
 	if n, err := strconv.ParseUint(value, 10, 16); err == nil {

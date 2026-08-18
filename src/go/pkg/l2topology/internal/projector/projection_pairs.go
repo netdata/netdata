@@ -33,7 +33,17 @@ func projectAdjacencyLinks(
 
 	for _, adj := range adjacencies {
 		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
-		link := adjacencyToTopologyLink(adj, protocol, layer, collectedAt, deviceByID, deviceLinkMatchByID, ifIndexByDeviceName, ifaceByDeviceIndex)
+		link := adjacencyToTopologyLink(
+			adj,
+			protocol,
+			layer,
+			collectedAt,
+			deviceByID,
+			deviceLinkMatchByID,
+			ifIndexByDeviceName,
+			ifaceByDeviceIndex,
+			bridgePortAliases,
+		)
 
 		pairID := strings.TrimSpace(adj.Labels[adjacencyLabelPairID])
 		if pairID != "" {
@@ -247,11 +257,38 @@ func adjacencyToTopologyLink(
 	deviceLinkMatchByID map[string]graph.Match,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
+	bridgePortAliases bridgePortAliasIndex,
 ) graph.Link {
 	srcDevice := deviceByID[adj.SourceID]
 	dstDevice := deviceByID[adj.TargetID]
-	src := adjacencySideToEndpointWithMatch(srcDevice, deviceLinkEndpointMatch(srcDevice, deviceLinkMatchByID), adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
-	dst := adjacencySideToEndpointWithMatch(dstDevice, deviceLinkEndpointMatch(dstDevice, deviceLinkMatchByID), adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
+	srcMatch := deviceLinkEndpointMatch(srcDevice, deviceLinkMatchByID)
+	dstMatch := deviceLinkEndpointMatch(dstDevice, deviceLinkMatchByID)
+	src := adjacencySideToEndpointWithMatch(srcDevice, srcMatch, adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
+	dst := adjacencySideToEndpointWithMatch(dstDevice, dstMatch, adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
+	if protocol == "stp" {
+		srcPort, dstPort := bridgePortsFromAdjacency(
+			adj,
+			ifIndexByDeviceName,
+			ifaceByDeviceIndex,
+			bridgePortAliases,
+		)
+		src = adjacencySideToEndpointWithBridgePortRef(
+			srcDevice,
+			srcMatch,
+			adj.SourcePort,
+			srcPort,
+			ifIndexByDeviceName,
+			ifaceByDeviceIndex,
+		)
+		dst = adjacencySideToEndpointWithBridgePortRef(
+			dstDevice,
+			dstMatch,
+			adj.TargetPort,
+			dstPort,
+			ifIndexByDeviceName,
+			ifaceByDeviceIndex,
+		)
+	}
 
 	link := graph.Link{
 		Layer:        layer,

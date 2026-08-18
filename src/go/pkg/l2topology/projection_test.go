@@ -474,6 +474,20 @@ func TestProjectionCorrelatesQBridgeFDBWithVLANScopedSTPSegment(t *testing.T) {
 	require.ElementsMatch(t, []string{"switch-a", "switch-b"}, segments[0].ParentDevices)
 	require.True(t, segments[0].EndpointsTotal.Has)
 	require.Equal(t, 4, segments[0].EndpointsTotal.Value)
+
+	stpLinkIndex := -1
+	for i := range projection.Graph.Links {
+		if projection.Graph.Links[i].LinkType == "stp" {
+			stpLinkIndex = i
+			break
+		}
+	}
+	require.NotEqual(t, -1, stpLinkIndex)
+	stpLink := projection.Graph.Links[stpLinkIndex]
+	require.Equal(t, 2, stpLink.Dst.IfIndex)
+	require.Equal(t, "Ethernet2", stpLink.Dst.IfName)
+	require.Equal(t, "2", stpLink.Dst.BridgePort)
+	require.Equal(t, "8002", stpLink.Dst.PortID)
 }
 
 func TestProjectionCorrelatesBridgeMIBWithCanonicalSTPPort(t *testing.T) {
@@ -524,30 +538,49 @@ func TestProjectionCorrelatesBridgeMIBWithCanonicalSTPPort(t *testing.T) {
 }
 
 func TestProjectionDeduplicatesDirectSTPAcrossVLANScopes(t *testing.T) {
-	result := Result{
-		Devices: []Device{
-			{ID: "switch-a", Hostname: "switch-a", ChassisID: "02:00:00:00:00:01"},
-			{ID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02"},
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			Interfaces:        []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			STPPorts: []STPPortObservation{
+				{Port: "1", VLANID: "100", DesignatedBridge: "02:00:00:00:00:02", DesignatedPort: "8002"},
+				{Port: "1", VLANID: "200", DesignatedBridge: "02:00:00:00:00:02", DesignatedPort: "8002"},
+			},
 		},
-		Interfaces: []Interface{
-			{DeviceID: "switch-a", IfIndex: 1, IfName: "Ethernet1"},
-			{DeviceID: "switch-b", IfIndex: 2, IfName: "Ethernet2"},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+			Interfaces:        []ObservedInterface{{IfIndex: 2, IfName: "Ethernet2"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "2", IfIndex: 2}},
+			STPPorts: []STPPortObservation{
+				{Port: "2", VLANID: "100", DesignatedBridge: "02:00:00:00:00:01", DesignatedPort: "8001"},
+			},
 		},
-		Adjacencies: []Adjacency{
-			{Protocol: "stp", SourceID: "switch-a", SourcePort: "Ethernet1", TargetID: "switch-b", TargetPort: "Ethernet2", Labels: map[string]string{"vlan_id": "100"}},
-			{Protocol: "stp", SourceID: "switch-a", SourcePort: "Ethernet1", TargetID: "switch-b", TargetPort: "Ethernet2", Labels: map[string]string{"vlan_id": "200"}},
-			{Protocol: "stp", SourceID: "switch-b", SourcePort: "Ethernet2", TargetID: "switch-a", TargetPort: "Ethernet1", Labels: map[string]string{"vlan_id": "100"}},
-		},
-	}
+	}, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
 
 	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
 	stpLinks := 0
-	for _, link := range projection.Graph.Links {
-		if link.LinkType == "stp" {
+	stpLinkIndex := -1
+	for i := range projection.Graph.Links {
+		if projection.Graph.Links[i].LinkType == "stp" {
 			stpLinks++
+			stpLinkIndex = i
 		}
 	}
 	require.Equal(t, 1, stpLinks)
+	require.NotEqual(t, -1, stpLinkIndex)
+	stpLink := projection.Graph.Links[stpLinkIndex]
+	require.Equal(t, 1, stpLink.Src.IfIndex)
+	require.Equal(t, "1", stpLink.Src.BridgePort)
+	require.Equal(t, 2, stpLink.Dst.IfIndex)
+	require.Equal(t, "2", stpLink.Dst.BridgePort)
 }
 
 func TestProjectionKeepsDistinctSTPLinksWithoutPortIdentity(t *testing.T) {

@@ -23,7 +23,7 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 		b.adjacencies,
 		b.ifIndexByDeviceName,
 		b.ifaceByDeviceIndex,
-		buildBridgePortAliasIndex(b.attachments),
+		b.bridgePortAliases,
 	)
 	seedMacLinks := collectBridgeMacLinkRecords(b.attachments, b.ifaceByDeviceIndex, deterministicTransitPortKeys)
 	b.rawFDBObservations = buildFDBReporterObservations(seedMacLinks)

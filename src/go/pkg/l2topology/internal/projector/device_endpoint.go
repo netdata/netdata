@@ -72,6 +72,30 @@ func adjacencySideToEndpointWithMatch(
 	return endpoint
 }
 
+func adjacencySideToEndpointWithBridgePortRef(
+	dev model.Device,
+	match graph.Match,
+	rawPort string,
+	port bridgePortRef,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+) graph.LinkEndpoint {
+	canonicalPort := strings.TrimSpace(port.ifName)
+	if port.ifIndex > 0 {
+		canonicalPort = strconv.Itoa(port.ifIndex)
+	}
+	endpoint := adjacencySideToEndpointWithMatch(
+		dev,
+		match,
+		canonicalPort,
+		ifIndexByDeviceName,
+		ifaceByDeviceIndex,
+	)
+	endpoint.PortID = strings.TrimSpace(rawPort)
+	endpoint.BridgePort = strings.TrimSpace(port.bridgePort)
+	return endpoint
+}
+
 func deviceLinkEndpointMatch(dev model.Device, matchByDeviceID map[string]graph.Match) graph.Match {
 	if match, ok := matchByDeviceID[dev.ID]; ok {
 		return match

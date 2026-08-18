@@ -438,8 +438,16 @@ func topologyScenarioSTPTags(local, designated *topologyScenarioPort) map[string
 		tagStpPortPathCost:         "4",
 		tagStpPortDesignatedRoot:   designated.device.chassisMAC,
 		tagStpPortDesignatedBridge: designated.device.chassisMAC,
-		tagStpPortDesignatedPort:   designated.bridgePort,
+		tagStpPortDesignatedPort:   topologyScenarioSTPPortID(designated.bridgePort),
 	}
+}
+
+func topologyScenarioSTPPortID(basePort string) string {
+	port, err := strconv.ParseUint(strings.TrimSpace(basePort), 10, 12)
+	if err != nil || port == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%04x", 0x8000|port)
 }
 
 func topologyScenarioOSPFTags(local, remote *topologyScenarioPort) map[string]string {
