@@ -111,18 +111,22 @@ func TestMergeRootDomainSets_MergesTwoNonRootMembersAcrossDomains(t *testing.T) 
 func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "lldp",
-			SourceID:   "a",
-			SourcePort: "Gi0/1",
-			TargetID:   "b",
-			TargetPort: "Gi0/2",
+			Protocol:           "lldp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/1",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+			TargetID:           "b",
+			TargetPort:         "Gi0/2",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
 		},
 		{
-			Protocol:   "lldp",
-			SourceID:   "b",
-			SourcePort: "Gi0/2",
-			TargetID:   "a",
-			TargetPort: "Gi0/1",
+			Protocol:           "lldp",
+			SourceID:           "b",
+			SourcePort:         "Gi0/2",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
+			TargetID:           "a",
+			TargetPort:         "Gi0/1",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 		},
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,
@@ -137,11 +141,12 @@ func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T
 func TestCollectBridgeLinkRecords_SkipsAdjacencyWithoutRemotePort(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "lldp",
-			SourceID:   "a",
-			SourcePort: "Gi0/1",
-			TargetID:   "b",
-			TargetPort: "",
+			Protocol:           "lldp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/1",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+			TargetID:           "b",
+			TargetPort:         "",
 		},
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,
@@ -202,18 +207,22 @@ func TestCollectBridgeLinkRecords_STPPreservesVLANScopes(t *testing.T) {
 func TestCollectBridgeLinkRecords_CDPHybridSkipsLLDPAdjacencies(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "lldp",
-			SourceID:   "a",
-			SourcePort: "Gi0/1",
-			TargetID:   "b",
-			TargetPort: "Gi0/2",
+			Protocol:           "lldp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/1",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+			TargetID:           "b",
+			TargetPort:         "Gi0/2",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
 		},
 		{
-			Protocol:   "cdp",
-			SourceID:   "a",
-			SourcePort: "Gi0/3",
-			TargetID:   "c",
-			TargetPort: "Gi0/4",
+			Protocol:           "cdp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/3",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "Gi0/3"},
+			TargetID:           "c",
+			TargetPort:         "Gi0/4",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 4, IfName: "Gi0/4"},
 		},
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,

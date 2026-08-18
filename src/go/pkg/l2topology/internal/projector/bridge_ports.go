@@ -56,41 +56,22 @@ func bridgePortsFromAdjacency(
 	ifaceByDeviceIndex map[string]model.Interface,
 	aliases bridgePortAliasIndex,
 ) (bridgePortRef, bridgePortRef) {
-	protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
 	vlanID := adjacencyVLANID(adj)
-	if protocol == "stp" {
-		return bridgePortFromAdjacencyEvidence(
-				adj.SourceID,
-				adj.SourcePortEvidence,
-				vlanID,
-				ifIndexByDeviceName,
-				ifaceByDeviceIndex,
-				aliases,
-			), bridgePortFromAdjacencyEvidence(
-				adj.TargetID,
-				adj.TargetPortEvidence,
-				vlanID,
-				ifIndexByDeviceName,
-				ifaceByDeviceIndex,
-				aliases,
-			)
-	}
-
-	src := bridgePortFromRawAdjacencySide(
-		adj.SourceID,
-		adj.SourcePort,
-		vlanID,
-		ifIndexByDeviceName,
-		ifaceByDeviceIndex,
-	)
-	dst := bridgePortFromRawAdjacencySide(
-		adj.TargetID,
-		adj.TargetPort,
-		vlanID,
-		ifIndexByDeviceName,
-		ifaceByDeviceIndex,
-	)
-	return src, dst
+	return bridgePortFromAdjacencyEvidence(
+			adj.SourceID,
+			adj.SourcePortEvidence,
+			vlanID,
+			ifIndexByDeviceName,
+			ifaceByDeviceIndex,
+			aliases,
+		), bridgePortFromAdjacencyEvidence(
+			adj.TargetID,
+			adj.TargetPortEvidence,
+			vlanID,
+			ifIndexByDeviceName,
+			ifaceByDeviceIndex,
+			aliases,
+		)
 }
 
 func bridgePortFromAdjacencyEvidence(
@@ -130,35 +111,6 @@ func bridgePortFromAdjacencyEvidence(
 		ifName:     ifName,
 		bridgePort: bridgePort,
 		vlanID:     strings.TrimSpace(vlanID),
-	}
-}
-
-func bridgePortFromRawAdjacencySide(
-	deviceID, port, vlanID string,
-	ifIndexByDeviceName map[string]int,
-	ifaceByDeviceIndex map[string]model.Interface,
-) bridgePortRef {
-	deviceID = strings.TrimSpace(deviceID)
-	port = strings.TrimSpace(port)
-	if deviceID == "" || port == "" {
-		return bridgePortRef{}
-	}
-
-	ifIndex := resolveIfIndexByPortName(deviceID, port, ifIndexByDeviceName)
-	ifName := port
-	if ifIndex > 0 {
-		if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(deviceID, ifIndex)]; ok {
-			if name := strings.TrimSpace(iface.IfName); name != "" {
-				ifName = name
-			}
-		}
-	}
-
-	return bridgePortRef{
-		deviceID: deviceID,
-		ifIndex:  ifIndex,
-		ifName:   ifName,
-		vlanID:   strings.TrimSpace(vlanID),
 	}
 }
 

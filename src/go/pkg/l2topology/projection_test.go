@@ -202,6 +202,93 @@ func TestProjectionDoesNotReintroduceRejectedCDPAddressAsEndpointIdentity(t *tes
 	require.Empty(t, observerDetail.Ports[0].Neighbors[0].RemoteIP)
 }
 
+func TestProjectionPreservesObservedCDPIfIndexAcrossNumericNameCollision(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:   "switch-a",
+			Hostname:   "switch-a",
+			Interfaces: []ObservedInterface{{IfIndex: 99, IfName: "7"}},
+			CDPRemotes: []CDPRemoteObservation{{
+				LocalIfIndex: 7,
+				DeviceID:     "switch-b",
+				SysName:      "switch-b",
+				DevicePort:   "Ethernet2",
+			}},
+		},
+		{DeviceID: "switch-b", Hostname: "switch-b"},
+	}, DiscoverOptions{EnableCDP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	require.Len(t, projection.Graph.Links, 1)
+	link := projection.Graph.Links[0]
+	require.Equal(t, "cdp", link.Protocol)
+	require.Equal(t, 7, link.Src.IfIndex)
+	require.Empty(t, link.Src.IfName)
+	require.Equal(t, "7", link.Src.PortID)
+}
+
+func TestProjectionDoesNotInferIfIndexFromNumericLLDPRawPortID(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:   "switch-a",
+			Hostname:   "switch-a",
+			ChassisID:  "02:00:00:00:00:01",
+			Interfaces: []ObservedInterface{{IfIndex: 99, IfName: "7"}},
+			LLDPRemotes: []LLDPRemoteObservation{{
+				LocalPortNum:       "7",
+				LocalPortID:        "7",
+				LocalPortIDSubtype: "local",
+				ChassisID:          "02:00:00:00:00:02",
+				SysName:            "switch-b",
+				PortID:             "Ethernet2",
+				PortIDSubtype:      "interfaceName",
+			}},
+		},
+		{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02"},
+	}, DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	require.Len(t, projection.Graph.Links, 1)
+	link := projection.Graph.Links[0]
+	require.Equal(t, "lldp", link.Protocol)
+	require.Zero(t, link.Src.IfIndex)
+	require.Empty(t, link.Src.IfName)
+	require.Equal(t, "7", link.Src.PortID)
+	require.Equal(t, "Ethernet2", link.Dst.IfName)
+	require.Equal(t, "Ethernet2", link.Dst.PortID)
+}
+
+func TestProjectionDoesNotInferIfIndexFromNumericCDPRemotePort(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			CDPRemotes: []CDPRemoteObservation{{
+				LocalIfIndex: 1,
+				DeviceID:     "switch-b",
+				SysName:      "switch-b",
+				DevicePort:   "7",
+			}},
+		},
+		{
+			DeviceID:   "switch-b",
+			Hostname:   "switch-b",
+			Interfaces: []ObservedInterface{{IfIndex: 99, IfName: "7"}},
+		},
+	}, DiscoverOptions{EnableCDP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	require.Len(t, projection.Graph.Links, 1)
+	link := projection.Graph.Links[0]
+	require.Equal(t, "cdp", link.Protocol)
+	require.Zero(t, link.Dst.IfIndex)
+	require.Empty(t, link.Dst.IfName)
+	require.Equal(t, "7", link.Dst.PortID)
+}
+
 func TestProjectionKeepsLinkEndpointIPHintsConstantSized(t *testing.T) {
 	const (
 		aliasCount = 256
@@ -488,6 +575,82 @@ func TestProjectionCorrelatesQBridgeFDBWithVLANScopedSTPSegment(t *testing.T) {
 	require.Equal(t, "Ethernet2", stpLink.Dst.IfName)
 	require.Equal(t, "2", stpLink.Dst.BridgePort)
 	require.Equal(t, "8002", stpLink.Dst.PortID)
+}
+
+func TestProjectionCoalescesOverlappingFDBSourcesBeforeAssignment(t *testing.T) {
+	tests := map[string]struct {
+		entries       []FDBObservation
+		managedPeers  []L2Observation
+		wantEndpoints int
+	}{
+		"domainless bridge and raw q-bridge": {
+			entries: []FDBObservation{
+				{MAC: "02:00:00:00:01:01", BridgePort: "1", Status: "learned"},
+				{MAC: "02:00:00:00:01:01", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+			},
+			managedPeers: []L2Observation{
+				{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:01:01"},
+			},
+			wantEndpoints: 1,
+		},
+		"raw q-bridge and vlan-context fdb": {
+			entries: []FDBObservation{
+				{MAC: "02:00:00:00:01:01", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+				{MAC: "02:00:00:00:01:01", BridgePort: "1", Status: "learned", FDBDomainID: "vlan:100", VLANID: "100"},
+			},
+			managedPeers: []L2Observation{
+				{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:01:01"},
+			},
+			wantEndpoints: 1,
+		},
+		"unique vlan alias spans endpoint rows": {
+			entries: []FDBObservation{
+				{MAC: "02:00:00:00:01:01", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+				{MAC: "02:00:00:00:01:02", BridgePort: "1", Status: "learned", FDBDomainID: "vlan:100", VLANID: "100"},
+			},
+			managedPeers: []L2Observation{
+				{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:01:01"},
+				{DeviceID: "switch-c", Hostname: "switch-c", ChassisID: "02:00:00:00:01:02"},
+			},
+			wantEndpoints: 2,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			observations := []L2Observation{{
+				DeviceID:    "switch-a",
+				Hostname:    "switch-a",
+				ChassisID:   "02:00:00:00:00:01",
+				Interfaces:  []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+				BridgePorts: []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+				FDBEntries:  tt.entries,
+			}}
+			observations = append(observations, tt.managedPeers...)
+			result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+			require.NoError(t, err)
+
+			projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+			var segments []ProjectionSegmentActorDetail
+			fdbLinks := 0
+			for _, detail := range projection.ActorDetails {
+				if detail.Segment.SegmentID != "" {
+					segments = append(segments, detail.Segment)
+				}
+			}
+			for _, link := range projection.Graph.Links {
+				if link.Protocol == "fdb" {
+					fdbLinks++
+				}
+			}
+
+			require.Len(t, segments, 1)
+			require.Equal(t, []string{"switch-a"}, segments[0].ParentDevices)
+			require.True(t, segments[0].EndpointsTotal.Has)
+			require.Equal(t, tt.wantEndpoints, segments[0].EndpointsTotal.Value)
+			require.Equal(t, tt.wantEndpoints, fdbLinks)
+		})
+	}
 }
 
 func TestProjectionCorrelatesBridgeMIBWithCanonicalSTPPort(t *testing.T) {

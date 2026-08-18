@@ -72,6 +72,72 @@ func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 	require.Equal(t, "switch-b", result.Adjacencies[1].TargetID)
 }
 
+func TestBuildL2ResultFromObservations_PopulatesTypedLLDPPortEvidenceBySubtype(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{
+		{
+			DeviceID:  "switch-a",
+			Hostname:  "switch-a",
+			ChassisID: "02:00:00:00:00:01",
+			LLDPRemotes: []model.LLDPRemoteObservation{{
+				LocalPortID:        "7",
+				LocalPortIDSubtype: "local",
+				ChassisID:          "02:00:00:00:00:02",
+				SysName:            "switch-b",
+				PortID:             "Ethernet2",
+				PortIDSubtype:      "interfaceName",
+			}},
+		},
+		{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02"},
+	}, model.DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 1)
+	require.Equal(t, "7", result.Adjacencies[0].SourcePort)
+	require.Equal(t, model.AdjacencyPortEvidence{}, result.Adjacencies[0].SourcePortEvidence)
+	require.Equal(t, "Ethernet2", result.Adjacencies[0].TargetPort)
+	require.Equal(t, model.AdjacencyPortEvidence{IfName: "Ethernet2"}, result.Adjacencies[0].TargetPortEvidence)
+}
+
+func TestBuildL2ResultFromObservations_PairedCDPCopiesObservedTargetPortEvidence(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			CDPRemotes: []model.CDPRemoteObservation{{
+				LocalIfIndex: 1,
+				LocalIfName:  "Ethernet1",
+				DeviceID:     "switch-b",
+				SysName:      "switch-b",
+				DevicePort:   "Ethernet2",
+			}},
+		},
+		{
+			DeviceID: "switch-b",
+			Hostname: "switch-b",
+			CDPRemotes: []model.CDPRemoteObservation{{
+				LocalIfIndex: 2,
+				LocalIfName:  "Ethernet2",
+				DeviceID:     "switch-a",
+				SysName:      "switch-a",
+				DevicePort:   "Ethernet1",
+			}},
+		},
+	}, model.DiscoverOptions{EnableCDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 2)
+	for _, adjacency := range result.Adjacencies {
+		switch adjacency.SourceID {
+		case "switch-a":
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Ethernet1"}, adjacency.SourcePortEvidence)
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Ethernet2"}, adjacency.TargetPortEvidence)
+		case "switch-b":
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Ethernet2"}, adjacency.SourcePortEvidence)
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Ethernet1"}, adjacency.TargetPortEvidence)
+		default:
+			t.Fatalf("unexpected source %q", adjacency.SourceID)
+		}
+	}
+}
+
 func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
 	observations := []model.L2Observation{
 		{

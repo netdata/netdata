@@ -31,17 +31,13 @@ func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, devic
 	protocol = strings.ToLower(strings.TrimSpace(protocol))
 	targetID := strings.TrimSpace(adj.TargetID)
 	remotePort := strings.TrimSpace(adj.TargetPort)
-	if protocol == "stp" {
-		switch {
-		case strings.TrimSpace(adj.TargetPortEvidence.IfName) != "":
-			remotePort = strings.TrimSpace(adj.TargetPortEvidence.IfName)
-		case adj.TargetPortEvidence.IfIndex > 0:
-			remotePort = strconv.Itoa(adj.TargetPortEvidence.IfIndex)
-		case strings.TrimSpace(adj.TargetPortEvidence.BridgePort) != "":
-			remotePort = strings.TrimSpace(adj.TargetPortEvidence.BridgePort)
-		default:
-			remotePort = ""
-		}
+	switch {
+	case strings.TrimSpace(adj.TargetPortEvidence.IfName) != "":
+		remotePort = strings.TrimSpace(adj.TargetPortEvidence.IfName)
+	case adj.TargetPortEvidence.IfIndex > 0:
+		remotePort = strconv.Itoa(adj.TargetPortEvidence.IfIndex)
+	case strings.TrimSpace(adj.TargetPortEvidence.BridgePort) != "":
+		remotePort = strings.TrimSpace(adj.TargetPortEvidence.BridgePort)
 	}
 
 	neighbor := topologyPortNeighborStatus{

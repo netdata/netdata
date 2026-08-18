@@ -14,6 +14,7 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 	lldpPairs := matchLLDPLinksEnlinkdPassOrder(lldpLinks)
 	lldpTargetOverrides := buildLLDPTargetOverrides(lldpLinks, lldpPairs)
 	lldpPairMetadata := buildLLDPPairMetadata(lldpLinks, lldpPairs)
+	lldpPairedTargetPortEvidence := buildLLDPPairedTargetPortEvidence(lldpLinks, lldpPairs)
 
 	for _, link := range lldpLinks {
 		managementIP := canonicalUsableIPAddress(link.remoteManagement)
@@ -28,11 +29,16 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 		s.recordRemoteManagementAddress(targetID, managementIPValue)
 
 		adj := model.Adjacency{
-			Protocol:   "lldp",
-			SourceID:   link.sourceDeviceID,
-			SourcePort: link.sourcePort,
-			TargetID:   targetID,
-			TargetPort: link.targetPort,
+			Protocol:           "lldp",
+			SourceID:           link.sourceDeviceID,
+			SourcePort:         link.sourcePort,
+			SourcePortEvidence: lldpLocalPortEvidence(link),
+			TargetID:           targetID,
+			TargetPort:         link.targetPort,
+			TargetPortEvidence: mergeAdjacencyPortEvidence(
+				lldpPairedTargetPortEvidence[link.index],
+				lldpRemotePortEvidence(link),
+			),
 		}
 		applyAdjacencyPairMetadata(&adj, lldpPairMetadata[link.index])
 		if addAdjacency(s.adjacencies, adj) {
@@ -46,6 +52,7 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 	cdpPairs := matchCDPLinksEnlinkdPassOrder(cdpLinks)
 	cdpTargetOverrides := buildCDPTargetOverrides(cdpLinks, cdpPairs)
 	cdpPairMetadata := buildCDPPairMetadata(cdpLinks, cdpPairs)
+	cdpPairedTargetPortEvidence := buildCDPPairedTargetPortEvidence(cdpLinks, cdpPairs)
 
 	for _, link := range cdpLinks {
 		managementAddr := canonicalUsableIPAddress(link.remoteManagementIP)
@@ -61,15 +68,13 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 		s.recordRemoteManagementAddress(targetID, managementIP)
 
 		adj := model.Adjacency{
-			Protocol:   "cdp",
-			SourceID:   link.sourceDeviceID,
-			SourcePort: link.localInterfaceName,
-			SourcePortEvidence: model.AdjacencyPortEvidence{
-				IfIndex: link.localIfIndex,
-				IfName:  link.localObservedName,
-			},
-			TargetID:   targetID,
-			TargetPort: link.remoteDevicePort,
+			Protocol:           "cdp",
+			SourceID:           link.sourceDeviceID,
+			SourcePort:         link.localInterfaceName,
+			SourcePortEvidence: cdpLocalPortEvidence(link),
+			TargetID:           targetID,
+			TargetPort:         link.remoteDevicePort,
+			TargetPortEvidence: cdpPairedTargetPortEvidence[link.index],
 		}
 		if managementIP != "" || strings.TrimSpace(rawAddress) != "" {
 			adj.Labels = make(map[string]string, 2)

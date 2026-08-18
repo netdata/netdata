@@ -1478,6 +1478,91 @@ func TestTopologyCache_VLANContextFDBEntriesRemainDistinct(t *testing.T) {
 	require.Equal(t, "servers", obs.FDBEntries[1].VLANName)
 }
 
+func TestTopologyCache_OverlappingFDBSourcesRemainUsableInProjection(t *testing.T) {
+	tests := map[string]struct {
+		addOverlap func(*topologyCache)
+	}{
+		"bridge and q-bridge": {
+			addOverlap: func(cache *topologyCache) {
+				cache.updateFdbEntry(map[string]string{
+					tagFdbMac:        "020000000101",
+					tagFdbBridgePort: "7",
+					tagFdbStatus:     "learned",
+				})
+			},
+		},
+		"q-bridge and vlan context": {
+			addOverlap: func(cache *topologyCache) {
+				cache.ingestTopologyVLANContextMetrics("100", "users", []*ddsnmp.ProfileMetrics{{
+					TopologyMetrics: []ddsnmp.Metric{{
+						TopologyKind: ddsnmp.KindFdbEntry,
+						Tags: map[string]string{
+							tagFdbMac:        "020000000101",
+							tagFdbBridgePort: "7",
+							tagFdbStatus:     "learned",
+						},
+					}},
+				}})
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyCache()
+			cache.localDevice = topologymodel.Device{
+				ChassisID:     "02:00:00:00:00:01",
+				ChassisIDType: "macAddress",
+				SysName:       "switch-a",
+			}
+			cache.updateBridgePortMap(map[string]string{
+				tagBridgeBasePort: "7",
+				tagBridgeIfIndex:  "1",
+			})
+			cache.updateIfNameByIndex(map[string]string{
+				tagTopoIfIndex: "1",
+				tagTopoIfName:  "Ethernet1",
+			})
+			cache.updateFdbEntry(map[string]string{
+				tagDot1qFdbID:     "500",
+				tagDot1qFdbMac:    "020000000101",
+				tagDot1qFdbPort:   "7",
+				tagDot1qFdbStatus: "learned",
+			})
+			cache.updateDot1qVlanMap(map[string]string{
+				tagDot1qVlanID:    "100",
+				tagDot1qVlanFdbID: "500",
+			})
+			tt.addOverlap(cache)
+			cache.finalizeTopologyCache()
+
+			local := cache.buildEngineObservation(cache.localDevice)
+			require.Len(t, local.FDBEntries, 2)
+			result, err := topologyengine.BuildL2ResultFromObservations([]topologyengine.L2Observation{
+				local,
+				{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:01:01"},
+			}, topologyengine.DiscoverOptions{EnableBridge: true})
+			require.NoError(t, err)
+
+			projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{Source: "snmp", Layer: "2"})
+			segments := 0
+			fdbLinks := 0
+			for _, actor := range projection.Graph.Actors {
+				if actor.ActorType == "segment" {
+					segments++
+				}
+			}
+			for _, link := range projection.Graph.Links {
+				if link.Protocol == "fdb" {
+					fdbLinks++
+				}
+			}
+			require.Equal(t, 1, segments)
+			require.Equal(t, 1, fdbLinks)
+		})
+	}
+}
+
 func TestPickManagementIP_DeterministicAcrossInputOrder(t *testing.T) {
 	addrsA := []topologymodel.ManagementAddress{
 		{Address: "10.20.4.60", Source: "ip_mib"},

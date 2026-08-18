@@ -41,11 +41,13 @@ func TestToGraph_ProjectsResult(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "local-device",
-				SourcePort: "Gi0/3",
-				TargetID:   "remote-device",
-				TargetPort: "Gi0/1",
+				Protocol:           "lldp",
+				SourceID:           "local-device",
+				SourcePort:         "Gi0/3",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "Gi0/3"},
+				TargetID:           "remote-device",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/1"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -215,11 +217,13 @@ func TestToGraph_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "sw1",
-				SourcePort: "Gi0/3",
-				TargetID:   "sw2",
-				TargetPort: "Gi0/1",
+				Protocol:           "lldp",
+				SourceID:           "sw1",
+				SourcePort:         "Gi0/3",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "Gi0/3"},
+				TargetID:           "sw2",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 			},
 			{
 				Protocol:           "stp",
@@ -513,18 +517,22 @@ func TestToGraph_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "sw1",
-				SourcePort: "Gi0/1",
-				TargetID:   "sw2",
-				TargetPort: "Gi0/24",
+				Protocol:           "lldp",
+				SourceID:           "sw1",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "sw2",
+				TargetPort:         "Gi0/24",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/24"},
 			},
 			{
-				Protocol:   "cdp",
-				SourceID:   "sw1",
-				SourcePort: "Gi0/1",
-				TargetID:   "sw2",
-				TargetPort: "Gi0/24",
+				Protocol:           "cdp",
+				SourceID:           "sw1",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "sw2",
+				TargetPort:         "Gi0/24",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/24"},
 			},
 			{
 				Protocol:           "stp",
@@ -761,11 +769,13 @@ func TestToGraph_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "sw1",
-				SourcePort: "Gi0/1",
-				TargetID:   "sw2",
-				TargetPort: "Gi0/2",
+				Protocol:           "lldp",
+				SourceID:           "sw1",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/1"},
+				TargetID:           "sw2",
+				TargetPort:         "Gi0/2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/2"},
 			},
 		},
 	}
@@ -821,11 +831,13 @@ func TestToGraph_DeterministicAcrossRepeatedCalls(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "local-device",
-				SourcePort: "Gi0/3",
-				TargetID:   "remote-device",
-				TargetPort: "Gi0/1",
+				Protocol:           "lldp",
+				SourceID:           "local-device",
+				SourcePort:         "Gi0/3",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "Gi0/3"},
+				TargetID:           "remote-device",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/1"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -1021,22 +1033,26 @@ func TestToGraph_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "switch-b",
-				TargetPort: "Gi0/2",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "switch-b",
+				TargetPort:         "Gi0/2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-a-b",
 					adjacencyLabelPairPass: lldpMatchPassDefault,
 				},
 			},
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-b",
-				SourcePort: "Gi0/2",
-				TargetID:   "switch-a",
-				TargetPort: "Gi0/1",
+				Protocol:           "lldp",
+				SourceID:           "switch-b",
+				SourcePort:         "Gi0/2",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
+				TargetID:           "switch-a",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-a-b",
 					adjacencyLabelPairPass: lldpMatchPassDefault,
@@ -1089,11 +1105,13 @@ func TestToGraph_MergesPairedAdjacenciesDoesNotProjectRawAddressEvidence(t *test
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "cdp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "switch-b",
-				TargetPort: "Gi0/2",
+				Protocol:           "cdp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/1"},
+				TargetID:           "switch-b",
+				TargetPort:         "Gi0/2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/2"},
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "cdp:pair-a-b",
 					adjacencyLabelPairPass: cdpMatchPassDefault,
@@ -1102,11 +1120,13 @@ func TestToGraph_MergesPairedAdjacenciesDoesNotProjectRawAddressEvidence(t *test
 				},
 			},
 			{
-				Protocol:   "cdp",
-				SourceID:   "switch-b",
-				SourcePort: "Gi0/2",
-				TargetID:   "switch-a",
-				TargetPort: "Gi0/1",
+				Protocol:           "cdp",
+				SourceID:           "switch-b",
+				SourcePort:         "Gi0/2",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/2"},
+				TargetID:           "switch-a",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/1"},
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "cdp:pair-a-b",
 					adjacencyLabelPairPass: cdpMatchPassDefault,
@@ -1155,22 +1175,25 @@ func TestToGraph_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "router-a",
-				SourcePort: "ether3",
-				TargetID:   "switch-b",
-				TargetPort: "",
+				Protocol:           "lldp",
+				SourceID:           "router-a",
+				SourcePort:         "ether3",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "ether3"},
+				TargetID:           "switch-b",
+				TargetPort:         "",
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-router-xs",
 					adjacencyLabelPairPass: lldpMatchPassPortDesc,
 				},
 			},
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-b",
-				SourcePort: "8",
-				TargetID:   "router-a",
-				TargetPort: "ether3",
+				Protocol:           "lldp",
+				SourceID:           "switch-b",
+				SourcePort:         "8",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 8, IfName: "swp07"},
+				TargetID:           "router-a",
+				TargetPort:         "ether3",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "ether3"},
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-router-xs",
 					adjacencyLabelPairPass: lldpMatchPassPortDesc,
@@ -1223,11 +1246,12 @@ func TestToGraph_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "router-a",
-				SourcePort: "ether3",
-				TargetID:   "switch-b",
-				TargetPort: "",
+				Protocol:           "lldp",
+				SourceID:           "router-a",
+				SourcePort:         "ether3",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "ether3"},
+				TargetID:           "switch-b",
+				TargetPort:         "",
 			},
 		},
 	}
@@ -1542,18 +1566,22 @@ func TestToGraph_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testin
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "switch-b",
-				TargetPort: "Gi0/1",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "switch-b",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 			},
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/2",
-				TargetID:   "switch-b",
-				TargetPort: "Gi0/2",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/2",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
+				TargetID:           "switch-b",
+				TargetPort:         "Gi0/2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -1793,18 +1821,22 @@ func TestToGraph_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) 
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "sw-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "sw-b",
-				TargetPort: "Gi0/1",
+				Protocol:           "lldp",
+				SourceID:           "sw-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "sw-b",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 			},
 			{
-				Protocol:   "cdp",
-				SourceID:   "sw-a",
-				SourcePort: "Gi0/2",
-				TargetID:   "sw-c",
-				TargetPort: "Gi0/1",
+				Protocol:           "cdp",
+				SourceID:           "sw-a",
+				SourcePort:         "Gi0/2",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
+				TargetID:           "sw-c",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -1994,11 +2026,12 @@ func TestToGraph_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *test
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "remote-peer",
-				TargetPort: "cc:cc:cc:cc:cc:cc",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "remote-peer",
+				TargetPort:         "cc:cc:cc:cc:cc:cc",
 			},
 		},
 		Attachments: []model.Attachment{
@@ -2051,11 +2084,12 @@ func TestToGraph_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "nova",
-				TargetPort: "9c:6b:00:7b:98:c7",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "nova",
+				TargetPort:         "9c:6b:00:7b:98:c7",
 			},
 		},
 		Attachments: []model.Attachment{
@@ -2270,11 +2304,13 @@ func TestToGraph_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testin
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "mega",
-				TargetPort: "eth0",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "mega",
+				TargetPort:         "eth0",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "eth0"},
 			},
 		},
 		Enrichments: []model.Enrichment{
@@ -2608,11 +2644,13 @@ func TestToGraph_DeviceLinkDisplayDoesNotUseAliasesWithoutSelectedManagementIP(t
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "router-a",
-				SourcePort: "Ethernet1",
-				TargetID:   "router-b",
-				TargetPort: "Ethernet2",
+				Protocol:           "lldp",
+				SourceID:           "router-a",
+				SourcePort:         "Ethernet1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfName: "Ethernet1"},
+				TargetID:           "router-b",
+				TargetPort:         "Ethernet2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Ethernet2"},
 			},
 		},
 	}
@@ -2676,8 +2714,18 @@ func TestToGraph_CollapsedDeviceLinkDisplayUsesRepresentativeManagementIP(t *tes
 			},
 		},
 		Adjacencies: []model.Adjacency{
-			{Protocol: "lldp", SourceID: "router-a", SourcePort: "Ethernet1", TargetID: "router-c", TargetPort: "Ethernet3"},
-			{Protocol: "lldp", SourceID: "router-b", SourcePort: "Ethernet2", TargetID: "router-c", TargetPort: "Ethernet4"},
+			{
+				Protocol: "lldp", SourceID: "router-a", SourcePort: "Ethernet1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfName: "Ethernet1"},
+				TargetID:           "router-c", TargetPort: "Ethernet3",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Ethernet3"},
+			},
+			{
+				Protocol: "lldp", SourceID: "router-b", SourcePort: "Ethernet2",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfName: "Ethernet2"},
+				TargetID:           "router-c", TargetPort: "Ethernet4",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "Ethernet4"},
+			},
 		},
 	}
 
@@ -2884,11 +2932,13 @@ func TestToGraph_FDBOwnerInferencePrefersNonLLDPSide(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "switch-b",
-				TargetPort: "Gi0/1",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "switch-b",
+				TargetPort:         "Gi0/1",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -3042,11 +3092,13 @@ func TestToGraph_SuppressesFDBEndpointsOnLLDPPorts(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "host-b",
-				TargetPort: "eth0",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "host-b",
+				TargetPort:         "eth0",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "eth0"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -3105,11 +3157,13 @@ func TestToGraph_KeepsChassisPlaceholderDevicesAsDevices(t *testing.T) {
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "chassis-788cb595dfcc",
-				TargetPort: "eth0",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfName: "Gi0/1"},
+				TargetID:           "chassis-788cb595dfcc",
+				TargetPort:         "eth0",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfName: "eth0"},
 			},
 		},
 	}
@@ -3269,11 +3323,13 @@ func TestToGraph_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "Gi0/1",
-				TargetID:   "switch-b",
-				TargetPort: "Gi0/2",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "Gi0/1",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+				TargetID:           "switch-b",
+				TargetPort:         "Gi0/2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -3293,7 +3349,7 @@ func TestToGraph_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t
 	require.Nil(t, findActorByType(data.Actors, "segment"))
 }
 
-func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *testing.T) {
+func TestToGraph_DeterministicTransitRuleUsesTypedLLDPIfIndex(t *testing.T) {
 	result := model.Result{
 		Devices: []model.Device{
 			{
@@ -3313,11 +3369,13 @@ func TestToGraph_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *test
 		},
 		Adjacencies: []model.Adjacency{
 			{
-				Protocol:   "lldp",
-				SourceID:   "switch-a",
-				SourcePort: "2",
-				TargetID:   "switch-b",
-				TargetPort: "ether4",
+				Protocol:           "lldp",
+				SourceID:           "switch-a",
+				SourcePort:         "2",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 2},
+				TargetID:           "switch-b",
+				TargetPort:         "ether4",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 4, IfName: "ether4"},
 			},
 		},
 		Attachments: []model.Attachment{
@@ -3475,7 +3533,9 @@ func TestToGraph_InferenceStrategiesKeepDomainfulScopeContract(t *testing.T) {
 			strategy: topologyInferenceStrategyCDPFDBHybrid,
 			adjacencies: []model.Adjacency{{
 				Protocol: "cdp", SourceID: "switch-a", SourcePort: "Ethernet1",
-				TargetID: "switch-b", TargetPort: "Ethernet2",
+				SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Ethernet1"},
+				TargetID:           "switch-b", TargetPort: "Ethernet2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Ethernet2"},
 			}},
 			wantProtocol: "cdp",
 		},

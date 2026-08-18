@@ -2,6 +2,8 @@
 
 package projector
 
+import "strings"
+
 type bridgeVLANAliasIndex struct {
 	rawScopeByAlias map[string]string
 	ambiguous       map[string]struct{}
@@ -43,6 +45,23 @@ func (i bridgeVLANAliasIndex) uniqueAliasKey(port bridgePortRef) string {
 		return ""
 	}
 	return aliasKey
+}
+
+func (i bridgeVLANAliasIndex) canonicalizeVLANScopedPort(port bridgePortRef) bridgePortRef {
+	if domain := bridgePortForwardingDomain(port); domain != "" && domain != bridgePortVLANScope(port) {
+		return port
+	}
+	aliasKey := bridgePortVLANAliasKey(port)
+	if aliasKey == "" {
+		return port
+	}
+	if _, ambiguous := i.ambiguous[aliasKey]; ambiguous {
+		return port
+	}
+	if rawScope := strings.TrimSpace(i.rawScopeByAlias[aliasKey]); rawScope != "" {
+		port.fdbDomainID = rawScope
+	}
+	return port
 }
 
 func bridgePortVLANAliasKey(port bridgePortRef) string {
