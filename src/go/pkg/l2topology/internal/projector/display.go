@@ -128,7 +128,11 @@ func topologyActorDisplayName(actor projectedActor, deviceDisplayByID map[string
 		}
 	}
 
-	display := topologyDisplayNameFromMatch(actor.Actor.Match, resolver)
+	displayMatch := actor.Actor.Match
+	if IsDeviceActorType(actor.Actor.ActorType) {
+		displayMatch = topologyDeviceDisplayMatch(displayMatch, actor.Detail.Device.ManagementIP)
+	}
+	display := topologyDisplayNameFromMatch(displayMatch, resolver)
 	if display.name != "" {
 		return display
 	}
@@ -137,6 +141,14 @@ func topologyActorDisplayName(actor projectedActor, deviceDisplayByID map[string
 		return topologyDisplayName{name: topologyCompactSegmentID(segmentID), source: "segment_id"}
 	}
 	return topologyDisplayName{}
+}
+
+func topologyDeviceDisplayMatch(match graph.Match, managementIP string) graph.Match {
+	match.IPAddresses = nil
+	if ip := normalizeTopologyIP(managementIP); ip != "" {
+		match.IPAddresses = []string{ip}
+	}
+	return match
 }
 
 func topologyFallbackActorDisplayName(actor projectedActor) topologyDisplayName {

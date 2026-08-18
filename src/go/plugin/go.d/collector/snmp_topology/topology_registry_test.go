@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"context"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -124,6 +125,60 @@ func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCan
 			return false
 		}
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestTopologyRegistry_ReverseDNSCandidatesExcludeDeviceAliases(t *testing.T) {
+	clock := newReverseDNSTestClock()
+	dns := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
+		now: clock.Now,
+		lookup: func(_ context.Context, ip string) ([]string, error) {
+			if ip == "198.51.100.8" {
+				return []string{"unrelated-alias.example"}, nil
+			}
+			return nil, nil
+		},
+	})
+	dns.warm(context.Background(), []string{"198.51.100.8"})
+
+	registry := newTopologyRegistry()
+	registry.reverseDNS = dns.resolver
+	cache := newTopologyCache()
+	seedPublishedEndpointSnapshot(cache)
+	cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{
+		{Address: "10.0.0.10", AddressType: "ipv4", Source: managementAddressSourceCollectorTarget},
+		{Address: "198.51.100.8", AddressType: "ipv4", Source: "lldp_local"},
+	}
+	registry.register(cache)
+
+	candidates := registry.reverseDNSCandidateCollector()
+	options := defaultTopologyQueryOptionsForTest()
+	options.ResolveDNSName = candidates.lookupCached
+	data, ok := registry.snapshotWithOptions(options)
+
+	require.True(t, ok)
+	require.True(t, containsMgmtAddr(data, map[string]struct{}{"198.51.100.8": {}}))
+	require.Condition(t, func() bool {
+		for _, actor := range data.Actors {
+			if actor.Match.SysName == "switch-a" {
+				return topologymodel.ActorDetailDisplayName(actor) == "switch-a"
+			}
+		}
+		return false
+	})
+	require.Equal(t, []netip.Addr{
+		netip.MustParseAddr("10.0.0.10"),
+		netip.MustParseAddr("10.0.0.20"),
+	}, candidates.collectedCandidates())
+
+	payload, err := topologyv1renderer.Render(data)
+	require.NoError(t, err)
+	require.Contains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "display_name"), "switch-a")
+	require.NotContains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "display_name"), "unrelated-alias.example")
+	require.Contains(t, topologyV1ColumnValues(t, payload.Actors, "ip_addresses"), []any{
+		"10.0.0.10",
+		"198.51.100.8",
+	})
+	require.Contains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip"), "10.0.0.10")
 }
 
 func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
