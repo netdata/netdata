@@ -111,6 +111,14 @@ struct rrdcalc {
 
     struct rrdcalc *next;
     struct rrdcalc *prev;
+
+    // ------------------------------------------------------------------------
+    // host->rrdcalc_by_name list links
+    // Distinct from next/prev above, which thread the chart's alert list.
+
+    struct rrdcalc *name_next;
+    struct rrdcalc *name_prev;
+    bool name_indexed;              // true while linked into host->rrdcalc_by_name
 };
 
 #define rrdcalc_name(rc) string2str((rc)->config.name)
@@ -219,6 +227,16 @@ void rrdcalc_delete_all(RRDHOST *host);
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host);
 void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
+
+// Snapshot every RRDCALC of the host whose config.name is `name` into `dst`,
+// returning how many exist. Up to `dst_size` are written; the return value may
+// exceed dst_size, in which case the caller should retry with a larger buffer.
+//
+// The caller MUST hold the host's alert dictionary read lock for as long as it
+// uses the returned pointers - that is what keeps them alive. The name-index
+// lock is taken and released inside, deliberately: it must not be held while
+// the caller acquires chart locks (see rrdcalc_name_index_del()).
+size_t rrdcalc_by_name_snapshot(RRDHOST *host, STRING *name, RRDCALC **dst, size_t dst_size);
 
 void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock);
 

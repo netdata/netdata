@@ -12,6 +12,14 @@ struct dictionary_stats dictionary_stats_category_other = {
 // ----------------------------------------------------------------------------
 // public locks API
 
+inline void dictionary_read_lock(DICTIONARY *dict) {
+    ll_recursive_lock(dict, DICTIONARY_LOCK_READ);
+}
+
+inline void dictionary_read_unlock(DICTIONARY *dict) {
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_READ);
+}
+
 inline void dictionary_write_lock(DICTIONARY *dict) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 }

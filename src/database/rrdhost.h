@@ -331,6 +331,16 @@ struct rrdhost {
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
 
+    // Secondary index of the above, keyed by the interned STRING* of
+    // rc->config.name, so health expression variable lookups can resolve an
+    // alert name without scanning every alert of the host. Alert names are not
+    // unique per host (the primary key is "{alert},on[{chart}]"), so each entry
+    // is the head of a list threaded through RRDCALC.name_next / name_prev.
+    struct {
+        RW_SPINLOCK spinlock;
+        Pvoid_t JudyL;
+    } rrdcalc_by_name;
+
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host

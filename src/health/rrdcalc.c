@@ -387,6 +387,10 @@ struct rrdcalc_constructor {
     } react_action;
 };
 
+// defined further down, next to the rest of the name-index implementation
+static void rrdcalc_name_index_add(RRDHOST *host, RRDCALC *rc);
+static void rrdcalc_name_index_del(RRDHOST *host, RRDCALC *rc);
+
 static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *constructor_data) {
     RRDCALC *rc = rrdcalc;
     struct rrdcalc_constructor *ctr = constructor_data;
@@ -434,6 +438,8 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     rrdcalc_update_info_using_rrdset_labels(rc);
     rrdcalc_runtime_snapshot_publish(rc, 0, NULL);
 
+    rrdcalc_name_index_add(host, rc);
+
     ctr->react_action = RRDCALC_REACT_NEW;
 }
 
@@ -456,9 +462,14 @@ static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_u
 
 static __thread bool thread_having_ll_wrlock = false;
 
-static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {
+static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost) {
     RRDCALC *rc = rrdcalc;
-    //RRDHOST *host = rrdhost;
+    RRDHOST *host = rrdhost;
+
+    // safety net: rrdcalc_unlink_and_delete() already did this, but the
+    // dictionary can reach the delete callback by other routes. Idempotent.
+    if(likely(host))
+        rrdcalc_name_index_del(host, rc);
 
     rrdcalc_unlink_from_rrdset(rc, thread_having_ll_wrlock);
 
@@ -477,10 +488,96 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
 }
 
 // ----------------------------------------------------------------------------
+// RRDCALC rrdhost index management - secondary index by alert name
+//
+// Keyed by the interned STRING* of rc->config.name, which is assigned once in
+// rrdcalc_rrdhost_insert_callback() and never mutated afterwards (the conflict
+// callback returns false and the dictionary is DICT_OPTION_DONT_OVERWRITE_VALUE),
+// so the key is stable for the lifetime of the RRDCALC.
+//
+// Locking: this index has its own spinlock rather than relying on the alert
+// dictionary lock, because rrdcalc_unlink_and_delete() is reached with only the
+// dictionary READ lock held from health_prototype_apply_to_all_hosts(), which
+// iterates reentrantly.
+
+static void rrdcalc_name_index_add(RRDHOST *host, RRDCALC *rc) {
+    if(unlikely(!rc->config.name))
+        return;
+
+    rw_spinlock_write_lock(&host->rrdcalc_by_name.spinlock);
+
+    Pvoid_t *PValue = JudyLIns(&host->rrdcalc_by_name.JudyL, (Word_t)rc->config.name, PJE0);
+    if(likely(PValue && PValue != PJERR && !rc->name_indexed)) {
+        RRDCALC *head = (RRDCALC *)*PValue;
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, rc, name_prev, name_next);
+        rc->name_indexed = true;
+        *PValue = head;
+    }
+
+    rw_spinlock_write_unlock(&host->rrdcalc_by_name.spinlock);
+}
+
+// Removing takes the index lock while the caller may already hold
+// st->alerts.spinlock (rrdcalc_unlink_and_delete_all_rrdset_alerts() holds it
+// write across its loop). That fixes the writer order as
+// alerts.spinlock -> name index, so readers must never take the name index and
+// then a chart lock - see rrdcalc_by_name_snapshot().
+static void rrdcalc_name_index_del(RRDHOST *host, RRDCALC *rc) {
+    if(unlikely(!rc->config.name))
+        return;
+
+    rw_spinlock_write_lock(&host->rrdcalc_by_name.spinlock);
+
+    // name_indexed makes this idempotent, which matters because both
+    // rrdcalc_unlink_and_delete() and the dictionary delete callback call it.
+    // It also avoids inferring membership from the list links, which would be
+    // wrong: DOUBLE_LINKED_LIST keeps head->prev pointing at the tail, so a
+    // single-item list has item->prev == item rather than NULL.
+    Pvoid_t *PValue = JudyLGet(host->rrdcalc_by_name.JudyL, (Word_t)rc->config.name, PJE0);
+    if(likely(PValue && PValue != PJERR && *PValue && rc->name_indexed)) {
+        RRDCALC *head = (RRDCALC *)*PValue;
+
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(head, rc, name_prev, name_next);
+        rc->name_indexed = false;
+        rc->name_prev = rc->name_next = NULL;
+
+        if(head)
+            *PValue = head;
+        else
+            JudyLDel(&host->rrdcalc_by_name.JudyL, (Word_t)rc->config.name, PJE0);
+    }
+
+    rw_spinlock_write_unlock(&host->rrdcalc_by_name.spinlock);
+}
+
+size_t rrdcalc_by_name_snapshot(RRDHOST *host, STRING *name, RRDCALC **dst, size_t dst_size) {
+    size_t found = 0;
+
+    rw_spinlock_read_lock(&host->rrdcalc_by_name.spinlock);
+
+    Pvoid_t *PValue = JudyLGet(host->rrdcalc_by_name.JudyL, (Word_t)name, PJE0);
+    if(PValue && PValue != PJERR) {
+        for(RRDCALC *rc = (RRDCALC *)*PValue; rc ; rc = rc->name_next) {
+            if(found < dst_size)
+                dst[found] = rc;
+            found++;
+        }
+    }
+
+    rw_spinlock_read_unlock(&host->rrdcalc_by_name.spinlock);
+
+    return found;
+}
+
+// ----------------------------------------------------------------------------
 // RRDCALC rrdhost index management - index API
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host) {
+    // called more than once per host (rrdhost.c:499 and :739), so everything
+    // here must stay behind the same idempotency guard as the dictionary
     if(!host->rrdcalc_root_index) {
+        rw_spinlock_init(&host->rrdcalc_by_name.spinlock);
+
         host->rrdcalc_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                               &dictionary_stats_category_rrdhealth, sizeof(RRDCALC));
 
@@ -495,6 +592,19 @@ void rrdcalc_rrdhost_index_destroy(RRDHOST *host) {
     rrdcalc_delete_all(host);
     dictionary_destroy(host->rrdcalc_root_index);
     host->rrdcalc_root_index = NULL;
+
+    // every alert is gone, so the name index must be empty; free whatever the
+    // Judy array itself still holds and report residue, which would mean a
+    // deletion path bypassed rrdcalc_name_index_del()
+    rw_spinlock_write_lock(&host->rrdcalc_by_name.spinlock);
+    Word_t idx = 0;
+    Pvoid_t *PValue = JudyLFirst(host->rrdcalc_by_name.JudyL, &idx, PJE0);
+    if(unlikely(PValue))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "HEALTH: host '%s' still has entries in the alert name index at teardown",
+               rrdhost_hostname(host));
+    JudyLFreeArray(&host->rrdcalc_by_name.JudyL, PJE0);
+    rw_spinlock_write_unlock(&host->rrdcalc_by_name.spinlock);
 }
 
 bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
@@ -520,6 +630,11 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 }
 
 void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
+    // remove from the name index first, while rc and host are both in hand and
+    // the caller's lock state is known; the delete callback repeats this
+    // defensively for any path that does not come through here
+    rrdcalc_name_index_del(host, rc);
+
     rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock);
 
     thread_having_ll_wrlock = having_ll_wrlock;

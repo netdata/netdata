@@ -162,31 +162,99 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
     return found;
 }
 
+// Alerts sharing one name on a single host - one per matching chart. Sized to
+// cover the usual case (an alert templated over every disk, interface, mount)
+// without allocating.
+#define ALERT_NAME_MATCHES_ONSTACK 64
+
+// Resolves an alert-name variable through the host's name index instead of
+// scanning every alert of the host.
+//
+// The host's alert dictionary read lock is held across the whole function: that
+// is what keeps the snapshotted RRDCALCs alive, exactly as the full traversal
+// this replaced did. The name-index lock is taken and released inside
+// rrdcalc_by_name_snapshot() and is deliberately NOT held while scoring, because
+// scoring acquires chart locks while rrdcalc_name_index_del() runs with
+// st->alerts.spinlock already held - holding both in the opposite order would be
+// a lock-order inversion.
 static bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd, bool snapshot_values) {
     bool found = false;
-    RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
-        if(rc->config.name == vbd->variable) {
-            RRDSET *st = NULL;
-            RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(vbd->host, rc, &st);
-            if(!rsa)
+
+    RRDCALC *onstack[ALERT_NAME_MATCHES_ONSTACK];
+    RRDCALC **matches = onstack, **allocated = NULL;
+    size_t matches_size = ALERT_NAME_MATCHES_ONSTACK;
+
+    dictionary_read_lock(vbd->host->rrdcalc_root_index);
+
+    size_t count = rrdcalc_by_name_snapshot(vbd->host, vbd->variable, matches, matches_size);
+    if(unlikely(count > matches_size)) {
+        // more alerts carry this name than the on-stack buffer holds
+        allocated = mallocz(sizeof(RRDCALC *) * count);
+        matches = allocated;
+        matches_size = count;
+
+        count = rrdcalc_by_name_snapshot(vbd->host, vbd->variable, matches, matches_size);
+        if(unlikely(count > matches_size))
+            count = matches_size;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    // A stale or missing index entry does not crash - it silently makes the
+    // variable unresolvable and takes the alert to UNDEFINED. Verify loudly here.
+    {
+        size_t scanned = 0;
+        RRDCALC *check;
+        foreach_rrdcalc_in_rrdhost_read(vbd->host, check) {
+            if(check->config.name != vbd->variable)
                 continue;
 
-            NETDATA_DOUBLE value;
-            if(snapshot_values) {
-                RRDCALC_RUNTIME_SNAPSHOT snapshot;
-                rrdcalc_runtime_snapshot_get(rc, &snapshot);
-                value = snapshot.value;
-            }
-            else
-                value = rc->value;
+            scanned++;
 
-            variable_lookup_add_result_with_score(vbd, value, st, "alarm value");
-            rrdset_acquired_release(rsa);
-            found = true;
+            bool indexed = false;
+            for(size_t i = 0; i < count ; i++) {
+                if(matches[i] == check) {
+                    indexed = true;
+                    break;
+                }
+            }
+
+            if(!indexed)
+                fatal("HEALTH: alert name index on host '%s' is missing alert '%s' of chart '%s'",
+                      rrdhost_hostname(vbd->host), rrdcalc_name(check), rrdcalc_chart_name(check));
         }
+        foreach_rrdcalc_in_rrdhost_done(check);
+
+        if(scanned != count)
+            fatal("HEALTH: alert name index on host '%s' has %zu entries for '%s', full scan found %zu",
+                  rrdhost_hostname(vbd->host), count, string2str(vbd->variable), scanned);
     }
-    foreach_rrdcalc_in_rrdhost_done(rc);
+#endif
+
+    for(size_t i = 0; i < count ; i++) {
+        RRDCALC *rc = matches[i];
+
+        RRDSET *st = NULL;
+        RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(vbd->host, rc, &st);
+        if(!rsa)
+            continue;
+
+        NETDATA_DOUBLE value;
+        if(snapshot_values) {
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
+            value = snapshot.value;
+        }
+        else
+            value = rc->value;
+
+        variable_lookup_add_result_with_score(vbd, value, st, "alarm value");
+        rrdset_acquired_release(rsa);
+        found = true;
+    }
+
+    dictionary_read_unlock(vbd->host->rrdcalc_root_index);
+
+    freez(allocated);
     return found;
 }
 

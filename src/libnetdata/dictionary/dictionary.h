@@ -265,6 +265,11 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
 #define DICTIONARY_LOCK_WRITE     'w'
 #define DICTIONARY_LOCK_REENTRANT 'z'
 
+// Hold the dictionary's items lock without traversing it. Useful to keep values
+// alive while resolving them through a secondary index. Read mode is recursive.
+void dictionary_read_lock(DICTIONARY *dict);
+void dictionary_read_unlock(DICTIONARY *dict);
+
 void dictionary_write_lock(DICTIONARY *dict);
 void dictionary_write_unlock(DICTIONARY *dict);
 
