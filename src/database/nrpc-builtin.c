@@ -26,13 +26,24 @@ static int nrpc_builtin_handler(struct nrpc_request *req, void *data) {
     return code;
 }
 
-void nrpc_method_register_builtin(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version,
-                             const char *help, const char *tags,
-                             HTTP_ACCESS access, nrpc_builtin_handler_cb_t handler) {
+void nrpc_method_register_builtin(const struct nrpc_builtin_desc *desc) {
+    internal_fatal(!desc->handler, "NRPC: builtin registration without a handler");
 
     nrpc_serving_started(); // this creates a serving handle that lives for as long as netdata runs
 
-    nrpc_method_register(host, st, name, timeout, priority, version,
-                     help, tags, access, true, NRPC_SOURCE_DAEMON,
-                     nrpc_builtin_handler, handler);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = desc->host,
+        .st = desc->st,
+        .name = desc->name,
+        .help = desc->help,
+        .tags = desc->tags,
+        .timeout_s = desc->timeout_s,
+        .priority = desc->priority,
+        .version = desc->version,
+        .access = desc->access,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_builtin_handler,
+        .handler_data = desc->handler,
+    });
 }

@@ -337,8 +337,20 @@ int pluginsd_functions_unittest(void) {
         // base ref == 1
 
         // COLLECTOR with transport: insert acquires -> 2
-        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, NRPC_SOURCE_PLUGIN, c6ut_noop_execute_cb, tr);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c6-mixed-fn",
+            .help = "mixed",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_PLUGIN,
+            .handler = c6ut_noop_execute_cb,
+            .handler_data = tr,
+        });
         if(refcount_references(&tr->entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: after COLLECTOR add, entry refs %d != 2\n",
                     refcount_references(&tr->entry_refcount));
@@ -346,8 +358,19 @@ int pluginsd_functions_unittest(void) {
         }
 
         // INTERNAL displaces it: displaced pair released under COLLECTOR tag -> 1
-        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, NRPC_SOURCE_DAEMON, c6ut_noop_execute_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c6-mixed-fn",
+            .help = "mixed",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = c6ut_noop_execute_cb,
+        });
         if(refcount_references(&tr->entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after INTERNAL re-add, entry refs %d != 1\n",
                     refcount_references(&tr->entry_refcount));
@@ -355,8 +378,20 @@ int pluginsd_functions_unittest(void) {
         }
 
         // and back to COLLECTOR: installed pair acquired -> 2
-        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, NRPC_SOURCE_PLUGIN, c6ut_noop_execute_cb, tr);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c6-mixed-fn",
+            .help = "mixed",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_PLUGIN,
+            .handler = c6ut_noop_execute_cb,
+            .handler_data = tr,
+        });
         if(refcount_references(&tr->entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: after COLLECTOR re-add, entry refs %d != 2\n",
                     refcount_references(&tr->entry_refcount));
@@ -364,8 +399,20 @@ int pluginsd_functions_unittest(void) {
         }
 
         // equal-pointer conflict (a re-sent function list): nets ZERO refs
-        nrpc_method_register(host, NULL, "c6-mixed-fn", 10, 0, 1, "mixed", "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                         true, NRPC_SOURCE_PLUGIN, c6ut_noop_execute_cb, tr);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c6-mixed-fn",
+            .help = "mixed",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_PLUGIN,
+            .handler = c6ut_noop_execute_cb,
+            .handler_data = tr,
+        });
         if(refcount_references(&tr->entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: equal-pointer conflict changed entry refs to %d (expected 2 - must net zero)\n",
                     refcount_references(&tr->entry_refcount));
@@ -400,9 +447,20 @@ int pluginsd_functions_unittest(void) {
         nrpc_inflight_calls_create(); // idempotent
 
         // the function is served by the pluginsd transport, as in production
-        nrpc_method_register(host, NULL, "c6-gc-mid-defer-fn", 1, 0, 1, "gc", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_nrpc_handler, parser->inflight.transport);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c6-gc-mid-defer-fn",
+            .help = "gc",
+            .tags = "top",
+            .timeout_s = 1,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_PLUGIN,
+            .handler = pluginsd_nrpc_handler,
+            .handler_data = parser->inflight.transport,
+        });
 
         // our own transaction id, so RESULT_BEGIN can reference it
         nd_uuid_t uuid;
@@ -562,9 +620,20 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_inflight_calls_create(); // idempotent
 
-        nrpc_method_register(host, NULL, "c6-gc-race-fn", 1, 0, 1, "gc", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_nrpc_handler, parser->inflight.transport);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c6-gc-race-fn",
+            .help = "gc",
+            .tags = "top",
+            .timeout_s = 1,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_PLUGIN,
+            .handler = pluginsd_nrpc_handler,
+            .handler_data = parser->inflight.transport,
+        });
 
         for(size_t i = 0; i < 50 && errors == before; i++) {
             size_t cancels_before = sends.cancels;
@@ -626,9 +695,19 @@ int pluginsd_functions_unittest(void) {
         // a SHORT timeout, so a PROGRESS actually extends it (the extension
         // fires only when less than FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT
         // remains)
-        nrpc_method_register(host, NULL, "c5b-deadline-fn", 5, 0, 1, "deadline", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
-                         c5b_async_execute_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c5b-deadline-fn",
+            .help = "deadline",
+            .tags = "top",
+            .timeout_s = 5,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = c5b_async_execute_cb,
+        });
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         int code = nrpc_call(host, wb, 5, HTTP_ACCESS_ALL, "c5b-deadline-fn",
@@ -682,9 +761,20 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_inflight_calls_create(); // idempotent
 
-        nrpc_method_register(host, NULL, "c7-dead-transport-fn", 10, 0, 1, "dead", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_nrpc_handler, tr);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c7-dead-transport-fn",
+            .help = "dead",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_PLUGIN,
+            .handler = pluginsd_nrpc_handler,
+            .handler_data = tr,
+        });
 
         // the owner tears down: dispatchers drained and `data` invalidated,
         // while the registry entry keeps holding the (dead) transport
@@ -801,9 +891,19 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_inflight_calls_create(); // idempotent
 
-        nrpc_method_register(host, NULL, "c7-dup-fn", 10, 0, 1, "dup", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
-                         c5b_async_execute_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c7-dup-fn",
+            .help = "dup",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = c5b_async_execute_cb,
+        });
 
         nd_uuid_t uuid;
         uuid_generate_random(uuid);
@@ -999,9 +1099,20 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_inflight_calls_create(); // idempotent
 
-        nrpc_method_register(host, NULL, "c7-grace-fn", 10, 0, 1, "grace", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_PLUGIN,
-                         pluginsd_nrpc_handler, parser->inflight.transport);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c7-grace-fn",
+            .help = "grace",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_PLUGIN,
+            .handler = pluginsd_nrpc_handler,
+            .handler_data = parser->inflight.transport,
+        });
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         usec_t t0 = now_monotonic_usec();
@@ -1056,9 +1167,19 @@ int pluginsd_functions_unittest(void) {
         c7_pin.first = nrpc_transport_create(NULL);
         c7_pin.second = nrpc_transport_create(NULL);
 
-        nrpc_method_register(host, NULL, "c7-pin-fn", 10, 0, 1, "pin", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
-                         c7_pin_execute_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c7-pin-fn",
+            .help = "pin",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = c7_pin_execute_cb,
+        });
 
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1139,9 +1260,19 @@ int pluginsd_functions_unittest(void) {
 
         nrpc_inflight_calls_create(); // idempotent
 
-        nrpc_method_register(host, NULL, "c7-timeout-fn", 7, 0, 1, "timeout", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, false /* async */, NRPC_SOURCE_DAEMON,
-                         c5b_async_execute_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c7-timeout-fn",
+            .help = "timeout",
+            .tags = "top",
+            .timeout_s = 7,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = false,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = c5b_async_execute_cb,
+        });
 
         struct { int ask; usec_t expect_s; } t[] = {
             { 0,  7 },   // no timeout given -> the registered one
@@ -1177,9 +1308,19 @@ int pluginsd_functions_unittest(void) {
         nrpc_method_unregister(host, NULL, "c7-timeout-fn", NRPC_SOURCE_DAEMON);
 
         memset(&c7_sync, 0, sizeof(c7_sync));
-        nrpc_method_register(host, NULL, "c7-sync-fn", 10, 0, 1, "sync", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true /* sync */, NRPC_SOURCE_DAEMON,
-                         c7_sync_execute_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "c7-sync-fn",
+            .help = "sync",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = c7_sync_execute_cb,
+        });
 
         struct c6ut_result sres = { 0 };
         {

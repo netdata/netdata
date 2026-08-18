@@ -442,20 +442,19 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
 //        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
 
     nrpc_serving_started();
-    nrpc_method_register(
-        host,
-        NULL,
-        string2str(df->function),
-        120,
-        1000,
-        DYNCFG_FUNCTIONS_VERSION,
-        "Dynamic configuration",
-        "config",
-        (view_access & edit_access),
-        sync,
-        NRPC_SOURCE_DAEMON,
-        dyncfg_function_intercept_cb,
-        NULL);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = string2str(df->function),
+        .help = "Dynamic configuration",
+        .tags = "config",
+        .timeout_s = 120,
+        .priority = 1000,
+        .version = DYNCFG_FUNCTIONS_VERSION,
+        .access = (view_access & edit_access),
+        .sync = sync,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = dyncfg_function_intercept_cb,
+    });
 
     if(df->type != DYNCFG_TYPE_TEMPLATE && (df->cmds & (DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE))) {
         DYNCFG_CMDS status_to_send_to_plugin =

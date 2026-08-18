@@ -37,17 +37,49 @@ int nrpc_access_unittest(void) {
     }
 
     // A protected function mirroring systemd-journal's requirements.
-    nrpc_method_register(host, NULL, "protected-fn", 10, 0, 1, "protected", "logs",
-                     HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                     true, NRPC_SOURCE_DAEMON, nrpc_unittest_noop_cb, NULL);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "protected-fn",
+        .help = "protected",
+        .tags = "logs",
+        .timeout_s = 10,
+        .priority = 0,
+        .version = 1,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
 
     // A restricted function: name starting with "__" flags NRPC_METHOD_FLAG_RESTRICTED.
-    nrpc_method_register(host, NULL, "__restricted-fn", 10, 0, 1, "restricted", "top",
-                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, nrpc_unittest_noop_cb, NULL);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "__restricted-fn",
+        .help = "restricted",
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = 0,
+        .version = 1,
+        .access = HTTP_ACCESS_NONE,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
 
     // A public function requiring nothing — baseline that the gate does not over-block.
-    nrpc_method_register(host, NULL, "public-fn", 10, 0, 1, "public", "top",
-                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON, nrpc_unittest_noop_cb, NULL);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "public-fn",
+        .help = "public",
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = 0,
+        .version = 1,
+        .access = HTTP_ACCESS_NONE,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
 
     struct {
         RRDHOST *host;
@@ -230,9 +262,19 @@ int nrpc_manifest_unittest(void) {
         };
 
         for(size_t i = 0; i < _countof(rejected); i++)
-            nrpc_method_register(host, NULL, rejected[i], 10, 0, 1, "hijack attempt", "top",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_PLUGIN,
-                             nrpc_unittest_noop_cb, NULL);
+            nrpc_method_register(&(struct nrpc_method_desc) {
+                .host = host,
+                .name = rejected[i],
+                .help = "hijack attempt",
+                .tags = "top",
+                .timeout_s = 10,
+                .priority = 0,
+                .version = 1,
+                .access = HTTP_ACCESS_ANONYMOUS_DATA,
+                .sync = true,
+                .source = NRPC_SOURCE_PLUGIN,
+                .handler = nrpc_unittest_noop_cb,
+            });
 
         if(dictionary_get(host->rpc_registry->dict, "config c2-reject:job")) {
             fprintf(stderr, "  FAILED enforcement: PLUGIN-source registration created reserved name 'config c2-reject:job'\n");
@@ -275,9 +317,19 @@ int nrpc_manifest_unittest(void) {
     };
 
     for(size_t i = 0; i < _countof(fns); i++)
-        nrpc_method_register(host, NULL, fns[i].name, 10, 0, 1, "manifest help text", fns[i].tags,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = fns[i].name,
+            .help = "manifest help text",
+            .tags = fns[i].tags,
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
 
     DICTIONARY *manifest = nrpc_catalog_manifest_dict(host);
 
@@ -837,9 +889,19 @@ static void fndel_race_worker(void *arg) {
     char name[64];
     for(size_t i = 0; i < FNDEL_RACE_N; i++) {
         snprintfz(name, sizeof(name), "tt-race-fn-%zu", i);
-        nrpc_method_register(ctx->host, NULL, name, 10, 0, 1, "race", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = ctx->host,
+            .name = name,
+            .help = "race",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
         nrpc_method_unregister(ctx->host, NULL, name, NRPC_SOURCE_DAEMON);
     }
     __atomic_store_n(&ctx->done, true, __ATOMIC_RELEASE);
@@ -930,9 +992,19 @@ int nrpc_del_unittest(void) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
             aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
 
-            nrpc_method_register(host, NULL, cases[i].fn, 10, 0, 1, "truth table", "top",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                             nrpc_unittest_noop_cb, NULL);
+            nrpc_method_register(&(struct nrpc_method_desc) {
+                .host = host,
+                .name = cases[i].fn,
+                .help = "truth table",
+                .tags = "top",
+                .timeout_s = 10,
+                .priority = 0,
+                .version = 1,
+                .access = HTTP_ACCESS_ANONYMOUS_DATA,
+                .sync = true,
+                .source = NRPC_SOURCE_DAEMON,
+                .handler = nrpc_unittest_noop_cb,
+            });
 
             if(!rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
                 fprintf(stderr, "  FAILED tt '%s': add did not set the flag\n", cases[i].fn);
@@ -984,12 +1056,32 @@ int nrpc_del_unittest(void) {
     {
         int drain_errors_before = errors;
 
-        nrpc_method_register(host, NULL, "tt-keep-fn", 10, 0, 1, "keep", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
-        nrpc_method_register(host, NULL, "tt-del-fn", 10, 0, 1, "del", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "tt-keep-fn",
+            .help = "keep",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "tt-del-fn",
+            .help = "del",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
         nrpc_method_unregister(host, NULL, "tt-del-fn", NRPC_SOURCE_DAEMON);
 
         {
@@ -1115,9 +1207,19 @@ int nrpc_del_unittest(void) {
     {
         int readd_errors_before = errors;
 
-        nrpc_method_register(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "tt-readd-fn",
+            .help = "readd",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
         nrpc_method_unregister(host, NULL, "tt-readd-fn", NRPC_SOURCE_DAEMON);
 
         if(!fndel_queued(host, "tt-readd-fn")) {
@@ -1125,9 +1227,19 @@ int nrpc_del_unittest(void) {
             errors++;
         }
 
-        nrpc_method_register(host, NULL, "tt-readd-fn", 10, 0, 1, "readd", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "tt-readd-fn",
+            .help = "readd",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
 
         if(!fndel_queued(host, "tt-readd-fn")) {
             fprintf(stderr, "  FAILED re-add: the re-add cancelled the queued FUNCTION_DEL\n");
@@ -1250,23 +1362,73 @@ int nrpc_catalog_unittest(void) {
     // ------------------------------------------------------------------ fixtures
     // registered in FIXED order; the registry dict preserves insertion order,
     // so the fixture lines appear in this relative order in the output
-    nrpc_method_register(host, NULL, "c4-global-fn", 11, 42, 3, "c4 global help", "top",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     nrpc_unittest_noop_cb, NULL);
-    nrpc_method_register(host, NULL, "__c4-restricted-fn", 12, 43, 4, "c4 restricted", "top",
-                     HTTP_ACCESS_NONE, true, NRPC_SOURCE_DAEMON,
-                     nrpc_unittest_noop_cb, NULL);
-    nrpc_method_register(host, NULL, "config c4test:job", 120, 1000, 1, "Dynamic configuration", "config",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     nrpc_unittest_noop_cb, NULL);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "c4-global-fn",
+        .help = "c4 global help",
+        .tags = "top",
+        .timeout_s = 11,
+        .priority = 42,
+        .version = 3,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "__c4-restricted-fn",
+        .help = "c4 restricted",
+        .tags = "top",
+        .timeout_s = 12,
+        .priority = 43,
+        .version = 4,
+        .access = HTTP_ACCESS_NONE,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "config c4test:job",
+        .help = "Dynamic configuration",
+        .tags = "config",
+        .timeout_s = 120,
+        .priority = 1000,
+        .version = 1,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
 
     // one plain global delete (queued) and one dyncfg delete (flag only - the quirk)
-    nrpc_method_register(host, NULL, "c4-deleted-fn", 14, 45, 6, "c4 deleted", "top",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     nrpc_unittest_noop_cb, NULL);
-    nrpc_method_register(host, NULL, "config c4del:job", 120, 1000, 1, "Dynamic configuration", "config",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     nrpc_unittest_noop_cb, NULL);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "c4-deleted-fn",
+        .help = "c4 deleted",
+        .tags = "top",
+        .timeout_s = 14,
+        .priority = 45,
+        .version = 6,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "config c4del:job",
+        .help = "Dynamic configuration",
+        .tags = "config",
+        .timeout_s = 120,
+        .priority = 1000,
+        .version = 1,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
     nrpc_method_unregister(host, NULL, "c4-deleted-fn", NRPC_SOURCE_DAEMON);
     nrpc_method_unregister(host, NULL, "config c4del:job", NRPC_SOURCE_DAEMON);
 
@@ -1279,9 +1441,20 @@ int nrpc_catalog_unittest(void) {
         errors++;
     }
     else
-        nrpc_method_register(host, st, "c4-chart-fn", 13, 44, 5, "c4 chart help", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .st = st,
+            .name = "c4-chart-fn",
+            .help = "c4 chart help",
+            .tags = "top",
+            .timeout_s = 13,
+            .priority = 44,
+            .version = 5,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
 
     // ------------------------------------------------------- expected line bytes
     CLEAN_BUFFER *exp_global = buffer_create(0, NULL);
@@ -1646,9 +1819,19 @@ static void reg_del_worker(void *arg) {
 static void reg_serving_worker(void *arg) {
     RRDHOST *host = arg;
     nrpc_serving_started();
-    nrpc_method_register(host, NULL, "reg-serving-fn", 10, 0, 1, "serving", "top",
-                     HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                     nrpc_unittest_noop_cb, NULL);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .name = "reg-serving-fn",
+        .help = "serving",
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = 0,
+        .version = 1,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
     nrpc_serving_finished();
 }
 
@@ -1666,11 +1849,19 @@ struct reg_race_ctx {
 static void reg_race_worker(void *arg) {
     struct reg_race_ctx *c = arg;
     for(size_t i = 0; i < REG_RACE_N; i++)
-        nrpc_method_register(c->host, NULL, "reg-race-fn", 10, 0, 1,
-                         (i & 1) ? REG_RACE_HELP_A : REG_RACE_HELP_B,
-                         (i & 1) ? REG_RACE_TAGS_A : REG_RACE_TAGS_B,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = c->host,
+            .name = "reg-race-fn",
+            .help = (i & 1) ? REG_RACE_HELP_A : REG_RACE_HELP_B,
+            .tags = (i & 1) ? REG_RACE_TAGS_A : REG_RACE_TAGS_B,
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
 
     __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
 }
@@ -1724,9 +1915,19 @@ int nrpc_registry_unittest(void) {
         for(size_t i = 0; i < _countof(empty_names); i++) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
-            nrpc_method_register(host, NULL, empty_names[i], 10, 0, 1, "empty", "top",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                             nrpc_unittest_noop_cb, NULL);
+            nrpc_method_register(&(struct nrpc_method_desc) {
+                .host = host,
+                .name = empty_names[i],
+                .help = "empty",
+                .tags = "top",
+                .timeout_s = 10,
+                .priority = 0,
+                .version = 1,
+                .access = HTTP_ACCESS_ANONYMOUS_DATA,
+                .sync = true,
+                .source = NRPC_SOURCE_DAEMON,
+                .handler = nrpc_unittest_noop_cb,
+            });
 
             // the refusal happens before anything is announced
             if(rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
@@ -1746,9 +1947,19 @@ int nrpc_registry_unittest(void) {
 
         // everything else lands on its collapsed key: leading/trailing spaces
         // dropped, runs of whitespace folded to one, '"' mapped to '\''
-        nrpc_method_register(host, NULL, "  reg-key   edge\"case  ", 10, 0, 1, "key", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = " reg-key edge\"case ",
+            .help = "key",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
 
         if(!dictionary_get(host->rpc_registry->dict, "reg-key edge'case")) {
             fprintf(stderr, "  FAILED key: a name was not indexed by its sanitized form\n");
@@ -1757,9 +1968,19 @@ int nrpc_registry_unittest(void) {
 
         // execution lookups strip words from the end until they hit a
         // registered function, so arguments resolve to their function...
-        nrpc_method_register(host, NULL, "reg-args-fn", 10, 0, 1, "args", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "reg-args-fn",
+            .help = "args",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             NRPC_METHOD_ACQUIRED *item = NULL;
@@ -1797,9 +2018,19 @@ int nrpc_registry_unittest(void) {
 
         // a streaming child's synthetic config proxy: allowed, and classified
         // as DYNCFG from the sanitized key
-        nrpc_method_register(host, NULL, fn, 10, 0, 1, "streamed config", "config",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_STREAM,
-                         reg_execute_cb_a, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = fn,
+            .help = "streamed config",
+            .tags = "config",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_STREAM,
+            .handler = reg_execute_cb_a,
+        });
 
         struct nrpc_method *entry = dictionary_get(host->rpc_registry->dict, fn);
         if(!entry) {
@@ -1814,9 +2045,19 @@ int nrpc_registry_unittest(void) {
 
             // a plugin registration cannot take it over - the rejection must not reach
             // the conflict callback, so the installed execute callback stays
-            nrpc_method_register(host, NULL, fn, 10, 0, 1, "hijack", "config",
-                             HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_PLUGIN,
-                             reg_execute_cb_b, NULL);
+            nrpc_method_register(&(struct nrpc_method_desc) {
+                .host = host,
+                .name = fn,
+                .help = "hijack",
+                .tags = "config",
+                .timeout_s = 10,
+                .priority = 0,
+                .version = 1,
+                .access = HTTP_ACCESS_ANONYMOUS_DATA,
+                .sync = true,
+                .source = NRPC_SOURCE_PLUGIN,
+                .handler = reg_execute_cb_b,
+            });
 
             struct nrpc_method *after = dictionary_get(host->rpc_registry->dict, fn);
             if(!after || after->handler != reg_execute_cb_a) {
@@ -1861,9 +2102,19 @@ int nrpc_registry_unittest(void) {
             errors++;
         }
 
-        nrpc_method_register(host, NULL, "reg-owned-fn", 10, 0, 1, "owned", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "reg-owned-fn",
+            .help = "owned",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
 
         struct reg_del_ctx ctx = { .host = host, .name = "reg-owned-fn" };
         ND_THREAD *t = nd_thread_create("reg-del", NETDATA_THREAD_OPTION_DONT_LOG, reg_del_worker, &ctx);
@@ -1901,9 +2152,19 @@ int nrpc_registry_unittest(void) {
         const char *fn = "reg-swap-fn";
         struct reg_probe p;
 
-        nrpc_method_register(host, NULL, fn, 11, 42, 3, "swap help one", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         reg_execute_cb_a, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = fn,
+            .help = "swap help one",
+            .tags = "top",
+            .timeout_s = 11,
+            .priority = 42,
+            .version = 3,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = reg_execute_cb_a,
+        });
 
         if(!reg_probe_run(host, NRPC_CATALOG_FILTER_USER, fn, &p)) {
             fprintf(stderr, "  FAILED swap: the function is not visible after registration\n");
@@ -1931,9 +2192,19 @@ int nrpc_registry_unittest(void) {
         // re-registration: every field changes, and the "hidden" tag must
         // actually restrict the function (options are derived from the tags
         // and swapped with them)
-        nrpc_method_register(host, NULL, fn, 22, 43, 4, "swap help two", "logs " NRPC_TAG_HIDDEN,
-                         HTTP_ACCESS_SIGNED_ID, true, NRPC_SOURCE_DAEMON,
-                         reg_execute_cb_b, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = fn,
+            .help = "swap help two",
+            .tags = "logs " NRPC_TAG_HIDDEN,
+            .timeout_s = 22,
+            .priority = 43,
+            .version = 4,
+            .access = HTTP_ACCESS_SIGNED_ID,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = reg_execute_cb_b,
+        });
 
         if(reg_probe_run(host, NRPC_CATALOG_FILTER_USER, fn, &p)) {
             fprintf(stderr, "  FAILED swap: a re-registration with the hidden tag stayed user-visible\n");
@@ -1967,9 +2238,19 @@ int nrpc_registry_unittest(void) {
         }
 
         // and back: dropping the tag un-restricts it
-        nrpc_method_register(host, NULL, fn, 11, 42, 3, "swap help one", "top",
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         reg_execute_cb_a, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = fn,
+            .help = "swap help one",
+            .tags = "top",
+            .timeout_s = 11,
+            .priority = 42,
+            .version = 3,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = reg_execute_cb_a,
+        });
 
         if(!reg_probe_run(host, NRPC_CATALOG_FILTER_USER, fn, &p)) {
             fprintf(stderr, "  FAILED swap: dropping the hidden tag did not un-restrict the function\n");
@@ -1981,9 +2262,19 @@ int nrpc_registry_unittest(void) {
         }
 
         // a registration without tags gets the default "top"
-        nrpc_method_register(host, NULL, "reg-notags-fn", 10, 0, 1, "no tags", NULL,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "reg-notags-fn",
+            .help = "no tags",
+            .tags = NULL, // the point of this case: NULL tags must normalize to "top"
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
         if(!reg_probe_run(host, NRPC_CATALOG_FILTER_USER, "reg-notags-fn", &p) ||
            strcmp(p.tags, "top") != 0) {
             fprintf(stderr, "  FAILED swap: a registration without tags did not default to 'top'\n");
@@ -2059,9 +2350,19 @@ int nrpc_registry_unittest(void) {
         struct reg_race_ctx ctx = { .host = host, .done = false };
         struct reg_race_check check = { 0 };
 
-        nrpc_method_register(host, NULL, "reg-race-fn", 10, 0, 1, REG_RACE_HELP_A, REG_RACE_TAGS_A,
-                         HTTP_ACCESS_ANONYMOUS_DATA, true, NRPC_SOURCE_DAEMON,
-                         nrpc_unittest_noop_cb, NULL);
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .host = host,
+            .name = "reg-race-fn",
+            .help = REG_RACE_HELP_A,
+            .tags = REG_RACE_TAGS_A,
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 1,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
 
         ND_THREAD *t = nd_thread_create("reg-race", NETDATA_THREAD_OPTION_DONT_LOG, reg_race_worker, &ctx);
         if(!t) {

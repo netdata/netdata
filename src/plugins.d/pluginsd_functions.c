@@ -562,10 +562,21 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     if(version_str && *version_str)
         version = str2u(version_str);
 
-    nrpc_method_register(host, st, name, timeout_s, priority, version, help, tags,
-                     http_access_from_hex_mapping_old_roles(access_str), false,
-                     from_streaming ? NRPC_SOURCE_STREAM : NRPC_SOURCE_PLUGIN,
-                     pluginsd_nrpc_handler, parser->inflight.transport);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .host = host,
+        .st = st,
+        .name = name,
+        .help = help,
+        .tags = tags,
+        .timeout_s = timeout_s,
+        .priority = priority,
+        .version = version,
+        .access = http_access_from_hex_mapping_old_roles(access_str),
+        .sync = false,
+        .source = from_streaming ? NRPC_SOURCE_STREAM : NRPC_SOURCE_PLUGIN,
+        .handler = pluginsd_nrpc_handler,
+        .handler_data = parser->inflight.transport,
+    });
 
     parser->user.data_collections_count++;
 

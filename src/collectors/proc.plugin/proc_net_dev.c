@@ -1698,11 +1698,17 @@ void netdev_main(void *ptr_is_null __maybe_unused)
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
         virtual_device_collect_delay_secs = 300;
 
-    nrpc_method_register_builtin(localhost, NULL, "network-interfaces", 10,
-                            NRPC_PRIORITY_DEFAULT, NRPC_VERSION_DEFAULT,
-                            FUNCTION_NETDEV_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            netdev_function_net_interfaces);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .host = localhost,
+        .name = "network-interfaces",
+        .help = FUNCTION_NETDEV_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = netdev_function_net_interfaces,
+    });
 
     heartbeat_t hb;
     heartbeat_init(&hb, localhost->rrd_update_every * USEC_PER_SEC);

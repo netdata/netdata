@@ -322,14 +322,17 @@ static inline NRPC_METHOD_FLAGS nrpc_method_flags_for(RRDSET *st, const char *na
     return options | (nrpc_method_is_restricted(name, tags) ? NRPC_METHOD_FLAG_RESTRICTED : 0);
 }
 
-void nrpc_method_register(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version,
-                      const char *help, const char *tags,
-                      HTTP_ACCESS access, bool sync, NRPC_SOURCE source,
-                      nrpc_handler_cb_t handler, void *handler_data) {
+void nrpc_method_register(const struct nrpc_method_desc *desc) {
+    internal_fatal(!desc->host, "NRPC: method registration without a host");
+    internal_fatal(!desc->name, "NRPC: method registration without a name");
+    internal_fatal(!desc->help, "NRPC: method registration without help text");
+    internal_fatal(!desc->handler, "NRPC: method registration without a handler");
 
-    // RRDSET *st may be NULL in this function
-    // to create a GLOBAL function
+    RRDHOST *host = desc->host;
+    RRDSET *st = desc->st; // st may be NULL, to create a GLOBAL function
+    const char *name = desc->name;
 
+    const char *tags = desc->tags;
     if(!tags || !*tags)
         tags = "top";
 
@@ -364,7 +367,7 @@ void nrpc_method_register(RRDHOST *host, RRDSET *st, const char *name, int timeo
     // Enforced on the SANITIZED key: the registry is indexed by the sanitized
     // form, which strips leading spaces/control chars, so a raw name like
     // " config" or "\tconfig" classifies exactly like the key it would land on.
-    if(source == NRPC_SOURCE_PLUGIN && nrpc_method_name_is_dyncfg(key)) {
+    if(desc->source == NRPC_SOURCE_PLUGIN && nrpc_method_name_is_dyncfg(key)) {
         // Log the sanitized name (what we actually classify on), not the raw name:
         // a raw name with leading whitespace/control chars or embedded newlines
         // would make this log line misleading or malformed.
@@ -386,16 +389,16 @@ void nrpc_method_register(RRDHOST *host, RRDSET *st, const char *name, int timeo
 
     struct nrpc_method tmp = {
         .serving = NULL,
-        .sync = sync,
-        .timeout = timeout,
-        .version = version,
-        .priority = priority,
+        .sync = desc->sync,
+        .timeout = desc->timeout_s,
+        .version = desc->version,
+        .priority = desc->priority,
         .options = options,
-        .access = access,
-        .source = source,
-        .handler = handler,
-        .handler_data = handler_data,
-        .help = string_strdupz(help),
+        .access = desc->access,
+        .source = desc->source,
+        .handler = desc->handler,
+        .handler_data = desc->handler_data,
+        .help = string_strdupz(desc->help),
         .tags = string_strdupz(tags),
     };
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(host->rpc_registry->dict, key, &tmp, sizeof(tmp));

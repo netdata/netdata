@@ -1105,11 +1105,17 @@ void diskspace_main(void *ptr) {
     netdata_mutex_init(&slow_mountinfo_mutex);
     diskspace_mountpoints_init();
 
-    nrpc_method_register_builtin(localhost, NULL, "mount-points", 10,
-                            NRPC_PRIORITY_DEFAULT, NRPC_VERSION_DEFAULT,
-                            FUNCTION_DISKSPACE_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            diskspace_function_mount_points);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .host = localhost,
+        .name = "mount-points",
+        .help = FUNCTION_DISKSPACE_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = diskspace_function_mount_points,
+    });
 
     cleanup_mount_points = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 

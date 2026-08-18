@@ -14,7 +14,9 @@
 // - method (struct nrpc_method): a named callable endpoint. Its static
 //   attribute bundle (name, help, tags, access, timeout, priority, version)
 //   is its DESCRIPTOR - never "metadata", which RPC reserves for per-call
-//   headers.
+//   headers. Registration takes a caller-filled desc struct
+//   (struct nrpc_method_desc, struct nrpc_builtin_desc) that extends the
+//   attribute bundle with the method's owner (host), scope (st) and handler.
 // - call: one invocation of a method, tracked in the in-flight calls table
 //   (struct nrpc_inflight_calls) and correlated by a call_id. Calls carry a
 //   deadline and support cancel and progress.
@@ -145,10 +147,30 @@ void nrpc_registry_destroy(RRDHOST *host);
 // release a handle acquired via nrpc_method_authorize()
 void nrpc_method_acquired_release(RRDHOST *host, NRPC_METHOD_ACQUIRED *acquired);
 
+// Registration descriptor: the method's attribute bundle plus its owner,
+// scope and handler. Stack-filled by the caller; the registry copies what it
+// keeps. Every field's zero keeps the meaning a zero positional argument had -
+// the registry adds NO defaulting. Style rule: policy-valued fields (source,
+// access, sync, timeout_s, priority, version) are written explicitly at every
+// site even when zero; pointer fields may be omitted when NULL.
+struct nrpc_method_desc {
+    RRDHOST *host;                 // required
+    RRDSET *st;                    // NULL = GLOBAL; non-NULL derives LOCAL + the chart functions_view
+    const char *name;              // required
+    const char *help;              // required
+    const char *tags;              // NULL normalizes to "top"; NRPC_TAG_HIDDEN derives RESTRICTED
+    int timeout_s;                 // stored raw - a zero is a 0s deadline, not "default"
+    int priority;                  // stored raw; 0 is a real value (not NRPC_PRIORITY_DEFAULT)
+    uint32_t version;              // 0 == NRPC_VERSION_DEFAULT (the production default)
+    HTTP_ACCESS access;            // HTTP_ACCESS_NONE (0) is a real, permissive value
+    bool sync;                     // false = async handler
+    NRPC_SOURCE source;            // registry policy depends on it - always write it
+    nrpc_handler_cb_t handler;     // required
+    void *handler_data;            // legitimately NULL for daemon handlers
+};
+
 // register a method, called from its serving thread
-void nrpc_method_register(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, uint32_t version, const char *help, const char *tags,
-                      HTTP_ACCESS access, bool sync, NRPC_SOURCE source,
-                      nrpc_handler_cb_t handler, void *handler_data);
+void nrpc_method_register(const struct nrpc_method_desc *desc);
 
 bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SOURCE source);
 

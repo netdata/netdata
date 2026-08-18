@@ -1407,11 +1407,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
                 SIMPLE_PATTERN_EXACT, true);
 
-        nrpc_method_register_builtin(localhost, NULL, "block-devices", 10,
-                                NRPC_PRIORITY_DEFAULT, NRPC_VERSION_DEFAULT,
-                                FUNCTION_DISKSTATS_HELP,
-                                "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                                diskstats_function_block_devices);
+        nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+            .host = localhost,
+            .name = "block-devices",
+            .help = FUNCTION_DISKSTATS_HELP,
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = NRPC_PRIORITY_DEFAULT,
+            .version = NRPC_VERSION_DEFAULT,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .handler = diskstats_function_block_devices,
+        });
     }
 
     // --------------------------------------------------------------------------

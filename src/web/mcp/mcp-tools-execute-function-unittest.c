@@ -109,10 +109,17 @@ int mcp_execute_function_access_unittest(void) {
     nrpc_inflight_calls_create();
 
     // A protected function mirroring systemd-journal's access requirements.
-    nrpc_method_register_builtin(host, NULL, MCP_UT_FN, 10, 0, 1,
-                            "unittest protected function", "logs",
-                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
-                            mcp_ut_protected_cb);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .host = host,
+        .name = MCP_UT_FN,
+        .help = "unittest protected function",
+        .tags = "logs",
+        .timeout_s = 10,
+        .priority = 0,
+        .version = 1,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        .handler = mcp_ut_protected_cb,
+    });
 
     const char *node = rrdhost_hostname(host);
     int errors = 0;
