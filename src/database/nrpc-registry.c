@@ -327,6 +327,7 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     internal_fatal(!desc->name, "NRPC: method registration without a name");
     internal_fatal(!desc->help, "NRPC: method registration without help text");
     internal_fatal(!desc->handler, "NRPC: method registration without a handler");
+    internal_fatal(desc->source == NRPC_SOURCE_UNSET, "NRPC: method registration without a source");
 
     RRDHOST *host = desc->host;
     RRDSET *st = desc->st; // st may be NULL, to create a GLOBAL function
@@ -439,6 +440,8 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
 }
 
 bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SOURCE source) {
+    internal_fatal(source == NRPC_SOURCE_UNSET, "NRPC: method unregistration without a source");
+
     if(unlikely(!name || !*name))
         return false;
 

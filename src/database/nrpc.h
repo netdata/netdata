@@ -136,9 +136,11 @@ typedef enum __attribute__((packed)) {
 // per-source rules (e.g. only the dyncfg subsystem and streaming children may
 // register dyncfg-reserved names) and, on delete, who may remove what
 typedef enum __attribute__((packed)) {
-    NRPC_SOURCE_PLUGIN = 0,  // a local plugin (pluginsd FUNCTION)
+    NRPC_SOURCE_UNSET = 0,   // a forgotten desc field, never a valid source - the register and
+                             // unregister paths assert against it in debug builds
+    NRPC_SOURCE_PLUGIN,      // a local plugin (pluginsd FUNCTION)
     NRPC_SOURCE_STREAM,      // a streaming child's advertisement on this parent
-    NRPC_SOURCE_DAEMON,       // daemon-internal registration (builtin methods, dyncfg)
+    NRPC_SOURCE_DAEMON,      // daemon-internal registration (builtin methods, dyncfg)
 } NRPC_SOURCE;
 
 void nrpc_registry_init(RRDHOST *host);
@@ -164,7 +166,7 @@ struct nrpc_method_desc {
     uint32_t version;              // 0 == NRPC_VERSION_DEFAULT (the production default)
     HTTP_ACCESS access;            // HTTP_ACCESS_NONE (0) is a real, permissive value
     bool sync;                     // false = async handler
-    NRPC_SOURCE source;            // registry policy depends on it - always write it
+    NRPC_SOURCE source;            // required: NRPC_SOURCE_UNSET (0) is debug-asserted against
     nrpc_handler_cb_t handler;     // required
     void *handler_data;            // legitimately NULL for daemon handlers
 };
