@@ -531,6 +531,9 @@ int netdata_main(int argc, char **argv) {
                             if (unittest_waiting_queue()) return 1;
                             if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if (mrg_unittest()) return 1;
+#endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
