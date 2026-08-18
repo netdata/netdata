@@ -177,14 +177,34 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
 // true if name is a reserved dynamic-configuration method name ("config" or "config <id>")
 bool nrpc_method_name_is_dyncfg(const char *name);
 
+// Call specification: the caller's input to one method invocation. Stack-
+// filled by the caller; the in-flight call record copies what it keeps, so
+// pointers into dying scopes are safe. Every field's zero keeps the meaning a
+// zero positional argument had - no defaulting is added. Style rule: policy-
+// valued fields (user_access, timeout_s, wait, allow_restricted) are written
+// explicitly at every site even when zero; pointer fields may be omitted when
+// NULL. Naming: the spec (caller input) feeds struct nrpc_call (the in-flight
+// record, private to nrpc-calls.c) which the handler sees as
+// struct nrpc_request - three views of one invocation.
+struct nrpc_call_spec {
+    RRDHOST *host;                 // required by every current caller (a NULL host answers 500)
+    BUFFER *result_wb;             // required; also the error sink
+    const char *cmd;               // "name [args]"; NULL/empty sanitizes to "" and fails the lookup (404) -
+                                   // api_v1_function() passes NULL when the request has no function= parameter
+    const char *source;            // provenance STRING (who is calling) - not NRPC_SOURCE
+    HTTP_ACCESS user_access;       // HTTP_ACCESS_NONE (0) is a real, anonymous caller
+    int timeout_s;                 // <= 0 = inherit the method's registered timeout
+    bool wait;                     // async only: block until the result arrives
+    bool allow_restricted;         // permit calling RESTRICTED (hidden) methods
+    const char *call_id;           // NULL = generate one
+    BUFFER *payload;               // NULL = none
+    struct { nrpc_result_cb_t cb;       void *data; } result;
+    struct { nrpc_progress_cb_t cb;     void *data; } progress;      // data may be NULL with cb set
+    struct { nrpc_is_cancelled_cb_t cb; void *data; } is_cancelled;
+};
+
 // invoke a method - callable from anywhere
-int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
-                     HTTP_ACCESS user_access, const char *cmd,
-                     bool wait, const char *call_id,
-                     nrpc_result_cb_t result_cb, void *result_cb_data,
-                     nrpc_progress_cb_t progress_cb, void *progress_cb_data,
-                     nrpc_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source, bool allow_restricted);
+int nrpc_call(const struct nrpc_call_spec *spec);
 
 // Verify the caller may invoke `cmd` on `host`, applying the same RESTRICTED and access-level
 // checks nrpc_call() enforces, WITHOUT executing the method. This lets non-execution

@@ -473,12 +473,17 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 
     should_be_saved(t, c);
 
-    int rc = nrpc_call(localhost, wb, 10, HTTP_ACCESS_ALL, cmd,
-                              true, NULL,
-                              NULL, NULL,
-                              NULL, NULL,
-                              NULL, NULL,
-                              pld, source, false);
+    int rc = nrpc_call(&(struct nrpc_call_spec) {
+        .host = localhost,
+        .result_wb = wb,
+        .cmd = cmd,
+        .source = source,
+        .user_access = HTTP_ACCESS_ALL,
+        .timeout_s = 10,
+        .wait = true,
+        .allow_restricted = false,
+        .payload = pld,
+    });
     if(!DYNCFG_RESP_SUCCESS(rc)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
         dyncfg_unittest_register_error(NULL, NULL);

@@ -78,12 +78,28 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         tmp->transaction = string_strdupz(transaction);
         BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
 
-        nrpc_call(s->host, wb, timeout,
-                         http_access_from_hex_mapping_old_roles(access), function, false, transaction,
-                         stream_execute_function_callback, tmp,
-                         stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
-                         stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
-                         NULL, NULL, payload, source, true);
+        struct nrpc_call_spec spec = {
+            .host = s->host,
+            .result_wb = wb,
+            .cmd = function,
+            .source = source,
+            .user_access = http_access_from_hex_mapping_old_roles(access),
+            .timeout_s = timeout,
+            .wait = false,
+            .allow_restricted = true,
+            .call_id = transaction,
+            .payload = payload,
+            .result.cb = stream_execute_function_callback,
+            .result.data = tmp,
+        };
+
+        // the progress callback and its data are set as a pair
+        if(stream_has_capability(s, STREAM_CAP_PROGRESS)) {
+            spec.progress.cb = stream_execute_function_progress_callback;
+            spec.progress.data = tmp;
+        }
+
+        nrpc_call(&spec);
     }
 }
 

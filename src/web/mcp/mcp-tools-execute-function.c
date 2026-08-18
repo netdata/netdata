@@ -2221,24 +2221,18 @@ static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload
     BUFFER *result_buffer = buffer_create(0, NULL);
     
     // Execute the function
-    int ret = nrpc_call(
-        data->request.host,
-        result_buffer,
-        (int)data->request.timeout,
-        data->request.auth->access,
-        data->request.function,
-        true,
-        data->request.transaction,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        payload,
-        buffer_tostring(source),
-        false
-    );
+    int ret = nrpc_call(&(struct nrpc_call_spec) {
+        .host = data->request.host,
+        .result_wb = result_buffer,
+        .cmd = data->request.function,
+        .source = buffer_tostring(source),
+        .user_access = data->request.auth->access,
+        .timeout_s = (int)data->request.timeout,
+        .wait = true,
+        .allow_restricted = false,
+        .call_id = data->request.transaction,
+        .payload = payload,
+    });
     
     if (ret != HTTP_RESP_OK) {
         buffer_sprintf(data->request.mcpc->error,

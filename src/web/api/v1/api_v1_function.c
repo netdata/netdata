@@ -36,9 +36,19 @@ int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     CLEAN_BUFFER *source = buffer_create(100, NULL);
     user_auth_to_source_buffer(&w->user_auth, source);
 
-    return nrpc_call(host, wb, timeout, w->user_auth.access, function, true, transaction,
-                            NULL, NULL,
-                            web_client_progress_functions_update, NULL,
-                            web_client_interrupt_callback, w, w->payload,
-                            buffer_tostring(source), false);
+    return nrpc_call(&(struct nrpc_call_spec) {
+        .host = host,
+        .result_wb = wb,
+        .cmd = function,
+        .source = buffer_tostring(source),
+        .user_access = w->user_auth.access,
+        .timeout_s = timeout,
+        .wait = true,
+        .allow_restricted = false,
+        .call_id = transaction,
+        .payload = w->payload,
+        .progress.cb = web_client_progress_functions_update,
+        .is_cancelled.cb = web_client_interrupt_callback,
+        .is_cancelled.data = w,
+    });
 }

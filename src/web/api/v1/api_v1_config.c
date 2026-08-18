@@ -84,12 +84,21 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
     user_auth_to_source_buffer(&w->user_auth, source);
 
     buffer_flush(w->response.data);
-    int code = nrpc_call(host, w->response.data, timeout, w->user_auth.access, cmd,
-                                true, transaction,
-                                NULL, NULL,
-                                web_client_progress_functions_update, NULL,
-                                web_client_interrupt_callback, w,
-                                w->payload, buffer_tostring(source), false);
+    int code = nrpc_call(&(struct nrpc_call_spec) {
+        .host = host,
+        .result_wb = w->response.data,
+        .cmd = cmd,
+        .source = buffer_tostring(source),
+        .user_access = w->user_auth.access,
+        .timeout_s = timeout,
+        .wait = true,
+        .allow_restricted = false,
+        .call_id = transaction,
+        .payload = w->payload,
+        .progress.cb = web_client_progress_functions_update,
+        .is_cancelled.cb = web_client_interrupt_callback,
+        .is_cancelled.data = w,
+    });
 
     freez(cmd);
     return code;

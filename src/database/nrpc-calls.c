@@ -552,19 +552,17 @@ int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
     return HTTP_RESP_OK;
 }
 
-int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
-                     HTTP_ACCESS user_access, const char *cmd,
-                     bool wait, const char *call_id,
-                     nrpc_result_cb_t result_cb, void *result_cb_data,
-                     nrpc_progress_cb_t progress_cb, void *progress_cb_data,
-                     nrpc_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload, const char *source, bool allow_restricted) {
+int nrpc_call(const struct nrpc_call_spec *spec) {
+    internal_fatal(!spec->result_wb, "NRPC: call without a result buffer");
+
+    RRDHOST *host = spec->host;
+    BUFFER *result_wb = spec->result_wb;
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     NRPC_METHOD_ACQUIRED *method_acquired = NULL;
 
-    const char *source_to_sanitize = source ? source : "";
+    const char *source_to_sanitize = spec->source ? spec->source : "";
     size_t sanitized_source_size = nrpc_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *sanitized_source = mallocz(sanitized_source_size);
     nrpc_sanitize_name(sanitized_source, source_to_sanitize, sanitized_source_size);
@@ -576,8 +574,8 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
         nrpc_call_error(result_wb, "No host given for routing this request to.", code);
 
-        if(result_cb)
-            result_cb(result_wb, code, result_cb_data);
+        if(spec->result.cb)
+            spec->result.cb(result_wb, code, spec->result.data);
 
         return code;
     }
@@ -585,19 +583,20 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     // ------------------------------------------------------------------------
     // find the function and verify the caller's access
 
-    size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, cmd, sizeof(sanitized_cmd));
+    size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, spec->cmd, sizeof(sanitized_cmd));
 
-    code = nrpc_method_authorize(host, result_wb, cmd, user_access, allow_restricted, &method_acquired);
+    code = nrpc_method_authorize(host, result_wb, spec->cmd, spec->user_access, spec->allow_restricted, &method_acquired);
     if(code != HTTP_RESP_OK) {
 
-        if(result_cb)
-            result_cb(result_wb, code, result_cb_data);
+        if(spec->result.cb)
+            spec->result.cb(result_wb, code, spec->result.data);
 
         return code;
     }
 
     struct nrpc_method *method = nrpc_method_acquired_value(method_acquired);
 
+    int timeout_s = spec->timeout_s;
     if(timeout_s <= 0)
         timeout_s = method->timeout;
 
@@ -607,11 +606,11 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     char uuid_str[UUID_COMPACT_STR_LEN];
     nd_uuid_t uuid;
 
-    if(!call_id || !*call_id || uuid_parse_flexi(call_id, uuid) != 0)
+    if(!spec->call_id || !*spec->call_id || uuid_parse_flexi(spec->call_id, uuid) != 0)
         uuid_generate_random(uuid);
 
     uuid_unparse_lower_compact(uuid, uuid_str);
-    call_id = uuid_str;
+    const char *call_id = uuid_str;
 
     // ------------------------------------------------------------------------
     // the function can only be executed in async mode
@@ -619,13 +618,13 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     struct nrpc_call t = {
         .host = host,
-        .cmd = strdupz(cmd),
+        .cmd = strdupz(spec->cmd),
         .sanitized_cmd = strdupz(sanitized_cmd),
         .sanitized_cmd_length = sanitized_cmd_length,
         .call_id = strdupz(call_id),
-        .user_access = user_access,
+        .user_access = spec->user_access,
         .source = sanitized_source,
-        .payload = buffer_dup(payload),
+        .payload = buffer_dup(spec->payload),
         .timeout = timeout_s,
         .cancelled = false,
         .stop_monotonic_ut = now_monotonic_usec() + timeout_s * USEC_PER_SEC,
@@ -633,16 +632,16 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         .method = method,
         .result = {
             .wb = result_wb,
-            .cb = result_cb,
-            .data = result_cb_data,
+            .cb = spec->result.cb,
+            .data = spec->result.data,
         },
         .is_cancelled = {
-            .cb = is_cancelled_cb,
-            .data = is_cancelled_cb_data,
+            .cb = spec->is_cancelled.cb,
+            .data = spec->is_cancelled.data,
         },
         .progress = {
-            .cb = progress_cb,
-            .data = progress_cb_data,
+            .cb = spec->progress.cb,
+            .data = spec->progress.data,
         },
     };
     sanitized_source = NULL;
@@ -664,8 +663,8 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         nrpc_call_cleanup(&t);
         nrpc_method_acquired_release(host, t.method_acquired);
 
-        if(result_cb)
-            result_cb(result_wb, code, result_cb_data);
+        if(spec->result.cb)
+            spec->result.cb(result_wb, code, spec->result.data);
 
         return code;
     }
@@ -680,8 +679,8 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         nrpc_call_cleanup(&t);
         nrpc_method_acquired_release(host, t.method_acquired);
 
-        if(result_cb)
-            result_cb(result_wb, code, result_cb_data);
+        if(spec->result.cb)
+            spec->result.cb(result_wb, code, spec->result.data);
 
         return code;
     }
@@ -728,7 +727,7 @@ int nrpc_call(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         return code;
     }
 
-    return nrpc_call_async(call, wait);
+    return nrpc_call_async(call, spec->wait);
 }
 
 bool nrpc_call_has_result_cb(nd_uuid_t *call_id, nrpc_result_cb_t cb) {

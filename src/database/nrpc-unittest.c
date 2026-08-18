@@ -2181,8 +2181,16 @@ int nrpc_registry_unittest(void) {
         size_t a_before = reg_cb_a_calls, b_before = reg_cb_b_calls;
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
-                             NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+            nrpc_call(&(struct nrpc_call_spec) {
+                .host = host,
+                .result_wb = wb,
+                .cmd = fn,
+                .source = "unittest",
+                .user_access = HTTP_ACCESS_ALL,
+                .timeout_s = 10,
+                .wait = true,
+                .allow_restricted = false,
+            });
         }
         if(reg_cb_a_calls != a_before + 1 || reg_cb_b_calls != b_before) {
             fprintf(stderr, "  FAILED swap: the registered execute callback did not run\n");
@@ -2229,8 +2237,16 @@ int nrpc_registry_unittest(void) {
         a_before = reg_cb_a_calls; b_before = reg_cb_b_calls;
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, fn, true, NULL,
-                             NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", true /* allow restricted */);
+            nrpc_call(&(struct nrpc_call_spec) {
+                .host = host,
+                .result_wb = wb,
+                .cmd = fn,
+                .source = "unittest",
+                .user_access = HTTP_ACCESS_ALL,
+                .timeout_s = 10,
+                .wait = true,
+                .allow_restricted = true,
+            });
         }
         if(reg_cb_b_calls != b_before + 1 || reg_cb_a_calls != a_before) {
             fprintf(stderr, "  FAILED swap: the swapped execute callback did not take over\n");
@@ -2318,8 +2334,16 @@ int nrpc_registry_unittest(void) {
             }
 
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "reg-serving-fn", true, NULL,
-                                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+            int code = nrpc_call(&(struct nrpc_call_spec) {
+                .host = host,
+                .result_wb = wb,
+                .cmd = "reg-serving-fn",
+                .source = "unittest",
+                .user_access = HTTP_ACCESS_ALL,
+                .timeout_s = 10,
+                .wait = true,
+                .allow_restricted = false,
+            });
             if(code != HTTP_RESP_SERVICE_UNAVAILABLE) {
                 fprintf(stderr, "  FAILED serving: running it returned %d, expected 503\n", code);
                 errors++;

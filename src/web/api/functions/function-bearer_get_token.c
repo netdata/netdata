@@ -73,10 +73,16 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
 
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction_str);
-    return nrpc_call(host, w->response.data, 10,
-                            w->user_auth.access, FUNCTION_BEARER_GET_TOKEN, true,
-                            transaction_str, NULL, NULL,
-                            NULL, NULL,
-                            NULL, NULL,
-                            payload, buffer_tostring(source), true);
+    return nrpc_call(&(struct nrpc_call_spec) {
+        .host = host,
+        .result_wb = w->response.data,
+        .cmd = FUNCTION_BEARER_GET_TOKEN,
+        .source = buffer_tostring(source),
+        .user_access = w->user_auth.access,
+        .timeout_s = 10,
+        .wait = true,
+        .allow_restricted = true,
+        .call_id = transaction_str,
+        .payload = payload,
+    });
 }

@@ -469,10 +469,19 @@ int pluginsd_functions_unittest(void) {
         uuid_unparse_lower_compact(uuid, tx);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = nrpc_call(host, wb, 1 /* second */, HTTP_ACCESS_ALL, "c6-gc-mid-defer-fn",
-                                    false /* don't wait */, tx,
-                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
-                                    NULL, "unittest", false);
+        int code = nrpc_call(&(struct nrpc_call_spec) {
+            .host = host,
+            .result_wb = wb,
+            .cmd = "c6-gc-mid-defer-fn",
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .timeout_s = 1,
+            .wait = false,
+            .allow_restricted = false,
+            .call_id = tx,
+            .result.cb = c6ut_result_cb,
+            .result.data = &res,
+        });
         if(code != HTTP_RESP_OK) {
             fprintf(stderr, "  FAILED gc-mid-defer: async run returned %d\n", code);
             errors++;
@@ -640,10 +649,18 @@ int pluginsd_functions_unittest(void) {
             size_t calls_before = res.calls;
 
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            int code = nrpc_call(host, wb, 1 /* second */, HTTP_ACCESS_ALL, "c6-gc-race-fn",
-                                        false /* don't wait */, NULL,
-                                        c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
-                                        NULL, "unittest", false);
+            int code = nrpc_call(&(struct nrpc_call_spec) {
+                .host = host,
+                .result_wb = wb,
+                .cmd = "c6-gc-race-fn",
+                .source = "unittest",
+                .user_access = HTTP_ACCESS_ALL,
+                .timeout_s = 1,
+                .wait = false,
+                .allow_restricted = false,
+                .result.cb = c6ut_result_cb,
+                .result.data = &res,
+            });
             if(code != HTTP_RESP_OK) {
                 fprintf(stderr, "  FAILED gc-race: async run returned %d\n", code);
                 errors++;
@@ -710,10 +727,16 @@ int pluginsd_functions_unittest(void) {
         });
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = nrpc_call(host, wb, 5, HTTP_ACCESS_ALL, "c5b-deadline-fn",
-                                    false /* don't wait */, NULL,
-                                    NULL, NULL, NULL, NULL, NULL, NULL,
-                                    NULL, "unittest", false);
+        int code = nrpc_call(&(struct nrpc_call_spec) {
+            .host = host,
+            .result_wb = wb,
+            .cmd = "c5b-deadline-fn",
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .timeout_s = 5,
+            .wait = false,
+            .allow_restricted = false,
+        });
         if(code != HTTP_RESP_OK) {
             fprintf(stderr, "  FAILED deadline: async run returned %d\n", code);
             errors++;
@@ -782,10 +805,18 @@ int pluginsd_functions_unittest(void) {
 
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "c7-dead-transport-fn",
-                                    false /* don't wait */, NULL,
-                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
-                                    NULL, "unittest", false);
+        int code = nrpc_call(&(struct nrpc_call_spec) {
+            .host = host,
+            .result_wb = wb,
+            .cmd = "c7-dead-transport-fn",
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .timeout_s = 10,
+            .wait = false,
+            .allow_restricted = false,
+            .result.cb = c6ut_result_cb,
+            .result.data = &res,
+        });
 
         if(code != HTTP_RESP_SERVICE_UNAVAILABLE) {
             fprintf(stderr, "  FAILED dead-transport: run returned %d, expected 503\n", code);
@@ -914,10 +945,32 @@ int pluginsd_functions_unittest(void) {
         CLEAN_BUFFER *wb1 = buffer_create(0, NULL);
         CLEAN_BUFFER *wb2 = buffer_create(0, NULL);
 
-        int c1 = nrpc_call(host, wb1, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
-                                  c6ut_result_cb, &r1, NULL, NULL, NULL, NULL, NULL, "unittest", false);
-        int c2 = nrpc_call(host, wb2, 10, HTTP_ACCESS_ALL, "c7-dup-fn", false, tx,
-                                  c6ut_result_cb, &r2, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+        int c1 = nrpc_call(&(struct nrpc_call_spec) {
+            .host = host,
+            .result_wb = wb1,
+            .cmd = "c7-dup-fn",
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .timeout_s = 10,
+            .wait = false,
+            .allow_restricted = false,
+            .call_id = tx,
+            .result.cb = c6ut_result_cb,
+            .result.data = &r1,
+        });
+        int c2 = nrpc_call(&(struct nrpc_call_spec) {
+            .host = host,
+            .result_wb = wb2,
+            .cmd = "c7-dup-fn",
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .timeout_s = 10,
+            .wait = false,
+            .allow_restricted = false,
+            .call_id = tx,
+            .result.cb = c6ut_result_cb,
+            .result.data = &r2,
+        });
 
         if(c1 != HTTP_RESP_OK || r1.calls != 0) {
             fprintf(stderr, "  FAILED duplicate: the first call returned %d and was delivered %zu times\n",
@@ -1116,10 +1169,18 @@ int pluginsd_functions_unittest(void) {
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         usec_t t0 = now_monotonic_usec();
-        int code = nrpc_call(host, wb, 10 /* seconds */, HTTP_ACCESS_ALL, "c7-grace-fn",
-                                    false /* don't wait */, NULL,
-                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL,
-                                    NULL, "unittest", false);
+        int code = nrpc_call(&(struct nrpc_call_spec) {
+            .host = host,
+            .result_wb = wb,
+            .cmd = "c7-grace-fn",
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .timeout_s = 10,
+            .wait = false,
+            .allow_restricted = false,
+            .result.cb = c6ut_result_cb,
+            .result.data = &res,
+        });
         if(code != HTTP_RESP_OK) {
             fprintf(stderr, "  FAILED grace: async run returned %d\n", code);
             errors++;
@@ -1183,8 +1244,18 @@ int pluginsd_functions_unittest(void) {
 
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "c7-pin-fn", false, NULL,
-                                    c6ut_result_cb, &res, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+        int code = nrpc_call(&(struct nrpc_call_spec) {
+            .host = host,
+            .result_wb = wb,
+            .cmd = "c7-pin-fn",
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .timeout_s = 10,
+            .wait = false,
+            .allow_restricted = false,
+            .result.cb = c6ut_result_cb,
+            .result.data = &res,
+        });
         if(code != HTTP_RESP_OK) {
             fprintf(stderr, "  FAILED pins: async run returned %d\n", code);
             errors++;
@@ -1283,8 +1354,16 @@ int pluginsd_functions_unittest(void) {
         for(size_t i = 0; i < _countof(t); i++) {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             usec_t t0 = now_monotonic_usec();
-            int code = nrpc_call(host, wb, t[i].ask, HTTP_ACCESS_ALL, "c7-timeout-fn", false, NULL,
-                                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+            int code = nrpc_call(&(struct nrpc_call_spec) {
+                .host = host,
+                .result_wb = wb,
+                .cmd = "c7-timeout-fn",
+                .source = "unittest",
+                .user_access = HTTP_ACCESS_ALL,
+                .timeout_s = t[i].ask,
+                .wait = false,
+                .allow_restricted = false,
+            });
             if(code != HTTP_RESP_OK) {
                 fprintf(stderr, "  FAILED timeout: run returned %d\n", code);
                 errors++;
@@ -1325,8 +1404,18 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result sres = { 0 };
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            int code = nrpc_call(host, wb, 10, HTTP_ACCESS_ALL, "c7-sync-fn", true, NULL,
-                                        c6ut_result_cb, &sres, NULL, NULL, NULL, NULL, NULL, "unittest", false);
+            int code = nrpc_call(&(struct nrpc_call_spec) {
+                .host = host,
+                .result_wb = wb,
+                .cmd = "c7-sync-fn",
+                .source = "unittest",
+                .user_access = HTTP_ACCESS_ALL,
+                .timeout_s = 10,
+                .wait = true,
+                .allow_restricted = false,
+                .result.cb = c6ut_result_cb,
+                .result.data = &sres,
+            });
             if(code != HTTP_RESP_OK) {
                 fprintf(stderr, "  FAILED sync: run returned %d\n", code);
                 errors++;
