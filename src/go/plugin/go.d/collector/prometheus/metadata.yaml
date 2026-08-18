@@ -4546,7 +4546,20 @@ modules:
           Alert ownership is deliberately layered. Configure one logical MGR scrape scope per Ceph cluster for cluster-health
           alerts and use the native Ceph collector for its complementary Dashboard API collection-integrity alerts. Netdata's
           generic Prometheus collection alert covers a configured MGR job that cannot scrape; it is distinct from native API
-          component failures and does not report an unconfigured job.
+          component failures and does not report an unconfigured job. The monitor and OSD cluster-summary charts sum member
+          rows only within that MGR job or vnode; they are one cluster instance, not an infrastructure-level aggregation.
+          Use one stable endpoint or failover target that follows the active MGR and one stable job/vnode identity per logical
+          cluster. Separate jobs for active and standby endpoints can create duplicate cluster alert owners.
+
+          Cluster-summary alerts evaluate the latest stored dimensions on each Netdata health beat. A failed scrape does not
+          obsolete the chart or fabricate new values, so the data-state alert may continue evaluating the last stored state;
+          the generic collection alert owns that scrape failure. When the collector knows the chart has disappeared and
+          obsoletes it, its instance alerts are removed.
+
+          Ceph's node root-filesystem and packet-drop recommendations are owned by Netdata's generic per-filesystem and
+          per-interface host alerts on the Agents collecting each Ceph node, not by the MGR profile. Those stock policies use
+          Netdata's own thresholds, windows, directionality, hysteresis, and routing. They remain silent policy guidance where
+          applicable and are not duplicated under Ceph-specific names.
         method_description: |
           Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
           built-in `ceph` profile. The MGR module refreshes its enabled metric cache every 15 seconds by default, and standalone
@@ -4654,6 +4667,82 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
         info: 'Every available sample in the 30-second observation window reports a cephadm upgrade exception.'
+      - name: ceph_device_failure_predicted
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a device predicted to fail.'
+      - name: ceph_device_failure_prediction_too_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports that removing all predicted failures would compromise availability.'
+      - name: ceph_device_failure_relocation_incomplete
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports blocked relocation from a predicted device failure.'
+      - name: ceph_mon_clock_skew
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports monitor clock skew.'
+      - name: ceph_mon_diskspace_critical
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports critically low monitor-store space.'
+      - name: ceph_mon_diskspace_low
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports low monitor-store space.'
+      - name: ceph_mon_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.control_plane.monitor.cluster_summary
+        info: 'The current MGR cluster summary reports fewer monitors in quorum than configured, while a majority still remains.'
+      - name: ceph_mon_quorum_at_risk
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.control_plane.monitor.cluster_summary
+        info: 'The current MGR cluster summary reports exactly the minimum surviving monitor majority; one more monitor loss would remove quorum.'
+      - name: ceph_osd_backfill_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports that an OSD has reached its backfill-full threshold and rebalance cannot complete.'
+      - name: ceph_osd_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports a down OSD.'
+      - name: ceph_osd_down_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
+        info: 'The current MGR cluster summary reports that at least 10% of configured OSDs are down.'
+      - name: ceph_osd_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports an OSD at its full threshold.'
+      - name: ceph_osd_host_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports an offline OSD host.'
+      - name: ceph_osd_internal_disk_size_mismatch
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a BlueStore device-size mismatch that can cause the affected OSD to crash.'
+      - name: ceph_osd_near_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports an OSD at its near-full threshold.'
+      - name: ceph_osd_read_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports BlueStore read errors that succeeded only after retries.'
+      - name: ceph_osd_timeouts_cluster_network
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports slow backend OSD heartbeats.'
+      - name: ceph_osd_timeouts_public_network
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports slow frontend OSD heartbeats.'
+      - name: ceph_osd_too_many_repairs
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports excessive repaired reads, which may indicate a failing drive.'
       - name: ceph_unknown_health_check
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state

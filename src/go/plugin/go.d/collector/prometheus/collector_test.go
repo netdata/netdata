@@ -8,6 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1089,6 +1091,236 @@ func TestCollector_CephMGRReleaseFixturesMaterializeM01AlertIdentities(t *testin
 	}
 }
 
+func TestCollector_CephMGRNamedHealthCheckIdentities(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
+	var want []string
+	for _, mapping := range manifest.Alerts {
+		if mapping.Netdata.Disposition == "reuse" ||
+			mapping.Netdata.Context != "prometheus.ceph.health.health_checks.state" {
+			continue
+		}
+		name, ok := strings.CutPrefix(mapping.Netdata.Labels, "name=")
+		require.True(t, ok)
+		want = append(want, name)
+	}
+
+	var input strings.Builder
+	input.WriteString("# TYPE ceph_health_detail gauge\n")
+	for _, name := range want {
+		fmt.Fprintf(&input, "ceph_health_detail{name=\"%s\",severity=\"HEALTH_WARN\"} 1\n", name)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(input.String()))
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	var actual []string
+	for _, action := range plan.Actions {
+		create, ok := action.(chartengine.CreateChartAction)
+		if ok && create.Meta.Context == "prometheus.ceph.health.health_checks.state" {
+			actual = append(actual, create.Labels["name"])
+		}
+	}
+	assert.ElementsMatch(t, want, actual)
+}
+
+func TestCollector_CephMGRClusterSummaries(t *testing.T) {
+	var input strings.Builder
+	input.WriteString("# TYPE ceph_mon_metadata gauge\n# TYPE ceph_mon_quorum_status gauge\n")
+	for i := 0; i < 3; i++ {
+		fmt.Fprintf(&input,
+			"ceph_mon_metadata{ceph_daemon=\"mon.%c\",ceph_version=\"19.2.5\",hostname=\"mon-host-%d\",public_addr=\"192.0.2.%d:3300\",rank=\"%d\"} 1\n",
+			'a'+i, i, i+1, i)
+		quorum := 1
+		if i == 2 {
+			quorum = 0
+		}
+		fmt.Fprintf(&input, "ceph_mon_quorum_status{ceph_daemon=\"mon.%c\"} %d\n", 'a'+i, quorum)
+	}
+	input.WriteString("# TYPE ceph_osd_metadata gauge\n# TYPE ceph_osd_up gauge\n")
+	for i := 0; i < 10; i++ {
+		fmt.Fprintf(&input,
+			"ceph_osd_metadata{back_iface=\"back%d\",ceph_daemon=\"osd.%d\",ceph_version=\"19.2.5\",cluster_addr=\"192.0.2.%d:6800\",device_class=\"ssd\",front_iface=\"front%d\",hostname=\"osd-host-%d\",objectstore=\"bluestore\",public_addr=\"198.51.100.%d:6800\"} 1\n",
+			i, i, i+1, i, i, i+1)
+		up := 1
+		if i == 9 {
+			up = 0
+		}
+		fmt.Fprintf(&input, "ceph_osd_up{ceph_daemon=\"osd.%d\"} %d\n", i, up)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(input.String()))
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	const (
+		monSummary  = "prometheus.ceph.control_plane.monitor.cluster_summary"
+		monMetadata = "prometheus.ceph.control_plane.monitor.state_metadata"
+		monQuorum   = "prometheus.ceph.control_plane.monitor.state_quorum_status"
+		osdSummary  = "prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary"
+		osdMetadata = "prometheus.ceph.osd_capacity_and_state.metadata.state"
+		osdState    = "prometheus.ceph.osd_capacity_and_state.osd_state.state"
+	)
+	creates := make(map[string][]chartengine.CreateChartAction)
+	updates := make(map[string]chartengine.UpdateChartAction)
+	for _, action := range plan.Actions {
+		switch action := action.(type) {
+		case chartengine.CreateChartAction:
+			creates[action.Meta.Context] = append(creates[action.Meta.Context], action)
+		case chartengine.UpdateChartAction:
+			updates[action.ChartID] = action
+		}
+	}
+
+	require.Len(t, creates[monSummary], 1)
+	require.Len(t, creates[osdSummary], 1)
+	assert.Equal(t, "monitors", creates[monSummary][0].Meta.Units)
+	assert.Equal(t, "OSDs", creates[osdSummary][0].Meta.Units)
+	assert.Len(t, creates[monMetadata], 3, "cluster summary must not replace monitor member charts")
+	assert.Len(t, creates[monQuorum], 3, "cluster summary must not replace monitor quorum charts")
+	assert.Len(t, creates[osdMetadata], 10, "cluster summary must not replace OSD metadata charts")
+	assert.Len(t, creates[osdState], 10, "cluster summary must not replace OSD state charts")
+
+	requireChartValues := func(chart chartengine.CreateChartAction, expected map[string]float64) {
+		t.Helper()
+		update, ok := updates[chart.ChartID]
+		require.Truef(t, ok, "chart %q has no update", chart.ChartID)
+		actual := make(map[string]float64)
+		for _, value := range update.Values {
+			if value.IsFloat {
+				actual[value.Name] = value.Float64
+			} else {
+				actual[value.Name] = float64(value.Int64)
+			}
+		}
+		assert.Equal(t, expected, actual)
+	}
+	requireChartValues(creates[monSummary][0], map[string]float64{"total": 3, "in_quorum": 2})
+	requireChartValues(creates[osdSummary][0], map[string]float64{"total": 10, "up": 9})
+}
+
+func TestCollector_CephMGRClusterAlertBoundaries(t *testing.T) {
+	monState := func(total, inQuorum float64) (down, atRisk float64) {
+		if math.IsNaN(total) || math.IsInf(total, 0) || math.IsNaN(inQuorum) || math.IsInf(inQuorum, 0) ||
+			total <= 0 || inQuorum < 0 || inQuorum > total {
+			return math.NaN(), math.NaN()
+		}
+		if inQuorum < total && inQuorum*2 > total {
+			down = 1
+			if (inQuorum-1)*2 <= total {
+				atRisk = 1
+			}
+		}
+		return down, atRisk
+	}
+	for _, tc := range []struct {
+		name               string
+		total, inQuorum    float64
+		wantDown, wantRisk float64
+		undefined          bool
+	}{
+		{name: "invalid NaN total", total: math.NaN(), inQuorum: 2, undefined: true},
+		{name: "invalid infinite quorum", total: 3, inQuorum: math.Inf(1), undefined: true},
+		{name: "zero population", total: 0, inQuorum: 0, undefined: true},
+		{name: "negative quorum", total: 3, inQuorum: -1, undefined: true},
+		{name: "quorum exceeds population", total: 3, inQuorum: 4, undefined: true},
+		{name: "healthy odd population", total: 3, inQuorum: 3},
+		{name: "minimum odd majority", total: 3, inQuorum: 2, wantDown: 1, wantRisk: 1},
+		{name: "odd majority above minimum", total: 5, inQuorum: 4, wantDown: 1},
+		{name: "minimum five member majority", total: 5, inQuorum: 3, wantDown: 1, wantRisk: 1},
+		{name: "minimum even majority", total: 4, inQuorum: 3, wantDown: 1, wantRisk: 1},
+		{name: "quorum already lost", total: 4, inQuorum: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			down, risk := monState(tc.total, tc.inQuorum)
+			if tc.undefined {
+				assert.True(t, math.IsNaN(down))
+				assert.True(t, math.IsNaN(risk))
+				return
+			}
+			assert.Equal(t, tc.wantDown, down)
+			assert.Equal(t, tc.wantRisk, risk)
+		})
+	}
+
+	osdDownPercent := func(total, up float64) float64 {
+		if math.IsNaN(total) || math.IsInf(total, 0) || math.IsNaN(up) || math.IsInf(up, 0) ||
+			total <= 0 || up < 0 || up > total {
+			return math.NaN()
+		}
+		return (total - up) * 100 / total
+	}
+	for _, tc := range []struct {
+		name      string
+		total, up float64
+		want      float64
+		critical  bool
+		undefined bool
+	}{
+		{name: "invalid NaN up", total: 10, up: math.NaN(), undefined: true},
+		{name: "zero population", total: 0, up: 0, undefined: true},
+		{name: "negative up", total: 10, up: -1, undefined: true},
+		{name: "up exceeds population", total: 10, up: 11, undefined: true},
+		{name: "all OSDs up", total: 10, up: 10},
+		{name: "below threshold", total: 10000, up: 9001, want: 9.99},
+		{name: "at threshold", total: 10, up: 9, want: 10, critical: true},
+		{name: "above threshold", total: 10, up: 8, want: 20, critical: true},
+	} {
+		t.Run("osd "+tc.name, func(t *testing.T) {
+			value := osdDownPercent(tc.total, tc.up)
+			if tc.undefined {
+				assert.True(t, math.IsNaN(value))
+				return
+			}
+			assert.InDelta(t, tc.want, value, 1e-12)
+			assert.Equal(t, tc.critical, value >= 10)
+		})
+	}
+}
+
 func TestCollector_CephMGRAlertContract(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	templates := cephHealthAlertTemplates(t)
@@ -1117,8 +1349,10 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		},
 	}, manifest.Sources)
 	require.ElementsMatch(t, []string{
-		"CEPH-001", "CEPH-002", "CEPH-013", "CEPH-014", "CEPH-015", "CEPH-016", "CEPH-059", "CEPH-060",
-		"CEPH-061", "CEPH-062",
+		"CEPH-001", "CEPH-002", "CEPH-003", "CEPH-004", "CEPH-005", "CEPH-013", "CEPH-014", "CEPH-015",
+		"CEPH-016", "CEPH-017", "CEPH-018", "CEPH-019", "CEPH-020", "CEPH-021", "CEPH-025", "CEPH-027",
+		"CEPH-028", "CEPH-029", "CEPH-030", "CEPH-032", "CEPH-033", "CEPH-034", "CEPH-035", "CEPH-036",
+		"CEPH-037", "CEPH-038", "CEPH-039", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
 	}, cephManifestSOWIDs(manifest.Alerts))
 	require.ElementsMatch(t, []string{"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02"},
 		cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
@@ -1134,8 +1368,17 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 
 	for name, mapping := range manifest.Alerts {
 		require.NotEmpty(t, mapping.SourceAlert)
-		require.NotEmpty(t, mapping.Source.Expression)
-		require.NotEmpty(t, mapping.Source.Persistence)
+		hasExpression := mapping.Source.Expression != ""
+		hasExpressions := len(mapping.Source.Expressions) > 0
+		require.NotEqualf(t, hasExpression, hasExpressions,
+			"%s must define exactly one of source expression or release expressions", name)
+		if hasExpressions {
+			require.Lenf(t, mapping.Source.Expressions, 3, "%s source expressions do not cover the supported releases", name)
+			for _, release := range []string{"reef", "squid", "tentacle"} {
+				require.Containsf(t, mapping.Source.Expressions, release,
+					"%s has no source expression for %s", name, release)
+			}
+		}
 		require.NotEmpty(t, mapping.Source.Severity)
 		require.Positive(t, mapping.Source.Lines["reef"])
 		require.Positive(t, mapping.Source.Lines["squid"])
@@ -1150,6 +1393,8 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		require.NotEmpty(t, adaptation.Differences)
 
 		if mapping.Netdata.Disposition == "reuse" {
+			require.NotEmptyf(t, mapping.Netdata.OwnerFile, "%s has no generic owner file", name)
+			require.NotEmptyf(t, mapping.Netdata.OwnerAlerts, "%s has no generic owner templates", name)
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
@@ -1158,26 +1403,48 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 			assert.Equal(t, mapping.Netdata.Context, block["on"])
 			assert.Equal(t, mapping.Netdata.Labels, block["chart labels"])
 			assert.Equal(t, mapping.Netdata.Lookup, block["lookup"])
+			assert.Equal(t, mapping.Netdata.Calc, block["calc"])
+			if mapping.Netdata.Calc != "" {
+				assert.Empty(t, mapping.Netdata.Lookup, "current compound alert must not mix historical and current dimensions")
+				assert.NotContains(t, mapping.Netdata.Calc, "$last_collected_t",
+					"data-state alert must not duplicate generic collection-failure ownership")
+			}
 			assert.Equal(t, mapping.Netdata.Units, block["units"])
 			assert.Equal(t, manifest.NetdataAlertCadence, block["every"])
-			assert.Empty(t, block["delay"], "observation-window adaptation must not use notification delay")
+			assert.Empty(t, block["delay"], "source persistence adaptation must not use notification delay")
 			assert.Equal(t, mapping.Netdata.Condition, block["condition"])
 			assert.Equal(t, mapping.Netdata.Recipient, block["to"])
-			assert.Equal(t, "NETDATA-ADAPTED", mapping.Netdata.Fidelity)
+			assert.Contains(t, []string{"NETDATA-ADAPTED", "CORRECTED-INTENT"}, mapping.Netdata.Fidelity)
 			assert.True(t, strings.HasPrefix(block["on"], "prometheus.ceph."))
-			assert.Contains(t, block["info"], "available")
+			if mapping.Netdata.Calc == "" {
+				assert.Contains(t, block["info"], "available")
+			} else {
+				assert.Contains(t, block["info"], "current")
+			}
 			assert.NotContains(t, block["info"], "continuously")
 		})
 	}
 
+	for name, mapping := range manifest.Alerts {
+		if mapping.Netdata.Disposition != "reuse" {
+			continue
+		}
+		generic := healthAlertTemplatesFromFile(t, filepath.Join("../../../../../..", mapping.Netdata.OwnerFile))
+		for _, owner := range mapping.Netdata.OwnerAlerts {
+			block, ok := generic[owner]
+			require.Truef(t, ok, "%s generic owner %q is absent from %s", name, owner, mapping.Netdata.OwnerFile)
+			assert.Equal(t, mapping.Netdata.Context, block["on"])
+			assert.NotContains(t, templates, owner, "Ceph alert pack duplicates a generic owner")
+		}
+		assert.Equal(t, "CORRECTED-INTENT", mapping.Netdata.Fidelity)
+	}
+
 	reuse := manifest.Alerts["plugin_data_collection_status"].Netdata
-	generic := healthAlertTemplatesFromFile(t, "../../../../../health/health.d/go.d.plugin.conf")["plugin_data_collection_status"]
-	assert.Equal(t, reuse.Context, generic["on"])
+	generic := healthAlertTemplatesFromFile(t, filepath.Join("../../../../../..", reuse.OwnerFile))["plugin_data_collection_status"]
 	assert.Equal(t, reuse.Lookup, generic["lookup"])
 	assert.Equal(t, reuse.Units, generic["units"])
 	assert.Equal(t, reuse.Condition, generic["condition"])
 	assert.Equal(t, reuse.Recipient, generic["to"])
-	assert.Equal(t, "CORRECTED-INTENT", reuse.Fidelity)
 
 	// The Dashboard API collector owns this separate native collection-integrity alert.
 	assert.Equal(t, manifest.NetdataExtensions["ceph_component_collection_failed"].Context,
@@ -1203,7 +1470,11 @@ func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
 					rule, ok := rules[mapping.SourceAlert]
 					require.Truef(t, ok, "source alert %q is absent", mapping.SourceAlert)
 
-					assert.Equal(t, mapping.Source.Expression, rule.Expression)
+					expression := mapping.Source.Expression
+					if len(mapping.Source.Expressions) > 0 {
+						expression = mapping.Source.Expressions[release]
+					}
+					assert.Equal(t, expression, rule.Expression)
 					assert.Equal(t, mapping.Source.Persistence, rule.Persistence)
 					assert.Equal(t, mapping.Source.Severity, rule.Severity)
 					assert.Equal(t, mapping.Source.Lines[release], rule.Line)
@@ -1526,6 +1797,7 @@ func TestCollector_CephMetadataVNodeExampleDeclaresPrerequisite(t *testing.T) {
 }
 
 func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
 	var metadata struct {
 		Modules []struct {
 			Meta struct {
@@ -1554,18 +1826,14 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 		}
 		break
 	}
-	assert.Equal(t, map[string]string{
-		"ceph_health_error":         "prometheus.ceph.health.cluster_status.state",
-		"ceph_health_warning":       "prometheus.ceph.health.cluster_status.state",
-		"ceph_daemon_crash":         "prometheus.ceph.health.health_checks.state",
-		"ceph_mgr_module_crash":     "prometheus.ceph.health.health_checks.state",
-		"ceph_daemon_slow_ops":      "prometheus.ceph.health.daemon_health.item_count",
-		"ceph_slow_ops":             "prometheus.ceph.health.slow_operations.current_operations",
-		"cephadm_daemon_failed":     "prometheus.ceph.health.health_checks.state",
-		"cephadm_paused":            "prometheus.ceph.health.health_checks.state",
-		"cephadm_upgrade_failed":    "prometheus.ceph.health.health_checks.state",
-		"ceph_unknown_health_check": "prometheus.ceph.health.health_checks.state",
-	}, actual)
+	expected := make(map[string]string)
+	for name, mapping := range manifest.Alerts {
+		if mapping.Netdata.Disposition != "reuse" {
+			expected[name] = mapping.Netdata.Context
+		}
+	}
+	expected["ceph_unknown_health_check"] = manifest.NetdataExtensions["ceph_unknown_health_check"].Context
+	assert.Equal(t, expected, actual)
 	for name, metadataInfo := range info {
 		if name == "ceph_unknown_health_check" {
 			assert.Contains(t, metadataInfo, "available sample")
@@ -1620,22 +1888,26 @@ type cephAlertMapping struct {
 	SourceAlert string `yaml:"source_alert"`
 	Source      struct {
 		Expression       string            `yaml:"expression"`
+		Expressions      map[string]string `yaml:"expressions"`
 		Persistence      string            `yaml:"persistence"`
 		Severity         string            `yaml:"severity"`
 		Lines            map[string]int    `yaml:"lines"`
 		DefinitionSHA256 map[string]string `yaml:"definition_sha256"`
 	} `yaml:"source"`
 	Netdata struct {
-		Disposition string `yaml:"disposition"`
-		Fidelity    string `yaml:"fidelity"`
-		Owner       string `yaml:"owner"`
-		Context     string `yaml:"context"`
-		Labels      string `yaml:"labels"`
-		Lookup      string `yaml:"lookup"`
-		Units       string `yaml:"units"`
-		Condition   string `yaml:"condition"`
-		Recipient   string `yaml:"recipient"`
-		Adaptation  string `yaml:"adaptation"`
+		Disposition string   `yaml:"disposition"`
+		Fidelity    string   `yaml:"fidelity"`
+		Owner       string   `yaml:"owner"`
+		Context     string   `yaml:"context"`
+		Labels      string   `yaml:"labels"`
+		Lookup      string   `yaml:"lookup"`
+		Calc        string   `yaml:"calc"`
+		Units       string   `yaml:"units"`
+		Condition   string   `yaml:"condition"`
+		Recipient   string   `yaml:"recipient"`
+		Adaptation  string   `yaml:"adaptation"`
+		OwnerFile   string   `yaml:"owner_file"`
+		OwnerAlerts []string `yaml:"owner_alerts"`
 	} `yaml:"netdata"`
 }
 
@@ -1688,7 +1960,7 @@ func healthAlertTemplatesFromFile(t *testing.T, path string) map[string]map[stri
 		if current == nil {
 			continue
 		}
-		for _, field := range []string{"on", "chart labels", "lookup", "units", "every", "delay", "warn", "crit", "info", "to"} {
+		for _, field := range []string{"on", "chart labels", "lookup", "calc", "units", "every", "delay", "warn", "crit", "info", "to"} {
 			if value, ok := strings.CutPrefix(line, field+":"); ok {
 				key := field
 				if field == "warn" || field == "crit" {

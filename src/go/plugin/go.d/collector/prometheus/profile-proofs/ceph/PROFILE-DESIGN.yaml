@@ -5199,6 +5199,31 @@ views:
       dimensions: {}
       promote: []
       omit: {}
+  control_plane.monitor.cluster_summary:
+    family: Ceph/Control Plane/Monitor
+    question: How many monitors exist and are currently in quorum for this cluster endpoint?
+    entity: cluster
+    inputs:
+      total:
+        signal: mon_metadata
+        components:
+        - value
+      in_quorum:
+        signal: mon_quorum_status
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        ceph_daemon: Member identity is reduced into the cluster population.
+        ceph_version: Member metadata is not meaningful on the cluster population chart.
+        hostname: Member metadata is not meaningful on the cluster population chart.
+        public_addr: Member metadata is not meaningful on the cluster population chart.
+        rank: Member metadata is not meaningful on the cluster population chart.
+    reduction:
+      reducer: sum
+      lost_comparison: Individual monitor rows remain available in the member charts; this view is the additive population for one MGR job.
   control_plane.monitor.state_quorum_status:
     family: Ceph/Control Plane/Monitor
     question: What is the state and metadata — quorum status for each ceph daemon?
@@ -7554,6 +7579,35 @@ views:
       dimensions: {}
       promote: []
       omit: {}
+  osd_capacity_and_state.osd_state.cluster_summary:
+    family: Ceph/OSD Capacity and State/OSD State
+    question: How many OSDs exist and are currently up for this cluster endpoint?
+    entity: cluster
+    inputs:
+      total:
+        signal: osd_metadata
+        components:
+        - value
+      up:
+        signal: osd_up
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        back_iface: Member metadata is not meaningful on the cluster population chart.
+        ceph_daemon: Member identity is reduced into the cluster population.
+        ceph_version: Member metadata is not meaningful on the cluster population chart.
+        cluster_addr: Member metadata is not meaningful on the cluster population chart.
+        device_class: Member metadata is not meaningful on the cluster population chart.
+        front_iface: Member metadata is not meaningful on the cluster population chart.
+        hostname: Member metadata is not meaningful on the cluster population chart.
+        objectstore: Member metadata is not meaningful on the cluster population chart.
+        public_addr: Member metadata is not meaningful on the cluster population chart.
+    reduction:
+      reducer: sum
+      lost_comparison: Individual OSD rows remain available in the member charts; this view is the additive population for one MGR job.
   osd_capacity_and_state.osd_state.weight:
     family: Ceph/OSD Capacity and State/OSD State
     question: What is the osd weight for each ceph daemon?
