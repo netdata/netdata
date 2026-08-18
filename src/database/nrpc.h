@@ -191,8 +191,7 @@ bool nrpc_method_name_is_dyncfg(const char *name);
 struct nrpc_call_spec {
     RRDHOST *host;                 // required by every current caller (a NULL host answers 500)
     BUFFER *result_wb;             // required; also the error sink
-    const char *cmd;               // "name [args]"; NULL/empty sanitizes to "" and fails the lookup (404) -
-                                   // api_v1_function() passes NULL when the request has no function= parameter
+    const char *cmd;               // "name [args]"; NULL-tolerant: sanitizes to "" and fails the lookup (404)
     const char *source;            // provenance STRING (who is calling) - not NRPC_SOURCE
     HTTP_ACCESS user_access;       // HTTP_ACCESS_NONE (0) is a real, anonymous caller
     int timeout_s;                 // <= 0 = inherit the method's registered timeout

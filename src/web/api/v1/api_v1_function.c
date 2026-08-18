@@ -30,6 +30,12 @@ int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
+    // a request without a function= parameter is malformed - answer 400 here
+    // instead of forwarding a NULL cmd, which would fail the registry lookup
+    // and answer a misleading 404 "not available on this host"
+    if(!function || !*function)
+        return nrpc_call_error(wb, "No function given to execute.", HTTP_RESP_BAD_REQUEST);
+
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 
