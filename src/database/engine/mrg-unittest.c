@@ -372,8 +372,10 @@ static int mrg_entries_acquired_counter_unittest(MRG *mrg) {
 // mrg_metric_get_and_acquire_by_uuid() resolves the uuid with uuidmap_peek_id(),
 // which returns an id it holds NO reference on. That is only safe because every
 // METRIC owns a uuidmap reference for its whole lifetime, so an id that resolves
-// to a metric is necessarily still alive, and because ids are never reused, so a
-// stale id can only miss -- never alias a different uuid.
+// to a metric is necessarily still alive, and because ids are unique for the
+// lifetime of the uuidmap, so a stale id can only miss -- never alias a different
+// uuid. (uuidmap_destroy() restarts the sequence, but it cannot succeed while a
+// METRIC holds a reference.)
 //
 // This exercises exactly that window: readers look metrics up by uuid while
 // writers add and delete metrics for the same uuid pool. Any mismatch between the

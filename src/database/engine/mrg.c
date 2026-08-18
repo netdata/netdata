@@ -203,8 +203,10 @@ METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t sec
     // own uuidmap reference for its whole lifetime (metric_add_and_acquire()
     // takes it, metric_del() releases it), so an id that resolves to a metric is
     // necessarily still alive. If the uuid is unknown there can be no metric for
-    // it, and if the entry died the lookup simply misses -- ids are never reused,
-    // so a stale id cannot alias a different uuid.
+    // it, and if the entry died the lookup simply misses -- ids are unique for the
+    // lifetime of the uuidmap, so a stale id cannot alias a different uuid. (The
+    // sequence only restarts on a successful uuidmap_destroy(), which cannot
+    // happen while any METRIC still holds its reference.)
     UUIDMAP_ID id = uuidmap_peek_id(*uuid);
     if(!id) return NULL;
 
