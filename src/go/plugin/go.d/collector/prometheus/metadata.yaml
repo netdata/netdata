@@ -4795,6 +4795,70 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.temperature.temperature
         info: 'Every available sample in the 1-minute observation window reports a recognized processor temperature sensor above 80°C.'
+      - name: ceph_osd_all_up
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
+        info: 'Internal helper holding the current all-configured-OSDs-up state; it does not notify.'
+      - name: ceph_object_missing
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'The current unfound condition is active while every configured OSD is up; client I/O for affected objects can block.'
+      - name: ceph_pg_backfill_at_risk
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports placement-group backfill blocked by fullness.'
+      - name: ceph_pg_not_deep_scrubbed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports placement groups overdue for deep scrub.'
+      - name: ceph_pg_not_scrubbed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports placement groups overdue for scrub.'
+      - name: ceph_pg_recovery_at_risk
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports recovery blocked by OSD fullness.'
+      - name: ceph_osd_down_current
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Internal helper holding the current OSD-down health state; it does not notify.'
+      - name: ceph_pg_unavailable_blocking_io
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'The current PG-unavailable condition is active while the separate OSD-down condition is not.'
+      - name: ceph_pgs_damaged
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports damaged placement-group data.'
+      - name: ceph_osd_scrub_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports scrub errors when PG-damage is not already active.'
+      - name: ceph_pgs_high_per_osd
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports excessive placement groups per OSD.'
+      - name: ceph_pgs_inactive
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state
+        info: 'The current per-pool count reports fewer active placement groups than the pool total.'
+      - name: ceph_pgs_unclean
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state
+        info: 'The current per-pool count reports fewer clean placement groups than the pool total.'
+      - name: ceph_pool_backfill_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 10-second observation window reports a pool at its backfill-full threshold.'
+      - name: ceph_pool_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a full pool.'
+      - name: ceph_pool_near_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports a near-full pool.'
       - name: ceph_mon_clock_skew
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state

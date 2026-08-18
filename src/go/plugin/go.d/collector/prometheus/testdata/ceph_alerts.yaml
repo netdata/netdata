@@ -87,6 +87,24 @@ adaptation_contracts:
       - partial collection gaps do not reset the window
       - a new chart may be evaluated with up to one chart update interval less history
       - a sufficiently stale lookup stops evaluating until collection resumes
+  same_chart_current_difference:
+    preserved:
+      - source current difference between dimensions on one chart instance
+      - source identity of that chart instance
+      - source severity and notification policy
+    differences:
+      - Netdata subtracts latest stored dimension values; it does not persist each operand over the source duration
+      - the source joins metadata to derive pool identity, while Netdata already owns per-pool chart identity
+      - non-finite or impossible counts become NaN rather than a false active or clear state
+  different_chart_current_composite:
+    preserved:
+      - source incident across related signals in one configured MGR job
+      - source severity and notification policy
+      - generic configured-job collection failure remains the scrape owner
+    differences:
+      - Netdata selects the latest matching chart/alert instance by equal label overlap instead of PromQL vector matching
+      - the source pending state is not reproduced for current composite signals
+      - missing or ambiguous operands become NaN rather than a fabricated clear or active state
   corrected_sensor_policy:
     preserved:
       - source sensor-family intent and severity
@@ -914,6 +932,404 @@ alerts:
       condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 80)'
       recipient: silent
       adaptation: corrected_sensor_policy
+  ceph_osd_all_up:
+    sow_id: CEPH-040-HELPER
+    source_alert: CephObjectMissing
+    source:
+      expression: 'count(ceph_osd_up == 1) == bool count(ceph_osd_metadata)'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
+      calc: '($total == nan or $total == inf or $up == nan or $up == inf or $total <= 0 or $up < 0 or $up > $total) ? (nan) : ($up == $total)'
+      units: status
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: different_chart_current_composite
+
+  ceph_object_missing:
+    sow_id: CEPH-040
+    source_alert: CephObjectMissing
+    source:
+      expressions:
+        reef: '(ceph_health_detail{name="OBJECT_UNFOUND"} == 1) * on() (count(ceph_osd_up == 1) == bool count(ceph_osd_metadata)) == 1'
+        squid: '(ceph_health_detail{name="OBJECT_UNFOUND"} == 1) * on() (count(ceph_osd_up == 1) == bool count(ceph_osd_metadata)) == 1'
+        tentacle: '(ceph_health_detail{name="OBJECT_UNFOUND"} == 1) * on() group_right(cluster) (count(ceph_osd_up == 1) by (cluster) == bool count(ceph_osd_metadata) by(cluster)) == 1'
+      persistence: 30s
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 717, squid: 729, tentacle: 817}
+      definition_sha256:
+        reef: 826d395caff801e17bed4ca839e0fe50d9dcfee2f2f25b8e679cf2fc334d0833
+        squid: 826d395caff801e17bed4ca839e0fe50d9dcfee2f2f25b8e679cf2fc334d0833
+        tentacle: c78a6a51640fc3a04715aafa8356ab6ed612fbd7319be6a90818eb2e34e2c3f0
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=OBJECT_UNFOUND
+      calc: '($value == nan or $value == inf or $value == 0 or $ceph_osd_all_up == nan or $ceph_osd_all_up == inf) ? (nan) : ($ceph_osd_all_up == 1)'
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: sysadmin
+      adaptation: different_chart_current_composite
+  ceph_pg_backfill_at_risk:
+    sow_id: CEPH-041
+    source_alert: CephPGBackfillAtRisk
+    source:
+      expression: 'ceph_health_detail{name="PG_BACKFILL_FULL"} == 1'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 407, squid: 419, tentacle: 417}
+      definition_sha256:
+        reef: b52630866db8087e37b218f1ec5f8f447559e390938fc0ea8787cf404de016ae
+        squid: b52630866db8087e37b218f1ec5f8f447559e390938fc0ea8787cf404de016ae
+        tentacle: 85e997ee6274e7f582a6da7b892ba3b933d421f0315f90d38e5dc7f633003064
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=PG_BACKFILL_FULL
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_pg_not_deep_scrubbed:
+    sow_id: CEPH-043
+    source_alert: CephPGNotDeepScrubbed
+    source:
+      expression: 'ceph_health_detail{name="PG_NOT_DEEP_SCRUBBED"} == 1'
+      persistence: 5m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 438, squid: 450, tentacle: 448}
+      definition_sha256:
+        reef: ed05ed6bf6b4471f9aba1484b7b6ae3abc1aa475c148d799684b8e9feeb37345
+        squid: ed05ed6bf6b4471f9aba1484b7b6ae3abc1aa475c148d799684b8e9feeb37345
+        tentacle: a954f3f3b8e8508fef32f78ef2b0248d6ac9f174cf86b841cdcc4f3dafb5648d
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=PG_NOT_DEEP_SCRUBBED
+      lookup: min -5m unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: silent
+      adaptation: observed_binary_window
+  ceph_pg_not_scrubbed:
+    sow_id: CEPH-044
+    source_alert: CephPGNotScrubbed
+    source:
+      expression: 'ceph_health_detail{name="PG_NOT_SCRUBBED"} == 1'
+      persistence: 5m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 418, squid: 430, tentacle: 428}
+      definition_sha256:
+        reef: 04eac2c237a04114030d917bcd58708173dc2d0cc60ed8883632ecd598e8e042
+        squid: 04eac2c237a04114030d917bcd58708173dc2d0cc60ed8883632ecd598e8e042
+        tentacle: 8f2184ba8fc1a9ea06ca903619a7c8906f4ec9eaad755515022adad39800b8e2
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=PG_NOT_SCRUBBED
+      lookup: min -5m unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: silent
+      adaptation: observed_binary_window
+  ceph_pg_recovery_at_risk:
+    sow_id: CEPH-045
+    source_alert: CephPGRecoveryAtRisk
+    source:
+      expression: 'ceph_health_detail{name="PG_RECOVERY_FULL"} == 1'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 385, squid: 397, tentacle: 395}
+      definition_sha256:
+        reef: 38a10375657dafab8027461e1615d6264c17713193f56a1b51227f9bf826191d
+        squid: 38a10375657dafab8027461e1615d6264c17713193f56a1b51227f9bf826191d
+        tentacle: 552d0eda278b405211ab59c0394f10246a4c5c025a1d174732e5afac523d45a6
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=PG_RECOVERY_FULL
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_osd_down_current:
+    sow_id: CEPH-046-HELPER
+    source_alert: CephPGUnavailableBlockingIO
+    source:
+      expression: 'ceph_health_detail{name="OSD_DOWN"}'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=OSD_DOWN
+      calc: $value
+      units: status
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: different_chart_current_composite
+
+  ceph_pg_unavailable_blocking_io:
+    sow_id: CEPH-046
+    source_alerts: {reef: CephPGUnavilableBlockingIO, squid: CephPGUnavailableBlockingIO, tentacle: CephPGUnavailableBlockingIO}
+    source:
+      expressions:
+        reef: '((ceph_health_detail{name="PG_AVAILABILITY"} == 1) - scalar(ceph_health_detail{name="OSD_DOWN"})) == 1'
+        squid: '((ceph_health_detail{name="PG_AVAILABILITY"} == 1) - scalar(ceph_health_detail{name="OSD_DOWN"})) == 1'
+        tentacle: '((ceph_health_detail{name="PG_AVAILABILITY"} == 1) - scalar(ceph_health_detail{name="OSD_DOWN"})) == 1'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 396, squid: 408, tentacle: 406}
+      definition_sha256:
+        reef: 65efad4c535b268c90b6ceea31882af9a5dd457b4706cbbee5f8fb2ff8495041
+        squid: bc6128d320ccd55cc2980bc14e9fc460db86810053505a97946ede8bd8e67066
+        tentacle: 1d02f70b254220351139f98455dd1f5aa563cd7558750005b6bcdd1c973e5cfa
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=PG_AVAILABILITY
+      calc: '($value == nan or $value == inf or $ceph_osd_down_current == nan or $ceph_osd_down_current == inf) ? (nan) : ($value == 1 and $ceph_osd_down_current != 1)'
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: sysadmin
+      adaptation: different_chart_current_composite
+  ceph_osd_scrub_errors:
+    sow_id: CEPH-047-HELPER
+    source_alert: CephPGsDamaged
+    source:
+      expression: 'ceph_health_detail{name=~"PG_DAMAGED|OSD_SCRUB_ERRORS"} == 1'
+      persistence: 5m
+      severity: critical
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: subsumed-helper
+      fidelity: CORRECTED-INTENT
+      owner: ceph_pgs_damaged
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=OSD_SCRUB_ERRORS !PG_DAMAGED *
+      lookup: min -5m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: silent
+      adaptation: observed_binary_window
+
+  ceph_pgs_damaged:
+    sow_id: CEPH-047
+    source_alert: CephPGsDamaged
+    source:
+      expression: 'ceph_health_detail{name=~"PG_DAMAGED|OSD_SCRUB_ERRORS"} == 1'
+      persistence: 5m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 374, squid: 386, tentacle: 384}
+      definition_sha256:
+        reef: f5983c7564d5d01cacb557a427a67f6c0b7e0a0019f6af517da558f9a75d6147
+        squid: f5983c7564d5d01cacb557a427a67f6c0b7e0a0019f6af517da558f9a75d6147
+        tentacle: acc24dda7d0ec78cb1ef0c346919f75941b114d3ce2fb59ee839e13e1222d100
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=PG_DAMAGED
+      lookup: min -5m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: sysadmin
+      adaptation: observed_enumerated_window
+  ceph_pgs_high_per_osd:
+    sow_id: CEPH-048
+    source_alert: CephPGsHighPerOSD
+    source:
+      expression: 'ceph_health_detail{name="TOO_MANY_PGS"} == 1'
+      persistence: 1m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 428, squid: 440, tentacle: 438}
+      definition_sha256:
+        reef: aa65787dec1f6aa6f6130dbbe9db6567e44240acd6d3d6eb55df3bab86ec7e94
+        squid: aa65787dec1f6aa6f6130dbbe9db6567e44240acd6d3d6eb55df3bab86ec7e94
+        tentacle: 98ba75442e8a2af30f8985178d10440ae31c7f65183090203e427a6c7580fc01
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=TOO_MANY_PGS
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: silent
+      adaptation: observed_binary_window
+  ceph_pgs_inactive:
+    sow_id: CEPH-049
+    source_alert: CephPGsInactive
+    source:
+      expressions:
+        reef: 'ceph_pool_metadata * on(pool_id,instance) group_left() (ceph_pg_total - ceph_pg_active) > 0'
+        squid: 'ceph_pool_metadata * on(pool_id,instance) group_left() (ceph_pg_total - ceph_pg_active) > 0'
+        tentacle: 'ceph_pool_metadata * on(cluster,pool_id,instance) group_left() (ceph_pg_total - ceph_pg_active) > 0'
+      persistence: 5m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 354, squid: 366, tentacle: 364}
+      definition_sha256:
+        reef: e03b49df7df58b41f1ff5718ff7ba6327330c639050e1995b56051ed91594e46
+        squid: e03b49df7df58b41f1ff5718ff7ba6327330c639050e1995b56051ed91594e46
+        tentacle: 1659e8fb4587751e452393879b299f02174cdb101c39b7cfcb331a27b6d63e34
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state
+      lookup: ''
+      calc: '($pg_total == nan or $pg_total == inf or $active == nan or $active == inf or $pg_total < 0 or $active < 0 or $active > $pg_total) ? (nan) : ($pg_total - $active)'
+      units: PGs
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: same_chart_current_difference
+  ceph_pgs_unclean:
+    sow_id: CEPH-050
+    source_alert: CephPGsUnclean
+    source:
+      expressions:
+        reef: 'ceph_pool_metadata * on(pool_id,instance) group_left() (ceph_pg_total - ceph_pg_clean) > 0'
+        squid: 'ceph_pool_metadata * on(pool_id,instance) group_left() (ceph_pg_total - ceph_pg_clean) > 0'
+        tentacle: 'ceph_pool_metadata * on(cluster,pool_id,instance) group_left() (ceph_pg_total - ceph_pg_clean) > 0'
+      persistence: 15m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 364, squid: 376, tentacle: 374}
+      definition_sha256:
+        reef: e294271fd383cc035f1d0bf3265b375905060d74cbc95c7fb4293b0a8d3c516a
+        squid: e294271fd383cc035f1d0bf3265b375905060d74cbc95c7fb4293b0a8d3c516a
+        tentacle: fa4ea2a8a53db172a1431fcbe95efa904287249951805ac685041e1e7c1c80b0
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state
+      lookup: ''
+      calc: '($pg_total == nan or $pg_total == inf or $clean == nan or $clean == inf or $pg_total < 0 or $clean < 0 or $clean > $pg_total) ? (nan) : ($pg_total - $clean)'
+      units: PGs
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: same_chart_current_difference
+  ceph_pool_backfill_full:
+    sow_id: CEPH-051
+    source_alert: CephPoolBackfillFull
+    source:
+      expression: 'ceph_health_detail{name="POOL_BACKFILLFULL"} > 0'
+      persistence: ''
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 559, squid: 571, tentacle: 569}
+      definition_sha256:
+        reef: 79579b93902826a6c4828d6878f19815c2b2fd044101170f34e86dabdbb38537
+        squid: 79579b93902826a6c4828d6878f19815c2b2fd044101170f34e86dabdbb38537
+        tentacle: a1f14e5bcbb36f9e33b20be3b80995718f28fb5491064d8c199f0f542a76e528
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=POOL_BACKFILLFULL
+      lookup: min -10s unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_pool_full:
+    sow_id: CEPH-052
+    source_alert: CephPoolFull
+    source:
+      expression: 'ceph_health_detail{name="POOL_FULL"} > 0'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 567, squid: 579, tentacle: 577}
+      definition_sha256:
+        reef: f76686ab452b125c78e2d4ed4d95caa337725a77411d5cd6e68e780ebc802e5c
+        squid: f76686ab452b125c78e2d4ed4d95caa337725a77411d5cd6e68e780ebc802e5c
+        tentacle: 1c20dc103119c3d0695de58fabecec199f40f5e7cf2ee54fbcfb3ee36ed02b93
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=POOL_FULL
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_pool_near_full:
+    sow_id: CEPH-054
+    source_alert: CephPoolNearFull
+    source:
+      expression: 'ceph_health_detail{name="POOL_NEAR_FULL"} > 0'
+      persistence: 5m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 578, squid: 590, tentacle: 588}
+      definition_sha256:
+        reef: 3038cf243067ca2ebf497ee99e74dcc917f2f2d2776e76794206f15737fc7686
+        squid: 3038cf243067ca2ebf497ee99e74dcc917f2f2d2776e76794206f15737fc7686
+        tentacle: 7c140b077eba3e0c4b41e4fb7a96806a3752c8f75a35c7e0cfb0a02d773d5018
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=POOL_NEAR_FULL
+      lookup: min -5m unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: observed_binary_window
   ceph_mon_clock_skew:
     sow_id: CEPH-017
     source_alert: CephMonClockSkew

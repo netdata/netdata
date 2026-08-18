@@ -319,7 +319,9 @@ modules:
               automatically compatible. On-demand Function tables are not Prometheus time series.
           - name: More preconfigured Ceph alerts are expected
             description: |
-              This integration ships alerts for collection failures and native capacity utilization.
+              This integration ships a notifying collection-failure alert and a silent-by-default native capacity-utilization
+              policy. Existing installations that relied on automatic capacity notifications must explicitly route the
+              capacity alert after upgrade.
               Health Function rows are on-demand tables and do not create alerts. When the Ceph Prometheus profile is
               configured, its MGR-owned alert layer supplies tested cluster health, crash, slow-operation, and cephadm
               conditions; this native collector remains the owner of Dashboard API component-collection failures. Keep Ceph
@@ -334,7 +336,7 @@ modules:
       - name: ceph_cluster_physical_capacity_utilization
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.cluster_physical_capacity_utilization
-        info: 'Ceph cluster ${label:fsid} disk space utilization'
+        info: 'Ceph cluster ${label:fsid} disk space utilization. This stock capacity policy is silent by default; explicitly route it when notifications are required.'
     metrics:
       folding:
         title: Metrics

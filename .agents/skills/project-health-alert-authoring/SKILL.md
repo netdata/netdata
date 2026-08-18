@@ -69,6 +69,103 @@ Pause for a user decision when the change creates a public alert contract, chang
 the owner of an incident, needs shared health/query framework work, or cannot preserve the approved operator-visible
 incident closely enough with Netdata-native behavior. A difference from Prometheus execution alone is not such a blocker.
 
+## Combine Values Across Dimensions, Charts, And Alerts
+
+Choose the smallest pattern that can express the condition truthfully. Do not introduce cross-chart or intermediate-alert
+plumbing when the required values already share the alert's chart.
+
+### Pattern 1 — dimensions on the alert's chart
+
+Use unqualified dimension variables in `calc`, `warn`, or `crit` when every required value is a dimension on the chart
+named by `on:`:
+
+```text
+template: example_ratio
+      on: app.state
+     calc: $total - $used
+```
+
+Runtime facts:
+
+- Matching is by dimension ID or name in the alert's own chart.
+- The default dimension value is `collector.last_stored_value`: the latest database-stored value after interpolation, not
+  a database-window aggregate and not necessarily the raw last collector sample.
+- A missing dimension makes the expression fail with an unknown variable and the alert value become `NaN`.
+- Prefer explicit non-finite guards when `UNDEFINED` is the required missing-input state; do not rely on arithmetic or
+  comparisons to preserve `NaN`.
+
+Use `$dimension_raw` only when the contract specifically needs the last collected value before interpolation/storage
+presentation, and `$dimension_last_collected_t` only when it needs that dimension's collection timestamp.
+
+### Pattern 2 — dimensions from another chart or context
+
+Use a dotted chart/context reference when values live on different charts:
+
+```text
+template: example_cross_chart
+      on: app.usage
+     calc: $this * 100 / ${app.capacity.total}
+```
+
+The dotted prefix is interpreted from right to left as chart/context plus the final dimension name. Runtime resolution:
+
+1. An exact chart ID is checked first.
+2. A chart name may match.
+3. If the prefix is a context, every chart instance in that context contributes candidates for the final dimension.
+4. Every candidate is scored against the alert's chart labels by counting equal key/value labels.
+5. The candidate with the highest score wins. Equal scores are resolved by candidate traversal order, so avoid designs
+   where a tie is possible.
+
+Consequences:
+
+- This is the natural way to compare related chart instances, but the matching labels must make the intended instance
+  unique. A generic shared label such as only `component=ceph` is usually insufficient across many cluster instances.
+- Like Pattern 1, the selected dimension value is the latest stored value, not a query over a time window.
+- Fully qualified names containing punctuation must use `${...}` braces.
+- A reference that resolves to no candidate fails as an unknown variable and produces `NaN`.
+
+### Pattern 3 — an intermediate alert as a computed variable
+
+Create a non-notifying helper alert when the required value itself needs a database lookup or multi-stage computation,
+then reference that alert by name from the consuming alert:
+
+```text
+template: example_window
+      on: app.work
+   lookup: average -1h of requests
+     calc: $this
+      to: silent
+
+template: example_consumes
+      on: app.current
+   lookup: average -1m of requests
+     calc: $this / $example_window
+     warn: $this > 1
+      to: sysadmin
+```
+
+Runtime facts:
+
+- Every running alert with the referenced name is a candidate.
+- Candidates are selected by the same equal-label score used for cross-chart variables.
+- The selected candidate contributes its current alert value (`rc->value`), after that helper's own lookup and `calc`.
+- This is the only one of the three patterns that can combine database-window results such as “max of the last hour of X
+  with the average of the last minute of Y”.
+- Health evaluates all lookup/calculation phases before warning/critical phases, but helper snapshots are published as
+  each alert completes. A consumer with a different cadence can therefore read the helper's previous published value on
+  its first beat or after cadence drift. Align `every:` or disclose this timing difference.
+- Prefer `to: silent` on helpers and document why they exist; a helper is instrumentation, not a second incident owner.
+
+### Choosing a pattern
+
+- Same chart, latest values: Pattern 1.
+- Different charts/contexts, latest values: Pattern 2.
+- Any input needs a database window or a staged calculation: Pattern 3.
+- Never use Pattern 3 merely to avoid a qualified dotted reference; its added timing and lifecycle coupling must earn its
+  place.
+- Never combine multiple RRDSET instances into one infrastructure-level alert on the alert side. If no source-owned chart
+  provides the required aggregate, that is a collector/profile/framework gap, not an alert-expression workaround.
+
 ## Model The Lifecycle Truthfully
 
 | Source situation | Alert-lifecycle consequence |
@@ -223,6 +320,8 @@ Before requesting review, confirm all of the following:
 - NIDL component/instance/dimension/label model: `docs/NIDL-Framework.md`
 - Template/alarm and user/stock precedence: `src/health/alert-configuration-ordering.md`
 - Alert eligibility, lookup execution, and `REMOVED`: `src/health/health_event_loop.c`
-- `$now`, `$last_collected_t`, `$update_every`, and dimension freshness: `src/health/health_variable.c`
+- `$now`, `$last_collected_t`, `$update_every`, dimension freshness, same-chart variables, cross-chart/context
+  variables, alert variables, and label-score selection: `src/health/health_variable.c`
+- Equal-label score implementation: `src/database/rrdlabels.c:rrdlabels_common_count()`
 - Query gaps and grouping: `src/web/api/queries/query-execute.c` and the relevant grouping implementation
 - `NaN` expression semantics: `src/libnetdata/eval/eval-evaluate.c`

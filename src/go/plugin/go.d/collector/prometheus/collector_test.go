@@ -1097,7 +1097,7 @@ func TestCollector_CephMGRNamedHealthCheckIdentities(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	var want []string
 	for _, mapping := range manifest.Alerts {
-		if mapping.Netdata.Disposition == "reuse" ||
+		if mapping.Netdata.Disposition == "reuse" || mapping.Netdata.Disposition == "internal-helper" ||
 			mapping.Netdata.Context != "prometheus.ceph.health.health_checks.state" {
 			continue
 		}
@@ -1242,6 +1242,183 @@ func TestCollector_CephMGRClusterSummaries(t *testing.T) {
 	}
 	requireChartValues(creates[monSummary][0], map[string]float64{"total": 3, "in_quorum": 2})
 	requireChartValues(creates[osdSummary][0], map[string]float64{"total": 10, "up": 9})
+}
+
+func TestCollector_CephM04DerivedBoundaries(t *testing.T) {
+	difference := func(total, partial float64) float64 {
+		if math.IsNaN(total) || math.IsInf(total, 0) || math.IsNaN(partial) || math.IsInf(partial, 0) ||
+			total < 0 || partial < 0 || partial > total {
+			return math.NaN()
+		}
+		return total - partial
+	}
+	for _, tc := range []struct {
+		name           string
+		total, partial float64
+		want           float64
+		active         bool
+		undefined      bool
+	}{
+		{name: "invalid NaN total", total: math.NaN(), partial: 1, undefined: true},
+		{name: "invalid infinite partial", total: 10, partial: math.Inf(1), undefined: true},
+		{name: "negative total", total: -1, partial: 0, undefined: true},
+		{name: "partial exceeds total", total: 1, partial: 2, undefined: true},
+		{name: "zero pool", total: 0, partial: 0},
+		{name: "healthy pool", total: 100, partial: 100},
+		{name: "one inactive or unclean PG", total: 100, partial: 99, want: 1, active: true},
+		{name: "all inactive or unclean PGs", total: 100, partial: 0, want: 100, active: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := difference(tc.total, tc.partial)
+			if tc.undefined {
+				assert.True(t, math.IsNaN(got))
+				return
+			}
+			assert.InDelta(t, tc.want, got, 1e-12)
+			assert.Equal(t, tc.active, got > 0)
+		})
+	}
+
+	allUp := func(total, up float64) float64 {
+		if math.IsNaN(total) || math.IsInf(total, 0) || math.IsNaN(up) || math.IsInf(up, 0) ||
+			total <= 0 || up < 0 || up > total {
+			return math.NaN()
+		}
+		if up == total {
+			return 1
+		}
+		return 0
+	}
+	for _, tc := range []struct {
+		name      string
+		total, up float64
+		want      float64
+		undefined bool
+	}{
+		{name: "invalid NaN up", total: 10, up: math.NaN(), undefined: true},
+		{name: "zero population", total: 0, up: 0, undefined: true},
+		{name: "all OSDs up", total: 10, up: 10, want: 1},
+		{name: "one OSD down", total: 10, up: 9},
+	} {
+		t.Run("all up "+tc.name, func(t *testing.T) {
+			got := allUp(tc.total, tc.up)
+			if tc.undefined {
+				assert.True(t, math.IsNaN(got))
+				return
+			}
+			assert.InDelta(t, tc.want, got, 1e-12)
+		})
+	}
+
+	blockingIO := func(pgAvailability, osdDown float64) float64 {
+		if math.IsNaN(pgAvailability) || math.IsInf(pgAvailability, 0) ||
+			math.IsNaN(osdDown) || math.IsInf(osdDown, 0) {
+			return math.NaN()
+		}
+		if pgAvailability == 1 && osdDown != 1 {
+			return 1
+		}
+		return 0
+	}
+	for _, tc := range []struct {
+		name              string
+		availability, osd float64
+		want              float64
+		undefined         bool
+	}{
+		{name: "availability with OSD down", availability: 1, osd: 1},
+		{name: "availability without OSD down", availability: 1, osd: 0, want: 1},
+		{name: "no availability", availability: 0, osd: 1},
+		{name: "invalid OSD state", availability: 1, osd: math.NaN(), undefined: true},
+	} {
+		t.Run("blocking I/O "+tc.name, func(t *testing.T) {
+			got := blockingIO(tc.availability, tc.osd)
+			if tc.undefined {
+				assert.True(t, math.IsNaN(got))
+				return
+			}
+			assert.InDelta(t, tc.want, got, 1e-12)
+		})
+	}
+}
+
+func TestCollector_CephM04PoolDifferenceMaterialization(t *testing.T) {
+	var input strings.Builder
+	input.WriteString("# TYPE ceph_pg_active gauge\n# TYPE ceph_pg_clean gauge\n# TYPE ceph_pg_total gauge\n")
+	for pool, values := range map[string][3]float64{
+		"healthy": {100, 100, 100},
+		"partial": {100, 99, 100},
+		"zero":    {0, 0, 0},
+	} {
+		fmt.Fprintf(&input, "ceph_pg_active{pool_id=%q} %v\n", pool, values[0])
+		fmt.Fprintf(&input, "ceph_pg_clean{pool_id=%q} %v\n", pool, values[1])
+		fmt.Fprintf(&input, "ceph_pg_total{pool_id=%q} %v\n", pool, values[2])
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(input.String()))
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	const context = "prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state"
+	chartContexts := make(map[string]string)
+	updates := make(map[string]chartengine.UpdateChartAction)
+	for _, action := range plan.Actions {
+		if create, ok := action.(chartengine.CreateChartAction); ok {
+			chartContexts[create.ChartID] = create.Meta.Context
+		}
+		update, ok := action.(chartengine.UpdateChartAction)
+		if ok && chartContexts[update.ChartID] == context {
+			updates[update.ChartID] = update
+		}
+	}
+	require.Len(t, updates, 3, "one PG chart instance must remain per pool")
+	for chartID, update := range updates {
+		actual := make(map[string]float64)
+		for _, value := range update.Values {
+			if value.IsFloat {
+				actual[value.Name] = value.Float64
+			} else {
+				actual[value.Name] = float64(value.Int64)
+			}
+		}
+		switch actual["pg_total"] {
+		case 100:
+			switch actual["clean"] {
+			case 100:
+				assert.Equal(t, map[string]float64{"active": 100, "clean": 100, "pg_total": 100}, actual)
+			case 99:
+				assert.Equal(t, map[string]float64{"active": 100, "clean": 99, "pg_total": 100}, actual)
+			default:
+				t.Fatalf("unexpected healthy-total PG chart values %q: %v", chartID, actual)
+			}
+		case 0:
+			assert.Equal(t, map[string]float64{"active": 0, "clean": 0, "pg_total": 0}, actual)
+		default:
+			t.Fatalf("unexpected PG chart values %q: %v", chartID, actual)
+		}
+	}
 }
 
 func TestCollector_CephHardwareProfileReleaseGating(t *testing.T) {
@@ -1448,7 +1625,9 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		"CEPH-037", "CEPH-038", "CEPH-039", "CEPH-063", "CEPH-064", "CEPH-065", "CEPH-066", "CEPH-067",
 		"CEPH-068", "CEPH-069", "CEPH-070", "CEPH-071", "CEPH-072", "CEPH-073", "CEPH-074", "CEPH-075",
 		"CEPH-076", "CEPH-077", "CEPH-098", "CEPH-099", "CEPH-100", "CEPH-101", "CEPH-102", "CEPH-103",
-		"CEPH-104", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
+		"CEPH-104", "CEPH-040", "CEPH-040-HELPER", "CEPH-041", "CEPH-043", "CEPH-044", "CEPH-045",
+		"CEPH-046", "CEPH-046-HELPER", "CEPH-047", "CEPH-047-HELPER", "CEPH-048", "CEPH-049", "CEPH-050",
+		"CEPH-051", "CEPH-052", "CEPH-054", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
 	}, cephManifestSOWIDs(manifest.Alerts))
 	require.ElementsMatch(t, []string{"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02"},
 		cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
@@ -1463,13 +1642,20 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 	}
 
 	for name, mapping := range manifest.Alerts {
-		require.NotEmpty(t, mapping.SourceAlert)
+		require.Truef(t, mapping.SourceAlert != "" || len(mapping.SourceAlerts) > 0,
+			"%s has no canonical or release source alert", name)
 		hasExpression := mapping.Source.Expression != ""
 		hasExpressions := len(mapping.Source.Expressions) > 0
 		require.NotEqualf(t, hasExpression, hasExpressions,
 			"%s must define exactly one of source expression or release expressions", name)
-		require.NotEmptyf(t, mapping.Source.Releases, "%s has no supported-release set", name)
+		isHelper := mapping.Netdata.Disposition == "internal-helper" || mapping.Netdata.Disposition == "subsumed-helper"
+		if !isHelper {
+			require.NotEmptyf(t, mapping.Source.Releases, "%s has no supported-release set", name)
+		}
 		for _, release := range []string{"reef", "squid", "tentacle"} {
+			if isHelper {
+				continue
+			}
 			supported := slices.Contains(mapping.Source.Releases, release)
 			require.Equalf(t, supported, mapping.Source.Lines[release] > 0,
 				"%s release availability and line pin disagree for %s", name, release)
@@ -1486,6 +1672,23 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		require.NotEmpty(t, adaptation.Preserved)
 		require.NotEmpty(t, adaptation.Differences)
 
+		if mapping.Netdata.Disposition == "internal-helper" {
+			require.Equalf(t, "silent", mapping.Netdata.Recipient, "%s internal helper must be silent", name)
+			require.Containsf(t, templates, name, "internal helper template is absent")
+			assert.Equalf(t, mapping.Netdata.Context, templates[name]["on"], "%s helper context mismatch", name)
+			assert.Equalf(t, mapping.Netdata.Calc, templates[name]["calc"], "%s helper calc mismatch", name)
+			assert.Equalf(t, manifest.NetdataAlertCadence, templates[name]["every"], "%s helper cadence mismatch", name)
+			assert.Equalf(t, mapping.Netdata.Condition, templates[name]["condition"], "%s helper condition mismatch", name)
+			assert.Equalf(t, mapping.Netdata.Recipient, templates[name]["to"], "%s helper routing mismatch", name)
+			continue
+		}
+		if mapping.Netdata.Disposition == "subsumed-helper" {
+			require.Equalf(t, "silent", mapping.Netdata.Recipient, "%s subsumed helper must be silent", name)
+			require.NotEmptyf(t, mapping.Netdata.Owner, "%s has no owning alert", name)
+			_, ok := templates[mapping.Netdata.Owner]
+			require.Truef(t, ok, "%s owner %q is absent", name, mapping.Netdata.Owner)
+			continue
+		}
 		if mapping.Netdata.Disposition == "reuse" {
 			require.NotEmptyf(t, mapping.Netdata.OwnerFile, "%s has no generic owner file", name)
 			require.NotEmptyf(t, mapping.Netdata.OwnerAlerts, "%s has no generic owner templates", name)
@@ -1498,7 +1701,7 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 			assert.Equal(t, mapping.Netdata.Labels, block["chart labels"])
 			assert.Equal(t, mapping.Netdata.Lookup, block["lookup"])
 			assert.Equal(t, mapping.Netdata.Calc, block["calc"])
-			if mapping.Netdata.Calc != "" {
+			if mapping.Netdata.Calc != "" && mapping.Netdata.Disposition == "correct" {
 				assert.Empty(t, mapping.Netdata.Lookup, "current compound alert must not mix historical and current dimensions")
 				assert.NotContains(t, mapping.Netdata.Calc, "$last_collected_t",
 					"data-state alert must not duplicate generic collection-failure ownership")
@@ -1560,14 +1763,21 @@ func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
 
 			rules := parseCephSourceAlertRules(t, content)
 			for name, mapping := range manifest.Alerts {
+				if mapping.Netdata.Disposition == "internal-helper" || mapping.Netdata.Disposition == "subsumed-helper" {
+					continue
+				}
 				if !slices.Contains(mapping.Source.Releases, release) {
 					require.NotContainsf(t, rules, mapping.SourceAlert,
 						"%s is incorrectly present in %s", mapping.SourceAlert, release)
 					continue
 				}
 				t.Run(name, func(t *testing.T) {
-					rule, ok := rules[mapping.SourceAlert]
-					require.Truef(t, ok, "source alert %q is absent", mapping.SourceAlert)
+					sourceAlert := mapping.SourceAlert
+					if len(mapping.SourceAlerts) > 0 {
+						sourceAlert = mapping.SourceAlerts[release]
+					}
+					rule, ok := rules[sourceAlert]
+					require.Truef(t, ok, "source alert %q is absent", sourceAlert)
 
 					expression := mapping.Source.Expression
 					if len(mapping.Source.Expressions) > 0 {
@@ -1983,9 +2193,10 @@ type cephNetdataExtension struct {
 }
 
 type cephAlertMapping struct {
-	SOWID       string `yaml:"sow_id"`
-	SourceAlert string `yaml:"source_alert"`
-	Source      struct {
+	SOWID        string            `yaml:"sow_id"`
+	SourceAlert  string            `yaml:"source_alert"`
+	SourceAlerts map[string]string `yaml:"source_alerts"`
+	Source       struct {
 		Expression       string            `yaml:"expression"`
 		Expressions      map[string]string `yaml:"expressions"`
 		Releases         []string          `yaml:"releases"`

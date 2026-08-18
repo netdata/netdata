@@ -834,6 +834,25 @@ func TestCollector_ChartTemplateContract(t *testing.T) {
 	assert.Equal(t, expectedChartFamilies(), actualFamilies)
 }
 
+func TestCollector_PhysicalCapacityAlertContract(t *testing.T) {
+	alert, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
+	require.NoError(t, err)
+
+	config := string(alert)
+	start := strings.Index(config, "template: ceph_cluster_physical_capacity_utilization")
+	require.NotEqual(t, -1, start)
+	block := config[start:]
+	if end := strings.Index(block, "\n template:"); end >= 0 {
+		block = block[:end]
+	}
+	assert.Contains(t, block, "on: ceph.cluster_physical_capacity_utilization")
+	assert.Contains(t, block, "calc: $utilization")
+	assert.Contains(t, block, "to: silent")
+	assert.Contains(t, block, "silent by default")
+	assert.Contains(t, block, "warn: $this > (($status >= $WARNING ) ? (85) : (90))")
+	assert.Contains(t, block, "crit: $this > (($status == $CRITICAL) ? (90) : (98))")
+}
+
 func TestCollector_ComponentCollectionAlertContract(t *testing.T) {
 	alert, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
 	require.NoError(t, err)
