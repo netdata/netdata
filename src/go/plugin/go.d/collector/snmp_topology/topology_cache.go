@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"net/netip"
 	"sync"
 	"time"
 
@@ -17,6 +18,8 @@ type topologyCache struct {
 
 	agentID     string
 	localDevice topologymodel.Device
+	// targetManagementIPs is private pre-finalization selection evidence.
+	targetManagementIPs []netip.Addr
 
 	lldpLocPorts map[string]*lldpLocPort
 	lldpRemotes  map[string]*lldpRemote

@@ -13,9 +13,6 @@ import (
 
 func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
 	localManagementIP := normalizeEligibleManagementIP(local.ManagementIP)
-	if localManagementIP == "" {
-		localManagementIP = pickManagementIP(local.ManagementAddresses)
-	}
 
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
 	if baseBridgeAddress != "" && topologyutil.NormalizeMAC(local.ChassisID) == "" {

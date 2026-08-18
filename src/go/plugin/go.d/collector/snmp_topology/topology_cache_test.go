@@ -312,7 +312,7 @@ func TestTopologyCache_FinalizeRejectsMaskProvenManagementAddressesAcrossSources
 
 			require.Equal(t, "1", cache.ifIndexByIP["192.0.2.0"])
 			require.Contains(t, cache.l3InterfacesByIP, "192.0.2.0")
-			require.Empty(t, cache.localDevice.ManagementIP)
+			require.Equal(t, "192.0.2.10", cache.localDevice.ManagementIP)
 			require.Equal(t, []topologymodel.ManagementAddress{{
 				Address:     "192.0.2.10",
 				AddressType: "ipv4",

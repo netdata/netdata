@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"sort"
 	"sync"
@@ -316,7 +317,7 @@ func TestCollectorNewDeviceCollectionCacheUsesEffectiveDeviceCheckEvery(t *testi
 	require.Equal(t, defaultRefreshEvery+2*defaultDeviceCheckEvery, cache.staleAfter)
 }
 
-func TestCollectorResolveDeviceTargetManagementIP(t *testing.T) {
+func TestCollectorResolveDeviceTargetManagementIPs(t *testing.T) {
 	t.Run("literal target bypasses resolver", func(t *testing.T) {
 		coll := newTestSNMPTopologyCollector()
 		coll.resolveTargetIPs = func(context.Context, string) ([]netip.Addr, error) {
@@ -324,10 +325,10 @@ func TestCollectorResolveDeviceTargetManagementIP(t *testing.T) {
 			return nil, nil
 		}
 
-		require.Equal(t, "192.0.2.10", coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+		require.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "::ffff:192.0.2.10",
 		}))
-		require.Empty(t, coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+		require.Empty(t, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "127.0.0.1",
 		}))
 	})
@@ -349,11 +350,15 @@ func TestCollectorResolveDeviceTargetManagementIP(t *testing.T) {
 			}, nil
 		}
 
-		got := coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+		got := coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "switch.example",
 			Timeout:  5,
 		})
-		require.Equal(t, "10.0.0.10", got)
+		require.Equal(t, []netip.Addr{
+			netip.MustParseAddr("10.0.0.10"),
+			netip.MustParseAddr("10.0.0.20"),
+			netip.MustParseAddr("198.51.100.20"),
+		}, got)
 		require.Equal(t, 1, calls)
 	})
 
@@ -363,7 +368,7 @@ func TestCollectorResolveDeviceTargetManagementIP(t *testing.T) {
 			return nil, errors.New("lookup failed")
 		}
 
-		require.Empty(t, coll.resolveDeviceTargetManagementIP(context.Background(), ddsnmp.DeviceConnectionInfo{
+		require.Empty(t, coll.resolveDeviceTargetManagementIPs(context.Background(), ddsnmp.DeviceConnectionInfo{
 			Hostname: "switch.example",
 		}))
 	})
@@ -539,7 +544,7 @@ func TestCollectorResolveTopologyTargetManagementIPsUsesStableBoundedSharedBudge
 	require.Less(t, elapsed, time.Second)
 	require.NoError(t, parent.Err())
 	for _, plan := range plans {
-		require.Empty(t, plan.managementIP)
+		require.Empty(t, plan.targetManagementIPs)
 	}
 }
 
@@ -574,12 +579,12 @@ func TestCollectorResolveTopologyTargetManagementIPsAssociatesResultsAndBypasses
 	gotCalls := append([]string(nil), calls...)
 	mu.Unlock()
 	require.Equal(t, []string{"switch-a.example", "switch-b.example"}, gotCalls)
-	require.Equal(t, "10.0.0.2", plans[0].managementIP)
-	require.Equal(t, "192.0.2.10", plans[1].managementIP)
-	require.Equal(t, "10.0.0.1", plans[2].managementIP)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("10.0.0.2")}, plans[0].targetManagementIPs)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("192.0.2.10")}, plans[1].targetManagementIPs)
+	require.Equal(t, []netip.Addr{netip.MustParseAddr("10.0.0.1")}, plans[2].targetManagementIPs)
 }
 
-func TestCollectorResolveDeviceTargetManagementIPHonorsShorterDeviceTimeout(t *testing.T) {
+func TestCollectorResolveDeviceTargetManagementIPsHonorsShorterDeviceTimeout(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
 	coll.resolveTargetIPs = func(ctx context.Context, _ string) ([]netip.Addr, error) {
 		<-ctx.Done()
@@ -588,7 +593,7 @@ func TestCollectorResolveDeviceTargetManagementIPHonorsShorterDeviceTimeout(t *t
 
 	parent := context.Background()
 	started := time.Now()
-	got := coll.resolveDeviceTargetManagementIP(parent, ddsnmp.DeviceConnectionInfo{
+	got := coll.resolveDeviceTargetManagementIPs(parent, ddsnmp.DeviceConnectionInfo{
 		Hostname: "switch.example",
 		Timeout:  1,
 	})
@@ -687,11 +692,87 @@ func TestCollectorRefreshPrefersResolvedTargetManagementIP(t *testing.T) {
 	}
 
 	key := dev.Hostname + ":161"
-	require.True(t, coll.refreshDeviceTopology(context.Background(), key, dev, "192.0.2.50"))
+	require.True(t, coll.refreshDeviceTopology(context.Background(), key, dev, []netip.Addr{netip.MustParseAddr("192.0.2.50")}))
 	snapshot, ok := coll.deviceCaches[key].snapshotEngineObservations()
 	require.True(t, ok)
 	require.Len(t, snapshot.L2Observations, 1)
 	require.Equal(t, "192.0.2.50", snapshot.L2Observations[0].ManagementIP)
+}
+
+func TestCollectorRefreshSelectsNextDNSTargetAfterMaskRejection(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "switch.example",
+		Port:        161,
+		Timeout:     5,
+		SysObjectID: "1.3.6.1.4.1.9.1.1",
+	}
+	mockHandler := snmpmock.NewMockHandler(ctrl)
+	expectTopologyRefreshSNMPClient(mockHandler, dev)
+
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	registerTestDeviceState(store, dev)
+	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+		return []*ddsnmp.Profile{{}}
+	}
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) {
+			return []*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{{
+				TopologyKind: ddsnmp.KindIpIfIndex,
+				Tags: map[string]string{
+					tagTopoIfIndex: "1",
+					tagTopoIPAddr:  "192.0.2.0",
+					tagTopoIPMask:  "255.255.255.0",
+				},
+			}}}}, nil
+		})
+	}
+
+	resolverCalls := 0
+	coll.resolveTargetIPs = func(_ context.Context, host string) ([]netip.Addr, error) {
+		resolverCalls++
+		require.Equal(t, dev.Hostname, host)
+		return []netip.Addr{
+			netip.MustParseAddr("203.0.113.20"),
+			netip.MustParseAddr("198.51.100.10"),
+			netip.MustParseAddr("192.0.2.0"),
+		}, nil
+	}
+
+	stats := coll.refreshTopology(context.Background())
+
+	require.Zero(t, stats.errors)
+	require.Equal(t, 1, resolverCalls)
+	cache := coll.deviceCaches[dev.Hostname+":161"]
+	require.NotNil(t, cache)
+	cache.mu.RLock()
+	local := cache.localDevice
+	trapMethods := maps.Clone(cache.trapMatchMethodByIP)
+	storedTargets := append([]netip.Addr(nil), cache.targetManagementIPs...)
+	cache.mu.RUnlock()
+	require.Equal(t, "198.51.100.10", local.ManagementIP)
+	require.Empty(t, storedTargets)
+	require.NotContains(t, local.ManagementAddresses, topologymodel.ManagementAddress{
+		Address:     "192.0.2.0",
+		AddressType: "ipv4",
+		Source:      "ip_mib",
+	})
+	require.NotContains(t, local.ManagementAddresses, topologymodel.ManagementAddress{Address: "198.51.100.10"})
+	require.NotContains(t, local.ManagementAddresses, topologymodel.ManagementAddress{Address: "203.0.113.20"})
+	require.Equal(t, "management_ip", trapMethods["198.51.100.10"])
+	require.Equal(t, "local_interface_ip", trapMethods["192.0.2.0"])
+	require.NotContains(t, trapMethods, "203.0.113.20")
+
+	data, ok := snapshotTopologyRegistryForTest(coll.topologyRegistry)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	require.Equal(t, "198.51.100.10", topologymodel.ActorDetailManagementIP(data.Actors[0]))
+	require.Contains(t, data.Actors[0].Match.IPAddresses, "198.51.100.10")
+	require.NotContains(t, data.Actors[0].Match.IPAddresses, "192.0.2.0")
+	require.NotContains(t, data.Actors[0].Match.IPAddresses, "203.0.113.20")
 }
 
 func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T) {
@@ -728,7 +809,7 @@ func TestCollector_RefreshKeepsPublishedSnapshotWhileCollectionRuns(t *testing.T
 
 	go func() {
 		defer close(done)
-		coll.refreshDeviceTopology(context.Background(), key, dev, "10.0.0.10")
+		coll.refreshDeviceTopology(context.Background(), key, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")})
 	}()
 
 	<-started
@@ -770,7 +851,7 @@ func TestCollector_RefreshFailureKeepsPublishedSnapshot(t *testing.T) {
 		})
 	}
 
-	require.False(t, coll.refreshDeviceTopology(context.Background(), key, dev, "10.0.0.10"))
+	require.False(t, coll.refreshDeviceTopology(context.Background(), key, dev, []netip.Addr{netip.MustParseAddr("10.0.0.10")}))
 
 	snapshot, ok := published.snapshotEngineObservations()
 	require.True(t, ok)

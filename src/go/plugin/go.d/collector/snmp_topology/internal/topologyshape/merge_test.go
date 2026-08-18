@@ -3,13 +3,121 @@
 package topologyshape
 
 import (
+	"fmt"
 	"testing"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCollapseActorsByIPOnePassPreservesSequentialMergeSemantics(t *testing.T) {
+	expectedActors := richTopologyActorsForCollapseEquivalence()
+	rep := 0
+	for idx := 1; idx < len(expectedActors); idx++ {
+		if compareCollapseActorPriority(expectedActors[idx], expectedActors[rep]) < 0 {
+			rep = idx
+		}
+	}
+	require.Equal(t, 1, rep)
+
+	expected := expectedActors[rep]
+	for idx := range expectedActors {
+		if idx == rep {
+			continue
+		}
+		expected.Match = mergeTopologyMatch(expected.Match, expectedActors[idx].Match)
+		expected.Labels = mergeTopologyStringMap(expected.Labels, expectedActors[idx].Labels)
+		expected.SegmentKind = topologyutil.FirstNonEmptyString(expected.SegmentKind, expectedActors[idx].SegmentKind)
+		expected.Detail = mergeTopologyActorDetail(expected.Detail, expectedActors[idx].Detail)
+	}
+	expected.Detail.L2.CollapsedByIP = true
+	expected.Detail.L2.CollapsedCount = len(expectedActors)
+
+	data := topologymodel.Data{
+		Actors: richTopologyActorsForCollapseEquivalence(),
+		Links: []topologymodel.Link{
+			{SrcActorID: "actor-0", DstActorID: "external", Protocol: "lldp", State: "first"},
+			{SrcActorID: "actor-2", DstActorID: "external", Protocol: "lldp", State: "first"},
+			{SrcActorID: "actor-0", DstActorID: "actor-2", Protocol: "lldp", State: "self"},
+		},
+	}
+
+	collapsed := collapseActorsByIP(&data)
+
+	require.Equal(t, 2, collapsed)
+	require.Equal(t, []topologymodel.Actor{expected}, data.Actors)
+	require.Equal(t, []topologymodel.Link{{
+		SrcActorID: "actor-1",
+		DstActorID: "external",
+		Protocol:   "lldp",
+		State:      "first",
+	}}, data.Links)
+	require.Equal(t, []topologymodel.ManagementAddress{{Address: "rep-address"}}, data.Actors[0].Detail.SNMP.ManagementAddresses)
+	require.Equal(t, []topologymodel.OSPFNeighborDetailRow{
+		{Source: "ospf-1"},
+		{Source: "ospf-0"},
+		{Source: "ospf-2"},
+	}, data.Actors[0].Detail.OSPF)
+	require.Equal(t, []topologymodel.BGPPeerDetailRow{
+		{Source: "bgp-1"},
+		{Source: "bgp-0"},
+		{Source: "bgp-2"},
+	}, data.Actors[0].Detail.BGP)
+}
+
+func richTopologyActorsForCollapseEquivalence() []topologymodel.Actor {
+	actors := make([]topologymodel.Actor, 0, 3)
+	for i := 0; i < 3; i++ {
+		actorType := "device"
+		if i == 0 {
+			actorType = "endpoint"
+		}
+		chassis := fmt.Sprintf("chassis-%d", i)
+		if i == 1 {
+			chassis = "chassis-a"
+		}
+		if i == 2 {
+			chassis = "chassis-z"
+		}
+		addresses := []topologymodel.ManagementAddress{{Address: fmt.Sprintf("address-%d", i)}}
+		if i == 1 {
+			addresses = []topologymodel.ManagementAddress{{Address: "rep-address"}}
+		}
+		actors = append(actors, topologymodel.Actor{
+			ActorID:   fmt.Sprintf("actor-%d", i),
+			ActorType: actorType,
+			Source:    "snmp",
+			Match: topologymodel.Match{
+				ChassisIDs:   []string{chassis, " shared-chassis "},
+				MacAddresses: []string{fmt.Sprintf("02:00:00:00:00:%02d", i)},
+				IPAddresses:  []string{"192.0.2.1", fmt.Sprintf(" 10.0.%d.1 ", i)},
+				Hostnames:    []string{fmt.Sprintf(" host-%d ", i)},
+				DNSNames:     []string{fmt.Sprintf(" dns-%d.example ", i)},
+				SysName:      map[int]string{0: " first-sysname ", 2: "last-sysname"}[i],
+				SysObjectID:  map[int]string{0: "1.3.6.1.4.1.1", 2: "1.3.6.1.4.1.2"}[i],
+			},
+			Labels: map[string]string{
+				"shared":                   fmt.Sprintf("value-%d", i),
+				fmt.Sprintf("label-%d", i): fmt.Sprintf(" value-%d ", i),
+			},
+			Detail: topologymodel.ActorDetail{
+				L2: topologyengine.ProjectionActorDetail{Device: topologyengine.ProjectionDeviceActorDetail{
+					ManagementAddresses: []string{fmt.Sprintf("l2-address-%d", i)},
+				}},
+				SNMP: topologymodel.SNMPActorDetail{
+					ManagementAddresses: addresses,
+					Capabilities:        []string{fmt.Sprintf("capability-%d", i)},
+				},
+				OSPF: []topologymodel.OSPFNeighborDetailRow{{Source: fmt.Sprintf("ospf-%d", i)}},
+				BGP:  []topologymodel.BGPPeerDetailRow{{Source: fmt.Sprintf("bgp-%d", i)}},
+			},
+		})
+	}
+	return actors
+}
 
 func TestAppendUniqueTopologyStringsSortsAndDeduplicates(t *testing.T) {
 	values := appendUniqueTopologyStrings([]string{" b ", "a"}, "a", "", " c ")

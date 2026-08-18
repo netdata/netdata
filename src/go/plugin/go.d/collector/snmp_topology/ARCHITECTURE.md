@@ -97,18 +97,18 @@ refreshTopology(ctx)
   build a plan of new or stale devices
   resolve planned DNS targets with up to eight workers under one shared 5s budget
   for each planned device, in DeviceStore snapshot order:
-    refreshDeviceTopology(ctx, key, device, selectedManagementIP)
+    refreshDeviceTopology(ctx, key, device, targetManagementIPs)
   prune caches for devices no longer registered
 
-refreshDeviceTopology(ctx, key, device, selectedManagementIP)
+refreshDeviceTopology(ctx, key, device, targetManagementIPs)
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector
   query sysUpTime
-  build a fresh per-device topologyCache off-registry with the selected management IP
+  build a fresh per-device topologyCache off-registry with private target candidates
   ingest topology metrics into the fresh cache
   collect VTP VLAN contexts when needed
-  finalize diagnostics
+  filter target and observed addresses with collected masks, select one management IP, and finalize diagnostics
   swap the fresh cache into the registered cache
 ```
 
@@ -119,6 +119,11 @@ Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
 The workers are joined before SNMP collection begins, stop with the refresh
 context, and use a lookup-only child context, so expiry of the shared lookup
 budget does not cancel the parent refresh or the subsequent serial SNMP walks.
+All normalized DNS answers remain private refresh evidence until collection has
+provided interface masks. Finalization rejects mask-proven network and broadcast
+addresses, then uses one selector across the surviving targets, LLDP/CDP
+addresses, and IP-MIB addresses. Only the selected target enters public identity
+or trap matching; alternate DNS answers are never published as aliases.
 
 The important safety property is that a device refresh builds the next cache
 off-registry and only swaps it into the registered cache after ingestion
@@ -202,6 +207,13 @@ Consequently, remote-only observations with different hostname or chassis
 identities do not merge solely because they advertise the same IP. They still
 correlate through matching strong identity or a uniquely owned direct-device
 address.
+
+IP collapse preserves complete actor aliases. Within each collision group, the
+generic projector unions every list field once and the SNMP shaping pass unions
+its match lists once; scalar, map, optional, attachment, and ordered protocol
+detail precedence remains representative-first and actor-index ordered. This
+keeps alias-rich shared-primary groups linear in their input plus the final
+deduplication sort instead of rebuilding the growing union after every actor.
 
 The aggregate also carries the producer scope id read from the parent Agent
 registry id. L3 subnet segment actor ids use that scope so identical private

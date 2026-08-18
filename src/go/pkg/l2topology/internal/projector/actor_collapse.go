@@ -78,17 +78,24 @@ func collapseActorsByIP(actors []projectedActor) []projectedActor {
 			}
 		}
 		merged := actors[rep]
+		var lists topologyActorCollapseLists
+		lists.add(merged)
+		clearTopologyActorCollapseLists(&merged)
 		collapsedCount := 1
 		for _, idx := range members {
 			if idx == rep {
 				continue
 			}
 			collapsedCount++
-			merged.Actor.Match = mergeTopologyActorMatch(merged.Actor.Match, actors[idx].Actor.Match)
-			merged.Actor.Labels = mergeTopologyActorLabels(merged.Actor.Labels, actors[idx].Actor.Labels)
-			merged.Detail = mergeProjectionActorDetail(merged.Detail, actors[idx].Detail)
+			member := actors[idx]
+			lists.add(member)
+			clearTopologyActorCollapseLists(&member)
+			merged.Actor.Match = mergeTopologyActorMatch(merged.Actor.Match, member.Actor.Match)
+			merged.Actor.Labels = mergeTopologyActorLabels(merged.Actor.Labels, member.Actor.Labels)
+			merged.Detail = mergeProjectionActorDetail(merged.Detail, member.Detail)
 			keep[idx] = false
 		}
+		lists.apply(&merged)
 		if collapsedCount > 1 {
 			merged.Detail.CollapsedByIP = true
 			merged.Detail.CollapsedCount = collapsedCount
@@ -229,6 +236,110 @@ func mergeTopologyStringLists(base []string, extra []string) []string {
 		return nil
 	}
 	return out
+}
+
+type topologyActorCollapseLists struct {
+	matchChassisIDs       []string
+	matchMACs             []string
+	matchIPs              []string
+	matchHostnames        []string
+	matchDNSNames         []string
+	managementAddrs       []string
+	protocols             []string
+	protocolsCollected    []string
+	capabilities          []string
+	capabilitiesSupported []string
+	capabilitiesEnabled   []string
+	deviceIfIndexes       []string
+	deviceIfNames         []string
+	endpointSources       []string
+	endpointDeviceIDs     []string
+	endpointIfIndexes     []string
+	endpointIfNames       []string
+	segmentParents        []string
+	segmentIfNames        []string
+	segmentIfIndexes      []string
+	segmentBridgePorts    []string
+	segmentVLANIDs        []string
+	segmentSources        []string
+}
+
+func (a *topologyActorCollapseLists) add(actor projectedActor) {
+	a.matchChassisIDs = append(a.matchChassisIDs, actor.Actor.Match.ChassisIDs...)
+	a.matchMACs = append(a.matchMACs, actor.Actor.Match.MacAddresses...)
+	a.matchIPs = append(a.matchIPs, actor.Actor.Match.IPAddresses...)
+	a.matchHostnames = append(a.matchHostnames, actor.Actor.Match.Hostnames...)
+	a.matchDNSNames = append(a.matchDNSNames, actor.Actor.Match.DNSNames...)
+	a.managementAddrs = append(a.managementAddrs, actor.Detail.Device.ManagementAddresses...)
+	a.protocols = append(a.protocols, actor.Detail.Device.Protocols...)
+	a.protocolsCollected = append(a.protocolsCollected, actor.Detail.Device.ProtocolsCollected...)
+	a.capabilities = append(a.capabilities, actor.Detail.Device.Capabilities...)
+	a.capabilitiesSupported = append(a.capabilitiesSupported, actor.Detail.Device.CapabilitiesSupported...)
+	a.capabilitiesEnabled = append(a.capabilitiesEnabled, actor.Detail.Device.CapabilitiesEnabled...)
+	a.deviceIfIndexes = append(a.deviceIfIndexes, actor.Detail.Device.IfIndexes...)
+	a.deviceIfNames = append(a.deviceIfNames, actor.Detail.Device.IfNames...)
+	a.endpointSources = append(a.endpointSources, actor.Detail.Endpoint.LearnedSources...)
+	a.endpointDeviceIDs = append(a.endpointDeviceIDs, actor.Detail.Endpoint.LearnedDeviceIDs...)
+	a.endpointIfIndexes = append(a.endpointIfIndexes, actor.Detail.Endpoint.LearnedIfIndexes...)
+	a.endpointIfNames = append(a.endpointIfNames, actor.Detail.Endpoint.LearnedIfNames...)
+	a.segmentParents = append(a.segmentParents, actor.Detail.Segment.ParentDevices...)
+	a.segmentIfNames = append(a.segmentIfNames, actor.Detail.Segment.IfNames...)
+	a.segmentIfIndexes = append(a.segmentIfIndexes, actor.Detail.Segment.IfIndexes...)
+	a.segmentBridgePorts = append(a.segmentBridgePorts, actor.Detail.Segment.BridgePorts...)
+	a.segmentVLANIDs = append(a.segmentVLANIDs, actor.Detail.Segment.VLANIDs...)
+	a.segmentSources = append(a.segmentSources, actor.Detail.Segment.LearnedSources...)
+}
+
+func (a *topologyActorCollapseLists) apply(actor *projectedActor) {
+	actor.Actor.Match.ChassisIDs = mergeTopologyStringLists(nil, a.matchChassisIDs)
+	actor.Actor.Match.MacAddresses = mergeTopologyStringLists(nil, a.matchMACs)
+	actor.Actor.Match.IPAddresses = mergeTopologyStringLists(nil, a.matchIPs)
+	actor.Actor.Match.Hostnames = mergeTopologyStringLists(nil, a.matchHostnames)
+	actor.Actor.Match.DNSNames = mergeTopologyStringLists(nil, a.matchDNSNames)
+	actor.Detail.Device.ManagementAddresses = mergeTopologyStringLists(nil, a.managementAddrs)
+	actor.Detail.Device.Protocols = mergeTopologyStringLists(nil, a.protocols)
+	actor.Detail.Device.ProtocolsCollected = mergeTopologyStringLists(nil, a.protocolsCollected)
+	actor.Detail.Device.Capabilities = mergeTopologyStringLists(nil, a.capabilities)
+	actor.Detail.Device.CapabilitiesSupported = mergeTopologyStringLists(nil, a.capabilitiesSupported)
+	actor.Detail.Device.CapabilitiesEnabled = mergeTopologyStringLists(nil, a.capabilitiesEnabled)
+	actor.Detail.Device.IfIndexes = mergeTopologyStringLists(nil, a.deviceIfIndexes)
+	actor.Detail.Device.IfNames = mergeTopologyStringLists(nil, a.deviceIfNames)
+	actor.Detail.Endpoint.LearnedSources = mergeTopologyStringLists(nil, a.endpointSources)
+	actor.Detail.Endpoint.LearnedDeviceIDs = mergeTopologyStringLists(nil, a.endpointDeviceIDs)
+	actor.Detail.Endpoint.LearnedIfIndexes = mergeTopologyStringLists(nil, a.endpointIfIndexes)
+	actor.Detail.Endpoint.LearnedIfNames = mergeTopologyStringLists(nil, a.endpointIfNames)
+	actor.Detail.Segment.ParentDevices = mergeTopologyStringLists(nil, a.segmentParents)
+	actor.Detail.Segment.IfNames = mergeTopologyStringLists(nil, a.segmentIfNames)
+	actor.Detail.Segment.IfIndexes = mergeTopologyStringLists(nil, a.segmentIfIndexes)
+	actor.Detail.Segment.BridgePorts = mergeTopologyStringLists(nil, a.segmentBridgePorts)
+	actor.Detail.Segment.VLANIDs = mergeTopologyStringLists(nil, a.segmentVLANIDs)
+	actor.Detail.Segment.LearnedSources = mergeTopologyStringLists(nil, a.segmentSources)
+}
+
+func clearTopologyActorCollapseLists(actor *projectedActor) {
+	actor.Actor.Match.ChassisIDs = nil
+	actor.Actor.Match.MacAddresses = nil
+	actor.Actor.Match.IPAddresses = nil
+	actor.Actor.Match.Hostnames = nil
+	actor.Actor.Match.DNSNames = nil
+	actor.Detail.Device.ManagementAddresses = nil
+	actor.Detail.Device.Protocols = nil
+	actor.Detail.Device.ProtocolsCollected = nil
+	actor.Detail.Device.Capabilities = nil
+	actor.Detail.Device.CapabilitiesSupported = nil
+	actor.Detail.Device.CapabilitiesEnabled = nil
+	actor.Detail.Device.IfIndexes = nil
+	actor.Detail.Device.IfNames = nil
+	actor.Detail.Endpoint.LearnedSources = nil
+	actor.Detail.Endpoint.LearnedDeviceIDs = nil
+	actor.Detail.Endpoint.LearnedIfIndexes = nil
+	actor.Detail.Endpoint.LearnedIfNames = nil
+	actor.Detail.Segment.ParentDevices = nil
+	actor.Detail.Segment.IfNames = nil
+	actor.Detail.Segment.IfIndexes = nil
+	actor.Detail.Segment.BridgePorts = nil
+	actor.Detail.Segment.VLANIDs = nil
+	actor.Detail.Segment.LearnedSources = nil
 }
 
 func mergeTopologyActorLabels(base, extra map[string]string) map[string]string {

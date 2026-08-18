@@ -86,6 +86,9 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		}
 
 		repActor := data.Actors[rep]
+		var matchLists topologyMatchCollapseLists
+		matchLists.add(repActor.Match)
+		clearTopologyMatchCollapseLists(&repActor.Match)
 		collapsedCount := 1
 		for _, idx := range members {
 			if idx == rep {
@@ -94,12 +97,16 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 			collapsedCount++
 			collapsed++
 			replaceActorID[data.Actors[idx].ActorID] = repActor.ActorID
-			repActor.Match = mergeTopologyMatch(repActor.Match, data.Actors[idx].Match)
-			repActor.Labels = mergeTopologyStringMap(repActor.Labels, data.Actors[idx].Labels)
-			repActor.SegmentKind = topologyutil.FirstNonEmptyString(repActor.SegmentKind, data.Actors[idx].SegmentKind)
-			repActor.Detail = mergeTopologyActorDetail(repActor.Detail, data.Actors[idx].Detail)
+			member := data.Actors[idx]
+			matchLists.add(member.Match)
+			clearTopologyMatchCollapseLists(&member.Match)
+			repActor.Match = mergeTopologyMatch(repActor.Match, member.Match)
+			repActor.Labels = mergeTopologyStringMap(repActor.Labels, member.Labels)
+			repActor.SegmentKind = topologyutil.FirstNonEmptyString(repActor.SegmentKind, member.SegmentKind)
+			repActor.Detail = mergeTopologyActorDetail(repActor.Detail, member.Detail)
 			keep[idx] = false
 		}
+		matchLists.apply(&repActor.Match)
 		if collapsedCount > 1 {
 			repActor.Detail.L2.CollapsedByIP = true
 			repActor.Detail.L2.CollapsedCount = collapsedCount

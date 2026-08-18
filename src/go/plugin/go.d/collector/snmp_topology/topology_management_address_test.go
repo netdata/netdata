@@ -3,11 +3,94 @@
 package snmptopology
 
 import (
+	"net/netip"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNormalizeTargetManagementIPsCanonicalizesDeduplicatesAndSorts(t *testing.T) {
+	got := normalizeTargetManagementIPs([]netip.Addr{
+		{},
+		netip.MustParseAddr("127.0.0.1"),
+		netip.MustParseAddr("198.51.100.20"),
+		netip.MustParseAddr("::ffff:192.0.2.10"),
+		netip.MustParseAddr("192.0.2.10"),
+		netip.MustParseAddr("10.0.0.10"),
+	})
+
+	require.Equal(t, []netip.Addr{
+		netip.MustParseAddr("10.0.0.10"),
+		netip.MustParseAddr("192.0.2.10"),
+		netip.MustParseAddr("198.51.100.20"),
+	}, got)
+}
+
+func TestFinalizeLocalManagementAddressesSelectsOnceAfterMaskFiltering(t *testing.T) {
+	tests := map[string]struct {
+		device  topologymodel.Device
+		targets []netip.Addr
+		masks   map[string]string
+		want    string
+	}{
+		"next target survives": {
+			device: topologymodel.Device{ManagementAddresses: []topologymodel.ManagementAddress{
+				{Address: "192.0.2.10", AddressType: "ipv4", Source: "ip_mib"},
+			}},
+			targets: []netip.Addr{netip.MustParseAddr("192.0.2.0"), netip.MustParseAddr("198.51.100.10")},
+			masks:   map[string]string{"192.0.2.0": "255.255.255.0"},
+			want:    "198.51.100.10",
+		},
+		"advertised fallback beats IP MIB": {
+			device: topologymodel.Device{ManagementAddresses: []topologymodel.ManagementAddress{
+				{Address: "192.0.2.10", AddressType: "ipv4", Source: "ip_mib"},
+				{Address: "198.51.100.20", AddressType: "ipv4", Source: "lldp_local"},
+			}},
+			targets: []netip.Addr{netip.MustParseAddr("192.0.2.0")},
+			masks:   map[string]string{"192.0.2.0": "255.255.255.0"},
+			want:    "198.51.100.20",
+		},
+		"IP MIB fallback": {
+			device: topologymodel.Device{ManagementAddresses: []topologymodel.ManagementAddress{
+				{Address: "192.0.2.10", AddressType: "ipv4", Source: "ip_mib"},
+			}},
+			targets: []netip.Addr{netip.MustParseAddr("192.0.2.0")},
+			masks:   map[string]string{"192.0.2.0": "255.255.255.0"},
+			want:    "192.0.2.10",
+		},
+		"scalar literal target falls back": {
+			device: topologymodel.Device{
+				ManagementIP: "192.0.2.0",
+				ManagementAddresses: []topologymodel.ManagementAddress{
+					{Address: "192.0.2.10", AddressType: "ipv4", Source: "ip_mib"},
+				},
+			},
+			masks: map[string]string{"192.0.2.0": "255.255.255.0"},
+			want:  "192.0.2.10",
+		},
+		"slash 31 target remains eligible": {
+			targets: []netip.Addr{netip.MustParseAddr("192.0.2.0")},
+			masks:   map[string]string{"192.0.2.0": "255.255.255.254"},
+			want:    "192.0.2.0",
+		},
+		"slash 32 target remains eligible": {
+			targets: []netip.Addr{netip.MustParseAddr("192.0.2.0")},
+			masks:   map[string]string{"192.0.2.0": "255.255.255.255"},
+			want:    "192.0.2.0",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			device := tc.device
+			finalizeLocalManagementAddresses(&device, tc.targets, tc.masks)
+			require.Equal(t, tc.want, device.ManagementIP)
+			finalizeLocalManagementAddresses(&device, tc.targets, tc.masks)
+			require.Equal(t, tc.want, device.ManagementIP)
+		})
+	}
+}
 
 func TestNormalizeManagementAddressHonorsProtocolFamilies(t *testing.T) {
 	tests := map[string]struct {

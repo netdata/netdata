@@ -14,8 +14,9 @@ import (
 
 func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 	tests := []struct {
-		devices int
-		aliases int
+		devices       int
+		aliases       int
+		sharedPrimary bool
 	}{
 		{devices: 16, aliases: 1},
 		{devices: 64, aliases: 1},
@@ -23,11 +24,15 @@ func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 		{devices: 32, aliases: 64},
 		{devices: 64, aliases: 64},
 		{devices: 64, aliases: 256},
+		{devices: 16, aliases: 64, sharedPrimary: true},
+		{devices: 32, aliases: 64, sharedPrimary: true},
+		{devices: 64, aliases: 64, sharedPrimary: true},
+		{devices: 64, aliases: 256, sharedPrimary: true},
 	}
 
 	for _, tc := range tests {
-		b.Run(fmt.Sprintf("devices=%d/aliases=%d", tc.devices, tc.aliases), func(b *testing.B) {
-			registry := benchmarkAliasRichTopologyRegistry(tc.devices, tc.aliases)
+		b.Run(fmt.Sprintf("devices=%d/aliases=%d/shared_primary=%t", tc.devices, tc.aliases, tc.sharedPrimary), func(b *testing.B) {
+			registry := benchmarkAliasRichTopologyRegistry(tc.devices, tc.aliases, tc.sharedPrimary)
 			deps := funcDepsAdapter{registry: registry}
 			options := topologyoptions.DefaultQueryOptions()
 			options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
@@ -48,7 +53,7 @@ func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 	}
 }
 
-func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int) *topologyRegistry {
+func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrimary bool) *topologyRegistry {
 	registry := &topologyRegistry{
 		caches:          make(map[*topologyCache]struct{}, deviceCount),
 		producerScopeID: "benchmark-producer",
@@ -72,6 +77,9 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int) *topologyRe
 				Source:      "ip_mib",
 			})
 			selectedIPs[deviceIndex] = ip
+		}
+		if sharedPrimary {
+			selectedIPs[deviceIndex] = "172.16.0.1"
 		}
 
 		cache.localDevice = topologymodel.Device{

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -115,12 +116,21 @@ func pickManagementIP(addrs []topologymodel.ManagementAddress) string {
 	return selector.selected()
 }
 
-func pickTargetManagementIP(addrs []netip.Addr) string {
-	var selector managementIPSelector
+func normalizeTargetManagementIPs(addrs []netip.Addr) []netip.Addr {
+	seen := make(map[netip.Addr]struct{}, len(addrs))
 	for _, addr := range addrs {
-		selector.add(addr, managementAddressSourceCollectorTarget)
+		addr = addr.Unmap()
+		if !isEligibleTopologyIPAddress(addr) {
+			continue
+		}
+		seen[addr] = struct{}{}
 	}
-	return selector.selected()
+	out := make([]netip.Addr, 0, len(seen))
+	for addr := range seen {
+		out = append(out, addr)
+	}
+	slices.SortFunc(out, netip.Addr.Compare)
+	return out
 }
 
 func (s *managementIPSelector) add(addr netip.Addr, source string) {
@@ -228,16 +238,27 @@ func isEligibleManagementInterfaceAddress(ip, netmask string) bool {
 	return !isNetwork && !isBroadcast
 }
 
-func finalizeLocalManagementAddresses(device *topologymodel.Device, netmasks map[string]string) {
+func finalizeLocalManagementAddresses(
+	device *topologymodel.Device,
+	targets []netip.Addr,
+	netmasks map[string]string,
+) {
 	if device == nil {
 		return
 	}
 
-	if ip := normalizeEligibleManagementIP(device.ManagementIP); ip != "" &&
-		isEligibleManagementInterfaceAddress(ip, netmasks[ip]) {
-		device.ManagementIP = ip
-	} else {
-		device.ManagementIP = ""
+	var selector managementIPSelector
+	addTarget := func(addr netip.Addr) {
+		addr = addr.Unmap()
+		if isEligibleManagementInterfaceAddress(addr.String(), netmasks[addr.String()]) {
+			selector.add(addr, managementAddressSourceCollectorTarget)
+		}
+	}
+	if addr, ok := parseTopologyIPAddress(device.ManagementIP); ok {
+		addTarget(addr)
+	}
+	for _, addr := range targets {
+		addTarget(addr)
 	}
 
 	addrs := device.ManagementAddresses
@@ -248,9 +269,13 @@ func finalizeLocalManagementAddresses(device *topologymodel.Device, netmasks map
 			continue
 		}
 		filtered = append(filtered, addr)
+		if ok {
+			selector.add(ip, addr.Source)
+		}
 	}
 	clear(addrs[len(filtered):])
 	device.ManagementAddresses = filtered
+	device.ManagementIP = selector.selected()
 }
 
 func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {

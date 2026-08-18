@@ -178,9 +178,9 @@ const (
 )
 
 type topologyRefreshDevicePlan struct {
-	key          string
-	device       ddsnmp.DeviceConnectionInfo
-	managementIP string
+	key                 string
+	device              ddsnmp.DeviceConnectionInfo
+	targetManagementIPs []netip.Addr
 }
 
 func (c *Collector) deviceCheckEvery() time.Duration {
@@ -250,7 +250,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		if ctx.Err() != nil {
 			break
 		}
-		if !c.refreshDeviceTopology(ctx, plan.key, plan.device, plan.managementIP) {
+		if !c.refreshDeviceTopology(ctx, plan.key, plan.device, plan.targetManagementIPs) {
 			if ctx.Err() != nil {
 				break
 			}
@@ -305,7 +305,12 @@ func (c *Collector) updateFunctionAvailability() {
 }
 
 // refreshDeviceTopology collects topology data for a single device into its own cache.
-func (c *Collector) refreshDeviceTopology(ctx context.Context, key string, dev ddsnmp.DeviceConnectionInfo, managementIP string) bool {
+func (c *Collector) refreshDeviceTopology(
+	ctx context.Context,
+	key string,
+	dev ddsnmp.DeviceConnectionInfo,
+	targetManagementIPs []netip.Addr,
+) bool {
 	if ctx.Err() != nil {
 		return false
 	}
@@ -375,7 +380,7 @@ func (c *Collector) refreshDeviceTopology(ctx context.Context, key string, dev d
 	// Build the next snapshot off-registry. Function readers keep seeing the
 	// previous complete snapshot until this collection is fully ingested.
 	next := c.newDeviceCollectionCache(dev)
-	next.localDevice.ManagementIP = managementIP
+	next.targetManagementIPs = append([]netip.Addr(nil), targetManagementIPs...)
 
 	next.updateTopologySysUptime(sysUptime)
 	next.updateTopologyProfileTags(pms)
@@ -411,8 +416,8 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 		if host == "" {
 			continue
 		}
-		if _, isIP := parseTopologyIPAddress(host); isIP {
-			plans[i].managementIP = normalizeEligibleManagementIP(host)
+		if addr, isIP := parseTopologyIPAddress(host); isIP {
+			plans[i].targetManagementIPs = normalizeTargetManagementIPs([]netip.Addr{addr})
 			continue
 		}
 		if c.resolveTargetIPs != nil {
@@ -448,7 +453,7 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 				if lookupCtx.Err() != nil {
 					continue
 				}
-				plans[job.planIndex].managementIP = c.resolveDeviceTargetManagementIP(
+				plans[job.planIndex].targetManagementIPs = c.resolveDeviceTargetManagementIPs(
 					lookupCtx,
 					plans[job.planIndex].device,
 				)
@@ -489,16 +494,16 @@ func (c *Collector) newDeviceCollectionCache(dev ddsnmp.DeviceConnectionInfo) *t
 	return cache
 }
 
-func (c *Collector) resolveDeviceTargetManagementIP(ctx context.Context, dev ddsnmp.DeviceConnectionInfo) string {
+func (c *Collector) resolveDeviceTargetManagementIPs(ctx context.Context, dev ddsnmp.DeviceConnectionInfo) []netip.Addr {
 	host := strings.TrimSpace(dev.Hostname)
 	if host == "" {
-		return ""
+		return nil
 	}
-	if _, isIP := parseTopologyIPAddress(host); isIP {
-		return normalizeEligibleManagementIP(host)
+	if addr, isIP := parseTopologyIPAddress(host); isIP {
+		return normalizeTargetManagementIPs([]netip.Addr{addr})
 	}
 	if c.resolveTargetIPs == nil {
-		return ""
+		return nil
 	}
 
 	timeout := topologyTargetLookupMaxTimeout
@@ -513,9 +518,9 @@ func (c *Collector) resolveDeviceTargetManagementIP(ctx context.Context, dev dds
 		if ctx.Err() == nil {
 			c.Debugf("device '%s': failed to resolve topology management target: %v", host, err)
 		}
-		return ""
+		return nil
 	}
-	return pickTargetManagementIP(addrs)
+	return normalizeTargetManagementIPs(addrs)
 }
 
 func (c *Collector) pruneStaleDeviceCaches(seen map[string]bool) {

@@ -89,9 +89,6 @@ func (c *topologyCache) hasRenderableObservationAt(now time.Time) bool {
 
 	local := normalizeTopologyDevice(c.localDevice)
 	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
-	if localManagementIP == "" {
-		localManagementIP = pickManagementIP(local.ManagementAddresses)
-	}
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
 	return strings.TrimSpace(ensureTopologyObservationDeviceID(local, baseBridgeAddress)) != ""
 }
@@ -125,7 +122,7 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	finalizeLocalManagementAddresses(&c.localDevice, c.ifNetmaskByIP)
+	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
 	c.rebuildTrapSourceMatchMethods()
 	c.updateFDBDiagnostics()
 	stats := topologyCacheFinalizeStats{
