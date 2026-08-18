@@ -36,3 +36,20 @@ func TestBridgeAttachmentSortKey_DistinguishesVLANAndMethod(t *testing.T) {
 	require.NotEqual(t, bridgeAttachmentSortKey(fdb), bridgeAttachmentSortKey(arp))
 	require.NotEqual(t, bridgeAttachmentSortKey(fdb), bridgeAttachmentSortKey(otherVLAN))
 }
+
+func TestBridgePortFromAttachment_PreservesForwardingDomainWithoutDisplayingVLAN(t *testing.T) {
+	first := bridgePortFromAttachment(model.Attachment{
+		DeviceID: "switch-a",
+		IfIndex:  7,
+		Labels:   map[string]string{"fdb_domain_id": "fdb:100"},
+	}, nil)
+	second := bridgePortFromAttachment(model.Attachment{
+		DeviceID: "switch-a",
+		IfIndex:  7,
+		Labels:   map[string]string{"fdb_domain_id": "fdb:200"},
+	}, nil)
+
+	require.Empty(t, first.vlanID)
+	require.Empty(t, second.vlanID)
+	require.NotEqual(t, bridgePortObservationVLANKey(first), bridgePortObservationVLANKey(second))
+}

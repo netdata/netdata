@@ -482,6 +482,33 @@ func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossPortsWhenVLANDiffers
 	require.Equal(t, 2, result.Stats.AttachmentsFDB)
 }
 
+func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossRawDomainsWithoutDisplayVLAN(t *testing.T) {
+	observations := []model.L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			BridgePorts: []model.BridgePortObservation{
+				{BasePort: "1", IfIndex: 1},
+				{BasePort: "2", IfIndex: 2},
+			},
+			FDBEntries: []model.FDBObservation{
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:100"},
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "2", Status: "learned", FDBDomainID: "fdb:200"},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+	require.Len(t, result.Attachments, 2)
+	require.Equal(t, "mac:70:49:a2:65:72:cd", result.Attachments[0].EndpointID)
+	require.Equal(t, "mac:70:49:a2:65:72:cd", result.Attachments[1].EndpointID)
+	require.Empty(t, result.Attachments[0].Labels["vlan_id"])
+	require.Empty(t, result.Attachments[1].Labels["vlan_id"])
+	require.NotEqual(t, result.Attachments[0].Labels["fdb_domain_id"], result.Attachments[1].Labels["fdb_domain_id"])
+	require.Equal(t, 2, result.Stats.AttachmentsFDB)
+}
+
 func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
 	observations := []model.L2Observation{
 		{

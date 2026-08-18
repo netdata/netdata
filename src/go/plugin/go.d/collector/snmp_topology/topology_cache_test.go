@@ -3,8 +3,11 @@
 package snmptopology
 
 import (
+	"fmt"
+	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -958,14 +961,16 @@ func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
 		tagDot1qVlanID:    "200",
 		tagDot1qVlanFdbID: "100",
 	})
+	cache.finalizeTopologyCache()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
 	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
 	require.Equal(t, "70:49:a2:65:72:cd", obs.FDBEntries[0].MAC)
 }
 
-func TestTopologyCache_Dot1qVLANFallbackUsesFDBIDWhenMapMissing(t *testing.T) {
+func TestTopologyCache_Dot1qUnmappedFDBKeepsDomainWithoutFalseVLAN(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
@@ -986,10 +991,164 @@ func TestTopologyCache_Dot1qVLANFallbackUsesFDBIDWhenMapMissing(t *testing.T) {
 		tagDot1qFdbPort:   "7",
 		tagDot1qFdbStatus: "learned",
 	})
+	cache.finalizeTopologyCache()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
-	require.Equal(t, "100", obs.FDBEntries[0].VLANID)
+	require.Empty(t, obs.FDBEntries[0].VLANID)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+}
+
+func TestTopologyCache_Dot1qAmbiguousFDBMappingKeepsDomainWithoutFalseVLAN(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+	cache.updateDot1qVlanMap(map[string]string{tagDot1qVlanID: "10", tagDot1qVlanFdbID: "100"})
+	cache.updateDot1qVlanMap(map[string]string{tagDot1qVlanID: "20", tagDot1qVlanFdbID: "100"})
+	cache.vlanIDToName["10"] = "users"
+	cache.vlanIDToName["20"] = "servers"
+
+	cache.finalizeTopologyCache()
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+	require.Empty(t, obs.FDBEntries[0].VLANID)
+	require.Empty(t, obs.FDBEntries[0].VLANName)
+}
+
+func TestTopologyCache_Dot1qRepeatedTimeMarkRowsKeepUniqueMapping(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID1:   "1",
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID1:   "2",
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+}
+
+func TestTopologyCache_FDBVLANFinalizationIsCollectionOrderIndependent(t *testing.T) {
+	operations := []func(*topologyCache){
+		func(cache *topologyCache) {
+			cache.updateFdbEntry(map[string]string{
+				tagDot1qFdbID:     "100",
+				tagDot1qFdbMac:    "7049a26572cd",
+				tagDot1qFdbPort:   "7",
+				tagDot1qFdbStatus: "learned",
+			})
+		},
+		func(cache *topologyCache) {
+			cache.updateDot1qVlanMap(map[string]string{
+				tagDot1qVlanID:    "200",
+				tagDot1qVlanFdbID: "100",
+			})
+		},
+		func(cache *topologyCache) {
+			cache.updateVtpVlanEntry(map[string]string{
+				tagVtpVlanIndex: "200",
+				tagVtpVlanState: "operational",
+				tagVtpVlanType:  "1",
+				tagVtpVlanName:  "servers",
+			})
+		},
+	}
+	orders := [][]int{
+		{0, 1, 2}, {0, 2, 1},
+		{1, 0, 2}, {1, 2, 0},
+		{2, 0, 1}, {2, 1, 0},
+	}
+
+	for _, order := range orders {
+		t.Run(strconv.Itoa(order[0])+strconv.Itoa(order[1])+strconv.Itoa(order[2]), func(t *testing.T) {
+			cache := newTopologyCache()
+			for _, index := range order {
+				operations[index](cache)
+			}
+			cache.finalizeTopologyCache()
+			cache.finalizeTopologyCache()
+
+			obs := cache.buildEngineObservation(cache.localDevice)
+			require.Len(t, obs.FDBEntries, 1)
+			require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+			require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+			require.Equal(t, "servers", obs.FDBEntries[0].VLANName)
+		})
+	}
+}
+
+func TestTopologyCache_FDBVLANFinalizationPreservesExplicitContext(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.updateVtpVlanEntry(map[string]string{
+		tagVtpVlanIndex: "200",
+		tagVtpVlanName:  "derived-name",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:              "100",
+		tagDot1qFdbMac:             "7049a26572cd",
+		tagDot1qFdbPort:            "7",
+		tagDot1qFdbStatus:          "learned",
+		tagTopologyContextVLANID:   "300",
+		tagTopologyContextVLANName: "explicit-name",
+	})
+
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+	require.Equal(t, "300", obs.FDBEntries[0].VLANID)
+	require.Equal(t, "explicit-name", obs.FDBEntries[0].VLANName)
+}
+
+func BenchmarkTopologyCache_FinalizeFDBVLANs_4095VLANs323FDBEntries(b *testing.B) {
+	b.ReportAllocs()
+	published := newTopologyCache()
+	for b.Loop() {
+		cache := newTopologyCache()
+		for index := 1; index <= 323; index++ {
+			cache.updateFdbEntry(map[string]string{
+				tagDot1qFdbID:     strconv.Itoa(index),
+				tagDot1qFdbMac:    fmt.Sprintf("02:00:00:00:%02x:%02x", index/256, index%256),
+				tagDot1qFdbPort:   strconv.Itoa(index),
+				tagDot1qFdbStatus: "learned",
+			})
+		}
+		for vlanID := 1; vlanID <= 4095; vlanID++ {
+			cache.updateDot1qVlanMap(map[string]string{
+				tagDot1qVlanID:    strconv.Itoa(vlanID),
+				tagDot1qVlanFdbID: strconv.Itoa((vlanID-1)%323 + 1),
+			})
+		}
+		cache.finalizeTopologyCache()
+		published.mu.Lock()
+		published.replaceWith(cache)
+		published.mu.Unlock()
+	}
+	runtime.KeepAlive(published)
 }
 
 func TestTopologyCache_FDBDiagnostics(t *testing.T) {
@@ -1050,6 +1209,7 @@ func TestTopologyCache_VTPVLANNameEnrichment(t *testing.T) {
 		tagDot1qFdbPort:   "7",
 		tagDot1qFdbStatus: "learned",
 	})
+	cache.finalizeTopologyCache()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)

@@ -3,6 +3,9 @@
 package snmptopology
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"runtime"
 	"testing"
@@ -159,6 +162,229 @@ func BenchmarkSNMPTopologyFunctionInferredActorIDScaling(b *testing.B) {
 			}
 		})
 	}
+}
+
+func BenchmarkSNMPTopologyFDBSnapshotMapTypeScaling(b *testing.B) {
+	tests := []struct {
+		devices             int
+		fdbEntriesPerDevice int
+		sharedEndpoints     bool
+		mapType             string
+	}{
+		{devices: 8, fdbEntriesPerDevice: 128},
+		{devices: 8, fdbEntriesPerDevice: 128, sharedEndpoints: true},
+		{devices: 40, fdbEntriesPerDevice: 1600},
+		{devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true},
+		{devices: 40, fdbEntriesPerDevice: 1600, mapType: topologyoptions.MapTypeLLDPCDPManaged},
+		{devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true, mapType: topologyoptions.MapTypeLLDPCDPManaged},
+	}
+
+	for _, tc := range tests {
+		mapType := tc.mapType
+		if mapType == "" {
+			mapType = topologyoptions.MapTypeManagedFabric
+		}
+		name := fmt.Sprintf(
+			"map_type=%s/devices=%d/fdb_entries_per_device=%d/shared_endpoints=%t",
+			mapType,
+			tc.devices,
+			tc.fdbEntriesPerDevice,
+			tc.sharedEndpoints,
+		)
+		b.Run(name, func(b *testing.B) {
+			registry := benchmarkManagedFabricFDBTopologyRegistry(tc.devices, tc.fdbEntriesPerDevice, tc.sharedEndpoints)
+			options := topologyoptions.DefaultQueryOptions()
+			options.MapType = mapType
+			snapshot := func() (topologymodel.Data, bool, error) {
+				candidates := registry.reverseDNSCandidateCollector()
+				current := options
+				current.ResolveDNSName = candidates.lookupCached
+				data, ok, err := registry.snapshotWithOptions(current)
+				runtime.KeepAlive(candidates.collectedCandidates())
+				return data, ok, err
+			}
+
+			probe, ok, err := snapshot()
+			if err != nil || !ok {
+				b.Fatalf("default managed-fabric snapshot ok=%t err=%v", ok, err)
+			}
+			if mapType == topologyoptions.MapTypeManagedFabric && len(probe.Links) == 0 {
+				b.Fatal("default managed-fabric snapshot emitted no links")
+			}
+			if mapType == topologyoptions.MapTypeLLDPCDPManaged && len(probe.Links) != 0 {
+				b.Fatalf("legacy LLDP/CDP map emitted %d FDB links", len(probe.Links))
+			}
+			actorCount := len(probe.Actors)
+			linkCount := len(probe.Links)
+			probe = topologymodel.Data{}
+			payloadBytes, compressedPayloadBytes := benchmarkTopologyPayloadSizes(b, registry, options)
+
+			// Two cycles clear prior json/gzip sync.Pool victims before measuring
+			// the graph objects retained by the snapshots below.
+			runtime.GC()
+			runtime.GC()
+			var before runtime.MemStats
+			runtime.ReadMemStats(&before)
+			const retainedCopies = 4
+			retained := make([]topologymodel.Data, retainedCopies)
+			for i := range retained {
+				var ok bool
+				var err error
+				retained[i], ok, err = snapshot()
+				if err != nil || !ok {
+					b.Fatalf("retained-heap snapshot ok=%t err=%v", ok, err)
+				}
+			}
+			runtime.GC()
+			var after runtime.MemStats
+			runtime.ReadMemStats(&after)
+			retainedBytes := int64(after.HeapAlloc) - int64(before.HeapAlloc)
+			if retainedBytes < 0 {
+				retainedBytes = 0
+			}
+			retainedBytes /= retainedCopies
+			runtime.KeepAlive(retained)
+			retained = nil
+			runtime.GC()
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				data, ok, err := snapshot()
+				if err != nil || !ok {
+					b.Fatalf("default managed-fabric snapshot ok=%t err=%v", ok, err)
+				}
+				runtime.KeepAlive(data)
+			}
+			b.ReportMetric(float64(actorCount), "actors/op")
+			b.ReportMetric(float64(linkCount), "links/op")
+			b.ReportMetric(float64(payloadBytes), "payload-B")
+			b.ReportMetric(float64(compressedPayloadBytes), "payload-gzip-B")
+			b.ReportMetric(float64(retainedBytes), "retained-B")
+		})
+	}
+}
+
+func benchmarkTopologyPayloadSizes(b *testing.B, registry *topologyRegistry, options topologyoptions.QueryOptions) (int, int) {
+	b.Helper()
+	payload, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(options)
+	if err != nil || !ok {
+		b.Fatalf("topology Function payload ok=%t err=%v", ok, err)
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		b.Fatalf("marshal topology Function payload: %v", err)
+	}
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if _, err := writer.Write(encoded); err != nil {
+		b.Fatalf("compress topology Function payload: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		b.Fatalf("finish topology Function payload compression: %v", err)
+	}
+	return len(encoded), compressed.Len()
+}
+
+func BenchmarkTopologyCacheFDBSnapshotReadLock(b *testing.B) {
+	registry := benchmarkManagedFabricFDBTopologyRegistry(1, 1600, false)
+	var cache *topologyCache
+	for candidate := range registry.caches {
+		cache = candidate
+		break
+	}
+	if cache == nil {
+		b.Fatal("benchmark cache is missing")
+	}
+	if _, ok := cache.snapshotEngineObservations(); !ok {
+		b.Fatal("benchmark cache is not renderable")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		snapshot, ok := cache.snapshotEngineObservations()
+		if !ok {
+			b.Fatal("benchmark cache became unavailable")
+		}
+		runtime.KeepAlive(snapshot)
+	}
+}
+
+func BenchmarkSNMPTopologyFunctionDefaultManagedFabricConcurrent(b *testing.B) {
+	registry := benchmarkManagedFabricFDBTopologyRegistry(8, 128, true)
+	deps := funcDepsAdapter{registry: registry}
+	options := topologyoptions.DefaultQueryOptions()
+	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Links.Rows == 0 {
+		b.Fatalf("default managed-fabric Function probe rows=%d ok=%t err=%v", payload.Links.Rows, ok, err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			payload, ok, err := deps.Snapshot(options)
+			if err != nil || !ok {
+				b.Fatalf("concurrent Function snapshot ok=%t err=%v", ok, err)
+			}
+			runtime.KeepAlive(payload)
+		}
+	})
+}
+
+func benchmarkManagedFabricFDBTopologyRegistry(deviceCount, fdbEntriesPerDevice int, sharedEndpoints bool) *topologyRegistry {
+	registry := newTopologyRegistry()
+	now := time.Now()
+	for deviceIndex := range deviceCount {
+		cache := newTopologyCache()
+		cache.lastUpdate = now
+		cache.updateTime = now
+		cache.agentID = fmt.Sprintf("benchmark-agent-%d", deviceIndex)
+		cache.localDevice = topologymodel.Device{
+			ChassisID:     benchmarkManagedFabricDeviceMAC(deviceIndex),
+			ChassisIDType: "macAddress",
+			SysName:       fmt.Sprintf("benchmark-switch-%d", deviceIndex),
+			ManagementIP:  fmt.Sprintf("192.0.2.%d", deviceIndex+1),
+		}
+		cache.bridgePortToIf["1"] = "1"
+		cache.ifNamesByIndex["1"] = "uplink"
+
+		if fdbEntriesPerDevice > 0 {
+			peerMAC := benchmarkManagedFabricDeviceMAC((deviceIndex + 1) % deviceCount)
+			cache.fdbEntries[peerMAC+"|1||"] = &fdbEntry{
+				mac:        peerMAC,
+				bridgePort: "1",
+				status:     "learned",
+			}
+		}
+		for entryIndex := 1; entryIndex < fdbEntriesPerDevice; entryIndex++ {
+			mac := benchmarkManagedFabricEndpointMAC(deviceIndex, entryIndex, sharedEndpoints)
+			cache.fdbEntries[mac+"|1||"] = &fdbEntry{
+				mac:        mac,
+				bridgePort: "1",
+				status:     "learned",
+			}
+		}
+		registry.register(cache)
+	}
+	return registry
+}
+
+func benchmarkManagedFabricDeviceMAC(deviceIndex int) string {
+	return fmt.Sprintf("02:10:00:00:%02x:%02x", deviceIndex/256, deviceIndex%256)
+}
+
+func benchmarkManagedFabricEndpointMAC(deviceIndex, entryIndex int, shared bool) string {
+	if shared {
+		deviceIndex = 0
+	}
+	return fmt.Sprintf(
+		"02:20:%02x:%02x:%02x:%02x",
+		deviceIndex/256,
+		deviceIndex%256,
+		entryIndex/256,
+		entryIndex%256,
+	)
 }
 
 func benchmarkInferredLLDPTopologyRegistry(linkCount, aliasCount int) *topologyRegistry {

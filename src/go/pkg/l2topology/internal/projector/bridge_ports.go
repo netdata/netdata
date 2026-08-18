@@ -90,11 +90,12 @@ func bridgePortFromAttachment(attachment model.Attachment, ifaceByDeviceIndex ma
 		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
 	}
 	return bridgePortRef{
-		deviceID:   deviceID,
-		ifIndex:    ifIndex,
-		ifName:     ifName,
-		bridgePort: bridgePort,
-		vlanID:     vlanID,
+		deviceID:    deviceID,
+		ifIndex:     ifIndex,
+		ifName:      ifName,
+		bridgePort:  bridgePort,
+		fdbDomainID: strings.TrimSpace(attachment.Labels["fdb_domain_id"]),
+		vlanID:      vlanID,
 	}
 }
 
@@ -108,6 +109,7 @@ func bridgeAttachmentSortKey(attachment model.Attachment) string {
 		strconv.Itoa(attachment.IfIndex),
 		strings.TrimSpace(attachment.Labels["if_name"]),
 		strings.TrimSpace(attachment.Labels["bridge_port"]),
+		strings.ToLower(strings.TrimSpace(attachment.Labels["fdb_domain_id"])),
 		strings.ToLower(vlanID),
 		strings.ToLower(strings.TrimSpace(attachment.Method)),
 		strings.TrimSpace(attachment.EndpointID),
@@ -137,9 +139,9 @@ func bridgePortRefKey(port bridgePortRef, includeBridgePort bool, includeVLAN bo
 		bridgePort = strconv.Itoa(port.ifIndex)
 	}
 	ifName := strings.TrimSpace(port.ifName)
-	vlanID := strings.TrimSpace(port.vlanID)
+	forwardingDomain := bridgePortForwardingDomain(port)
 	if !includeVLAN {
-		vlanID = ""
+		forwardingDomain = ""
 	}
 
 	parts := []string{
@@ -150,8 +152,21 @@ func bridgePortRefKey(port bridgePortRef, includeBridgePort bool, includeVLAN bo
 	if includeBridgePort {
 		parts = append(parts, "bp:"+strings.ToLower(bridgePort))
 	}
-	parts = append(parts, "vlan:"+strings.ToLower(vlanID))
+	parts = append(parts, "vlan:"+strings.ToLower(forwardingDomain))
 	return strings.Join(parts, keySep)
+}
+
+func bridgePortForwardingDomain(port bridgePortRef) string {
+	if domain := strings.TrimSpace(port.fdbDomainID); domain != "" {
+		if vlanID := strings.TrimSpace(port.vlanID); vlanID != "" && strings.EqualFold(domain, "vlan:"+vlanID) {
+			return vlanID
+		}
+		return domain
+	}
+	if vlanID := strings.TrimSpace(port.vlanID); vlanID != "" {
+		return vlanID
+	}
+	return ""
 }
 
 func bridgePortRefSortKey(port bridgePortRef) string {

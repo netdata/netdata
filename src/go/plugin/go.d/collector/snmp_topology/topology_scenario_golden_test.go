@@ -52,6 +52,14 @@ func topologyScenarioCases() map[string]topologyScenarioCase {
 			scenario: newProbableFDBLowConfidenceScenario(),
 			assert:   assertProbableFDBLowConfidenceScenario,
 		},
+		"managed_fabric_fdb_default": {
+			scenario: newManagedFabricFDBDefaultScenario(),
+			assert:   assertManagedFabricFDBDefaultScenario,
+		},
+		"managed_fabric_fdb_mac_identity": {
+			scenario: newManagedFabricFDBMACIdentityScenario(),
+			assert:   assertManagedFabricFDBDefaultScenario,
+		},
 		"focus_depth_l2": {
 			scenario: newFocusDepthL2Scenario(),
 			assert:   assertFocusDepthL2Scenario,
@@ -111,6 +119,7 @@ func topologyScenarioGoldenCases() map[string]topologyScenarioCase {
 	all := topologyScenarioCases()
 	return map[string]topologyScenarioCase{
 		"mixed_l2_l3_control":             all["mixed_l2_l3_control"],
+		"managed_fabric_fdb_default":      all["managed_fabric_fdb_default"],
 		"probable_fdb_low_confidence":     all["probable_fdb_low_confidence"],
 		"focus_depth_l2":                  all["focus_depth_l2"],
 		"device_display_selected_primary": all["device_display_selected_primary"],
@@ -256,6 +265,26 @@ func newProbableFDBLowConfidenceScenario() *topologyScenario {
 	s.FDBARP(aPort, switchB.chassisMAC, switchB.mgmtIP)
 	s.FDBARP(bPort, switchA.chassisMAC, switchA.mgmtIP)
 	return s
+}
+
+func newManagedFabricFDBDefaultScenario() *topologyScenario {
+	s := newTopologyScenario("managed_fabric_fdb_default")
+	switchA := s.Switch("switch-a", "192.0.2.21", "02:00:00:00:03:01")
+	switchB := s.Switch("switch-b", "192.0.2.22", "02:00:00:00:03:02")
+	aPort := switchA.Port("uplink-a", 1)
+	bPort := switchB.Port("uplink-b", 1)
+	s.FDBARP(aPort, switchB.chassisMAC, switchB.mgmtIP)
+	s.FDBARP(bPort, switchA.chassisMAC, switchA.mgmtIP)
+	return s
+}
+
+func newManagedFabricFDBMACIdentityScenario() *topologyScenario {
+	s := newManagedFabricFDBDefaultScenario()
+	s.name = "managed_fabric_fdb_mac_identity"
+	return s.WithOptions(func(options *topologyoptions.QueryOptions) {
+		options.CollapseActorsByIP = false
+		options.EliminateNonIPInferred = false
+	})
 }
 
 func newFocusDepthL2Scenario() *topologyScenario {
@@ -418,6 +447,8 @@ func assertMixedL2L3ControlScenario(t testing.TB, data topologyv1test.Normalized
 	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
 		{Type: "lldp", Src: "router-a", Dst: "switch-a", Direction: "bidirectional", Protocol: "lldp", SrcPort: "lan0", DstPort: "uplink-a"},
 		{Type: "cdp", Src: "switch-a", Dst: "switch-b", Direction: "bidirectional", Protocol: "cdp", SrcPort: "uplink-a", DstPort: "uplink-b"},
+		{Type: "stp", Src: "switch-a", Dst: "switch-b", Direction: "unidirectional", Protocol: "stp", SrcPort: "uplink-a", DstPort: "uplink-b"},
+		{Type: "stp", Src: "switch-b", Dst: "switch-a", Direction: "unidirectional", Protocol: "stp", SrcPort: "uplink-b", DstPort: "uplink-a"},
 		{Type: topologymodel.L3SubnetMembershipLinkType, Src: "router-a", Dst: "10.10.10.0/24", Direction: "observed", Protocol: topologymodel.L3SubnetMembershipLinkType, SrcPort: "lan0"},
 		{Type: topologymodel.L3SubnetMembershipLinkType, Src: "switch-a", Dst: "10.10.10.0/24", Direction: "observed", Protocol: topologymodel.L3SubnetMembershipLinkType, SrcPort: "uplink-a"},
 		{Type: topologymodel.L3SubnetMembershipLinkType, Src: "switch-b", Dst: "10.10.10.0/24", Direction: "observed", Protocol: topologymodel.L3SubnetMembershipLinkType, SrcPort: "uplink-b"},
@@ -434,7 +465,11 @@ func assertMixedL2L3ControlScenario(t testing.TB, data topologyv1test.Normalized
 		{"actor": "router-a", "remote_actor": "switch-a", "type": "lldp", "protocol": "lldp", "if_index": 2, "port_name": "lan0", "remote_if_index": 1, "remote_port_name": "uplink-a"},
 		{"actor": "switch-a", "remote_actor": "router-a", "type": "lldp", "protocol": "lldp", "if_index": 1, "port_name": "uplink-a", "remote_if_index": 2, "remote_port_name": "lan0"},
 		{"actor": "switch-a", "remote_actor": "switch-b", "type": "cdp", "protocol": "cdp", "if_index": 1, "port_name": "uplink-a", "remote_if_index": 1, "remote_port_name": "uplink-b"},
+		{"actor": "switch-a", "remote_actor": "switch-b", "type": "stp", "protocol": "stp", "if_index": 1, "port_name": "uplink-a", "remote_if_index": 1, "remote_port_name": "uplink-b"},
+		{"actor": "switch-a", "remote_actor": "switch-b", "type": "stp", "protocol": "stp", "if_index": 1, "port_name": "uplink-a", "remote_if_index": 1, "remote_port_name": "uplink-b"},
 		{"actor": "switch-b", "remote_actor": "switch-a", "type": "cdp", "protocol": "cdp", "if_index": 1, "port_name": "uplink-b", "remote_if_index": 1, "remote_port_name": "uplink-a"},
+		{"actor": "switch-b", "remote_actor": "switch-a", "type": "stp", "protocol": "stp", "if_index": 1, "port_name": "uplink-b", "remote_if_index": 1, "remote_port_name": "uplink-a"},
+		{"actor": "switch-b", "remote_actor": "switch-a", "type": "stp", "protocol": "stp", "if_index": 1, "port_name": "uplink-b", "remote_if_index": 1, "remote_port_name": "uplink-a"},
 	})
 	assertScenarioTableRowsExactly(t, data, "actor_ospf_neighbors", []map[string]any{
 		{"actor": "router-a", "remote_actor": "router-b", "local_ip": "198.51.100.1", "neighbor_ip": "198.51.100.2", "local_router_id": "192.0.2.101", "neighbor_router_id": "192.0.2.102", "state": "full", "subnet": "198.51.100.0/30"},
@@ -494,6 +529,24 @@ func assertProbableFDBLowConfidenceScenario(t testing.TB, data topologyv1test.No
 	assertScenarioStatEquals(t, data, "attachments_fdb", 2)
 	assertScenarioStatEquals(t, data, "enrichments_arp_nd", 2)
 	assertScenarioStatEquals(t, data, "l3_subnet_segment_suppressed_no_producer_scope", 0)
+}
+
+func assertManagedFabricFDBDefaultScenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "switch-a", Type: "switch", ManagementIP: "192.0.2.21"},
+		{Name: "switch-b", Type: "switch", ManagementIP: "192.0.2.22"},
+		{Name: "switch-a.uplink-a.segment", Type: "segment"},
+		{Name: "switch-b.uplink-b.segment", Type: "segment"},
+	})
+	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
+		{Type: "bridge", Src: "switch-a", Dst: "switch-a.uplink-a.segment", Direction: "bidirectional", Protocol: "bridge", SrcPort: "uplink-a"},
+		{Type: "bridge", Src: "switch-b", Dst: "switch-b.uplink-b.segment", Direction: "bidirectional", Protocol: "bridge", SrcPort: "uplink-b"},
+		{Type: "fdb", Src: "switch-a.uplink-a.segment", Dst: "switch-b", Direction: "bidirectional", Protocol: "fdb"},
+		{Type: "fdb", Src: "switch-b.uplink-b.segment", Dst: "switch-a", Direction: "bidirectional", Protocol: "fdb"},
+	})
+	assertScenarioStatEquals(t, data, "map_type", topologyoptions.MapTypeManagedFabric)
+	assertScenarioStatEquals(t, data, "links_total", 4)
 }
 
 func assertFocusDepthL2Scenario(t testing.TB, data topologyv1test.NormalizedData) {

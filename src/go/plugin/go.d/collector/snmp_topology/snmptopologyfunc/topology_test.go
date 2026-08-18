@@ -38,11 +38,12 @@ func TestMethodsIncludesSelectors(t *testing.T) {
 	assert.Equal(t, ParamMapType, mapType.ID)
 	assert.Equal(t, "Map", mapType.Name)
 	assert.Equal(t, funcapi.ParamSelect, mapType.Selection)
-	require.Len(t, mapType.Options, 3)
-	assert.Equal(t, topologyoptions.MapTypeLLDPCDPManaged, mapType.Options[0].ID)
+	require.Len(t, mapType.Options, 4)
+	assert.Equal(t, topologyoptions.MapTypeManagedFabric, mapType.Options[0].ID)
 	assert.True(t, mapType.Options[0].Default)
-	assert.Equal(t, topologyoptions.MapTypeHighConfidenceInferred, mapType.Options[1].ID)
-	assert.Equal(t, topologyoptions.MapTypeAllDevicesLowConfidence, mapType.Options[2].ID)
+	assert.Equal(t, topologyoptions.MapTypeLLDPCDPManaged, mapType.Options[1].ID)
+	assert.Equal(t, topologyoptions.MapTypeHighConfidenceInferred, mapType.Options[2].ID)
+	assert.Equal(t, topologyoptions.MapTypeAllDevicesLowConfidence, mapType.Options[3].ID)
 
 	strategy := cfg.RequiredParams[2]
 	assert.Equal(t, ParamInferenceStrategy, strategy.ID)
@@ -114,7 +115,7 @@ func TestTopologyHandlerHandleDefaultOptions(t *testing.T) {
 	assert.Equal(t, topologyoptions.QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
-		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
+		MapType:                topologyoptions.MapTypeManagedFabric,
 		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
 		Depth:                  topologyoptions.DepthAllInternal,
@@ -174,7 +175,7 @@ func TestTopologyHandlerHandleUnknownSelectorsFallbackToDefaults(t *testing.T) {
 	assert.Equal(t, topologyoptions.QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
-		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
+		MapType:                topologyoptions.MapTypeManagedFabric,
 		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
 		Depth:                  topologyoptions.DepthAllInternal,

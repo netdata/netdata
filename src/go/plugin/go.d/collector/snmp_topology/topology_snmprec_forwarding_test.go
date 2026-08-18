@@ -136,6 +136,7 @@ func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecFo
 	for _, tags := range data.arpEntries {
 		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindArpEntry, Tags: tags})
 	}
+	cache.finalizeTopologyCache()
 
 	return cache
 }

@@ -155,12 +155,13 @@ type BridgePortObservation struct {
 
 // FDBObservation captures one forwarding database entry from a bridge table.
 type FDBObservation struct {
-	MAC        string
-	BridgePort string
-	IfIndex    int
-	Status     string
-	VLANID     string
-	VLANName   string
+	MAC         string
+	BridgePort  string
+	IfIndex     int
+	Status      string
+	FDBDomainID string
+	VLANID      string
+	VLANName    string
 }
 
 // STPPortObservation captures one spanning-tree port row.

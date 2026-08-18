@@ -35,11 +35,17 @@ func attachmentKey(attachment model.Attachment) string {
 	deviceID := strings.TrimSpace(attachment.DeviceID)
 	endpointID := strings.TrimSpace(attachment.EndpointID)
 	method := strings.ToLower(strings.TrimSpace(attachment.Method))
-	vlanID := ""
+	forwardingDomain := ""
 	if len(attachment.Labels) > 0 {
-		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
-		if vlanID == "" {
-			vlanID = strings.TrimSpace(attachment.Labels["vlan"])
+		forwardingDomain = strings.TrimSpace(attachment.Labels["fdb_domain_id"])
+		if forwardingDomain == "" {
+			vlanID := strings.TrimSpace(attachment.Labels["vlan_id"])
+			if vlanID == "" {
+				vlanID = strings.TrimSpace(attachment.Labels["vlan"])
+			}
+			if vlanID != "" {
+				forwardingDomain = "vlan:" + vlanID
+			}
 		}
 	}
 	return opaqueCompositeKey(
@@ -47,7 +53,7 @@ func attachmentKey(attachment model.Attachment) string {
 		strconv.Itoa(attachment.IfIndex),
 		endpointID,
 		method,
-		strings.ToLower(vlanID),
+		strings.ToLower(forwardingDomain),
 	)
 }
 

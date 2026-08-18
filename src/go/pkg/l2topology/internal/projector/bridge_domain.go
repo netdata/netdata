@@ -275,6 +275,9 @@ func (s *bridgeDomainSegment) addPort(port bridgePortRef) {
 		if existing.bridgePort == "" {
 			existing.bridgePort = port.bridgePort
 		}
+		if existing.fdbDomainID == "" {
+			existing.fdbDomainID = port.fdbDomainID
+		}
 		if existing.vlanID == "" {
 			existing.vlanID = port.vlanID
 		}
@@ -368,7 +371,7 @@ func portSortKey(port bridgePortRef) string {
 		strings.ToLower(strings.TrimSpace(port.bridgePort)),
 		strings.TrimSpace(port.ifName),
 		strconvItoa(port.ifIndex),
-		strings.TrimSpace(port.vlanID),
+		bridgePortForwardingDomain(port),
 	}, keySep)
 }
 

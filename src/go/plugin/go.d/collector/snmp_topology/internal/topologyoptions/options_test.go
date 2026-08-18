@@ -38,7 +38,7 @@ func TestNormalizeQueryOptions(t *testing.T) {
 	}{
 		"defaults": {
 			want: QueryOptions{
-				MapType:            MapTypeLLDPCDPManaged,
+				MapType:            MapTypeManagedFabric,
 				InferenceStrategy:  InferenceStrategyFDBMinimumKnowledge,
 				ManagedDeviceFocus: ManagedFocusAllDevices,
 				Depth:              0,
@@ -79,4 +79,13 @@ func TestNormalizeQueryOptions(t *testing.T) {
 			assert.Equal(t, tc.want, NormalizeQueryOptions(tc.in))
 		})
 	}
+}
+
+func TestNormalizeMapTypeUsesOneManagedFabricFallback(t *testing.T) {
+	for _, value := range []string{"", "invalid", "  INVALID  "} {
+		assert.Equal(t, MapTypeManagedFabric, NormalizeMapType(value))
+	}
+	assert.Equal(t, MapTypeLLDPCDPManaged, NormalizeMapType(MapTypeLLDPCDPManaged))
+	assert.Equal(t, MapTypeHighConfidenceInferred, NormalizeMapType(MapTypeHighConfidenceInferred))
+	assert.Equal(t, MapTypeAllDevicesLowConfidence, NormalizeMapType(MapTypeAllDevicesLowConfidence))
 }

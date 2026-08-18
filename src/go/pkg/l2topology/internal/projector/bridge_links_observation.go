@@ -20,7 +20,7 @@ func bridgePortObservationVLANKey(port bridgePortRef) string {
 	if base == "" {
 		return ""
 	}
-	return base + keySep + "vlan:" + strings.ToLower(strings.TrimSpace(port.vlanID))
+	return base + keySep + "vlan:" + strings.ToLower(bridgePortForwardingDomain(port))
 }
 
 func bridgePortObservationBaseKey(port bridgePortRef) string {
