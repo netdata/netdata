@@ -583,6 +583,283 @@ func TestProjectionDeduplicatesDirectSTPAcrossVLANScopes(t *testing.T) {
 	require.Equal(t, "2", stpLink.Dst.BridgePort)
 }
 
+func TestProjectionKeepsUnresolvedSTPPortsInBridgePortNamespace(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+		},
+	}, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	var stpLinks []int
+	for i := range projection.Graph.Links {
+		if projection.Graph.Links[i].LinkType == "stp" {
+			stpLinks = append(stpLinks, i)
+		}
+	}
+	require.Len(t, stpLinks, 1)
+	link := projection.Graph.Links[stpLinks[0]]
+	require.Zero(t, link.Src.IfIndex)
+	require.Empty(t, link.Src.IfName)
+	require.Equal(t, "1", link.Src.PortID)
+	require.Equal(t, "1", link.Src.BridgePort)
+	require.Equal(t, "1", link.Src.PortName)
+	require.Zero(t, link.Dst.IfIndex)
+	require.Empty(t, link.Dst.IfName)
+	require.Equal(t, "8002", link.Dst.PortID)
+	require.Equal(t, "2", link.Dst.BridgePort)
+	require.Equal(t, "2", link.Dst.PortName)
+}
+
+func TestProjectionDisplaysDecodedUnresolvedSTPTargetPort(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			STPPorts: []STPPortObservation{{
+				Port:             "port-a",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+		},
+	}, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	for _, link := range projection.Graph.Links {
+		if link.LinkType != "stp" {
+			continue
+		}
+		require.Equal(t, "8002", link.Dst.PortID)
+		require.Equal(t, "2", link.Dst.BridgePort)
+		require.Equal(t, "2", link.Dst.PortName)
+		return
+	}
+	t.Fatal("missing STP link")
+}
+
+func TestProjectionPreservesMappedSTPIfIndexWithoutInterfaceName(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			BridgePorts:       []BridgePortObservation{{BasePort: "1", IfIndex: 7}},
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+		},
+	}, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	for _, link := range projection.Graph.Links {
+		if link.LinkType != "stp" {
+			continue
+		}
+		require.Equal(t, 7, link.Src.IfIndex)
+		require.Empty(t, link.Src.IfName)
+		require.Equal(t, "1", link.Src.PortID)
+		require.Equal(t, "1", link.Src.BridgePort)
+		return
+	}
+	t.Fatal("missing STP link")
+}
+
+func TestProjectionDoesNotResolveEncodedSTPPortAsInterfaceName(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+			Interfaces:        []ObservedInterface{{IfIndex: 99, IfName: "8002"}},
+		},
+	}, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	for _, link := range projection.Graph.Links {
+		if link.LinkType != "stp" {
+			continue
+		}
+		require.Zero(t, link.Dst.IfIndex)
+		require.Empty(t, link.Dst.IfName)
+		require.Equal(t, "8002", link.Dst.PortID)
+		require.Equal(t, "2", link.Dst.BridgePort)
+		require.Equal(t, "2", link.Dst.PortName)
+		return
+	}
+	t.Fatal("missing STP link")
+}
+
+func TestProjectionDoesNotReresolveObservedSTPIfIndexAsInterfaceName(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 7, IfName: "Ethernet7"},
+				{IfIndex: 99, IfName: "7"},
+			},
+			BridgePorts: []BridgePortObservation{{BasePort: "2", IfIndex: 7}},
+			FDBEntries: []FDBObservation{{
+				MAC:        "70:49:a2:65:72:cd",
+				BridgePort: "2",
+				Status:     "learned",
+			}},
+		},
+	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	for _, link := range projection.Graph.Links {
+		if link.LinkType != "stp" {
+			continue
+		}
+		require.Equal(t, 7, link.Dst.IfIndex)
+		require.Equal(t, "Ethernet7", link.Dst.IfName)
+		require.Equal(t, "8002", link.Dst.PortID)
+		require.Equal(t, "2", link.Dst.BridgePort)
+		return
+	}
+	t.Fatal("missing STP link")
+}
+
+func TestProjectionDoesNotReresolveObservedSTPSourceIfIndexAsInterfaceName(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 7, IfName: "Ethernet7"},
+				{IfIndex: 99, IfName: "7"},
+			},
+			BridgePorts: []BridgePortObservation{{BasePort: "1", IfIndex: 7}},
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+		},
+	}, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	for _, link := range projection.Graph.Links {
+		if link.LinkType != "stp" {
+			continue
+		}
+		require.Equal(t, 7, link.Src.IfIndex)
+		require.Equal(t, "Ethernet7", link.Src.IfName)
+		require.Equal(t, "1", link.Src.PortID)
+		require.Equal(t, "1", link.Src.BridgePort)
+		return
+	}
+	t.Fatal("missing STP link")
+}
+
+func TestProjectionDeduplicatesReciprocalSTPWithOnlyBridgePortIdentity(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+			STPPorts: []STPPortObservation{{
+				Port:             "2",
+				DesignatedBridge: "02:00:00:00:00:01",
+				DesignatedPort:   "8001",
+			}},
+		},
+	}, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	stpLinks := 0
+	for _, link := range projection.Graph.Links {
+		if link.LinkType == "stp" {
+			stpLinks++
+		}
+	}
+	require.Equal(t, 1, stpLinks)
+}
+
 func TestProjectionKeepsDistinctSTPLinksWithoutPortIdentity(t *testing.T) {
 	result := Result{
 		Devices: []Device{

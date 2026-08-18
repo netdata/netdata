@@ -263,8 +263,7 @@ func adjacencyToTopologyLink(
 	dstDevice := deviceByID[adj.TargetID]
 	srcMatch := deviceLinkEndpointMatch(srcDevice, deviceLinkMatchByID)
 	dstMatch := deviceLinkEndpointMatch(dstDevice, deviceLinkMatchByID)
-	src := adjacencySideToEndpointWithMatch(srcDevice, srcMatch, adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
-	dst := adjacencySideToEndpointWithMatch(dstDevice, dstMatch, adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
+	var src, dst graph.LinkEndpoint
 	if protocol == "stp" {
 		srcPort, dstPort := bridgePortsFromAdjacency(
 			adj,
@@ -277,7 +276,6 @@ func adjacencyToTopologyLink(
 			srcMatch,
 			adj.SourcePort,
 			srcPort,
-			ifIndexByDeviceName,
 			ifaceByDeviceIndex,
 		)
 		dst = adjacencySideToEndpointWithBridgePortRef(
@@ -285,9 +283,11 @@ func adjacencyToTopologyLink(
 			dstMatch,
 			adj.TargetPort,
 			dstPort,
-			ifIndexByDeviceName,
 			ifaceByDeviceIndex,
 		)
+	} else {
+		src = adjacencySideToEndpointWithMatch(srcDevice, srcMatch, adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
+		dst = adjacencySideToEndpointWithMatch(dstDevice, dstMatch, adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
 	}
 
 	link := graph.Link{

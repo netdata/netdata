@@ -77,22 +77,50 @@ func adjacencySideToEndpointWithBridgePortRef(
 	match graph.Match,
 	rawPort string,
 	port bridgePortRef,
-	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
 ) graph.LinkEndpoint {
-	canonicalPort := strings.TrimSpace(port.ifName)
-	if port.ifIndex > 0 {
-		canonicalPort = strconv.Itoa(port.ifIndex)
+	ifIndex := port.ifIndex
+	ifName := strings.TrimSpace(port.ifName)
+	ifDescr := ""
+	var iface model.Interface
+	hasIface := false
+	if ifIndex > 0 {
+		if ifaceValue, ok := ifaceByDeviceIndex[deviceIfIndexKey(dev.ID, ifIndex)]; ok {
+			iface = ifaceValue
+			hasIface = true
+			if name := strings.TrimSpace(iface.IfName); name != "" {
+				ifName = name
+			}
+			ifDescr = strings.TrimSpace(iface.IfDescr)
+		}
 	}
-	endpoint := adjacencySideToEndpointWithMatch(
-		dev,
-		match,
-		canonicalPort,
-		ifIndexByDeviceName,
-		ifaceByDeviceIndex,
-	)
-	endpoint.PortID = strings.TrimSpace(rawPort)
-	endpoint.BridgePort = strings.TrimSpace(port.bridgePort)
+	if ifName == "" {
+		ifName = ifDescr
+	}
+	bridgePort := strings.TrimSpace(port.bridgePort)
+	endpoint := graph.LinkEndpoint{
+		Match:        match,
+		IfIndex:      ifIndex,
+		IfName:       ifName,
+		PortID:       strings.TrimSpace(rawPort),
+		BridgePort:   bridgePort,
+		SysName:      strings.TrimSpace(dev.Hostname),
+		ManagementIP: selectedDeviceManagementIP(dev),
+	}
+	if ifDescr != "" {
+		endpoint.IfDescr = ifDescr
+	}
+	if ifIndex <= 0 && ifName == "" {
+		endpoint.PortName = bridgePort
+	}
+	if ifIndex > 0 && hasIface {
+		if admin := strings.TrimSpace(iface.Labels["admin_status"]); admin != "" {
+			endpoint.AdminStatus = admin
+		}
+		if oper := strings.TrimSpace(iface.Labels["oper_status"]); oper != "" {
+			endpoint.OperStatus = oper
+		}
+	}
 	return endpoint
 }
 

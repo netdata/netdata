@@ -64,6 +64,10 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 			Protocol:   "cdp",
 			SourceID:   link.sourceDeviceID,
 			SourcePort: link.localInterfaceName,
+			SourcePortEvidence: model.AdjacencyPortEvidence{
+				IfIndex: link.localIfIndex,
+				IfName:  link.localObservedName,
+			},
 			TargetID:   targetID,
 			TargetPort: link.remoteDevicePort,
 		}
@@ -114,29 +118,33 @@ func (s *l2BuildState) applySTP(observations []model.L2Observation) {
 				continue
 			}
 
+			sourcePort := strings.TrimSpace(entry.Port)
 			ifIndex := entry.IfIndex
 			if ifIndex <= 0 {
-				ifIndex = bridgePortToIfIndex[strings.TrimSpace(entry.Port)]
+				ifIndex = bridgePortToIfIndex[sourcePort]
 			}
-			sourcePort := strings.TrimSpace(entry.IfName)
-			if sourcePort == "" && ifIndex > 0 {
-				sourcePort = strings.TrimSpace(s.ifNameByDeviceIfIndex[deviceIfIndexKey(sourceID, ifIndex)])
+			sourceIfName := strings.TrimSpace(entry.IfName)
+			if sourceIfName == "" && ifIndex > 0 {
+				sourceIfName = strings.TrimSpace(s.ifNameByDeviceIfIndex[deviceIfIndexKey(sourceID, ifIndex)])
 			}
-			if sourcePort == "" {
-				sourcePort = strings.TrimSpace(entry.Port)
-			}
+			targetPort := strings.TrimSpace(entry.DesignatedPort)
 
 			adj := model.Adjacency{
 				Protocol:   "stp",
 				SourceID:   sourceID,
 				SourcePort: sourcePort,
+				SourcePortEvidence: model.AdjacencyPortEvidence{
+					IfIndex:    ifIndex,
+					IfName:     sourceIfName,
+					BridgePort: sourcePort,
+				},
 				TargetID:   targetID,
-				TargetPort: strings.TrimSpace(entry.DesignatedPort),
+				TargetPort: targetPort,
+				TargetPortEvidence: model.AdjacencyPortEvidence{
+					BridgePort: stpBridgePortFromPortID(targetPort),
+				},
 			}
 			labels := make(map[string]string)
-			if v := strings.TrimSpace(entry.Port); v != "" {
-				labels["stp_port"] = v
-			}
 			if v := strings.TrimSpace(entry.State); v != "" {
 				labels["stp_state"] = v
 			}

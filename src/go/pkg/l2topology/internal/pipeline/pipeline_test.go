@@ -64,6 +64,8 @@ func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 
 	require.Equal(t, "cdp", result.Adjacencies[0].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[0].SourceID)
+	require.Equal(t, 8, result.Adjacencies[0].SourcePortEvidence.IfIndex)
+	require.Equal(t, "Gi0/0", result.Adjacencies[0].SourcePortEvidence.IfName)
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
 	require.Equal(t, "lldp", result.Adjacencies[1].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[1].SourceID)
@@ -571,10 +573,21 @@ func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
 	require.Equal(t, "stp", result.Adjacencies[0].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[0].SourceID)
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
-	require.Equal(t, "Port3", result.Adjacencies[0].SourcePort)
+	require.Equal(t, "3", result.Adjacencies[0].SourcePort)
+	require.Equal(t, 3, result.Adjacencies[0].SourcePortEvidence.IfIndex)
+	require.Equal(t, "Port3", result.Adjacencies[0].SourcePortEvidence.IfName)
+	require.Equal(t, "3", result.Adjacencies[0].SourcePortEvidence.BridgePort)
+	require.Equal(t, "8001", result.Adjacencies[0].TargetPort)
+	require.Equal(t, "1", result.Adjacencies[0].TargetPortEvidence.BridgePort)
 	require.Equal(t, "200", result.Adjacencies[0].Labels["vlan_id"])
 	require.Equal(t, "servers", result.Adjacencies[0].Labels["vlan_name"])
 	require.Equal(t, 1, result.Stats.LinksSTP)
+}
+
+func TestSTPBridgePortFromPortID(t *testing.T) {
+	require.Equal(t, "2", stpBridgePortFromPortID("8002"))
+	require.Equal(t, "2", stpBridgePortFromPortID("2"))
+	require.Empty(t, stpBridgePortFromPortID("8000"))
 }
 
 func TestBuildL2ResultFromObservations_STPPreservesVLANScopes(t *testing.T) {

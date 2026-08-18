@@ -153,11 +153,13 @@ func TestCollectBridgeLinkRecords_SkipsAdjacencyWithoutRemotePort(t *testing.T) 
 func TestCollectBridgeLinkRecords_STPParentTreeUsesDesignatedTargetPort(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "stp",
-			SourceID:   "child",
-			SourcePort: "Gi0/10",
-			TargetID:   "root",
-			TargetPort: "Gi0/1",
+			Protocol:           "stp",
+			SourceID:           "child",
+			SourcePort:         "10",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 10, IfName: "Gi0/10", BridgePort: "10"},
+			TargetID:           "root",
+			TargetPort:         "8001",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1", BridgePort: "1"},
 		},
 	}, map[string]int{
 		deviceIfNameKey("child", "Gi0/10"): 10,
@@ -172,8 +174,20 @@ func TestCollectBridgeLinkRecords_STPParentTreeUsesDesignatedTargetPort(t *testi
 
 func TestCollectBridgeLinkRecords_STPPreservesVLANScopes(t *testing.T) {
 	adjacencies := []model.Adjacency{
-		{Protocol: "stp", SourceID: "child", SourcePort: "Gi0/10", TargetID: "root", TargetPort: "Gi0/1", Labels: map[string]string{"vlan_id": "100"}},
-		{Protocol: "stp", SourceID: "child", SourcePort: "Gi0/10", TargetID: "root", TargetPort: "Gi0/1", Labels: map[string]string{"vlan_id": "200"}},
+		{
+			Protocol: "stp", SourceID: "child", SourcePort: "10",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 10, IfName: "Gi0/10", BridgePort: "10"},
+			TargetID:           "root", TargetPort: "8001",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1", BridgePort: "1"},
+			Labels:             map[string]string{"vlan_id": "100"},
+		},
+		{
+			Protocol: "stp", SourceID: "child", SourcePort: "10",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 10, IfName: "Gi0/10", BridgePort: "10"},
+			TargetID:           "root", TargetPort: "8001",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1", BridgePort: "1"},
+			Labels:             map[string]string{"vlan_id": "200"},
+		},
 	}
 	records := collectBridgeLinkRecords(adjacencies, map[string]int{
 		deviceIfNameKey("child", "Gi0/10"): 10,

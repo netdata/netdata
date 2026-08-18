@@ -58,66 +58,64 @@ func bridgePortsFromAdjacency(
 ) (bridgePortRef, bridgePortRef) {
 	protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
 	vlanID := adjacencyVLANID(adj)
-	sourceBridgePort := ""
-	targetBridgePort := ""
 	if protocol == "stp" {
-		sourceBridgePort = strings.TrimSpace(adj.Labels["stp_port"])
-		targetBridgePort = stpBridgePortFromPortID(adj.TargetPort)
+		return bridgePortFromAdjacencyEvidence(
+				adj.SourceID,
+				adj.SourcePortEvidence,
+				vlanID,
+				ifIndexByDeviceName,
+				ifaceByDeviceIndex,
+				aliases,
+			), bridgePortFromAdjacencyEvidence(
+				adj.TargetID,
+				adj.TargetPortEvidence,
+				vlanID,
+				ifIndexByDeviceName,
+				ifaceByDeviceIndex,
+				aliases,
+			)
 	}
 
-	src := bridgePortFromAdjacencySide(
+	src := bridgePortFromRawAdjacencySide(
 		adj.SourceID,
 		adj.SourcePort,
-		sourceBridgePort,
 		vlanID,
-		protocol == "stp",
-		false,
 		ifIndexByDeviceName,
 		ifaceByDeviceIndex,
-		aliases,
 	)
-	dst := bridgePortFromAdjacencySide(
+	dst := bridgePortFromRawAdjacencySide(
 		adj.TargetID,
 		adj.TargetPort,
-		targetBridgePort,
 		vlanID,
-		protocol == "stp",
-		protocol == "stp",
 		ifIndexByDeviceName,
 		ifaceByDeviceIndex,
-		aliases,
 	)
 	return src, dst
 }
 
-func bridgePortFromAdjacencySide(
-	deviceID, port, bridgePort, vlanID string,
-	stpSide, encodedPortID bool,
+func bridgePortFromAdjacencyEvidence(
+	deviceID string,
+	evidence model.AdjacencyPortEvidence,
+	vlanID string,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
 	aliases bridgePortAliasIndex,
 ) bridgePortRef {
 	deviceID = strings.TrimSpace(deviceID)
-	port = strings.TrimSpace(port)
-	bridgePort = strings.TrimSpace(bridgePort)
-	if deviceID == "" || (port == "" && bridgePort == "") {
+	ifName := strings.TrimSpace(evidence.IfName)
+	bridgePort := strings.TrimSpace(evidence.BridgePort)
+	if deviceID == "" || (evidence.IfIndex <= 0 && ifName == "" && bridgePort == "") {
 		return bridgePortRef{}
 	}
 
-	ifIndex := resolveIfIndexByInterfaceName(deviceID, port, ifIndexByDeviceName)
+	ifIndex := evidence.IfIndex
+	if ifIndex <= 0 && ifName != "" {
+		ifIndex = resolveIfIndexByInterfaceName(deviceID, ifName, ifIndexByDeviceName)
+	}
 	if ifIndex <= 0 && bridgePort != "" {
 		ifIndex = aliases.resolveIfIndex(deviceID, bridgePort)
 	}
-	if ifIndex <= 0 && !stpSide {
-		ifIndex = resolveIfIndexByPortName(deviceID, port, ifIndexByDeviceName)
-	}
 
-	ifName := port
-	if encodedPortID {
-		// A raw STP port ID is not an interface name. Keep its decoded bridge
-		// base-port in its own namespace until an observed alias resolves it.
-		ifName = ""
-	}
 	if ifIndex > 0 {
 		if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(deviceID, ifIndex)]; ok {
 			if name := strings.TrimSpace(iface.IfName); name != "" {
@@ -132,6 +130,35 @@ func bridgePortFromAdjacencySide(
 		ifName:     ifName,
 		bridgePort: bridgePort,
 		vlanID:     strings.TrimSpace(vlanID),
+	}
+}
+
+func bridgePortFromRawAdjacencySide(
+	deviceID, port, vlanID string,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+) bridgePortRef {
+	deviceID = strings.TrimSpace(deviceID)
+	port = strings.TrimSpace(port)
+	if deviceID == "" || port == "" {
+		return bridgePortRef{}
+	}
+
+	ifIndex := resolveIfIndexByPortName(deviceID, port, ifIndexByDeviceName)
+	ifName := port
+	if ifIndex > 0 {
+		if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(deviceID, ifIndex)]; ok {
+			if name := strings.TrimSpace(iface.IfName); name != "" {
+				ifName = name
+			}
+		}
+	}
+
+	return bridgePortRef{
+		deviceID: deviceID,
+		ifIndex:  ifIndex,
+		ifName:   ifName,
+		vlanID:   strings.TrimSpace(vlanID),
 	}
 }
 

@@ -3,7 +3,6 @@
 package projector
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -36,8 +35,11 @@ func buildBridgePortAliasIndex(
 			continue
 		}
 		deviceID := strings.TrimSpace(adjacency.SourceID)
-		basePort := strings.TrimSpace(adjacency.Labels["stp_port"])
-		ifIndex := resolveIfIndexByInterfaceName(deviceID, adjacency.SourcePort, ifIndexByDeviceName)
+		basePort := strings.TrimSpace(adjacency.SourcePortEvidence.BridgePort)
+		ifIndex := adjacency.SourcePortEvidence.IfIndex
+		if ifIndex <= 0 {
+			ifIndex = resolveIfIndexByInterfaceName(deviceID, adjacency.SourcePortEvidence.IfName, ifIndexByDeviceName)
+		}
 		if deviceID == "" || basePort == "" || ifIndex <= 0 {
 			continue
 		}
@@ -80,31 +82,4 @@ func bridgeBasePortAliasKey(deviceID, basePort string) string {
 		return ""
 	}
 	return strings.Join([]string{deviceID, "bp:" + basePort}, keySep)
-}
-
-func stpBridgePortFromPortID(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-
-	// BRIDGE-MIB represents dot1dStpPortDesignatedPort as a two-octet
-	// 802.1D port ID: priority in the high bits and bridge port in the low 12.
-	if len(value) == 4 {
-		if n, err := strconv.ParseUint(value, 16, 16); err == nil {
-			if port := n & 0x0fff; port > 0 {
-				return strconv.FormatUint(port, 10)
-			}
-			return ""
-		}
-	}
-	if n, err := strconv.ParseUint(value, 10, 16); err == nil {
-		if n > 0x0fff {
-			n &= 0x0fff
-		}
-		if n > 0 {
-			return strconv.FormatUint(n, 10)
-		}
-	}
-	return ""
 }

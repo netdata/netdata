@@ -60,10 +60,6 @@ func TestBridgePortForwardingDomain_CanonicalizesVLANScope(t *testing.T) {
 	require.Equal(t, "vlan:100", bridgePortForwardingDomain(bridgePortRef{vlanID: "100"}))
 }
 
-func TestSTPBridgePortFromPortID_RejectsEncodedZeroPort(t *testing.T) {
-	require.Empty(t, stpBridgePortFromPortID("8000"))
-}
-
 func TestBridgePortRefDisplayKey_PreservesInterfacePunctuation(t *testing.T) {
 	port := bridgePortRef{
 		deviceID:   "switch-a",
