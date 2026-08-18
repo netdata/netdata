@@ -57,7 +57,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				Protocol:     "bridge",
 				LinkType:     "bridge",
 				Direction:    "bidirectional",
-				Src:          adjacencySideToEndpoint(device, localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+				Src:          adjacencySideToEndpointWithMatch(device, deviceLinkEndpointMatch(device, b.deviceLinkMatchByID), localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
 				Dst:          segmentEndpoint,
 				DiscoveredAt: topologyTimePtr(b.collectedAt),
 				LastSeen:     topologyTimePtr(b.collectedAt),
@@ -92,6 +92,10 @@ func (b *segmentProjectionBuilder) emitLinks() {
 					continue
 				}
 			}
+			endpointLinkMatch, ok := b.endpointLinkMatchByID[endpointID]
+			if !ok {
+				endpointLinkMatch = graph.LinkEndpointMatch(endpointMatch, "")
+			}
 			overlappingDeviceIDs := endpointMatchOverlappingKnownDeviceIDs(endpointMatch, b.deviceIdentityByID)
 			if len(overlappingDeviceIDs) > 0 {
 				matchedManagedDeviceIDs := make([]string, 0, len(overlappingDeviceIDs))
@@ -121,7 +125,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 									LinkType:     "fdb",
 									Direction:    "bidirectional",
 									Src:          segmentEndpoint,
-									Dst:          adjacencySideToEndpoint(matchedDevice, "", b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+									Dst:          adjacencySideToEndpointWithMatch(matchedDevice, deviceLinkEndpointMatch(matchedDevice, b.deviceLinkMatchByID), "", b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
 									DiscoveredAt: topologyTimePtr(b.collectedAt),
 									LastSeen:     topologyTimePtr(b.collectedAt),
 									L2:           &graph.LinkL2{BridgeDomain: segmentID},
@@ -177,8 +181,8 @@ func (b *segmentProjectionBuilder) emitLinks() {
 								Protocol:     "fdb",
 								LinkType:     "fdb",
 								Direction:    "bidirectional",
-								Src:          adjacencySideToEndpoint(device, localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
-								Dst:          graph.LinkEndpoint{Match: endpointMatch},
+								Src:          adjacencySideToEndpointWithMatch(device, deviceLinkEndpointMatch(device, b.deviceLinkMatchByID), localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+								Dst:          graph.LinkEndpoint{Match: endpointLinkMatch},
 								DiscoveredAt: topologyTimePtr(b.collectedAt),
 								LastSeen:     topologyTimePtr(b.collectedAt),
 								State:        linkState,
@@ -226,7 +230,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				LinkType:     "fdb",
 				Direction:    "bidirectional",
 				Src:          segmentEndpoint,
-				Dst:          graph.LinkEndpoint{Match: endpointMatch},
+				Dst:          graph.LinkEndpoint{Match: endpointLinkMatch},
 				DiscoveredAt: topologyTimePtr(b.collectedAt),
 				LastSeen:     topologyTimePtr(b.collectedAt),
 				State:        linkState,

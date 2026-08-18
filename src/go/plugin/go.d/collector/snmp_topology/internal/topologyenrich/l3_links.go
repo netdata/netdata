@@ -93,13 +93,13 @@ func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef to
 		SrcActorID: srcRef.actorID,
 		DstActorID: dstRef.actorID,
 		Src: topologymodel.LinkEndpoint{
-			Match:   srcRef.match,
+			Match:   srcRef.endpointMatch,
 			IfIndex: topologyutil.ParseIndex(adjacency.A.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.A.IfName),
 			IfDescr: strings.TrimSpace(adjacency.A.IfDescr),
 		},
 		Dst: topologymodel.LinkEndpoint{
-			Match:   dstRef.match,
+			Match:   dstRef.endpointMatch,
 			IfIndex: topologyutil.ParseIndex(adjacency.B.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.B.IfName),
 			IfDescr: strings.TrimSpace(adjacency.B.IfDescr),
@@ -271,7 +271,7 @@ func topologyL3SubnetSegmentActorID(producerScopeID string, segment topologyL3Su
 }
 
 func topologyL3SubnetMembershipLink(segment topologyL3SubnetSegment, segmentActorID string, member topologyL3SubnetMember) topologymodel.Link {
-	src := topologymodel.LinkEndpoint{Match: member.ref.match}
+	src := topologymodel.LinkEndpoint{Match: member.ref.endpointMatch}
 	if len(member.interfaces) > 0 {
 		src.IfIndex = member.interfaces[0].IfIndex
 		src.IfName = member.interfaces[0].IfName

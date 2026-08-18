@@ -4,6 +4,7 @@ package l2topology
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -261,6 +262,147 @@ func TestProjectionKeepsLinkEndpointIPHintsConstantSized(t *testing.T) {
 		}
 	}
 	require.LessOrEqual(t, totalEndpointIPHints, 2*linkCount)
+}
+
+func TestProjectionKeepsFDBLinkEndpointIPHintsConstantSized(t *testing.T) {
+	const aliasCount = 256
+
+	arpEntries := make([]ARPNDObservation, 0, aliasCount)
+	for i := 0; i < aliasCount; i++ {
+		arpEntries = append(arpEntries, ARPNDObservation{
+			Protocol: "arp",
+			IfIndex:  1,
+			IfName:   "Ethernet1",
+			IP:       fmt.Sprintf("10.2.%d.%d", i/254, i%254+1),
+			MAC:      "70:49:a2:65:72:cd",
+		})
+	}
+
+	result, err := BuildL2ResultFromObservations([]L2Observation{{
+		DeviceID:     "switch-a",
+		Hostname:     "switch-a",
+		ManagementIP: "192.0.2.1",
+		ChassisID:    "02:00:00:00:00:01",
+		Interfaces: []ObservedInterface{{
+			IfIndex: 1,
+			IfName:  "Ethernet1",
+		}},
+		BridgePorts: []BridgePortObservation{{
+			BasePort: "1",
+			IfIndex:  1,
+		}},
+		FDBEntries: []FDBObservation{{
+			MAC:        "70:49:a2:65:72:cd",
+			BridgePort: "1",
+			Status:     "learned",
+		}},
+		ARPNDEntries: arpEntries,
+	}}, DiscoverOptions{EnableBridge: true, EnableARP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{
+		SchemaVersion: "1.0.0",
+		Source:        "snmp",
+		Layer:         "2",
+		AgentID:       "agent-1",
+		LocalDeviceID: "switch-a",
+	})
+
+	var endpointActorID string
+	for _, actor := range projection.Graph.Actors {
+		if !slices.Contains(actor.Match.MacAddresses, "70:49:a2:65:72:cd") {
+			continue
+		}
+		endpointActorID = actor.ActorID
+		require.Len(t, actor.Match.IPAddresses, aliasCount)
+	}
+	require.NotEmpty(t, endpointActorID)
+	require.Len(t, projection.Graph.Links, 1)
+
+	link := projection.Graph.Links[0]
+	var endpointHints []string
+	if link.SrcActorID == endpointActorID {
+		endpointHints = link.Src.Match.IPAddresses
+	} else {
+		require.Equal(t, endpointActorID, link.DstActorID)
+		endpointHints = link.Dst.Match.IPAddresses
+	}
+	require.Equal(t, []string{"10.2.0.1"}, endpointHints)
+}
+
+func TestProjectionKeepsFDBSegmentEndpointIPHintsConstantSized(t *testing.T) {
+	const aliasCount = 256
+	const endpointMAC = "70:49:a2:65:72:cd"
+
+	arpEntries := make([]ARPNDObservation, 0, aliasCount)
+	for i := 0; i < aliasCount; i++ {
+		arpEntries = append(arpEntries, ARPNDObservation{
+			Protocol: "arp",
+			IfIndex:  1,
+			IfName:   "Ethernet1",
+			IP:       fmt.Sprintf("10.3.%d.%d", i/254, i%254+1),
+			MAC:      endpointMAC,
+		})
+	}
+
+	observations := []L2Observation{
+		{
+			DeviceID:     "switch-a",
+			Hostname:     "switch-a",
+			ManagementIP: "192.0.2.1",
+			ChassisID:    "02:00:00:00:00:01",
+			Interfaces:   []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts:  []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries:   []FDBObservation{{MAC: endpointMAC, BridgePort: "1", Status: "learned"}},
+			ARPNDEntries: arpEntries,
+		},
+		{
+			DeviceID:     "switch-b",
+			Hostname:     "switch-b",
+			ManagementIP: "192.0.2.2",
+			ChassisID:    "02:00:00:00:00:02",
+			Interfaces:   []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts:  []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries:   []FDBObservation{{MAC: endpointMAC, BridgePort: "1", Status: "learned"}},
+		},
+	}
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true, EnableARP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{
+		SchemaVersion:             "1.0.0",
+		Source:                    "snmp",
+		Layer:                     "2",
+		AgentID:                   "agent-1",
+		LocalDeviceID:             "switch-a",
+		ProbabilisticConnectivity: true,
+	})
+
+	var endpointActorID string
+	for _, actor := range projection.Graph.Actors {
+		if !slices.Contains(actor.Match.MacAddresses, endpointMAC) {
+			continue
+		}
+		endpointActorID = actor.ActorID
+		require.Len(t, actor.Match.IPAddresses, aliasCount)
+	}
+	require.NotEmpty(t, endpointActorID)
+
+	linked := 0
+	for _, link := range projection.Graph.Links {
+		if link.Protocol != "fdb" {
+			continue
+		}
+		if link.SrcActorID == endpointActorID {
+			linked++
+			require.Equal(t, []string{"10.3.0.1"}, link.Src.Match.IPAddresses)
+		}
+		if link.DstActorID == endpointActorID {
+			linked++
+			require.Equal(t, []string{"10.3.0.1"}, link.Dst.Match.IPAddresses)
+		}
+	}
+	require.Equal(t, 1, linked)
 }
 
 func TestProjectionResolvesConstantEndpointHintsPastSharedPrimary(t *testing.T) {

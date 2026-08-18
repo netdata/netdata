@@ -28,11 +28,7 @@ func buildDeviceActorMatch(dev model.Device, reporterAliases []string) graph.Mat
 }
 
 func buildDeviceEndpointMatch(dev model.Device) graph.Match {
-	match := buildDeviceBaseMatch(dev, nil)
-	if ip := deviceEndpointIPHint(dev); ip != "" {
-		match.IPAddresses = []string{ip}
-	}
-	return match
+	return graph.LinkEndpointMatch(buildDeviceActorMatch(dev, nil), selectedDeviceManagementIP(dev))
 }
 
 func buildDeviceBaseMatch(dev model.Device, reporterAliases []string) graph.Match {

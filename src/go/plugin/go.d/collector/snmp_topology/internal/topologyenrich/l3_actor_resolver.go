@@ -5,13 +5,14 @@ package topologyenrich
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 type topologyL3ActorRef struct {
-	actorID string
-	match   topologymodel.Match
+	actorID       string
+	endpointMatch topologymodel.Match
 }
 
 type topologyL3ActorResolver struct {
@@ -61,8 +62,8 @@ func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymo
 			continue
 		}
 		ref := topologyL3ActorRef{
-			actorID: strings.TrimSpace(actor.ActorID),
-			match:   actor.Match,
+			actorID:       strings.TrimSpace(actor.ActorID),
+			endpointMatch: graph.LinkEndpointMatch(actor.Match, topologymodel.ActorDetailManagementIP(actor)),
 		}
 		managedActors = append(managedActors, ref)
 		localMatchIndex.AddMatch(len(managedActors)-1, actor.Match)

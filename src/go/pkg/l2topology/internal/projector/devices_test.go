@@ -47,8 +47,8 @@ func TestAdjacencySideToEndpoint_UsesOneDeterministicIPHintWithoutSelectedPrimar
 		ID:       "switch-a",
 		Hostname: "switch-a",
 		Addresses: []netip.Addr{
+			netip.MustParseAddr("10.0.0.10"),
 			netip.MustParseAddr("10.0.0.2"),
-			netip.MustParseAddr("10.0.0.3"),
 		},
 	}
 

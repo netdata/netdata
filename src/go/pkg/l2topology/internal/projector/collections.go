@@ -63,19 +63,6 @@ func selectedDeviceManagementIP(dev model.Device) string {
 	return ""
 }
 
-func deviceEndpointIPHint(dev model.Device) string {
-	if addr := dev.ManagementIP.Unmap(); addr.IsValid() {
-		return addr.String()
-	}
-	if len(dev.Addresses) == 0 {
-		return ""
-	}
-	if addr := dev.Addresses[0].Unmap(); addr.IsValid() {
-		return addr.String()
-	}
-	return ""
-}
-
 func uniqueTopologyStrings(values []string) []string {
 	if len(values) == 0 {
 		return nil

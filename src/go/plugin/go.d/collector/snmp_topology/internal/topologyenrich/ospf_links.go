@@ -96,10 +96,10 @@ func topologyOSPFAdjacencyLink(row topologymodel.OSPFNeighbor, srcRef, dstRef to
 		SrcActorID: srcRef.actorID,
 		DstActorID: dstRef.actorID,
 		Src: topologymodel.LinkEndpoint{
-			Match: srcRef.match,
+			Match: srcRef.endpointMatch,
 		},
 		Dst: topologymodel.LinkEndpoint{
-			Match: dstRef.match,
+			Match: dstRef.endpointMatch,
 		},
 		Inference: &graph.LinkInference{
 			Inference:      "ospf_full_adjacency",

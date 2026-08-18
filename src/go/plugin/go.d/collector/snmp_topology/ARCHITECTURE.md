@@ -182,8 +182,9 @@ Each cache snapshot is converted into:
 
 Each direct SNMP observation gives the generic L2 builder one selected
 `ManagementIP` plus vetted `ManagementAliases`. Raw typed SNMP management rows
-remain diagnostic and trap-matching evidence; public match, focus, and collapse
-identity consume the reconciled L2 result.
+remain diagnostic evidence; valid IP-family rows also remain trap-matching
+evidence. Public match, focus, and collapse identity consume the reconciled L2
+result.
 
 The generic L2 builder resolves address authority before neighbor matching:
 
@@ -195,7 +196,9 @@ The generic L2 builder resolves address authority before neighbor matching:
   neighbor resolution, including claims removed from public identity;
 - actors retain the complete reconciled alias set for match, focus, and
   collapse, while each repeated link endpoint carries only the selected primary
-  or one deterministic alias as its IP identity hint;
+  or one numerically deterministic canonical alias as its IP identity hint;
+- FDB ownership and L3 correlation use complete actor matches, then precompute
+  bounded link-only match views once per endpoint or actor;
 - addresses from inferred observations and LLDP/CDP neighbors are accumulated
   as claims and enter device identity only after the complete claim set proves
   exclusive ownership;
@@ -209,10 +212,10 @@ correlate through matching strong identity or a uniquely owned direct-device
 address.
 
 IP collapse preserves complete actor aliases. Within each collision group, the
-generic projector unions every list field once and the SNMP shaping pass unions
-its match lists once; scalar, map, optional, attachment, and ordered protocol
-detail precedence remains representative-first and actor-index ordered. This
-keeps alias-rich shared-primary groups linear in their input plus the final
+generic projector unions every union-merged list field once and the SNMP shaping
+pass unions its match lists once; scalar, map, optional, attachment, and ordered
+protocol detail precedence remains representative-first and actor-index ordered.
+This keeps alias-rich shared-primary groups linear in their input plus the final
 deduplication sort instead of rebuilding the growing union after every actor.
 
 The aggregate also carries the producer scope id read from the parent Agent

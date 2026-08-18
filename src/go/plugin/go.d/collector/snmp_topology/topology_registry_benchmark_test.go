@@ -10,13 +10,59 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/stretchr/testify/require"
 )
+
+func TestSNMPTopologyRegistryKeepsLogicalLinkEndpointIPHintsConstantSized(t *testing.T) {
+	const aliasCount = 256
+
+	registry := benchmarkAliasRichTopologyRegistry(2, aliasCount, false, false, 1)
+	data, ok := registry.snapshotWithOptions(topologyoptions.DefaultQueryOptions())
+	require.True(t, ok)
+
+	selectedIPByActorID := make(map[string]string)
+	managedActors := 0
+	for _, actor := range data.Actors {
+		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
+			continue
+		}
+		managedActors++
+		require.Len(t, actor.Match.IPAddresses, aliasCount)
+		selectedIPByActorID[actor.ActorID] = topologymodel.ActorDetailManagementIP(actor)
+	}
+	require.Equal(t, 2, managedActors)
+
+	seen := make(map[string]int)
+	for _, link := range data.Links {
+		switch link.LinkType {
+		case topologymodel.L3SubnetLinkType, topologymodel.L3SubnetMembershipLinkType,
+			topologymodel.OSPFAdjacencyLinkType, topologymodel.BGPAdjacencyLinkType:
+			seen[link.LinkType]++
+			require.LessOrEqual(t, len(link.Src.Match.IPAddresses), 1, link.LinkType)
+			require.LessOrEqual(t, len(link.Dst.Match.IPAddresses), 1, link.LinkType)
+			if selected := selectedIPByActorID[link.SrcActorID]; selected != "" {
+				require.Equal(t, []string{selected}, link.Src.Match.IPAddresses, link.LinkType)
+			}
+			if selected := selectedIPByActorID[link.DstActorID]; selected != "" {
+				require.Equal(t, []string{selected}, link.Dst.Match.IPAddresses, link.LinkType)
+			}
+		}
+	}
+	require.Equal(t, map[string]int{
+		topologymodel.L3SubnetLinkType:           1,
+		topologymodel.L3SubnetMembershipLinkType: 2,
+		topologymodel.OSPFAdjacencyLinkType:      1,
+		topologymodel.BGPAdjacencyLinkType:       1,
+	}, seen)
+}
 
 func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 	tests := []struct {
 		devices       int
 		aliases       int
 		sharedPrimary bool
+		ipOnly        bool
+		logicalPeers  int
 	}{
 		{devices: 16, aliases: 1},
 		{devices: 64, aliases: 1},
@@ -28,14 +74,34 @@ func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 		{devices: 32, aliases: 64, sharedPrimary: true},
 		{devices: 64, aliases: 64, sharedPrimary: true},
 		{devices: 64, aliases: 256, sharedPrimary: true},
+		{devices: 64, aliases: 256, logicalPeers: 63},
+		{devices: 64, aliases: 1, ipOnly: true},
+		{devices: 64, aliases: 1, ipOnly: true, logicalPeers: 63},
+		{devices: 64, aliases: 256, ipOnly: true},
+		{devices: 64, aliases: 256, ipOnly: true, logicalPeers: 63},
 	}
 
 	for _, tc := range tests {
-		b.Run(fmt.Sprintf("devices=%d/aliases=%d/shared_primary=%t", tc.devices, tc.aliases, tc.sharedPrimary), func(b *testing.B) {
-			registry := benchmarkAliasRichTopologyRegistry(tc.devices, tc.aliases, tc.sharedPrimary)
+		b.Run(fmt.Sprintf("devices=%d/aliases=%d/shared_primary=%t/ip_only=%t/logical_peers=%d", tc.devices, tc.aliases, tc.sharedPrimary, tc.ipOnly, tc.logicalPeers), func(b *testing.B) {
+			logicalPeers := tc.logicalPeers
+			if logicalPeers == 0 {
+				logicalPeers = 1
+			}
+			registry := benchmarkAliasRichTopologyRegistry(tc.devices, tc.aliases, tc.sharedPrimary, tc.ipOnly, logicalPeers)
 			deps := funcDepsAdapter{registry: registry}
 			options := topologyoptions.DefaultQueryOptions()
 			options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
+
+			probe, ok, err := deps.Snapshot(options)
+			if err != nil || !ok {
+				b.Fatalf("topology snapshot probe failed: ok=%t err=%v", ok, err)
+			}
+			if minimumLinks := logicalPeers * 3; !tc.sharedPrimary && probe.Links.Rows < minimumLinks {
+				b.Fatalf("topology snapshot emitted %d links, want at least %d", probe.Links.Rows, minimumLinks)
+			}
+			if tc.sharedPrimary && probe.Links.Rows != 0 {
+				b.Fatalf("shared-primary topology emitted %d links after actor collapse, want 0", probe.Links.Rows)
+			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -53,7 +119,7 @@ func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 	}
 }
 
-func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrimary bool) *topologyRegistry {
+func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrimary, ipOnly bool, logicalPeerCount int) *topologyRegistry {
 	registry := &topologyRegistry{
 		caches:          make(map[*topologyCache]struct{}, deviceCount),
 		producerScopeID: "benchmark-producer",
@@ -82,8 +148,12 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 			selectedIPs[deviceIndex] = "172.16.0.1"
 		}
 
+		chassisID := ""
+		if !ipOnly {
+			chassisID = fmt.Sprintf("02:00:00:00:%02x:%02x", deviceIndex/256, deviceIndex%256)
+		}
 		cache.localDevice = topologymodel.Device{
-			ChassisID:           fmt.Sprintf("02:00:00:00:%02x:%02x", deviceIndex/256, deviceIndex%256),
+			ChassisID:           chassisID,
 			ChassisIDType:       "macAddress",
 			SysName:             fmt.Sprintf("benchmark-router-%d", deviceIndex),
 			ManagementIP:        selectedIPs[deviceIndex],
@@ -94,29 +164,40 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 		caches = append(caches, cache)
 	}
 
-	if len(caches) >= 2 {
-		caches[0].l3InterfacesByIP["198.51.100.1"] = topologymodel.L3Interface{
-			IP:      "198.51.100.1",
+	for deviceIndex, cache := range caches {
+		ip := fmt.Sprintf("203.0.113.%d", deviceIndex+1)
+		cache.l3InterfacesByIP[ip] = topologymodel.L3Interface{
+			IP:      ip,
+			Netmask: "255.255.255.0",
+			IfIndex: "100",
+		}
+	}
+
+	logicalPeerCount = min(logicalPeerCount, len(caches)-1)
+	for peerIndex := 1; peerIndex <= logicalPeerCount; peerIndex++ {
+		networkOffset := (peerIndex - 1) * 4
+		localIP := fmt.Sprintf("198.51.100.%d", networkOffset+1)
+		remoteIP := fmt.Sprintf("198.51.100.%d", networkOffset+2)
+		caches[0].l3InterfacesByIP[localIP] = topologymodel.L3Interface{
+			IP:      localIP,
+			Netmask: "255.255.255.252",
+			IfIndex: fmt.Sprintf("%d", peerIndex),
+		}
+		caches[peerIndex].l3InterfacesByIP[remoteIP] = topologymodel.L3Interface{
+			IP:      remoteIP,
 			Netmask: "255.255.255.252",
 			IfIndex: "1",
 		}
-		caches[1].l3InterfacesByIP["198.51.100.2"] = topologymodel.L3Interface{
-			IP:      "198.51.100.2",
-			Netmask: "255.255.255.252",
-			IfIndex: "1",
+		caches[0].ospfNeighborsByKey[fmt.Sprintf("benchmark-neighbor-%d", peerIndex)] = topologymodel.OSPFNeighbor{
+			LocalRouterID: caches[0].localDevice.OSPFRouterID,
+			NeighborIP:    benchmarkAliasIPAddress(peerIndex, 0),
+			LocalIP:       selectedIPs[0],
+			State:         "full",
 		}
-		caches[0].ospfNeighborsByKey["benchmark-neighbor"] = topologymodel.OSPFNeighbor{
-			LocalRouterID:    caches[0].localDevice.OSPFRouterID,
-			NeighborRouterID: caches[1].localDevice.OSPFRouterID,
-			NeighborIP:       selectedIPs[1],
-			LocalIP:          selectedIPs[0],
-			State:            "full",
-		}
-		caches[0].bgpPeersByKey["benchmark-peer"] = topologymodel.BGPPeer{
-			NeighborIP:      selectedIPs[1],
+		caches[0].bgpPeersByKey[fmt.Sprintf("benchmark-peer-%d", peerIndex)] = topologymodel.BGPPeer{
+			NeighborIP:      benchmarkAliasIPAddress(peerIndex, 0),
 			LocalIP:         selectedIPs[0],
 			LocalIdentifier: caches[0].localDevice.OSPFRouterID,
-			PeerIdentifier:  caches[1].localDevice.OSPFRouterID,
 			State:           "established",
 		}
 	}
