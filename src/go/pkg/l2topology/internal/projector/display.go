@@ -25,6 +25,7 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 	}
 
 	deviceDisplayByID := make(map[string]string, len(actors))
+	deviceDisplayByActorHandle := make(map[graph.ActorHandle]string, len(actors))
 	displayByMatchKey := make(map[string]string, len(actors))
 
 	// First pass: materialize display names for non-segment actors so segment naming can reuse them.
@@ -37,6 +38,9 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 			display = topologyFallbackActorDisplayName(actors[i])
 		}
 		topologySetActorDisplay(&actors[i], display)
+		if handle := actors[i].Actor.ActorHandle; IsDeviceActorType(actors[i].Actor.ActorType) && !handle.IsZero() {
+			deviceDisplayByActorHandle[handle] = display.name
+		}
 		if matchKey := canonicalTopologyMatchKey(actors[i].Actor.Match); matchKey != "" {
 			displayByMatchKey[matchKey] = display.name
 		}
@@ -63,13 +67,13 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 	}
 
 	for i := range links {
-		src := topologyEndpointDisplayName(links[i].Src, displayByMatchKey, &resolver)
+		src := topologyEndpointDisplayName(links[i].Src, links[i].SrcActorHandle, deviceDisplayByActorHandle, displayByMatchKey, &resolver)
 		if src.name == "" {
 			src = topologyDisplayName{name: "[unset]", source: "fallback"}
 		}
 		srcPortName := topologySetEndpointDisplayAndCanonicalPortName(&links[i].Src, src)
 
-		dst := topologyEndpointDisplayName(links[i].Dst, displayByMatchKey, &resolver)
+		dst := topologyEndpointDisplayName(links[i].Dst, links[i].DstActorHandle, deviceDisplayByActorHandle, displayByMatchKey, &resolver)
 		if dst.name == "" {
 			dst = topologyDisplayName{name: "[unset]", source: "fallback"}
 		}
@@ -112,7 +116,18 @@ func topologySetEndpointDisplayAndCanonicalPortName(endpoint *graph.LinkEndpoint
 	return name
 }
 
-func topologyEndpointDisplayName(endpoint graph.LinkEndpoint, actorDisplayByMatch map[string]string, resolver *topologyDisplayNameResolver) topologyDisplayName {
+func topologyEndpointDisplayName(
+	endpoint graph.LinkEndpoint,
+	actorHandle graph.ActorHandle,
+	deviceDisplayByActorHandle map[graph.ActorHandle]string,
+	actorDisplayByMatch map[string]string,
+	resolver *topologyDisplayNameResolver,
+) topologyDisplayName {
+	if !actorHandle.IsZero() {
+		if name := strings.TrimSpace(deviceDisplayByActorHandle[actorHandle]); name != "" {
+			return topologyDisplayName{name: name, source: "actor"}
+		}
+	}
 	if key := canonicalTopologyMatchKey(endpoint.Match); key != "" {
 		if name := strings.TrimSpace(actorDisplayByMatch[key]); name != "" {
 			return topologyDisplayName{name: name, source: "actor"}
@@ -152,7 +167,11 @@ func topologyDeviceDisplayMatch(match graph.Match, managementIP string) graph.Ma
 }
 
 func topologyFallbackActorDisplayName(actor projectedActor) topologyDisplayName {
-	if matchKey := canonicalTopologyMatchKey(actor.Actor.Match); matchKey != "" {
+	match := actor.Actor.Match
+	if IsDeviceActorType(actor.Actor.ActorType) {
+		match = topologyDeviceDisplayMatch(match, actor.Detail.Device.ManagementIP)
+	}
+	if matchKey := canonicalTopologyMatchKey(match); matchKey != "" {
 		return topologyDisplayName{name: matchKey, source: "fallback_match"}
 	}
 	if segmentID := strings.TrimSpace(actor.Detail.Segment.SegmentID); segmentID != "" {

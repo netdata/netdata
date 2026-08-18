@@ -248,8 +248,8 @@ func (b *graphBuilder) finalizeGraph() {
 	b.segmentSuppressed += additionalSegmentSuppressed
 	sortProjectedTopologyActors(b.actors)
 	sortTopologyLinks(b.links)
-	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)
 	assignTopologyActorIDsAndLinkEndpoints(b.actors, b.links)
+	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)
 	enrichTopologyPortDetailsWithLinkCounts(b.actors, b.links)
 
 	b.linkCounts = summarizeTopologyLinks(b.links)

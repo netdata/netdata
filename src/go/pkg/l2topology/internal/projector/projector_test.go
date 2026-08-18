@@ -2313,6 +2313,88 @@ func TestToGraph_DeviceDisplayDNSUsesOnlySelectedManagementIP(t *testing.T) {
 	require.Equal(t, []string{primary.String(), alias.String()}, detail.Device.ManagementAddresses)
 }
 
+func TestToGraph_InferredDeviceDisplayDNSUsesOnlySelectedManagementIP(t *testing.T) {
+	primary := netip.MustParseAddr("192.0.2.20")
+	alias := netip.MustParseAddr("198.51.100.20")
+	result := model.Result{
+		Devices: []model.Device{
+			{
+				ID:           "inferred-router",
+				Hostname:     "inferred-router",
+				ManagementIP: primary,
+				Addresses:    []netip.Addr{primary, alias},
+				Labels:       map[string]string{"inferred": "true"},
+			},
+		},
+	}
+
+	var lookups []string
+	data, _ := toGraphForTest(result, model.GraphOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+		ResolveDNSName: func(ip string) string {
+			lookups = append(lookups, ip)
+			if ip == alias.String() {
+				return "alias.example"
+			}
+			return ""
+		},
+	})
+
+	device := findActorBySysName(data.Actors, "inferred-router")
+	require.NotNil(t, device)
+	require.Equal(t, "inferred-router", device.Labels["display_name"])
+	require.Equal(t, []string{primary.String()}, lookups)
+	detail := requireActorDetail(t, data, device)
+	require.True(t, detail.Device.Inferred)
+	require.Equal(t, primary.String(), detail.Device.ManagementIP)
+	require.Equal(t, []string{primary.String(), alias.String()}, device.Match.IPAddresses)
+}
+
+func TestToGraph_DeviceDisplayDNSLookupCountIsIndependentOfAliasCount(t *testing.T) {
+	const (
+		deviceCount = 8
+		aliasCount  = 128
+	)
+
+	result := model.Result{Devices: make([]model.Device, 0, deviceCount)}
+	for deviceIndex := range deviceCount {
+		addresses := make([]netip.Addr, 0, aliasCount)
+		for aliasIndex := range aliasCount {
+			addresses = append(addresses, netip.AddrFrom4([4]byte{
+				10,
+				byte(deviceIndex + 1),
+				byte(aliasIndex/254 + 1),
+				byte(aliasIndex%254 + 1),
+			}))
+		}
+		result.Devices = append(result.Devices, model.Device{
+			ID:           string(rune('a' + deviceIndex)),
+			Hostname:     string(rune('a' + deviceIndex)),
+			ManagementIP: addresses[0],
+			Addresses:    addresses,
+		})
+	}
+
+	lookupCount := 0
+	data, _ := toGraphForTest(result, model.GraphOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+		ResolveDNSName: func(string) string {
+			lookupCount++
+			return ""
+		},
+	})
+
+	require.Len(t, data.Actors, deviceCount)
+	require.Equal(t, deviceCount, lookupCount)
+	for _, actor := range data.Actors {
+		require.Len(t, actor.Match.IPAddresses, aliasCount)
+	}
+}
+
 func TestTopologyActorDisplayName_DevicePreservesExplicitDNSName(t *testing.T) {
 	primary := "192.0.2.10"
 	alias := "198.51.100.8"
@@ -2402,6 +2484,156 @@ func TestToGraph_DeviceDisplayDoesNotUseAmbiguousAliasesWithoutSelectedManagemen
 	require.Empty(t, lookups)
 	require.Equal(t, []string{"192.0.2.10", "198.51.100.8"}, device.Match.IPAddresses)
 	require.Empty(t, requireActorDetail(t, data, device).Device.ManagementIP)
+}
+
+func TestApplyTopologyDisplayNames_DeviceFallbackDoesNotUseAliasesWithoutSelectedManagementIP(t *testing.T) {
+	actors := []projectedActor{
+		{
+			Actor: graph.Actor{
+				ActorType: "device",
+				Match: graph.Match{
+					IPAddresses: []string{"192.0.2.10", "198.51.100.8"},
+				},
+			},
+		},
+	}
+
+	applyTopologyDisplayNames(actors, nil, func(string) string {
+		t.Fatal("device alias must not be used as a PTR display candidate")
+		return ""
+	})
+
+	require.Equal(t, "device:[unset]", actors[0].Actor.Labels["display_name"])
+	require.Equal(t, "fallback", actors[0].Actor.Labels["display_source"])
+	require.Equal(t, []string{"192.0.2.10", "198.51.100.8"}, actors[0].Actor.Match.IPAddresses)
+}
+
+func TestToGraph_DeviceLinkDisplayDoesNotUseAliasesWithoutSelectedManagementIP(t *testing.T) {
+	result := model.Result{
+		Devices: []model.Device{
+			{
+				ID:        "router-a",
+				Hostname:  "router-a",
+				Addresses: []netip.Addr{netip.MustParseAddr("192.0.2.10"), netip.MustParseAddr("198.51.100.8")},
+			},
+			{
+				ID:        "router-b",
+				Hostname:  "router-b",
+				ChassisID: "aa:bb:cc:dd:ee:ff",
+				Addresses: []netip.Addr{netip.MustParseAddr("203.0.113.10")},
+			},
+		},
+		Adjacencies: []model.Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "router-a",
+				SourcePort: "Ethernet1",
+				TargetID:   "router-b",
+				TargetPort: "Ethernet2",
+			},
+		},
+	}
+
+	var lookups []string
+	data, _ := toGraphForTest(result, model.GraphOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+		ResolveDNSName: func(ip string) string {
+			lookups = append(lookups, ip)
+			if ip == "192.0.2.10" || ip == "198.51.100.8" {
+				return "alias.example"
+			}
+			return ""
+		},
+	})
+
+	device := findActorBySysName(data.Actors, "router-a")
+	require.NotNil(t, device)
+	require.Equal(t, "router-a", device.Labels["display_name"])
+	require.Empty(t, requireActorDetail(t, data, device).Device.ManagementIP)
+
+	link := findLinkByProtocol(data.Links, "lldp")
+	require.NotNil(t, link)
+	require.Equal(t, device.ActorHandle, link.SrcActorHandle)
+	require.Equal(t, "router-a", link.Src.DisplayName)
+	require.NotContains(t, lookups, "192.0.2.10")
+	require.NotContains(t, lookups, "198.51.100.8")
+}
+
+func TestToGraph_CollapsedDeviceLinkDisplayUsesRepresentativeManagementIP(t *testing.T) {
+	result := model.Result{
+		Devices: []model.Device{
+			{
+				ID:           "router-a",
+				Hostname:     "router-a",
+				ChassisID:    "aa:bb:cc:dd:ee:01",
+				ManagementIP: netip.MustParseAddr("192.0.2.10"),
+				Addresses: []netip.Addr{
+					netip.MustParseAddr("192.0.2.10"),
+					netip.MustParseAddr("198.51.100.100"),
+				},
+			},
+			{
+				ID:           "router-b",
+				Hostname:     "router-b",
+				ChassisID:    "aa:bb:cc:dd:ee:02",
+				ManagementIP: netip.MustParseAddr("192.0.2.20"),
+				Addresses: []netip.Addr{
+					netip.MustParseAddr("192.0.2.20"),
+					netip.MustParseAddr("198.51.100.100"),
+				},
+				Labels: map[string]string{"inferred": "true"},
+			},
+			{
+				ID:        "router-c",
+				Hostname:  "router-c",
+				ChassisID: "aa:bb:cc:dd:ee:03",
+				Addresses: []netip.Addr{netip.MustParseAddr("192.0.2.30")},
+			},
+		},
+		Adjacencies: []model.Adjacency{
+			{Protocol: "lldp", SourceID: "router-a", SourcePort: "Ethernet1", TargetID: "router-c", TargetPort: "Ethernet3"},
+			{Protocol: "lldp", SourceID: "router-b", SourcePort: "Ethernet2", TargetID: "router-c", TargetPort: "Ethernet4"},
+		},
+	}
+
+	var lookups []string
+	data, _ := toGraphForTest(result, model.GraphOptions{
+		Source:             "snmp",
+		Layer:              "2",
+		View:               "summary",
+		CollapseActorsByIP: true,
+		ResolveDNSName: func(ip string) string {
+			lookups = append(lookups, ip)
+			switch ip {
+			case "192.0.2.10":
+				return "representative.example"
+			case "192.0.2.20":
+				return "member.example"
+			default:
+				return ""
+			}
+		},
+	})
+
+	collapsed := findActorByIP(data.Actors, "198.51.100.100")
+	require.NotNil(t, collapsed)
+	require.Equal(t, "representative.example", collapsed.Labels["display_name"])
+	detail := requireActorDetail(t, data, collapsed)
+	require.Equal(t, "192.0.2.10", detail.Device.ManagementIP)
+	require.True(t, detail.CollapsedByIP)
+	require.Equal(t, 2, detail.CollapsedCount)
+
+	for _, link := range data.Links {
+		if link.SrcActorHandle == collapsed.ActorHandle {
+			require.Equal(t, "representative.example", link.Src.DisplayName)
+		}
+		if link.DstActorHandle == collapsed.ActorHandle {
+			require.Equal(t, "representative.example", link.Dst.DisplayName)
+		}
+	}
+	require.NotContains(t, lookups, "192.0.2.20")
 }
 
 func TestToGraph_DeviceDisplayAfterCollapseUsesRepresentativeManagementIP(t *testing.T) {
