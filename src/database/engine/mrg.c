@@ -187,10 +187,30 @@ METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
 
 ALWAYS_INLINE
 METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
-    UUIDMAP_ID id = uuidmap_create(*uuid);
-    METRIC *metric = metric_get_and_acquire_by_id(mrg, id, section);
-    uuidmap_free(id);
-    return metric;
+    // This is a pure lookup, so resolve the uuid to its id WITHOUT creating it
+    // and WITHOUT taking a reference on it.
+    //
+    // It used to call uuidmap_create()/uuidmap_free() around the lookup, which
+    // was wrong twice over. Functionally, a miss inserted the uuid into the
+    // uuidmap only for the matching free to delete it again -- create/delete
+    // churn for something we only ever used as a search key. And for
+    // performance, uuidmap_free() takes the partition WRITE lock on every call,
+    // so every metric lookup serialized on it; during MRG population that is one
+    // exclusive acquisition per metric per journal file across only
+    // UUIDMAP_PARTITIONS partitions.
+    //
+    // Using the id as a bare key is safe here: every METRIC in the MRG holds its
+    // own uuidmap reference for its whole lifetime (metric_add_and_acquire()
+    // takes it, metric_del() releases it), so an id that resolves to a metric is
+    // necessarily still alive. If the uuid is unknown there can be no metric for
+    // it, and if the entry died the lookup simply misses -- ids are unique for the
+    // lifetime of the uuidmap, so a stale id cannot alias a different uuid. (The
+    // sequence only restarts on a successful uuidmap_destroy(), which cannot
+    // happen while any METRIC still holds its reference.)
+    UUIDMAP_ID id = uuidmap_peek_id(*uuid);
+    if(!id) return NULL;
+
+    return metric_get_and_acquire_by_id(mrg, id, section);
 }
 
 ALWAYS_INLINE
