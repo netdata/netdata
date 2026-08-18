@@ -18,6 +18,7 @@ func projectAdjacencyLinks(
 	deviceLinkMatchByID map[string]graph.Match,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
+	bridgePortAliases bridgePortAliasIndex,
 ) projectedLinks {
 	out := projectedLinks{
 		links: make([]graph.Link, 0, len(adjacencies)),
@@ -28,6 +29,7 @@ func projectAdjacencyLinks(
 
 	pairs := make(map[string]*pairedLinkAccumulator)
 	pairOrder := make([]string, 0)
+	directSTPSeen := make(map[string]struct{})
 
 	for _, adj := range adjacencies {
 		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
@@ -49,6 +51,21 @@ func projectAdjacencyLinks(
 			}
 			acc.all = append(acc.all, entry)
 			continue
+		}
+		if protocol == "stp" {
+			key := directPhysicalAdjacencyKey(
+				adj,
+				protocol,
+				ifIndexByDeviceName,
+				ifaceByDeviceIndex,
+				bridgePortAliases,
+			)
+			if key != "" {
+				if _, seen := directSTPSeen[key]; seen {
+					continue
+				}
+				directSTPSeen[key] = struct{}{}
+			}
 		}
 
 		out.links = append(out.links, link)
@@ -84,6 +101,21 @@ func projectAdjacencyLinks(
 
 	sortTopologyLinks(out.links)
 	return out
+}
+
+func directPhysicalAdjacencyKey(
+	adj model.Adjacency,
+	protocol string,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
+) string {
+	src, dst := bridgePortsFromAdjacency(adj, ifIndexByDeviceName, ifaceByDeviceIndex, aliases)
+	pair := bridgePairKey(src, dst)
+	if pair == "" {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(protocol)) + keySep + pair
 }
 
 func reversePairEntriesForBidirectionalMerge(entries []*builtAdjacencyLink) (left, right *builtAdjacencyLink, ok bool) {

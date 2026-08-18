@@ -26,6 +26,7 @@ type graphBuilder struct {
 	deviceLinkMatchByID  map[string]graph.Match
 	ifaceByDeviceIndex   map[string]model.Interface
 	ifIndexByDeviceName  map[string]int
+	bridgePortAliases    bridgePortAliasIndex
 	bridgeLinks          []bridgeBridgeLinkRecord
 	reporterAliases      map[string][]string
 	ifaceSummaryByDevice map[string]topologyDeviceInterfaceSummary
@@ -104,10 +105,17 @@ func (b *graphBuilder) prepareIndexes() {
 			b.ifIndexByDeviceName[deviceIfNameKey(iface.DeviceID, alias)] = iface.IfIndex
 		}
 	}
+	b.bridgePortAliases = buildBridgePortAliasIndex(b.result.Attachments)
 }
 
 func (b *graphBuilder) collectBridgeTopologyInputs() {
-	b.bridgeLinks = collectBridgeLinkRecords(b.result.Adjacencies, b.ifIndexByDeviceName, b.strategyConfig)
+	b.bridgeLinks = collectBridgeLinkRecords(
+		b.result.Adjacencies,
+		b.ifIndexByDeviceName,
+		b.ifaceByDeviceIndex,
+		b.bridgePortAliases,
+		b.strategyConfig,
+	)
 	b.reporterAliases = buildFDBReporterAliases(b.deviceByID, b.ifaceByDeviceIndex)
 	if b.strategyConfig.enableFDBPairwiseLinks {
 		b.bridgeLinks = mergeBridgeLinkRecordSets(
@@ -116,7 +124,12 @@ func (b *graphBuilder) collectBridgeTopologyInputs() {
 		)
 	}
 
-	deterministicTransitPortKeys := buildDeterministicTransitPortKeySet(b.result.Adjacencies, b.ifIndexByDeviceName)
+	deterministicTransitPortKeys := buildDeterministicTransitPortKeySet(
+		b.result.Adjacencies,
+		b.ifIndexByDeviceName,
+		b.ifaceByDeviceIndex,
+		b.bridgePortAliases,
+	)
 	discoveryDevicePairs := buildDeterministicDiscoveryDevicePairSet(b.result.Adjacencies)
 	b.bridgeLinks = suppressInferredBridgeLinksOnDeterministicDiscovery(
 		b.bridgeLinks,
@@ -176,6 +189,7 @@ func (b *graphBuilder) projectAdjacencyTopology() {
 		b.deviceLinkMatchByID,
 		b.ifIndexByDeviceName,
 		b.ifaceByDeviceIndex,
+		b.bridgePortAliases,
 	)
 }
 

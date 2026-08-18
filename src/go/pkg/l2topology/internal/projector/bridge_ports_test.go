@@ -54,6 +54,25 @@ func TestBridgePortFromAttachment_PreservesForwardingDomainWithoutDisplayingVLAN
 	require.NotEqual(t, bridgePortObservationVLANKey(first), bridgePortObservationVLANKey(second))
 }
 
+func TestBridgePortForwardingDomain_CanonicalizesVLANScope(t *testing.T) {
+	require.Equal(t, "vlan:100", bridgePortForwardingDomain(bridgePortRef{fdbDomainID: "VLAN:100", vlanID: "100"}))
+	require.Equal(t, "vlan:100", bridgePortForwardingDomain(bridgePortRef{fdbDomainID: "vlan:100"}))
+	require.Equal(t, "vlan:100", bridgePortForwardingDomain(bridgePortRef{vlanID: "100"}))
+}
+
+func TestBridgePortRefDisplayKey_PreservesInterfacePunctuation(t *testing.T) {
+	port := bridgePortRef{
+		deviceID:   "switch-a",
+		ifIndex:    1,
+		ifName:     "uplink-a",
+		bridgePort: "1",
+	}
+
+	ref := parseTopologySegmentPortRef(bridgePortRefDisplayKey(port))
+	require.Equal(t, "uplink-a", topologySegmentPortDisplay(ref))
+	require.NotEqual(t, bridgePortRefDisplayKey(port), bridgePortRefSortKey(port))
+}
+
 func TestCollectBridgeMacLinkRecords_KeepsSameEndpointAcrossRawForwardingDomains(t *testing.T) {
 	records := collectBridgeMacLinkRecords([]model.Attachment{
 		{

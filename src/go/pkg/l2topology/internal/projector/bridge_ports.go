@@ -50,18 +50,86 @@ func bridgeDomainSegmentID(segment *bridgeDomainSegment) string {
 	return "bridge-domain:" + sig
 }
 
-func bridgePortFromAdjacencySide(deviceID, port string, ifIndexByDeviceName map[string]int) bridgePortRef {
+func bridgePortsFromAdjacency(
+	adj model.Adjacency,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
+) (bridgePortRef, bridgePortRef) {
+	protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
+	vlanID := adjacencyVLANID(adj)
+	sourceBridgePort := ""
+	targetBridgePort := ""
+	if protocol == "stp" {
+		sourceBridgePort = strings.TrimSpace(adj.Labels["stp_port"])
+		targetBridgePort = stpBridgePortFromPortID(adj.TargetPort)
+	}
+
+	src := bridgePortFromAdjacencySide(
+		adj.SourceID,
+		adj.SourcePort,
+		sourceBridgePort,
+		vlanID,
+		protocol == "stp",
+		ifIndexByDeviceName,
+		ifaceByDeviceIndex,
+		aliases,
+	)
+	dst := bridgePortFromAdjacencySide(
+		adj.TargetID,
+		adj.TargetPort,
+		targetBridgePort,
+		vlanID,
+		protocol == "stp",
+		ifIndexByDeviceName,
+		ifaceByDeviceIndex,
+		aliases,
+	)
+	return src, dst
+}
+
+func bridgePortFromAdjacencySide(
+	deviceID, port, bridgePort, vlanID string,
+	stpSide bool,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
+) bridgePortRef {
 	deviceID = strings.TrimSpace(deviceID)
 	port = strings.TrimSpace(port)
-	if deviceID == "" || port == "" {
+	bridgePort = strings.TrimSpace(bridgePort)
+	if deviceID == "" || (port == "" && bridgePort == "") {
 		return bridgePortRef{}
 	}
-	ifIndex := resolveIfIndexByPortName(deviceID, port, ifIndexByDeviceName)
+
+	ifIndex := resolveIfIndexByInterfaceName(deviceID, port, ifIndexByDeviceName)
+	if ifIndex <= 0 && bridgePort != "" {
+		ifIndex = aliases.resolveIfIndex(deviceID, bridgePort)
+	}
+	if ifIndex <= 0 && !stpSide {
+		ifIndex = resolveIfIndexByPortName(deviceID, port, ifIndexByDeviceName)
+	}
+
+	ifName := port
+	if stpSide && bridgePort != "" && ifIndex <= 0 {
+		// A raw STP port ID is not an interface name. Keep its decoded bridge
+		// base-port in its own namespace until an observed alias resolves it.
+		ifName = ""
+	}
+	if ifIndex > 0 {
+		if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(deviceID, ifIndex)]; ok {
+			if name := strings.TrimSpace(iface.IfName); name != "" {
+				ifName = name
+			}
+		}
+	}
+
 	return bridgePortRef{
 		deviceID:   deviceID,
 		ifIndex:    ifIndex,
-		ifName:     port,
-		bridgePort: port,
+		ifName:     ifName,
+		bridgePort: bridgePort,
+		vlanID:     strings.TrimSpace(vlanID),
 	}
 }
 
@@ -120,6 +188,16 @@ func bridgeAttachmentSortKey(attachment model.Attachment) string {
 func bridgePairKey(left, right bridgePortRef) string {
 	leftKey := bridgePortRefKey(left, false, false)
 	rightKey := bridgePortRefKey(right, false, false)
+	return canonicalBridgePairKey(leftKey, rightKey)
+}
+
+func bridgeScopedPairKey(left, right bridgePortRef) string {
+	leftKey := bridgePortRefKey(left, false, true)
+	rightKey := bridgePortRefKey(right, false, true)
+	return canonicalBridgePairKey(leftKey, rightKey)
+}
+
+func canonicalBridgePairKey(leftKey, rightKey string) string {
 	if leftKey == "" || rightKey == "" {
 		return ""
 	}
@@ -130,47 +208,72 @@ func bridgePairKey(left, right bridgePortRef) string {
 }
 
 func bridgePortRefKey(port bridgePortRef, includeBridgePort bool, includeVLAN bool) string {
-	deviceID := strings.TrimSpace(port.deviceID)
-	if deviceID == "" {
+	identity := bridgePortCanonicalIdentity(port)
+	if identity == "" {
 		return ""
 	}
-	bridgePort := strings.TrimSpace(port.bridgePort)
-	if bridgePort == "" && port.ifIndex > 0 {
-		bridgePort = strconv.Itoa(port.ifIndex)
-	}
-	ifName := strings.TrimSpace(port.ifName)
-	forwardingDomain := bridgePortForwardingDomain(port)
-	if !includeVLAN {
-		forwardingDomain = ""
-	}
-
-	parts := []string{
-		deviceID,
-		"if:" + strconv.Itoa(port.ifIndex),
-		"name:" + strings.ToLower(ifName),
+	parts := []string{identity}
+	if includeVLAN {
+		parts = append(parts, "scope:"+bridgePortForwardingDomain(port))
 	}
 	if includeBridgePort {
-		parts = append(parts, "bp:"+strings.ToLower(bridgePort))
+		parts = append(parts,
+			"name:"+normalizeInterfaceNameForLookup(port.ifName),
+			"bp:"+strings.ToLower(strings.TrimSpace(port.bridgePort)),
+		)
 	}
-	parts = append(parts, "vlan:"+strings.ToLower(forwardingDomain))
 	return strings.Join(parts, keySep)
 }
 
 func bridgePortForwardingDomain(port bridgePortRef) string {
 	if domain := strings.TrimSpace(port.fdbDomainID); domain != "" {
-		if vlanID := strings.TrimSpace(port.vlanID); vlanID != "" && strings.EqualFold(domain, "vlan:"+vlanID) {
-			return vlanID
-		}
-		return domain
+		return strings.ToLower(domain)
 	}
 	if vlanID := strings.TrimSpace(port.vlanID); vlanID != "" {
-		return vlanID
+		return "vlan:" + strings.ToLower(vlanID)
+	}
+	return ""
+}
+
+func bridgePortVLANScope(port bridgePortRef) string {
+	if vlanID := strings.TrimSpace(port.vlanID); vlanID != "" {
+		return "vlan:" + strings.ToLower(vlanID)
+	}
+	return ""
+}
+
+func bridgePortCanonicalIdentity(port bridgePortRef) string {
+	deviceID := strings.TrimSpace(port.deviceID)
+	if deviceID == "" {
+		return ""
+	}
+	if port.ifIndex > 0 {
+		return strings.Join([]string{deviceID, "if:" + strconv.Itoa(port.ifIndex)}, keySep)
+	}
+	if name := normalizeInterfaceNameForLookup(port.ifName); name != "" {
+		return strings.Join([]string{deviceID, "name:" + name}, keySep)
+	}
+	if bridgePort := strings.ToLower(strings.TrimSpace(port.bridgePort)); bridgePort != "" {
+		return strings.Join([]string{deviceID, "bp:" + bridgePort}, keySep)
 	}
 	return ""
 }
 
 func bridgePortRefSortKey(port bridgePortRef) string {
 	return bridgePortRefKey(port, true, true)
+}
+
+func bridgePortRefDisplayKey(port bridgePortRef) string {
+	identity := bridgePortCanonicalIdentity(port)
+	if identity == "" {
+		return ""
+	}
+	return strings.Join([]string{
+		identity,
+		"name:" + strings.ToLower(strings.TrimSpace(port.ifName)),
+		"bp:" + strings.ToLower(strings.TrimSpace(port.bridgePort)),
+		"scope:" + bridgePortForwardingDomain(port),
+	}, keySep)
 }
 
 func bridgePortDisplay(port bridgePortRef) string {
@@ -181,4 +284,12 @@ func bridgePortDisplay(port bridgePortRef) string {
 		return strconv.Itoa(port.ifIndex)
 	}
 	return strings.TrimSpace(port.bridgePort)
+}
+
+func adjacencyVLANID(adj model.Adjacency) string {
+	vlanID := strings.TrimSpace(adj.Labels["vlan_id"])
+	if vlanID == "" {
+		vlanID = strings.TrimSpace(adj.Labels["vlan"])
+	}
+	return vlanID
 }

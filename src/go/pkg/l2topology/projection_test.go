@@ -3,9 +3,11 @@
 package l2topology
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -403,6 +405,287 @@ func TestProjectionKeepsFDBSegmentEndpointIPHintsConstantSized(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, linked)
+}
+
+func TestProjectionCorrelatesQBridgeFDBWithVLANScopedSTPSegment(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			Interfaces:        []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries: []FDBObservation{
+				{
+					MAC:         "70:49:a2:65:72:cd",
+					BridgePort:  "1",
+					Status:      "learned",
+					FDBDomainID: "fdb:500",
+					VLANID:      "100",
+				},
+				{
+					MAC:         "70:49:a2:65:72:ce",
+					BridgePort:  "1",
+					Status:      "learned",
+					FDBDomainID: "fdb:500",
+					VLANID:      "100",
+				},
+			},
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				VLANID:           "100",
+				State:            "forwarding",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+			Interfaces:        []ObservedInterface{{IfIndex: 2, IfName: "Ethernet2"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "2", IfIndex: 2}},
+			FDBEntries: []FDBObservation{
+				{MAC: "70:49:a2:65:73:cd", BridgePort: "2", Status: "learned", FDBDomainID: "fdb:900", VLANID: "100"},
+				{MAC: "70:49:a2:65:73:ce", BridgePort: "2", Status: "learned", FDBDomainID: "fdb:900", VLANID: "100"},
+			},
+		},
+	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{
+		SchemaVersion:     "1.0.0",
+		Source:            "snmp",
+		Layer:             "2",
+		AgentID:           "agent-1",
+		LocalDeviceID:     "switch-a",
+		InferenceStrategy: "stp_parent_tree",
+	})
+
+	var segments []ProjectionSegmentActorDetail
+	for _, detail := range projection.ActorDetails {
+		if detail.Segment.SegmentID != "" {
+			segments = append(segments, detail.Segment)
+		}
+	}
+	require.Len(t, segments, 1)
+	require.ElementsMatch(t, []string{"switch-a", "switch-b"}, segments[0].ParentDevices)
+	require.True(t, segments[0].EndpointsTotal.Has)
+	require.Equal(t, 4, segments[0].EndpointsTotal.Value)
+}
+
+func TestProjectionCorrelatesBridgeMIBWithCanonicalSTPPort(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			Interfaces:        []ObservedInterface{{IfIndex: 7, IfName: "Ethernet1"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "1", IfIndex: 7}},
+			FDBEntries: []FDBObservation{
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "1", Status: "learned"},
+				{MAC: "70:49:a2:65:72:ce", BridgePort: "1", Status: "learned"},
+			},
+			STPPorts: []STPPortObservation{{
+				Port:             "1",
+				State:            "forwarding",
+				DesignatedBridge: "02:00:00:00:00:02",
+				DesignatedPort:   "8002",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ChassisID:         "02:00:00:00:00:02",
+			BaseBridgeAddress: "02:00:00:00:00:02",
+			Interfaces:        []ObservedInterface{{IfIndex: 9, IfName: "Ethernet2"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "2", IfIndex: 9}},
+		},
+	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{
+		Source:            "snmp",
+		Layer:             "2",
+		InferenceStrategy: "stp_parent_tree",
+	})
+
+	var segments []ProjectionSegmentActorDetail
+	for _, detail := range projection.ActorDetails {
+		if detail.Segment.SegmentID != "" {
+			segments = append(segments, detail.Segment)
+		}
+	}
+	require.Len(t, segments, 1)
+	require.ElementsMatch(t, []string{"switch-a", "switch-b"}, segments[0].ParentDevices)
+}
+
+func TestProjectionDeduplicatesDirectSTPAcrossVLANScopes(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{ID: "switch-a", Hostname: "switch-a", ChassisID: "02:00:00:00:00:01"},
+			{ID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02"},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Ethernet1"},
+			{DeviceID: "switch-b", IfIndex: 2, IfName: "Ethernet2"},
+		},
+		Adjacencies: []Adjacency{
+			{Protocol: "stp", SourceID: "switch-a", SourcePort: "Ethernet1", TargetID: "switch-b", TargetPort: "Ethernet2", Labels: map[string]string{"vlan_id": "100"}},
+			{Protocol: "stp", SourceID: "switch-a", SourcePort: "Ethernet1", TargetID: "switch-b", TargetPort: "Ethernet2", Labels: map[string]string{"vlan_id": "200"}},
+			{Protocol: "stp", SourceID: "switch-b", SourcePort: "Ethernet2", TargetID: "switch-a", TargetPort: "Ethernet1", Labels: map[string]string{"vlan_id": "100"}},
+		},
+	}
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	stpLinks := 0
+	for _, link := range projection.Graph.Links {
+		if link.LinkType == "stp" {
+			stpLinks++
+		}
+	}
+	require.Equal(t, 1, stpLinks)
+}
+
+func TestProjectionKeepsDistinctSTPLinksWithoutPortIdentity(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{ID: "switch-a", Hostname: "switch-a", ChassisID: "02:00:00:00:00:01"},
+			{ID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02"},
+			{ID: "switch-c", Hostname: "switch-c", ChassisID: "02:00:00:00:00:03"},
+			{ID: "switch-d", Hostname: "switch-d", ChassisID: "02:00:00:00:00:04"},
+		},
+		Adjacencies: []Adjacency{
+			{Protocol: "stp", SourceID: "switch-a", TargetID: "switch-b"},
+			{Protocol: "stp", SourceID: "switch-c", TargetID: "switch-d"},
+		},
+	}
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	stpLinks := 0
+	for _, link := range projection.Graph.Links {
+		if link.LinkType == "stp" {
+			stpLinks++
+		}
+	}
+	require.Equal(t, 2, stpLinks)
+}
+
+func TestProjectionDoesNotCorrelateAmbiguousVLANAliasWithSTP(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			Interfaces:        []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries: []FDBObservation{
+				{MAC: "70:49:a2:65:72:01", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+				{MAC: "70:49:a2:65:72:02", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+				{MAC: "70:49:a2:65:73:01", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:600", VLANID: "100"},
+				{MAC: "70:49:a2:65:73:02", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:600", VLANID: "100"},
+			},
+			STPPorts: []STPPortObservation{{Port: "1", VLANID: "100", DesignatedBridge: "02:00:00:00:00:02", DesignatedPort: "8002"}},
+		},
+		{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02", BaseBridgeAddress: "02:00:00:00:00:02"},
+	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2", InferenceStrategy: "stp_parent_tree"})
+	segments := make([]ProjectionSegmentActorDetail, 0, 2)
+	for _, detail := range projection.ActorDetails {
+		if detail.Segment.SegmentID != "" {
+			segments = append(segments, detail.Segment)
+		}
+	}
+	require.Len(t, segments, 2)
+	for _, segment := range segments {
+		require.Equal(t, []string{"switch-a"}, segment.ParentDevices)
+	}
+}
+
+func TestProjectionDoesNotTreatDomainlessSTPAsQBridgeWildcard(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ChassisID:         "02:00:00:00:00:01",
+			BaseBridgeAddress: "02:00:00:00:00:01",
+			Interfaces:        []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts:       []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries: []FDBObservation{
+				{MAC: "70:49:a2:65:72:01", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+				{MAC: "70:49:a2:65:72:02", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+			},
+			STPPorts: []STPPortObservation{{Port: "1", DesignatedBridge: "02:00:00:00:00:02", DesignatedPort: "8002"}},
+		},
+		{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02", BaseBridgeAddress: "02:00:00:00:00:02"},
+	}, DiscoverOptions{EnableBridge: true, EnableSTP: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2", InferenceStrategy: "stp_parent_tree"})
+	var segments []ProjectionSegmentActorDetail
+	for _, detail := range projection.ActorDetails {
+		if detail.Segment.SegmentID != "" {
+			segments = append(segments, detail.Segment)
+		}
+	}
+	require.Len(t, segments, 1)
+	require.Equal(t, []string{"switch-a"}, segments[0].ParentDevices)
+}
+
+func TestProjectionPairwiseMultiDomainIsDeterministic(t *testing.T) {
+	collectedAt := time.Unix(1_700_000_000, 0).UTC()
+	base := []L2Observation{
+		{
+			DeviceID: "switch-a", Hostname: "switch-a", ChassisID: "aa:aa:aa:aa:aa:aa",
+			Interfaces:  []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts: []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries: []FDBObservation{
+				{MAC: "bb:bb:bb:bb:bb:bb", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:10", VLANID: "100"},
+				{MAC: "bb:bb:bb:bb:bb:bb", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:20", VLANID: "200"},
+			},
+		},
+		{
+			DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "bb:bb:bb:bb:bb:bb",
+			Interfaces:  []ObservedInterface{{IfIndex: 2, IfName: "Ethernet2"}},
+			BridgePorts: []BridgePortObservation{{BasePort: "2", IfIndex: 2}},
+			FDBEntries: []FDBObservation{
+				{MAC: "aa:aa:aa:aa:aa:aa", BridgePort: "2", Status: "learned", FDBDomainID: "fdb:30", VLANID: "100"},
+				{MAC: "aa:aa:aa:aa:aa:aa", BridgePort: "2", Status: "learned", FDBDomainID: "fdb:40", VLANID: "200"},
+			},
+		},
+	}
+
+	var expected []byte
+	for iteration := 0; iteration < 100; iteration++ {
+		observations := append([]L2Observation(nil), base...)
+		if iteration%2 == 1 {
+			observations[0], observations[1] = observations[1], observations[0]
+			for i := range observations {
+				slices.Reverse(observations[i].FDBEntries)
+			}
+		}
+		result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true, CollectedAt: collectedAt})
+		require.NoError(t, err)
+		projection := ToGraph(result, GraphOptions{
+			Source:            "snmp",
+			Layer:             "2",
+			CollectedAt:       collectedAt,
+			InferenceStrategy: "fdb_pairwise_minimum_knowledge",
+		})
+		payload, err := json.Marshal(projection)
+		require.NoError(t, err)
+		if iteration == 0 {
+			expected = payload
+			continue
+		}
+		require.Equal(t, expected, payload)
+	}
 }
 
 func TestProjectionResolvesConstantEndpointHintsPastSharedPrimary(t *testing.T) {

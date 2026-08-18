@@ -221,33 +221,7 @@ func BenchmarkSNMPTopologyFDBSnapshotMapTypeScaling(b *testing.B) {
 			probe = topologymodel.Data{}
 			payloadBytes, compressedPayloadBytes := benchmarkTopologyPayloadSizes(b, registry, options)
 
-			// Two cycles clear prior json/gzip sync.Pool victims before measuring
-			// the graph objects retained by the snapshots below.
-			runtime.GC()
-			runtime.GC()
-			var before runtime.MemStats
-			runtime.ReadMemStats(&before)
-			const retainedCopies = 4
-			retained := make([]topologymodel.Data, retainedCopies)
-			for i := range retained {
-				var ok bool
-				var err error
-				retained[i], ok, err = snapshot()
-				if err != nil || !ok {
-					b.Fatalf("retained-heap snapshot ok=%t err=%v", ok, err)
-				}
-			}
-			runtime.GC()
-			var after runtime.MemStats
-			runtime.ReadMemStats(&after)
-			retainedBytes := int64(after.HeapAlloc) - int64(before.HeapAlloc)
-			if retainedBytes < 0 {
-				retainedBytes = 0
-			}
-			retainedBytes /= retainedCopies
-			runtime.KeepAlive(retained)
-			retained = nil
-			runtime.GC()
+			retainedBytes := benchmarkTopologyRetainedSnapshotBytes(b, snapshot)
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -320,6 +294,92 @@ func BenchmarkSNMPTopologyFDBFunctionRenderingScaling(b *testing.B) {
 	}
 }
 
+func TestBenchmarkManagedFabricFDBSegmentDensityRegistry(t *testing.T) {
+	const (
+		deviceCount  = 9
+		fdbEntries   = 32
+		segmentCount = 8
+	)
+	registry := benchmarkManagedFabricFDBSegmentDensityRegistry(deviceCount, fdbEntries, segmentCount)
+	data, ok, err := registry.snapshotWithOptions(topologyoptions.DefaultQueryOptions())
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	segments := 0
+	for _, actor := range data.Actors {
+		if topologymodel.ActorSegmentKind(actor) == topologymodel.SegmentKindBroadcastDomain {
+			segments++
+		}
+	}
+	require.Equal(t, segmentCount, segments)
+	require.Equal(t, segmentCount*2, testCountTopologyLinksByType(data.Links, "bridge")+testCountTopologyLinksByType(data.Links, "fdb"))
+}
+
+func BenchmarkSNMPTopologyFDBSegmentDensityEndToEnd(b *testing.B) {
+	tests := []struct {
+		devices  int
+		fdb      int
+		segments int
+	}{
+		{devices: 129, fdb: 2048, segments: 128},
+		{devices: 1025, fdb: 2048, segments: 128},
+		{devices: 1025, fdb: 8192, segments: 128},
+		{devices: 1025, fdb: 8192, segments: 1024},
+	}
+
+	for _, tc := range tests {
+		name := fmt.Sprintf("devices=%d/fdb=%d/segments=%d", tc.devices, tc.fdb, tc.segments)
+		b.Run(name, func(b *testing.B) {
+			registry := benchmarkManagedFabricFDBSegmentDensityRegistry(tc.devices, tc.fdb, tc.segments)
+			options := topologyoptions.DefaultQueryOptions()
+			snapshot := func() (topologymodel.Data, bool, error) {
+				return registry.snapshotWithOptions(options)
+			}
+
+			probe, ok, err := snapshot()
+			if err != nil || !ok {
+				b.Fatalf("high-segment snapshot ok=%t err=%v", ok, err)
+			}
+			segments := 0
+			for _, actor := range probe.Actors {
+				if topologymodel.ActorSegmentKind(actor) == topologymodel.SegmentKindBroadcastDomain {
+					segments++
+				}
+			}
+			if segments != tc.segments {
+				b.Fatalf("broadcast segments=%d, want %d", segments, tc.segments)
+			}
+			actorCount := len(probe.Actors)
+			linkCount := len(probe.Links)
+			probe = topologymodel.Data{}
+
+			payloadBytes, compressedPayloadBytes := benchmarkTopologyPayloadSizes(b, registry, options)
+			retainedBytes := benchmarkTopologyRetainedSnapshotBytes(b, snapshot)
+			deps := funcDepsAdapter{registry: registry}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				payload, ok, err := deps.Snapshot(options)
+				if err != nil || !ok {
+					b.Fatalf("high-segment Function snapshot ok=%t err=%v", ok, err)
+				}
+				encoded, err := json.Marshal(payload)
+				if err != nil {
+					b.Fatalf("encode high-segment Function payload: %v", err)
+				}
+				runtime.KeepAlive(encoded)
+			}
+			b.ReportMetric(float64(actorCount), "actors/op")
+			b.ReportMetric(float64(linkCount), "links/op")
+			b.ReportMetric(float64(tc.segments), "segments/op")
+			b.ReportMetric(float64(payloadBytes), "payload-B")
+			b.ReportMetric(float64(compressedPayloadBytes), "payload-gzip-B")
+			b.ReportMetric(float64(retainedBytes), "retained-B")
+		})
+	}
+}
+
 func benchmarkTopologyPayloadSizes(b *testing.B, registry *topologyRegistry, options topologyoptions.QueryOptions) (int, int) {
 	b.Helper()
 	payload, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(options)
@@ -339,6 +399,40 @@ func benchmarkTopologyPayloadSizes(b *testing.B, registry *topologyRegistry, opt
 		b.Fatalf("finish topology Function payload compression: %v", err)
 	}
 	return len(encoded), compressed.Len()
+}
+
+func benchmarkTopologyRetainedSnapshotBytes(
+	b *testing.B,
+	snapshot func() (topologymodel.Data, bool, error),
+) int64 {
+	b.Helper()
+	// Two cycles clear prior json/gzip sync.Pool victims before measuring the
+	// graph objects retained by the snapshots below.
+	runtime.GC()
+	runtime.GC()
+	var before runtime.MemStats
+	runtime.ReadMemStats(&before)
+	const retainedCopies = 4
+	retained := make([]topologymodel.Data, retainedCopies)
+	for i := range retained {
+		var ok bool
+		var err error
+		retained[i], ok, err = snapshot()
+		if err != nil || !ok {
+			b.Fatalf("retained-heap snapshot ok=%t err=%v", ok, err)
+		}
+	}
+	runtime.GC()
+	var after runtime.MemStats
+	runtime.ReadMemStats(&after)
+	retainedBytes := int64(after.HeapAlloc) - int64(before.HeapAlloc)
+	if retainedBytes < 0 {
+		retainedBytes = 0
+	}
+	retainedBytes /= retainedCopies
+	runtime.KeepAlive(retained)
+	runtime.GC()
+	return retainedBytes
 }
 
 func BenchmarkTopologyCacheFDBSnapshotReadLock(b *testing.B) {
@@ -478,6 +572,59 @@ func benchmarkManagedFabricFDBTopologyRegistry(deviceCount, fdbEntriesPerDevice 
 			}
 		}
 		registry.register(cache)
+	}
+	return registry
+}
+
+func benchmarkManagedFabricFDBSegmentDensityRegistry(deviceCount, fdbEntryCount, segmentCount int) *topologyRegistry {
+	if deviceCount < segmentCount+1 {
+		panic("segment-density benchmark needs one managed peer per segment")
+	}
+	if segmentCount <= 0 || fdbEntryCount < segmentCount {
+		panic("segment-density benchmark needs at least one FDB row per segment")
+	}
+
+	registry := newTopologyRegistry()
+	now := time.Now()
+	caches := make([]*topologyCache, 0, deviceCount)
+	for deviceIndex := range deviceCount {
+		cache := newTopologyCache()
+		cache.lastUpdate = now
+		cache.updateTime = now
+		cache.agentID = fmt.Sprintf("segment-benchmark-agent-%d", deviceIndex)
+		cache.localDevice = topologymodel.Device{
+			ChassisID:     benchmarkManagedFabricDeviceMAC(deviceIndex),
+			ChassisIDType: "macAddress",
+			SysName:       fmt.Sprintf("segment-benchmark-switch-%d", deviceIndex),
+			ManagementIP:  fmt.Sprintf("198.18.%d.%d", deviceIndex/254, deviceIndex%254+1),
+		}
+		caches = append(caches, cache)
+		registry.register(cache)
+	}
+
+	hub := caches[0]
+	for segmentIndex := range segmentCount {
+		port := fmt.Sprintf("%d", segmentIndex+1)
+		hub.bridgePortToIf[port] = port
+		hub.ifNamesByIndex[port] = "uplink-" + port
+		peerMAC := caches[segmentIndex+1].localDevice.ChassisID
+		key := fmt.Sprintf("managed|%s|%s", peerMAC, port)
+		hub.fdbEntries[key] = &fdbEntry{
+			mac:        peerMAC,
+			bridgePort: port,
+			status:     "learned",
+		}
+	}
+	for entryIndex := segmentCount; entryIndex < fdbEntryCount; entryIndex++ {
+		segmentIndex := entryIndex % segmentCount
+		port := fmt.Sprintf("%d", segmentIndex+1)
+		mac := benchmarkManagedFabricEndpointMAC(segmentIndex+1, entryIndex+1, false)
+		key := fmt.Sprintf("endpoint|%s|%s|%d", mac, port, entryIndex)
+		hub.fdbEntries[key] = &fdbEntry{
+			mac:        mac,
+			bridgePort: port,
+			status:     "learned",
+		}
 	}
 	return registry
 }

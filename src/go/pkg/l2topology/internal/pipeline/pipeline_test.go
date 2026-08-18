@@ -577,6 +577,34 @@ func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
 	require.Equal(t, 1, result.Stats.LinksSTP)
 }
 
+func TestBuildL2ResultFromObservations_STPPreservesVLANScopes(t *testing.T) {
+	observations := []model.L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			BaseBridgeAddress: "00:11:22:33:44:55",
+			Interfaces:        []model.ObservedInterface{{IfIndex: 3, IfName: "Ethernet1"}},
+			BridgePorts:       []model.BridgePortObservation{{BasePort: "1", IfIndex: 3}},
+			STPPorts: []model.STPPortObservation{
+				{Port: "1", VLANID: "100", DesignatedBridge: "66:77:88:99:aa:bb", DesignatedPort: "8001"},
+				{Port: "1", VLANID: "200", DesignatedBridge: "66:77:88:99:aa:bb", DesignatedPort: "8001"},
+			},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			BaseBridgeAddress: "66:77:88:99:aa:bb",
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 2)
+	require.Equal(t, "100", result.Adjacencies[0].Labels["vlan_id"])
+	require.Equal(t, "200", result.Adjacencies[1].Labels["vlan_id"])
+	require.Equal(t, 2, result.Stats.LinksSTP)
+}
+
 func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testing.T) {
 	observations := []model.L2Observation{
 		{

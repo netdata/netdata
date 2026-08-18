@@ -3427,6 +3427,85 @@ func TestSuppressInferredBridgeLinksOnDeterministicDiscovery(t *testing.T) {
 	require.Equal(t, "switch-c", filtered[1].port.deviceID)
 }
 
+func TestToGraph_InferenceStrategiesKeepDomainfulScopeContract(t *testing.T) {
+	tests := map[string]struct {
+		strategy     string
+		adjacencies  []model.Adjacency
+		wantSegments int
+		wantProtocol string
+	}{
+		"fdb pairwise": {
+			strategy:     topologyInferenceStrategyFDBPairwise,
+			wantSegments: 1,
+		},
+		"stp parent tree": {
+			strategy: topologyInferenceStrategySTPParentTree,
+			adjacencies: []model.Adjacency{{
+				Protocol: "stp", SourceID: "switch-a", SourcePort: "Ethernet1",
+				TargetID: "switch-b", TargetPort: "Ethernet2", Labels: map[string]string{"vlan_id": "100"},
+			}},
+			wantSegments: 1,
+			wantProtocol: "stp",
+		},
+		"stp fdb correlated": {
+			strategy: topologyInferenceStrategySTPFDBCorrelated,
+			adjacencies: []model.Adjacency{{
+				Protocol: "stp", SourceID: "switch-a", SourcePort: "Ethernet1",
+				TargetID: "switch-b", TargetPort: "Ethernet2", Labels: map[string]string{"vlan_id": "100"},
+			}},
+			wantSegments: 1,
+			wantProtocol: "stp",
+		},
+		"cdp hybrid": {
+			strategy: topologyInferenceStrategyCDPFDBHybrid,
+			adjacencies: []model.Adjacency{{
+				Protocol: "cdp", SourceID: "switch-a", SourcePort: "Ethernet1",
+				TargetID: "switch-b", TargetPort: "Ethernet2",
+			}},
+			wantProtocol: "cdp",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			result := model.Result{
+				Devices: []model.Device{
+					{ID: "switch-a", Hostname: "switch-a", ChassisID: "aa:aa:aa:aa:aa:aa"},
+					{ID: "switch-b", Hostname: "switch-b", ChassisID: "bb:bb:bb:bb:bb:bb"},
+				},
+				Interfaces: []model.Interface{
+					{DeviceID: "switch-a", IfIndex: 1, IfName: "Ethernet1"},
+					{DeviceID: "switch-b", IfIndex: 2, IfName: "Ethernet2"},
+				},
+				Adjacencies: tc.adjacencies,
+				Attachments: []model.Attachment{
+					{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb", Labels: map[string]string{"bridge_port": "1", "fdb_domain_id": "fdb:10", "vlan_id": "100"}},
+					{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:01", Method: "fdb", Labels: map[string]string{"bridge_port": "1", "fdb_domain_id": "fdb:10", "vlan_id": "100"}},
+					{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb", Labels: map[string]string{"bridge_port": "2", "fdb_domain_id": "fdb:20", "vlan_id": "100"}},
+					{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:02", Method: "fdb", Labels: map[string]string{"bridge_port": "2", "fdb_domain_id": "fdb:20", "vlan_id": "100"}},
+				},
+			}
+
+			data, _ := toGraphForTest(result, model.GraphOptions{
+				Source:            "snmp",
+				Layer:             "2",
+				InferenceStrategy: tc.strategy,
+			})
+
+			segments := 0
+			for _, actor := range data.Actors {
+				if actor.ActorType == "segment" {
+					segments++
+				}
+			}
+			require.Equal(t, tc.wantSegments, segments)
+			if tc.wantProtocol != "" {
+				require.NotNil(t, findLinkByProtocol(data.Links, tc.wantProtocol))
+			}
+		})
+	}
+}
+
 func TestToGraph_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
 	result := model.Result{
 		Devices: []model.Device{

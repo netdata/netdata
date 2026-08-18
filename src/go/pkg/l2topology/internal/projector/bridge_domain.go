@@ -92,12 +92,17 @@ func buildBridgeDomainModel(
 
 	bmlSegments := make([]*bridgeDomainSegment, 0)
 	bmlIndex := newBridgeDomainSegmentIndex()
+	vlanAliases := buildBridgeVLANAliasIndex(macLinks)
 	for _, link := range macLinks {
 		if strings.TrimSpace(link.port.deviceID) == "" || strings.TrimSpace(link.endpointID) == "" {
 			continue
 		}
 
 		if segment := bblIndex.segmentForPort(link.port); segment != nil {
+			segment.addEndpoint(link.endpointID, link.method)
+			continue
+		}
+		if segment := bblIndex.segmentForKey(vlanAliases.uniqueAliasKey(link.port)); segment != nil {
 			segment.addEndpoint(link.endpointID, link.method)
 			continue
 		}
@@ -302,7 +307,14 @@ func (i *bridgeDomainSegmentIndex) segmentForPort(port bridgePortRef) *bridgeDom
 	if i == nil {
 		return nil
 	}
-	return i.byPort[bridgeDomainPortIdentityKey(port)]
+	return i.segmentForKey(bridgeDomainPortIdentityKey(port))
+}
+
+func (i *bridgeDomainSegmentIndex) segmentForKey(key string) *bridgeDomainSegment {
+	if i == nil || key == "" {
+		return nil
+	}
+	return i.byPort[key]
 }
 
 func (i *bridgeDomainSegmentIndex) indexPort(segment *bridgeDomainSegment, port bridgePortRef) {
@@ -366,23 +378,7 @@ func (s *bridgeDomainSegment) portIdentityKey(port bridgePortRef) string {
 }
 
 func bridgeDomainPortIdentityKey(port bridgePortRef) string {
-	nodeID := strings.TrimSpace(port.deviceID)
-	bridgePort := strings.TrimSpace(port.bridgePort)
-	if bridgePort == "" {
-		if port.ifIndex > 0 {
-			bridgePort = strconvItoa(port.ifIndex)
-		} else {
-			bridgePort = strings.TrimSpace(port.ifName)
-		}
-	}
-	if nodeID == "" || bridgePort == "" {
-		return ""
-	}
-	return strings.Join([]string{
-		nodeID,
-		strings.ToLower(bridgePort),
-		strings.ToLower(bridgePortForwardingDomain(port)),
-	}, keySep)
+	return bridgePortRefKey(port, false, true)
 }
 
 func (s *bridgeDomainSegment) sortKey() string {

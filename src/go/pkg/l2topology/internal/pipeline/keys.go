@@ -28,7 +28,18 @@ func adjacencyKey(adj model.Adjacency) string {
 	targetID := strings.TrimSpace(adj.TargetID)
 	targetPort := strings.TrimSpace(adj.TargetPort)
 
-	return opaqueCompositeKey(protocol, sourceID, sourcePort, targetID, targetPort)
+	forwardingScope := ""
+	if protocol == "stp" {
+		vlanID := strings.TrimSpace(adj.Labels["vlan_id"])
+		if vlanID == "" {
+			vlanID = strings.TrimSpace(adj.Labels["vlan"])
+		}
+		if vlanID != "" {
+			forwardingScope = "vlan:" + strings.ToLower(vlanID)
+		}
+	}
+
+	return opaqueCompositeKey(protocol, sourceID, sourcePort, targetID, targetPort, forwardingScope)
 }
 
 func attachmentKey(attachment model.Attachment) string {

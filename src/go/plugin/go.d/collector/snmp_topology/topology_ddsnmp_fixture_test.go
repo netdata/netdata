@@ -24,6 +24,9 @@ import (
 
 func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 	fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", "iosxe_ie32008t2s-ios17-12.snmprec"))
+	// Model the reported LLDP-less device behavior at the SNMP boundary while
+	// retaining the fixture's real BRIDGE-MIB, interface, and VTP rows.
+	fixture.hideOIDPrefix("1.0.8802.1.1.2")
 	dev := ddsnmp.DeviceConnectionInfo{
 		Hostname:       "192.0.2.10",
 		Port:           161,
@@ -71,16 +74,43 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 
 	observation := cache.buildEngineObservation(cache.localDevice)
 	require.NotEmpty(t, observation.FDBEntries, "cache should retain collected FDB rows")
+	peerMAC := ""
+	for _, entry := range observation.FDBEntries {
+		mac := topologyutil.NormalizeMAC(entry.MAC)
+		if mac != "" && mac != topologyutil.NormalizeMAC(observation.ChassisID) {
+			peerMAC = mac
+			break
+		}
+	}
+	require.NotEmpty(t, peerMAC, "fixture should expose a learned MAC distinct from the local bridge identity")
 
-	data, ok := snapshotTopologyCacheForTest(cache)
+	peer := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
+		Hostname:    "192.0.2.11",
+		SysObjectID: "1.3.6.1.4.1.8072.3.2.10",
+		SysName:     "fixture-fdb-peer",
+	})
+	peer.localDevice.ChassisID = peerMAC
+	peer.localDevice.ChassisIDType = "macAddress"
+	peer.localDevice.Capabilities = []string{"bridge"}
+	peer.localDevice.Labels = map[string]string{"type": "switch"}
+	peer.finalizeTopologyCache()
+
+	registry := newTopologyRegistry()
+	registry.register(cache)
+	registry.register(peer)
+	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok, "default managed-fabric inference should render the collected cache")
-	require.NotEmpty(t, data.Actors)
+	require.GreaterOrEqual(t, testCountTopologyLinksByType(data.Links, "bridge"), 1,
+		"a real collected FDB row should attach the fixture device to a broadcast segment")
+	require.GreaterOrEqual(t, testCountTopologyLinksByType(data.Links, "fdb"), 1,
+		"the broadcast segment should resolve the real learned MAC to the synthetic managed peer")
 }
 
 type topologySNMPRecHandler struct {
 	gosnmp.Handler
-	entries []gosnmp.SnmpPDU
-	byOID   map[string]gosnmp.SnmpPDU
+	entries           []gosnmp.SnmpPDU
+	byOID             map[string]gosnmp.SnmpPDU
+	hiddenOIDPrefixes []string
 }
 
 func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandler {
@@ -115,6 +145,10 @@ func (h *topologySNMPRecHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) 
 	variables := make([]gosnmp.SnmpPDU, 0, len(oids))
 	for _, oid := range oids {
 		key := strings.TrimPrefix(strings.TrimSpace(oid), ".")
+		if h.isHiddenOID(key) {
+			variables = append(variables, gosnmp.SnmpPDU{Name: key, Type: gosnmp.NoSuchObject})
+			continue
+		}
 		if pdu, ok := h.byOID[key]; ok {
 			variables = append(variables, pdu)
 			continue
@@ -138,11 +172,31 @@ func (h *topologySNMPRecHandler) walkAll(root string) []gosnmp.SnmpPDU {
 	var out []gosnmp.SnmpPDU
 	for _, pdu := range h.entries {
 		name := strings.TrimPrefix(pdu.Name, ".")
+		if h.isHiddenOID(name) {
+			continue
+		}
 		if name == root || strings.HasPrefix(name, prefix) {
 			out = append(out, pdu)
 		}
 	}
 	return out
+}
+
+func (h *topologySNMPRecHandler) hideOIDPrefix(prefix string) {
+	prefix = strings.TrimPrefix(strings.TrimSpace(prefix), ".")
+	if prefix != "" {
+		h.hiddenOIDPrefixes = append(h.hiddenOIDPrefixes, prefix)
+	}
+}
+
+func (h *topologySNMPRecHandler) isHiddenOID(oid string) bool {
+	oid = strings.TrimPrefix(strings.TrimSpace(oid), ".")
+	for _, prefix := range h.hiddenOIDPrefixes {
+		if oid == prefix || strings.HasPrefix(oid, prefix+".") {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *topologySNMPRecHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }

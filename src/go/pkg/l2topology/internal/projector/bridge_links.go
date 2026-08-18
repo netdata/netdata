@@ -12,6 +12,8 @@ import (
 func collectBridgeLinkRecords(
 	adjacencies []model.Adjacency,
 	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
 	strategy topologyInferenceStrategyConfig,
 ) []bridgeBridgeLinkRecord {
 	records := make([]bridgeBridgeLinkRecord, 0)
@@ -23,15 +25,14 @@ func collectBridgeLinkRecords(
 			continue
 		}
 
-		src := bridgePortFromAdjacencySide(adj.SourceID, adj.SourcePort, ifIndexByDeviceName)
-		dst := bridgePortFromAdjacencySide(adj.TargetID, adj.TargetPort, ifIndexByDeviceName)
+		src, dst := bridgePortsFromAdjacency(adj, ifIndexByDeviceName, ifaceByDeviceIndex, aliases)
 		srcKey := bridgePortRefKey(src, false, false)
 		dstKey := bridgePortRefKey(dst, false, false)
 		if srcKey == "" || dstKey == "" {
 			continue
 		}
 
-		pairKey := bridgePairKey(src, dst)
+		pairKey := bridgeScopedPairKey(src, dst)
 		if pairKey == "" {
 			continue
 		}
@@ -91,12 +92,12 @@ func mergeBridgeLinkRecordSets(base, extra []bridgeBridgeLinkRecord) []bridgeBri
 	out = append(out, base...)
 	seen := make(map[string]struct{}, len(base)+len(extra))
 	for _, link := range out {
-		if key := bridgePairKey(link.designatedPort, link.port); key != "" {
+		if key := bridgeScopedPairKey(link.designatedPort, link.port); key != "" {
 			seen[key] = struct{}{}
 		}
 	}
 	for _, link := range extra {
-		key := bridgePairKey(link.designatedPort, link.port)
+		key := bridgeScopedPairKey(link.designatedPort, link.port)
 		if key == "" {
 			continue
 		}
