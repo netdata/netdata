@@ -49,7 +49,8 @@ func testCountTopologyLinksByType(links []topologymodel.Link, linkType string) i
 }
 
 func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
-	return registry.snapshotWithOptions(options)
+	data, ok, err := registry.snapshotWithOptions(options)
+	return data, ok && err == nil
 }
 
 func snapshotTopologyCacheForTest(cache *topologyCache) (topologymodel.Data, bool) {

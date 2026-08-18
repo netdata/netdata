@@ -96,15 +96,24 @@ func topologyScenarioCases() map[string]topologyScenarioCase {
 			scenario: newBGPDirectScenario(),
 			assert:   assertBGPDirectScenario,
 		},
+		"dns_targets_shared_loopback": {
+			scenario: newDNSTargetsSharedLoopbackScenario(),
+			assert:   assertDNSTargetsSharedLoopbackScenario,
+		},
+		"device_display_selected_primary": {
+			scenario: newDeviceDisplaySelectedPrimaryScenario(),
+			assert:   assertDeviceDisplaySelectedPrimaryScenario,
+		},
 	}
 }
 
 func topologyScenarioGoldenCases() map[string]topologyScenarioCase {
 	all := topologyScenarioCases()
 	return map[string]topologyScenarioCase{
-		"mixed_l2_l3_control":         all["mixed_l2_l3_control"],
-		"probable_fdb_low_confidence": all["probable_fdb_low_confidence"],
-		"focus_depth_l2":              all["focus_depth_l2"],
+		"mixed_l2_l3_control":             all["mixed_l2_l3_control"],
+		"probable_fdb_low_confidence":     all["probable_fdb_low_confidence"],
+		"focus_depth_l2":                  all["focus_depth_l2"],
+		"device_display_selected_primary": all["device_display_selected_primary"],
 	}
 }
 
@@ -374,6 +383,25 @@ func newBGPDirectScenario() *topologyScenario {
 	routerA := s.Router("bgp-router-a", "192.0.2.141", "02:00:00:00:0e:01", "192.0.2.241", "65141")
 	routerB := s.Router("bgp-router-b", "192.0.2.142", "02:00:00:00:0e:02", "192.0.2.242", "65142")
 	s.BGP(routerA, routerB, "default")
+	return s
+}
+
+func newDNSTargetsSharedLoopbackScenario() *topologyScenario {
+	s := newTopologyScenario("dns_targets_shared_loopback")
+	switchA := s.Switch("dns-switch-a", "192.168.10.1", "02:00:00:00:0f:01").Target("switch-a.example")
+	switchB := s.Switch("dns-switch-b", "192.168.20.1", "02:00:00:00:0f:02").Target("switch-b.example")
+	switchA.Port("management", 1).IPv4("192.168.10.1/24")
+	switchA.Port("loopback", 2).IPv4("127.0.0.1/8")
+	switchB.Port("management", 1).IPv4("192.168.20.1/24")
+	switchB.Port("loopback", 2).IPv4("127.0.0.1/8")
+	return s
+}
+
+func newDeviceDisplaySelectedPrimaryScenario() *topologyScenario {
+	s := newTopologyScenario("device_display_selected_primary").PTR("198.51.100.8", "unrelated-alias.example")
+	switchA := s.Switch("display-switch-a", "192.0.2.151", "02:00:00:00:10:01").ManagementAlias("198.51.100.8")
+	switchB := s.Switch("display-switch-b", "192.0.2.152", "02:00:00:00:10:02")
+	s.LLDP(switchA.Port("uplink-a", 1), switchB.Port("uplink-b", 1))
 	return s
 }
 
@@ -699,6 +727,30 @@ func assertBGPDirectScenario(t testing.TB, data topologyv1test.NormalizedData) {
 	})
 	assertScenarioStatEquals(t, data, "bgp_adjacency_emitted_links", 1)
 	assertScenarioStatEquals(t, data, "bgp_adjacency_visible_links", 1)
+}
+
+func assertDNSTargetsSharedLoopbackScenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "dns-switch-a", Type: "switch", ManagementIP: "192.168.10.1"},
+		{Name: "dns-switch-b", Type: "switch", ManagementIP: "192.168.20.1"},
+	})
+}
+
+func assertDeviceDisplaySelectedPrimaryScenario(t testing.TB, data topologyv1test.NormalizedData) {
+	t.Helper()
+
+	assertScenarioActors(t, data, []topologyScenarioActorExpectation{
+		{Name: "display-switch-a", Type: "switch", ManagementIP: "192.0.2.151"},
+		{Name: "display-switch-b", Type: "switch", ManagementIP: "192.0.2.152"},
+	})
+	assertScenarioLinks(t, data, []topologyScenarioLinkExpectation{
+		{Type: "lldp", Src: "display-switch-a", Dst: "display-switch-b", Direction: "bidirectional", Protocol: "lldp", SrcPort: "uplink-a", DstPort: "uplink-b"},
+	})
+	actor := scenarioActorByName(t, data, "display-switch-a")
+	require.Equal(t, []any{"192.0.2.151", "198.51.100.8"}, actor["ip_addresses"])
+	assertScenarioNoActor(t, data, "unrelated-alias.example")
 }
 
 func assertScenarioActors(t testing.TB, data topologyv1test.NormalizedData, want []topologyScenarioActorExpectation) {

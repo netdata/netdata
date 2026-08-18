@@ -3,6 +3,7 @@
 package topologyshape
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -10,52 +11,52 @@ import (
 )
 
 type topologyFocusGraph struct {
-	actorByID        map[string]topologymodel.Actor
-	segmentSet       map[string]struct{}
-	segmentKind      map[string]string
-	nonSegmentSet    map[string]struct{}
-	nonSegmentAdj    map[string]map[string]struct{}
-	nodeSegments     map[string]map[string]struct{}
-	segmentNeighbors map[string]map[string]struct{}
+	actorByHandle    map[topologymodel.ActorHandle]topologymodel.Actor
+	segmentSet       map[topologymodel.ActorHandle]struct{}
+	segmentKind      map[topologymodel.ActorHandle]string
+	nonSegmentSet    map[topologymodel.ActorHandle]struct{}
+	nonSegmentAdj    map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{}
+	nodeSegments     map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{}
+	segmentNeighbors map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{}
 }
 
 func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
 	graph := topologyFocusGraph{
-		actorByID:        make(map[string]topologymodel.Actor, len(data.Actors)),
-		segmentSet:       make(map[string]struct{}),
-		segmentKind:      make(map[string]string),
-		nonSegmentSet:    make(map[string]struct{}),
-		nonSegmentAdj:    make(map[string]map[string]struct{}),
-		nodeSegments:     make(map[string]map[string]struct{}),
-		segmentNeighbors: make(map[string]map[string]struct{}),
+		actorByHandle:    make(map[topologymodel.ActorHandle]topologymodel.Actor, len(data.Actors)),
+		segmentSet:       make(map[topologymodel.ActorHandle]struct{}),
+		segmentKind:      make(map[topologymodel.ActorHandle]string),
+		nonSegmentSet:    make(map[topologymodel.ActorHandle]struct{}),
+		nonSegmentAdj:    make(map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{}),
+		nodeSegments:     make(map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{}),
+		segmentNeighbors: make(map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{}),
 	}
 
 	for _, actor := range data.Actors {
-		id := strings.TrimSpace(actor.ActorID)
-		if id == "" {
+		handle := actor.ActorHandle
+		if handle.IsZero() {
 			continue
 		}
-		graph.actorByID[id] = actor
+		graph.actorByHandle[handle] = actor
 		if topologymodel.ActorIsSegment(actor) {
-			graph.segmentSet[id] = struct{}{}
-			graph.segmentKind[id] = topologymodel.ActorSegmentKind(actor)
+			graph.segmentSet[handle] = struct{}{}
+			graph.segmentKind[handle] = topologymodel.ActorSegmentKind(actor)
 		} else {
-			graph.nonSegmentSet[id] = struct{}{}
+			graph.nonSegmentSet[handle] = struct{}{}
 		}
 	}
 
-	for actorID := range graph.nonSegmentSet {
-		graph.nonSegmentAdj[actorID] = make(map[string]struct{})
-		graph.nodeSegments[actorID] = make(map[string]struct{})
+	for actorHandle := range graph.nonSegmentSet {
+		graph.nonSegmentAdj[actorHandle] = make(map[topologymodel.ActorHandle]struct{})
+		graph.nodeSegments[actorHandle] = make(map[topologymodel.ActorHandle]struct{})
 	}
-	for segmentID := range graph.segmentSet {
-		graph.segmentNeighbors[segmentID] = make(map[string]struct{})
+	for segmentHandle := range graph.segmentSet {
+		graph.segmentNeighbors[segmentHandle] = make(map[topologymodel.ActorHandle]struct{})
 	}
 
 	for _, link := range data.Links {
-		src := strings.TrimSpace(link.SrcActorID)
-		dst := strings.TrimSpace(link.DstActorID)
-		if src == "" || dst == "" || src == dst {
+		src := link.SrcActorHandle
+		dst := link.DstActorHandle
+		if src.IsZero() || dst.IsZero() || src == dst {
 			continue
 		}
 		_, srcSegment := graph.segmentSet[src]
@@ -79,14 +80,14 @@ func buildTopologyFocusGraph(data *topologymodel.Data) topologyFocusGraph {
 	return graph
 }
 
-func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[string]struct{}, depth int) map[string]int {
-	distance := make(map[string]int, len(graph.nonSegmentSet))
-	queue := make([]string, 0, len(roots))
+func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[topologymodel.ActorHandle]struct{}, depth int) map[topologymodel.ActorHandle]int {
+	distance := make(map[topologymodel.ActorHandle]int, len(graph.nonSegmentSet))
+	queue := make([]topologymodel.ActorHandle, 0, len(roots))
 	for root := range roots {
 		distance[root] = 0
 		queue = append(queue, root)
 	}
-	segmentExpandedDepth := make(map[string]int)
+	segmentExpandedDepth := make(map[topologymodel.ActorHandle]int)
 
 	for head := 0; head < len(queue); head++ {
 		current := queue[head]
@@ -126,25 +127,25 @@ func traverseTopologyFocusDepth(graph topologyFocusGraph, roots map[string]struc
 
 func collectTopologyFocusDepthSets(
 	graph topologyFocusGraph,
-	distance map[string]int,
+	distance map[topologymodel.ActorHandle]int,
 	depth int,
-) (map[string]struct{}, map[string]struct{}) {
-	includedNonSegment := make(map[string]struct{}, len(distance))
-	for actorID, currentDepth := range distance {
+) (map[topologymodel.ActorHandle]struct{}, map[topologymodel.ActorHandle]struct{}) {
+	includedNonSegment := make(map[topologymodel.ActorHandle]struct{}, len(distance))
+	for actorHandle, currentDepth := range distance {
 		if depth == topologyoptions.DepthAllInternal || currentDepth <= depth {
-			includedNonSegment[actorID] = struct{}{}
+			includedNonSegment[actorHandle] = struct{}{}
 		}
 	}
 
-	includedActorsByDepth := make(map[string]struct{}, len(includedNonSegment)+len(graph.segmentSet))
-	for actorID := range includedNonSegment {
-		includedActorsByDepth[actorID] = struct{}{}
+	includedActorsByDepth := make(map[topologymodel.ActorHandle]struct{}, len(includedNonSegment)+len(graph.segmentSet))
+	for actorHandle := range includedNonSegment {
+		includedActorsByDepth[actorHandle] = struct{}{}
 	}
 	if depth == topologyoptions.DepthAllInternal || depth > 0 {
-		for segmentID, neighbors := range graph.segmentNeighbors {
-			for actorID := range neighbors {
-				if _, ok := includedNonSegment[actorID]; ok {
-					includedActorsByDepth[segmentID] = struct{}{}
+		for segmentHandle, neighbors := range graph.segmentNeighbors {
+			for actorHandle := range neighbors {
+				if _, ok := includedNonSegment[actorHandle]; ok {
+					includedActorsByDepth[segmentHandle] = struct{}{}
 					break
 				}
 			}
@@ -152,4 +153,24 @@ func collectTopologyFocusDepthSets(
 	}
 
 	return includedNonSegment, includedActorsByDepth
+}
+
+func topologyActorLexicalOrder(actors []topologymodel.Actor) map[topologymodel.ActorHandle]int {
+	type entry struct {
+		handle  topologymodel.ActorHandle
+		actorID string
+	}
+	entries := make([]entry, 0, len(actors))
+	for _, actor := range actors {
+		if actor.ActorHandle.IsZero() {
+			continue
+		}
+		entries = append(entries, entry{handle: actor.ActorHandle, actorID: strings.TrimSpace(actor.ActorID)})
+	}
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].actorID < entries[j].actorID })
+	order := make(map[topologymodel.ActorHandle]int, len(entries))
+	for i, entry := range entries {
+		order[entry.handle] = i
+	}
+	return order
 }

@@ -4,6 +4,7 @@ package topologymodel
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
@@ -60,18 +61,23 @@ func ActorDetailSysContact(actor Actor) string {
 }
 
 func ActorDetailManagementIP(actor Actor) string {
-	return topologyutil.FirstNonEmptyString(actor.Detail.SNMP.ManagementIP, actor.Detail.L2.Device.ManagementIP)
+	if actorHasReconciledL2Device(actor) {
+		return strings.TrimSpace(actor.Detail.L2.Device.ManagementIP)
+	}
+	return strings.TrimSpace(actor.Detail.SNMP.ManagementIP)
 }
 
 func ActorDetailManagementIPs(actor Actor) []string {
-	out := make([]string, 0, 1+len(actor.Detail.SNMP.ManagementAddresses)+len(actor.Detail.L2.Device.ManagementAddresses))
+	if !actorHasReconciledL2Device(actor) {
+		if ip := ActorDetailManagementIPValue(actor.Detail.SNMP.ManagementIP); ip != "" {
+			return []string{ip}
+		}
+		return nil
+	}
+
+	out := make([]string, 0, 1+len(actor.Detail.L2.Device.ManagementAddresses))
 	if ip := ActorDetailManagementIPValue(ActorDetailManagementIP(actor)); ip != "" {
 		out = append(out, ip)
-	}
-	for _, address := range actor.Detail.SNMP.ManagementAddresses {
-		if ip := ActorDetailManagementIPValue(address.Address); ip != "" {
-			out = append(out, ip)
-		}
 	}
 	for _, address := range actor.Detail.L2.Device.ManagementAddresses {
 		if ip := ActorDetailManagementIPValue(address); ip != "" {
@@ -81,8 +87,34 @@ func ActorDetailManagementIPs(actor Actor) []string {
 	return topologyutil.DeduplicateSortedStrings(out)
 }
 
+func actorHasReconciledL2Device(actor Actor) bool {
+	return strings.TrimSpace(actor.Detail.L2.Device.DeviceID) != ""
+}
+
 func ActorDetailManagementIPValue(value string) string {
 	return topologyutil.NormalizeNonUnspecifiedIPAddress(value)
+}
+
+// ParseManagementAddressIP accepts only IP-family observations. An empty type
+// retains legacy inference.
+func ParseManagementAddressIP(address ManagementAddress) (netip.Addr, bool) {
+	parsed, ok := topologyutil.ParseIPAddress(address.Address)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	switch strings.ToLower(strings.TrimSpace(address.AddressType)) {
+	case "":
+		return parsed.Unmap(), true
+	case "ipv4":
+		if parsed.Is4() {
+			return parsed.Unmap(), true
+		}
+	case "ipv6":
+		if parsed.Is6() {
+			return parsed, true
+		}
+	}
+	return netip.Addr{}, false
 }
 
 func ActorDetailDeviceID(actor Actor) string {

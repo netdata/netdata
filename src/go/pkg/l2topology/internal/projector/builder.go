@@ -23,6 +23,7 @@ type graphBuilder struct {
 	strategyConfig topologyInferenceStrategyConfig
 
 	deviceByID           map[string]model.Device
+	deviceLinkMatchByID  map[string]graph.Match
 	ifaceByDeviceIndex   map[string]model.Interface
 	ifIndexByDeviceName  map[string]int
 	bridgeLinks          []bridgeBridgeLinkRecord
@@ -85,11 +86,13 @@ func newGraphBuilder(result model.Result, opts model.GraphOptions) *graphBuilder
 
 func (b *graphBuilder) prepareIndexes() {
 	b.deviceByID = make(map[string]model.Device, len(b.result.Devices))
+	b.deviceLinkMatchByID = make(map[string]graph.Match, len(b.result.Devices))
 	b.ifaceByDeviceIndex = make(map[string]model.Interface, len(b.result.Interfaces))
 	b.ifIndexByDeviceName = make(map[string]int, len(b.result.Interfaces))
 
 	for _, dev := range b.result.Devices {
 		b.deviceByID[dev.ID] = dev
+		b.deviceLinkMatchByID[dev.ID] = buildDeviceEndpointMatch(dev)
 	}
 
 	for _, iface := range b.result.Interfaces {
@@ -170,6 +173,7 @@ func (b *graphBuilder) projectAdjacencyTopology() {
 		b.layer,
 		b.collectedAt,
 		b.deviceByID,
+		b.deviceLinkMatchByID,
 		b.ifIndexByDeviceName,
 		b.ifaceByDeviceIndex,
 	)
@@ -196,11 +200,13 @@ func (b *graphBuilder) buildSegmentTopology() {
 		b.source,
 		b.collectedAt,
 		b.deviceByID,
+		b.deviceLinkMatchByID,
 		b.ifaceByDeviceIndex,
 		b.ifIndexByDeviceName,
 		b.bridgeLinks,
 		b.reporterAliases,
 		b.endpointActors.matchByEndpointID,
+		b.endpointActors.linkMatchByEndpointID,
 		b.endpointActors.labelsByEndpointID,
 		b.actorIndex,
 		b.opts.ProbabilisticConnectivity,
@@ -242,8 +248,8 @@ func (b *graphBuilder) finalizeGraph() {
 	b.segmentSuppressed += additionalSegmentSuppressed
 	sortProjectedTopologyActors(b.actors)
 	sortTopologyLinks(b.links)
-	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)
 	assignTopologyActorIDsAndLinkEndpoints(b.actors, b.links)
+	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)
 	enrichTopologyPortDetailsWithLinkCounts(b.actors, b.links)
 
 	b.linkCounts = summarizeTopologyLinks(b.links)

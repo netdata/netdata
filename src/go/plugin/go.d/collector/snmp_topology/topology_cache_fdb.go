@@ -20,13 +20,13 @@ func init() {
 func (c *topologyCache) updateFdbEntry(tags map[string]string) {
 	c.updateLocalBridgeIdentityFromTags(tags)
 
-	mac := topologyutil.NormalizeMAC(firstNonEmpty(tags[tagFdbMac], tags[tagDot1qFdbMac]))
+	mac := topologyutil.NormalizeMAC(topologyutil.FirstNonEmptyString(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
 		c.fdbRowsDroppedNoMAC++
 		return
 	}
 
-	bridgePort := strings.TrimSpace(firstNonEmpty(tags[tagFdbBridgePort], tags[tagDot1qFdbPort]))
+	bridgePort := strings.TrimSpace(topologyutil.FirstNonEmptyString(tags[tagFdbBridgePort], tags[tagDot1qFdbPort]))
 	if bridgePort == "" || bridgePort == "0" {
 		return
 	}
@@ -45,7 +45,7 @@ func (c *topologyCache) updateFdbEntry(tags map[string]string) {
 		c.fdbEntries[key] = entry
 	}
 
-	if v := strings.TrimSpace(firstNonEmpty(tags[tagFdbStatus], tags[tagDot1qFdbStatus])); v != "" {
+	if v := strings.TrimSpace(topologyutil.FirstNonEmptyString(tags[tagFdbStatus], tags[tagDot1qFdbStatus])); v != "" {
 		entry.status = v
 	}
 	if entry.vlanID == "" && contextVLANID != "" {

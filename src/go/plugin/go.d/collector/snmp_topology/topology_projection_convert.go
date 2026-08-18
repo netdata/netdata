@@ -12,6 +12,7 @@ import (
 
 func topologyActorFromGraph(actor graph.Actor, detail topologyengine.ProjectionActorDetail) topologymodel.Actor {
 	return topologymodel.Actor{
+		ActorHandle: actor.ActorHandle,
 		ActorID:     actor.ActorID,
 		ActorType:   actor.ActorType,
 		SegmentKind: strings.TrimSpace(detail.Segment.SegmentKind),
@@ -37,19 +38,19 @@ func topologyLinksFromGraph(links []graph.Link) []topologymodel.Link {
 
 func topologyLinkFromGraph(link graph.Link) topologymodel.Link {
 	return topologymodel.Link{
-		Layer:        link.Layer,
-		Protocol:     link.Protocol,
-		LinkType:     link.LinkType,
-		Direction:    link.Direction,
-		State:        link.State,
-		SrcActorID:   link.SrcActorID,
-		DstActorID:   link.DstActorID,
-		Src:          link.Src,
-		Dst:          link.Dst,
-		DiscoveredAt: link.DiscoveredAt,
-		LastSeen:     link.LastSeen,
-		Display:      link.Display,
-		L2:           link.L2,
-		Inference:    link.Inference,
+		Layer:          link.Layer,
+		Protocol:       link.Protocol,
+		LinkType:       link.LinkType,
+		Direction:      link.Direction,
+		State:          link.State,
+		SrcActorHandle: link.SrcActorHandle,
+		DstActorHandle: link.DstActorHandle,
+		Src:            link.Src,
+		Dst:            link.Dst,
+		DiscoveredAt:   link.DiscoveredAt,
+		LastSeen:       link.LastSeen,
+		Display:        link.Display,
+		L2:             link.L2,
+		Inference:      link.Inference,
 	}
 }

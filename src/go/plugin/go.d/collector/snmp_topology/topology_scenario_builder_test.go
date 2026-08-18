@@ -3,9 +3,11 @@
 package snmptopology
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -37,6 +39,7 @@ type topologyScenario struct {
 	ospf   []topologyScenarioPortPair
 	bgp    []topologyScenarioBGPAdjacency
 	fdbARP []topologyScenarioFDBARP
+	ptr    map[string]string
 }
 
 type topologyScenarioDevice struct {
@@ -44,11 +47,13 @@ type topologyScenarioDevice struct {
 	name         string
 	actorType    string
 	mgmtIP       string
+	target       string
 	chassisMAC   string
 	sysObjectID  string
 	routerID     string
 	localAS      string
 	capabilities string
+	mgmtAliases  []string
 	ports        []*topologyScenarioPort
 }
 
@@ -93,6 +98,14 @@ func (s *topologyScenario) WithOptions(fn func(*topologyoptions.QueryOptions)) *
 	return s
 }
 
+func (s *topologyScenario) PTR(ip, name string) *topologyScenario {
+	if s.ptr == nil {
+		s.ptr = make(map[string]string)
+	}
+	s.ptr[strings.TrimSpace(ip)] = strings.TrimSpace(name)
+	return s
+}
+
 func (s *topologyScenario) Router(name, mgmtIP, chassisMAC, routerID, localAS string) *topologyScenarioDevice {
 	return s.device("router", name, mgmtIP, chassisMAC, routerID, localAS)
 }
@@ -111,6 +124,7 @@ func (s *topologyScenario) device(actorType, name, mgmtIP, chassisMAC, routerID,
 		name:         name,
 		actorType:    actorType,
 		mgmtIP:       mgmtIP,
+		target:       mgmtIP,
 		chassisMAC:   topologyutil.NormalizeMAC(chassisMAC),
 		sysObjectID:  fmt.Sprintf("1.3.6.1.4.1.8072.3.2.%d", len(s.devs)+1),
 		routerID:     routerID,
@@ -119,6 +133,16 @@ func (s *topologyScenario) device(actorType, name, mgmtIP, chassisMAC, routerID,
 	}
 	s.devs = append(s.devs, dev)
 	return dev
+}
+
+func (d *topologyScenarioDevice) Target(value string) *topologyScenarioDevice {
+	d.target = strings.TrimSpace(value)
+	return d
+}
+
+func (d *topologyScenarioDevice) ManagementAlias(ip string) *topologyScenarioDevice {
+	d.mgmtAliases = append(d.mgmtAliases, strings.TrimSpace(ip))
+	return d
 }
 
 func (d *topologyScenarioDevice) Port(name string, ifIndex int) *topologyScenarioPort {
@@ -187,6 +211,24 @@ func (s *topologyScenario) render(t testing.TB) topologyapi.Data {
 
 	registry := newTopologyRegistry()
 	registry.producerScopeID = topologyScenarioProducerScopeID
+	if len(s.ptr) > 0 {
+		dns := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
+			now: newReverseDNSTestClock().Now,
+			lookup: func(_ context.Context, ip string) ([]string, error) {
+				if name := s.ptr[ip]; name != "" {
+					return []string{name}, nil
+				}
+				return nil, nil
+			},
+		})
+		ips := make([]string, 0, len(s.ptr))
+		for ip := range s.ptr {
+			ips = append(ips, ip)
+		}
+		sort.Strings(ips)
+		dns.warm(context.Background(), ips)
+		registry.reverseDNS = dns.resolver
+	}
 	for _, dev := range s.devs {
 		registry.register(s.cacheForDevice(t, dev))
 	}
@@ -202,7 +244,7 @@ func (s *topologyScenario) cacheForDevice(t testing.TB, dev *topologyScenarioDev
 	t.Helper()
 
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
-		Hostname:    dev.mgmtIP,
+		Hostname:    dev.target,
 		SysObjectID: dev.sysObjectID,
 		SysName:     dev.name,
 		SysDescr:    topologyScenarioSysDescr,
@@ -244,6 +286,12 @@ func (s *topologyScenario) deviceMetadata(dev *topologyScenarioDevice) map[strin
 
 func (s *topologyScenario) topologyMetricsForDevice(dev *topologyScenarioDevice) []ddsnmp.Metric {
 	var metrics []ddsnmp.Metric
+	for _, ip := range dev.mgmtAliases {
+		metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindLldpLocManAddr, map[string]string{
+			tagLldpLocMgmtAddrSubtype: "1",
+			tagLldpLocMgmtAddr:        topologyScenarioIPv4Hex(ip),
+		}))
+	}
 	for _, port := range dev.ports {
 		metrics = append(metrics,
 			topologyScenarioMetric(ddsnmp.KindIfName, topologyScenarioIfTags(port)),

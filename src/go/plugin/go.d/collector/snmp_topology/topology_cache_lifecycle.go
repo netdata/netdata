@@ -49,6 +49,7 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.ifIndexByIP = src.ifIndexByIP
 	c.ifNetmaskByIP = src.ifNetmaskByIP
 	c.l3InterfacesByIP = src.l3InterfacesByIP
+	c.trapMatchMethodByIP = src.trapMatchMethodByIP
 	c.bridgePortToIf = src.bridgePortToIf
 	c.fdbEntries = src.fdbEntries
 	c.fdbIDToVlanID = src.fdbIDToVlanID
@@ -88,9 +89,6 @@ func (c *topologyCache) hasRenderableObservationAt(now time.Time) bool {
 
 	local := normalizeTopologyDevice(c.localDevice)
 	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
-	if localManagementIP == "" {
-		localManagementIP = pickManagementIP(local.ManagementAddresses)
-	}
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
 	return strings.TrimSpace(ensureTopologyObservationDeviceID(local, baseBridgeAddress)) != ""
 }
@@ -124,6 +122,8 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
+	c.rebuildTrapSourceMatchMethods()
 	c.updateFDBDiagnostics()
 	stats := topologyCacheFinalizeStats{
 		agentID:      c.agentID,
@@ -132,6 +132,24 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 	}
 	c.lastUpdate = c.updateTime
 	return stats
+}
+
+func (c *topologyCache) rebuildTrapSourceMatchMethods() {
+	methods := make(map[string]string, len(c.ifIndexByIP)+len(c.localDevice.ManagementAddresses)+1)
+	for value := range c.ifIndexByIP {
+		if addr, ok := topologyutil.ParseIPAddress(value); ok {
+			methods[addr.String()] = "local_interface_ip"
+		}
+	}
+	for _, address := range c.localDevice.ManagementAddresses {
+		if addr, ok := topologymodel.ParseManagementAddressIP(address); ok && !addr.IsUnspecified() {
+			methods[addr.String()] = "management_address"
+		}
+	}
+	if addr, ok := topologyutil.ParseIPAddress(c.localDevice.ManagementIP); ok {
+		methods[addr.String()] = "management_ip"
+	}
+	c.trapMatchMethodByIP = methods
 }
 
 func (c *topologyCache) updateFDBDiagnostics() {

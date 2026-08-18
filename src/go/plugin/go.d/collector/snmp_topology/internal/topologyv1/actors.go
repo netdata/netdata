@@ -12,8 +12,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func buildSNMPTopologyV1Actors(actors []topologymodel.Actor, stringsDict *topologyapi.StringDictionary) (topologyapi.Table, map[string]int) {
-	actorIndex := make(map[string]int, len(actors))
+type topologyV1ActorIndex map[topologymodel.ActorHandle]int
+
+func buildSNMPTopologyV1Actors(actors []topologymodel.Actor, stringsDict *topologyapi.StringDictionary) (topologyapi.Table, topologyV1ActorIndex) {
+	actorIndex := make(topologyV1ActorIndex, len(actors))
 	usedActorIDs := make(map[string]struct{}, len(actors))
 	for _, actor := range actors {
 		if actorID := strings.TrimSpace(actor.ActorID); actorID != "" {
@@ -55,7 +57,7 @@ func buildSNMPTopologyV1Actors(actors []topologymodel.Actor, stringsDict *topolo
 		if actorID == "" {
 			actorID = snmpTopologyV1FallbackActorID(actor, i, usedActorIDs)
 		}
-		actorIndex[actorID] = i
+		actorIndex[actor.ActorHandle] = i
 		ids[i] = stringsDict.Ref(actorID)
 		types[i] = stringsDict.Ref(snmpTopologyV1ActorType(actor.ActorType))
 		layers[i] = stringsDict.Ref(snmpTopologyV1ActorLayer(actor))

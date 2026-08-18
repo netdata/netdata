@@ -6,9 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func (c *topologyCache) appendObservedLLDPRemotes(observation *topologyengine.L2Observation) {
@@ -28,10 +27,7 @@ func (c *topologyCache) appendObservedLLDPRemotes(observation *topologyengine.L2
 			continue
 		}
 
-		managementIP := topologyutil.NormalizeIPAddress(remote.managementAddr)
-		if managementIP == "" {
-			managementIP = pickManagementIP(remote.managementAddrs)
-		}
+		managementIP := pickManagementIP(remote.managementAddrs)
 
 		localPort := c.lldpLocPorts[remote.localPortNum]
 		localPortID := ""
@@ -90,10 +86,7 @@ func (c *topologyCache) appendObservedCDPRemotes(observation *topologyengine.L2O
 			ifName = strings.TrimSpace(c.ifNamesByIndex[remote.ifIndex])
 		}
 
-		address := strings.TrimSpace(remote.address)
-		if address == "" {
-			address = pickManagementIP(remote.managementAddrs)
-		}
+		address := pickManagementIP(remote.managementAddrs)
 
 		observation.CDPRemotes = append(observation.CDPRemotes, topologyengine.CDPRemoteObservation{
 			LocalIfIndex: topologyutil.ParseIndex(remote.ifIndex),
@@ -103,6 +96,7 @@ func (c *topologyCache) appendObservedCDPRemotes(observation *topologyengine.L2O
 			SysName:      sysName,
 			DevicePort:   strings.TrimSpace(remote.devicePort),
 			Address:      address,
+			RawAddress:   remote.rawAddress,
 		})
 	}
 }

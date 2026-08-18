@@ -33,12 +33,13 @@ type Result struct {
 
 // Device is a discovered network device.
 type Device struct {
-	ID        string
-	Hostname  string
-	Addresses []netip.Addr
-	SysObject string
-	ChassisID string
-	Labels    map[string]string
+	ID           string
+	Hostname     string
+	ManagementIP netip.Addr
+	Addresses    []netip.Addr
+	SysObject    string
+	ChassisID    string
+	Labels       map[string]string
 }
 
 // Interface is a discovered interface on a device.
@@ -83,9 +84,12 @@ type L2Observation struct {
 	DeviceID string
 	// Inferred marks observations synthesized from neighbor advertisements
 	// (for example LLDP/CDP remotes), not directly observed local devices.
-	Inferred          bool
-	Hostname          string
-	ManagementIP      string
+	Inferred     bool
+	Hostname     string
+	ManagementIP string
+	// ManagementAliases contains vetted canonical IP identity aliases. Raw or
+	// typed diagnostic address observations must not use this field.
+	ManagementAliases []string
 	SysObjectID       string
 	ChassisID         string
 	BaseBridgeAddress string
@@ -137,7 +141,10 @@ type CDPRemoteObservation struct {
 	DeviceID     string
 	SysName      string
 	DevicePort   string
-	Address      string
+	// Address is the normalized management identity selected for matching.
+	Address string
+	// RawAddress is the exact cdpCacheAddress observation for diagnostics.
+	RawAddress string
 }
 
 // BridgePortObservation maps one bridge base port to an interface index.

@@ -12,6 +12,9 @@ import (
 
 func TestGraphJSONShape(t *testing.T) {
 	tm := time.Date(2026, time.June, 20, 8, 9, 10, 0, time.UTC)
+	handles := NewActorHandleAllocator()
+	actorAHandle := handles.Next()
+	actorBHandle := handles.Next()
 	payload := Graph{
 		SchemaVersion: "2.0",
 		Source:        "snmp",
@@ -20,10 +23,11 @@ func TestGraphJSONShape(t *testing.T) {
 		CollectedAt:   tm,
 		View:          "summary",
 		Actors: []Actor{{
-			ActorID:   "actor-a",
-			ActorType: "router",
-			Layer:     "3",
-			Source:    "snmp",
+			ActorHandle: actorAHandle,
+			ActorID:     "actor-a",
+			ActorType:   "router",
+			Layer:       "3",
+			Source:      "snmp",
 			Match: Match{
 				ChassisIDs:         []string{"chassis-a"},
 				MacAddresses:       []string{"00:11:22:33:44:55"},
@@ -44,13 +48,15 @@ func TestGraphJSONShape(t *testing.T) {
 			Labels:      map[string]string{"site": "lab"},
 		}},
 		Links: []Link{{
-			Layer:      "3",
-			Protocol:   "ospf",
-			LinkType:   "ospf_adjacency",
-			Direction:  "bidirectional",
-			State:      "up",
-			SrcActorID: "actor-a",
-			DstActorID: "actor-b",
+			Layer:          "3",
+			Protocol:       "ospf",
+			LinkType:       "ospf_adjacency",
+			Direction:      "bidirectional",
+			State:          "up",
+			SrcActorHandle: actorAHandle,
+			DstActorHandle: actorBHandle,
+			SrcActorID:     "actor-a",
+			DstActorID:     "actor-b",
 			Src: LinkEndpoint{
 				Match:         Match{IPAddresses: []string{"10.0.0.1"}},
 				IfIndex:       1,
@@ -146,4 +152,53 @@ func TestGraphJSONShape(t *testing.T) {
 				"inference":{"inference":"probable","confidence":"low","attachment_mode":"probable_direct"}
 			}]
 		}`, string(bs))
+}
+
+func TestLinkEndpointMatch(t *testing.T) {
+	tests := map[string]struct {
+		match     Match
+		preferred string
+		want      []string
+	}{
+		"preferred canonical member": {
+			match:     Match{IPAddresses: []string{"10.0.0.2", "::ffff:10.0.0.10"}},
+			preferred: " ::ffff:10.0.0.10 ",
+			want:      []string{"10.0.0.10"},
+		},
+		"preferred absent uses numeric first": {
+			match:     Match{IPAddresses: []string{"10.0.0.10", "10.0.0.2"}},
+			preferred: "10.0.0.3",
+			want:      []string{"10.0.0.2"},
+		},
+		"invalid and zoned values are ignored": {
+			match: Match{IPAddresses: []string{"not-an-ip", "fe80::1%eth0"}},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			original := append([]string(nil), tc.match.IPAddresses...)
+			got := LinkEndpointMatch(tc.match, tc.preferred)
+
+			require.Equal(t, tc.want, got.IPAddresses)
+			require.Equal(t, original, tc.match.IPAddresses)
+		})
+	}
+
+	source := Match{
+		ChassisIDs:   []string{"chassis-a"},
+		MacAddresses: []string{"00:11:22:33:44:55"},
+		IPAddresses:  []string{"10.0.0.2", "10.0.0.10"},
+		Hostnames:    []string{"router-a"},
+		SysName:      "router-a",
+	}
+	got := LinkEndpointMatch(source, "10.0.0.10")
+	require.Equal(t, []string{"10.0.0.10"}, got.IPAddresses)
+	require.Equal(t, source.ChassisIDs, got.ChassisIDs)
+	require.Equal(t, source.MacAddresses, got.MacAddresses)
+	require.Equal(t, source.Hostnames, got.Hostnames)
+	require.Equal(t, source.SysName, got.SysName)
+
+	got.IPAddresses[0] = "192.0.2.1"
+	require.Equal(t, []string{"10.0.0.2", "10.0.0.10"}, source.IPAddresses)
 }

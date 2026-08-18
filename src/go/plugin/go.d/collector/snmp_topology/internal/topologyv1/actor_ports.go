@@ -26,8 +26,9 @@ type snmpTopologyV1PortNeighborSummary struct {
 }
 
 type topologyV1DynamicRow struct {
-	actorRef int
-	values   map[string]any
+	actorRef          int
+	remoteActorHandle topologymodel.ActorHandle
+	values            map[string]any
 }
 
 func snmpTopologyV1PortNeighborKeyFor(actorRef int, ifIndex any, portName string) snmpTopologyV1PortNeighborKey {
@@ -43,15 +44,15 @@ func snmpTopologyV1PortNeighborKeyFor(actorRef int, ifIndex any, portName string
 
 func buildSNMPTopologyV1PortNeighborSummaries(
 	links []topologymodel.Link,
-	actorIndex map[string]int,
+	actorIndex topologyV1ActorIndex,
 ) map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary {
 	summaries := make(map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary)
-	appendSide := func(actorID, remoteActorID string, endpoint, remoteEndpoint topologymodel.LinkEndpoint) {
-		actorRef, ok := actorIndex[strings.TrimSpace(actorID)]
+	appendSide := func(actorHandle, remoteActorHandle topologymodel.ActorHandle, endpoint, remoteEndpoint topologymodel.LinkEndpoint) {
+		actorRef, ok := actorIndex[actorHandle]
 		if !ok {
 			return
 		}
-		remoteActorRef, ok := actorIndex[strings.TrimSpace(remoteActorID)]
+		remoteActorRef, ok := actorIndex[remoteActorHandle]
 		if !ok {
 			return
 		}
@@ -80,8 +81,8 @@ func buildSNMPTopologyV1PortNeighborSummaries(
 		if snmpTopologyV1LinkIsLogicalL3(link) {
 			continue
 		}
-		appendSide(link.SrcActorID, link.DstActorID, link.Src, link.Dst)
-		appendSide(link.DstActorID, link.SrcActorID, link.Dst, link.Src)
+		appendSide(link.SrcActorHandle, link.DstActorHandle, link.Src, link.Dst)
+		appendSide(link.DstActorHandle, link.SrcActorHandle, link.Dst, link.Src)
 	}
 	return summaries
 }
@@ -142,14 +143,16 @@ func collectSNMPTopologyV1ActorTableRows(actors []topologymodel.Actor) map[strin
 		}
 		for _, row := range actor.Detail.OSPF {
 			tables["ospf_neighbors"] = append(tables["ospf_neighbors"], topologyV1DynamicRow{
-				actorRef: actorIndex,
-				values:   snmpTopologyV1OSPFNeighborValues(row),
+				actorRef:          actorIndex,
+				remoteActorHandle: row.RemoteActorHandle,
+				values:            snmpTopologyV1OSPFNeighborValues(row),
 			})
 		}
 		for _, row := range actor.Detail.BGP {
 			tables["bgp_peers"] = append(tables["bgp_peers"], topologyV1DynamicRow{
-				actorRef: actorIndex,
-				values:   snmpTopologyV1BGPPeerValues(row),
+				actorRef:          actorIndex,
+				remoteActorHandle: row.RemoteActorHandle,
+				values:            snmpTopologyV1BGPPeerValues(row),
 			})
 		}
 	}
@@ -353,18 +356,18 @@ func buildSNMPTopologyV1ActorPortsTable(
 
 func buildSNMPTopologyV1ActorPortLinksTable(
 	links []topologymodel.Link,
-	actorIndex map[string]int,
+	actorIndex topologyV1ActorIndex,
 	stringsDict *topologyapi.StringDictionary,
 ) (topologyapi.Table, error) {
 	rows := &snmpTopologyV1ActorPortLinkRows{}
-	appendSide := func(linkIndex int, link topologymodel.Link, actorID, remoteActorID string, endpoint, remoteEndpoint topologymodel.LinkEndpoint) error {
-		actorRef, ok := actorIndex[strings.TrimSpace(actorID)]
+	appendSide := func(linkIndex int, link topologymodel.Link, actorHandle, remoteActorHandle topologymodel.ActorHandle, endpoint, remoteEndpoint topologymodel.LinkEndpoint) error {
+		actorRef, ok := actorIndex[actorHandle]
 		if !ok {
-			return fmt.Errorf("link %d references unknown actor %q", linkIndex, actorID)
+			return fmt.Errorf("link %d references an unknown actor handle", linkIndex)
 		}
-		remoteActorRef, ok := actorIndex[strings.TrimSpace(remoteActorID)]
+		remoteActorRef, ok := actorIndex[remoteActorHandle]
 		if !ok {
-			return fmt.Errorf("link %d references unknown remote actor %q", linkIndex, remoteActorID)
+			return fmt.Errorf("link %d references an unknown remote actor handle", linkIndex)
 		}
 		protocol := topologyutil.FirstNonEmptyString(link.Protocol, link.LinkType, "l2")
 		linkType := snmpTopologyV1LinkType(link)
@@ -394,10 +397,10 @@ func buildSNMPTopologyV1ActorPortLinksTable(
 		if snmpTopologyV1LinkIsLogicalL3(link) {
 			continue
 		}
-		if err := appendSide(i, link, link.SrcActorID, link.DstActorID, link.Src, link.Dst); err != nil {
+		if err := appendSide(i, link, link.SrcActorHandle, link.DstActorHandle, link.Src, link.Dst); err != nil {
 			return topologyapi.Table{}, err
 		}
-		if err := appendSide(i, link, link.DstActorID, link.SrcActorID, link.Dst, link.Src); err != nil {
+		if err := appendSide(i, link, link.DstActorHandle, link.SrcActorHandle, link.Dst, link.Src); err != nil {
 			return topologyapi.Table{}, err
 		}
 	}

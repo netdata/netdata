@@ -10,7 +10,7 @@ import (
 
 func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologymodel.Device {
 	device := topologymodel.Device{
-		ManagementIP:       dev.Hostname,
+		ManagementIP:       normalizeEligibleManagementIP(dev.Hostname),
 		ChartIDPrefix:      topologyProfileChartIDPrefix,
 		ChartContextPrefix: topologyProfileChartContextPrefix,
 		SysObjectID:        dev.SysObjectID,

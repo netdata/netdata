@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ func (s *l2BuildState) registerObservations(observations []model.L2Observation) 
 			return err
 		}
 	}
+	s.finalizeDirectIPIndex()
 	return nil
 }
 
@@ -36,21 +38,39 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	if primaryMAC := primaryL2MACIdentity(obs.ChassisID, obs.BaseBridgeAddress); primaryMAC != "" {
 		device.ChassisID = primaryMAC
 	}
-	if !obs.Inferred {
-		s.managedObservationByDeviceID[deviceID] = true
-	}
+	incomingManaged := !obs.Inferred
+	existingManagementIPDirect := s.directManagementIPByDeviceID[deviceID]
 	if device.Hostname == "" {
 		device.Hostname = device.ID
 	}
-	if addr := parseAddr(obs.ManagementIP); addr.IsValid() {
-		device.Addresses = []netip.Addr{addr}
+	managementAddr := canonicalUsableIPAddress(obs.ManagementIP)
+	managementAliases := canonicalManagementAliases(obs.ManagementAliases)
+	if incomingManaged {
+		addresses := make(map[string]netip.Addr, 1+len(managementAliases))
+		for _, addr := range managementAliases {
+			addresses[addr.String()] = addr
+		}
+		if managementAddr.IsValid() {
+			device.ManagementIP = managementAddr
+			addresses[managementAddr.String()] = managementAddr
+		}
+		device.Addresses = sortedAddrValues(addresses)
 	}
+	selectedManagementIPDirect := incomingManaged && device.ManagementIP.IsValid()
 	if len(device.Labels) == 0 {
 		device.Labels = make(map[string]string)
 	}
 	observedProtocols := observationProtocolsUsed(obs)
 	if existing, ok := s.devices[device.ID]; ok {
+		selectedManagementIP, selectedDirect := selectObservedManagementIP(
+			existing.ManagementIP,
+			device.ManagementIP,
+			existingManagementIPDirect,
+			selectedManagementIPDirect,
+		)
 		device = mergeObservedDevice(existing, device)
+		device.ManagementIP = selectedManagementIP
+		selectedManagementIPDirect = selectedDirect
 		if device.Labels == nil {
 			device.Labels = make(map[string]string)
 		}
@@ -58,16 +78,36 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 			observedProtocols[protocol] = struct{}{}
 		}
 	}
+	if incomingManaged {
+		s.managedObservationByDeviceID[deviceID] = true
+	}
+	if selectedManagementIPDirect {
+		s.directManagementIPByDeviceID[deviceID] = true
+	} else {
+		delete(s.directManagementIPByDeviceID, deviceID)
+	}
 	if len(observedProtocols) > 0 {
 		device.Labels["protocols_observed"] = setToCSV(observedProtocols)
 	}
 	s.devices[device.ID] = device
+	if incomingManaged {
+		if managementAddr.IsValid() {
+			s.recordDirectManagementAddress(device.ID, managementAddr, true)
+		}
+		for _, addr := range managementAliases {
+			s.recordDirectManagementAddress(device.ID, addr, false)
+		}
+	} else {
+		if managementAddr.IsValid() {
+			s.recordRemoteManagementAddress(device.ID, managementAddr.String())
+		}
+		for _, addr := range managementAliases {
+			s.recordRemoteManagementAddress(device.ID, addr.String())
+		}
+	}
 
 	if host := canonicalHost(device.Hostname); host != "" {
 		s.hostToID[host] = device.ID
-	}
-	if ip := canonicalIP(obs.ManagementIP); ip != "" {
-		s.ipToID[ip] = device.ID
 	}
 	if mac := primaryL2MACIdentity(device.ChassisID, ""); mac != "" {
 		if _, exists := s.macToID[mac]; !exists {
@@ -160,6 +200,93 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	return nil
 }
 
+func canonicalManagementAliases(values []string) []netip.Addr {
+	aliases := make(map[string]netip.Addr, len(values))
+	for _, value := range values {
+		addr := canonicalUsableIPAddress(value)
+		if !addr.IsValid() {
+			continue
+		}
+		aliases[addr.String()] = addr
+	}
+	return sortedAddrValues(aliases)
+}
+
+func (s *l2BuildState) recordDirectManagementAddress(deviceID string, addr netip.Addr, selectedPrimary bool) {
+	deviceID = strings.TrimSpace(deviceID)
+	addr = addr.Unmap()
+	if deviceID == "" || !isUsableAliasIPAddress(addr) {
+		return
+	}
+
+	claims := s.directAddressClaimsByIP[addr.String()]
+	if claims == nil {
+		claims = &directAddressClaims{
+			primaryOwners: make(map[string]struct{}),
+			aliasOwners:   make(map[string]struct{}),
+		}
+		s.directAddressClaimsByIP[addr.String()] = claims
+	}
+	if selectedPrimary {
+		claims.primaryOwners[deviceID] = struct{}{}
+	} else {
+		claims.aliasOwners[deviceID] = struct{}{}
+	}
+}
+
+func (s *l2BuildState) finalizeDirectIPIndex() {
+	s.directIPToID = make(map[string]string, len(s.directAddressClaimsByIP))
+	s.directOwnersByIP = make(map[string]map[string]struct{}, len(s.directAddressClaimsByIP))
+	for ip, claims := range s.directAddressClaimsByIP {
+		owners := make(map[string]struct{}, len(claims.primaryOwners)+len(claims.aliasOwners))
+		maps.Copy(owners, claims.primaryOwners)
+		maps.Copy(owners, claims.aliasOwners)
+		s.directOwnersByIP[ip] = owners
+
+		if len(claims.primaryOwners) == 1 {
+			for deviceID := range claims.primaryOwners {
+				s.directIPToID[ip] = deviceID
+			}
+		} else if len(claims.primaryOwners) == 0 && len(claims.aliasOwners) == 1 {
+			for deviceID := range claims.aliasOwners {
+				s.directIPToID[ip] = deviceID
+			}
+		}
+	}
+
+	for deviceID, device := range s.devices {
+		addresses := make(map[string]netip.Addr, len(device.Addresses))
+		for _, addr := range device.Addresses {
+			addr = addr.Unmap()
+			if !addr.IsValid() || !s.keepDirectManagementAddress(deviceID, addr.String()) {
+				continue
+			}
+			addresses[addr.String()] = addr
+		}
+		device.Addresses = sortedAddrValues(addresses)
+		s.devices[deviceID] = device
+	}
+	s.directAddressClaimsByIP = nil
+}
+
+func (s *l2BuildState) keepDirectManagementAddress(deviceID, ip string) bool {
+	claims := s.directAddressClaimsByIP[ip]
+	if claims == nil {
+		return true
+	}
+	if _, primary := claims.primaryOwners[deviceID]; primary {
+		return true
+	}
+	if len(claims.primaryOwners) > 0 {
+		return false
+	}
+	if len(claims.aliasOwners) != 1 {
+		return false
+	}
+	_, owned := claims.aliasOwners[deviceID]
+	return owned
+}
+
 func mergeObservedDevice(existing, incoming model.Device) model.Device {
 	out := existing
 	if strings.TrimSpace(out.ID) == "" {
@@ -180,6 +307,33 @@ func mergeObservedDevice(existing, incoming model.Device) model.Device {
 		out.Hostname = out.ID
 	}
 	return out
+}
+
+func selectObservedManagementIP(existing, incoming netip.Addr, existingDirect, incomingDirect bool) (netip.Addr, bool) {
+	existing = existing.Unmap()
+	incoming = incoming.Unmap()
+	if !existing.IsValid() {
+		return incoming, incoming.IsValid() && incomingDirect
+	}
+	if !incoming.IsValid() {
+		return existing, existingDirect
+	}
+	if existingDirect != incomingDirect {
+		if incomingDirect {
+			return incoming, true
+		}
+		return existing, true
+	}
+	if !existingDirect && existing.IsPrivate() != incoming.IsPrivate() {
+		if incoming.IsPrivate() {
+			return incoming, false
+		}
+		return existing, false
+	}
+	if incoming.Compare(existing) < 0 {
+		return incoming, incomingDirect
+	}
+	return existing, existingDirect
 }
 
 func mergeObservedDeviceAddresses(existing, incoming []netip.Addr) []netip.Addr {

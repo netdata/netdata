@@ -73,7 +73,16 @@ func sortedCDPRemotes(in []model.CDPRemoteObservation) []model.CDPRemoteObservat
 		if a.DeviceID != b.DeviceID {
 			return a.DeviceID < b.DeviceID
 		}
-		return a.Address < b.Address
+		if a.LocalIfName != b.LocalIfName {
+			return a.LocalIfName < b.LocalIfName
+		}
+		if a.DevicePort != b.DevicePort {
+			return a.DevicePort < b.DevicePort
+		}
+		if a.Address != b.Address {
+			return a.Address < b.Address
+		}
+		return a.RawAddress < b.RawAddress
 	})
 	return out
 }

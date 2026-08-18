@@ -434,9 +434,6 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 			entry[tagCdpIfIndex] = ifIndex
 			entry[tagCdpDeviceIndex] = deviceIndex
 			entry[tagCdpAddress] = val
-			if val != "" {
-				data.cdpMgmtAddrs[val] = struct{}{}
-			}
 			continue
 		}
 		if indexes, ok := parseOIDIndexes(oid, "1.3.6.1.4.1.9.9.23.1.2.1.1.10", 2); ok {
@@ -521,9 +518,6 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 			entry[tagCdpIfIndex] = ifIndex
 			entry[tagCdpDeviceIndex] = deviceIndex
 			entry[tagCdpPrimaryMgmtAddr] = val
-			if val != "" {
-				data.cdpMgmtAddrs[val] = struct{}{}
-			}
 			continue
 		}
 		if indexes, ok := parseOIDIndexes(oid, "1.3.6.1.4.1.9.9.23.1.2.1.1.21", 2); ok {
@@ -542,9 +536,6 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 			entry[tagCdpIfIndex] = ifIndex
 			entry[tagCdpDeviceIndex] = deviceIndex
 			entry[tagCdpSecondaryMgmtAddr] = val
-			if val != "" {
-				data.cdpMgmtAddrs[val] = struct{}{}
-			}
 			continue
 		}
 		if indexes, ok := parseOIDIndexes(oid, "1.3.6.1.4.1.9.9.23.1.2.1.1.23", 2); ok {
@@ -574,6 +565,11 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 		if len(parts) == 2 {
 			if name := data.ifNames[parts[0]]; name != "" {
 				entry[tagCdpIfName] = name
+			}
+		}
+		for _, address := range appendCdpManagementAddresses(entry, nil) {
+			if ip, ok := managementAddressIP(address); ok {
+				data.cdpMgmtAddrs[ip.String()] = struct{}{}
 			}
 		}
 	}

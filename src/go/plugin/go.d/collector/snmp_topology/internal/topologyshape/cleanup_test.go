@@ -9,23 +9,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFilterDanglingLinks_TrimActorIDsBeforeLookup(t *testing.T) {
+func TestFilterDanglingLinksUsesActorHandles(t *testing.T) {
 	data := &topologymodel.Data{
 		Actors: []topologymodel.Actor{
 			{ActorID: "device-a"},
 			{ActorID: "device-b"},
 		},
 		Links: []topologymodel.Link{
-			{SrcActorID: " device-a ", DstActorID: "\tdevice-b\n"},
-			{SrcActorID: "device-a", DstActorID: "missing"},
+			{SrcActorHandle: topologyShapeTestActorHandle(" device-a "), DstActorHandle: topologyShapeTestActorHandle("\tdevice-b\n")},
+			{SrcActorHandle: topologyShapeTestActorHandle("device-a"), DstActorHandle: topologyShapeTestActorHandle("missing")},
 		},
 	}
+	assignTopologyShapeTestHandles(t, data)
 
 	filterDanglingLinks(data)
 
 	require.Len(t, data.Links, 1)
-	require.Equal(t, " device-a ", data.Links[0].SrcActorID)
-	require.Equal(t, "\tdevice-b\n", data.Links[0].DstActorID)
+	require.Equal(t, topologyShapeTestActorHandle("device-a"), data.Links[0].SrcActorHandle)
+	require.Equal(t, topologyShapeTestActorHandle("device-b"), data.Links[0].DstActorHandle)
 }
 
 func TestPruneSparseSegmentsRemovesMultiRoundFixpoint(t *testing.T) {
@@ -36,19 +37,21 @@ func TestPruneSparseSegmentsRemovesMultiRoundFixpoint(t *testing.T) {
 			{ActorID: "segment-b", ActorType: "segment", SegmentKind: topologymodel.SegmentKindBroadcastDomain},
 		},
 		Links: []topologymodel.Link{
-			{SrcActorID: "device-a", DstActorID: "segment-a"},
-			{SrcActorID: "segment-a", DstActorID: "segment-b"},
+			{SrcActorHandle: topologyShapeTestActorHandle("device-a"), DstActorHandle: topologyShapeTestActorHandle("segment-a")},
+			{SrcActorHandle: topologyShapeTestActorHandle("segment-a"), DstActorHandle: topologyShapeTestActorHandle("segment-b")},
 		},
 	}
+	assignTopologyShapeTestHandles(t, data)
+	expectedActor := data.Actors[0]
 
 	removed := pruneSparseSegments(data, 1)
 
 	require.Equal(t, 2, removed)
-	require.Equal(t, []topologymodel.Actor{{ActorID: "device-a", ActorType: "device"}}, data.Actors)
+	require.Equal(t, []topologymodel.Actor{expectedActor}, data.Actors)
 	require.Empty(t, data.Links)
 }
 
-func TestPruneSparseSegmentsTrimsLinkEndpointIDsBeforeNeighborLookup(t *testing.T) {
+func TestPruneSparseSegmentsUsesLinkEndpointHandles(t *testing.T) {
 	data := &topologymodel.Data{
 		Actors: []topologymodel.Actor{
 			{ActorID: "device-a", ActorType: "device"},
@@ -56,10 +59,11 @@ func TestPruneSparseSegmentsTrimsLinkEndpointIDsBeforeNeighborLookup(t *testing.
 			{ActorID: "segment-a", ActorType: "segment", SegmentKind: topologymodel.SegmentKindBroadcastDomain},
 		},
 		Links: []topologymodel.Link{
-			{SrcActorID: "device-a", DstActorID: " segment-a "},
-			{SrcActorID: "\tsegment-a\n", DstActorID: "device-b"},
+			{SrcActorHandle: topologyShapeTestActorHandle("device-a"), DstActorHandle: topologyShapeTestActorHandle(" segment-a ")},
+			{SrcActorHandle: topologyShapeTestActorHandle("\tsegment-a\n"), DstActorHandle: topologyShapeTestActorHandle("device-b")},
 		},
 	}
+	assignTopologyShapeTestHandles(t, data)
 
 	removed := pruneSparseSegments(data, 1)
 
@@ -75,9 +79,10 @@ func TestPruneSparseSegmentsKeepsVisibleL3SubnetSegment(t *testing.T) {
 			{ActorID: "subnet-a", ActorType: topologymodel.L3SubnetSegmentActorType, SegmentKind: topologymodel.SegmentKindL3Subnet},
 		},
 		Links: []topologymodel.Link{
-			{SrcActorID: "router-a", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+			{SrcActorHandle: topologyShapeTestActorHandle("router-a"), DstActorHandle: topologyShapeTestActorHandle("subnet-a"), Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
 		},
 	}
+	assignTopologyShapeTestHandles(t, data)
 
 	removed := pruneSparseSegments(data, 1)
 

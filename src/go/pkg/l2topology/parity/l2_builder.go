@@ -495,7 +495,8 @@ func (p parsedFixture) toCDPRemotes() []l2topology.CDPRemoteObservation {
 			DeviceIndex:  remote.deviceIndex,
 			DeviceID:     remote.deviceID,
 			DevicePort:   remote.devicePort,
-			Address:      remote.address,
+			Address:      normalizeCDPFixtureAddress(remote.address, remote.addressType),
+			RawAddress:   remote.address,
 		})
 	}
 	return obs
@@ -633,6 +634,56 @@ func decodeHexIP(v string) string {
 		}
 	}
 	return ""
+}
+
+func normalizeCDPFixtureAddress(value, addressType string) string {
+	value = strings.TrimSpace(value)
+	addressType = strings.TrimSpace(addressType)
+	if value == "" {
+		return ""
+	}
+
+	var addr netip.Addr
+	var family string
+	if parsed, err := netip.ParseAddr(value); err == nil && parsed.IsValid() {
+		addr = parsed
+		if parsed.Is4() {
+			family = "1"
+		} else {
+			family = "20"
+		}
+	} else {
+		decoded := decodeHexBytes(value)
+		switch len(decoded) {
+		case 4:
+			family = "1"
+		case 16:
+			family = "20"
+		default:
+			parsed, err := netip.ParseAddr(strings.TrimSpace(string(decoded)))
+			if err != nil || !parsed.IsValid() {
+				return ""
+			}
+			addr = parsed
+			if parsed.Is4() {
+				family = "1"
+			} else {
+				family = "20"
+			}
+		}
+		if !addr.IsValid() {
+			parsed, ok := netip.AddrFromSlice(decoded)
+			if !ok {
+				return ""
+			}
+			addr = parsed
+		}
+	}
+
+	if addressType != "" && addressType != family {
+		return ""
+	}
+	return addr.Unmap().String()
 }
 
 func decodeHexBytes(v string) []byte {

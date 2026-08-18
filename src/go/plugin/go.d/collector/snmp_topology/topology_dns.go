@@ -196,15 +196,5 @@ func normalizeTopologyReverseDNSCandidateIP(ip string) (netip.Addr, bool) {
 }
 
 func isEligibleTopologyReverseDNSAddress(addr netip.Addr) bool {
-	if !addr.IsValid() {
-		return false
-	}
-	if addr.IsUnspecified() || addr.IsLoopback() || addr.IsMulticast() ||
-		addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() {
-		return false
-	}
-	if addr.Is4() && addr == netip.MustParseAddr("255.255.255.255") {
-		return false
-	}
-	return true
+	return isEligibleTopologyIPAddress(addr)
 }

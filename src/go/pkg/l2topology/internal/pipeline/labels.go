@@ -5,8 +5,10 @@ package pipeline
 import "github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 
 const (
-	adjacencyLabelPairID   = model.AdjacencyLabelPairID
-	adjacencyLabelPairPass = model.AdjacencyLabelPairPass
+	adjacencyLabelPairID             = model.AdjacencyLabelPairID
+	adjacencyLabelPairPass           = model.AdjacencyLabelPairPass
+	adjacencyLabelRemoteManagementIP = model.AdjacencyLabelRemoteManagementIP
+	adjacencyLabelRemoteAddressRaw   = model.AdjacencyLabelRemoteAddressRaw
 )
 
 const (

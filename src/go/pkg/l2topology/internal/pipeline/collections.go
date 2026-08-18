@@ -14,17 +14,20 @@ func sortedAddrValues(in map[string]netip.Addr) []netip.Addr {
 	if len(in) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(in))
-	for key := range in {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	out := make([]netip.Addr, 0, len(keys))
-	for _, key := range keys {
-		if addr, ok := in[key]; ok && addr.IsValid() {
-			out = append(out, addr)
+	out := make([]netip.Addr, 0, len(in))
+	seen := make(map[netip.Addr]struct{}, len(in))
+	for _, addr := range in {
+		addr = addr.Unmap()
+		if !addr.IsValid() {
+			continue
 		}
+		if _, ok := seen[addr]; ok {
+			continue
+		}
+		seen[addr] = struct{}{}
+		out = append(out, addr)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Compare(out[j]) < 0 })
 	return out
 }
 

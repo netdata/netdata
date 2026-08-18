@@ -99,7 +99,7 @@ func annotateLLDPLinkMatchIdentities(
 	links []lldpMatchLink,
 	hostToID map[string]string,
 	chassisToID map[string]string,
-	ipToID map[string]string,
+	directIPToID map[string]string,
 ) {
 	for i := range links {
 		link := &links[i]
@@ -109,14 +109,14 @@ func annotateLLDPLinkMatchIdentities(
 		if strings.TrimSpace(link.remoteMatchID) != "" {
 			continue
 		}
-		link.remoteMatchID = resolveKnownDeviceID(hostToID, chassisToID, ipToID, link.remoteSysName, link.remoteChassisID, link.remoteManagement)
+		link.remoteMatchID = resolveKnownDeviceID(hostToID, chassisToID, directIPToID, link.remoteSysName, link.remoteChassisID, link.remoteManagement)
 	}
 }
 
 func resolveKnownDeviceID(
 	hostToID map[string]string,
 	chassisToID map[string]string,
-	ipToID map[string]string,
+	directIPToID map[string]string,
 	hostname, chassisID, managementIP string,
 ) string {
 	if id := hostToID[canonicalHost(hostname)]; strings.TrimSpace(id) != "" {
@@ -125,7 +125,7 @@ func resolveKnownDeviceID(
 	if id := chassisToID[canonicalToken(chassisID)]; strings.TrimSpace(id) != "" {
 		return strings.TrimSpace(id)
 	}
-	if id := ipToID[canonicalIP(managementIP)]; strings.TrimSpace(id) != "" {
+	if id := directIPToID[canonicalIP(managementIP)]; strings.TrimSpace(id) != "" {
 		return strings.TrimSpace(id)
 	}
 	return ""

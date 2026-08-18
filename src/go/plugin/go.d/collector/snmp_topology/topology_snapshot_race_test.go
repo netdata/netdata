@@ -59,7 +59,7 @@ func TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels(t *testing.
 			if collectPath {
 				_, _ = snapshotTopologyRegistryForTest(registry)
 			} else {
-				_, _ = registry.snapshotWithOptions(topologyoptions.QueryOptions{})
+				_, _, _ = registry.snapshotWithOptions(topologyoptions.QueryOptions{})
 			}
 		}()
 	}
