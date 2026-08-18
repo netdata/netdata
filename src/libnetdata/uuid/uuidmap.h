@@ -43,6 +43,16 @@ size_t uuidmap_destroy(void);
 // delete a uuid from the map
 void uuidmap_free(UUIDMAP_ID id);
 
+// Look up the id of a uuid WITHOUT creating it and WITHOUT taking a reference,
+// so it needs no matching uuidmap_free(). Returns 0 when the uuid is unknown.
+//
+// The returned id is a key, not a handle: it must NOT be used to reach the
+// uuidmap entry (uuidmap_uuid(), uuidmap_uuid_ptr(), uuidmap_dup(), ...), because
+// nothing keeps that entry alive. It is safe to use as a lookup key in a
+// structure whose own entries hold uuidmap references -- ids are never reused,
+// so a stale id can only ever miss, never alias a different uuid.
+UUIDMAP_ID uuidmap_peek_id(const nd_uuid_t uuid);
+
 // returns true if found, false if not found
 // UUID is copied to out_uuid if found
 bool uuidmap_uuid(UUIDMAP_ID id, nd_uuid_t out_uuid);

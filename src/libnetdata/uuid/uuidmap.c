@@ -111,6 +111,25 @@ static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     return id;
 }
 
+UUIDMAP_ID uuidmap_peek_id(const nd_uuid_t uuid) {
+    UUIDMAP_ID id = 0;
+
+    uint8_t partition = uuid_to_uuidmap_partition(uuid);
+
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+
+    Pvoid_t *PValue = JudyHSGet(uuid_map.p[partition].uuid_to_id, (void *)uuid, sizeof(nd_uuid_t));
+    if(unlikely(PValue == PJERR))
+        fatal("UUIDMAP: corrupted JudyHS array");
+
+    if(PValue && *PValue)
+        id = *(UUIDMAP_ID *)PValue;
+
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
+    return id;
+}
+
 UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     UUIDMAP_ID id = uuidmap_acquire_by_uuid(uuid);
     if(id != 0) return id;
