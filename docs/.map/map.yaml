@@ -7,15 +7,18 @@ sidebar:
       - meta:
           label: Enterprise Evaluation Guide
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation.md
+          description: Evaluate Netdata architecture, deployment models, infrastructure requirements, security, integrations, and operational capabilities.
           keywords:
             - real-time observability
             - infrastructure monitoring
       - meta:
           label: Real-time Monitoring
           edit_url: https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md
+          description: Learn how Netdata delivers one-second collection and sub-two-second visibility without sacrificing fidelity as infrastructure scales.
       - meta:
           label: Scalability
           edit_url: https://github.com/netdata/netdata/edit/master/docs/scalability.md
+          description: See how Netdata scales from one node to large infrastructures with distributed processing, per-second metrics, and horizontal Parent clusters.
       - meta:
           label: Monitor Anything
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md
@@ -125,15 +128,15 @@ sidebar:
           - meta:
               label: AWS
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/aws.md
-              description: The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality.
+              description: Install Netdata on AWS instances or EKS, then configure network access and cloud-specific monitoring integrations.
           - meta:
               label: Azure
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/azure.md
-              description: The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality.
+              description: Install Netdata on Azure virtual machines, then configure network access and Azure-specific monitoring integrations.
           - meta:
               label: GCP
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/gcp.md
-              description: The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality.
+              description: Install Netdata on Google Cloud instances, then configure VPC access and Google Cloud monitoring integrations.
       - meta:
           label: Maintenance
           edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/maintenance-operations-on-netdata-agents.md
@@ -196,6 +199,7 @@ sidebar:
           - meta:
               label: Dynamic Configuration Manager
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/dynamic-configuration.md
+              description: Create, test, deploy, enable, and disable collector and alert configurations across nodes from the Netdata UI.
           - meta:
               label: Daemon
               edit_url: https://github.com/netdata/netdata/edit/master/src/daemon/config/README.md
@@ -207,7 +211,7 @@ sidebar:
           - meta:
               label: Registry
               edit_url: https://github.com/netdata/netdata/edit/master/src/registry/CONFIGURATION.md
-              description: Netdata utilizes a central registry of machines/person GUIDs, URLs, and opt-in account information to provide unified cross-server dashboards.
+              description: Configure a private Netdata Registry, access controls, retention, cookies, and Agent settings for cross-server dashboards.
           - meta:
               label: Securing Agents
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/securing-netdata-agents.md
@@ -276,7 +280,7 @@ sidebar:
       - meta:
           label: Registry
           edit_url: https://github.com/netdata/netdata/edit/master/src/registry/README.md
-          description: Netdata utilizes a central registry of machines/person GUIDs, URLs, and opt-in account information to provide unified cross-server dashboards.
+          description: Understand how the Netdata Registry links browsers, Agents, URLs, and accounts to support unified cross-Agent dashboards.
       - meta:
           label: Agent CLI
           edit_url: https://github.com/netdata/netdata/edit/master/src/cli/README.md
@@ -321,6 +325,7 @@ sidebar:
       - meta:
           label: Parent-Child Configuration Reference
           edit_url: https://github.com/netdata/netdata/edit/master/src/streaming/README.md
+          description: Configure real-time metric streaming and historical replication between Netdata Children and Parents.
       - meta:
           label: Configuration Examples
           edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-strategies.md
@@ -337,18 +342,22 @@ sidebar:
           - meta:
               label: Configuring Metrics Centralization Points
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md
+              description: Configure stream.conf for Netdata Children and Parents, including API keys, TLS encryption, routing, and troubleshooting.
           - meta:
               label: Sizing Netdata Parents
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md
           - meta:
               label: Clustering and High Availability of Netdata Parents
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md
+              description: Build highly available Netdata Parent clusters with Child failover, Parent synchronization, and safe maintenance procedures.
           - meta:
               label: Replication of Past Samples
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md
+              description: Learn how Netdata replicates historical samples after reconnection to fill gaps between Children and Parents.
           - meta:
               label: FAQ on Metrics Centralization Points
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/faq.md
+              description: Find answers about Netdata Parent sizing, clustering, retention, encryption, replication, and centralization troubleshooting.
   # Netdata Cloud
   - meta:
       label: Netdata Cloud
@@ -415,6 +424,7 @@ sidebar:
       - meta:
           label: Installation
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/installation.md
+          description: Install Netdata Cloud On-Prem on Kubernetes with Helm, required dependencies, TLS, storage, and Amazon ECR access.
       - meta:
           label: Software Bill of Materials
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/sbom.md
@@ -433,6 +443,7 @@ sidebar:
       - meta:
           label: Mirroring image registry
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/ecr-mirror.md
+          description: Mirror Netdata Cloud On-Prem container images from Amazon ECR into a private registry for restricted environments.
       - meta:
           label: Troubleshooting
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/troubleshooting.md
@@ -936,6 +947,7 @@ sidebar:
           - meta:
               label: Alert Troubleshooting
               edit_url: https://github.com/netdata/netdata/edit/master/docs/troubleshooting/troubleshoot.md
+              description: Use Netdata AI to investigate alerts, correlate abnormal metrics and logs, assess urgency, and develop a root-cause hypothesis.
           - meta:
               label: Anomaly Advisor
               edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/anomaly-advisor.md
@@ -1061,6 +1073,7 @@ sidebar:
       - meta:
           label: NIDL Framework
           edit_url: https://github.com/netdata/netdata/edit/master/docs/NIDL-Framework.md
+          description: Understand Netdata's Nodes, Instances, Dimensions, and Labels model for organizing, exploring, and designing metrics.
       - meta:
           label: Node Filter
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/node-filter.md
@@ -1071,6 +1084,7 @@ sidebar:
   - meta:
       label: Security and Privacy Design
       edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md
+      description: Understand Netdata's security and privacy architecture, data boundaries, encryption, access controls, and compliance practices.
     items:
       - meta:
           label: Access Control and Feature Availability
@@ -1079,9 +1093,11 @@ sidebar:
       - meta:
           label: Netdata Agent
           edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md
+          description: Learn how Netdata Agent protects raw data, isolates collectors, limits privileges, encrypts communications, and controls access.
       - meta:
           label: Netdata Cloud
           edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md
+          description: Learn how Netdata Cloud secures metadata, live metric access, authentication, authorization, communications, and infrastructure.
   # Developer and Contributor Corner
   - meta:
       label: Developer and Contributor Corner
@@ -1146,9 +1162,11 @@ sidebar:
               - meta:
                   label: CSV formatter
                   edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/csv/README.md
+                  description: Format Netdata metric query results as CSV, TSV, HTML, Markdown tables, or JSON arrays with supported data options.
               - meta:
                   label: JSON formatter
                   edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/json/README.md
+                  description: Format Netdata metric query results as JSON, JSONP, Google DataTable, or DataSource responses with supported options.
               - meta:
                   label: SSV formatter
                   edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/ssv/README.md
@@ -1161,6 +1179,7 @@ sidebar:
       - meta:
           label: Dynamic Configuration
           edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/dyncfg.md
+          description: Integrate plugins and modules with Netdata Dynamic Configuration using JSON Schema, validation, persistence, and generated UI forms.
       - meta:
           label: Database Engine
           edit_url: https://github.com/netdata/netdata/edit/master/src/database/engine/README.md
@@ -1235,6 +1254,7 @@ sidebar:
           - meta:
               label: Clocks
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/clocks/README.md
+              description: Use libnetdata clock APIs for wall-clock timestamps, monotonic elapsed time, heartbeat scheduling, sleeps, and safe time arithmetic.
           - meta:
               label: Netdata ini config files
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/config/README.md
@@ -1287,6 +1307,7 @@ sidebar:
           - meta:
               label: Socket
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/socket/README.md
+              description: Use libnetdata socket APIs for connections, listeners, polling, peer details, access checks, and optional TLS transport.
       - meta:
           label: Running a Local Dashboard through Cloudflare Tunnels
           edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/running-through-cf-tunnels.md

@@ -1,13 +1,10 @@
 To generate a copy of `integrations.js` and validate collector
 taxonomy locally, you will need:
 
-- Python 3.6 or newer (only tested on Python 3.10 currently, should work
-  on any version of Python newer than 3.6).
-- The following third-party Python modules:
-    - `jsonschema`
-    - `referencing`
-    - `jinja2`
-    - `ruamel.yaml`
+- Python 3.10 or newer.
+- The generation and test dependencies installed by
+  `./integrations/pip.sh`, including `jsonschema`, `referencing`, `jinja2`,
+  `ruamel.yaml`, and `markdown-it-py`.
 - A local checkout of https://github.com/netdata/netdata
 - A local checkout of https://github.com/netdata/go.d.plugin. The script
   expects this to be checked out in a directory called `go.d.plugin`
@@ -21,6 +18,9 @@ as a VM or Docker container:
 - On Alpine: `apk add py3-jsonschema py3-referencing py3-jinja2 py3-ruamel.yaml`
 - On Fedora or RHEL (EPEL is required on RHEL systems): `dnf install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel-yaml`
 
+Those packages cover generation. Running `python3 -m unittest integrations.tests.test_descriptions` also requires
+`markdown-it-py`; `./integrations/pip.sh` installs the complete generation-and-test dependency set.
+
 Once the environment is set up, run the documentation generators from
 the Agent repo root:
 
@@ -30,6 +30,7 @@ the Agent repo root:
 - `integrations/gen_docs_integrations.py`
 - `integrations/gen_doc_collector_page.py`
 - `integrations/gen_doc_secrets_page.py`
+- `integrations/gen_doc_service_discovery_page.py`
 
 These scripts must be run _from this specific location_, as they use
 their own path to figure out where all the files they need are.

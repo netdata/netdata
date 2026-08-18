@@ -170,6 +170,20 @@ mod tests {
     }
 
     #[test]
+    fn empty_attribute_keys_are_sanitized_and_counted() {
+        // Proto3 accepts an empty key; stored bare it would become a
+        // prefix-only field ("attributes.") that enumerates as an empty
+        // attribute name and cannot round-trip through selections.
+        let span = Span {
+            attributes: vec![kv("", Av::StringValue("v".into()))],
+            ..Default::default()
+        };
+        let (flat, sanitized) = flatten_trace_request(trace_req(span, None, None));
+        assert_eq!(sanitized, 1);
+        node_for_path(&flat.tree, "attributes._");
+    }
+
+    #[test]
     fn span_facets_carry_dual_enum_and_attributes() {
         let span = Span {
             name: "GET /x".into(),
@@ -183,7 +197,7 @@ mod tests {
             ..Default::default()
         };
         let mut f = Flattener::new();
-        let entries = f.flatten_span(span);
+        let entries = f.flatten_span(span).entries;
         let tree = f.into_tree();
         let leaves = tree.resolve(&entries);
 
@@ -217,7 +231,7 @@ mod tests {
             }),
             ..Default::default()
         });
-        let l = f.into_tree().resolve(&e);
+        let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "kind").is_empty() && at(&l, "_kind").is_empty());
         assert!(at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty());
 
@@ -231,7 +245,7 @@ mod tests {
             }),
             ..Default::default()
         });
-        let l = f.into_tree().resolve(&e);
+        let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "kind").is_empty(), "no label for an unknown kind");
         assert_eq!(at(&l, "_kind"), [&Value::Int(99)]);
         assert!(at(&l, "status_code").is_empty());
@@ -331,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn normalize_trace_ids_and_span_timestamps() {
+    fn normalize_trace_request_ids_and_timestamps() {
         let mut req = trace_req(
             Span {
                 trace_id: vec![0x01, 0x02], // wrong length → cleared
@@ -343,18 +357,162 @@ mod tests {
             None,
             None,
         );
-        let bad = normalize_trace_ids(&mut req);
-        assert_eq!(bad.trace, 1);
-        assert_eq!(bad.span, 1, "malformed parent_span_id counted under span");
+        let norm = normalize_trace_request(&mut req, 5_000, None);
+        assert_eq!(norm.bad_ids.trace, 1);
+        assert_eq!(
+            norm.bad_ids.span, 1,
+            "malformed parent_span_id counted under span"
+        );
+        assert_eq!(norm.records, 1);
+        assert_eq!(norm.rejected, 0);
         let s = &req.resource_spans[0].scope_spans[0].spans[0];
         assert!(s.trace_id.is_empty() && s.parent_span_id.is_empty());
         assert_eq!(s.span_id.len(), 8, "valid span_id untouched");
-
-        normalize_span_timestamps(&mut req, 5_000);
+        assert_eq!(s.start_time_unix_nano, 5_001, "zero start synthesized");
         assert_eq!(
-            req.resource_spans[0].scope_spans[0].spans[0].start_time_unix_nano,
-            5_001
+            norm.ts_range,
+            Some((5_001, 5_001)),
+            "ts_range folds the RESOLVED start"
         );
+    }
+
+    #[test]
+    fn normalize_trace_request_interval_bounds() {
+        use opentelemetry_proto::tonic::trace::v1::ScopeSpans;
+        let bounds = Some(TimeBounds {
+            min_ns: 1_000,
+            max_ns: 2_000,
+        });
+        let span = |start, end| Span {
+            start_time_unix_nano: start,
+            end_time_unix_nano: end,
+            ..Default::default()
+        };
+        let mut req = trace_req(span(0, 0), None, None);
+        req.resource_spans[0].scope_spans[0].spans = vec![
+            span(500, 1_500),  // start before the window → rejected (past bound)
+            span(1_200, 2_500),// end past the window → rejected (future bound)
+            span(2_500, 2_600),// entirely future: caught via end > max_ns → rejected
+            span(1_200, 1_800),// whole interval inside → kept
+            span(1_300, 0),    // unset end clamps to start (in-window) → kept
+            span(1_400, 700),  // end < start clamps to start (in-window) → kept
+            span(0, 0),        // synthesized start (base 1_500) → kept
+            span(0, 9_999),    // synthesized start BUT absurd client end → rejected
+        ];
+        let norm = normalize_trace_request(&mut req, 1_500, bounds);
+        assert_eq!(norm.rejected, 4);
+        assert_eq!(norm.records, 4);
+        let kept: Vec<u64> = req.resource_spans[0].scope_spans[0].spans
+            .iter()
+            .map(|s| s.start_time_unix_nano)
+            .collect();
+        assert_eq!(kept, vec![1_200, 1_300, 1_400, 1_501]);
+        assert_eq!(
+            norm.ts_range,
+            Some((1_200, 1_501)),
+            "range covers kept spans only"
+        );
+
+        // A request whose every span is out-of-window: the emptied scope AND
+        // resource are dropped (no zero-row attrs), rejected still counted.
+        let mut req = trace_req(span(10, 20), None, None);
+        req.resource_spans[0].scope_spans.push(ScopeSpans {
+            spans: vec![span(1_200, 1_300)],
+            ..Default::default()
+        });
+        let norm = normalize_trace_request(&mut req, 1_500, bounds);
+        assert_eq!((norm.records, norm.rejected), (1, 1));
+        assert_eq!(
+            req.resource_spans[0].scope_spans.len(),
+            1,
+            "emptied scope dropped, surviving scope kept"
+        );
+        let mut req = trace_req(span(10, 20), None, None);
+        let norm = normalize_trace_request(&mut req, 1_500, bounds);
+        assert_eq!((norm.records, norm.rejected), (0, 1));
+        assert!(req.resource_spans.is_empty(), "emptied resource dropped");
+    }
+
+    /// `future_skew = 0` collapses the window's upper edge onto "now"
+    /// (`max_ns == fallback_base`). Synthesized starts land at
+    /// `fallback_base + k` — past that edge — so they MUST NOT face the
+    /// future bound through their own clamp (the value is ours, not the
+    /// client's); only a RAW client end does. Mirrors the logs zero-skew
+    /// exemption; review round 1 finding 2.
+    #[test]
+    fn normalize_trace_request_zero_future_skew_keeps_synthesized_starts() {
+        let base: u64 = 1_000_000;
+        let bounds = Some(TimeBounds {
+            min_ns: base - 1_000,
+            max_ns: base, // future_skew = 0
+        });
+        let span = |start, end| Span {
+            start_time_unix_nano: start,
+            end_time_unix_nano: end,
+            ..Default::default()
+        };
+        let mut req = trace_req(span(0, 0), None, None);
+        req.resource_spans[0].scope_spans[0].spans = vec![
+            span(0, 0),            // synthesized, no client end → kept
+            span(0, base - 500),   // synthesized, client end < synth start (clamp
+                                   // would judge OUR value) → kept
+            span(0, base + 500),   // synthesized, raw client end past the edge → rejected
+            span(base - 100, 0),   // client start in-window, unset end → kept
+            span(base - 100, base + 1), // client end 1ns past the edge → rejected
+        ];
+        let norm = normalize_trace_request(&mut req, base, bounds);
+        assert_eq!((norm.records, norm.rejected), (3, 2));
+    }
+
+    #[test]
+    fn prepare_trace_frame_encodes_and_reports() {
+        // Normal request → encoded payload round-trips through the frame codec.
+        let frame = prepare_trace_frame(
+            trace_req(
+                Span {
+                    start_time_unix_nano: 1_000,
+                    end_time_unix_nano: 1_500,
+                    ..Default::default()
+                },
+                None,
+                None,
+            ),
+            1,
+            None,
+        )
+        .unwrap();
+        assert_eq!((frame.records, frame.rejected), (1, 0));
+        assert_eq!(frame.ts_range, Some((1_000, 1_000)));
+        let decoded = decode_trace_frame(&frame.data).unwrap();
+        assert_eq!(decoded.resources[0].scopes[0].spans[0].ts, 1_000);
+
+        // Zero spans → nothing prepared, nothing to write.
+        let frame =
+            prepare_trace_frame(ExportTraceServiceRequest::default(), 1, None).unwrap();
+        assert_eq!((frame.records, frame.rejected), (0, 0));
+        assert!(frame.data.is_empty() && frame.ts_range.is_none());
+
+        // Every span out-of-window → no frame, but `rejected` is carried so the
+        // caller can report it via partial_success.
+        let frame = prepare_trace_frame(
+            trace_req(
+                Span {
+                    start_time_unix_nano: 10,
+                    end_time_unix_nano: 20,
+                    ..Default::default()
+                },
+                None,
+                None,
+            ),
+            1_500,
+            Some(TimeBounds {
+                min_ns: 1_000,
+                max_ns: 2_000,
+            }),
+        )
+        .unwrap();
+        assert_eq!((frame.records, frame.rejected), (0, 1));
+        assert!(frame.data.is_empty());
     }
 
     #[test]
@@ -368,7 +526,7 @@ mod tests {
             status: None,
             ..Default::default()
         });
-        let l = f.into_tree().resolve(&e);
+        let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "name").is_empty(), "empty name → no facet");
         assert!(
             at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty(),
@@ -378,7 +536,160 @@ mod tests {
     }
 
     #[test]
-    fn normalize_trace_ids_keeps_conformant() {
+    fn span_trace_state_and_status_message_are_facets() {
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            trace_state: "ot=th:8".into(),
+            status: Some(Status {
+                code: 0, // UNSET — the message must still round-trip
+                message: "boom".into(),
+            }),
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&e.entries);
+        assert_eq!(at(&l, "trace_state"), [&Value::Str("ot=th:8".into())]);
+        assert_eq!(at(&l, "status_message"), [&Value::Str("boom".into())]);
+        assert!(
+            at(&l, "status_code").is_empty(),
+            "UNSET code stays absent even with a message"
+        );
+
+        // Empty trace_state / message → absent (proto3 empty == unset on the wire).
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span::default());
+        let l = f.into_tree().resolve(&e.entries);
+        assert!(at(&l, "trace_state").is_empty());
+        assert!(at(&l, "status_message").is_empty());
+
+        // OK code + empty message: the code facets emit, the message doesn't —
+        // an empty message must never suppress the status code (or vice versa).
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            status: Some(Status {
+                code: 1, // OK
+                message: String::new(),
+            }),
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&e.entries);
+        assert_eq!(at(&l, "status_code"), [&Value::Str("OK".into())]);
+        assert_eq!(at(&l, "_status_code"), [&Value::Int(1)]);
+        assert!(at(&l, "status_message").is_empty());
+    }
+
+    #[test]
+    fn span_events_flatten_grouped_and_faceted() {
+        use opentelemetry_proto::tonic::trace::v1::span::Event;
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            events: vec![
+                Event {
+                    time_unix_nano: 111,
+                    name: "exception".into(),
+                    attributes: vec![
+                        kv("exception.type", Av::StringValue("IOError".into())),
+                        kv("exception.stacktrace", Av::StringValue("at main()".into())),
+                    ],
+                    dropped_attributes_count: 3,
+                },
+                Event {
+                    time_unix_nano: 222,
+                    name: "retry".into(),
+                    attributes: vec![kv("attempt", Av::IntValue(3))],
+                    dropped_attributes_count: 0,
+                },
+            ],
+            ..Default::default()
+        });
+
+        // Structure: grouping, order, per-event scalars survive.
+        assert_eq!(e.events.len(), 2);
+        assert_eq!(e.events[0].time_unix_nano, 111);
+        assert_eq!(e.events[0].dropped_attributes_count, 3);
+        assert_eq!(e.events[0].attributes.len(), 2);
+        assert_eq!(e.events[1].time_unix_nano, 222);
+        assert_eq!(e.events[1].attributes.len(), 1);
+
+        // Facets: names + attrs resolve under the reserved `events.` namespace.
+        let tree = f.into_tree();
+        let names = tree.resolve(&[e.events[0].name.clone(), e.events[1].name.clone()]);
+        assert_eq!(
+            at(&names, "events.name"),
+            [
+                &Value::Str("exception".into()),
+                &Value::Str("retry".into())
+            ]
+        );
+        let attrs = tree.resolve(&e.events[1].attributes);
+        assert_eq!(at(&attrs, "events.attributes.attempt"), [&Value::Int(3)]);
+
+        // Malformed empty event name still yields a name entry (EVNB needs one).
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            events: vec![Event::default()],
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&[e.events[0].name.clone()]);
+        assert_eq!(at(&l, "events.name"), [&Value::Str(String::new())]);
+    }
+
+    #[test]
+    fn span_links_flatten_ids_structured_attrs_faceted() {
+        use opentelemetry_proto::tonic::trace::v1::span::Link;
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            links: vec![Link {
+                trace_id: vec![0xbb; 16],
+                span_id: vec![0xcc; 8],
+                trace_state: "vendor=1".into(),
+                attributes: vec![kv("messaging.op", Av::StringValue("publish".into()))],
+                dropped_attributes_count: 1,
+                flags: 0x100,
+            }],
+            ..Default::default()
+        });
+
+        assert_eq!(e.links.len(), 1);
+        let link = &e.links[0];
+        assert_eq!(link.trace_id, TraceId::from([0xbb; 16]));
+        assert_eq!(link.span_id, SpanId::from([0xcc; 8]));
+        assert_eq!(link.trace_state, "vendor=1");
+        assert_eq!(link.flags, 0x100);
+        assert_eq!(link.dropped_attributes_count, 1);
+
+        let l = f.into_tree().resolve(&link.attributes);
+        assert_eq!(
+            at(&l, "links.attributes.messaging.op"),
+            [&Value::Str("publish".into())]
+        );
+    }
+
+    #[test]
+    fn normalize_trace_request_clears_malformed_link_ids() {
+        use opentelemetry_proto::tonic::trace::v1::span::Link;
+        let mut req = trace_req(
+            Span {
+                trace_id: vec![1u8; 16],
+                span_id: vec![2u8; 8],
+                links: vec![Link {
+                    trace_id: vec![9u8; 5], // wrong length → cleared
+                    span_id: vec![8u8; 8],  // conformant → kept
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+        let norm = normalize_trace_request(&mut req, 1, None);
+        assert_eq!((norm.bad_ids.trace, norm.bad_ids.span), (1, 0));
+        let link = &req.resource_spans[0].scope_spans[0].spans[0].links[0];
+        assert!(link.trace_id.is_empty(), "malformed link trace_id cleared");
+        assert_eq!(link.span_id, vec![8u8; 8]);
+    }
+
+    #[test]
+    fn normalize_trace_request_keeps_conformant_ids() {
         let mut req = trace_req(
             Span {
                 trace_id: vec![1u8; 16],
@@ -390,7 +701,7 @@ mod tests {
             None,
         );
         assert_eq!(
-            normalize_trace_ids(&mut req),
+            normalize_trace_request(&mut req, 1, None).bad_ids,
             MalformedIds::default(),
             "conformant ids untouched"
         );

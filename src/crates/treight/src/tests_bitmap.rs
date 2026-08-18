@@ -355,3 +355,44 @@ fn test_bitmap_or_exhaustive() {
         }
     }
 }
+
+#[test]
+fn test_bitmap_and_not_all_flag_combinations() {
+    let mut da = Vec::new();
+    let mut db = Vec::new();
+    let a = Bitmap::from_sorted_iter([1, 5, 10, 20].into_iter(), 64, &mut da);
+    let b = Bitmap::from_sorted_iter([5, 20, 40].into_iter(), 64, &mut db);
+
+    // N \ N
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &b, &db, &mut out);
+    assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![1, 10]);
+
+    // N \ I (b complemented: {5,20,40} are the CLEAR bits)
+    let mut dbi = Vec::new();
+    let bi = Bitmap::from_sorted_iter_complemented([5, 20, 40].into_iter(), 64, &mut dbi);
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &bi, &dbi, &mut out);
+    assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![5, 20]);
+
+    // full \ N = complement of N
+    let full = Bitmap::full(64);
+    let mut out = Vec::new();
+    let c = full.and_not(&[], &b, &db, &mut out);
+    assert_eq!(c.len(&out), 61);
+    assert!(!c.contains(&out, 5) && !c.contains(&out, 20) && !c.contains(&out, 40));
+    assert!(c.contains(&out, 0) && c.contains(&out, 63));
+
+    // A \ empty = A; A \ full = empty
+    let empty = Bitmap::empty(64);
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &empty, &[], &mut out);
+    assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![1, 5, 10, 20]);
+    let mut out = Vec::new();
+    let c = a.and_not(&da, &full, &[], &mut out);
+    assert!(c.is_empty(&out));
+
+    // complement round-trips
+    assert_eq!(a.complement().complement().iter(&da).collect::<Vec<_>>(),
+               a.iter(&da).collect::<Vec<_>>());
+}

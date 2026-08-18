@@ -22,7 +22,7 @@ As infrastructures grow from a handful of servers to thousands of nodes across m
 
 | Capability                         | Linux                                                                                                                   | Kubernetes                                                                       | FreeBSD        | macOS          | Windows                                                                                |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------- | -------------- | -------------------------------------------------------------------------------------- |
-| **Auto-deploy**                    | ✅ [kickstart.sh](https://learn.netdata.cloud/docs/netdata-agent/installation/one-line-installer-for-all-linux-systems)¹ | ✅ [Helm](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) | ✅ kickstart.sh | ✅ kickstart.sh | ✅ [MSI](https://learn.netdata.cloud/docs/netdata-agent/installation/windows)² (silent) |
+| **Auto-deploy**                    | ✅ [kickstart.sh](/packaging/installer/methods/kickstart.md)¹ | ✅ [Helm](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) | ✅ kickstart.sh | ✅ kickstart.sh | ✅ [MSI](https://learn.netdata.cloud/docs/netdata-agent/installation/windows)² (silent) |
 | **Auto-update**                    | ✅ Built-in                                                                                                              | ✅ Built-in                                                                       | ✅ Built-in     | ✅ Built-in     | ⚠️ Manual³                                                                              |
 | **Auto-discover system metrics**   | ✅ Yes                                                                                                                   | ✅ Yes                                                                            | ✅ Yes          | ✅ Yes          | ✅ Yes                                                                                  |
 | **Auto-discover all processes**    | ✅ Yes                                                                                                                   | ✅ Yes                                                                            | ✅ Yes          | ✅ Yes          | ✅ Yes                                                                                  |
@@ -36,7 +36,8 @@ As infrastructures grow from a handful of servers to thousands of nodes across m
 **Legend**: ✅ Full support | ⚠️ Partial support | ❌ Not available
 
 **Footnotes**:
-1. **kickstart.sh**: [Universal installer script](https://learn.netdata.cloud/docs/netdata-agent/installation/one-line-installer-for-all-linux-systems) that auto-detects the best installation method
+
+1. **kickstart.sh**: [Universal installer script](/packaging/installer/methods/kickstart.md) that auto-detects the best installation method
 2. **MSI**: Microsoft Software Installer package for Windows deployment
 3. **Manual**: Auto-updates coming Q3 2025; currently requires PowerShell/SCCM/GPO automation
 4. **Via k8s**: Uses Kubernetes API for service discovery instead of Docker API
@@ -159,7 +160,8 @@ On Linux, Netdata autodetect all kernel modules and technologies which have been
 
 Similarly for Windows, Netdata will autodetect everything exposed via Perflib.
 
-### [Process and Application Monitoring](https://learn.netdata.cloud/docs/collecting-metrics/processes-and-system-services/applications) (apps.plugin)
+### [Process and Application Monitoring](/src/collectors/apps.plugin/integrations/applications.md) (apps.plugin)
+
 The apps.plugin provides intelligent process tree aggregation and monitoring on all platforms (Linux, FreeBSD, macOS, Windows):
 
 **Intelligent Process Tree Aggregation**:
@@ -277,7 +279,7 @@ When Netdata runs inside a Kubernetes cluster, it provides comprehensive multi-l
 - **[Kubelet metrics](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) (k8s_kubelet)**: Container and pod resource usage, volume statistics
 - **[Control plane](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes)** (kube-proxy, kube-scheduler, kube-controller-manager): When accessible
 
-**[Service Discovery](https://learn.netdata.cloud/docs/collecting-metrics/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents)** (k8ssd):
+**[Service Discovery](/src/go/plugin/go.d/discovery/sdext/discoverer/k8ssd/README.md)** (k8ssd):
 - Automatically enabled, replacing traditional host-based discovery
 - Uses Kubernetes API to monitor all pods and services
 - Discovers applications by inspecting pod containers and their exposed ports

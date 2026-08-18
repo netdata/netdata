@@ -56,6 +56,24 @@ pub struct RowIndex<'a> {
     /// only be set together with `trace_ids`. The logs path leaves it `false` (its
     /// `trace_ids` are near-unique-free log correlation ids, not a trace key).
     pub build_trace_id_index: bool,
+    /// Producer signal: build the per-file trace-id bloom (`TBLM`) at seal.
+    /// Derived from the trace-id index, so this MUST only be set together with
+    /// [`build_trace_id_index`](Self::build_trace_id_index) (and the chunk is
+    /// skipped when the file has no set trace ids). The logs path leaves it
+    /// `false`.
+    pub build_trace_id_bloom: bool,
+    /// Span event structure accumulator (`EVNB` chunk; traces seal only). When
+    /// present it MUST have exactly one ended row per [`row`](RowIndex::row)
+    /// call ([`crate::Error::ColumnLengthMismatch`] at build). See
+    /// [`crate::EventRows`].
+    pub events: Option<crate::EventRows>,
+    /// Span link structure accumulator (`LNKB` chunk; traces seal only). Same
+    /// row protocol as [`events`](Self::events). See [`crate::LinkRows`].
+    pub links: Option<crate::LinkRows>,
+    /// Per-file trace rollup accumulator (`TRSU` chunk; traces seal only).
+    /// Trace-keyed (no per-row protocol); skipped at build when it holds no
+    /// rows. See [`crate::TraceRollupRows`].
+    pub trace_rollup: Option<crate::TraceRollupRows>,
     /// The typed schema tree to persist as the on-disk field descriptor
     /// (`Metadata.tree`). `Some` when a producer with typed flattening supplies
     /// it (the `ng-index` path) — structure + per-leaf `ValueKind`, leaf stats
@@ -81,6 +99,10 @@ impl<'a> RowIndex<'a> {
             parent_span_ids: None,
             durations: None,
             build_trace_id_index: false,
+            build_trace_id_bloom: false,
+            events: None,
+            links: None,
+            trace_rollup: None,
             tree: None,
         }
     }

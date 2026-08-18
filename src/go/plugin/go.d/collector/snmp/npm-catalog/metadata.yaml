@@ -124,6 +124,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
+        description: Monitor A10 Thunder ADC metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - a10
         - thunder
@@ -507,6 +508,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
+        description: Monitor APC PDU power distribution metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - apc
         - pdu
@@ -555,6 +557,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
+        description: Monitor APC UPS power and battery metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - apc
         - ups
@@ -880,7 +883,7 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: "On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this Aruba CX Switch profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.\n\n**37 metrics** in 9 groups; each row is a chart context usable in alerts.\n\n| Group | Metrics |\n|---|---|\n| Hardware / Fan | 2 |\n| Hardware / PowerSupply | 2 |\n| Hardware / Sensor | 1 |\n| Network / Interface | 4 |\n| Network / Routing | 10 |\n| System / Activity | 2 |\n| System / CPU | 1 |\n| System / Uptime | 1 |\n| Uncategorized | 14 |\n\n### Hardware / Fan\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_arubaWiredFanRPM` | `{revolution}/min` | per aruba_wired_fan_name, aruba_wired_fan_product_name, aruba_wired_fan_serial_number, aruba_wired_fan_airflow_direction | Current RPM read for the fan. |\n| `snmp.device_prof_arubaWiredFanState` | `{status}` | per aruba_wired_fan_name, aruba_wired_fan_product_name, aruba_wired_fan_serial_number, aruba_wired_fan_airflow_direction | Current status for the fan |\n\n### Hardware / PowerSupply\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_arubaWiredPSUInstantaneousPower` | `W` | per aruba_wired_psu_name, aruba_wired_psu_product_name, aruba_wired_psu_serial_number, aruba_wired_psu_airflow_direction | Total instantaneous power supplied by the power supply in Watts. |\n| `snmp.device_prof_arubaWiredPSUNumberFailures` | `{failure}/s` | per aruba_wired_psu_name, aruba_wired_psu_product_name, aruba_wired_psu_serial_number, aruba_wired_psu_airflow_direction | Number of failures the power supply has experienced since the most recent insertion of the power supply and boot of the system. |\n\n### Hardware / Sensor\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_arubaWiredTempSensorTemperature` | `Cel` | per aruba_wired_temp_sensor_name | Current temperature value read from the temperature sensor |\n\n### Network / Interface\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_ifAdminStatus` | `{status}` | per interface, interface | Current administrative state of the interface |\n| `snmp.device_prof_ifHighSpeed` | `bit/s` | per interface, interface | Estimate of the interface's current bandwidth |\n| `snmp.device_prof_ifNumber` | `{interface}` | device | Number of network interfaces regardless of their current state present on this system |\n| `snmp.device_prof_ifOperStatus` | `{status}` | per interface, interface | Current operational state of the interface |\n\n### Network / Routing\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_ospfIfLsaCount` | `{advertisement}/s` | per ospf_ip_addr, neighbor_id | The total number of link-local link state advertisements in this interface's link-local link state database |\n| `snmp.device_prof_ospfIfState` | `{status}` | per ospf_ip_addr, neighbor_id | The OSPF Interface State |\n| `snmp.device_prof_ospfNbrEvents` | `{event}/s` | per neighbor_id, neighbor_ip | The number of times this neighbor relationship has changed state or an error has occurred |\n| `snmp.device_prof_ospfNbrLsRetransQLen` | `{message}` | per neighbor_id, neighbor_ip | The current length of the retransmission queue |\n| `snmp.device_prof_ospfNbrState` | `{status}` | per neighbor_id, neighbor_ip | The state of the relationship with this neighbor |\n| `snmp.device_prof_ospfVirtIfLsaCount` | `{advertisement}/s` | per neighbor_id | The total number of link-local link state advertisements in this virtual interface's link-local link state database |\n| `snmp.device_prof_ospfVirtIfState` | `{status}` | per neighbor_id | OSPF virtual interface states |\n| `snmp.device_prof_ospfVirtNbrEvents` | `{change}/s` | per neighbor_id, neighbor_ip | The number of times this virtual link
+      description: "On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this Aruba CX Switch profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.\n\n**37 metrics** in 9 groups; each row is a chart context usable in alerts.\n\n| Group | Metrics |\n|---|---|\n| Hardware / Fan | 2 |\n| Hardware / PowerSupply | 2 |\n| Hardware / Sensor | 1 |\n| Network / Interface | 4 |\n| Network / Routing | 10 |\n| System / Activity | 2 |\n| System / CPU | 1 |\n| System / Uptime | 1 |\n| Uncategorized | 14 |\n\n### Hardware / Fan\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_arubaWiredFanRPM` | `{revolution}/min` | per aruba_wired_fan_name, aruba_wired_fan_product_name, aruba_wired_fan_serial_number, aruba_wired_fan_airflow_direction | Current RPM read for the fan. |\n| `snmp.device_prof_arubaWiredFanStateEnum` | `{status}` | per aruba_wired_fan_name, aruba_wired_fan_product_name, aruba_wired_fan_serial_number, aruba_wired_fan_airflow_direction | Current status for the fan |\n\n### Hardware / PowerSupply\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_arubaWiredPSUInstantaneousPower` | `W` | per aruba_wired_psu_name, aruba_wired_psu_product_name, aruba_wired_psu_serial_number, aruba_wired_psu_airflow_direction | Total instantaneous power supplied by the power supply in Watts. |\n| `snmp.device_prof_arubaWiredPSUNumberFailures` | `{failure}/s` | per aruba_wired_psu_name, aruba_wired_psu_product_name, aruba_wired_psu_serial_number, aruba_wired_psu_airflow_direction | Number of failures the power supply has experienced since the most recent insertion of the power supply and boot of the system. |\n\n### Hardware / Sensor\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_arubaWiredTempSensorTemperature` | `Cel` | per aruba_wired_temp_sensor_name | Current temperature value read from the temperature sensor |\n\n### Network / Interface\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_ifAdminStatus` | `{status}` | per interface, interface | Current administrative state of the interface |\n| `snmp.device_prof_ifHighSpeed` | `bit/s` | per interface, interface | Estimate of the interface's current bandwidth |\n| `snmp.device_prof_ifNumber` | `{interface}` | device | Number of network interfaces regardless of their current state present on this system |\n| `snmp.device_prof_ifOperStatus` | `{status}` | per interface, interface | Current operational state of the interface |\n\n### Network / Routing\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_ospfIfLsaCount` | `{advertisement}/s` | per ospf_ip_addr, neighbor_id | The total number of link-local link state advertisements in this interface's link-local link state database |\n| `snmp.device_prof_ospfIfState` | `{status}` | per ospf_ip_addr, neighbor_id | The OSPF Interface State |\n| `snmp.device_prof_ospfNbrEvents` | `{event}/s` | per neighbor_id, neighbor_ip | The number of times this neighbor relationship has changed state or an error has occurred |\n| `snmp.device_prof_ospfNbrLsRetransQLen` | `{message}` | per neighbor_id, neighbor_ip | The current length of the retransmission queue |\n| `snmp.device_prof_ospfNbrState` | `{status}` | per neighbor_id, neighbor_ip | The state of the relationship with this neighbor |\n| `snmp.device_prof_ospfVirtIfLsaCount` | `{advertisement}/s` | per neighbor_id | The total number of link-local link state advertisements in this virtual interface's link-local link state database |\n| `snmp.device_prof_ospfVirtIfState` | `{status}` | per neighbor_id | OSPF virtual interface states |\n| `snmp.device_prof_ospfVirtNbrEvents` | `{change}/s` | per neighbor_id, neighbor_ip | The number of times this virtual link
         has changed its state or an error has occurred |\n| `snmp.device_prof_ospfVirtNbrLsRetransQLen` | `{message}` | per neighbor_id, neighbor_ip | The current length of the retransmission queue |\n| `snmp.device_prof_ospfVirtNbrState` | `{status}` | per neighbor_id, neighbor_ip | The state of the virtual neighbor relationship |\n\n### System / Activity\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_hrSystemNumUsers` | `{session}` | device | The number of user sessions for which this host is storing state information. A session is a collection of processes requiring a s… |\n| `snmp.device_prof_hrSystemProcesses` | `{process}` | device | The number of process contexts currently loaded or running on this system. |\n\n### System / CPU\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_cpu_usage` | `%` | per cpu_index | The current CPU utilization |\n\n### System / Uptime\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_systemUptime` | `s` | device | Time since the system was last rebooted or powered on. |\n\n### Uncategorized\n\n| Metric (chart context) | Unit | Scope | Description |\n|---|---|---|---|\n| `snmp.device_prof_hrStorageSize` | `By` | per storage_index, rm:storage_type, rm:storage_alloc_unit |  |\n| `snmp.device_prof_hrStorageUsed` | `By` | per storage_index, rm:storage_type, rm:storage_alloc_unit |  |\n| `snmp.device_prof_lldpStatsRemTablesAgeouts` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesDeletes` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesDrops` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesInserts` | — | device |  |\n| `snmp.device_prof_lldpStatsRemTablesLastChangeTime` | — | device |  |\n| `snmp.device_prof_lldpStatsRxPortAgeoutsTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortFramesDiscardedTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortFramesErrors` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortFramesTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortTLVsDiscardedTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsRxPortTLVsUnrecognizedTotal` | — | per lldp_loc_port_num |  |\n| `snmp.device_prof_lldpStatsTxPortFramesTotal` | — | per lldp_loc_port_num |  |\n"
       availability: []
       scopes: []
@@ -2654,6 +2657,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: cisco.svg
+        description: Monitor Cisco ICM device metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - cisco
         - icm
@@ -3121,6 +3125,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: cisco.svg
+        description: Monitor Cisco SB device metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - cisco
         - sb
@@ -3223,6 +3228,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: cisco.svg
+        description: Monitor Cisco UCS server metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - cisco
         - ucs
@@ -4104,6 +4110,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
+        description: Monitor Eaton ePDU power distribution metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - eaton
         - epdu
@@ -4152,6 +4159,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
+        description: Monitor Eaton UPS power and battery metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - eaton
         - ups
@@ -4201,6 +4209,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
+        description: Monitor ExaGrid storage metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - exagrid
         - snmp
@@ -4830,6 +4839,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: hp.svg
+        description: Monitor HP iLO server hardware metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - hp
         - ilo
@@ -4880,6 +4890,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: hp.svg
+        description: Monitor HP iLO 4 server hardware metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - hp
         - ilo4
@@ -4981,6 +4992,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: hp.svg
+        description: Monitor HPE MSA storage metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - hpe
         - msa
@@ -5465,6 +5477,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: dell.svg
+        description: Monitor Dell iDRAC server hardware metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - idrac
         - snmp
@@ -5612,6 +5625,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: dell.svg
+        description: Monitor Dell Isilon storage metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - isilon
         - snmp
@@ -7129,6 +7143,7 @@ modules:
         categories:
           - network-performance-monitoring.device-metrics
         icon_filename: SNMP.png
+        description: Monitor Peplink router metrics over SNMP with automatic profile recognition and no manual OID configuration.
       keywords:
         - peplink
         - snmp
@@ -9566,6 +9581,7 @@ modules:
         categories:
           - network-performance-monitoring.topologies
         icon_filename: SNMP.png
+        description: Map BGP peer relationships between routers, including remote autonomous system numbers and session state from standard and vendor MIBs.
       keywords:
         - bgp
         - peering
@@ -9652,6 +9668,7 @@ modules:
         categories:
           - network-performance-monitoring.topologies
         icon_filename: network.svg
+        description: Map live application dependencies from host socket tables, including local processes, remote endpoints, and Linux workload ownership.
       keywords:
         - network connections
         - sockets
@@ -9783,6 +9800,7 @@ modules:
         categories:
           - network-performance-monitoring.topologies
         icon_filename: vmware.svg
+        description: Map VMware vSphere clusters, hosts, virtual machines, datastores, networks, and port groups with placement and utilization overlays.
       keywords:
         - vsphere
         - vmware
@@ -49386,6 +49404,7 @@ modules:
         categories:
           - network-performance-monitoring.traps
         icon_filename: SNMP.png
+        description: Add reverse DNS hostnames to SNMP traps through cached PTR lookups of their source addresses.
       keywords:
         - reverse dns
         - rdns
@@ -49428,6 +49447,7 @@ modules:
         categories:
           - network-performance-monitoring.traps
         icon_filename: SNMP.png
+        description: Attribute each SNMP trap to an unambiguous Netdata node when possible, otherwise retaining it under a bounded source label.
       keywords:
         - vnode
         - identity

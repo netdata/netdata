@@ -165,7 +165,7 @@ func validateSourceEvidence(
 ) error {
 	if err := requireEnum(field+".kind", evidence.Kind,
 		"availability", "registration", "lifecycle", "unit", "population", "label", "relationship",
-		"state_encoding", "normalization", "identity", "deprecation", "collection_hazard", "delegation",
+		"state_encoding", "normalization", "identity", "deprecation", "collection_hazard",
 		"display_convention"); err != nil {
 		return err
 	}
@@ -303,7 +303,12 @@ func validateSignal(field string, signal SignalDefinition, document SourceSemant
 		}
 		for index, grammar := range generated.Scope.Families.Grammars {
 			if !validID(grammar) {
-				return fmt.Errorf("%s.source.generated.scope.families.grammars[%d] %q is invalid", field, index, grammar)
+				return fmt.Errorf(
+					"%s.source.generated.scope.families.grammars[%d] %q is invalid",
+					field,
+					index,
+					grammar,
+				)
 			}
 		}
 	}
@@ -416,7 +421,12 @@ func validateSignal(field string, signal SignalDefinition, document SourceSemant
 						return fmt.Errorf("%s label %q must have optional presence", constraintField, label)
 					}
 					if owner, ok := claimed[label]; ok {
-						return fmt.Errorf("%s label %q is already owned by constraint %q", constraintField, label, owner)
+						return fmt.Errorf(
+							"%s label %q is already owned by constraint %q",
+							constraintField,
+							label,
+							owner,
+						)
 					}
 					claimed[label] = id
 				}

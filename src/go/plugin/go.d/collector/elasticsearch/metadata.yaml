@@ -7,6 +7,7 @@ modules:
       plugin_name: go.d.plugin
       monitored_instance:
         name: Elasticsearch
+        description: "Monitor Elasticsearch cluster and node health, indexing, search, storage, JVM, and resource performance metrics."
         link: https://www.elastic.co/elasticsearch/
         icon_filename: elasticsearch.svg
         categories:
@@ -32,9 +33,9 @@ modules:
           This collector monitors the performance and health of the Elasticsearch cluster.
         method_description: |
           It uses [Cluster APIs](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster.html) to collect metrics.
-          
+
           Used endpoints:
-          
+
           | Endpoint               | Description          | API                                                                                                         |
           |------------------------|----------------------|-------------------------------------------------------------------------------------------------------------|
           | `/`                    | Node info            |                                                                                                             |
@@ -265,7 +266,7 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:9200
-                
+
                   - name: remote
                     url: http://192.0.2.1:9200
     troubleshooting:
@@ -792,6 +793,7 @@ modules:
       id: collector-go.d.plugin-opensearch
       monitored_instance:
         name: OpenSearch
+        description: "Monitor OpenSearch cluster and node health, indexing, search, storage, JVM, and resource performance metrics."
         link: https://opensearch.org/
         icon_filename: opensearch.svg
         categories:

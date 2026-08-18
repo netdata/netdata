@@ -422,6 +422,23 @@ pub(crate) fn build_into<W: Write + Seek>(
         // Built from the chronological `trace_id` column when the producer asks
         // (the traces seal). The logs seal leaves `build_trace_id_index` false.
         trace_id_index: row_index.build_trace_id_index,
+        // Bloom presence needs an up-front answer (the TOC is reserved before
+        // any chunk exists): declared when the producer asks AND the file has
+        // at least one set trace id (an empty filter is never written).
+        trace_id_bloom: row_index.build_trace_id_bloom
+            && row_index.trace_ids.as_ref().is_some_and(|t| t.any_set()),
+        // Span event/link structures (traces seal only; the logs seal leaves
+        // both `None`). Presence driven off the `RowIndex` `Option`s, like the
+        // per-row columns.
+        event_index: row_index.events.is_some(),
+        link_index: row_index.links.is_some(),
+        // The trace rollup (traces seal only): declared when the producer
+        // accumulated any rows — an empty rollup is never written (the
+        // `is_meaningful` rule the span structures also follow).
+        trace_rollup: row_index
+            .trace_rollup
+            .as_ref()
+            .is_some_and(|r| r.is_meaningful()),
         mid_fields: u16::try_from(row_index.mid_fields().len())
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
@@ -498,7 +515,41 @@ pub(crate) fn build_into<W: Write + Seek>(
         let trace_ids = chronological_trace_ids.as_ref().expect(
             "build_trace_id_index requires the trace_id column (ChunkWriter also enforces this)",
         );
-        w.trace_id_index(&TraceIdIndex::build(trace_ids))?;
+        let index = TraceIdIndex::build(trace_ids);
+        w.trace_id_index(&index)?;
+        // The bloom derives from the index's sorted permutation (distinct ids
+        // via adjacent dedup); `counts.trace_id_bloom` already folded in the
+        // any-set check, so a declared bloom always builds non-empty.
+        if counts.trace_id_bloom {
+            let bloom = crate::TraceIdBloom::build(&index, trace_ids)
+                .expect("declared only when a set trace id exists");
+            w.trace_id_bloom(&bloom)?;
+        }
+    }
+
+    // Optional span event/link structures (EVNB/LNKB), after TIDX: rows remapped
+    // through the same time permutation as every column, interner slots
+    // translated to file KvIds through the same table as the stream batches —
+    // so the structure refs and the row entry lists point at identical ids.
+    if let Some(events) = &row_index.events {
+        check_column_len("events", events.num_rows(), n)?;
+        w.event_index(&events.reordered(by_time(), &kv_to_file))?;
+    }
+    if let Some(links) = &row_index.links {
+        check_column_len("links", links.num_rows(), n)?;
+        w.link_index(&links.reordered(by_time(), &kv_to_file))?;
+    }
+
+    // Optional per-file trace rollup (TRSU), after the span structures:
+    // trace-keyed (no chronological permutation — emission sorts by trace
+    // id); slots translate through the SAME kv_to_file table, so the root
+    // refs point at exactly the ids the rows carry.
+    if counts.trace_rollup {
+        let rollup = row_index
+            .trace_rollup
+            .as_ref()
+            .expect("declared only when the accumulator exists");
+        w.trace_rollup(&rollup.sealed(&kv_to_file))?;
     }
 
     // Low/mid-cardinality FSTs, high-cardinality chunks, then the

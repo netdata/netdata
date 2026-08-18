@@ -16,12 +16,13 @@ import (
 
 // ModuleInfo contains metadata about a module
 type ModuleInfo struct {
-	Name        string
-	DisplayName string
-	Description string
-	Icon        string
-	Categories  []string
-	Link        string
+	Name            string
+	DisplayName     string
+	Description     string
+	PageDescription string
+	Icon            string
+	Categories      []string
+	Link            string
 }
 
 // Config represents the YAML structure from contexts.yaml
@@ -187,24 +188,26 @@ func (g *DocGenerator) parseModuleInfo() (*ModuleInfo, error) {
 	}
 
 	var info struct {
-		Name        string   `yaml:"name"`
-		DisplayName string   `yaml:"display_name"`
-		Description string   `yaml:"description"`
-		Icon        string   `yaml:"icon"`
-		Categories  []string `yaml:"categories"`
-		Link        string   `yaml:"link"`
+		Name            string   `yaml:"name"`
+		DisplayName     string   `yaml:"display_name"`
+		Description     string   `yaml:"description"`
+		PageDescription string   `yaml:"page_description"`
+		Icon            string   `yaml:"icon"`
+		Categories      []string `yaml:"categories"`
+		Link            string   `yaml:"link"`
 	}
 	if err := yaml.Unmarshal(data, &info); err != nil {
 		return nil, err
 	}
 
 	return &ModuleInfo{
-		Name:        info.Name,
-		DisplayName: info.DisplayName,
-		Description: info.Description,
-		Icon:        info.Icon,
-		Categories:  info.Categories,
-		Link:        info.Link,
+		Name:            info.Name,
+		DisplayName:     info.DisplayName,
+		Description:     info.Description,
+		PageDescription: info.PageDescription,
+		Icon:            info.Icon,
+		Categories:      info.Categories,
+		Link:            info.Link,
 	}, nil
 }
 
@@ -358,11 +361,33 @@ func indent(spaces int, text string) string {
 	return strings.Join(lines, "\n")
 }
 
+func yamlScalar(value string) (string, error) {
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSuffix(string(data), "\n"), nil
+}
+
+func indentContinuation(spaces int, text string) string {
+	lines := strings.Split(text, "\n")
+	prefix := strings.Repeat(" ", spaces)
+	for i := 1; i < len(lines); i++ {
+		if lines[i] != "" {
+			lines[i] = prefix + lines[i]
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (g *DocGenerator) generateMetadata(contexts *Config, moduleInfo *ModuleInfo) error {
 	tmpl := template.Must(template.New("metadata").Funcs(template.FuncMap{
-		"lower":  strings.ToLower,
-		"title":  strings.Title,
-		"indent": indent,
+		"lower":              strings.ToLower,
+		"title":              strings.Title,
+		"indent":             indent,
+		"indentContinuation": indentContinuation,
+		"yamlScalar":         yamlScalar,
 	}).Parse(metadataTemplate))
 
 	// Prepare template data
@@ -572,14 +597,14 @@ modules:
         categories:{{range .ModuleInfo.Categories}}
           - {{.}}{{end}}
         icon_filename: "{{.ModuleInfo.Icon}}"
-      related_resources:
+{{if .ModuleInfo.PageDescription}}        description: {{yamlScalar .ModuleInfo.PageDescription | indentContinuation 8}}
+{{end}}      related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
         - {{.ModuleName}}
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

@@ -6,6 +6,7 @@ modules:
       module_name: rabbitmq
       monitored_instance:
         name: RabbitMQ
+        description: "Monitor RabbitMQ clusters, nodes, queues, connections, messages, churn, alarms, and resource usage."
         link: https://www.rabbitmq.com/
         icon_filename: rabbitmq.svg
         categories:
@@ -22,10 +23,10 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors RabbitMQ instances.
-          
+
           It collects data using an HTTP-based API provided by the [management plugin](https://www.rabbitmq.com/management.html).
           The following endpoints are used:
-          
+
           - `/api/definitions` (one-time retrieval, used to obtain the cluster ID and name)
           - `/api/overview`
           - `/api/nodes`
@@ -196,13 +197,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:15672
-                
+
                   - name: remote
                     url: http://192.0.2.0:15672
     troubleshooting:

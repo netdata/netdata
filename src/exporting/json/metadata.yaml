@@ -7,6 +7,7 @@ meta:
   categories:
     - export
   icon_filename: 'json.svg'
+  description: 'Export Netdata Agent metrics as JSON documents for long-term storage, further analysis, and correlation with other data sources.'
 keywords:
   - exporter
   - json

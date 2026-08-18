@@ -8,6 +8,7 @@
     categories:
       - export
     icon_filename: 'graphite.png'
+    description: 'Export Netdata metrics to Graphite providers for long-term storage, further analysis, and correlation with other data sources.'
   keywords:
     - exporter
     - graphite
@@ -183,6 +184,7 @@
     name: Blueflood
     link: http://blueflood.io/
     icon_filename: 'blueflood.png'
+    description: 'Export Netdata metrics to Blueflood through the Graphite protocol for long-term storage, further analysis, and correlation with other data.'
     keywords:
       - export
       - Blueflood
@@ -198,6 +200,7 @@
     name: KairosDB
     link: https://kairosdb.github.io/
     icon_filename: 'kairos.png'
+    description: 'Export Netdata metrics to KairosDB through the Graphite protocol for long-term storage, further analysis, and correlation with other data.'
     keywords:
       - KairosDB
       - kairos

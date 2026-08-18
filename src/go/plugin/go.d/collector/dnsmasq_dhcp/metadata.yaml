@@ -21,7 +21,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors  Dnsmasq DHCP leases databases, depending on your configuration.
+          Monitor Dnsmasq DHCP leases and utilization across configured address ranges.
           
           By default, it uses:
 

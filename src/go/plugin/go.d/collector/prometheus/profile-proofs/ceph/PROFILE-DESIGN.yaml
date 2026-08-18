@@ -649,6 +649,70 @@ entities:
     identity:
       required: []
       optional: []
+  node_hardware_component:
+    grain: Ceph node hardware component
+    identity:
+      required:
+      - hostname
+      - category
+      - component
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-component identity preserves actionable hardware health observations exposed by Ceph node-proxy.
+  node_hardware_cpu:
+    grain: Ceph node CPU and processor inventory identity
+    identity:
+      required:
+      - hostname
+      - cpu
+      - manufacturer
+      - model
+      - total_threads
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-CPU identity preserves processor capacity observations exposed by Ceph node-proxy.
+  node_hardware_fan:
+    grain: Ceph node fan
+    identity:
+      required:
+      - hostname
+      - fan_name
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-fan identity preserves cooling observations exposed by Ceph node-proxy.
+  node_hardware_memory_module:
+    grain: Ceph node memory module and type
+    identity:
+      required:
+      - hostname
+      - dimm
+      - type
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-DIMM identity preserves memory inventory exposed by Ceph node-proxy.
+  node_hardware_storage_device:
+    grain: Ceph node storage device and inventory identity
+    identity:
+      required:
+      - hostname
+      - device
+      - model
+      - protocol
+      - firmware_version
+      - slot
+      - serial_number
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-device identity preserves storage inventory exposed by Ceph node-proxy.
+  node_hardware_temperature_sensor:
+    grain: Ceph node temperature sensor
+    identity:
+      required:
+      - hostname
+      - sensor_name
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Per-sensor identity preserves thermal observations exposed by Ceph node-proxy.
 label_policies: {}
 reduction_policies: {}
 normalizations:
@@ -5769,6 +5833,84 @@ views:
       dimensions: {}
       promote: []
       omit: {}
+  node_hardware.cooling.fan_speed:
+    family: Ceph/Node Hardware/Cooling
+    question: What is the current speed of each reported fan?
+    entity: node_hardware_fan
+    inputs:
+      value:
+        signal: hardware_fan_rpm
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.health.state:
+    family: Ceph/Node Hardware/Health
+    question: What is the current health state of each reported hardware component?
+    entity: node_hardware_component
+    inputs:
+      value:
+        signal: hardware_health
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.memory.capacity:
+    family: Ceph/Node Hardware/Memory
+    question: What capacity does each reported memory module provide?
+    entity: node_hardware_memory_module
+    inputs:
+      value:
+        signal: hardware_memory_capacity_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.processors.cpu_cores:
+    family: Ceph/Node Hardware/Processors
+    question: How many cores does each reported CPU provide?
+    entity: node_hardware_cpu
+    inputs:
+      value:
+        signal: hardware_cpu_cores
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.storage.capacity:
+    family: Ceph/Node Hardware/Storage
+    question: What capacity does each reported storage device provide?
+    entity: node_hardware_storage_device
+    inputs:
+      value:
+        signal: hardware_storage_capacity_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.temperature.temperature:
+    family: Ceph/Node Hardware/Temperature
+    question: What temperature does each reported hardware sensor observe?
+    entity: node_hardware_temperature_sensor
+    inputs:
+      value:
+        signal: hardware_temperature_celsius
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
   nvme_of.block_devices.byte_throughput:
     family: Ceph/NVMe-oF/Block Devices
     question: What is the byte throughput for each bdev name?
@@ -7828,6 +7970,49 @@ views:
     inputs:
       value:
         signal: osd_recovery_ops
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  osd_recovery.pg_rebuild_accumulated_duration:
+    family: Ceph/OSD Recovery
+    question: At what rate is primary-OSD PG-rebuild duration accumulating for each Ceph daemon?
+    entity: by_ceph_daemon
+    inputs:
+      value:
+        signal: recoverystate_perf_pg_rebuild_duration_sum
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  osd_recovery.pg_rebuild_duration_measurements:
+    family: Ceph/OSD Recovery
+    question: At what rate are primary-OSD PG-rebuild duration measurements recorded for each Ceph daemon?
+    entity: by_ceph_daemon
+    inputs:
+      value:
+        signal: recoverystate_perf_pg_rebuild_duration_count
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  osd_recovery.pg_rebuild_duration_range:
+    family: Ceph/OSD Recovery
+    question: What minimum and maximum PG-rebuild durations does each primary OSD currently report?
+    entity: by_ceph_daemon
+    inputs:
+      maximum:
+        signal: recoverystate_perf_pg_rebuild_max_secs
+        components:
+        - value
+      minimum:
+        signal: recoverystate_perf_pg_rebuild_min_secs
         components:
         - value
     labels:

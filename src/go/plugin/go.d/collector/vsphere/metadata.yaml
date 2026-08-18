@@ -6,6 +6,7 @@ modules:
       module_name: vsphere
       monitored_instance:
         name: VMware vCenter Server
+        description: "Monitor VMware vSphere hosts, VMs, datastores, clusters, resource pools, and inventory through vCenter."
         link: https://www.vmware.com/products/vcenter-server.html
         icon_filename: vmware.svg
         categories:

@@ -1139,6 +1139,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastbloom"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef975e30683b2d965054bb0a836f8973857c4ebf6acf274fe46617cd285060d8"
+dependencies = [
+ "foldhash 0.2.0",
+ "libm",
+ "portable-atomic",
+ "rand 0.9.5",
+ "serde",
+ "siphasher",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3152,6 +3166,7 @@ dependencies = [
  "file-registry",
  "ng-flatten",
  "opentelemetry-proto",
+ "otel-logs-identity",
  "sfst",
  "tempfile",
  "thiserror 2.0.19",
@@ -3536,7 +3551,9 @@ dependencies = [
  "netdata-plugin-error",
  "netdata-plugin-protocol",
  "netdata-plugin-types",
+ "ng-flatten",
  "ng-index",
+ "opentelemetry-proto",
  "otel-catalog",
  "otel-logs-identity",
  "serde",
@@ -3802,6 +3819,9 @@ name = "portable-atomic"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c33a9471896f1c69cecef8d20cbe2f7accd12527ce60845ff44c153bb2a21b49"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "portable-atomic-util"
@@ -4857,6 +4877,7 @@ checksum = "a57e0db32629cc3dc6a7a524f321aec809e6cbc334d84ff525d6af07040c1d28"
 name = "sfsq"
 version = "0.1.3"
 dependencies = [
+ "chunk-file",
  "clap",
  "file-registry",
  "libc",
@@ -4871,6 +4892,7 @@ dependencies = [
  "thiserror 2.0.19",
  "tokio-util",
  "tracing",
+ "treight",
  "uuid",
  "wal",
 ]
@@ -4910,6 +4932,7 @@ dependencies = [
  "chunk-file",
  "clap",
  "criterion",
+ "fastbloom",
  "file-registry",
  "fst",
  "hashbrown 0.17.1",
@@ -5024,6 +5047,9 @@ name = "siphasher"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "slab"

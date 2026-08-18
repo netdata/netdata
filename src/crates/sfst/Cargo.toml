@@ -35,6 +35,7 @@ regex = { workspace = true }
 hashbrown = { workspace = true }
 roaring = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
+fastbloom = { workspace = true }
 
 # Registry
 file-registry = { workspace = true }
