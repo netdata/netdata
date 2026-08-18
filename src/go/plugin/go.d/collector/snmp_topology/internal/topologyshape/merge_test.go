@@ -75,7 +75,7 @@ func TestCollapseActorsByIPOnePassPreservesSequentialMergeSemantics(t *testing.T
 
 func richTopologyActorsForCollapseEquivalence() []topologymodel.Actor {
 	actors := make([]topologymodel.Actor, 0, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		actorType := "device"
 		if i == 0 {
 			actorType = "endpoint"

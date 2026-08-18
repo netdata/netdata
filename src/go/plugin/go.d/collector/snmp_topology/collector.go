@@ -446,9 +446,7 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 
 	var wg sync.WaitGroup
 	for range min(maxWorkers, len(jobs)) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for job := range jobCh {
 				if lookupCtx.Err() != nil {
 					continue
@@ -458,7 +456,7 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 					plans[job.planIndex].device,
 				)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

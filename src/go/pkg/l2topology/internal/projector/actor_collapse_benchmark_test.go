@@ -36,10 +36,10 @@ func BenchmarkCollapseActorsByIPAliasCollisions(b *testing.B) {
 
 func projectedActorsWithSharedPrimary(actorCount, aliasCount int) []projectedActor {
 	actors := make([]projectedActor, 0, actorCount)
-	for actorIndex := 0; actorIndex < actorCount; actorIndex++ {
+	for actorIndex := range actorCount {
 		addresses := make([]string, 0, aliasCount+1)
 		addresses = append(addresses, "172.16.0.1")
-		for aliasIndex := 0; aliasIndex < aliasCount; aliasIndex++ {
+		for aliasIndex := range aliasCount {
 			addresses = append(addresses, fmt.Sprintf(
 				"10.%d.%d.%d",
 				actorIndex+1,

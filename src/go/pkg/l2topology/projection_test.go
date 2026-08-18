@@ -207,11 +207,11 @@ func TestProjectionKeepsLinkEndpointIPHintsConstantSized(t *testing.T) {
 	)
 
 	aliases := make([]string, 0, aliasCount)
-	for i := 0; i < aliasCount; i++ {
+	for i := range aliasCount {
 		aliases = append(aliases, fmt.Sprintf("10.1.%d.%d", i/254, i%254+1))
 	}
 	remotes := make([]LLDPRemoteObservation, 0, linkCount)
-	for i := 0; i < linkCount; i++ {
+	for i := range linkCount {
 		remotes = append(remotes, LLDPRemoteObservation{
 			LocalPortNum: fmt.Sprintf("%d", i+1),
 			LocalPortID:  fmt.Sprintf("Ethernet%d", i+1),
@@ -268,7 +268,7 @@ func TestProjectionKeepsFDBLinkEndpointIPHintsConstantSized(t *testing.T) {
 	const aliasCount = 256
 
 	arpEntries := make([]ARPNDObservation, 0, aliasCount)
-	for i := 0; i < aliasCount; i++ {
+	for i := range aliasCount {
 		arpEntries = append(arpEntries, ARPNDObservation{
 			Protocol: "arp",
 			IfIndex:  1,
@@ -335,7 +335,7 @@ func TestProjectionKeepsFDBSegmentEndpointIPHintsConstantSized(t *testing.T) {
 	const endpointMAC = "70:49:a2:65:72:cd"
 
 	arpEntries := make([]ARPNDObservation, 0, aliasCount)
-	for i := 0; i < aliasCount; i++ {
+	for i := range aliasCount {
 		arpEntries = append(arpEntries, ARPNDObservation{
 			Protocol: "arp",
 			IfIndex:  1,

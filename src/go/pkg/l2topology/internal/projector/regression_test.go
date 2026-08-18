@@ -40,7 +40,7 @@ func TestCollapseActorsByIPOnePassPreservesSequentialMergeSemantics(t *testing.T
 
 func richProjectedActorsForCollapseEquivalence() []projectedActor {
 	actors := make([]projectedActor, 0, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		actorType := "device"
 		if i == 0 {
 			actorType = "endpoint"

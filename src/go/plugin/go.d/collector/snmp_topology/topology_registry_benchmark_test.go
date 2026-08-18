@@ -169,7 +169,7 @@ func benchmarkInferredLLDPTopologyRegistry(linkCount, aliasCount int) *topologyR
 		ManagementIP:  "192.0.2.1",
 	}
 
-	for i := 0; i < linkCount; i++ {
+	for i := range linkCount {
 		port := fmt.Sprintf("Ethernet%d", i+1)
 		aliasIndex := i % aliasCount
 		ip := fmt.Sprintf("10.%d.%d.%d", aliasIndex/64516+1, (aliasIndex/254)%254, aliasIndex%254+1)
@@ -265,14 +265,14 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 	selectedIPs := make([]string, deviceCount)
 	caches := make([]*topologyCache, 0, deviceCount)
 
-	for deviceIndex := 0; deviceIndex < deviceCount; deviceIndex++ {
+	for deviceIndex := range deviceCount {
 		cache := newTopologyCache()
 		cache.lastUpdate = now
 		cache.updateTime = now
 		cache.agentID = fmt.Sprintf("benchmark-agent-%d", deviceIndex)
 
 		addresses := make([]topologymodel.ManagementAddress, 0, aliasCount)
-		for aliasIndex := 0; aliasIndex < aliasCount; aliasIndex++ {
+		for aliasIndex := range aliasCount {
 			ip := benchmarkAliasIPAddress(deviceIndex, aliasIndex)
 			addresses = append(addresses, topologymodel.ManagementAddress{
 				Address:     ip,
