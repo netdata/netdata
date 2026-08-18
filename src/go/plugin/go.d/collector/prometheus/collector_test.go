@@ -1244,6 +1244,116 @@ func TestCollector_CephMGRClusterSummaries(t *testing.T) {
 	requireChartValues(creates[osdSummary][0], map[string]float64{"total": 10, "up": 9})
 }
 
+func TestCollector_CephM05RBDMirrorTimestampBoundaries(t *testing.T) {
+	drift := func(local, remote float64) float64 {
+		if math.IsNaN(local) || math.IsInf(local, 0) || math.IsNaN(remote) || math.IsInf(remote, 0) ||
+			local < 0 || remote < 0 {
+			return math.NaN()
+		}
+		return local - remote
+	}
+	for _, tc := range []struct {
+		name      string
+		local     float64
+		remote    float64
+		want      float64
+		unsynced  bool
+		undefined bool
+	}{
+		{name: "invalid NaN local", local: math.NaN(), remote: 1, undefined: true},
+		{name: "invalid infinite remote", local: 1, remote: math.Inf(1), undefined: true},
+		{name: "negative local timestamp", local: -1, remote: 1, undefined: true},
+		{name: "synchronized", local: 100, remote: 100},
+		{name: "local behind", local: 99, remote: 100, want: -1, unsynced: true},
+		{name: "local ahead", local: 101, remote: 100, want: 1, unsynced: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := drift(tc.local, tc.remote)
+			if tc.undefined {
+				assert.True(t, math.IsNaN(got))
+				return
+			}
+			assert.InDelta(t, tc.want, got, 1e-12)
+			assert.Equal(t, tc.unsynced, got != 0)
+		})
+	}
+}
+
+func TestCollector_CephM05RBDMirrorTimestampMaterialization(t *testing.T) {
+	var input strings.Builder
+	input.WriteString("# TYPE ceph_rbd_mirror_snapshot_image_local_timestamp gauge\n")
+	input.WriteString("# TYPE ceph_rbd_mirror_snapshot_image_remote_timestamp gauge\n")
+	input.WriteString("ceph_rbd_mirror_snapshot_image_local_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"synced\",namespace=\"ns\",pool=\"pool\"} 100\n")
+	input.WriteString("ceph_rbd_mirror_snapshot_image_remote_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"synced\",namespace=\"ns\",pool=\"pool\"} 100\n")
+	input.WriteString("ceph_rbd_mirror_snapshot_image_local_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"ahead\",namespace=\"ns\",pool=\"pool\"} 101\n")
+	input.WriteString("ceph_rbd_mirror_snapshot_image_remote_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"ahead\",namespace=\"ns\",pool=\"pool\"} 100\n")
+	input.WriteString("ceph_rbd_mirror_snapshot_image_local_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"behind\",namespace=\"other\",pool=\"other\"} 99\n")
+	input.WriteString("ceph_rbd_mirror_snapshot_image_remote_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"behind\",namespace=\"other\",pool=\"other\"} 100\n")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(input.String()))
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	const context = "prometheus.ceph.rbd_mirror.snapshot_replication.timestamp"
+	chartContexts := make(map[string]string)
+	updates := make(map[string]chartengine.UpdateChartAction)
+	for _, action := range plan.Actions {
+		create, ok := action.(chartengine.CreateChartAction)
+		if ok {
+			chartContexts[create.ChartID] = create.Meta.Context
+		}
+		update, ok := action.(chartengine.UpdateChartAction)
+		if ok && chartContexts[update.ChartID] == context {
+			updates[update.ChartID] = update
+		}
+	}
+	require.Len(t, updates, 3, "each mirrored image retains its own chart identity")
+
+	for chartID, update := range updates {
+		actual := make(map[string]float64)
+		for _, value := range update.Values {
+			if value.IsFloat {
+				actual[value.Name] = value.Float64
+			} else {
+				actual[value.Name] = float64(value.Int64)
+			}
+		}
+		require.Len(t, actual, 2, "chart %q must expose both timestamps", chartID)
+		switch actual["local_timestamp"] {
+		case 100:
+			assert.EqualValues(t, 100, actual["remote_timestamp"])
+		case 101:
+			assert.EqualValues(t, 100, actual["remote_timestamp"])
+		case 99:
+			assert.EqualValues(t, 100, actual["remote_timestamp"])
+		default:
+			t.Fatalf("unexpected timestamp chart values %q: %v", chartID, actual)
+		}
+	}
+}
+
 func TestCollector_CephM04DerivedBoundaries(t *testing.T) {
 	difference := func(total, partial float64) float64 {
 		if math.IsNaN(total) || math.IsInf(total, 0) || math.IsNaN(partial) || math.IsInf(partial, 0) ||
@@ -1625,7 +1735,8 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		"CEPH-037", "CEPH-038", "CEPH-039", "CEPH-063", "CEPH-064", "CEPH-065", "CEPH-066", "CEPH-067",
 		"CEPH-068", "CEPH-069", "CEPH-070", "CEPH-071", "CEPH-072", "CEPH-073", "CEPH-074", "CEPH-075",
 		"CEPH-076", "CEPH-077", "CEPH-098", "CEPH-099", "CEPH-100", "CEPH-101", "CEPH-102", "CEPH-103",
-		"CEPH-104", "CEPH-040", "CEPH-040-HELPER", "CEPH-041", "CEPH-043", "CEPH-044", "CEPH-045",
+		"CEPH-006", "CEPH-007", "CEPH-008", "CEPH-009", "CEPH-010", "CEPH-011", "CEPH-012", "CEPH-055",
+		"CEPH-056", "CEPH-057", "CEPH-058", "CEPH-104", "CEPH-040", "CEPH-040-HELPER", "CEPH-041", "CEPH-043", "CEPH-044", "CEPH-045",
 		"CEPH-046", "CEPH-046-HELPER", "CEPH-047", "CEPH-047-HELPER", "CEPH-048", "CEPH-049", "CEPH-050",
 		"CEPH-051", "CEPH-052", "CEPH-054", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
 	}, cephManifestSOWIDs(manifest.Alerts))
@@ -1672,6 +1783,13 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		require.NotEmpty(t, adaptation.Preserved)
 		require.NotEmpty(t, adaptation.Differences)
 
+		if mapping.Netdata.Disposition == "reject" {
+			require.Equal(t, "UNSUPPORTED", mapping.Netdata.Fidelity)
+			require.Empty(t, mapping.Netdata.Context)
+			require.NotEmptyf(t, mapping.Netdata.Reason, "%s has no rejection rationale", name)
+			require.NotContains(t, templates, name, "%s rejected rule must not ship an alert template")
+			continue
+		}
 		if mapping.Netdata.Disposition == "internal-helper" {
 			require.Equalf(t, "silent", mapping.Netdata.Recipient, "%s internal helper must be silent", name)
 			require.Containsf(t, templates, name, "internal helper template is absent")
@@ -1763,7 +1881,7 @@ func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
 
 			rules := parseCephSourceAlertRules(t, content)
 			for name, mapping := range manifest.Alerts {
-				if mapping.Netdata.Disposition == "internal-helper" || mapping.Netdata.Disposition == "subsumed-helper" {
+				if slices.Contains([]string{"internal-helper", "subsumed-helper"}, mapping.Netdata.Disposition) {
 					continue
 				}
 				if !slices.Contains(mapping.Source.Releases, release) {
@@ -2137,7 +2255,7 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 	}
 	expected := make(map[string]string)
 	for name, mapping := range manifest.Alerts {
-		if mapping.Netdata.Disposition != "reuse" {
+		if mapping.Netdata.Disposition != "reuse" && mapping.Netdata.Disposition != "reject" {
 			expected[name] = mapping.Netdata.Context
 		}
 	}
@@ -2216,6 +2334,7 @@ type cephAlertMapping struct {
 		Units       string   `yaml:"units"`
 		Condition   string   `yaml:"condition"`
 		Recipient   string   `yaml:"recipient"`
+		Reason      string   `yaml:"reason"`
 		Adaptation  string   `yaml:"adaptation"`
 		OwnerFile   string   `yaml:"owner_file"`
 		OwnerAlerts []string `yaml:"owner_alerts"`

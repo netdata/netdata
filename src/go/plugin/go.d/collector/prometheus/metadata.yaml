@@ -4769,6 +4769,38 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.temperature.temperature
         info: 'Every available sample in the 1-minute observation window reports a recognized processor temperature sensor above 80°C.'
+      - name: ceph_filesystem_damaged
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports filesystem metadata damage.'
+      - name: ceph_filesystem_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a degraded Ceph filesystem.'
+      - name: ceph_filesystem_failure_no_standby
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a failed MDS rank with no standby.'
+      - name: ceph_filesystem_insufficient_standby
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports insufficient CephFS standby daemons.'
+      - name: ceph_filesystem_mds_ranks_low
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports fewer active MDS ranks than configured.'
+      - name: ceph_filesystem_offline
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports all MDS ranks unavailable.'
+      - name: ceph_filesystem_read_only
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a Ceph filesystem forced read-only.'
+      - name: ceph_rbd_mirror_images_not_in_sync
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.rbd_mirror.snapshot_replication.timestamp
+        info: 'The current local and remote snapshot timestamps differ for this mirrored image.'
       - name: ceph_osd_all_up
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
