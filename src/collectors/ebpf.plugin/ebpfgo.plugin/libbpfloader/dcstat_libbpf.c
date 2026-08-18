@@ -371,7 +371,12 @@ int netdata_dcstat_runtime_prepare(
     if (dcstat_update_map_types(obj, maps_per_core) != 0)
         return -1;
     dcstat_update_map_sizes(obj, pid_table_size);
+#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+    /* The userspace accumulator only exists for the buffer and arena flavors,
+     * which require CO-RE.  Bounding it is meaningless — and the field is not
+     * even declared — in a legacy-only build. */
     nd_ebpf_acc_set_max_entries(&rt->acc, pid_table_size);
+#endif
 
     nd_ebpf_alloc_percpu_buffers(
         &rt->percpu_u64, &rt->percpu_u64_cap,
