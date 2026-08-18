@@ -4521,7 +4521,7 @@ modules:
           from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. Optional branches cover
           CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
           scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
-          and Tentacle 20.2.2. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
+          and Tentacle 20.2.3. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
           exposes cephadm node-proxy CPU, memory, storage, cooling, temperature, and per-component health metrics. Firmware
           remains source metadata and is not charted because Ceph exposes it as an info family. PG state flags and RGW
           global/user/bucket views are overlapping diagnostic populations and are not additive totals. Profile relabeling
@@ -4541,7 +4541,9 @@ modules:
 
           The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
           `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
-          NVMe-oF gateway's Python process runtime surface.
+          NVMe-oF gateway's Python process runtime surface. On Tentacle, the optional MGR node-proxy hardware surface is
+          charted per reported component and temperature sensor with its hostname, category, component, or sensor identity.
+          These families are absent on Reef and Squid; their absence creates no chart or alert there.
 
           Alert ownership is deliberately layered. Configure one logical MGR scrape scope per Ceph cluster for cluster-health
           alerts and use the native Ceph collector for its complementary Dashboard API collection-integrity alerts. Netdata's
@@ -4679,6 +4681,94 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
         info: 'Every available sample in the 1-minute observation window reports blocked relocation from a predicted device failure.'
+      - name: ceph_cooling_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for a reported fan component.'
+      - name: ceph_cooling_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for a reported fan component.'
+      - name: ceph_dimm_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized DIMM temperature sensor above 80°C.'
+      - name: ceph_hardware_fan_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph fan hardware error.'
+      - name: ceph_hardware_memory_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph memory hardware error.'
+      - name: ceph_hardware_network_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph network hardware error.'
+      - name: ceph_hardware_power_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph power hardware error.'
+      - name: ceph_hardware_processor_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph processor hardware error.'
+      - name: ceph_hardware_storage_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph storage hardware error.'
+      - name: ceph_memory_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for a reported memory component.'
+      - name: ceph_memory_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for a reported memory component.'
+      - name: ceph_motherboard_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized motherboard temperature sensor above 60°C.'
+      - name: ceph_nvme_drive_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for a reported storage component.'
+      - name: ceph_nvme_drive_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for a reported storage component.'
+      - name: ceph_nvme_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized NVMe temperature sensor above 70°C.'
+      - name: ceph_network_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for a reported network component.'
+      - name: ceph_network_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for a reported network component.'
+      - name: ceph_power_supply_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for a reported power component.'
+      - name: ceph_power_supply_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for a reported power component.'
+      - name: ceph_processor_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for a reported processor component.'
+      - name: ceph_processor_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for a reported processor component.'
+      - name: ceph_processor_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized processor temperature sensor above 80°C.'
       - name: ceph_mon_clock_skew
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state

@@ -984,68 +984,9 @@ normalizations:
     - normalization_throttle_identity
 # `hardware_firmware_info` is a source-declared info family. The writer rejects it as
 # `writer_ineligible/info_family` before authored or autogen output, so it has no
-# exclusion. P1-M03 owns any future presentation after a deliberate writer-policy decision.
-exclusions:
-  hardware_cpu_cores_deferred_to_p1_m03:
-    source: {signal: hardware_cpu_cores, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
-    evidence: [delegation_hardware_metrics]
-    outcome: retain_writable_unrendered
-  hardware_fan_rpm_deferred_to_p1_m03:
-    source: {signal: hardware_fan_rpm, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
-    evidence: [delegation_hardware_metrics]
-    outcome: retain_writable_unrendered
-  hardware_health_deferred_to_p1_m03:
-    source: {signal: hardware_health, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
-    evidence: [delegation_hardware_metrics]
-    outcome: retain_writable_unrendered
-  hardware_memory_capacity_bytes_deferred_to_p1_m03:
-    source: {signal: hardware_memory_capacity_bytes, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
-    evidence: [delegation_hardware_metrics]
-    outcome: retain_writable_unrendered
-  hardware_storage_capacity_bytes_deferred_to_p1_m03:
-    source: {signal: hardware_storage_capacity_bytes, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
-    evidence: [delegation_hardware_metrics]
-    outcome: retain_writable_unrendered
-  hardware_temperature_celsius_deferred_to_p1_m03:
-    source: {signal: hardware_temperature_celsius, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M03 Tentacle hardware signal and output disposition
-    evidence: [delegation_hardware_metrics]
-    outcome: retain_writable_unrendered
-  recoverystate_perf_pg_rebuild_duration_count_deferred_to_p1_m04:
-    source: {signal: recoverystate_perf_pg_rebuild_duration_count, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
-    evidence: [delegation_pg_rebuild]
-    outcome: retain_writable_unrendered
-  recoverystate_perf_pg_rebuild_duration_sum_deferred_to_p1_m04:
-    source: {signal: recoverystate_perf_pg_rebuild_duration_sum, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
-    evidence: [delegation_pg_rebuild]
-    outcome: retain_writable_unrendered
-  recoverystate_perf_pg_rebuild_max_secs_deferred_to_p1_m04:
-    source: {signal: recoverystate_perf_pg_rebuild_max_secs, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
-    evidence: [delegation_pg_rebuild]
-    outcome: retain_writable_unrendered
-  recoverystate_perf_pg_rebuild_min_secs_deferred_to_p1_m04:
-    source: {signal: recoverystate_perf_pg_rebuild_min_secs, components: [value]}
-    reason: scope_delegation
-    delegated_domain: P1-M04 PG recovery and capacity signal and output disposition
-    evidence: [delegation_pg_rebuild]
-    outcome: retain_writable_unrendered
+# exclusion. A future inventory presentation requires a deliberate writer-policy decision.
+exclusions: {}
+
 limitations:
   objecter.accumulated_latency#value:
     contributor_variant: objecter_handles
@@ -5912,19 +5853,6 @@ views:
       dimensions: {}
       promote: []
       omit: {}
-  node_hardware.cooling.fan_speed:
-    family: Ceph/Node Hardware/Cooling
-    question: What is the current speed of each reported fan?
-    entity: node_hardware_fan
-    inputs:
-      value:
-        signal: hardware_fan_rpm
-        components:
-        - value
-    labels:
-      dimensions: {}
-      promote: []
-      omit: {}
   node_hardware.health.state:
     family: Ceph/Node Hardware/Health
     question: What is the current health state of each reported hardware component?
@@ -5932,6 +5860,32 @@ views:
     inputs:
       value:
         signal: hardware_health
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.temperature.temperature:
+    family: Ceph/Node Hardware/Temperature
+    question: What temperature does each reported hardware sensor observe?
+    entity: node_hardware_temperature_sensor
+    inputs:
+      value:
+        signal: hardware_temperature_celsius
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.cooling.fan_speed:
+    family: Ceph/Node Hardware/Cooling
+    question: What is the current speed of each reported fan?
+    entity: node_hardware_fan
+    inputs:
+      value:
+        signal: hardware_fan_rpm
         components:
         - value
     labels:
@@ -5971,19 +5925,6 @@ views:
     inputs:
       value:
         signal: hardware_storage_capacity_bytes
-        components:
-        - value
-    labels:
-      dimensions: {}
-      promote: []
-      omit: {}
-  node_hardware.temperature.temperature:
-    family: Ceph/Node Hardware/Temperature
-    question: What temperature does each reported hardware sensor observe?
-    entity: node_hardware_temperature_sensor
-    inputs:
-      value:
-        signal: hardware_temperature_celsius
         components:
         - value
     labels:
