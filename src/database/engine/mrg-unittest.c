@@ -366,9 +366,181 @@ static int mrg_entries_acquired_counter_unittest(MRG *mrg) {
     return errors;
 }
 
+// ----------------------------------------------------------------------------
+// Concurrent lookup-vs-delete on the uuid path.
+//
+// mrg_metric_get_and_acquire_by_uuid() resolves the uuid with uuidmap_peek_id(),
+// which returns an id it holds NO reference on. That is only safe because every
+// METRIC owns a uuidmap reference for its whole lifetime, so an id that resolves
+// to a metric is necessarily still alive, and because ids are never reused, so a
+// stale id can only miss -- never alias a different uuid.
+//
+// This exercises exactly that window: readers look metrics up by uuid while
+// writers add and delete metrics for the same uuid pool. Any mismatch between the
+// uuid asked for and the uuid of the metric returned means the id aliased, which
+// is the failure mode the contract forbids.
+
+#define MRG_UUID_RACE_ENTRIES 512
+#define MRG_UUID_RACE_SECS 3
+#define MRG_UUID_RACE_READERS 4
+#define MRG_UUID_RACE_WRITERS 4
+
+struct mrg_uuid_race {
+    MRG *mrg;
+    nd_uuid_t *uuids;
+    size_t entries;
+    size_t churn_from;      // uuids below this index are stable, above they churn
+    bool stop;
+    size_t lookups_ok;
+    size_t lookups_miss;
+    size_t mismatches;
+    size_t deletes;
+};
+
+static void mrg_uuid_race_writer(void *ptr) {
+    struct mrg_uuid_race *t = ptr;
+    size_t span = t->entries - t->churn_from;
+    size_t i = 0;
+
+    while(!__atomic_load_n(&t->stop, __ATOMIC_RELAXED)) {
+        i = t->churn_from + ((i + 1) % span);
+
+        bool added = false;
+        // no retention on purpose: metric_release() only deletes a metric that
+        // has none (acquired_metric_has_retention()), and this test needs the
+        // delete path to actually run
+        MRG_ENTRY entry = {
+            .uuid = &t->uuids[i],
+            .section = (Word_t)&test_ctx_0,
+            .first_time_s = 0,
+            .last_time_s = 0,
+            .latest_update_every_s = 0,
+        };
+
+        METRIC *metric = mrg_metric_add_and_acquire(t->mrg, entry, &added);
+        if(mrg_metric_release_and_delete(t->mrg, metric))
+            __atomic_add_fetch(&t->deletes, 1, __ATOMIC_RELAXED);
+    }
+}
+
+static void mrg_uuid_race_reader(void *ptr) {
+    struct mrg_uuid_race *t = ptr;
+    size_t i = 0;
+
+    while(!__atomic_load_n(&t->stop, __ATOMIC_RELAXED)) {
+        i = (i + 1) % t->entries;
+
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(t->mrg, &t->uuids[i], (Word_t)&test_ctx_0);
+        if(!metric) {
+            // a miss is a legitimate outcome here - the writers delete constantly
+            __atomic_add_fetch(&t->lookups_miss, 1, __ATOMIC_RELAXED);
+            continue;
+        }
+
+        // we hold the metric, so its uuidmap entry cannot go away underneath us
+        nd_uuid_t *got = mrg_metric_uuid(t->mrg, metric);
+        if(!got || uuid_compare(*got, t->uuids[i]) != 0)
+            __atomic_add_fetch(&t->mismatches, 1, __ATOMIC_RELAXED);
+        else
+            __atomic_add_fetch(&t->lookups_ok, 1, __ATOMIC_RELAXED);
+
+        mrg_metric_release(t->mrg, metric);
+    }
+}
+
+static int mrg_uuid_lookup_delete_race_unittest(void) {
+    fprintf(stderr, "\nTesting concurrent MRG lookup-by-uuid vs delete (%d readers, %d writers, %ds)...\n",
+            MRG_UUID_RACE_READERS, MRG_UUID_RACE_WRITERS, MRG_UUID_RACE_SECS);
+
+    int errors = 0;
+
+    // isolated MRG so the churn cannot disturb the accounting the other tests check
+    MRG *mrg = mrg_create_for_unittest();
+
+    struct mrg_uuid_race t = {
+        .mrg = mrg,
+        .entries = MRG_UUID_RACE_ENTRIES,
+        .uuids = callocz(MRG_UUID_RACE_ENTRIES, sizeof(nd_uuid_t)),
+    };
+    for(size_t i = 0; i < t.entries ;i++)
+        uuid_generate_random(t.uuids[i]);
+
+    // Seed the lower half with metrics that HAVE retention. metric_release()
+    // refuses to delete those, so they stay put and give the readers something
+    // they must reliably find; the upper half is left to the writers to churn.
+    // Without both halves the test proves nothing: all-stable means the delete
+    // path never runs, all-churn means the lookup path never succeeds.
+    t.churn_from = t.entries / 2;
+    for(size_t i = 0; i < t.churn_from ;i++) {
+        bool added = false;
+        MRG_ENTRY entry = {
+            .uuid = &t.uuids[i],
+            .section = (Word_t)&test_ctx_0,
+            .first_time_s = 2,
+            .last_time_s = 3,
+            .latest_update_every_s = 1,
+        };
+        METRIC *m = mrg_metric_add_and_acquire(mrg, entry, &added);
+        mrg_metric_release(mrg, m);
+    }
+
+    ND_THREAD *th[MRG_UUID_RACE_READERS + MRG_UUID_RACE_WRITERS];
+    size_t n = 0;
+    for(size_t i = 0; i < MRG_UUID_RACE_WRITERS ;i++) {
+        char buf[15 + 1];
+        snprintfz(buf, sizeof(buf) - 1, "MRGRW[%zu]", i);
+        th[n++] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, mrg_uuid_race_writer, &t);
+    }
+    for(size_t i = 0; i < MRG_UUID_RACE_READERS ;i++) {
+        char buf[15 + 1];
+        snprintfz(buf, sizeof(buf) - 1, "MRGRD[%zu]", i);
+        th[n++] = nd_thread_create(buf, NETDATA_THREAD_OPTION_DONT_LOG, mrg_uuid_race_reader, &t);
+    }
+
+    sleep_usec(MRG_UUID_RACE_SECS * USEC_PER_SEC);
+    __atomic_store_n(&t.stop, true, __ATOMIC_RELAXED);
+
+    for(size_t i = 0; i < n ;i++)
+        nd_thread_join(th[i]);
+
+    fprintf(stderr, "  lookups: %zu hit, %zu miss, %zu deletes, %zu MISMATCHES\n",
+            t.lookups_ok, t.lookups_miss, t.deletes, t.mismatches);
+
+    if(t.mismatches) {
+        fprintf(stderr, "ERROR: %zu lookups returned a metric for the wrong UUID\n", t.mismatches);
+        errors++;
+    }
+
+    // both outcomes must actually have happened, or the test proved nothing
+    if(!t.lookups_ok) {
+        fprintf(stderr, "ERROR: no successful lookup - the race was never exercised\n");
+        errors++;
+    }
+    if(!t.deletes) {
+        fprintf(stderr, "ERROR: no deletion happened - the race was never exercised\n");
+        errors++;
+    }
+
+    freez(t.uuids);
+
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced after the race (leaked reference)\n", referenced);
+        errors++;
+    }
+
+    if(errors)
+        fprintf(stderr, "MRG uuid lookup/delete race test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "MRG uuid lookup/delete race test: OK\n");
+
+    return errors;
+}
+
 int mrg_unittest(void) {
     int errors = dbengine_accounting_helpers_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
+    errors += mrg_uuid_lookup_delete_race_unittest();
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
     MRG *mrg = mrg_create_for_unittest();

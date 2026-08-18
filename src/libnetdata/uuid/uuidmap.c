@@ -735,11 +735,86 @@ static int uuidmap_concurrent_unittest(void) {
     return errors;
 }
 
+// Verifies the uuidmap_peek_id() contract: it resolves a uuid to its id WITHOUT
+// creating it and WITHOUT taking a reference. Both halves matter -- a leaked
+// reference would keep entries alive forever, and a created-on-miss entry would
+// reintroduce the create/delete churn peek exists to avoid.
+static int uuidmap_peek_id_unittest(void) {
+    fprintf(stderr, "\nTesting UUID Map peek (non-owning lookup)...\n");
+    int errors = 0;
+
+    nd_uuid_t uuid;
+    uuid_generate_random(uuid);
+
+    // 1. an unknown uuid must miss, and must NOT be inserted as a side effect
+    UUIDMAP_ID id = uuidmap_peek_id(uuid);
+    if(id != 0) {
+        fprintf(stderr, "ERROR: peek returned id %u for an unknown UUID (expected 0)\n", id);
+        errors++;
+    }
+    if(uuidmap_peek_id(uuid) != 0) {
+        fprintf(stderr, "ERROR: peek created the UUID it was asked to look up\n");
+        errors++;
+    }
+
+    // 2. a known uuid must resolve to exactly the id create() handed out
+    UUIDMAP_ID created = uuidmap_create(uuid);
+    if(!created) {
+        fprintf(stderr, "ERROR: cannot create UUID for the peek test\n");
+        return errors + 1;
+    }
+
+    if((id = uuidmap_peek_id(uuid)) != created) {
+        fprintf(stderr, "ERROR: peek returned %u, expected %u\n", id, created);
+        errors++;
+    }
+
+    // 3. peek must take no reference: after many peeks, the SINGLE outstanding
+    //    reference from create() must still be enough to delete the entry
+    for(size_t i = 0; i < 1000 ;i++) {
+        if(uuidmap_peek_id(uuid) != created) {
+            fprintf(stderr, "ERROR: peek became unstable at iteration %zu\n", i);
+            errors++;
+            break;
+        }
+    }
+
+    uuidmap_free(created);
+
+    if(uuidmap_uuid_ptr(created) != NULL) {
+        fprintf(stderr, "ERROR: entry survived its last free - peek leaked a reference\n");
+        errors++;
+    }
+
+    // 4. peek must not report (or resurrect) a deleted entry
+    if((id = uuidmap_peek_id(uuid)) != 0) {
+        fprintf(stderr, "ERROR: peek returned id %u for a deleted UUID (expected 0)\n", id);
+        errors++;
+    }
+
+    // 5. ids are never reused - this is what makes a stale peeked id safe to use
+    //    as a bare lookup key: it can only ever miss, never alias another uuid
+    UUIDMAP_ID recreated = uuidmap_create(uuid);
+    if(recreated == created) {
+        fprintf(stderr, "ERROR: recreate reused id %u - ids must never be reused\n", created);
+        errors++;
+    }
+    uuidmap_free(recreated);
+
+    if(errors)
+        fprintf(stderr, "UUID Map peek test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "UUID Map peek test: OK\n");
+
+    return errors;
+}
+
 int uuidmap_unittest(void) {
     fprintf(stderr, "\nTesting UUID Map...\n");
 
     const size_t ENTRIES = 100000;
     int errors = uuidmap_destroy_referenced_entry_unittest();
+    errors += uuidmap_peek_id_unittest();
     errors += uuidmap_locked_lookup_delete_interleaving_unittest();
     errors += uuidmap_concurrent_unittest();
 
