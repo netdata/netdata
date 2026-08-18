@@ -54,10 +54,12 @@ impl FunctionHandler for OtelTracesHandler {
     }
 
     fn declaration(&self) -> FunctionDeclaration {
-        FunctionDeclaration::new(
+        let mut d = FunctionDeclaration::new(
             "otel_traces",
             "OTel traces (proof scaffold; query not implemented)",
-        )
+        );
+        d.global = true;
+        d
     }
 }
 
