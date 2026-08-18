@@ -84,6 +84,12 @@ cases:
       expected:
         verdict: PASS
       observations:
+        control_plane.monitor.cluster_summary#total:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        control_plane.monitor.cluster_summary#in_quorum:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
         health.cluster_status.state#value:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
@@ -94,6 +100,12 @@ cases:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
         health.slow_operations.current_operations#value:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        osd_capacity_and_state.osd_state.cluster_summary#total:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        osd_capacity_and_state.osd_state.cluster_summary#up:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   squid_ceph_exporter_limit11:
@@ -122,6 +134,12 @@ cases:
       expected:
         verdict: PASS
       observations:
+        control_plane.monitor.cluster_summary#total:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        control_plane.monitor.cluster_summary#in_quorum:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
         health.cluster_status.state#value:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
@@ -132,6 +150,12 @@ cases:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
         health.slow_operations.current_operations#value:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        osd_capacity_and_state.osd_state.cluster_summary#total:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        osd_capacity_and_state.osd_state.cluster_summary#up:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   tentacle_ceph_exporter_limit11:
@@ -160,6 +184,12 @@ cases:
       expected:
         verdict: PASS
       observations:
+        control_plane.monitor.cluster_summary#total:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        control_plane.monitor.cluster_summary#in_quorum:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
         health.cluster_status.state#value:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
@@ -170,6 +200,12 @@ cases:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
         health.slow_operations.current_operations#value:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        osd_capacity_and_state.osd_state.cluster_summary#total:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+        osd_capacity_and_state.osd_state.cluster_summary#up:
           state: current
           predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   nvmeof:

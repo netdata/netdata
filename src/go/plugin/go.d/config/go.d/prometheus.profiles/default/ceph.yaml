@@ -507,6 +507,16 @@ template:
       - ceph_mon_metadata
       - ceph_mon_quorum_status
       charts:
+      - title: Cluster Summary
+        context: cluster_summary
+        units: monitors
+        label_promotion: []
+        dimensions:
+        - selector: ceph_mon_metadata
+          name: total
+        - selector: ceph_mon_quorum_status
+          name: in_quorum
+        aggregation: sum
       - title: State and Metadata — Metadata
         context: state_metadata
         units: '{status}'
@@ -907,10 +917,21 @@ template:
     - family: OSD State
       context_namespace: osd_state
       metrics:
+      - ceph_osd_metadata
       - ceph_osd_in
       - ceph_osd_up
       - ceph_osd_weight
       charts:
+      - title: Cluster Summary
+        context: cluster_summary
+        units: OSDs
+        label_promotion: []
+        dimensions:
+        - selector: ceph_osd_metadata
+          name: total
+        - selector: ceph_osd_up
+          name: up
+        aggregation: sum
       - title: OSD State
         context: state
         units: '{status}'
