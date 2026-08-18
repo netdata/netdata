@@ -520,13 +520,9 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_FUNCTION);
     if(!host) return PARSER_RC_ERROR;
 
-    RRDSET *st = (global)? NULL: pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_FUNCTION, PLUGINSD_KEYWORD_CHART);
-    if(!st) global = true;
-
-    if (unlikely(!timeout_str || !name || !help || (!global && !st))) {
-        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', priority = '%s', version = '%s', help = '%s'). Ignoring it.",
+    if (unlikely(!timeout_str || !name || !help)) {
+        netdata_log_error("PLUGINSD: 'host:%s' got a FUNCTION, without providing the required data (global = '%s', name = '%s', timeout = '%s', priority = '%s', version = '%s', help = '%s'). Ignoring it.",
                           rrdhost_hostname(host),
-                          st?rrdset_id(st):"(unset)",
                           global?"yes":"no",
                           name?name:"(unset)",
                           timeout_str ? timeout_str : "(unset)",
@@ -535,6 +531,18 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
                           help?help:"(unset)"
         );
         return PARSER_RC_ERROR;
+    }
+
+    // chart-scoped functions no longer exist: a FUNCTION line without GLOBAL
+    // registers host-wide. Inside an open chart scope that is a coercion worth
+    // reporting once per line; without one it was always the effective behavior.
+    if(!global) {
+        RRDSET *st = pluginsd_get_scope_chart(parser);
+        if(st)
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "PLUGINSD: 'host:%s' got a FUNCTION '%s' within chart '%s' scope - "
+                   "chart-scoped functions are no longer supported, registering it host-wide",
+                   rrdhost_hostname(host), name, rrdset_id(st));
     }
 
     // Reserved dynamic-configuration function names ("config", "config <id>")
@@ -564,7 +572,6 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
 
     nrpc_method_register(&(struct nrpc_method_desc) {
         .host = host,
-        .st = st,
         .name = name,
         .help = help,
         .tags = tags,
@@ -584,30 +591,26 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
 }
 
 PARSER_RC pluginsd_function_del(char **words, size_t num_words, PARSER *parser) {
-    bool global = false;
+    // FUNCTION_DEL is name-keyed: with chart-scoped functions gone, the
+    // optional GLOBAL word only moves the name to the next slot
     size_t i = 1;
-    if(num_words >= 2 && strcmp(get_word(words, num_words, 1), "GLOBAL") == 0) {
+    if(num_words >= 2 && strcmp(get_word(words, num_words, 1), "GLOBAL") == 0)
         i++;
-        global = true;
-    }
 
     char *name = get_word(words, num_words, i++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_FUNCTION_DEL);
     if(!host) return PARSER_RC_ERROR;
 
-    RRDSET *st = (global) ? NULL : pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_FUNCTION_DEL, PLUGINSD_KEYWORD_CHART);
-
     if (unlikely(!name || !*name)) {
-        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION_DEL without a name. Ignoring it.",
-                          rrdhost_hostname(host),
-                          st ? rrdset_id(st) : "(unset)");
+        netdata_log_error("PLUGINSD: 'host:%s' got a FUNCTION_DEL without a name. Ignoring it.",
+                          rrdhost_hostname(host));
         return PARSER_RC_ERROR;
     }
 
     bool from_streaming = (parser->repertoire & PARSER_INIT_STREAMING) != 0;
 
-    if(!nrpc_method_unregister(host, st, name,
+    if(!nrpc_method_unregister(host, name,
                          from_streaming ? NRPC_SOURCE_STREAM : NRPC_SOURCE_PLUGIN)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' FUNCTION_DEL '%s' - function not found or ownership mismatch",

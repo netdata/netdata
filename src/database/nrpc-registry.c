@@ -8,8 +8,7 @@
 // ----------------------------------------------------------------------------
 
 // each host owns a function registry (NRPC_REGISTRY) holding its function
-// definitions; an RRDSET gets a view into it on demand (only when a function
-// is added to that RRDSET)
+// definitions, keyed by sanitized method name
 
 // ----------------------------------------------------------------------------
 
@@ -313,13 +312,11 @@ bool nrpc_method_name_is_dyncfg(const char *name) {
     return false;
 }
 
-static inline NRPC_METHOD_FLAGS nrpc_method_flags_for(RRDSET *st, const char *name, const char *tags) {
+static inline NRPC_METHOD_FLAGS nrpc_method_flags_for(const char *name, const char *tags) {
     if(nrpc_method_name_is_dyncfg(name))
         return NRPC_METHOD_FLAG_DYNCFG;
 
-    NRPC_METHOD_FLAGS options = st ? NRPC_METHOD_FLAG_LOCAL : NRPC_METHOD_FLAG_GLOBAL;
-
-    return options | (nrpc_method_is_restricted(name, tags) ? NRPC_METHOD_FLAG_RESTRICTED : 0);
+    return nrpc_method_is_restricted(name, tags) ? NRPC_METHOD_FLAG_RESTRICTED : NRPC_METHOD_FLAG_NONE;
 }
 
 void nrpc_method_register(const struct nrpc_method_desc *desc) {
@@ -330,7 +327,6 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     internal_fatal(desc->source == NRPC_SOURCE_UNSET, "NRPC: method registration without a source");
 
     RRDHOST *host = desc->host;
-    RRDSET *st = desc->st; // st may be NULL, to create a GLOBAL function
     const char *name = desc->name;
 
     const char *tags = desc->tags;
@@ -378,15 +374,12 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
         return;
     }
 
-    if(st && !st->functions_view)
-        st->functions_view = dictionary_create_view(host->rpc_registry->dict);
-
     // Classify from the sanitized key, not the raw name: the key is what the dictionary is
     // indexed by, so classifying the raw name lets " config" land on the "config" key without
     // the DYNCFG option, which would hand a dyncfg-reserved entry to a regular function.
     // Captured before the insert because the conflict callback swaps options with the
     // previous value, leaving tmp.options holding the old one.
-    NRPC_METHOD_FLAGS options = nrpc_method_flags_for(st, key, tags);
+    NRPC_METHOD_FLAGS options = nrpc_method_flags_for(key, tags);
 
     struct nrpc_method tmp = {
         .serving = NULL,
@@ -412,21 +405,17 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
         return;
     }
 
-    if(st)
-        dictionary_view_set(st->functions_view, key, item);
-    else {
-        // Deliberately NO cancellation of a queued pending_dels entry here:
-        // the queue is a change-log and the renderer's full re-list is the
-        // ground truth in the same committed payload, so a stale DEL for a
-        // re-added function heals within one drain (DEL lines render first,
-        // then the re-list re-affirms it). Cancelling here can swallow the
-        // ONLY prune signal the parent will ever get: a concurrent del can
-        // land its registry delete AFTER this insert while its queue insert
-        // lands BEFORE the cancellation, leaving the function absent from the
-        // registry with no DEL queued - and parents prune only on
-        // FUNCTION_DEL, never on a re-list.
-        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
-    }
+    // Deliberately NO cancellation of a queued pending_dels entry here:
+    // the queue is a change-log and the renderer's full re-list is the
+    // ground truth in the same committed payload, so a stale DEL for a
+    // re-added function heals within one drain (DEL lines render first,
+    // then the re-list re-affirms it). Cancelling here can swallow the
+    // ONLY prune signal the parent will ever get: a concurrent del can
+    // land its registry delete AFTER this insert while its queue insert
+    // lands BEFORE the cancellation, leaving the function absent from the
+    // registry with no DEL queued - and parents prune only on
+    // FUNCTION_DEL, never on a re-list.
+    rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_acquired_item_release(host->rpc_registry->dict, item);
 
@@ -439,7 +428,7 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
         aclk_arm_node_manifest(host);
 }
 
-bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SOURCE source) {
+bool nrpc_method_unregister(RRDHOST *host, const char *name, NRPC_SOURCE source) {
     internal_fatal(source == NRPC_SOURCE_UNSET, "NRPC: method unregistration without a source");
 
     if(unlikely(!name || !*name))
@@ -494,9 +483,6 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
     // a specific "unregistered by the plugin" error in that window.
     __atomic_store_n(&method->unregistered, true, __ATOMIC_RELEASE);
 
-    if(st && st->functions_view)
-        dictionary_del(st->functions_view, key);
-
     // Delete from the index while still holding our acquired reference, then
     // release: this unlinks the item before any concurrent re-registration could
     // resurrect it through the conflict callback (a re-add now allocates a fresh
@@ -515,14 +501,13 @@ bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SO
     // sender configured, else it would grow for the process lifetime on
     // never-streaming hosts. dyncfg global deletes keep their quirk: they set
     // the flag but never emit FUNCTION_DEL.
-    if(!st && !is_dyncfg && rrdhost_has_stream_sender_enabled(host)) {
+    if(!is_dyncfg && rrdhost_has_stream_sender_enabled(host)) {
         spinlock_lock(&host->rpc_registry->pending_dels.spinlock);
         dictionary_set(host->rpc_registry->pending_dels.dict, key, NULL, 0);
         spinlock_unlock(&host->rpc_registry->pending_dels.spinlock);
     }
 
-    if(!st)
-        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+    rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_garbage_collect(host->rpc_registry->dict);
 
@@ -540,7 +525,7 @@ bool nrpc_method_is_available(RRDHOST *host, struct nrpc_method *method) {
     if(!nrpc_serving_running(method->serving))
         return false;
 
-    if(host && method->rrdhost_state_id != object_state_id(&host->state_id))
+    if(method->rrdhost_state_id != object_state_id(&host->state_id))
         return false;
 
     return true;

@@ -16,7 +16,7 @@
 //   is its DESCRIPTOR - never "metadata", which RPC reserves for per-call
 //   headers. Registration takes a caller-filled desc struct
 //   (struct nrpc_method_desc, struct nrpc_builtin_desc) that extends the
-//   attribute bundle with the method's owner (host), scope (st) and handler.
+//   attribute bundle with the method's owner (host) and handler.
 // - call: one invocation of a method, tracked in the in-flight calls table
 //   (struct nrpc_inflight_calls) and correlated by a call_id. Calls carry a
 //   deadline and support cancel and progress.
@@ -124,10 +124,9 @@ struct nrpc_method;
 typedef struct nrpc_method_acquired NRPC_METHOD_ACQUIRED;
 
 typedef enum __attribute__((packed)) {
-    NRPC_METHOD_FLAG_LOCAL  = (1 << 0),
-    NRPC_METHOD_FLAG_GLOBAL = (1 << 1),
-    NRPC_METHOD_FLAG_DYNCFG = (1 << 2),
-    NRPC_METHOD_FLAG_RESTRICTED = (1 << 3), // this method is restricted (hidden from users)
+    NRPC_METHOD_FLAG_NONE = 0,
+    NRPC_METHOD_FLAG_DYNCFG = (1 << 0),
+    NRPC_METHOD_FLAG_RESTRICTED = (1 << 1), // this method is restricted (hidden from users)
 
     // this is 8-bit
 } NRPC_METHOD_FLAGS;
@@ -149,15 +148,14 @@ void nrpc_registry_destroy(RRDHOST *host);
 // release a handle acquired via nrpc_method_authorize()
 void nrpc_method_acquired_release(RRDHOST *host, NRPC_METHOD_ACQUIRED *acquired);
 
-// Registration descriptor: the method's attribute bundle plus its owner,
-// scope and handler. Stack-filled by the caller; the registry copies what it
+// Registration descriptor: the method's attribute bundle plus its owner
+// and handler. Stack-filled by the caller; the registry copies what it
 // keeps. Every field's zero keeps the meaning a zero positional argument had -
 // the registry adds NO defaulting. Style rule: policy-valued fields (source,
 // access, sync, timeout_s, priority, version) are written explicitly at every
 // site even when zero; pointer fields may be omitted when NULL.
 struct nrpc_method_desc {
     RRDHOST *host;                 // required
-    RRDSET *st;                    // NULL = GLOBAL; non-NULL derives LOCAL + the chart functions_view
     const char *name;              // required
     const char *help;              // required
     const char *tags;              // NULL normalizes to "top"; NRPC_TAG_HIDDEN derives RESTRICTED
@@ -174,7 +172,7 @@ struct nrpc_method_desc {
 // register a method, called from its serving thread
 void nrpc_method_register(const struct nrpc_method_desc *desc);
 
-bool nrpc_method_unregister(RRDHOST *host, RRDSET *st, const char *name, NRPC_SOURCE source);
+bool nrpc_method_unregister(RRDHOST *host, const char *name, NRPC_SOURCE source);
 
 // true if name is a reserved dynamic-configuration method name ("config" or "config <id>")
 bool nrpc_method_name_is_dyncfg(const char *name);

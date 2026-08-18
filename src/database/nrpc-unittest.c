@@ -172,9 +172,9 @@ int nrpc_access_unittest(void) {
                     i, cases[i].fn, (unsigned)cases[i].user_access, cases[i].allow_restricted, code);
     }
 
-    nrpc_method_unregister(host, NULL, "protected-fn", NRPC_SOURCE_DAEMON);
-    nrpc_method_unregister(host, NULL, "__restricted-fn", NRPC_SOURCE_DAEMON);
-    nrpc_method_unregister(host, NULL, "public-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, "protected-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, "__restricted-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, "public-fn", NRPC_SOURCE_DAEMON);
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
@@ -279,7 +279,7 @@ int nrpc_manifest_unittest(void) {
         if(dictionary_get(host->rpc_registry->dict, "config c2-reject:job")) {
             fprintf(stderr, "  FAILED enforcement: PLUGIN-source registration created reserved name 'config c2-reject:job'\n");
             errors++;
-            nrpc_method_unregister(host, NULL, "config c2-reject:job", NRPC_SOURCE_DAEMON);
+            nrpc_method_unregister(host, "config c2-reject:job", NRPC_SOURCE_DAEMON);
         }
 
         // fixed-size dictionary slots keep the value pointer stable across conflicts, so a
@@ -296,7 +296,7 @@ int nrpc_manifest_unittest(void) {
         if(!live && dictionary_get(host->rpc_registry->dict, "config")) {
             fprintf(stderr, "  FAILED enforcement: PLUGIN-source registration created reserved name 'config'\n");
             errors++;
-            nrpc_method_unregister(host, NULL, "config", NRPC_SOURCE_DAEMON);
+            nrpc_method_unregister(host, "config", NRPC_SOURCE_DAEMON);
         }
 
         if(errors == enforce_errors_before)
@@ -370,7 +370,7 @@ int nrpc_manifest_unittest(void) {
     dictionary_destroy(manifest);
 
     for(size_t i = 0; i < _countof(fns); i++)
-        nrpc_method_unregister(host, NULL, fns[i].name, NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, fns[i].name, NRPC_SOURCE_DAEMON);
 
     // 4. The suppression hash. build_node_manifest() publishes only when nrpc_catalog_manifest_hash()
     //    differs from the last sent hash, so the hash must be: deterministic for identical
@@ -902,7 +902,7 @@ static void fndel_race_worker(void *arg) {
             .source = NRPC_SOURCE_DAEMON,
             .handler = nrpc_unittest_noop_cb,
         });
-        nrpc_method_unregister(ctx->host, NULL, name, NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(ctx->host, name, NRPC_SOURCE_DAEMON);
     }
     __atomic_store_n(&ctx->done, true, __ATOMIC_RELEASE);
 }
@@ -1022,7 +1022,7 @@ int nrpc_del_unittest(void) {
             aclk_send_timestamp_set(&cfg->node_manifest_send_time, 0);
             fndel_flush_queue(host);
 
-            nrpc_method_unregister(host, NULL, cases[i].fn, NRPC_SOURCE_DAEMON);
+            nrpc_method_unregister(host, cases[i].fn, NRPC_SOURCE_DAEMON);
 
             if(!rrdhost_flag_check(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
                 fprintf(stderr, "  FAILED tt '%s': del did not set the flag\n", cases[i].fn);
@@ -1082,7 +1082,7 @@ int nrpc_del_unittest(void) {
             .source = NRPC_SOURCE_DAEMON,
             .handler = nrpc_unittest_noop_cb,
         });
-        nrpc_method_unregister(host, NULL, "tt-del-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "tt-del-fn", NRPC_SOURCE_DAEMON);
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1119,7 +1119,7 @@ int nrpc_del_unittest(void) {
 
         // discard: a parent without FUNCDEL support gets no DEL lines, and the
         // queue is still emptied (matches the old silent drop)
-        nrpc_method_unregister(host, NULL, "tt-keep-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "tt-keep-fn", NRPC_SOURCE_DAEMON);
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             stream_sender_send_host_functions(host, wb, false, false);
@@ -1220,7 +1220,7 @@ int nrpc_del_unittest(void) {
             .source = NRPC_SOURCE_DAEMON,
             .handler = nrpc_unittest_noop_cb,
         });
-        nrpc_method_unregister(host, NULL, "tt-readd-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "tt-readd-fn", NRPC_SOURCE_DAEMON);
 
         if(!fndel_queued(host, "tt-readd-fn")) {
             fprintf(stderr, "  FAILED re-add: del did not queue the FUNCTION_DEL\n");
@@ -1272,7 +1272,7 @@ int nrpc_del_unittest(void) {
             }
         }
 
-        nrpc_method_unregister(host, NULL, "tt-readd-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "tt-readd-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == readd_errors_before)
             fprintf(stderr, "  OK re-add: the queued FUNCTION_DEL survives and the payload heals (DEL before the re-affirming re-list)\n");
@@ -1297,21 +1297,20 @@ int nrpc_del_unittest(void) {
 }
 
 // ----------------------------------------------------------------------------
-// Golden-output test for the two streaming emitters (step 8 prerequisite).
+// Golden-output test for the streaming emitter (step 8 prerequisite).
 //
-// Pins the BYTES the post-C3 emitters produce for a controlled fixture set, so
+// Pins the BYTES the post-C3 emitter produces for a controlled fixture set, so
 // the C4 iteration-API rewrite can be verified to reproduce them identically.
 // The expected lines are built here with their own copies of the format
-// strings - not by calling the emitters - so any rewrite that changes the
+// strings - not by calling the emitter - so any rewrite that changes the
 // bytes fails this test. Covered: the FUNCTION_DEL-before-re-list order and
 // the dyncfg FUNCDEL quirk (dyncfg deletes never emit FUNCTION_DEL), the
 // dyncfg-count => dyncfg_add_streaming() synthetic "config" line (only when
-// the parent supports DYNCFG), RESTRICTED functions DO stream, DYNCFG and
-// LOCAL functions do not appear in the global list, and the chart emitter's
-// exact full output.
+// the parent supports DYNCFG), RESTRICTED functions DO stream, and DYNCFG
+// functions do not appear in the global list.
 //
-// It also covers the OTHER consumers of the iteration API - the two JSON
-// renderers and the two dictionary exporters - because they share the same
+// It also covers the OTHER consumers of the iteration API - the JSON
+// renderer and the dictionary exporter - because they share the same
 // visibility filter and the same "the view is a byte copy" contract, and
 // because the api/v2 contexts exporter additionally owns a key format
 // ("<version>|<name>") and an ownership rule (the destination dictionary frees
@@ -1429,32 +1428,8 @@ int nrpc_catalog_unittest(void) {
         .source = NRPC_SOURCE_DAEMON,
         .handler = nrpc_unittest_noop_cb,
     });
-    nrpc_method_unregister(host, NULL, "c4-deleted-fn", NRPC_SOURCE_DAEMON);
-    nrpc_method_unregister(host, NULL, "config c4del:job", NRPC_SOURCE_DAEMON);
-
-    // a chart with one LOCAL function - the chart emitter's whole output
-    RRDSET *st = rrdset_create_localhost("c4test", "c4chart", NULL, "c4fam", "c4test.ctx",
-                                         "c4 title", "units", "c4plugin", "c4module",
-                                         999999, 1, RRDSET_TYPE_LINE);
-    if(!st) {
-        fprintf(stderr, "  FAILED: could not create the fixture chart\n");
-        errors++;
-    }
-    else
-        nrpc_method_register(&(struct nrpc_method_desc) {
-            .host = host,
-            .st = st,
-            .name = "c4-chart-fn",
-            .help = "c4 chart help",
-            .tags = "top",
-            .timeout_s = 13,
-            .priority = 44,
-            .version = 5,
-            .access = HTTP_ACCESS_ANONYMOUS_DATA,
-            .sync = true,
-            .source = NRPC_SOURCE_DAEMON,
-            .handler = nrpc_unittest_noop_cb,
-        });
+    nrpc_method_unregister(host, "c4-deleted-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, "config c4del:job", NRPC_SOURCE_DAEMON);
 
     // ------------------------------------------------------- expected line bytes
     CLEAN_BUFFER *exp_global = buffer_create(0, NULL);
@@ -1476,12 +1451,6 @@ int nrpc_catalog_unittest(void) {
     buffer_sprintf(exp_dyncfg,
                    PLUGINSD_KEYWORD_FUNCTION " GLOBAL " PLUGINSD_FUNCTION_CONFIG " %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n",
                    120, "Dynamic configuration", "config", (unsigned)HTTP_ACCESS_ANONYMOUS_DATA, 1000);
-
-    CLEAN_BUFFER *exp_chart = buffer_create(0, NULL);
-    buffer_sprintf(exp_chart,
-                   PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n",
-                   "c4-chart-fn", 13, "c4 chart help", "top",
-                   (HTTP_ACCESS_FORMAT_CAST)HTTP_ACCESS_ANONYMOUS_DATA, 44, (uint32_t)5);
 
     // ------------------------------------------------------------ global emitter
     {
@@ -1505,9 +1474,6 @@ int nrpc_catalog_unittest(void) {
         }
         if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"config c4del:job\"")) {
             fprintf(stderr, "  FAILED global: dyncfg delete emitted FUNCTION_DEL (quirk broken)\n"); errors++;
-        }
-        if(strstr(out, "\"c4-chart-fn\"")) {
-            fprintf(stderr, "  FAILED global: LOCAL function leaked into the global list\n"); errors++;
         }
         if(p_del && p_first_fn && p_del > p_first_fn) {
             fprintf(stderr, "  FAILED global: FUNCTION_DEL did not precede the re-list\n"); errors++;
@@ -1533,24 +1499,9 @@ int nrpc_catalog_unittest(void) {
             fprintf(stderr, "  OK global emitter: no synthetic config line without the capability\n");
     }
 
-    // ------------------------------------------------------------- chart emitter
-    if(st) {
-        int before = errors;
-        CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_rrdset_functions(st, wb);
-        if(strcmp(buffer_tostring(wb), buffer_tostring(exp_chart)) != 0) {
-            fprintf(stderr, "  FAILED chart: output is not byte-identical to the golden\n    expected: %s    got:      %s",
-                    buffer_tostring(exp_chart), buffer_tostring(wb));
-            errors++;
-        }
-        if(errors == before)
-            fprintf(stderr, "  OK chart emitter: byte-identical output\n");
-    }
-
-    // --------------------------------------------------------------- JSON renderers
+    // --------------------------------------------------------------- JSON renderer
     // same EXPORTABLE filter as the manifest: dyncfg and restricted functions
-    // must never reach a user-facing list. The host list is the whole registry,
-    // so it DOES include the chart (LOCAL) functions, tagged as such.
+    // must never reach a user-facing list
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1568,32 +1519,17 @@ int nrpc_catalog_unittest(void) {
         if(strstr(out, "\"config c4test:job\"")) {
             fprintf(stderr, "  FAILED host json: a dyncfg function was exported\n"); errors++;
         }
-        if(st && !strstr(out, "\"c4-chart-fn\"")) {
-            fprintf(stderr, "  FAILED host json: chart functions must be part of the host list\n"); errors++;
+        // the payload-compatibility constant: every entry renders ["GLOBAL"],
+        // and "LOCAL" can never appear any more
+        if(!strstr(out, "\"GLOBAL\"")) {
+            fprintf(stderr, "  FAILED host json: the GLOBAL options array is not rendered\n"); errors++;
         }
-        if(!strstr(out, "\"LOCAL\"") || !strstr(out, "\"GLOBAL\"")) {
-            fprintf(stderr, "  FAILED host json: the LOCAL/GLOBAL options array is not rendered\n"); errors++;
-        }
-
-        if(st) {
-            CLEAN_BUFFER *cwb = buffer_create(0, NULL);
-            buffer_json_initialize(cwb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-            buffer_json_member_add_object(cwb, "functions");
-            nrpc_catalog_chart2json(st, cwb);
-            buffer_json_object_close(cwb);
-            buffer_json_finalize(cwb);
-            const char *cout = buffer_tostring(cwb);
-
-            if(!strstr(cout, "\"c4-chart-fn\"") || !strstr(cout, "\"c4 chart help\"")) {
-                fprintf(stderr, "  FAILED chart json: the chart function or its help is missing\n"); errors++;
-            }
-            if(strstr(cout, "\"c4-global-fn\"")) {
-                fprintf(stderr, "  FAILED chart json: a host-global function leaked into the chart list\n"); errors++;
-            }
+        if(strstr(out, "\"LOCAL\"")) {
+            fprintf(stderr, "  FAILED host json: LOCAL rendered, but chart-scoped functions no longer exist\n"); errors++;
         }
 
         if(errors == before)
-            fprintf(stderr, "  OK json renderers: host list includes LOCAL, excludes dyncfg/restricted; chart list is scoped\n");
+            fprintf(stderr, "  OK json renderer: host list excludes dyncfg/restricted, options render GLOBAL\n");
     }
 
     // ----------------------------------------------------- dictionary exporters
@@ -1641,30 +1577,8 @@ int nrpc_catalog_unittest(void) {
 
         dictionary_destroy(dst);  // frees every copy; ASAN verifies the ownership rule
 
-        if(st) {
-            DICTIONARY *cdst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-            nrpc_catalog_chart_to_dict(st, cdst, NULL, 0);
-
-            // the entries carry no value, so membership is tested through the item
-            const DICTIONARY_ITEM *ci = dictionary_get_and_acquire_item(cdst, "c4-chart-fn");
-            if(!ci) {
-                fprintf(stderr, "  FAILED to_dict: the chart function is missing from the chart dictionary\n");
-                errors++;
-            }
-            else
-                dictionary_acquired_item_release(cdst, ci);
-
-            ci = dictionary_get_and_acquire_item(cdst, "c4-global-fn");
-            if(ci) {
-                fprintf(stderr, "  FAILED to_dict: a host-global function leaked into the chart dictionary\n");
-                errors++;
-                dictionary_acquired_item_release(cdst, ci);
-            }
-            dictionary_destroy(cdst);
-        }
-
         if(errors == before)
-            fprintf(stderr, "  OK dictionary exporters: version|name keys, owned copies, filters\n");
+            fprintf(stderr, "  OK dictionary exporter: version|name keys, owned copies, filters\n");
     }
 
     // --------------------------------------------------- the NULL-registry path
@@ -1697,11 +1611,9 @@ int nrpc_catalog_unittest(void) {
     }
 
     // -------------------------------------------------------------------- cleanup
-    if(st)
-        nrpc_method_unregister(host, st, "c4-chart-fn", NRPC_SOURCE_DAEMON);
-    nrpc_method_unregister(host, NULL, "c4-global-fn", NRPC_SOURCE_DAEMON);
-    nrpc_method_unregister(host, NULL, "__c4-restricted-fn", NRPC_SOURCE_DAEMON);
-    nrpc_method_unregister(host, NULL, "config c4test:job", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, "c4-global-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, "__c4-restricted-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(host, "config c4test:job", NRPC_SOURCE_DAEMON);
     fndel_flush_queue(host);
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
@@ -1811,7 +1723,7 @@ struct reg_del_ctx {
 
 static void reg_del_worker(void *arg) {
     struct reg_del_ctx *c = arg;
-    c->plugin_del = nrpc_method_unregister(c->host, NULL, c->name, NRPC_SOURCE_PLUGIN);
+    c->plugin_del = nrpc_method_unregister(c->host, c->name, NRPC_SOURCE_PLUGIN);
 }
 
 // registers a method and then ends its serving handle, exactly like a plugin
@@ -2004,8 +1916,8 @@ int nrpc_registry_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "  reg-key   edge\"case  ", NRPC_SOURCE_DAEMON);
-        nrpc_method_unregister(host, NULL, "reg-args-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "  reg-key   edge\"case  ", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "reg-args-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK key: empty-sanitizing names refused, sanitized indexing, argument stripping\n");
@@ -2067,11 +1979,11 @@ int nrpc_registry_unittest(void) {
         }
 
         // 3. FUNCTION_DEL can never remove a dyncfg entry
-        if(nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_STREAM)) {
+        if(nrpc_method_unregister(host, fn, NRPC_SOURCE_STREAM)) {
             fprintf(stderr, "  FAILED namespace: STREAMING FUNCTION_DEL removed a dyncfg function\n");
             errors++;
         }
-        if(nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_PLUGIN)) {
+        if(nrpc_method_unregister(host, fn, NRPC_SOURCE_PLUGIN)) {
             fprintf(stderr, "  FAILED namespace: a PLUGIN-source FUNCTION_DEL removed a dyncfg method\n");
             errors++;
         }
@@ -2079,7 +1991,7 @@ int nrpc_registry_unittest(void) {
             fprintf(stderr, "  FAILED namespace: a refused FUNCTION_DEL removed the entry anyway\n");
             errors++;
         }
-        if(!nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_DAEMON)) {
+        if(!nrpc_method_unregister(host, fn, NRPC_SOURCE_DAEMON)) {
             fprintf(stderr, "  FAILED namespace: the dyncfg subsystem could not remove its own function\n");
             errors++;
         }
@@ -2092,12 +2004,12 @@ int nrpc_registry_unittest(void) {
     {
         int before = errors;
 
-        if(nrpc_method_unregister(host, NULL, "reg-does-not-exist-fn", NRPC_SOURCE_DAEMON)) {
+        if(nrpc_method_unregister(host, "reg-does-not-exist-fn", NRPC_SOURCE_DAEMON)) {
             fprintf(stderr, "  FAILED del: deleting an unknown function reported success\n");
             errors++;
         }
-        if(nrpc_method_unregister(host, NULL, "", NRPC_SOURCE_DAEMON) ||
-           nrpc_method_unregister(host, NULL, NULL, NRPC_SOURCE_DAEMON)) {
+        if(nrpc_method_unregister(host, "", NRPC_SOURCE_DAEMON) ||
+           nrpc_method_unregister(host, NULL, NRPC_SOURCE_DAEMON)) {
             fprintf(stderr, "  FAILED del: deleting an empty name reported success\n");
             errors++;
         }
@@ -2136,7 +2048,7 @@ int nrpc_registry_unittest(void) {
         }
 
         // the registering thread (this one) may remove it as a PLUGIN-source delete
-        if(!nrpc_method_unregister(host, NULL, "reg-owned-fn", NRPC_SOURCE_PLUGIN)) {
+        if(!nrpc_method_unregister(host, "reg-owned-fn", NRPC_SOURCE_PLUGIN)) {
             fprintf(stderr, "  FAILED del: the registering serving thread could not remove its own method\n");
             errors++;
         }
@@ -2173,7 +2085,7 @@ int nrpc_registry_unittest(void) {
         else if(strcmp(p.help, "swap help one") != 0 || strcmp(p.tags, "top") != 0 ||
                 p.timeout != 11 || p.priority != 42 || p.version != 3 ||
                 p.access != HTTP_ACCESS_ANONYMOUS_DATA ||
-                (p.options & NRPC_METHOD_FLAG_RESTRICTED) || !(p.options & NRPC_METHOD_FLAG_GLOBAL)) {
+                (p.options & NRPC_METHOD_FLAG_RESTRICTED)) {
             fprintf(stderr, "  FAILED swap: the initial registration is not reported as registered\n");
             errors++;
         }
@@ -2297,8 +2209,8 @@ int nrpc_registry_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "reg-notags-fn", NRPC_SOURCE_DAEMON);
-        nrpc_method_unregister(host, NULL, fn, NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "reg-notags-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, fn, NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK swap: every field swaps, tags drive the RESTRICTED option both ways, cb takes over\n");
@@ -2356,7 +2268,7 @@ int nrpc_registry_unittest(void) {
             // the serving handle itself is released only when the last
             // entry referencing it goes away (ASAN verifies there is no leak
             // and no use-after-free here)
-            if(!nrpc_method_unregister(host, NULL, "reg-serving-fn", NRPC_SOURCE_DAEMON)) {
+            if(!nrpc_method_unregister(host, "reg-serving-fn", NRPC_SOURCE_DAEMON)) {
                 fprintf(stderr, "  FAILED serving: could not delete the orphaned function\n");
                 errors++;
             }
@@ -2410,7 +2322,7 @@ int nrpc_registry_unittest(void) {
             }
         }
 
-        nrpc_method_unregister(host, NULL, "reg-race-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "reg-race-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK race: %zu consistent help/tags observations against %d re-registrations\n",

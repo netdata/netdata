@@ -16,8 +16,7 @@
 // check (serving thread running, host state current, not unregistered)
 typedef enum {
     NRPC_CATALOG_FILTER_USER,        // + skip DYNCFG and RESTRICTED (user-facing lists, cloud)
-    NRPC_CATALOG_FILTER_STREAM_CHART,  // + skip DYNCFG (chart functions stream, RESTRICTED included)
-    NRPC_CATALOG_FILTER_STREAM_GLOBAL, // + skip LOCAL and DYNCFG; DYNCFG entries are COUNTED
+    NRPC_CATALOG_FILTER_STREAM_GLOBAL, // + skip DYNCFG; DYNCFG entries are COUNTED
                                             //   (the return value) for dyncfg_add_streaming()
 } NRPC_CATALOG_FILTER;
 
@@ -38,26 +37,16 @@ struct nrpc_method_view {
 
 typedef void (*nrpc_method_view_cb_t)(const struct nrpc_method_view *v, void *data);
 
-// both return the number of DYNCFG entries encountered (meaningful for
+// returns the number of DYNCFG entries encountered (meaningful for
 // NRPC_CATALOG_FILTER_STREAM_GLOBAL, zero otherwise)
 size_t nrpc_catalog_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data);
-size_t nrpc_catalog_rrdset_foreach(RRDSET *st, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data);
-
-// destroy the per-chart view of the registry (rrdset teardown)
-void nrpc_catalog_rrdset_view_destroy(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 // the consumers built on the iteration API
 
-void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb);
 void stream_sender_send_host_functions(RRDHOST *host, BUFFER *wb, bool dyncfg, bool can_function_del);
 
-void nrpc_catalog_chart2json(RRDSET *st, BUFFER *wb);
 void nrpc_catalog_host2json(RRDHOST *host, BUFFER *wb);
-
-// preserves the historical host==NULL availability semantics (no host-state
-// check) for instances resolved through the contexts index
-void nrpc_catalog_chart_to_dict(RRDSET *st, DICTIONARY *dst, void *value, size_t value_size);
 
 // help/tags receive OWNED byte copies (strdupz) - the destination dictionary's
 // callbacks own freeing them (conflict losers and deleted entries)

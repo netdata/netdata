@@ -33,7 +33,6 @@ void nrpc_method_register_builtin(const struct nrpc_builtin_desc *desc) {
 
     nrpc_method_register(&(struct nrpc_method_desc) {
         .host = desc->host,
-        .st = desc->st,
         .name = desc->name,
         .help = desc->help,
         .tags = desc->tags,

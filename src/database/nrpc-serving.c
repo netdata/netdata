@@ -42,7 +42,7 @@ void nrpc_serving_dispatcher_release(struct nrpc_serving_handle *serving) {
 static void nrpc_serving_free(struct nrpc_serving_handle *serving) {
     if(nrpc_serving_running(serving) || !refcount_acquire_for_deletion(&serving->entry_refcount))
         // the serving handle is still referenced by registered methods.
-        // leave it hanging there, the last chart will actually free it.
+        // leave it hanging there, the last method will actually free it.
         return;
 
     // we can free it now

@@ -6,26 +6,21 @@
 // ----------------------------------------------------------------------------
 // the iteration core
 
-// Walks one registry dictionary (the host's, or a chart's view of it) and
-// hands the callback a self-contained snapshot of every visited entry.
-//
-// availability_host may be NULL to skip the host-state check (the historical
-// semantics of instances resolved through the contexts index).
+// Walks the host's registry dictionary and hands the callback a
+// self-contained snapshot of every visited entry.
 //
 // The snapshot - including the help/tags byte copies - is taken under the
 // entry's LEAF spinlock: an item reference pins the entry memory but NOT the
 // swapped contents, and the conflict callback frees displaced STRINGs under
 // that same lock, so a copy taken outside it could read freed bytes.
-static size_t nrpc_catalog_view_foreach(DICTIONARY *dict, RRDHOST *availability_host,
-                                         NRPC_CATALOG_FILTER filter,
-                                         nrpc_method_view_cb_t cb, void *data) {
-    if(!dict) return 0;
+size_t nrpc_catalog_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
+    if(!host || !host->rpc_registry) return 0;
 
     size_t dyncfg_count = 0;
 
     struct nrpc_method *t;
-    dfe_start_read(dict, t) {
-        if(!nrpc_method_is_available(availability_host, t)) continue;
+    dfe_start_read(host->rpc_registry->dict, t) {
+        if(!nrpc_method_is_available(host, t)) continue;
 
         struct nrpc_method_view v = { .name = t_dfe.name };
         char *help = NULL, *tags = NULL;
@@ -40,14 +35,10 @@ static size_t nrpc_catalog_view_foreach(DICTIONARY *dict, RRDHOST *availability_
                 visit = !(v.options & (NRPC_METHOD_FLAG_DYNCFG | NRPC_METHOD_FLAG_RESTRICTED));
                 break;
 
-            case NRPC_CATALOG_FILTER_STREAM_CHART:
-                visit = !(v.options & NRPC_METHOD_FLAG_DYNCFG);
-                break;
-
             case NRPC_CATALOG_FILTER_STREAM_GLOBAL:
                 if(v.options & NRPC_METHOD_FLAG_DYNCFG)
                     dyncfg_count++;
-                visit = !(v.options & (NRPC_METHOD_FLAG_LOCAL | NRPC_METHOD_FLAG_DYNCFG));
+                visit = !(v.options & NRPC_METHOD_FLAG_DYNCFG);
                 break;
         }
 
@@ -75,42 +66,8 @@ static size_t nrpc_catalog_view_foreach(DICTIONARY *dict, RRDHOST *availability_
     return dyncfg_count;
 }
 
-size_t nrpc_catalog_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
-    if(!host || !host->rpc_registry) return 0;
-    return nrpc_catalog_view_foreach(host->rpc_registry->dict, host, filter, cb, data);
-}
-
-size_t nrpc_catalog_rrdset_foreach(RRDSET *st, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
-    if(!st || !st->functions_view) return 0;
-    return nrpc_catalog_view_foreach(st->functions_view, st->rrdhost, filter, cb, data);
-}
-
-void nrpc_catalog_rrdset_view_destroy(RRDSET *st) {
-    dictionary_destroy(st->functions_view);
-    st->functions_view = NULL;
-}
-
 // ----------------------------------------------------------------------------
-// the streaming emitters
-
-static void stream_chart_function_cb(const struct nrpc_method_view *v, void *data) {
-    BUFFER *wb = data;
-
-    buffer_sprintf(wb
-                   , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d %"PRIu32"\n"
-                   , v->name
-                   , v->timeout
-                   , v->help
-                   , v->tags
-                   , (HTTP_ACCESS_FORMAT_CAST)v->access
-                   , v->priority
-                   , v->version
-    );
-}
-
-void stream_sender_send_rrdset_functions(RRDSET *st, BUFFER *wb) {
-    nrpc_catalog_rrdset_foreach(st, NRPC_CATALOG_FILTER_STREAM_CHART, stream_chart_function_cb, wb);
-}
+// the streaming emitter
 
 static void stream_global_function_cb(const struct nrpc_method_view *v, void *data) {
     BUFFER *wb = data;
@@ -177,36 +134,7 @@ void stream_sender_send_host_functions(RRDHOST *host, BUFFER *wb, bool dyncfg, b
 }
 
 // ----------------------------------------------------------------------------
-// the JSON renderers
-
-static void chart_function2json_cb(const struct nrpc_method_view *v, void *data) {
-    BUFFER *wb = data;
-
-    buffer_json_member_add_object(wb, v->name);
-    {
-        buffer_json_member_add_string_or_empty(wb, "help", v->help);
-        buffer_json_member_add_int64(wb, "timeout", (int64_t)v->timeout);
-        buffer_json_member_add_uint64(wb, "version", (uint64_t)v->version);
-
-        char options[65];
-        snprintfz(
-            options, 64
-            , "%s%s"
-            , (v->options & NRPC_METHOD_FLAG_LOCAL) ? "LOCAL " : ""
-            , (v->options & NRPC_METHOD_FLAG_GLOBAL) ? "GLOBAL" : ""
-        );
-
-        buffer_json_member_add_string_or_empty(wb, "options", options);
-        buffer_json_member_add_string_or_empty(wb, "tags", v->tags);
-        http_access2buffer_json_array(wb, "access", v->access);
-        buffer_json_member_add_uint64(wb, "priority", v->priority);
-    }
-    buffer_json_object_close(wb);
-}
-
-void nrpc_catalog_chart2json(RRDSET *st, BUFFER *wb) {
-    nrpc_catalog_rrdset_foreach(st, NRPC_CATALOG_FILTER_USER, chart_function2json_cb, wb);
-}
+// the JSON renderer
 
 static void host_function2json_cb(const struct nrpc_method_view *v, void *data) {
     BUFFER *wb = data;
@@ -218,10 +146,9 @@ static void host_function2json_cb(const struct nrpc_method_view *v, void *data) 
         buffer_json_member_add_uint64(wb, "version", (uint64_t)v->version);
         buffer_json_member_add_array(wb, "options");
         {
-            if (v->options & NRPC_METHOD_FLAG_GLOBAL)
-                buffer_json_add_array_item_string(wb, "GLOBAL");
-            if (v->options & NRPC_METHOD_FLAG_LOCAL)
-                buffer_json_add_array_item_string(wb, "LOCAL");
+            // every registered method is host-wide; the constant keeps the
+            // payload byte-identical to the era when the flag existed
+            buffer_json_add_array_item_string(wb, "GLOBAL");
         }
         buffer_json_array_close(wb);
         buffer_json_member_add_string(wb, "tags", v->tags);
@@ -242,29 +169,7 @@ void nrpc_catalog_host2json(RRDHOST *host, BUFFER *wb) {
 }
 
 // ----------------------------------------------------------------------------
-// the dictionary exporters
-
-struct nrpc_chart_to_dict_ctx {
-    DICTIONARY *dst;
-    void *value;
-    size_t value_size;
-};
-
-static void chart_function_to_dict_cb(const struct nrpc_method_view *v, void *data) {
-    struct nrpc_chart_to_dict_ctx *ctx = data;
-    dictionary_set(ctx->dst, v->name, ctx->value, ctx->value_size);
-}
-
-void nrpc_catalog_chart_to_dict(RRDSET *st, DICTIONARY *dst, void *value, size_t value_size) {
-    if(!st || !st->functions_view || !dst) return;
-
-    struct nrpc_chart_to_dict_ctx ctx = { .dst = dst, .value = value, .value_size = value_size };
-
-    // host==NULL availability semantics preserved: instances resolved through
-    // the contexts index skip the host-state check
-    nrpc_catalog_view_foreach(st->functions_view, NULL, NRPC_CATALOG_FILTER_USER,
-                               chart_function_to_dict_cb, &ctx);
-}
+// the dictionary exporter
 
 struct nrpc_host_to_dict_ctx {
     DICTIONARY *dst;

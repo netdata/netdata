@@ -15,7 +15,6 @@ typedef int (*nrpc_builtin_handler_cb_t)(BUFFER *wb, const char *function, BUFFE
 // applies (timeout_s, priority, version, access).
 struct nrpc_builtin_desc {
     RRDHOST *host;                 // required
-    RRDSET *st;                    // NULL = GLOBAL
     const char *name;              // required
     const char *help;              // required
     const char *tags;              // NULL normalizes to "top"; NRPC_TAG_HIDDEN derives RESTRICTED

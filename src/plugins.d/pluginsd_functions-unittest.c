@@ -420,7 +420,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         // delete: the stored pair released under its stored tag -> 1
-        nrpc_method_unregister(host, NULL, "c6-mixed-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c6-mixed-fn", NRPC_SOURCE_DAEMON);
         if(refcount_references(&tr->entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after del, entry refs %d != 1\n",
                     refcount_references(&tr->entry_refcount));
@@ -522,7 +522,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "c6-gc-mid-defer-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c6-gc-mid-defer-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK gc-mid-defer: GC delete mid-defer delivered exactly once, at RESULT_END\n");
@@ -729,7 +729,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         parser_destroy(parser);
-        nrpc_method_unregister(host, NULL, "c6-gc-race-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c6-gc-race-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK gc-race: concurrent GC passes cancel and deliver exactly once\n");
@@ -800,7 +800,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "c5b-deadline-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c5b-deadline-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK deadline: accessor sees the deadline, the progress extension, and the completion\n");
@@ -865,7 +865,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "c7-dead-transport-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c7-dead-transport-fn", NRPC_SOURCE_DAEMON);
         nrpc_transport_owner_release(tr); // frees it; ASAN verifies the accounting
 
         if(errors == before)
@@ -1036,7 +1036,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "c7-dup-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c7-dup-fn", NRPC_SOURCE_DAEMON);
 
         // the same collision inside the parser's own dictionary
         {
@@ -1240,7 +1240,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         parser_destroy(parser);
-        nrpc_method_unregister(host, NULL, "c7-grace-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c7-grace-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK grace: the deadline is enforced one extension late, and exactly once\n");
@@ -1344,7 +1344,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "c7-pin-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c7-pin-fn", NRPC_SOURCE_DAEMON);
         nrpc_transport_mark_dead_and_drain(c7_pin.first);
         nrpc_transport_owner_release(c7_pin.first);
         nrpc_transport_mark_dead_and_drain(c7_pin.second);
@@ -1417,7 +1417,7 @@ int pluginsd_functions_unittest(void) {
             c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
         }
 
-        nrpc_method_unregister(host, NULL, "c7-timeout-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c7-timeout-fn", NRPC_SOURCE_DAEMON);
 
         memset(&c7_sync, 0, sizeof(c7_sync));
         nrpc_method_register(&(struct nrpc_method_desc) {
@@ -1473,7 +1473,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host, NULL, "c7-sync-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(host, "c7-sync-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK deadline/sync: the registered timeout is the fallback; a sync call leaves no transaction\n");
