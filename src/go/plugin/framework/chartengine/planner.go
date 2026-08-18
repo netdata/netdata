@@ -523,10 +523,8 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 		}
 		if trackStats && ctx.routeCacheEnabled {
 			if hit {
-				e.addRouteCacheHit()
 				ctx.routeCacheHits++
 			} else {
-				e.addRouteCacheMiss()
 				ctx.routeCacheMisses++
 			}
 		}

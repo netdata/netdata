@@ -648,9 +648,8 @@ groups:
 	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
-	stats1 := e.stats()
-	assert.Equal(t, uint64(0), stats1.RouteCacheHits)
-	assert.Equal(t, uint64(1), stats1.RouteCacheMisses)
+	assert.Equal(t, float64(0), engineRuntimeMetricValue(t, e, routeCacheHitsMetricName))
+	assert.Equal(t, float64(1), engineRuntimeMetricValue(t, e, routeCacheMissesMetricName))
 	require.NotNil(t, findUpdateAction(plan1))
 	assert.Equal(t, float64(10), findUpdateAction(plan1).Values[0].Float64)
 
@@ -661,9 +660,8 @@ groups:
 	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
-	stats2 := e.stats()
-	assert.Equal(t, uint64(1), stats2.RouteCacheHits)
-	assert.Equal(t, uint64(1), stats2.RouteCacheMisses)
+	assert.Equal(t, float64(1), engineRuntimeMetricValue(t, e, routeCacheHitsMetricName))
+	assert.Equal(t, float64(1), engineRuntimeMetricValue(t, e, routeCacheMissesMetricName))
 	require.NotNil(t, findUpdateAction(plan2))
 	assert.Equal(t, float64(20), findUpdateAction(plan2).Values[0].Float64)
 }
