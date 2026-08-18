@@ -401,7 +401,7 @@ struct mrg_uuid_race {
     size_t churn_hits;
     size_t churn_misses;
     size_t mismatches;
-    size_t deletes;
+    size_t deletes;        // deletions actually performed, by whichever side won
 };
 
 struct mrg_uuid_race_writer_ctx {
@@ -477,7 +477,12 @@ static void mrg_uuid_race_reader(void *ptr) {
         else
             __atomic_add_fetch(churned ? &t->churn_hits : &t->stable_hits, 1, __ATOMIC_RELAXED);
 
-        mrg_metric_release(t->mrg, metric);
+        // If the writer retired this metric while we held it, the writer's
+        // release could not delete it and OUR release performs the deletion.
+        // Counting only the writer side would undercount, and could report zero
+        // deletions - a false failure - in a run where readers always won.
+        if(mrg_metric_release(t->mrg, metric))
+            __atomic_add_fetch(&t->deletes, 1, __ATOMIC_RELAXED);
     }
 }
 
@@ -514,7 +519,7 @@ static int mrg_uuid_lookup_delete_race_unittest(void) {
             .latest_update_every_s = 1,
         };
         METRIC *m = mrg_metric_add_and_acquire(mrg, entry, &added);
-        mrg_metric_release(mrg, m);
+        if(m) mrg_metric_release(mrg, m);
     }
 
     ND_THREAD *th[MRG_UUID_RACE_READERS + MRG_UUID_RACE_WRITERS];
@@ -626,8 +631,13 @@ static int mrg_stale_peeked_id_unittest(void) {
     // 2. borrow the id exactly as the production lookup does - no reference taken
     UUIDMAP_ID borrowed = uuidmap_peek_id(victim);
     if(!borrowed) {
+        // Without a borrowed id there is nothing that can go stale, and the
+        // assertion below would look up id 0 and pass vacuously. Stop here.
         fprintf(stderr, "ERROR: peek could not resolve a uuid that has a metric\n");
-        errors++;
+        mrg_metric_release_and_delete(mrg, metric);
+        (void)mrg_destroy(mrg);
+        fprintf(stderr, "Stale peeked id test: 1 ERROR(S)\n");
+        return 1;
     }
 
     // 3. delete the metric. metric_release() also drops the METRIC's uuidmap
@@ -674,7 +684,14 @@ static int mrg_stale_peeked_id_unittest(void) {
         mrg_metric_release(mrg, ghost);
     }
 
-    (void)mrg_destroy(mrg);
+    // A non-zero result means metrics were still referenced and the MRG was left
+    // alive - i.e. this test leaked a reference. Ignoring it would let a cleanup
+    // regression pass silently.
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n", referenced);
+        errors++;
+    }
 
     if(errors)
         fprintf(stderr, "Stale peeked id test: %d ERROR(S)\n", errors);
