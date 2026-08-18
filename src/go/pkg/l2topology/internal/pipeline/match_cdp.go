@@ -47,10 +47,7 @@ func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 
 		remotes := sortedCDPRemotes(obs.CDPRemotes)
 		for _, remote := range remotes {
-			localIfIndex := remote.LocalIfIndex
-			if localIfIndex < 0 {
-				localIfIndex = 0
-			}
+			localIfIndex := max(remote.LocalIfIndex, 0)
 			localObservedName := strings.TrimSpace(remote.LocalIfName)
 			localInterfaceName := localObservedName
 			if localInterfaceName == "" && localIfIndex > 0 {

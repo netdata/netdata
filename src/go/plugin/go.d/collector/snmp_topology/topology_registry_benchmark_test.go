@@ -425,10 +425,7 @@ func benchmarkTopologyRetainedSnapshotBytes(
 	runtime.GC()
 	var after runtime.MemStats
 	runtime.ReadMemStats(&after)
-	retainedBytes := int64(after.HeapAlloc) - int64(before.HeapAlloc)
-	if retainedBytes < 0 {
-		retainedBytes = 0
-	}
+	retainedBytes := max(int64(after.HeapAlloc)-int64(before.HeapAlloc), 0)
 	retainedBytes /= retainedCopies
 	runtime.KeepAlive(retained)
 	runtime.GC()

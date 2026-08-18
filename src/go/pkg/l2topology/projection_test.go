@@ -1230,7 +1230,7 @@ func TestProjectionPairwiseMultiDomainIsDeterministic(t *testing.T) {
 	}
 
 	var expected []byte
-	for iteration := 0; iteration < 100; iteration++ {
+	for iteration := range 100 {
 		observations := append([]L2Observation(nil), base...)
 		if iteration%2 == 1 {
 			observations[0], observations[1] = observations[1], observations[0]
