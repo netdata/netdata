@@ -38,15 +38,16 @@ func applyTopologyDisplayNames(actors []projectedActor, links []graph.Link, look
 			display = topologyFallbackActorDisplayName(actors[i])
 		}
 		topologySetActorDisplay(&actors[i], display)
-		if handle := actors[i].Actor.ActorHandle; IsDeviceActorType(actors[i].Actor.ActorType) && !handle.IsZero() {
-			deviceDisplayByActorHandle[handle] = display.name
-		}
-		if matchKey := canonicalTopologyMatchKey(actors[i].Actor.Match); matchKey != "" {
-			displayByMatchKey[matchKey] = display.name
-		}
 		if IsDeviceActorType(actors[i].Actor.ActorType) {
+			if handle := actors[i].Actor.ActorHandle; !handle.IsZero() {
+				deviceDisplayByActorHandle[handle] = display.name
+			}
 			if deviceID := topologyActorDeviceID(actors[i]); deviceID != "" {
 				deviceDisplayByID[deviceID] = display.name
+			}
+		} else {
+			if matchKey := canonicalTopologyMatchKey(actors[i].Actor.Match); matchKey != "" {
+				displayByMatchKey[matchKey] = display.name
 			}
 		}
 	}
