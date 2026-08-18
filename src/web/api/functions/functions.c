@@ -6,7 +6,7 @@ void global_functions_add(void) {
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host = localhost,
+        .host_id = localhost->host_id,
         .name = "netdata-streaming",
         .help = FUNCTION_STREAMING_HELP,
         .tags = "top",
@@ -18,7 +18,7 @@ void global_functions_add(void) {
     });
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host = localhost,
+        .host_id = localhost->host_id,
         .name = "topology:streaming",
         .help = FUNCTION_STREAMING_TOPOLOGY_HELP,
         .tags = "top",
@@ -30,7 +30,7 @@ void global_functions_add(void) {
     });
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host = localhost,
+        .host_id = localhost->host_id,
         .name = "netdata-api-calls",
         .help = FUNCTION_PROGRESS_HELP,
         .tags = "top",
@@ -42,7 +42,7 @@ void global_functions_add(void) {
     });
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host = localhost,
+        .host_id = localhost->host_id,
         .name = FUNCTION_BEARER_GET_TOKEN,
         .help = FUNCTION_BEARER_GET_TOKEN_HELP,
         .tags = NRPC_TAG_HIDDEN,
@@ -54,7 +54,7 @@ void global_functions_add(void) {
     });
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host = localhost,
+        .host_id = localhost->host_id,
         .name = "netdata-metrics-cardinality",
         .help = FUNCTION_METRICS_CARDINALITY_HELP,
         .tags = "top",

@@ -9,8 +9,11 @@
 
 // ----------------------------------------------------------------------------
 // the iteration/visibility API: every consumer that renders or exports the
-// function registry goes through nrpc_catalog_*_foreach() - nobody outside
-// the module touches the registry dictionary or its entries directly
+// function registry goes through the catalog's iteration core (the in-module
+// renderers via the internal registry_foreach on an entry they already hold;
+// external consumers and the unittests via nrpc_catalog_host_foreach()) -
+// nobody outside the module touches the registry dictionary or its entries
+// directly
 
 // which functions a traversal visits; EVERY filter includes the availability
 // check (serving thread running, host state current, not unregistered)

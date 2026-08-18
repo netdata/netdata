@@ -13,13 +13,13 @@
 // entry's LEAF spinlock: an item reference pins the entry memory but NOT the
 // swapped contents, and the conflict callback frees displaced STRINGs under
 // that same lock, so a copy taken outside it could read freed bytes.
-size_t nrpc_catalog_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
-    if(!host || !host->rpc_registry) return 0;
-
+static size_t nrpc_catalog_registry_foreach(struct nrpc_registry *registry, NRPC_CATALOG_FILTER filter,
+                                            nrpc_method_view_cb_t cb, void *data) {
+    RRDHOST *host = __atomic_load_n(&registry->host, __ATOMIC_ACQUIRE);
     size_t dyncfg_count = 0;
 
     struct nrpc_method *t;
-    dfe_start_read(host->rpc_registry->dict, t) {
+    dfe_start_read(registry->dict, t) {
         if(!nrpc_method_is_available(host, t)) continue;
 
         struct nrpc_method_view v = { .name = t_dfe.name };
@@ -66,6 +66,19 @@ size_t nrpc_catalog_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, nrpc
     return dyncfg_count;
 }
 
+size_t nrpc_catalog_host_foreach(RRDHOST *host, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
+    if(!host) return 0;
+
+    const DICTIONARY_ITEM *registry_item;
+    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    if(!registry) return 0;
+
+    size_t dyncfg_count = nrpc_catalog_registry_foreach(registry, filter, cb, data);
+
+    nrpc_registry_release(registry_item);
+    return dyncfg_count;
+}
+
 // ----------------------------------------------------------------------------
 // the streaming emitter
 
@@ -106,13 +119,14 @@ void stream_sender_send_host_functions(RRDHOST *host, BUFFER *wb, bool dyncfg, b
     // stream-sender-internals.h).
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
-    // after the flag clear, so a NULL registry (archived host racing the sender's
-    // flag poll) behaves exactly like the old NULL-tolerant dictionary traversal:
-    // flag cleared, nothing emitted
-    if(!host->rpc_registry)
+    // after the flag clear, so a host without a live registry entry (an
+    // archived host racing the sender's flag poll) behaves exactly like the
+    // old NULL-tolerant dictionary traversal: flag cleared, nothing emitted
+    const DICTIONARY_ITEM *registry_item;
+    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    if(!registry)
         return;
 
-    struct nrpc_registry *registry = host->rpc_registry;
     spinlock_lock(&registry->pending_dels.spinlock);
     if(dictionary_entries(registry->pending_dels.dict)) {
         if(can_function_del) {
@@ -126,11 +140,13 @@ void stream_sender_send_host_functions(RRDHOST *host, BUFFER *wb, bool dyncfg, b
     }
     spinlock_unlock(&registry->pending_dels.spinlock);
 
-    size_t configs = nrpc_catalog_host_foreach(host, NRPC_CATALOG_FILTER_STREAM_GLOBAL,
-                                                stream_global_function_cb, wb);
+    size_t configs = nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_STREAM_GLOBAL,
+                                                   stream_global_function_cb, wb);
 
     if(dyncfg && configs)
         dyncfg_add_streaming(wb);
+
+    nrpc_registry_release(registry_item);
 }
 
 // ----------------------------------------------------------------------------
@@ -159,13 +175,21 @@ static void host_function2json_cb(const struct nrpc_method_view *v, void *data) 
 }
 
 void nrpc_catalog_host2json(RRDHOST *host, BUFFER *wb) {
-    if(!host || !host->rpc_registry) return;
+    if(!host) return;
+
+    // the "functions" key is OMITTED entirely when the host has no live
+    // registry entry - the historical NULL-registry payload shape
+    const DICTIONARY_ITEM *registry_item;
+    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    if(!registry) return;
 
     buffer_json_member_add_object(wb, "functions");
 
-    nrpc_catalog_host_foreach(host, NRPC_CATALOG_FILTER_USER, host_function2json_cb, wb);
+    nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_USER, host_function2json_cb, wb);
 
     buffer_json_object_close(wb);
+
+    nrpc_registry_release(registry_item);
 }
 
 // ----------------------------------------------------------------------------
@@ -216,7 +240,16 @@ static void host_function_to_dict_cb(const struct nrpc_method_view *v, void *dat
 
 void nrpc_catalog_host_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size,
                             const char **help, const char **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
-    if(!host || !host->rpc_registry || !dictionary_entries(host->rpc_registry->dict) || !dst) return;
+    if(!host || !dst) return;
+
+    const DICTIONARY_ITEM *registry_item;
+    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    if(!registry) return;
+
+    if(!dictionary_entries(registry->dict)) {
+        nrpc_registry_release(registry_item);
+        return;
+    }
 
     struct nrpc_host_to_dict_ctx ctx = {
         .dst = dst,
@@ -229,7 +262,9 @@ void nrpc_catalog_host_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size
         .version = version,
     };
 
-    nrpc_catalog_host_foreach(host, NRPC_CATALOG_FILTER_USER, host_function_to_dict_cb, &ctx);
+    nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_USER, host_function_to_dict_cb, &ctx);
+
+    nrpc_registry_release(registry_item);
 }
 
 // ----------------------------------------------------------------------------
@@ -260,10 +295,16 @@ DICTIONARY *nrpc_catalog_manifest_dict(RRDHOST *host) {
     DICTIONARY *dst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_register_delete_callback(dst, manifest_entry_delete_cb, NULL);
 
-    if(!host || !host->rpc_registry || !dictionary_entries(host->rpc_registry->dict)) return dst;
+    if(!host) return dst;
 
-    nrpc_catalog_host_foreach(host, NRPC_CATALOG_FILTER_USER, manifest_entry_cb, dst);
+    const DICTIONARY_ITEM *registry_item;
+    struct nrpc_registry *registry = nrpc_registry_acquire(host->host_id, &registry_item);
+    if(!registry) return dst;
 
+    if(dictionary_entries(registry->dict))
+        nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_USER, manifest_entry_cb, dst);
+
+    nrpc_registry_release(registry_item);
     return dst;
 }
 

@@ -5,7 +5,13 @@
 #include "nrpc-calls.h"
 
 struct nrpc_call {
-    RRDHOST *host;
+    // The held method pair: the outer item pins the registry entry, the inner
+    // item pins the method. Self-contained, so the completion paths (async
+    // result, shutdown unwind, delete callback) release through it without
+    // any host lookup - a host teardown that unlinked the registry entry
+    // cannot make the release dangle.
+    struct nrpc_method_acquired held;
+
     nd_uuid_t call_id_uuid;
     const char *call_id;
     const char *cmd;
@@ -19,8 +25,6 @@ struct nrpc_call {
     HTTP_ACCESS user_access;
 
     BUFFER *payload;
-
-    NRPC_METHOD_ACQUIRED *method_acquired;
 
     // the method being called
     // we acquire this structure at the beginning,
@@ -121,7 +125,7 @@ static void nrpc_inflight_calls_delete_cb(const DICTIONARY_ITEM *item __maybe_un
     // internal_error(true, "NRPC: call_id '%s' finished", call->call_id);
 
     nrpc_call_cleanup(call);
-    nrpc_method_acquired_release(call->host, call->method_acquired);
+    nrpc_method_acquired_release_pair(&call->held);
 }
 
 static void nrpc_inflight_calls_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -225,7 +229,6 @@ static void nrpc_call_register_progress_hook_cb(void *register_progress_hook_cb_
 // waiting for async function completion
 
 struct nrpc_call_wait {
-    RRDHOST *host;
     char *call_id;
 
     bool free_with_signal;
@@ -235,13 +238,13 @@ struct nrpc_call_wait {
     int code;
 };
 
-static void nrpc_inflight_calls_del(RRDHOST *host __maybe_unused, const char *call_id) {
+static void nrpc_inflight_calls_del(const char *call_id) {
     dictionary_del(nrpc_inflight_calls.dict, call_id);
     dictionary_garbage_collect(nrpc_inflight_calls.dict);
 }
 
 static void nrpc_call_wait_free(struct nrpc_call_wait *tmp) {
-    nrpc_inflight_calls_del(tmp->host, tmp->call_id);
+    nrpc_inflight_calls_del(tmp->call_id);
     freez(tmp->call_id);
 
     netdata_cond_destroy(&tmp->cond);
@@ -281,7 +284,7 @@ static void nrpc_call_nowait_finished(BUFFER *wb, int code, void *data) {
     if(call->result.cb)
         call->result.cb(wb, code, call->result.data);
 
-    nrpc_inflight_calls_del(call->host, call->call_id);
+    nrpc_inflight_calls_del(call->call_id);
 }
 
 static bool nrpc_call_is_cancelled(void *data) {
@@ -328,7 +331,6 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
     struct nrpc_call_wait *tmp = mallocz(sizeof(struct nrpc_call_wait));
     tmp->free_with_signal = false;
     tmp->data_are_ready = false;
-    tmp->host = call->host;
     tmp->call_id = strdupz(call->call_id);
     netdata_mutex_init(&tmp->mutex);
     netdata_cond_init(&tmp->cond);
@@ -477,32 +479,47 @@ static inline int nrpc_call_async(struct nrpc_call *call, bool wait) {
 
 // ----------------------------------------------------------------------------
 
-int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
-                              HTTP_ACCESS user_access, bool allow_restricted,
-                              NRPC_METHOD_ACQUIRED **out_acquired) {
+// Internal: authorize and fill a caller-owned held pair (outer registry
+// handle + inner method item). On failure everything acquired is released and
+// out_pair is zeroed. UUID_ZERO answers 500 exactly as the old NULL host did;
+// an identity with no live registry entry answers 404 exactly as the old
+// NULL host->rpc_registry did.
+static int nrpc_method_authorize_pair(ND_UUID host_id, BUFFER *result_wb, const char *cmd,
+                                      HTTP_ACCESS user_access, bool allow_restricted,
+                                      struct nrpc_method_acquired *out_pair) {
+    *out_pair = (struct nrpc_method_acquired){ 0 };
 
-    if(out_acquired)
-        *out_acquired = NULL;
-
-    if(!host)
+    if(UUIDiszero(host_id))
         return nrpc_call_error(result_wb, "No host given for routing this request to.",
                                        HTTP_RESP_INTERNAL_SERVER_ERROR);
+
+    const DICTIONARY_ITEM *registry_item;
+    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    if(!registry)
+        return nrpc_call_error(result_wb,
+                                       "This feature is not available on this host at this time.",
+                                       HTTP_RESP_NOT_FOUND);
 
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, cmd, sizeof(sanitized_cmd));
 
-    NRPC_METHOD_ACQUIRED *method_acquired = NULL;
-    int code = nrpc_registry_find(host, result_wb, sanitized_cmd, sanitized_cmd_length, &method_acquired);
-    if(code != HTTP_RESP_OK)
+    const DICTIONARY_ITEM *inner_item = NULL;
+    int code = nrpc_registry_find(registry, result_wb, sanitized_cmd, sanitized_cmd_length, &inner_item);
+    if(code != HTTP_RESP_OK) {
+        nrpc_registry_release(registry_item);
         return code;
+    }
 
-    struct nrpc_method *method = nrpc_method_acquired_value(method_acquired);
+    out_pair->outer_item = registry_item;
+    out_pair->inner_item = inner_item;
+
+    struct nrpc_method *method = nrpc_method_acquired_value(out_pair);
 
     if((method->options & NRPC_METHOD_FLAG_RESTRICTED) && !allow_restricted) {
         code = nrpc_call_error(result_wb,
                                        "This feature is not available via this API.",
                                        HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
-        nrpc_method_acquired_release(host, method_acquired);
+        nrpc_method_acquired_release_pair(out_pair);
         return code;
     }
 
@@ -540,14 +557,30 @@ int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
         }
 
-        nrpc_method_acquired_release(host, method_acquired);
+        nrpc_method_acquired_release_pair(out_pair);
         return code;
     }
 
+    return HTTP_RESP_OK;
+}
+
+int nrpc_method_authorize(ND_UUID host_id, BUFFER *result_wb, const char *cmd,
+                              HTTP_ACCESS user_access, bool allow_restricted,
+                              NRPC_METHOD_ACQUIRED **out_acquired) {
     if(out_acquired)
-        *out_acquired = method_acquired;
+        *out_acquired = NULL;
+
+    struct nrpc_method_acquired pair;
+    int code = nrpc_method_authorize_pair(host_id, result_wb, cmd, user_access, allow_restricted, &pair);
+    if(code != HTTP_RESP_OK)
+        return code;
+
+    if(out_acquired) {
+        *out_acquired = mallocz(sizeof(pair));
+        **out_acquired = pair;
+    }
     else
-        nrpc_method_acquired_release(host, method_acquired);
+        nrpc_method_acquired_release_pair(&pair);
 
     return HTTP_RESP_OK;
 }
@@ -555,12 +588,10 @@ int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
 int nrpc_call(const struct nrpc_call_spec *spec) {
     internal_fatal(!spec->result_wb, "NRPC: call without a result buffer");
 
-    RRDHOST *host = spec->host;
     BUFFER *result_wb = spec->result_wb;
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
-    NRPC_METHOD_ACQUIRED *method_acquired = NULL;
 
     const char *source_to_sanitize = spec->source ? spec->source : "";
     size_t sanitized_source_size = nrpc_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
@@ -568,24 +599,14 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     nrpc_sanitize_name(sanitized_source, source_to_sanitize, sanitized_source_size);
 
     // ------------------------------------------------------------------------
-    // check for the host
-    if(!host) {
-        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-
-        nrpc_call_error(result_wb, "No host given for routing this request to.", code);
-
-        if(spec->result.cb)
-            spec->result.cb(result_wb, code, spec->result.data);
-
-        return code;
-    }
-
-    // ------------------------------------------------------------------------
     // find the function and verify the caller's access
+    // (a zero host_id answers 500 - the "no host given" sentinel)
 
     size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, spec->cmd, sizeof(sanitized_cmd));
 
-    code = nrpc_method_authorize(host, result_wb, spec->cmd, spec->user_access, spec->allow_restricted, &method_acquired);
+    struct nrpc_method_acquired held;
+    code = nrpc_method_authorize_pair(spec->host_id, result_wb, spec->cmd, spec->user_access,
+                                      spec->allow_restricted, &held);
     if(code != HTTP_RESP_OK) {
 
         if(spec->result.cb)
@@ -594,7 +615,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         return code;
     }
 
-    struct nrpc_method *method = nrpc_method_acquired_value(method_acquired);
+    struct nrpc_method *method = nrpc_method_acquired_value(&held);
 
     int timeout_s = spec->timeout_s;
     if(timeout_s <= 0)
@@ -617,7 +638,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     // put the function into the inflight requests
 
     struct nrpc_call t = {
-        .host = host,
+        .held = held,
         .cmd = strdupz(spec->cmd),
         .sanitized_cmd = strdupz(sanitized_cmd),
         .sanitized_cmd_length = sanitized_cmd_length,
@@ -628,7 +649,6 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         .timeout = timeout_s,
         .cancelled = false,
         .stop_monotonic_ut = now_monotonic_usec() + timeout_s * USEC_PER_SEC,
-        .method_acquired = method_acquired,
         .method = method,
         .result = {
             .wb = result_wb,
@@ -651,7 +671,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     // transport - executors must never re-read method's pair at call time (see
     // struct nrpc_call.captured). The early error paths below
     // release the pin via nrpc_call_cleanup(&t).
-    nrpc_method_capture(method_acquired, &t.captured);
+    nrpc_method_capture(&t.held, &t.captured);
 
     bool duplicate_call_id = false;
     struct nrpc_call *call = dictionary_set_advanced(
@@ -661,7 +681,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         code = nrpc_call_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
 
         nrpc_call_cleanup(&t);
-        nrpc_method_acquired_release(host, t.method_acquired);
+        nrpc_method_acquired_release_pair(&t.held);
 
         if(spec->result.cb)
             spec->result.cb(result_wb, code, spec->result.data);
@@ -677,7 +697,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         code = nrpc_call_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
 
         nrpc_call_cleanup(&t);
-        nrpc_method_acquired_release(host, t.method_acquired);
+        nrpc_method_acquired_release_pair(&t.held);
 
         if(spec->result.cb)
             spec->result.cb(result_wb, code, spec->result.data);
@@ -723,7 +743,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         };
         code = call->captured.handler(&req, call->captured.handler_data);
 
-        nrpc_inflight_calls_del(host, call->call_id);
+        nrpc_inflight_calls_del(call->call_id);
         return code;
     }
 

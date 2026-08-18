@@ -484,7 +484,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
     should_be_saved(t, c);
 
     int rc = nrpc_call(&(struct nrpc_call_spec) {
-        .host = localhost,
+        .host_id = localhost->host_id,
         .result_wb = wb,
         .cmd = cmd,
         .source = source,

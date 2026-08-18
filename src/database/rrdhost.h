@@ -16,7 +16,6 @@ struct rrdset;
 typedef struct rrdhost RRDHOST;
 typedef struct ml_host rrd_ml_host_t;
 typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
-typedef struct nrpc_registry NRPC_REGISTRY;
 
 //#include "streaming/stream-traffic-types.h"
 #include "streaming/stream-sender-commit.h"
@@ -353,10 +352,6 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // Support for host-level labels
     RRDLABELS *rrdlabels;
-
-    // ------------------------------------------------------------------------
-    // Support for functions
-    NRPC_REGISTRY *rpc_registry;                    // the host's function registry, can be NULL
 
     // ------------------------------------------------------------------------
     // indexes

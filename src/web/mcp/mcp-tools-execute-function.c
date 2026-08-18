@@ -2222,7 +2222,7 @@ static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload
     
     // Execute the function
     int ret = nrpc_call(&(struct nrpc_call_spec) {
-        .host = data->request.host,
+        .host_id = data->request.host->host_id,
         .result_wb = result_buffer,
         .cmd = data->request.function,
         .source = buffer_tostring(source),
@@ -2627,7 +2627,7 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
     {
         CLEAN_BUFFER *access_error = buffer_create(0, NULL);
         int access_code = nrpc_method_authorize(
-            data.request.host, access_error, data.request.function,
+            data.request.host ? data.request.host->host_id : UUID_ZERO, access_error, data.request.function,
             data.request.auth ? data.request.auth->access : HTTP_ACCESS_NONE,
             false, NULL);
 

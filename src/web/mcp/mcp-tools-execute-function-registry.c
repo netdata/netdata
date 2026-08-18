@@ -329,7 +329,7 @@ static MCP_FUNCTION_REGISTRY_ENTRY *mcp_function_get_info(RRDHOST *host, const c
     // Call the function with info parameter
     BUFFER *response = buffer_create(0, NULL);
     int code = nrpc_call(&(struct nrpc_call_spec) {
-        .host = host,
+        .host_id = host ? host->host_id : UUID_ZERO,
         .result_wb = response,
         .cmd = info_function,
         .source = buffer_tostring(source),

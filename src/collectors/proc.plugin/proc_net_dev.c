@@ -1699,7 +1699,7 @@ void netdev_main(void *ptr_is_null __maybe_unused)
         virtual_device_collect_delay_secs = 300;
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host = localhost,
+        .host_id = localhost->host_id,
         .name = "network-interfaces",
         .help = FUNCTION_NETDEV_HELP,
         .tags = "top",

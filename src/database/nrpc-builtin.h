@@ -14,7 +14,7 @@ typedef int (*nrpc_builtin_handler_cb_t)(BUFFER *wb, const char *function, BUFFE
 // semantics match struct nrpc_method_desc; the same must-write style rule
 // applies (timeout_s, priority, version, access).
 struct nrpc_builtin_desc {
-    RRDHOST *host;                 // required
+    ND_UUID host_id;               // required: the owning host's identity (host->host_id)
     const char *name;              // required
     const char *help;              // required
     const char *tags;              // NULL normalizes to "top"; NRPC_TAG_HIDDEN derives RESTRICTED

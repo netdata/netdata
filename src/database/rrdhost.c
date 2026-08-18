@@ -467,7 +467,6 @@ RRDHOST *rrdhost_create(
     spinlock_init(&host->aclk.spinlock);
 
     if (likely(!archived)) {
-        nrpc_registry_init(host);
         host->stream.snd.status.last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
         stream_sender_structures_init(host, stream, parents, api_key, send_charts_matching);
@@ -567,6 +566,16 @@ RRDHOST *rrdhost_create(
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(localhost, host, prev, next);
     else
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(localhost, host, prev, next);
+
+    // The function-registry entry is created only AFTER this host won the
+    // machine-guid index insertion above, still under rrd_wrlock: host_id is
+    // parsed by now, the LOSER of a same-guid collision never gets an entry
+    // it could tear down over the winner's, and entry existence tracks index
+    // membership atomically - which is what the ACLK teardown ordering keys
+    // on. (A dying same-identity predecessor already unlinked from the index
+    // may still hold the entry; init takes it over - see nrpc_registry_init.)
+    if (likely(!archived))
+        nrpc_registry_init(host);
 
     rrd_wrunlock();
 
@@ -927,7 +936,7 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     // ORDERING (both directions load-bearing):
     // - the registry MUST be destroyed AFTER stream_sender_structures_free():
     //   until the sender thread is joined there, it can still run the global-
-    //   functions renderer, which locks host->rpc_registry->pending_dels.spinlock
+    //   functions renderer, which locks the registry's pending_dels.spinlock
     //   and traverses its dictionary - destroying earlier is a use-after-free
     //   on the sender thread. (The receiver stop at the top of this function
     //   is a BOUNDED ~2s wait that can give up on a stalled receiver thread -

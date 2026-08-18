@@ -292,7 +292,7 @@ void dyncfg_host_init(RRDHOST *host) {
     // The reason is that it can call by itself another function that may or may not be internal (sync).
 
     nrpc_method_register(&(struct nrpc_method_desc) {
-        .host = host,
+        .host_id = host->host_id,
         .name = PLUGINSD_FUNCTION_CONFIG,
         .help = "Dynamic configuration",
         .tags = "config",

@@ -92,7 +92,7 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
     snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
     nrpc_call(&(struct nrpc_call_spec) {
-        .host = host,
+        .host_id = host ? host->host_id : UUID_ZERO,
         .result_wb = e->wb,
         .cmd = buf,
         .source = string2str(df->dyncfg.source),
@@ -131,7 +131,7 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
     snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
     nrpc_call(&(struct nrpc_call_spec) {
-        .host = host,
+        .host_id = host ? host->host_id : UUID_ZERO,
         .result_wb = e->wb,
         .cmd = buf,
         .source = string2str(df->dyncfg.source),
@@ -173,7 +173,7 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
     snprintfz(buf, buf_size, "%s %s", string2str(df_template->function), cmd);
 
     nrpc_call(&(struct nrpc_call_spec) {
-        .host = host,
+        .host_id = host ? host->host_id : UUID_ZERO,
         .result_wb = e->wb,
         .cmd = buf,
         .source = string2str(df_job->dyncfg.source),

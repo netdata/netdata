@@ -1431,7 +1431,7 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
     static bool function_registered = false;
     if (unlikely(!function_registered && sensor_charts_root)) {
         nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-            .host = localhost,
+            .host_id = localhost->host_id,
             .name = "sensors",
             .help = MACOS_SENSORS_FUNCTION_HELP,
             .tags = "top",

@@ -10,7 +10,9 @@
 // expose, and that users, parents and Netdata Cloud invoke on demand.
 //
 // Concept map:
-// - registry (struct nrpc_registry): per-host table of methods.
+// - registry (struct nrpc_registry): per-host-identity table of methods; the
+//   registries live in a component-global index keyed by the host's ND_UUID,
+//   not inside RRDHOST.
 // - method (struct nrpc_method): a named callable endpoint. Its static
 //   attribute bundle (name, help, tags, access, timeout, priority, version)
 //   is its DESCRIPTOR - never "metadata", which RPC reserves for per-call
@@ -142,11 +144,25 @@ typedef enum __attribute__((packed)) {
     NRPC_SOURCE_DAEMON,      // daemon-internal registration (builtin methods, dyncfg)
 } NRPC_SOURCE;
 
+// Registry entry lifecycle - called from the host lifecycle (rrdhost.c) with
+// a live host: init creates the host's entry in the component-global
+// registries index (keyed by host->host_id; a zero host_id is refused with an
+// ERROR), destroy unlinks it. Both verify entry OWNERSHIP against the calling
+// host, so the losing host of a machine-guid index collision can never touch
+// the winner's live entry.
 void nrpc_registry_init(RRDHOST *host);
 void nrpc_registry_destroy(RRDHOST *host);
 
-// release a handle acquired via nrpc_method_authorize()
-void nrpc_method_acquired_release(RRDHOST *host, NRPC_METHOD_ACQUIRED *acquired);
+// destroy the (by then empty) component-global registries index at daemon
+// shutdown, after rrdhost_free_all(), so leak checking sees a clean heap
+// (the same contract as nrpc_inflight_calls_destroy)
+void nrpc_registries_destroy(void);
+
+// Release a handle acquired via nrpc_method_authorize(). The handle is
+// self-contained (it pins both the method and its registry entry), so release
+// needs no host identity and is safe even after the host's registry entry was
+// unlinked by a concurrent teardown.
+void nrpc_method_acquired_release(NRPC_METHOD_ACQUIRED *acquired);
 
 // Registration descriptor: the method's attribute bundle plus its owner
 // and handler. Stack-filled by the caller; the registry copies what it
@@ -155,7 +171,7 @@ void nrpc_method_acquired_release(RRDHOST *host, NRPC_METHOD_ACQUIRED *acquired)
 // access, sync, timeout_s, priority, version) are written explicitly at every
 // site even when zero; pointer fields may be omitted when NULL.
 struct nrpc_method_desc {
-    RRDHOST *host;                 // required
+    ND_UUID host_id;               // required: the owning host's identity (host->host_id)
     const char *name;              // required
     const char *help;              // required
     const char *tags;              // NULL normalizes to "top"; NRPC_TAG_HIDDEN derives RESTRICTED
@@ -172,7 +188,7 @@ struct nrpc_method_desc {
 // register a method, called from its serving thread
 void nrpc_method_register(const struct nrpc_method_desc *desc);
 
-bool nrpc_method_unregister(RRDHOST *host, const char *name, NRPC_SOURCE source);
+bool nrpc_method_unregister(ND_UUID host_id, const char *name, NRPC_SOURCE source);
 
 // true if name is a reserved dynamic-configuration method name ("config" or "config <id>")
 bool nrpc_method_name_is_dyncfg(const char *name);
@@ -187,7 +203,7 @@ bool nrpc_method_name_is_dyncfg(const char *name);
 // record, private to nrpc-calls.c) which the handler sees as
 // struct nrpc_request - three views of one invocation.
 struct nrpc_call_spec {
-    RRDHOST *host;                 // required by every current caller (a NULL host answers 500)
+    ND_UUID host_id;               // the target host's identity; UUID_ZERO = "no host given" (answers 500)
     BUFFER *result_wb;             // required; also the error sink
     const char *cmd;               // "name [args]"; NULL-tolerant: sanitizes to "" and fails the lookup (404)
     const char *source;            // provenance STRING (who is calling) - not NRPC_SOURCE
@@ -205,14 +221,15 @@ struct nrpc_call_spec {
 // invoke a method - callable from anywhere
 int nrpc_call(const struct nrpc_call_spec *spec);
 
-// Verify the caller may invoke `cmd` on `host`, applying the same RESTRICTED and access-level
-// checks nrpc_call() enforces, WITHOUT executing the method. This lets non-execution
-// paths (e.g. MCP descriptor/help generation) authorize a caller before disclosing anything.
+// Verify the caller may invoke `cmd` on the host identified by host_id, applying the same
+// RESTRICTED and access-level checks nrpc_call() enforces, WITHOUT executing the method.
+// This lets non-execution paths (e.g. MCP descriptor/help generation) authorize a caller
+// before disclosing anything. UUID_ZERO is the "no host given" sentinel and answers 500.
 // On success returns HTTP_RESP_OK; if out_acquired != NULL it receives an acquired registry
-// handle the caller MUST release with nrpc_method_acquired_release(host, *out_acquired),
+// handle the caller MUST release with nrpc_method_acquired_release(*out_acquired),
 // otherwise the handle is released internally. On failure it writes the error into result_wb,
 // releases any acquired handle, sets *out_acquired (if any) to NULL, and returns the HTTP code.
-int nrpc_method_authorize(RRDHOST *host, BUFFER *result_wb, const char *cmd,
+int nrpc_method_authorize(ND_UUID host_id, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
                               NRPC_METHOD_ACQUIRED **out_acquired);
 
