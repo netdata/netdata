@@ -7,6 +7,8 @@
 #include "rrdcalc.h"
 
 struct alarm_entry {
+    RRDHOST *host;  // The host this alert belongs to
+
     uint32_t unique_id;
     uint32_t alarm_id;
     uint32_t alarm_event_id;
@@ -30,7 +32,6 @@ struct alarm_entry {
     STRING *exec;
     STRING *recipient;
     time_t exec_run_timestamp;
-    int exec_code;
 
     STRING *source;
     STRING *units;
@@ -47,6 +48,7 @@ struct alarm_entry {
     RRDCALC_STATUS new_status;
 
     uint32_t flags;
+    int exec_code;
     int32_t pending_save_count;
 
     int delay;
@@ -81,5 +83,8 @@ struct alarm_entry {
 
 // Function to clean up old alarm entries based on retention settings
 void health_alarm_log_cleanup(RRDHOST *host);
+
+// Free an alarm entry directly (no pending_save_count check, no linked-list check)
+void health_alarm_entry_free_direct(ALARM_ENTRY *ae);
 
 #endif //NETDATA_HEALTH_ALERT_ENTRY_H

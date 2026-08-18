@@ -12,14 +12,13 @@ typedef enum {
     SERVICE_REPLICATION           = (1 << 3),
     SERVICE_WEB_SERVER            = (1 << 4),
     SERVICE_ACLK                  = (1 << 5),
-    SERVICE_HEALTH                = (1 << 6),
-    SERVICE_STREAMING             = (1 << 7),
-    SERVICE_STREAMING_CONNECTOR   = (1 << 8),
-    SERVICE_CONTEXT               = (1 << 9),
-    SERVICE_ANALYTICS             = (1 << 10),
-    SERVICE_EXPORTERS             = (1 << 11),
-    SERVICE_HTTPD                 = (1 << 12),
-    SERVICE_SYSTEMD               = (1 << 13),
+    SERVICE_STREAMING             = (1 << 6),
+    SERVICE_STREAMING_CONNECTOR   = (1 << 7),
+    SERVICE_CONTEXT               = (1 << 8),
+    SERVICE_ANALYTICS             = (1 << 9),
+    SERVICE_EXPORTERS             = (1 << 10),
+    SERVICE_HTTPD                 = (1 << 11),
+    SERVICE_SYSTEMD               = (1 << 12),
 } SERVICE_TYPE;
 
 typedef void (*force_quit_t)(void *data);
