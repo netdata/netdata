@@ -18,10 +18,11 @@ func TestApplyPoliciesRecordsShapeStats(t *testing.T) {
 			{ActorID: "endpoint-a", ActorType: "endpoint"},
 		},
 		Links: []topologymodel.Link{
-			{SrcActorID: "device-a", DstActorID: "segment-a"},
-			{SrcActorID: "segment-a", DstActorID: "endpoint-a"},
+			{SrcActorHandle: topologyShapeTestActorHandle("device-a"), DstActorHandle: topologyShapeTestActorHandle("segment-a")},
+			{SrcActorHandle: topologyShapeTestActorHandle("segment-a"), DstActorHandle: topologyShapeTestActorHandle("endpoint-a")},
 		},
 	}
+	assignTopologyShapeTestHandles(t, &data)
 
 	ApplyPolicies(&data, topologyoptions.QueryOptions{
 		EliminateNonIPInferred: true,

@@ -413,16 +413,16 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 	require.Equal(t, topologymodel.SegmentKindL3Subnet, segment.SegmentKind)
 	require.Equal(t, "203.0.113.0/24", topologymodel.ActorDetailDisplayName(*segment))
 
-	memberIDs := make([]string, 0, 3)
+	memberHandles := make([]topologymodel.ActorHandle, 0, 3)
 	for _, link := range data.Links {
 		if link.LinkType != topologymodel.L3SubnetMembershipLinkType {
 			continue
 		}
-		require.Equal(t, segment.ActorID, link.DstActorID)
+		require.Equal(t, segment.ActorHandle, link.DstActorHandle)
 		require.NotNil(t, link.Detail.L3SubnetMembership)
 		require.Equal(t, "203.0.113.0/24", link.Detail.L3SubnetMembership.Subnet)
 		require.Len(t, link.Detail.L3SubnetMembership.Interfaces, 1)
-		memberIDs = append(memberIDs, link.SrcActorID)
+		memberHandles = append(memberHandles, link.SrcActorHandle)
 	}
 	routerA := findDeviceActorBySysName(data, "router-a")
 	require.NotNil(t, routerA)
@@ -430,7 +430,7 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 	require.NotNil(t, routerB)
 	routerC := findDeviceActorBySysName(data, "router-c")
 	require.NotNil(t, routerC)
-	require.ElementsMatch(t, []string{routerA.ActorID, routerB.ActorID, routerC.ActorID}, memberIDs)
+	require.ElementsMatch(t, []topologymodel.ActorHandle{routerA.ActorHandle, routerB.ActorHandle, routerC.ActorHandle}, memberHandles)
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_segment_emitted_segments"])
 	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_emitted_links"])
 	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_visible_links"])
@@ -581,7 +581,7 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 	routerB := findDeviceActorBySysName(data, "router-b")
 	require.NotNil(t, routerB)
 	require.Len(t, routerA.Detail.BGP, 1)
-	require.Equal(t, routerB.ActorID, routerA.Detail.BGP[0].RemoteActorID)
+	require.Equal(t, routerB.ActorHandle, routerA.Detail.BGP[0].RemoteActorHandle)
 }
 
 func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDetails(t *testing.T) {
@@ -634,7 +634,7 @@ func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDet
 	require.NotNil(t, routerA)
 	require.Len(t, routerA.Detail.BGP, 2)
 	for _, row := range routerA.Detail.BGP {
-		require.Empty(t, row.RemoteActorID)
+		require.True(t, row.RemoteActorHandle.IsZero())
 	}
 }
 
@@ -1234,14 +1234,15 @@ func TestApplySNMPTopologyShapePolicies_CollapsesActorsByIP(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "endpoint:b",
-				DstActorID: "device:a",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("endpoint:b"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:a"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		CollapseActorsByIP: true,
 		MapType:            topologyoptions.MapTypeHighConfidenceInferred,
@@ -1273,14 +1274,15 @@ func TestApplySNMPTopologyShapePolicies_EliminatesNonIPInferredActorsAndSparseSe
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		EliminateNonIPInferred: true,
 		MapType:                topologyoptions.MapTypeHighConfidenceInferred,
@@ -1316,14 +1318,15 @@ func TestApplySNMPTopologyShapePolicies_HighConfidenceSuppressesUnlinkedInferred
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "endpoint:linked",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:linked"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		MapType: topologyoptions.MapTypeHighConfidenceInferred,
 	})
@@ -1359,20 +1362,21 @@ func TestApplySNMPTopologyShapePolicies_LLDPManagedMapKeepsOnlyLLDPCDPAndManaged
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "device:d2",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:d2"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		MapType: topologyoptions.MapTypeLLDPCDPManaged,
 	})
@@ -1387,26 +1391,26 @@ func TestMarkProbableDeltaLinks_MarksAllAddedLinksAsProbable(t *testing.T) {
 	strictData := topologymodel.Data{
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "device:d2",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:d2"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 	probableData := topologymodel.Data{
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "device:d2",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:d2"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 				L2: &graph.LinkL2{
 					BridgeDomain: "bridge-domain:s1",
 				},
@@ -1454,26 +1458,27 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthZero(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1",
 		Depth:                  0,
@@ -1517,26 +1522,27 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthOneIncludesDirectNeighbo
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1",
 		Depth:                  1,
@@ -1580,32 +1586,33 @@ func TestApplyTopologyDepthFocusFilter_MultiFocusDepthZeroIncludesAllShortestPat
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-b",
-				DstActorID: "device:managed-c",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-c"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "device:managed-c",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-c"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.3,ip:10.0.0.1",
 		Depth:                  0,
@@ -1656,26 +1663,27 @@ func TestApplyTopologyDepthFocusFilter_DepthExpandsFromSelectedRootsOnly(t *test
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-b",
-				DstActorID: "device:managed-c",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-c"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-b",
-				DstActorID: "endpoint:x",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:x"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1,ip:10.0.0.3",
 		Depth:                  1,
@@ -1692,7 +1700,8 @@ func TestApplyTopologyDepthFocusFilter_DepthExpandsFromSelectedRootsOnly(t *test
 		actorIDs,
 	)
 	for _, link := range data.Links {
-		assert.False(t, link.SrcActorID == "endpoint:x" || link.DstActorID == "endpoint:x")
+		endpointHandle := snmpTopologyTestActorHandle("endpoint:x")
+		assert.False(t, link.SrcActorHandle == endpointHandle || link.DstActorHandle == endpointHandle)
 	}
 }
 

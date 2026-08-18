@@ -29,7 +29,7 @@ func applyBGPAdjacencyWithResolver(
 
 	resolver := newTopologyBGPActorResolver(l3Resolver.resolve(), aggregate)
 	seen := existingTopologyBGPLinkKeys(data.Links)
-	peerRowsByActor := make(map[string][]topologymodel.BGPPeerDetailRow)
+	peerRowsByActor := make(map[topologymodel.ActorHandle][]topologymodel.BGPPeerDetailRow)
 
 	for _, row := range aggregate.BGPPeers {
 		stats.ObservedRows++
@@ -38,9 +38,9 @@ func applyBGPAdjacencyWithResolver(
 		if localOK {
 			modalRow := topologyBGPPeerActorRow(row)
 			if remoteOK {
-				modalRow.RemoteActorID = remoteRef.actorID
+				modalRow.RemoteActorHandle = remoteRef.actorHandle
 			}
-			peerRowsByActor[localRef.actorID] = append(peerRowsByActor[localRef.actorID], modalRow)
+			peerRowsByActor[localRef.actorHandle] = append(peerRowsByActor[localRef.actorHandle], modalRow)
 			stats.AttachedPeerRows++
 		}
 
@@ -56,17 +56,18 @@ func applyBGPAdjacencyWithResolver(
 			stats.SuppressedUnresolvedNeighbor++
 			continue
 		}
-		if localRef.actorID == remoteRef.actorID {
+		if localRef.actorHandle == remoteRef.actorHandle {
 			stats.SuppressedSelfActor++
 			continue
 		}
 
-		key := topologyBGPPeerLinkKeyParts(row, localRef.actorID, remoteRef.actorID)
+		key := topologyBGPPeerLinkKeyParts(row, localRef.actorHandle, remoteRef.actorHandle)
 		if _, exists := seen[key]; exists {
 			stats.SuppressedDuplicateLink++
 			continue
 		}
 		seen[key] = struct{}{}
+		seen[key.reversed()] = struct{}{}
 		data.Links = append(data.Links, topologyBGPAdjacencyLink(row, localRef, remoteRef))
 		stats.EmittedLinks++
 	}
@@ -116,7 +117,7 @@ func (r topologyBGPActorResolver) resolveDeviceID(deviceID string) (topologyL3Ac
 }
 
 func (r topologyBGPActorResolver) resolveBGPPeer(row topologymodel.BGPPeer) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byIdentifier[topologyutil.NormalizeBGPRouterID(row.PeerIdentifier)]; ok && ref.actorID != "" {
+	if ref, ok := r.byIdentifier[topologyutil.NormalizeBGPRouterID(row.PeerIdentifier)]; ok && ref.valid() {
 		return ref, true
 	}
 	return r.l3.resolveRouterEndpoint(row.PeerIdentifier, row.NeighborIP)
@@ -124,7 +125,7 @@ func (r topologyBGPActorResolver) resolveBGPPeer(row topologymodel.BGPPeer) (top
 
 func (r topologyBGPActorResolver) addUniqueIdentifier(identifier string, ref topologyL3ActorRef) {
 	identifier = topologyutil.NormalizeBGPRouterID(identifier)
-	if identifier == "" || ref.actorID == "" {
+	if identifier == "" || !ref.valid() {
 		return
 	}
 	existing, ok := r.byIdentifier[identifier]
@@ -132,7 +133,7 @@ func (r topologyBGPActorResolver) addUniqueIdentifier(identifier string, ref top
 		r.byIdentifier[identifier] = ref
 		return
 	}
-	if existing.actorID != "" && existing.actorID != ref.actorID {
+	if existing.valid() && existing.actorHandle != ref.actorHandle {
 		r.byIdentifier[identifier] = topologyL3ActorRef{}
 	}
 }
@@ -154,19 +155,19 @@ func topologyBGPAdjacencyLink(row topologymodel.BGPPeer, srcRef, dstRef topology
 		ip:         row.NeighborIP,
 		asn:        row.RemoteAS,
 	}
-	if srcRef.actorID > dstRef.actorID {
+	if srcRef.actorOrder > dstRef.actorOrder {
 		srcRef, dstRef = dstRef, srcRef
 		src, dst = dst, src
 	}
 
 	return topologymodel.Link{
-		Layer:      "3",
-		Protocol:   topologymodel.BGPAdjacencyLinkType,
-		LinkType:   topologymodel.BGPAdjacencyLinkType,
-		Direction:  "observed",
-		State:      "established",
-		SrcActorID: srcRef.actorID,
-		DstActorID: dstRef.actorID,
+		Layer:          "3",
+		Protocol:       topologymodel.BGPAdjacencyLinkType,
+		LinkType:       topologymodel.BGPAdjacencyLinkType,
+		Direction:      "observed",
+		State:          "established",
+		SrcActorHandle: srcRef.actorHandle,
+		DstActorHandle: dstRef.actorHandle,
 		Src: topologymodel.LinkEndpoint{
 			Match: srcRef.endpointMatch,
 		},
@@ -212,32 +213,39 @@ func topologyBGPPeerActorRow(row topologymodel.BGPPeer) topologymodel.BGPPeerDet
 	}
 }
 
-func existingTopologyBGPLinkKeys(links []topologymodel.Link) map[string]struct{} {
-	seen := make(map[string]struct{})
+func existingTopologyBGPLinkKeys(links []topologymodel.Link) map[topologyBGPPeerLinkKey]struct{} {
+	seen := make(map[topologyBGPPeerLinkKey]struct{})
 	for _, link := range links {
 		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.BGPAdjacencyLinkType) {
 			// Seed the key set so repeated enrichment over already-shaped data remains idempotent.
 			row := topologymodel.BGPPeer{
 				RoutingInstance: topologyBGPLinkRoutingInstance(link),
 			}
-			seen[topologyBGPPeerLinkKeyParts(row, link.SrcActorID, link.DstActorID)] = struct{}{}
+			key := topologyBGPPeerLinkKeyParts(row, link.SrcActorHandle, link.DstActorHandle)
+			seen[key] = struct{}{}
+			seen[key.reversed()] = struct{}{}
 		}
 	}
 	return seen
 }
 
-func topologyBGPPeerLinkKeyParts(row topologymodel.BGPPeer, srcActorID, dstActorID string) string {
-	srcActorID = strings.TrimSpace(srcActorID)
-	dstActorID = strings.TrimSpace(dstActorID)
-	if srcActorID > dstActorID {
-		srcActorID, dstActorID = dstActorID, srcActorID
-	}
+type topologyBGPPeerLinkKey struct {
+	srcActor        topologymodel.ActorHandle
+	dstActor        topologymodel.ActorHandle
+	routingInstance string
+}
 
-	return topologyutil.JoinKeyParts(
-		srcActorID,
-		dstActorID,
-		topologyBGPRoutingInstanceValue(row.RoutingInstance),
-	)
+func (k topologyBGPPeerLinkKey) reversed() topologyBGPPeerLinkKey {
+	k.srcActor, k.dstActor = k.dstActor, k.srcActor
+	return k
+}
+
+func topologyBGPPeerLinkKeyParts(row topologymodel.BGPPeer, srcActor, dstActor topologymodel.ActorHandle) topologyBGPPeerLinkKey {
+	return topologyBGPPeerLinkKey{
+		srcActor:        srcActor,
+		dstActor:        dstActor,
+		routingInstance: topologyBGPRoutingInstanceValue(row.RoutingInstance),
+	}
 }
 
 func topologyBGPRoutingInstanceValue(routingInstance string) string {

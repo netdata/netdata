@@ -40,14 +40,18 @@ func TestApplyLayer3MatchesStandaloneEnrichmentSequence(t *testing.T) {
 	}
 
 	want := newData()
+	assignTopologyEnrichTestHandles(t, &want)
 	ApplyL3Subnet(&want, aggregate)
 	ApplyOSPFAdjacency(&want, aggregate)
 	ApplyBGPAdjacency(&want, aggregate)
 
 	got := newData()
+	assignTopologyEnrichTestHandles(t, &got)
 	ApplyLayer3(&got, aggregate)
 
-	require.Equal(t, want, got)
+	require.Equal(t, want.Stats, got.Stats)
+	require.Equal(t, topologyActorIDsForLayer3Test(want.Actors), topologyActorIDsForLayer3Test(got.Actors))
+	require.Equal(t, topologyLinkIDsForLayer3Test(want.Actors, want.Links), topologyLinkIDsForLayer3Test(got.Actors, got.Links))
 }
 
 func TestLayer3ResolverProviderStaysLazyWithoutUsableSubnetCandidates(t *testing.T) {
@@ -59,6 +63,7 @@ func TestLayer3ResolverProviderStaysLazyWithoutUsableSubnetCandidates(t *testing
 		IP:       "198.51.100.1",
 		Netmask:  "255.255.255.252",
 	}}}
+	assignTopologyEnrichTestHandles(t, &data)
 	provider := newTopologyL3ActorResolverProvider(&data, aggregate.Snapshots)
 
 	applyL3SubnetWithResolver(&data, aggregate, provider)
@@ -70,10 +75,13 @@ func TestLayer3ResolverProviderReusesOneActorGeneration(t *testing.T) {
 	data := topologymodel.Data{Actors: []topologymodel.Actor{
 		topologyL3ManagedActorForTest("router-a", nil, "198.51.100.1"),
 	}}
+	assignTopologyEnrichTestHandles(t, &data)
 	provider := newTopologyL3ActorResolverProvider(&data, nil)
 
 	first := provider.resolve()
-	data.Actors = append(data.Actors, topologyL3ManagedActorForTest("router-b", nil, "198.51.100.1"))
+	added := topologyL3ManagedActorForTest("router-b", nil, "198.51.100.1")
+	added.ActorHandle = data.NextActorHandle()
+	data.Actors = append(data.Actors, added)
 	second := provider.resolve()
 
 	firstRef, firstOK := first.resolveIPAddress("198.51.100.1")
@@ -82,4 +90,24 @@ func TestLayer3ResolverProviderReusesOneActorGeneration(t *testing.T) {
 	require.True(t, secondOK)
 	require.Equal(t, "router-a", firstRef.actorID)
 	require.Equal(t, firstRef, secondRef)
+}
+
+func topologyActorIDsForLayer3Test(actors []topologymodel.Actor) []string {
+	ids := make([]string, len(actors))
+	for i, actor := range actors {
+		ids[i] = actor.ActorID
+	}
+	return ids
+}
+
+func topologyLinkIDsForLayer3Test(actors []topologymodel.Actor, links []topologymodel.Link) [][2]string {
+	actorIDByHandle := make(map[topologymodel.ActorHandle]string, len(actors))
+	for _, actor := range actors {
+		actorIDByHandle[actor.ActorHandle] = actor.ActorID
+	}
+	ids := make([][2]string, len(links))
+	for i, link := range links {
+		ids[i] = [2]string{actorIDByHandle[link.SrcActorHandle], actorIDByHandle[link.DstActorHandle]}
+	}
+	return ids
 }

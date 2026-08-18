@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var topologyLinkDeltaKeySink topologyLinkDeltaKeyValue
+
 func TestCollapseActorsByIPOnePassPreservesSequentialMergeSemantics(t *testing.T) {
 	expectedActors := richTopologyActorsForCollapseEquivalence()
 	rep := 0
@@ -37,23 +39,26 @@ func TestCollapseActorsByIPOnePassPreservesSequentialMergeSemantics(t *testing.T
 	expected.Detail.L2.CollapsedCount = len(expectedActors)
 
 	data := topologymodel.Data{
-		Actors: richTopologyActorsForCollapseEquivalence(),
+		Actors: append(richTopologyActorsForCollapseEquivalence(), topologymodel.Actor{ActorID: "external", ActorType: "device"}),
 		Links: []topologymodel.Link{
-			{SrcActorID: "actor-0", DstActorID: "external", Protocol: "lldp", State: "first"},
-			{SrcActorID: "actor-2", DstActorID: "external", Protocol: "lldp", State: "first"},
-			{SrcActorID: "actor-0", DstActorID: "actor-2", Protocol: "lldp", State: "self"},
+			{SrcActorHandle: topologyShapeTestActorHandle("actor-0"), DstActorHandle: topologyShapeTestActorHandle("external"), Protocol: "lldp", State: "first"},
+			{SrcActorHandle: topologyShapeTestActorHandle("actor-2"), DstActorHandle: topologyShapeTestActorHandle("external"), Protocol: "lldp", State: "first"},
+			{SrcActorHandle: topologyShapeTestActorHandle("actor-0"), DstActorHandle: topologyShapeTestActorHandle("actor-2"), Protocol: "lldp", State: "self"},
 		},
 	}
+	handles := assignTopologyShapeTestHandles(t, &data)
+	expected.ActorHandle = handles[expected.ActorID]
+	external := data.Actors[len(data.Actors)-1]
 
 	collapsed := collapseActorsByIP(&data)
 
 	require.Equal(t, 2, collapsed)
-	require.Equal(t, []topologymodel.Actor{expected}, data.Actors)
+	require.Equal(t, []topologymodel.Actor{expected, external}, data.Actors)
 	require.Equal(t, []topologymodel.Link{{
-		SrcActorID: "actor-1",
-		DstActorID: "external",
-		Protocol:   "lldp",
-		State:      "first",
+		SrcActorHandle: handles["actor-1"],
+		DstActorHandle: handles["external"],
+		Protocol:       "lldp",
+		State:          "first",
 	}}, data.Links)
 	require.Equal(t, []topologymodel.ManagementAddress{{Address: "rep-address"}}, data.Actors[0].Detail.SNMP.ManagementAddresses)
 	require.Equal(t, []topologymodel.OSPFNeighborDetailRow{
@@ -222,10 +227,10 @@ func TestCompareCollapseActorPriorityPrefersNonEmptyActorID(t *testing.T) {
 
 func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {
 	link := topologymodel.Link{
-		Protocol:   " LLDP ",
-		Direction:  " Bidirectional ",
-		SrcActorID: " device:a ",
-		DstActorID: " device:b ",
+		Protocol:       " LLDP ",
+		Direction:      " Bidirectional ",
+		SrcActorHandle: topologyShapeTestActorHandle(" device:a "),
+		DstActorHandle: topologyShapeTestActorHandle(" device:b "),
 		Src: topologymodel.LinkEndpoint{
 			IfIndex: 7,
 			IfName:  "Gi0/1",
@@ -242,7 +247,19 @@ func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {
 		State: "probable",
 	}
 
-	require.Equal(t, "lldp|bidirectional|device:a|device:b|7|Gi0/1|port-a|8|Gi0/2|port-b|vlan-10", topologyLinkDeltaKey(link))
+	require.Equal(t, topologyLinkDeltaKeyValue{
+		protocol:     "lldp",
+		direction:    "bidirectional",
+		srcActor:     1,
+		dstActor:     2,
+		srcIfIndex:   "7",
+		srcIfName:    "Gi0/1",
+		srcPortID:    "port-a",
+		dstIfIndex:   "8",
+		dstIfName:    "Gi0/2",
+		dstPortID:    "port-b",
+		bridgeDomain: "vlan-10",
+	}, topologyLinkDeltaKey(link, 1, 2))
 }
 
 func TestTopologyLinkSortKeyUsesStableEndpointFields(t *testing.T) {
@@ -289,10 +306,10 @@ func TestTopologyEndpointKeyDropsNonPositiveIfIndex(t *testing.T) {
 
 func TestTopologyLinkActorKeyIncludesStateAndAttachmentMode(t *testing.T) {
 	base := topologymodel.Link{
-		Protocol:   "bridge",
-		Direction:  "bidirectional",
-		SrcActorID: "device:a",
-		DstActorID: "endpoint:b",
+		Protocol:       "bridge",
+		Direction:      "bidirectional",
+		SrcActorHandle: topologyShapeTestActorHandle("device:a"),
+		DstActorHandle: topologyShapeTestActorHandle("endpoint:b"),
 		Src: topologymodel.LinkEndpoint{
 			IfName: "Gi0/1",
 		},
@@ -314,17 +331,41 @@ func TestTopologyLinkActorKeyIncludesStateAndAttachmentMode(t *testing.T) {
 	strict.Inference = nil
 
 	require.NotEqual(t, topologyLinkActorKey(base), topologyLinkActorKey(strict))
-	require.NotEqual(t, topologyLinkDeltaKey(base), topologyLinkActorKey(base))
+}
+
+func TestTopologyLinkDeltaKeyDoesNotAllocatePerLink(t *testing.T) {
+	link := topologymodel.Link{
+		Protocol:  "lldp",
+		Direction: "bidirectional",
+		Src:       topologymodel.LinkEndpoint{IfName: "Gi0/1"},
+		Dst:       topologymodel.LinkEndpoint{IfName: "Gi0/2"},
+	}
+
+	allocations := testing.AllocsPerRun(1000, func() {
+		topologyLinkDeltaKeySink = topologyLinkDeltaKey(link, 1, 2)
+	})
+	require.Zero(t, allocations)
 }
 
 func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *testing.T) {
+	strictHandles := graph.NewActorHandleAllocator()
+	strictA := strictHandles.Next()
+	strictB := strictHandles.Next()
+	probableHandles := graph.NewActorHandleAllocator()
+	probableB := probableHandles.Next()
+	probableA := probableHandles.Next()
+	probableSegment := probableHandles.Next()
 	strictData := topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{ActorHandle: strictA, ActorID: "device:a"},
+			{ActorHandle: strictB, ActorID: "device:b"},
+		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
-				SrcActorID: "device:a",
-				DstActorID: "device:b",
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
+				SrcActorHandle: strictA,
+				DstActorHandle: strictB,
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 1,
 					IfName:  "Gi0/1",
@@ -339,13 +380,25 @@ func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *t
 		},
 	}
 	probableData := topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{ActorHandle: probableB, ActorID: "device:b"},
+			{ActorHandle: probableA, ActorID: "device:a"},
+			{ActorHandle: probableSegment, ActorID: "segment:10"},
+		},
 		Links: []topologymodel.Link{
-			strictData.Links[0],
 			{
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
-				SrcActorID: "device:a",
-				DstActorID: "segment:10",
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
+				SrcActorHandle: probableA,
+				DstActorHandle: probableB,
+				Src:            strictData.Links[0].Src,
+				Dst:            strictData.Links[0].Dst,
+			},
+			{
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
+				SrcActorHandle: probableA,
+				DstActorHandle: probableSegment,
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 3,
 					IfName:  "Gi0/3",
@@ -365,6 +418,7 @@ func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *t
 	MarkProbableDeltaLinks(&strictData, &probableData)
 
 	require.Len(t, probableData.Links, 2)
+	require.Empty(t, probableData.Links[0].State)
 	probableLink := probableData.Links[1]
 	require.Equal(t, "probable", probableLink.State)
 	require.Equal(t, "probable", topologymodel.LinkInferenceValue(probableLink))

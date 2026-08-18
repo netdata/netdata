@@ -7,16 +7,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[string]struct{} {
-	roots := make(map[string]struct{})
+func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[topologymodel.ActorHandle]struct{} {
+	roots := make(map[topologymodel.ActorHandle]struct{})
 	normalizedFocusIPs := make(map[string]struct{}, len(focusIPs))
 	for _, focusIP := range focusIPs {
 		if ip := topologyutil.NormalizeIPAddress(focusIP); ip != "" {
 			normalizedFocusIPs[ip] = struct{}{}
 		}
 	}
-	for actorID, actor := range graph.actorByID {
-		if _, ok := graph.nonSegmentSet[actorID]; !ok {
+	for actorHandle, actor := range graph.actorByHandle {
+		if _, ok := graph.nonSegmentSet[actorHandle]; !ok {
 			continue
 		}
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
@@ -27,7 +27,7 @@ func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[
 			if _, ok := actorIPs[focusIP]; !ok {
 				continue
 			}
-			roots[actorID] = struct{}{}
+			roots[actorHandle] = struct{}{}
 			break
 		}
 	}

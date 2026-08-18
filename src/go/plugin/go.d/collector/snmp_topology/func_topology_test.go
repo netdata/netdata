@@ -256,11 +256,11 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				Direction:  "bidirectional",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				Direction:      "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 1,
 					IfName:  "Gi0/1",
@@ -280,6 +280,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -463,14 +464,15 @@ func TestSNMPTopologyToV1_PrefersSNMPMetadataAndReconciledL2Primary(t *testing.T
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -516,10 +518,10 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 42,
 					IfName:  "Gi0/42",
@@ -531,6 +533,7 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -575,10 +578,10 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 42,
 					IfName:  "Gi0/42",
@@ -590,6 +593,7 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -629,10 +633,10 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 				Src: topologymodel.LinkEndpoint{
 					DisplayName: "10.0.0.10",
 				},
@@ -643,6 +647,7 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -680,11 +685,11 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   topologymodel.L3SubnetLinkType,
-				LinkType:   topologymodel.L3SubnetLinkType,
-				Direction:  "observed",
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
+				Protocol:       topologymodel.L3SubnetLinkType,
+				LinkType:       topologymodel.L3SubnetLinkType,
+				Direction:      "observed",
+				SrcActorHandle: snmpTopologyTestActorHandle("router-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("router-b"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 10,
 					IfName:  "xe-0/0/0",
@@ -712,6 +717,7 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -801,11 +807,11 @@ func TestSNMPTopologyToV1_PreservesL3SubnetMembershipPresentationAndEvidence(t *
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   topologymodel.L3SubnetMembershipLinkType,
-				LinkType:   topologymodel.L3SubnetMembershipLinkType,
-				Direction:  "observed",
-				SrcActorID: "router-a",
-				DstActorID: "subnet-a",
+				Protocol:       topologymodel.L3SubnetMembershipLinkType,
+				LinkType:       topologymodel.L3SubnetMembershipLinkType,
+				Direction:      "observed",
+				SrcActorHandle: snmpTopologyTestActorHandle("router-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("subnet-a"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 10,
 					IfName:  "xe-0/0/0",
@@ -831,6 +837,7 @@ func TestSNMPTopologyToV1_PreservesL3SubnetMembershipPresentationAndEvidence(t *
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -916,7 +923,6 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 							State:            "full",
 							LocalIP:          "192.0.2.1",
 							Subnet:           "192.0.2.0/30",
-							RemoteActorID:    "router-b",
 						},
 					},
 				},
@@ -929,14 +935,14 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   topologymodel.OSPFAdjacencyLinkType,
-				LinkType:   topologymodel.OSPFAdjacencyLinkType,
-				Direction:  "observed",
-				State:      "full",
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
-				Src:        topologymodel.LinkEndpoint{},
-				Dst:        topologymodel.LinkEndpoint{},
+				Protocol:       topologymodel.OSPFAdjacencyLinkType,
+				LinkType:       topologymodel.OSPFAdjacencyLinkType,
+				Direction:      "observed",
+				State:          "full",
+				SrcActorHandle: snmpTopologyTestActorHandle("router-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("router-b"),
+				Src:            topologymodel.LinkEndpoint{},
+				Dst:            topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					Inference:      "ospf_full_adjacency",
 					AttachmentMode: "logical_l3_ospf",
@@ -957,6 +963,8 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 			},
 		},
 	}
+	handles := assignSNMPTopologyTestHandles(t, &data)
+	data.Actors[0].Detail.OSPF[0].RemoteActorHandle = handles["router-b"]
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
@@ -1043,7 +1051,6 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 							Description:           "edge-peer",
 							EstablishedUptime:     new(int64(300)),
 							LastReceivedUpdateAge: new(int64(12)),
-							RemoteActorID:         "router-b",
 						},
 					},
 				},
@@ -1056,14 +1063,14 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   topologymodel.BGPAdjacencyLinkType,
-				LinkType:   topologymodel.BGPAdjacencyLinkType,
-				Direction:  "observed",
-				State:      "established",
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
-				Src:        topologymodel.LinkEndpoint{},
-				Dst:        topologymodel.LinkEndpoint{},
+				Protocol:       topologymodel.BGPAdjacencyLinkType,
+				LinkType:       topologymodel.BGPAdjacencyLinkType,
+				Direction:      "observed",
+				State:          "established",
+				SrcActorHandle: snmpTopologyTestActorHandle("router-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("router-b"),
+				Src:            topologymodel.LinkEndpoint{},
+				Dst:            topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					Inference:      "bgp_established_adjacency",
 					AttachmentMode: "logical_l3_bgp",
@@ -1083,6 +1090,8 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 			},
 		},
 	}
+	handles := assignSNMPTopologyTestHandles(t, &data)
+	data.Actors[0].Detail.BGP[0].RemoteActorHandle = handles["router-b"]
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
@@ -1158,10 +1167,10 @@ func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   topologymodel.L3SubnetLinkType,
-				LinkType:   topologymodel.L3SubnetLinkType,
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
+				Protocol:       topologymodel.L3SubnetLinkType,
+				LinkType:       topologymodel.L3SubnetLinkType,
+				SrcActorHandle: snmpTopologyTestActorHandle("router-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("router-b"),
 				Detail: topologymodel.LinkDetail{
 					L3Subnet: &topologymodel.L3SubnetLinkDetail{
 						Prefix: 30,
@@ -1171,6 +1180,7 @@ func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	_, err := topologyv1renderer.Render(data)
 
 	require.Error(t, err)
@@ -1205,19 +1215,19 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				Direction:  "bidirectional",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				Direction:      "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 			},
 			{
-				Protocol:   "bridge",
-				LinkType:   "segment",
-				Direction:  "bidirectional",
-				State:      "probable",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "bridge",
+				LinkType:       "segment",
+				Direction:      "bidirectional",
+				State:          "probable",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 				Inference: &graph.LinkInference{
 					AttachmentMode: "probable_bridge_anchor",
 					Inference:      "probable",
@@ -1226,6 +1236,7 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -1315,15 +1326,16 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "fdb",
-				LinkType:   "fdb",
-				Direction:  "observed",
-				SrcActorID: "device-a",
-				DstActorID: "endpoint-a",
+				Protocol:       "fdb",
+				LinkType:       "fdb",
+				Direction:      "observed",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint-a"),
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))
@@ -1361,11 +1373,11 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				Direction:  "bidirectional",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				Direction:      "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex:  1,
 					IfName:   "Gi0/1",
@@ -1380,11 +1392,11 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 				},
 			},
 			{
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				Direction:  "bidirectional",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				Direction:      "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device-b"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex:  2,
 					IfName:   "Gi0/2",
@@ -1401,6 +1413,7 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(payload))

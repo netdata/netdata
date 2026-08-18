@@ -20,7 +20,7 @@ func TestSNMPTopologyRegistryKeepsLogicalLinkEndpointIPHintsConstantSized(t *tes
 	data, ok := registry.snapshotWithOptions(topologyoptions.DefaultQueryOptions())
 	require.True(t, ok)
 
-	selectedIPByActorID := make(map[string]string)
+	selectedIPByActorHandle := make(map[topologymodel.ActorHandle]string)
 	managedActors := 0
 	for _, actor := range data.Actors {
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
@@ -28,7 +28,7 @@ func TestSNMPTopologyRegistryKeepsLogicalLinkEndpointIPHintsConstantSized(t *tes
 		}
 		managedActors++
 		require.Len(t, actor.Match.IPAddresses, aliasCount)
-		selectedIPByActorID[actor.ActorID] = topologymodel.ActorDetailManagementIP(actor)
+		selectedIPByActorHandle[actor.ActorHandle] = topologymodel.ActorDetailManagementIP(actor)
 	}
 	require.Equal(t, 2, managedActors)
 
@@ -40,10 +40,10 @@ func TestSNMPTopologyRegistryKeepsLogicalLinkEndpointIPHintsConstantSized(t *tes
 			seen[link.LinkType]++
 			require.LessOrEqual(t, len(link.Src.Match.IPAddresses), 1, link.LinkType)
 			require.LessOrEqual(t, len(link.Dst.Match.IPAddresses), 1, link.LinkType)
-			if selected := selectedIPByActorID[link.SrcActorID]; selected != "" {
+			if selected := selectedIPByActorHandle[link.SrcActorHandle]; selected != "" {
 				require.Equal(t, []string{selected}, link.Src.Match.IPAddresses, link.LinkType)
 			}
-			if selected := selectedIPByActorID[link.DstActorID]; selected != "" {
+			if selected := selectedIPByActorHandle[link.DstActorHandle]; selected != "" {
 				require.Equal(t, []string{selected}, link.Dst.Match.IPAddresses, link.LinkType)
 			}
 		}
@@ -54,6 +54,143 @@ func TestSNMPTopologyRegistryKeepsLogicalLinkEndpointIPHintsConstantSized(t *tes
 		topologymodel.OSPFAdjacencyLinkType:      1,
 		topologymodel.BGPAdjacencyLinkType:       1,
 	}, seen)
+}
+
+func TestSNMPTopologyRegistryPreservesInferredLLDPAliasesWithCompactLinkHandles(t *testing.T) {
+	const (
+		linkCount  = 4
+		aliasCount = 4
+	)
+	registry := benchmarkInferredLLDPTopologyRegistry(linkCount, aliasCount)
+	options := topologyoptions.DefaultQueryOptions()
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
+
+	data, ok := registry.snapshotWithOptions(options)
+	require.True(t, ok)
+	require.Len(t, data.Links, linkCount)
+
+	actorsByHandle := make(map[topologymodel.ActorHandle]topologymodel.Actor, len(data.Actors))
+	var remote *topologymodel.Actor
+	for i := range data.Actors {
+		actor := &data.Actors[i]
+		require.False(t, actor.ActorHandle.IsZero())
+		actorsByHandle[actor.ActorHandle] = *actor
+		if actor.Match.SysName == "weak-remote" {
+			remote = actor
+		}
+	}
+	require.NotNil(t, remote)
+	require.Equal(t, []string{"10.1.0.1", "10.1.0.2", "10.1.0.3", "10.1.0.4"}, remote.Match.IPAddresses)
+	require.Equal(t, "ip:10.1.0.1,10.1.0.2,10.1.0.3,10.1.0.4", remote.ActorID)
+
+	for _, link := range data.Links {
+		require.Contains(t, actorsByHandle, link.SrcActorHandle)
+		require.Contains(t, actorsByHandle, link.DstActorHandle)
+		require.Equal(t, remote.ActorHandle, link.DstActorHandle)
+	}
+
+	payload, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(options)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, linkCount, payload.Links.Rows)
+}
+
+func BenchmarkSNMPTopologyFunctionInferredActorIDScaling(b *testing.B) {
+	tests := []struct {
+		links   int
+		aliases int
+	}{
+		{links: 512, aliases: 1},
+		{links: 512, aliases: 512},
+		{links: 1024, aliases: 1},
+		{links: 1024, aliases: 512},
+		{links: 1024, aliases: 1024},
+	}
+
+	for _, tc := range tests {
+		b.Run(fmt.Sprintf("links=%d/aliases=%d", tc.links, tc.aliases), func(b *testing.B) {
+			registry := benchmarkInferredLLDPTopologyRegistry(tc.links, tc.aliases)
+			options := topologyoptions.DefaultQueryOptions()
+			options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
+
+			data, ok := registry.snapshotWithOptions(options)
+			if !ok {
+				b.Fatal("topology snapshot is unavailable")
+			}
+			seenRemote := false
+			for _, actor := range data.Actors {
+				if actor.Match.SysName != "weak-remote" {
+					continue
+				}
+				seenRemote = true
+				if got := len(actor.Match.IPAddresses); got != tc.aliases {
+					b.Fatalf("remote aliases=%d, want %d", got, tc.aliases)
+				}
+				if tc.aliases > 1 && len(actor.ActorID) < tc.aliases*8 {
+					b.Fatalf("remote ActorID length=%d, unexpectedly short for %d aliases", len(actor.ActorID), tc.aliases)
+				}
+			}
+			if !seenRemote {
+				b.Fatal("inferred remote actor was not emitted")
+			}
+			if got := len(data.Links); got != tc.links {
+				b.Fatalf("links=%d, want %d", got, tc.links)
+			}
+
+			deps := funcDepsAdapter{registry: registry}
+			probe, ok, err := deps.Snapshot(options)
+			if err != nil || !ok || probe.Links.Rows != tc.links {
+				b.Fatalf("Function probe rows=%d ok=%t err=%v", probe.Links.Rows, ok, err)
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				payload, ok, err := deps.Snapshot(options)
+				if err != nil || !ok {
+					b.Fatalf("Function snapshot ok=%t err=%v", ok, err)
+				}
+				runtime.KeepAlive(payload)
+			}
+		})
+	}
+}
+
+func benchmarkInferredLLDPTopologyRegistry(linkCount, aliasCount int) *topologyRegistry {
+	now := time.Now()
+	cache := newTopologyCache()
+	cache.lastUpdate = now
+	cache.updateTime = now
+	cache.agentID = "benchmark-agent"
+	cache.localDevice = topologymodel.Device{
+		ChassisID:     "02:00:00:00:00:01",
+		ChassisIDType: "macAddress",
+		SysName:       "reporter",
+		ManagementIP:  "192.0.2.1",
+	}
+
+	for i := 0; i < linkCount; i++ {
+		port := fmt.Sprintf("Ethernet%d", i+1)
+		aliasIndex := i % aliasCount
+		ip := fmt.Sprintf("10.%d.%d.%d", aliasIndex/64516+1, (aliasIndex/254)%254, aliasIndex%254+1)
+		cache.lldpLocPorts[port] = &lldpLocPort{portNum: port, portID: port}
+		cache.lldpRemotes[fmt.Sprintf("%s:1", port)] = &lldpRemote{
+			localPortNum: port,
+			remIndex:     "1",
+			sysName:      "weak-remote",
+			portID:       fmt.Sprintf("remote-%d", i+1),
+			managementAddrs: []topologymodel.ManagementAddress{{
+				Address:     ip,
+				AddressType: "ipv4",
+				Source:      "lldp_remote",
+			}},
+		}
+	}
+
+	return &topologyRegistry{
+		caches:          map[*topologyCache]struct{}{cache: {}},
+		producerScopeID: "benchmark-producer",
+	}
 }
 
 func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {

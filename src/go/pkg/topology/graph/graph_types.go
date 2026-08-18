@@ -22,6 +22,7 @@ type Match struct {
 }
 
 type Actor struct {
+	ActorHandle ActorHandle       `json:"-"`
 	ActorID     string            `json:"actor_id,omitempty"`
 	ActorType   string            `json:"actor_type"`
 	Layer       string            `json:"layer"`
@@ -69,20 +70,22 @@ type LinkInference struct {
 }
 
 type Link struct {
-	Layer        string         `json:"layer"`
-	Protocol     string         `json:"protocol"`
-	LinkType     string         `json:"link_type"`
-	Direction    string         `json:"direction,omitempty"`
-	State        string         `json:"state,omitempty"`
-	SrcActorID   string         `json:"src_actor_id,omitempty"`
-	DstActorID   string         `json:"dst_actor_id,omitempty"`
-	Src          LinkEndpoint   `json:"src"`
-	Dst          LinkEndpoint   `json:"dst"`
-	DiscoveredAt *time.Time     `json:"discovered_at,omitempty"`
-	LastSeen     *time.Time     `json:"last_seen,omitempty"`
-	Display      *LinkDisplay   `json:"display,omitempty"`
-	L2           *LinkL2        `json:"l2,omitempty"`
-	Inference    *LinkInference `json:"inference,omitempty"`
+	Layer          string         `json:"layer"`
+	Protocol       string         `json:"protocol"`
+	LinkType       string         `json:"link_type"`
+	Direction      string         `json:"direction,omitempty"`
+	State          string         `json:"state,omitempty"`
+	SrcActorHandle ActorHandle    `json:"-"`
+	DstActorHandle ActorHandle    `json:"-"`
+	SrcActorID     string         `json:"src_actor_id,omitempty"`
+	DstActorID     string         `json:"dst_actor_id,omitempty"`
+	Src            LinkEndpoint   `json:"src"`
+	Dst            LinkEndpoint   `json:"dst"`
+	DiscoveredAt   *time.Time     `json:"discovered_at,omitempty"`
+	LastSeen       *time.Time     `json:"last_seen,omitempty"`
+	Display        *LinkDisplay   `json:"display,omitempty"`
+	L2             *LinkL2        `json:"l2,omitempty"`
+	Inference      *LinkInference `json:"inference,omitempty"`
 }
 
 type Graph struct {

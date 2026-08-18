@@ -3,6 +3,7 @@
 package topologyenrich
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -11,8 +12,14 @@ import (
 )
 
 type topologyL3ActorRef struct {
+	actorHandle   topologymodel.ActorHandle
 	actorID       string
+	actorOrder    int
 	endpointMatch topologymodel.Match
+}
+
+func (r topologyL3ActorRef) valid() bool {
+	return !r.actorHandle.IsZero()
 }
 
 type topologyL3ActorResolver struct {
@@ -56,13 +63,16 @@ func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymo
 	}
 
 	managedActors := make([]topologyL3ActorRef, 0, len(data.Actors))
+	actorOrder := topologyL3ActorLexicalOrder(data.Actors)
 	localMatchIndex := topologymodel.NewLocalActorMatchIndex()
 	for _, actor := range data.Actors {
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
 		}
 		ref := topologyL3ActorRef{
+			actorHandle:   actor.ActorHandle,
 			actorID:       strings.TrimSpace(actor.ActorID),
+			actorOrder:    actorOrder[actor.ActorHandle],
 			endpointMatch: graph.LinkEndpointMatch(actor.Match, topologymodel.ActorDetailManagementIP(actor)),
 		}
 		managedActors = append(managedActors, ref)
@@ -99,20 +109,20 @@ func newTopologyL3ActorResolver(data *topologymodel.Data, snapshots []topologymo
 }
 
 func (r topologyL3ActorResolver) resolve(row topologymodel.L3Interface) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byDeviceID[strings.TrimSpace(row.DeviceID)]; ok && ref.actorID != "" {
+	if ref, ok := r.byDeviceID[strings.TrimSpace(row.DeviceID)]; ok && ref.valid() {
 		return ref, true
 	}
-	if ref, ok := r.byActorID[strings.TrimSpace(row.DeviceID)]; ok && ref.actorID != "" {
+	if ref, ok := r.byActorID[strings.TrimSpace(row.DeviceID)]; ok && ref.valid() {
 		return ref, true
 	}
 	return r.resolveIPAddress(row.IP)
 }
 
 func (r topologyL3ActorResolver) resolveDeviceID(deviceID string) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byDeviceID[strings.TrimSpace(deviceID)]; ok && ref.actorID != "" {
+	if ref, ok := r.byDeviceID[strings.TrimSpace(deviceID)]; ok && ref.valid() {
 		return ref, true
 	}
-	if ref, ok := r.byActorID[strings.TrimSpace(deviceID)]; ok && ref.actorID != "" {
+	if ref, ok := r.byActorID[strings.TrimSpace(deviceID)]; ok && ref.valid() {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false
@@ -126,21 +136,21 @@ func (r topologyL3ActorResolver) resolveRouterEndpoint(routerID, ip string) (top
 }
 
 func (r topologyL3ActorResolver) resolveRouterID(routerID string) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byRouterID[topologyutil.NormalizeTopologyRouterID(routerID)]; ok && ref.actorID != "" {
+	if ref, ok := r.byRouterID[topologyutil.NormalizeTopologyRouterID(routerID)]; ok && ref.valid() {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false
 }
 
 func (r topologyL3ActorResolver) resolveIPAddress(ip string) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byIP[topologyutil.NormalizeIPAddress(ip)]; ok && ref.actorID != "" {
+	if ref, ok := r.byIP[topologyutil.NormalizeIPAddress(ip)]; ok && ref.valid() {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false
 }
 
 func (r topologyL3ActorResolver) resolveNonUnspecifiedIPAddress(ip string) (topologyL3ActorRef, bool) {
-	if ref, ok := r.byIP[topologyutil.NormalizeNonUnspecifiedIPAddress(ip)]; ok && ref.actorID != "" {
+	if ref, ok := r.byIP[topologyutil.NormalizeNonUnspecifiedIPAddress(ip)]; ok && ref.valid() {
 		return ref, true
 	}
 	return topologyL3ActorRef{}, false
@@ -148,7 +158,7 @@ func (r topologyL3ActorResolver) resolveNonUnspecifiedIPAddress(ip string) (topo
 
 func (r topologyL3ActorResolver) addUniqueDeviceID(deviceID string, ref topologyL3ActorRef) {
 	deviceID = strings.TrimSpace(deviceID)
-	if deviceID == "" || ref.actorID == "" {
+	if deviceID == "" || !ref.valid() {
 		return
 	}
 	existing, ok := r.byDeviceID[deviceID]
@@ -156,14 +166,14 @@ func (r topologyL3ActorResolver) addUniqueDeviceID(deviceID string, ref topology
 		r.byDeviceID[deviceID] = ref
 		return
 	}
-	if existing.actorID != "" && existing.actorID != ref.actorID {
+	if existing.valid() && existing.actorHandle != ref.actorHandle {
 		r.byDeviceID[deviceID] = topologyL3ActorRef{}
 	}
 }
 
 func (r topologyL3ActorResolver) addUniqueIPAddress(ip string, ref topologyL3ActorRef) {
 	ip = topologyutil.NormalizeIPAddress(ip)
-	if ip == "" || ref.actorID == "" {
+	if ip == "" || !ref.valid() {
 		return
 	}
 	existing, ok := r.byIP[ip]
@@ -171,14 +181,14 @@ func (r topologyL3ActorResolver) addUniqueIPAddress(ip string, ref topologyL3Act
 		r.byIP[ip] = ref
 		return
 	}
-	if existing.actorID != "" && existing.actorID != ref.actorID {
+	if existing.valid() && existing.actorHandle != ref.actorHandle {
 		r.byIP[ip] = topologyL3ActorRef{}
 	}
 }
 
 func (r topologyL3ActorResolver) addUniqueRouterID(routerID string, ref topologyL3ActorRef) {
 	routerID = topologyutil.NormalizeTopologyRouterID(routerID)
-	if routerID == "" || ref.actorID == "" {
+	if routerID == "" || !ref.valid() {
 		return
 	}
 	existing, ok := r.byRouterID[routerID]
@@ -186,9 +196,29 @@ func (r topologyL3ActorResolver) addUniqueRouterID(routerID string, ref topology
 		r.byRouterID[routerID] = ref
 		return
 	}
-	if existing.actorID != "" && existing.actorID != ref.actorID {
+	if existing.valid() && existing.actorHandle != ref.actorHandle {
 		r.byRouterID[routerID] = topologyL3ActorRef{}
 	}
+}
+
+func topologyL3ActorLexicalOrder(actors []topologymodel.Actor) map[topologymodel.ActorHandle]int {
+	type entry struct {
+		handle  topologymodel.ActorHandle
+		actorID string
+	}
+	entries := make([]entry, 0, len(actors))
+	for _, actor := range actors {
+		if actor.ActorHandle.IsZero() {
+			continue
+		}
+		entries = append(entries, entry{handle: actor.ActorHandle, actorID: strings.TrimSpace(actor.ActorID)})
+	}
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].actorID < entries[j].actorID })
+	order := make(map[topologymodel.ActorHandle]int, len(entries))
+	for i, entry := range entries {
+		order[entry.handle] = i
+	}
+	return order
 }
 
 func topologyL3ActorRouterIDs(actor topologymodel.Actor) []string {

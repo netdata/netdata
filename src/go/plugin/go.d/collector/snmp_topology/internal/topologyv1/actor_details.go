@@ -13,7 +13,7 @@ import (
 
 func buildSNMPTopologyV1ActorDetails(
 	actors []topologymodel.Actor,
-	actorIndex map[string]int,
+	actorIndex topologyV1ActorIndex,
 	stringsDict *topologyapi.StringDictionary,
 	portNeighborSummaries map[snmpTopologyV1PortNeighborKey]snmpTopologyV1PortNeighborSummary,
 ) (map[string]topologyapi.DetailTable, map[string]topologyapi.TableType, error) {

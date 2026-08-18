@@ -218,6 +218,24 @@ protocol detail precedence remains representative-first and actor-index ordered.
 This keeps alias-rich shared-primary groups linear in their input plus the final
 deduplication sort instead of rebuilding the growing union after every actor.
 
+Public actor IDs retain the complete reconciled identity and remain unchanged.
+Internal graph traversal and link ownership use opaque, nonzero actor handles
+instead of copying or hashing those IDs per link:
+
+- handles are generation-local, nonserialized, and unrelated to public actor
+  IDs or rendered actor row references;
+- the generic projector assigns final actor and link handles at its centralized
+  identity boundary, while later local and L3 actors receive fresh handles from
+  the same generation high-water mark;
+- shaping, collapse, focus, L3/OSPF/BGP enrichment, and rendering use handles
+  for equality and lookup, while public actor-ID ordering remains the
+  deterministic presentation order;
+- strict and probable graphs never compare raw handles across generations;
+  probable-link marking interns their public actor IDs once into request-local
+  comparison tokens;
+- the renderer validates unique actors and resolved link handles, then maps
+  handles to final actor rows without serializing the handles.
+
 The aggregate also carries the producer scope id read from the parent Agent
 registry id. L3 subnet segment actor ids use that scope so identical private
 subnets observed by different Agents do not collide after Cloud aggregation.

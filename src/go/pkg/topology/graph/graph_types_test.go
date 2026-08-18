@@ -12,6 +12,9 @@ import (
 
 func TestGraphJSONShape(t *testing.T) {
 	tm := time.Date(2026, time.June, 20, 8, 9, 10, 0, time.UTC)
+	handles := NewActorHandleAllocator()
+	actorAHandle := handles.Next()
+	actorBHandle := handles.Next()
 	payload := Graph{
 		SchemaVersion: "2.0",
 		Source:        "snmp",
@@ -20,10 +23,11 @@ func TestGraphJSONShape(t *testing.T) {
 		CollectedAt:   tm,
 		View:          "summary",
 		Actors: []Actor{{
-			ActorID:   "actor-a",
-			ActorType: "router",
-			Layer:     "3",
-			Source:    "snmp",
+			ActorHandle: actorAHandle,
+			ActorID:     "actor-a",
+			ActorType:   "router",
+			Layer:       "3",
+			Source:      "snmp",
 			Match: Match{
 				ChassisIDs:         []string{"chassis-a"},
 				MacAddresses:       []string{"00:11:22:33:44:55"},
@@ -44,13 +48,15 @@ func TestGraphJSONShape(t *testing.T) {
 			Labels:      map[string]string{"site": "lab"},
 		}},
 		Links: []Link{{
-			Layer:      "3",
-			Protocol:   "ospf",
-			LinkType:   "ospf_adjacency",
-			Direction:  "bidirectional",
-			State:      "up",
-			SrcActorID: "actor-a",
-			DstActorID: "actor-b",
+			Layer:          "3",
+			Protocol:       "ospf",
+			LinkType:       "ospf_adjacency",
+			Direction:      "bidirectional",
+			State:          "up",
+			SrcActorHandle: actorAHandle,
+			DstActorHandle: actorBHandle,
+			SrcActorID:     "actor-a",
+			DstActorID:     "actor-b",
 			Src: LinkEndpoint{
 				Match:         Match{IPAddresses: []string{"10.0.0.1"}},
 				IfIndex:       1,

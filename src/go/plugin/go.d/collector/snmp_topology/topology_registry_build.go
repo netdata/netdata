@@ -105,6 +105,7 @@ func augmentTopologySnapshotLocals(data *topologymodel.Data, snapshots []topolog
 		if !ok || index.ContainsActorID(actor.ActorID) {
 			continue
 		}
+		actor.ActorHandle = data.NextActorHandle()
 		data.Actors = append(data.Actors, actor)
 		actorIndex := len(data.Actors) - 1
 		index.AddActorID(actor.ActorID)
@@ -162,6 +163,9 @@ func buildSNMPL2TopologyData(
 			L2:    projection.Stats,
 			HasL2: true,
 		},
+	}
+	if err := data.InitializeActorHandles(); err != nil {
+		return topologymodel.Data{}, false
 	}
 	return data, true
 }

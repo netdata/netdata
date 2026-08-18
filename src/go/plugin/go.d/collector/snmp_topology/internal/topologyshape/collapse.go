@@ -67,7 +67,7 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		groupMembers[root] = append(groupMembers[root], idx)
 	}
 
-	replaceActorID := make(map[string]string)
+	replaceActor := make(map[topologymodel.ActorHandle]topologymodel.ActorHandle)
 	keep := make([]bool, len(data.Actors))
 	for i := range keep {
 		keep[i] = true
@@ -96,7 +96,7 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 			}
 			collapsedCount++
 			collapsed++
-			replaceActorID[data.Actors[idx].ActorID] = repActor.ActorID
+			replaceActor[data.Actors[idx].ActorHandle] = repActor.ActorHandle
 			member := data.Actors[idx]
 			matchLists.add(member.Match)
 			clearTopologyMatchCollapseLists(&member.Match)
@@ -128,18 +128,18 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 	data.Actors = actors
 
 	links := make([]topologymodel.Link, 0, len(data.Links))
-	seen := make(map[string]struct{}, len(data.Links))
+	seen := make(map[topologyLinkActorKeyValue]struct{}, len(data.Links))
 	for _, link := range data.Links {
-		if replacement, ok := replaceActorID[link.SrcActorID]; ok && replacement != "" {
-			link.SrcActorID = replacement
+		if replacement, ok := replaceActor[link.SrcActorHandle]; ok {
+			link.SrcActorHandle = replacement
 		}
-		if replacement, ok := replaceActorID[link.DstActorID]; ok && replacement != "" {
-			link.DstActorID = replacement
+		if replacement, ok := replaceActor[link.DstActorHandle]; ok {
+			link.DstActorHandle = replacement
 		}
-		if strings.TrimSpace(link.SrcActorID) == "" || strings.TrimSpace(link.DstActorID) == "" {
+		if link.SrcActorHandle.IsZero() || link.DstActorHandle.IsZero() {
 			continue
 		}
-		if link.SrcActorID == link.DstActorID {
+		if link.SrcActorHandle == link.DstActorHandle {
 			continue
 		}
 		key := topologyLinkActorKey(link)
