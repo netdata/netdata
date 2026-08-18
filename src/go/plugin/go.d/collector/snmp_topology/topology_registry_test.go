@@ -93,6 +93,14 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 	require.GreaterOrEqual(t, topologyStatsToV1ForTest(t, data.Stats)["links_lldp"].(int), 1)
 }
 
+func TestBuildSNMPTopologySnapshotPreservesL2BuildError(t *testing.T) {
+	_, ok, err := buildSNMPTopologySnapshot(topologymodel.ObservationAggregate{
+		L2Observations: []topologyengine.L2Observation{{}},
+	}, topologyoptions.DefaultQueryOptions())
+	require.ErrorContains(t, err, "empty device id")
+	require.False(t, ok)
+}
+
 func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCandidates(t *testing.T) {
 	clock := newReverseDNSTestClock()
 	warmed := make(chan string, 4)
@@ -153,7 +161,8 @@ func TestTopologyRegistry_ReverseDNSCandidatesExcludeDeviceAliases(t *testing.T)
 	candidates := registry.reverseDNSCandidateCollector()
 	options := defaultTopologyQueryOptionsForTest()
 	options.ResolveDNSName = candidates.lookupCached
-	data, ok := registry.snapshotWithOptions(options)
+	data, ok, err := registry.snapshotWithOptions(options)
+	require.NoError(t, err)
 
 	require.True(t, ok)
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{"198.51.100.8": {}}))
@@ -708,13 +717,14 @@ func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t
 		"Gi0/2",
 	))
 
-	data, ok := registry.snapshotWithOptions(topologyoptions.QueryOptions{
+	data, ok, err := registry.snapshotWithOptions(topologyoptions.QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
 		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
 		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
 		Depth:                  topologyoptions.DepthAllInternal,
 	})
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, topologyoptions.MapTypeLLDPCDPManaged, topologyStatsToV1ForTest(t, data.Stats)["map_type"])
 	require.Equal(t, topologyoptions.InferenceStrategyFDBMinimumKnowledge, topologyStatsToV1ForTest(t, data.Stats)["inference_strategy"])
@@ -804,20 +814,22 @@ func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManaged
 	}
 	registry.register(cache)
 
-	withoutCollapse, ok := registry.snapshotWithOptions(topologyoptions.QueryOptions{
+	withoutCollapse, ok, err := registry.snapshotWithOptions(topologyoptions.QueryOptions{
 		MapType:            topologyoptions.MapTypeAllDevicesLowConfidence,
 		ManagedDeviceFocus: topologyoptions.ManagedFocusAllDevices,
 		Depth:              topologyoptions.DepthAllInternal,
 	})
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.NotNil(t, findActorByMAC(withoutCollapse, "9c:6b:00:7b:98:c7"))
 
-	withCollapse, ok := registry.snapshotWithOptions(topologyoptions.QueryOptions{
+	withCollapse, ok, err := registry.snapshotWithOptions(topologyoptions.QueryOptions{
 		CollapseActorsByIP: true,
 		MapType:            topologyoptions.MapTypeAllDevicesLowConfidence,
 		ManagedDeviceFocus: topologyoptions.ManagedFocusAllDevices,
 		Depth:              topologyoptions.DepthAllInternal,
 	})
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.NotNil(t, findActorByMAC(withCollapse, "9c:6b:00:7b:98:c6"))
 	require.Nil(t, findActorByMAC(withCollapse, "9c:6b:00:7b:98:c7"))
@@ -923,6 +935,7 @@ func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *t
 	require.NotNil(t, baselineA)
 	require.NotContains(t, baselineA.Match.IPAddresses, "192.0.2.20")
 	require.NotContains(t, baselineA.Detail.L2.Device.ManagementAddresses, "192.0.2.20")
+	require.NotEmpty(t, baselineA.Detail.SNMP.ManagementAddresses)
 	require.Equal(t, "192.0.2.20", baselineA.Detail.SNMP.ManagementAddresses[0].Address)
 
 	options := defaultTopologyQueryOptionsForTest()

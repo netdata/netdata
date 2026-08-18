@@ -15,10 +15,10 @@ type topologyLinkDeltaKeyValue struct {
 	direction    string
 	srcActor     deltaActorRef
 	dstActor     deltaActorRef
-	srcIfIndex   string
+	srcIfIndex   int
 	srcIfName    string
 	srcPortID    string
-	dstIfIndex   string
+	dstIfIndex   int
 	dstIfName    string
 	dstPortID    string
 	bridgeDomain string
@@ -30,10 +30,10 @@ func topologyLinkDeltaKey(link topologymodel.Link, srcActor, dstActor deltaActor
 		direction:    strings.ToLower(strings.TrimSpace(link.Direction)),
 		srcActor:     srcActor,
 		dstActor:     dstActor,
-		srcIfIndex:   topologymodel.EndpointKey(link.Src, "if_index"),
+		srcIfIndex:   max(link.Src.IfIndex, 0),
 		srcIfName:    topologymodel.EndpointKey(link.Src, "if_name"),
 		srcPortID:    topologymodel.EndpointKey(link.Src, "port_id"),
-		dstIfIndex:   topologymodel.EndpointKey(link.Dst, "if_index"),
+		dstIfIndex:   max(link.Dst.IfIndex, 0),
 		dstIfName:    topologymodel.EndpointKey(link.Dst, "if_name"),
 		dstPortID:    topologymodel.EndpointKey(link.Dst, "port_id"),
 		bridgeDomain: topologyL2BridgeDomain(link),

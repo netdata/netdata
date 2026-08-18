@@ -2625,14 +2625,22 @@ func TestToGraph_CollapsedDeviceLinkDisplayUsesRepresentativeManagementIP(t *tes
 	require.True(t, detail.CollapsedByIP)
 	require.Equal(t, 2, detail.CollapsedCount)
 
+	matchedLinks := 0
 	for _, link := range data.Links {
+		matched := false
 		if link.SrcActorHandle == collapsed.ActorHandle {
 			require.Equal(t, "representative.example", link.Src.DisplayName)
+			matched = true
 		}
 		if link.DstActorHandle == collapsed.ActorHandle {
 			require.Equal(t, "representative.example", link.Dst.DisplayName)
+			matched = true
+		}
+		if matched {
+			matchedLinks++
 		}
 	}
+	require.Positive(t, matchedLinks)
 	require.NotContains(t, lookups, "192.0.2.20")
 }
 

@@ -16,11 +16,16 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 	lldpPairMetadata := buildLLDPPairMetadata(lldpLinks, lldpPairs)
 
 	for _, link := range lldpLinks {
+		managementIP := canonicalUsableIPAddress(link.remoteManagement)
+		managementIPValue := ""
+		if managementIP.IsValid() {
+			managementIPValue = managementIP.String()
+		}
 		targetID := strings.TrimSpace(lldpTargetOverrides[link.index])
 		if targetID == "" {
-			targetID = s.resolveRemote(link.remoteSysName, link.remoteChassisID, link.remoteManagement, link.remoteFallbackID)
+			targetID = s.resolveRemote(link.remoteSysName, link.remoteChassisID, managementIPValue, link.remoteFallbackID)
 		}
-		s.recordRemoteManagementAddress(targetID, link.remoteManagement)
+		s.recordRemoteManagementAddress(targetID, managementIPValue)
 
 		adj := model.Adjacency{
 			Protocol:   "lldp",
@@ -43,7 +48,11 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 	cdpPairMetadata := buildCDPPairMetadata(cdpLinks, cdpPairs)
 
 	for _, link := range cdpLinks {
-		managementIP := canonicalIP(link.remoteManagementIP)
+		managementAddr := canonicalUsableIPAddress(link.remoteManagementIP)
+		managementIP := ""
+		if managementAddr.IsValid() {
+			managementIP = managementAddr.String()
+		}
 		rawAddress := link.remoteAddressRaw
 		targetID := strings.TrimSpace(cdpTargetOverrides[link.index])
 		if targetID == "" {

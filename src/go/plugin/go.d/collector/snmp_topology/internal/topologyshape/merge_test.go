@@ -252,10 +252,10 @@ func TestTopologyLinkDeltaKeyUsesStableEndpointAndBridgeFields(t *testing.T) {
 		direction:    "bidirectional",
 		srcActor:     1,
 		dstActor:     2,
-		srcIfIndex:   "7",
+		srcIfIndex:   7,
 		srcIfName:    "Gi0/1",
 		srcPortID:    "port-a",
-		dstIfIndex:   "8",
+		dstIfIndex:   8,
 		dstIfName:    "Gi0/2",
 		dstPortID:    "port-b",
 		bridgeDomain: "vlan-10",
@@ -337,14 +337,28 @@ func TestTopologyLinkDeltaKeyDoesNotAllocatePerLink(t *testing.T) {
 	link := topologymodel.Link{
 		Protocol:  "lldp",
 		Direction: "bidirectional",
-		Src:       topologymodel.LinkEndpoint{IfName: "Gi0/1"},
-		Dst:       topologymodel.LinkEndpoint{IfName: "Gi0/2"},
+		Src:       topologymodel.LinkEndpoint{IfIndex: 12345, IfName: "Gi0/1"},
+		Dst:       topologymodel.LinkEndpoint{IfIndex: 67890, IfName: "Gi0/2"},
 	}
 
 	allocations := testing.AllocsPerRun(1000, func() {
 		topologyLinkDeltaKeySink = topologyLinkDeltaKey(link, 1, 2)
 	})
 	require.Zero(t, allocations)
+}
+
+func BenchmarkTopologyLinkDeltaKey(b *testing.B) {
+	link := topologymodel.Link{
+		Protocol:  "lldp",
+		Direction: "bidirectional",
+		Src:       topologymodel.LinkEndpoint{IfIndex: 12345, IfName: "Gi0/1"},
+		Dst:       topologymodel.LinkEndpoint{IfIndex: 67890, IfName: "Gi0/2"},
+	}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		topologyLinkDeltaKeySink = topologyLinkDeltaKey(link, 1, 2)
+	}
 }
 
 func TestMarkProbableDeltaLinksPreservesExistingConfidenceAndAttachmentMode(t *testing.T) {

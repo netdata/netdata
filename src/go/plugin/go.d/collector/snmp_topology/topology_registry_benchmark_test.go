@@ -17,7 +17,8 @@ func TestSNMPTopologyRegistryKeepsLogicalLinkEndpointIPHintsConstantSized(t *tes
 	const aliasCount = 256
 
 	registry := benchmarkAliasRichTopologyRegistry(2, aliasCount, false, false, 1)
-	data, ok := registry.snapshotWithOptions(topologyoptions.DefaultQueryOptions())
+	data, ok, err := registry.snapshotWithOptions(topologyoptions.DefaultQueryOptions())
+	require.NoError(t, err)
 	require.True(t, ok)
 
 	selectedIPByActorHandle := make(map[topologymodel.ActorHandle]string)
@@ -65,7 +66,8 @@ func TestSNMPTopologyRegistryPreservesInferredLLDPAliasesWithCompactLinkHandles(
 	options := topologyoptions.DefaultQueryOptions()
 	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 
-	data, ok := registry.snapshotWithOptions(options)
+	data, ok, err := registry.snapshotWithOptions(options)
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.Len(t, data.Links, linkCount)
 
@@ -113,7 +115,10 @@ func BenchmarkSNMPTopologyFunctionInferredActorIDScaling(b *testing.B) {
 			options := topologyoptions.DefaultQueryOptions()
 			options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 
-			data, ok := registry.snapshotWithOptions(options)
+			data, ok, err := registry.snapshotWithOptions(options)
+			if err != nil {
+				b.Fatalf("build topology snapshot: %v", err)
+			}
 			if !ok {
 				b.Fatal("topology snapshot is unavailable")
 			}

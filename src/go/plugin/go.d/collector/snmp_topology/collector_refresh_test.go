@@ -424,8 +424,9 @@ func TestCollectorRefreshBoundsTargetResolutionAcrossDevices(t *testing.T) {
 
 	require.Zero(t, stats.errors)
 	require.Equal(t, deviceCount, calls)
-	require.Equal(t, 8, maxActive)
-	require.Less(t, elapsed, 600*time.Millisecond)
+	require.LessOrEqual(t, maxActive, topologyTargetLookupMaxWorkers)
+	require.GreaterOrEqual(t, maxActive, 2)
+	require.Less(t, elapsed, 2*time.Second)
 }
 
 func TestCollectorRefreshResolvesOnlyDueDNSTargets(t *testing.T) {

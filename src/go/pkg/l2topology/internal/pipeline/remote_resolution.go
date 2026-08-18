@@ -154,7 +154,7 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 
 func (s *l2BuildState) recordRemoteManagementAddress(deviceID, value string) {
 	deviceID = strings.TrimSpace(deviceID)
-	addr := canonicalAddr(value)
+	addr := canonicalUsableIPAddress(value)
 	if deviceID == "" || !addr.IsValid() {
 		return
 	}

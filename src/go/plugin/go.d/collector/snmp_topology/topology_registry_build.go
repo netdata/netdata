@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -15,9 +16,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 )
 
-func buildSNMPTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
+func buildSNMPTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
 	if len(aggregate.L2Observations) == 0 {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, nil
 	}
 
 	if options.MapType != topologyoptions.MapTypeAllDevicesLowConfidence {
@@ -27,58 +28,67 @@ func buildSNMPTopologySnapshot(aggregate topologymodel.ObservationAggregate, opt
 	return buildProbableTopologySnapshot(aggregate, options)
 }
 
-func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
-	data, ok := buildSNMPL2TopologyData(
+func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
+	data, ok, err := buildSNMPL2TopologyData(
 		aggregate.L2Observations,
 		aggregate.AgentID,
 		aggregate.LocalDeviceID,
 		aggregate.CollectedAt,
 		options,
 	)
+	if err != nil {
+		return topologymodel.Data{}, false, err
+	}
 	if !ok {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, nil
 	}
 	augmentTopologySnapshotLocals(&data, aggregate.Snapshots)
 	topologyshape.ApplyPolicies(&data, options)
 	topologyenrich.ApplyLayer3(&data, aggregate)
 	topologyshape.ApplyDepthFocusFilter(&data, options)
-	return data, true
+	return data, true, nil
 }
 
-func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
+func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
 	strictOptions := options
 	strictOptions.MapType = topologyoptions.MapTypeHighConfidenceInferred
-	strictData, strictOK := buildSNMPL2TopologyData(
+	strictData, strictOK, err := buildSNMPL2TopologyData(
 		aggregate.L2Observations,
 		aggregate.AgentID,
 		aggregate.LocalDeviceID,
 		aggregate.CollectedAt,
 		strictOptions,
 	)
+	if err != nil {
+		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
+	}
 	if !strictOK {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, nil
 	}
 	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
 	topologyshape.ApplyPolicies(&strictData, strictOptions)
 
 	probableOptions := options
 	probableOptions.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
-	probableData, probableOK := buildSNMPL2TopologyData(
+	probableData, probableOK, err := buildSNMPL2TopologyData(
 		aggregate.L2Observations,
 		aggregate.AgentID,
 		aggregate.LocalDeviceID,
 		aggregate.CollectedAt,
 		probableOptions,
 	)
+	if err != nil {
+		return topologymodel.Data{}, false, fmt.Errorf("build probable topology: %w", err)
+	}
 	if !probableOK {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, nil
 	}
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
 	topologyshape.ApplyPolicies(&probableData, probableOptions)
 	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
 	topologyenrich.ApplyLayer3(&probableData, aggregate)
 	topologyshape.ApplyDepthFocusFilter(&probableData, options)
-	return probableData, true
+	return probableData, true, nil
 }
 
 func augmentTopologySnapshotLocals(data *topologymodel.Data, snapshots []topologymodel.ObservationSnapshot) {
@@ -119,9 +129,9 @@ func buildSNMPL2TopologyData(
 	localDeviceID string,
 	collectedAt time.Time,
 	options topologyoptions.QueryOptions,
-) (topologymodel.Data, bool) {
+) (topologymodel.Data, bool, error) {
 	if len(observations) == 0 {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, nil
 	}
 
 	result, err := topologyengine.BuildL2ResultFromObservations(observations, topologyengine.DiscoverOptions{
@@ -132,7 +142,7 @@ func buildSNMPL2TopologyData(
 		EnableSTP:    true,
 	})
 	if err != nil {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, fmt.Errorf("build L2 topology result: %w", err)
 	}
 
 	projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{
@@ -165,9 +175,9 @@ func buildSNMPL2TopologyData(
 		},
 	}
 	if err := data.InitializeActorHandles(); err != nil {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, fmt.Errorf("initialize topology actor handles: %w", err)
 	}
-	return data, true
+	return data, true, nil
 }
 
 func topologyActorsFromProjection(actors []graph.Actor, details map[string]topologyengine.ProjectionActorDetail) []topologymodel.Actor {

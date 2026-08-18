@@ -43,7 +43,7 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 	if device.Hostname == "" {
 		device.Hostname = device.ID
 	}
-	managementAddr := canonicalAddr(obs.ManagementIP)
+	managementAddr := canonicalUsableIPAddress(obs.ManagementIP)
 	managementAliases := canonicalManagementAliases(obs.ManagementAliases)
 	if incomingManaged {
 		addresses := make(map[string]netip.Addr, 1+len(managementAliases))
@@ -203,8 +203,8 @@ func (s *l2BuildState) registerObservation(obs model.L2Observation) error {
 func canonicalManagementAliases(values []string) []netip.Addr {
 	aliases := make(map[string]netip.Addr, len(values))
 	for _, value := range values {
-		addr := canonicalAddr(value)
-		if !isUsableAliasIPAddress(addr) {
+		addr := canonicalUsableIPAddress(value)
+		if !addr.IsValid() {
 			continue
 		}
 		aliases[addr.String()] = addr
@@ -215,7 +215,7 @@ func canonicalManagementAliases(values []string) []netip.Addr {
 func (s *l2BuildState) recordDirectManagementAddress(deviceID string, addr netip.Addr, selectedPrimary bool) {
 	deviceID = strings.TrimSpace(deviceID)
 	addr = addr.Unmap()
-	if deviceID == "" || !addr.IsValid() {
+	if deviceID == "" || !isUsableAliasIPAddress(addr) {
 		return
 	}
 
@@ -323,6 +323,12 @@ func selectObservedManagementIP(existing, incoming netip.Addr, existingDirect, i
 			return incoming, true
 		}
 		return existing, true
+	}
+	if !existingDirect && existing.IsPrivate() != incoming.IsPrivate() {
+		if incoming.IsPrivate() {
+			return incoming, false
+		}
+		return existing, false
 	}
 	if incoming.Compare(existing) < 0 {
 		return incoming, incomingDirect
