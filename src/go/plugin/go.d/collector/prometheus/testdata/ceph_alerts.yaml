@@ -105,6 +105,20 @@ adaptation_contracts:
       - Netdata selects the latest matching chart/alert instance by equal label overlap instead of PromQL vector matching
       - the source pending state is not reproduced for current composite signals
       - missing or ambiguous operands become NaN rather than a fabricated clear or active state
+  per_image_current_timestamp_difference:
+    preserved:
+      - per-image local-versus-remote snapshot timestamp inequality
+      - ceph-exporter per daemon/image/namespace/pool identity
+      - source severity and notification policy
+    differences:
+      - Netdata compares the latest stored timestamp dimensions on the existing per-image chart
+      - the source 1-minute pending state is not reproduced for the current timestamp inequality
+      - non-finite timestamps become NaN rather than a false synchronized or unsynchronized state
+  rejected_rule:
+    preserved:
+      - source rule identity and exact source expression
+    differences:
+      - no Netdata alert or derived chart is implemented because the source semantic is invalid or redundant
   corrected_sensor_policy:
     preserved:
       - source sensor-family intent and severity
@@ -932,6 +946,266 @@ alerts:
       condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 80)'
       recipient: silent
       adaptation: corrected_sensor_policy
+  ceph_filesystem_damaged:
+    sow_id: CEPH-006
+    source_alert: CephFilesystemDamaged
+    source:
+      expression: 'ceph_health_detail{name="MDS_DAMAGE"} > 0'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 254, squid: 266, tentacle: 264}
+      definition_sha256:
+        reef: 72f0f958515b66ab624f7d9c8418f6ba80839be530107b647116bdfef95237f3
+        squid: 72f0f958515b66ab624f7d9c8418f6ba80839be530107b647116bdfef95237f3
+        tentacle: de5eb9c55bfdfff6dfb4df1b6bf38298d648d80c90e20e23bbea137974223cac
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=MDS_DAMAGE
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_filesystem_degraded:
+    sow_id: CEPH-007
+    source_alert: CephFilesystemDegraded
+    source:
+      expression: 'ceph_health_detail{name="FS_DEGRADED"} > 0'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 276, squid: 288, tentacle: 286}
+      definition_sha256:
+        reef: 79e20a41eba3f59560365126ea00dae0722772394c5611da120bb893f1b6ac59
+        squid: 79e20a41eba3f59560365126ea00dae0722772394c5611da120bb893f1b6ac59
+        tentacle: 62a25086e294d0d5813cfde820b259f4df0e1dda564abe0f725a08a2460dab32
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=FS_DEGRADED
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_filesystem_failure_no_standby:
+    sow_id: CEPH-008
+    source_alert: CephFilesystemFailureNoStandby
+    source:
+      expression: 'ceph_health_detail{name="FS_WITH_FAILED_MDS"} > 0'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 307, squid: 319, tentacle: 317}
+      definition_sha256:
+        reef: 2c8605a9dec384e3a7a3e8c3e0fb9dd446e8a222dcd228f8451fe370a9be08c2
+        squid: 2c8605a9dec384e3a7a3e8c3e0fb9dd446e8a222dcd228f8451fe370a9be08c2
+        tentacle: 63229778a5d8886a888214f64f95eb7f5a9360351588b91a5a52e061d28db720
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=FS_WITH_FAILED_MDS
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_filesystem_insufficient_standby:
+    sow_id: CEPH-009
+    source_alert: CephFilesystemInsufficientStandby
+    source:
+      expression: 'ceph_health_detail{name="MDS_INSUFFICIENT_STANDBY"} > 0'
+      persistence: 1m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 297, squid: 309, tentacle: 307}
+      definition_sha256:
+        reef: 9212f1408c37b22b48bf21c5b3e75803b5b3e71e129bc4d5104b3f170181e207
+        squid: 9212f1408c37b22b48bf21c5b3e75803b5b3e71e129bc4d5104b3f170181e207
+        tentacle: b9d45525808dfe6f6eea4eb0cf88c36e314ae420b7ec2f6517edf4740ad98696
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=MDS_INSUFFICIENT_STANDBY
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: observed_binary_window
+  ceph_filesystem_mds_ranks_low:
+    sow_id: CEPH-010
+    source_alert: CephFilesystemMDSRanksLow
+    source:
+      expression: 'ceph_health_detail{name="MDS_UP_LESS_THAN_MAX"} > 0'
+      persistence: 1m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 287, squid: 299, tentacle: 297}
+      definition_sha256:
+        reef: ef973b812ca36d7a81f8e4ffa9bc1519f763c259d333a6b6ec02c7dce4840057
+        squid: ef973b812ca36d7a81f8e4ffa9bc1519f763c259d333a6b6ec02c7dce4840057
+        tentacle: 3f04c6cfe9fe27d21d21b48b9618558b31a7d7b4d4e62024c13e0e796d47fd27
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=MDS_UP_LESS_THAN_MAX
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: observed_binary_window
+  ceph_filesystem_offline:
+    sow_id: CEPH-011
+    source_alert: CephFilesystemOffline
+    source:
+      expression: 'ceph_health_detail{name="MDS_ALL_DOWN"} > 0'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 265, squid: 277, tentacle: 275}
+      definition_sha256:
+        reef: 6e26074baff4517d532657495f258ffed3dccbb7d4a0f1b6853771fa59e4bb27
+        squid: 6e26074baff4517d532657495f258ffed3dccbb7d4a0f1b6853771fa59e4bb27
+        tentacle: 5fc6b7ff315496d9dac72ecb8540f9812fabe288c10a0659e403b58e2590180c
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=MDS_ALL_DOWN
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_filesystem_read_only:
+    sow_id: CEPH-012
+    source_alert: CephFilesystemReadOnly
+    source:
+      expression: 'ceph_health_detail{name="MDS_HEALTH_READ_ONLY"} > 0'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 318, squid: 330, tentacle: 328}
+      definition_sha256:
+        reef: 1748e2ac9fe8670090c677e24beb5e83e032b8ca3bbdd373740a7e1ecdf51c4b
+        squid: 1748e2ac9fe8670090c677e24beb5e83e032b8ca3bbdd373740a7e1ecdf51c4b
+        tentacle: 87ba15677f3f2b942d284a4071c8e71e2b648d17248dd0d0ddc5f5fc29496aea
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.health.health_checks.state
+      labels: name=MDS_HEALTH_READ_ONLY
+      lookup: min -1m unaligned of value
+      units: status
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: sysadmin
+      adaptation: observed_binary_window
+  ceph_rbd_mirror_images_not_in_sync:
+    sow_id: CEPH-056
+    source_alert: CephRBDMirrorImagesNotInSync
+    source:
+      expressions:
+        reef: 'sum by (ceph_daemon, image, namespace, pool) (topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_local_timestamp) - topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_remote_timestamp)) != 0'
+        squid: 'sum by (ceph_daemon, image, namespace, pool) (topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_local_timestamp) - topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_remote_timestamp)) != 0'
+        tentacle: 'sum by (cluster, ceph_daemon, image, namespace, pool) (topk by (cluster, ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_local_timestamp) - topk by (cluster, ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_remote_timestamp)) != 0'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 753, squid: 765, tentacle: 853}
+      definition_sha256:
+        reef: 8970913636aa3c0e7cc30424ebe7add2f84edb4788f824135f3885b1759bb8c3
+        squid: 8970913636aa3c0e7cc30424ebe7add2f84edb4788f824135f3885b1759bb8c3
+        tentacle: e58c14fb0337cfb50ab51ec0210a6a2bf559a50c456ac493b349d3f894898f7f
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: ceph_exporter
+      context: prometheus.ceph.rbd_mirror.snapshot_replication.timestamp
+      calc: '($local_timestamp == nan or $local_timestamp == inf or $remote_timestamp == nan or $remote_timestamp == inf or $local_timestamp < 0 or $remote_timestamp < 0) ? (nan) : ($local_timestamp - $remote_timestamp)'
+      units: seconds
+      condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this != 0)'
+      recipient: sysadmin
+      adaptation: per_image_current_timestamp_difference
+  ceph_rbd_mirror_image_transfer_bandwidth_high:
+    sow_id: CEPH-055
+    source_alert: CephRBDMirrorImageTransferBandwidthHigh
+    source:
+      expressions:
+        reef: 'rate(ceph_rbd_mirror_journal_replay_bytes[30m]) > 0.80'
+        squid: 'rate(ceph_rbd_mirror_journal_replay_bytes[30m]) > 0.80'
+        tentacle: 'rate(ceph_rbd_mirror_journal_replay_bytes[30m]) > 0.80'
+      persistence: 1m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 773, squid: 785, tentacle: 873}
+      definition_sha256:
+        reef: 3a7ca6fcbfd8a9648b43d129310b25f6fdc7f52e759b9ffa675e594a1a7fddb1
+        squid: 3a7ca6fcbfd8a9648b43d129310b25f6fdc7f52e759b9ffa675e594a1a7fddb1
+        tentacle: 9cb36cb3a43ace0cbb87ea6caa067b864e1fa826d2e960f11beb498b4812c4a8
+    netdata:
+      disposition: reject
+      fidelity: UNSUPPORTED
+      owner: none
+      reason: 'Byte rate is compared with dimensionless 0.80 and no capacity denominator exists.'
+      adaptation: rejected_rule
+  ceph_rbd_mirror_images_not_in_sync_very_high:
+    sow_id: CEPH-057
+    source_alert: CephRBDMirrorImagesNotInSyncVeryHigh
+    source:
+      expressions:
+        reef: 'count by (ceph_daemon) ((topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_local_timestamp) - topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_remote_timestamp)) != 0) > (sum by (ceph_daemon) (ceph_rbd_mirror_snapshot_snapshots)*.1)'
+        squid: 'count by (ceph_daemon) ((topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_local_timestamp) - topk by (ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_remote_timestamp)) != 0) > (sum by (ceph_daemon) (ceph_rbd_mirror_snapshot_snapshots)*.1)'
+        tentacle: 'count by (ceph_daemon, cluster) ((topk by (cluster, ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_local_timestamp) - topk by (cluster, ceph_daemon, image, namespace, pool) (1, ceph_rbd_mirror_snapshot_image_remote_timestamp)) != 0) > (sum by (ceph_daemon, cluster) (ceph_rbd_mirror_snapshot_snapshots)*.1)'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 763, squid: 775, tentacle: 863}
+      definition_sha256:
+        reef: 3132c55422fade0e024ec542dd55893b465d3b3cb95700c8991ea0f24bcc1a46
+        squid: 3132c55422fade0e024ec542dd55893b465d3b3cb95700c8991ea0f24bcc1a46
+        tentacle: 3a5769edfc0a643ade62008c9b7b44fbb1a3c570732faf2cf3b1f4180c09d349
+    netdata:
+      disposition: reject
+      fidelity: UNSUPPORTED
+      owner: none
+      reason: Aggregate escalation is redundant with the per-image hard alert and expensive Dashboard enumeration is not a valid threshold denominator.
+      adaptation: rejected_rule
+  ceph_rbd_mirror_images_per_daemon_high:
+    sow_id: CEPH-058
+    source_alert: CephRBDMirrorImagesPerDaemonHigh
+    source:
+      expressions:
+        reef: 'sum by (ceph_daemon, namespace) (ceph_rbd_mirror_snapshot_image_snapshots) > 100'
+        squid: 'sum by (ceph_daemon, namespace) (ceph_rbd_mirror_snapshot_image_snapshots) > 100'
+        tentacle: 'sum by (cluster, ceph_daemon, namespace) (ceph_rbd_mirror_snapshot_image_snapshots) > 100'
+      persistence: 1m
+      severity: critical
+      releases: [reef, squid, tentacle]
+      lines: {reef: 743, squid: 755, tentacle: 843}
+      definition_sha256:
+        reef: fdd26da31520059866e0f3a977bb15a2b76ad1e9ae801af87fd59eefc379e14b
+        squid: fdd26da31520059866e0f3a977bb15a2b76ad1e9ae801af87fd59eefc379e14b
+        tentacle: 00df93373a4f8394a30ec1d4270d6d7a75225416a2f47e5f9ceb0dc0daa9b515
+    netdata:
+      disposition: reject
+      fidelity: UNSUPPORTED
+      owner: none
+      reason: Summed cumulative per-image snapshot counters are not active-image inventory and can remain above the threshold after historical activity.
+      adaptation: rejected_rule
   ceph_osd_all_up:
     sow_id: CEPH-040-HELPER
     source_alert: CephObjectMissing
