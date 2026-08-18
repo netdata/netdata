@@ -20,19 +20,25 @@ import (
 // counter history as one interval's activity.  This also repeats whenever a PID
 // re-enters the BPF map or the producer restarts, so it has to be handled here,
 // once, rather than in each consumer.
-func buildDCStatPublish(current, previous netdataPublishDCStatPid, ct uint64, hasPrevious bool) netdataPublishDCStat {
+func buildDCStatPublish(
+	current, previous netdataPublishDCStatPid,
+	ct uint64,
+	hasPrevious bool,
+	updateEverySec uint32,
+) netdataPublishDCStat {
 	if !hasPrevious {
-		return netdataPublishDCStat{Ct: ct, Curr: current, Prev: current}
+		return netdataPublishDCStat{Ct: ct, Curr: current, Prev: current, UpdateEverySec: updateEverySec}
 	}
 
 	reference := diffCounters(current.CacheAccess, previous.CacheAccess)
 
 	return netdataPublishDCStat{
-		Ct:          ct,
-		Ratio:       dcstatHitRatio(reference, diffCounters(current.NotFound, previous.NotFound)),
-		CacheAccess: reference,
-		Curr:        current,
-		Prev:        previous,
+		Ct:             ct,
+		Ratio:          dcstatHitRatio(reference, diffCounters(current.NotFound, previous.NotFound)),
+		CacheAccess:    reference,
+		Curr:           current,
+		Prev:           previous,
+		UpdateEverySec: updateEverySec,
 	}
 }
 
@@ -65,7 +71,10 @@ func (s *ebpfSharedMemoryStore) ClearDCStatApps() {
 //
 // dcstat keeps its own ct/miss bookkeeping because its BPF map advances
 // independently of cachestat's.
-func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSnapshot) []uint32 {
+func (s *ebpfSharedMemoryStore) UpdateDCStatApps(
+	apps []libbpfloader.DCStatAppSnapshot,
+	updateEverySec uint32,
+) []uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -151,7 +160,7 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(apps []libbpfloader.DCStatAppSn
 		copy(ident.comm[:], app.Comm[:])
 		ident.ppid = app.Ppid
 
-		s.dcstatData[app.Pid] = buildDCStatPublish(current, previous, publishCt, hasPrevious)
+		s.dcstatData[app.Pid] = buildDCStatPublish(current, previous, publishCt, hasPrevious, updateEverySec)
 		s.dcstatIdent[app.Pid] = ident
 		pids, ordered = appendAscending(pids, app.Pid, ordered)
 	}

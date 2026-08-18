@@ -10,13 +10,14 @@ func TestBuildDCStatPublish(t *testing.T) {
 	current := netdataPublishDCStatPid{CacheAccess: 1100, FileSystem: 260, NotFound: 60}
 	previous := netdataPublishDCStatPid{CacheAccess: 1000, FileSystem: 200, NotFound: 50}
 
-	got := buildDCStatPublish(current, previous, 1234, true)
+	got := buildDCStatPublish(current, previous, 1234, true, 10)
 	want := netdataPublishDCStat{
-		Ct:          1234,
-		Ratio:       90, // interval: reference +100, not_found +10
-		CacheAccess: 100,
-		Curr:        current,
-		Prev:        previous,
+		Ct:             1234,
+		Ratio:          90, // interval: reference +100, not_found +10
+		CacheAccess:    100,
+		Curr:           current,
+		Prev:           previous,
+		UpdateEverySec: 10,
 	}
 
 	if got != want {
@@ -30,7 +31,7 @@ func TestBuildDCStatPublishIdleRatioIsZero(t *testing.T) {
 	// be unified.
 	current := netdataPublishDCStatPid{CacheAccess: 1000, FileSystem: 200, NotFound: 50}
 
-	got := buildDCStatPublish(current, current, 1234, true)
+	got := buildDCStatPublish(current, current, 1234, true, 10)
 	if got.Ratio != 0 {
 		t.Fatalf("idle ratio = %d, want 0", got.Ratio)
 	}
@@ -45,7 +46,7 @@ func TestBuildDCStatPublishIdleRatioIsZero(t *testing.T) {
 func TestBuildDCStatPublishFirstSampleSelfBaselines(t *testing.T) {
 	current := netdataPublishDCStatPid{CacheAccess: 1000, FileSystem: 200, NotFound: 50}
 
-	got := buildDCStatPublish(current, netdataPublishDCStatPid{}, 7, false)
+	got := buildDCStatPublish(current, netdataPublishDCStatPid{}, 7, false, 10)
 	if got.Ratio != 0 || got.CacheAccess != 0 {
 		t.Fatalf("first sample = %+v, want zero ratio and delta", got)
 	}
@@ -78,7 +79,7 @@ func TestDCStatStoreUpdateApps(t *testing.T) {
 			NotFound:    8,
 			Comm:        [libbpfloader.DCStatAppCommLen]byte{'b', 'e', 't', 'a'},
 		},
-	})
+	}, 10)
 
 	got := store.Snapshot()
 	if len(got) != 2 {
@@ -106,12 +107,12 @@ func TestDCStatStoreFlagsStaleAfterStaleCycles(t *testing.T) {
 	app := libbpfloader.DCStatAppSnapshot{Pid: 42, Ppid: 1, Ct: 100, CacheAccess: 10}
 
 	// First call establishes the ct baseline — no stale PIDs yet.
-	if stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}); len(stale) != 0 {
+	if stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10); len(stale) != 0 {
 		t.Fatalf("cycle 0 (baseline): unexpected stale %v", stale)
 	}
 
 	for i := 1; i < ebpfStaleCycles; i++ {
-		if stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}); len(stale) != 0 {
+		if stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10); len(stale) != 0 {
 			t.Fatalf("cycle %d: unexpected stale %v (threshold not yet reached)", i, stale)
 		}
 		if len(store.Snapshot()) != 1 {
@@ -119,7 +120,7 @@ func TestDCStatStoreFlagsStaleAfterStaleCycles(t *testing.T) {
 		}
 	}
 
-	stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+	stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10)
 	if len(stale) != 1 || stale[0] != 42 {
 		t.Fatalf("expected stale candidate for PID 42, got stale=%v", stale)
 	}
@@ -132,11 +133,11 @@ func TestDCStatStoreNoFlagWhenCountersAdvance(t *testing.T) {
 	app := libbpfloader.DCStatAppSnapshot{Pid: 7, Ct: 100, CacheAccess: 10}
 
 	for range ebpfStaleCycles {
-		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10)
 	}
 
 	app.CacheAccess = 20
-	if stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}); len(stale) != 0 {
+	if stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10); len(stale) != 0 {
 		t.Fatalf("expected no stale flag after the counters advanced, got stale=%v", stale)
 	}
 }
@@ -149,14 +150,14 @@ func TestDCStatStoreEvictsExitedPIDs(t *testing.T) {
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 10, Ct: 100, CacheAccess: 5},
 		{Pid: 20, Ct: 100, CacheAccess: 5},
-	})
+	}, 10)
 	if len(store.Snapshot()) != 2 {
 		t.Fatalf("cycle 1: Snapshot() len = %d, want 2", len(store.Snapshot()))
 	}
 
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 20, Ct: 200, CacheAccess: 9},
-	})
+	}, 10)
 	snap := store.Snapshot()
 	if len(snap) != 1 || snap[0].pid != 20 {
 		t.Fatalf("cycle 2: Snapshot() = %+v, want only PID 20", snap)
@@ -176,7 +177,7 @@ func TestSharedStoreMergesAllThreeModules(t *testing.T) {
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 10, Ppid: 1, Ct: 100, CacheAccess: 7},
 		{Pid: 20, Ppid: 1, Ct: 100, CacheAccess: 9},
-	})
+	}, 10)
 	// Two cycles so the socket delta is non-zero on the second one.
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 10}, {PID: 40}}, 10)
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 10, BytesSent: 1000}, {PID: 40, BytesSent: 5}}, 10)
@@ -223,7 +224,7 @@ func TestSharedStoreMergesAllThreeModules(t *testing.T) {
 func TestMarkDCStatInactiveClearsOnlyDCStat(t *testing.T) {
 	store := NewEbpfSharedMemoryStore()
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 1, Ct: 1}})
-	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 1, Ct: 1}})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 1, Ct: 1}}, 10)
 
 	store.MarkDCStatInactive()
 	if store.activeModules&ebpfgoSHMFlagDCStat != 0 {
@@ -249,7 +250,7 @@ func TestDCStatStoreKeepsBaselineForIdlePID(t *testing.T) {
 	// Baseline, then enough unchanged cycles to be flagged as a stale candidate.
 	for range ebpfStaleCycles + 1 {
 		busy.CacheAccess += 10
-		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app, busy})
+		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app, busy}, 10)
 	}
 	if snap := store.Snapshot(); len(snap) != 1 || snap[0].pid != 43 {
 		t.Fatalf("a stale candidate must not be published as a live row, got %+v", snap)
@@ -260,7 +261,7 @@ func TestDCStatStoreKeepsBaselineForIdlePID(t *testing.T) {
 	app.CacheAccess = 1100
 	app.NotFound = 110
 	busy.CacheAccess += 10
-	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app, busy})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app, busy}, 10)
 
 	snap := store.Snapshot()
 	if len(snap) != 2 || snap[0].pid != 42 {
@@ -284,7 +285,7 @@ func TestClearDCStatAppsDropsRowsAndFlag(t *testing.T) {
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 10, Ppid: 1, Ct: 100, CacheAccess: 1000, NotFound: 100},
 		{Pid: 20, Ppid: 1, Ct: 100, CacheAccess: 50},
-	})
+	}, 10)
 
 	store.ClearDCStatApps()
 
@@ -315,13 +316,13 @@ func TestClearDCStatAppsKeepsBaseline(t *testing.T) {
 	store := NewEbpfSharedMemoryStore()
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 10, Ct: 100, CacheAccess: 1000, NotFound: 100},
-	})
+	}, 10)
 
 	store.ClearDCStatApps() // failed cycle
 
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 10, Ct: 200, CacheAccess: 1100, NotFound: 110},
-	})
+	}, 10)
 
 	snap := store.Snapshot()
 	if len(snap) != 1 {
@@ -346,11 +347,11 @@ func TestDCStatStoreEmptySnapshotPreservesBaseline(t *testing.T) {
 
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 10, Ct: 100, CacheAccess: 1000, NotFound: 100},
-	})
-	store.UpdateDCStatApps(nil) // empty cycle: nothing to publish, baseline must survive
+	}, 10)
+	store.UpdateDCStatApps(nil, 10) // empty cycle: nothing to publish, baseline must survive
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 10, Ct: 200, CacheAccess: 1100, NotFound: 110},
-	})
+	}, 10)
 
 	snap := store.Snapshot()
 	if len(snap) != 1 {
@@ -394,7 +395,7 @@ func TestCachestatStoreEmptySnapshotPreservesBaseline(t *testing.T) {
 func TestSharedStoreModulesUpdateIndependently(t *testing.T) {
 	store := NewEbpfSharedMemoryStore()
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ppid: 1, Ct: 100, MarkPageAccessed: 50}})
-	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 20, Ppid: 1, Ct: 100, CacheAccess: 9}})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 20, Ppid: 1, Ct: 100, CacheAccess: 9}}, 10)
 
 	// cachestat alone updates: PID 20's dcstat row must survive.
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{{Pid: 10, Ppid: 1, Ct: 200, MarkPageAccessed: 90}})
@@ -404,7 +405,7 @@ func TestSharedStoreModulesUpdateIndependently(t *testing.T) {
 	}
 
 	// dcstat alone updates: PID 10's cachestat row must survive.
-	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 20, Ppid: 1, Ct: 200, CacheAccess: 19}})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{{Pid: 20, Ppid: 1, Ct: 200, CacheAccess: 19}}, 10)
 	snap = store.Snapshot()
 	if len(snap) != 2 || snap[0].pid != 10 || snap[0].cachestat.Current.MarkPageAccessed != 90 {
 		t.Fatalf("cachestat row lost when only dcstat updated: %+v", snap)
@@ -430,7 +431,7 @@ func TestDCStatFreshnessIgnoresBPFCt(t *testing.T) {
 			// must already be non-zero or the consumers' `ct > 0` gate rejects it.
 			store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 				{Pid: 7, Ct: bpfCt, CacheAccess: 100, FileSystem: 10, NotFound: 5},
-			})
+			}, 10)
 			first := store.Snapshot()[0].dc
 			if first.Ct == 0 {
 				t.Fatalf("first sample published ct = 0; consumers gate on ct > 0")
@@ -442,7 +443,7 @@ func TestDCStatFreshnessIgnoresBPFCt(t *testing.T) {
 			for cycle, access := range []uint64{160, 190} {
 				store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 					{Pid: 7, Ct: bpfCt, CacheAccess: access, FileSystem: 10, NotFound: 5},
-				})
+				}, 10)
 				got := store.Snapshot()[0].dc
 				if got.Ct <= prevCt {
 					t.Fatalf("cycle %d: ct = %d, want > %d (activity must advance the token)",
@@ -459,7 +460,7 @@ func TestDCStatFreshnessIgnoresBPFCt(t *testing.T) {
 			// token here would make the consumers re-add the already-counted delta.
 			store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 				{Pid: 7, Ct: bpfCt, CacheAccess: 190, FileSystem: 10, NotFound: 5},
-			})
+			}, 10)
 			if got := store.Snapshot()[0].dc; got.Ct != prevCt {
 				t.Fatalf("idle cycle: ct = %d, want it held at %d", got.Ct, prevCt)
 			}
@@ -477,7 +478,7 @@ func TestDCStatStaleUsesCountersNotCt(t *testing.T) {
 		stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 			// Ct pinned at 0, as the CO-RE base object leaves it.
 			{Pid: 7, Ct: 0, CacheAccess: uint64(100 + cycle*10)},
-		})
+		}, 10)
 		if len(stale) != 0 {
 			t.Fatalf("cycle %d: active PID flagged stale %v", cycle, stale)
 		}
@@ -488,7 +489,7 @@ func TestDCStatStaleUsesCountersNotCt(t *testing.T) {
 	for cycle := range ebpfStaleCycles + 1 {
 		stale := store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 			{Pid: 7, Ct: 0, CacheAccess: uint64(100 + (ebpfStaleCycles+1)*10)},
-		})
+		}, 10)
 		if len(stale) > 0 {
 			flagged = append(flagged, cycle)
 		}
@@ -562,7 +563,7 @@ func TestDCStatTokensAreComparableAcrossPIDs(t *testing.T) {
 	// A long-lived PID is active on its own for many cycles.
 	for range 50 {
 		old.CacheAccess += 10
-		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old})
+		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old}, 10)
 	}
 
 	// The cgroup consumer's watermark after consuming those cycles.
@@ -579,10 +580,10 @@ func TestDCStatTokensAreComparableAcrossPIDs(t *testing.T) {
 	// A brand-new PID joins the same cgroup and is immediately active.
 	newcomer := libbpfloader.DCStatAppSnapshot{Pid: 200, CacheAccess: 7}
 	old.CacheAccess += 10
-	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old, newcomer})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old, newcomer}, 10)
 	newcomer.CacheAccess += 5
 	old.CacheAccess += 10
-	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old, newcomer})
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{old, newcomer}, 10)
 
 	var newRow netdataPublishDCStat
 	for _, row := range store.Snapshot() {
@@ -615,7 +616,7 @@ func TestDCStatTokensSurviveProducerRestart(t *testing.T) {
 	watermark := uint64(0)
 	for range 5 {
 		app.CacheAccess += 10
-		before.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+		before.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10)
 		for _, row := range before.Snapshot() {
 			if row.dc.Ct > watermark {
 				watermark = row.dc.Ct
@@ -630,9 +631,9 @@ func TestDCStatTokensSurviveProducerRestart(t *testing.T) {
 	// watermark above. The BPF counters are unchanged because the kernel maps
 	// survived, so the first cycle re-baselines and the second one is the live test.
 	after := NewEbpfSharedMemoryStore()
-	after.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+	after.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10)
 	app.CacheAccess += 10
-	after.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app})
+	after.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{app}, 10)
 
 	snap := after.Snapshot()
 	if len(snap) != 1 {
@@ -667,7 +668,7 @@ func TestSharedStoreIdentityPrefersPopulatedModule(t *testing.T) {
 	})
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 77, Comm: named, CacheAccess: 5},
-	})
+	}, 10)
 
 	snap := store.Snapshot()
 	if len(snap) != 1 {
@@ -694,7 +695,7 @@ func TestSharedStoreIdentityKeepsCachestatPriority(t *testing.T) {
 	})
 	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 		{Pid: 77, Comm: dcName, CacheAccess: 5},
-	})
+	}, 10)
 
 	snap := store.Snapshot()
 	if len(snap) != 1 {
@@ -702,5 +703,38 @@ func TestSharedStoreIdentityKeepsCachestatPriority(t *testing.T) {
 	}
 	if got := string(snap[0].comm[:6]); got != "csproc" {
 		t.Fatalf("comm = %q, want cachestat's %q", got, "csproc")
+	}
+}
+
+// TestDCStatPublishesCollectionInterval pins that every row carries the dcstat
+// collection interval that produced its deltas.
+//
+// Consumers must divide by that interval, not by their own tick rate:
+// cgroups.plugin ticks every second while dcstat collects every 10s by default,
+// so dividing a 10-second total by one second inflated the published rate ~10x.
+// The SHM header's update_every_s belongs to whichever module owns the segment,
+// which need not be dcstat, so the interval has to travel per row — the same
+// reason ebpf_socket_publish_apps carries socket_update_every_s.
+func TestDCStatPublishesCollectionInterval(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
+	const interval = uint32(10)
+
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 5, CacheAccess: 100, NotFound: 10},
+	}, interval)
+	// Second cycle so the row carries real deltas rather than a self-baseline.
+	store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
+		{Pid: 5, CacheAccess: 200, NotFound: 20},
+	}, interval)
+
+	snap := store.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("Snapshot() len = %d, want 1", len(snap))
+	}
+	if got := snap[0].dc.UpdateEverySec; got != interval {
+		t.Fatalf("UpdateEverySec = %d, want %d: consumers cannot scale the deltas without it", got, interval)
+	}
+	if got := snap[0].dc.CacheAccess; got != 100 {
+		t.Fatalf("cache_access delta = %d, want 100", got)
 	}
 }

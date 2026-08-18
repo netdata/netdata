@@ -262,7 +262,7 @@ func runDCStatGlobalCollector(
 			return
 		}
 
-		staleCandidates := store.UpdateDCStatApps(apps)
+		staleCandidates := store.UpdateDCStatApps(apps, uint32(updateEvery))
 		if len(staleCandidates) > 0 {
 			// Authoritative liveness check matching the C-version behavior: a
 			// process is alive iff kill(pid, 0) succeeds.  Idle-but-alive PIDs

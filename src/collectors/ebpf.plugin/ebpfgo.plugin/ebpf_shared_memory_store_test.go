@@ -44,7 +44,7 @@ func TestSharedStoreConcurrentModuleUpdates(t *testing.T) {
 		store.UpdateDCStatApps([]libbpfloader.DCStatAppSnapshot{
 			{Pid: 10, CacheAccess: uint64(i)},
 			{Pid: 20, CacheAccess: uint64(i)},
-		})
+		}, 10)
 	})
 	worker(func(i int) {
 		store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
