@@ -6,7 +6,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/xml"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -524,23 +526,25 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 		limit = 500
 	}
 
-	sessionExists, err := c.mssqlErrorSessionAvailable(ctx, sessionName)
+	target, available, err := c.resolveMSSQLErrorReadTarget(ctx, sessionName)
 	if err != nil {
 		return mssqlErrorAttrNotEnabled, nil, err
 	}
-	if !sessionExists {
-		return mssqlErrorAttrNotEnabled, nil, fmt.Errorf("session not found")
+	if !available {
+		return mssqlErrorAttrNotEnabled, nil, errors.New("session not found")
 	}
 
 	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
 	query := queryMSSQLErrorInfoEventFile
+	args := []any{sql.Named("filePath", target.filePath), sql.Named("limit", limit)}
 	if c.Functions.ErrorInfo.UseRingBuffer {
 		query = queryMSSQLErrorInfoRingBuffer
+		args = []any{sql.Named("sessionName", sessionName), sql.Named("limit", limit)}
 	}
 
-	rows, err := c.db.QueryContext(qctx, query, sql.Named("sessionName", sessionName), sql.Named("limit", limit))
+	rows, err := c.db.QueryContext(qctx, query, args...)
 	if err != nil {
 		return mssqlErrorAttrNotSupported, nil, err
 	}
@@ -575,7 +579,7 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 			ErrorState:  errStatePtr,
 			Message:     message.String,
 			Query:       sqlText.String,
-			QueryHash:   queryHash.String,
+			QueryHash:   mssqlQueryHashToHex(queryHash.String),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -585,32 +589,87 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 	return mssqlErrorAttrEnabled, results, nil
 }
 
-func (c *Collector) mssqlErrorSessionAvailable(ctx context.Context, sessionName string) (bool, error) {
+// mssqlErrorReadTarget says where error_reported events should be read from.
+type mssqlErrorReadTarget struct {
+	// filePath is the event_file read pattern. Empty when reading the ring buffer.
+	filePath string
+}
+
+// resolveMSSQLErrorReadTarget locates the Extended Events target for a session, reporting
+// false when the session or the requested target does not exist.
+//
+// For the event_file target the on-disk name is read from the catalog rather than derived
+// from the session name: the filename is operator-chosen and the two frequently differ.
+// The ring_buffer target only exists while the session is running, so that path still
+// goes through the runtime DMVs.
+func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName string) (mssqlErrorReadTarget, bool, error) {
 	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
-	sessionQuery := queryMSSQLErrorConfiguredSessionHasEventFile
-	if c.Functions.ErrorInfo.UseRingBuffer {
-		sessionQuery = queryMSSQLErrorActiveSessionExists
+	if !c.Functions.ErrorInfo.UseRingBuffer {
+		var configured sql.NullString
+		err := c.db.QueryRowContext(qctx, queryMSSQLErrorSessionEventFilePath, sql.Named("sessionName", sessionName)).Scan(&configured)
+		if errors.Is(err, sql.ErrNoRows) {
+			return mssqlErrorReadTarget{}, false, nil
+		}
+		if err != nil {
+			return mssqlErrorReadTarget{}, false, err
+		}
+		pattern := eventFileReadPattern(configured.String)
+		if pattern == "" {
+			return mssqlErrorReadTarget{}, false, nil
+		}
+		return mssqlErrorReadTarget{filePath: pattern}, true, nil
 	}
 
 	var count int
-	err := c.db.QueryRowContext(qctx, sessionQuery, sql.Named("sessionName", sessionName)).Scan(&count)
+	err := c.db.QueryRowContext(qctx, queryMSSQLErrorActiveSessionExists, sql.Named("sessionName", sessionName)).Scan(&count)
 	if err != nil {
-		return false, err
-	}
-	if !c.Functions.ErrorInfo.UseRingBuffer {
-		return count > 0, nil
+		return mssqlErrorReadTarget{}, false, err
 	}
 	if count == 0 {
-		return false, nil
+		return mssqlErrorReadTarget{}, false, nil
 	}
 
 	err = c.db.QueryRowContext(qctx, queryMSSQLErrorSessionHasRingBuffer, sql.Named("sessionName", sessionName)).Scan(&count)
 	if err != nil {
-		return false, err
+		return mssqlErrorReadTarget{}, false, err
 	}
-	return count > 0, nil
+	return mssqlErrorReadTarget{}, count > 0, nil
+}
+
+// eventFileReadPattern turns the filename configured on an event_file target into a pattern
+// that also matches the rollover files SQL Server creates (<base>_<n>_<ticks>.xel).
+func eventFileReadPattern(configured string) string {
+	path := strings.TrimSpace(configured)
+	if path == "" {
+		return ""
+	}
+	if strings.ContainsAny(path, "*?") {
+		return path
+	}
+	if strings.HasSuffix(strings.ToLower(path), ".xel") {
+		return path[:len(path)-len(".xel")] + "*.xel"
+	}
+	return path + "*.xel"
+}
+
+// mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events
+// uses for query_hash into the 0x-prefixed form Query Store comparisons use, so error
+// attribution can join top-queries rows. Returns "" when the value is not a uint64.
+func mssqlQueryHashToHex(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		return s
+	}
+	v, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("0x%016X", v)
 }
 
 func countPlanOperators(planXML string) mssqlPlanOps {

@@ -379,6 +379,19 @@ SELECT database_id, name
 FROM sys.databases;
 `
 
+// queryQueryStoreSupported reports whether this instance exposes Query Store.
+// sys.databases.is_query_store_on arrived in SQL Server 2016 (13.x). Probing for the
+// column rather than comparing ProductVersion keeps Azure SQL Database working: it
+// reports version 12.x yet is newer than SQL Server 2016 and does support Query Store.
+const queryQueryStoreSupported = `
+SELECT COUNT(*)
+FROM sys.all_columns AS c
+INNER JOIN sys.all_objects AS o ON o.object_id = c.object_id
+WHERE o.name = 'databases'
+  AND o.schema_id = SCHEMA_ID('sys')
+  AND c.name = 'is_query_store_on';
+`
+
 // queryMSSQLErrorActiveSessionExists checks for a running configured Extended Events session.
 const queryMSSQLErrorActiveSessionExists = `
 SELECT COUNT(*)
@@ -386,13 +399,20 @@ FROM sys.dm_xe_sessions
 WHERE name = @sessionName;
 `
 
-// queryMSSQLErrorConfiguredSessionHasEventFile verifies that the configured session has an event_file target.
-const queryMSSQLErrorConfiguredSessionHasEventFile = `
-SELECT COUNT(*)
+// queryMSSQLErrorSessionEventFilePath returns the filename configured on the session's
+// event_file target. The on-disk name is operator-chosen and need not match the session
+// name, so it has to be read from the catalog rather than guessed.
+const queryMSSQLErrorSessionEventFilePath = `
+SELECT CONVERT(nvarchar(260), fld.value) AS file_path
 FROM sys.server_event_sessions AS ses
-JOIN sys.server_event_session_targets AS setgt ON setgt.event_session_id = ses.event_session_id
+INNER JOIN sys.server_event_session_targets AS tgt
+  ON tgt.event_session_id = ses.event_session_id
+INNER JOIN sys.server_event_session_fields AS fld
+  ON fld.event_session_id = tgt.event_session_id
+ AND fld.object_id = tgt.target_id
 WHERE ses.name = @sessionName
-  AND setgt.name = 'event_file';
+  AND tgt.name = 'event_file'
+  AND fld.name = 'filename';
 `
 
 // queryMSSQLErrorSessionHasRingBuffer verifies that the session has a ring_buffer target.
@@ -405,10 +425,16 @@ WHERE xs.name = @sessionName
 `
 
 // queryMSSQLErrorInfoEventFile reads recent error_reported events from the event_file target.
+// @filePath is the resolved on-disk pattern, not the session name; see
+// queryMSSQLErrorSessionEventFilePath.
+//
+// query_hash is returned as the raw unsigned-64-bit decimal string that Extended Events
+// emits. It is not converted here because query_hash exceeds bigint range, so
+// CAST(... AS bigint) would overflow; mssqlQueryHashToHex does it in Go instead.
 const queryMSSQLErrorInfoEventFile = `
 WITH xevents AS (
   SELECT CAST(event_data AS XML) AS event_xml
-  FROM sys.fn_xe_file_target_read_file(@sessionName + N'*.xel', NULL, NULL, NULL)
+  FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
   WHERE object_name = 'error_reported'
 )
 SELECT TOP (@limit)
@@ -417,13 +443,14 @@ SELECT TOP (@limit)
   event_xml.value('(/event/data[@name="state"]/value)[1]', 'int') AS error_state,
   event_xml.value('(/event/data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
   event_xml.value('(/event/action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
-  CONVERT(VARCHAR(64), event_xml.value('(/event/action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash
+  event_xml.value('(/event/action[@name="query_hash"]/value)[1]', 'nvarchar(32)') AS query_hash
 FROM xevents
 ORDER BY event_time DESC;
 `
 
 // queryMSSQLErrorInfoRingBuffer reads recent error_reported events from the ring_buffer target.
 // Note: This can be slow with large buffers due to XML parsing overhead.
+// query_hash is returned raw for the same reason as queryMSSQLErrorInfoEventFile.
 const queryMSSQLErrorInfoRingBuffer = `
 WITH xevents AS (
   SELECT CAST(xet.target_data AS XML) AS target_data
@@ -438,7 +465,7 @@ SELECT TOP (@limit)
   xevent.value('(data[@name="state"]/value)[1]', 'int') AS error_state,
   xevent.value('(data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
   xevent.value('(action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
-  CONVERT(VARCHAR(64), xevent.value('(action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash
+  xevent.value('(action[@name="query_hash"]/value)[1]', 'nvarchar(32)') AS query_hash
 FROM xevents
 CROSS APPLY target_data.nodes('RingBufferTarget/event[@name="error_reported"]') AS T(xevent)
 ORDER BY event_time DESC;

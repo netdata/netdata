@@ -832,7 +832,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to SQL Server 2016 (13.x) or later<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing or SQL Server does not support Query Store<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to a server that exposes Query Store (SQL Server 2016 (13.x) and later, and Azure SQL Database)<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if the collector is still initializing or the server does not expose Query Store<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
         - id: deadlock-info
           name: Deadlock Info
@@ -986,7 +986,7 @@ modules:
                       error_info_session_name: your_session_name
                   ```
           availability: |
-            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target (its configured `filename` is read from the session, so it need not match the session name)<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
     metrics:
       folding:

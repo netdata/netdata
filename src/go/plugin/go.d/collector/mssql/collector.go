@@ -175,9 +175,11 @@ type Collector struct {
 	seenAGPageRepairDBs    map[string]bool // key: database_name
 	agClusterChartAdded    bool            // true after cluster quorum chart has been added
 
-	// Query Store column cache (per-instance to handle different SQL Server versions)
-	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access
-	queryStoreCols   map[string]bool
+	// Query Store discovery cache (per-instance to handle different SQL Server versions).
+	// Function handlers run on their own goroutine, so every field here needs the mutex.
+	queryStoreMu        sync.RWMutex
+	queryStoreCols      map[string]bool
+	queryStoreSupported *bool // nil until the capability probe has run
 
 	funcRouter *funcRouter
 }

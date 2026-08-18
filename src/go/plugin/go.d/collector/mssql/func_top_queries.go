@@ -5,6 +5,7 @@ package mssql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -17,8 +18,13 @@ const (
 	topQueriesMethodID      = "top-queries"
 	topQueriesMaxTextLength = 4096
 	topQueriesParamSort     = "__sort"
-	queryStoreUnavailable   = "top-queries requires Query Store, available in SQL Server 2016 (13.x) and later; this server version does not support it"
+	queryStoreUnavailable   = "top-queries requires Query Store, available in SQL Server 2016 (13.x) and later; this server does not expose it"
+	queryStoreNotEnabled    = "top-queries requires Query Store to be enabled on at least one user database"
 )
+
+// errQueryStoreNotEnabled marks a configuration state, not a failure: the server supports
+// Query Store but no user database has it turned on.
+var errQueryStoreNotEnabled = errors.New(queryStoreNotEnabled)
 
 func topQueriesFunctionConfig() funcapi.FunctionConfig {
 	return funcapi.FunctionConfig{
@@ -194,7 +200,9 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	}
 	switch method {
 	case topQueriesMethodID:
-		return f.methodParams(ctx)
+		paramsCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+		defer cancel()
+		return f.methodParams(paramsCtx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
@@ -222,12 +230,12 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 	if f.router.collector.Functions.TopQueries.Disabled {
 		return nil, fmt.Errorf("top-queries function disabled in configuration")
 	}
-	unsupported, err := f.queryStoreUnsupported(ctx)
+	supported, err := f.queryStoreSupported(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if unsupported {
-		return nil, fmt.Errorf("%s", queryStoreUnavailable)
+	if !supported {
+		return nil, errors.New(queryStoreUnavailable)
 	}
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
@@ -248,16 +256,19 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	if f.router.collector.Functions.TopQueries.Disabled {
 		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
 	}
-	unsupported, err := f.queryStoreUnsupported(ctx)
+	supported, err := f.queryStoreSupported(ctx)
 	if err != nil {
-		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to determine SQL Server version: %v", err)}
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to detect Query Store support: %v", err)}
 	}
-	if unsupported {
+	if !supported {
 		return funcapi.UnavailableResponse(queryStoreUnavailable)
 	}
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
 	if err != nil {
+		if errors.Is(err, errQueryStoreNotEnabled) {
+			return funcapi.UnavailableResponse(queryStoreNotEnabled)
+		}
 		return &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to detect available columns: %v", err),
@@ -413,16 +424,38 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	}
 }
 
-func (f *funcTopQueries) queryStoreUnsupported(ctx context.Context) (bool, error) {
-	majorVersion := f.router.collector.majorVersion
-	if majorVersion == 0 {
-		var version string
-		if err := f.router.collector.db.QueryRowContext(ctx, queryVersion).Scan(&version); err != nil {
-			return false, err
-		}
-		majorVersion = parseMajorVersion(version)
+// queryStoreSupported reports whether this instance exposes Query Store.
+//
+// It deliberately does NOT compare ProductVersion: Azure SQL Database reports 12.x while
+// being newer than SQL Server 2016, so a "major < 13" test would wrongly disable
+// top-queries there. Probing the catalog is version-proof, and it also fails closed on
+// servers whose version string cannot be parsed.
+func (f *funcTopQueries) queryStoreSupported(ctx context.Context) (bool, error) {
+	c := f.router.collector
+
+	c.queryStoreMu.RLock()
+	if cached := c.queryStoreSupported; cached != nil {
+		c.queryStoreMu.RUnlock()
+		return *cached, nil
 	}
-	return majorVersion > 0 && majorVersion < 13, nil
+	c.queryStoreMu.RUnlock()
+
+	c.queryStoreMu.Lock()
+	defer c.queryStoreMu.Unlock()
+
+	if cached := c.queryStoreSupported; cached != nil {
+		return *cached, nil
+	}
+
+	var count int
+	if err := c.db.QueryRowContext(ctx, queryQueryStoreSupported).Scan(&count); err != nil {
+		return false, err
+	}
+
+	supported := count > 0
+	c.queryStoreSupported = &supported
+
+	return supported, nil
 }
 
 func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
@@ -431,17 +464,17 @@ func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[to
 
 func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result
-	f.router.collector.queryStoreColsMu.RLock()
+	f.router.collector.queryStoreMu.RLock()
 	if f.router.collector.queryStoreCols != nil {
 		cols := f.router.collector.queryStoreCols
-		f.router.collector.queryStoreColsMu.RUnlock()
+		f.router.collector.queryStoreMu.RUnlock()
 		return cols, nil
 	}
-	f.router.collector.queryStoreColsMu.RUnlock()
+	f.router.collector.queryStoreMu.RUnlock()
 
 	// Slow path: query and cache
-	f.router.collector.queryStoreColsMu.Lock()
-	defer f.router.collector.queryStoreColsMu.Unlock()
+	f.router.collector.queryStoreMu.Lock()
+	defer f.router.collector.queryStoreMu.Unlock()
 
 	// Double-check after acquiring write lock
 	if f.router.collector.queryStoreCols != nil {
@@ -457,8 +490,8 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 		  AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
 	`).Scan(&sampleDB)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("no databases have Query Store enabled")
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errQueryStoreNotEnabled
 		}
 		return nil, fmt.Errorf("failed to find database with Query Store: %w", err)
 	}

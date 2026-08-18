@@ -4,6 +4,7 @@ package mssql
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"testing"
@@ -146,23 +147,43 @@ func TestQuerySystemHealthLatestDeadlockEventFile_SQLServer2014Compatible(t *tes
 	assert.Contains(t, query, "order by deadlock_time desc")
 }
 
-func TestMSSQLErrorSessionAvailable_ConfiguredEventFileSession(t *testing.T) {
+func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("server_event_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	// The on-disk name deliberately differs from the session name.
+	mock.ExpectQuery("server_event_session_fields").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
 
 	c := New()
 	c.db = db
 
-	available, err := c.mssqlErrorSessionAvailable(context.Background(), "netdata_errors")
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
 	require.NoError(t, err)
 	assert.True(t, available)
+	assert.Equal(t, `C:\Logs\nd_err*.xel`, target.filePath)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestMSSQLErrorSessionAvailable_RingBufferRequiresRunningSession(t *testing.T) {
+func TestResolveMSSQLErrorReadTarget_EventFileMissingSession(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
+
+	c := New()
+	c.db = db
+
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	require.NoError(t, err)
+	assert.False(t, available)
+	assert.Empty(t, target.filePath)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestResolveMSSQLErrorReadTarget_RingBufferRequiresRunningSession(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
 	defer db.Close()
@@ -174,10 +195,98 @@ func TestMSSQLErrorSessionAvailable_RingBufferRequiresRunningSession(t *testing.
 	c.db = db
 	c.Config.Functions.ErrorInfo.UseRingBuffer = true
 
-	available, err := c.mssqlErrorSessionAvailable(context.Background(), "netdata_errors")
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
 	require.NoError(t, err)
 	assert.True(t, available)
+	assert.Empty(t, target.filePath, "ring buffer reads must not carry a file path")
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestEventFileReadPattern(t *testing.T) {
+	tests := map[string]struct {
+		configured string
+		want       string
+	}{
+		"absolute .xel gets a rollover wildcard": {
+			configured: `C:\Logs\netdata_errors.xel`,
+			want:       `C:\Logs\netdata_errors*.xel`,
+		},
+		"bare name gets a rollover wildcard": {
+			configured: "netdata_errors.xel",
+			want:       "netdata_errors*.xel",
+		},
+		"name without extension still gets a pattern": {
+			configured: "netdata_errors",
+			want:       "netdata_errors*.xel",
+		},
+		"existing wildcard is preserved": {
+			configured: "netdata_errors*.xel",
+			want:       "netdata_errors*.xel",
+		},
+		"surrounding whitespace is trimmed": {
+			configured: "  netdata_errors.xel  ",
+			want:       "netdata_errors*.xel",
+		},
+		"empty stays empty": {
+			configured: "   ",
+			want:       "",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, eventFileReadPattern(tc.configured))
+		})
+	}
+}
+
+func TestMSSQLQueryHashToHex(t *testing.T) {
+	tests := map[string]struct {
+		raw  string
+		want string
+	}{
+		"decimal uint64 becomes padded hex": {
+			raw:  "5088882792278653941",
+			want: "0x469F57F0015DFBF5",
+		},
+		"value above int64 range still converts": {
+			raw:  "13087066542645627366",
+			want: "0xB59E99AEAA4AC9E6",
+		},
+		"zero converts": {
+			raw:  "0",
+			want: "0x0000000000000000",
+		},
+		"already hex is passed through": {
+			raw:  "0x469F57F0015DFBF5",
+			want: "0x469F57F0015DFBF5",
+		},
+		"empty stays empty": {
+			raw:  "",
+			want: "",
+		},
+		"non numeric is dropped": {
+			raw:  "not-a-hash",
+			want: "",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, mssqlQueryHashToHex(tc.raw))
+		})
+	}
+}
+
+func TestQueryMSSQLErrorInfoEventFile_ReadsResolvedPathAndRawHash(t *testing.T) {
+	query := strings.ToLower(queryMSSQLErrorInfoEventFile)
+
+	// The path must come from the resolver, never be rebuilt from the session name.
+	assert.Contains(t, query, "sys.fn_xe_file_target_read_file(@filepath, null, null, null)")
+	assert.NotContains(t, query, "@sessionname")
+	// query_hash must stay raw: it exceeds bigint range, so SQL-side conversion overflows.
+	assert.NotContains(t, query, "varbinary(8)")
+	assert.Contains(t, query, `'nvarchar(32)') as query_hash`)
 }
 
 func TestQueryMSSQLErrorInfoEventFile_SQLServer2014Compatible(t *testing.T) {
