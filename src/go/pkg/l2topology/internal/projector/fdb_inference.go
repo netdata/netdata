@@ -29,15 +29,15 @@ func inferFDBPairwiseBridgeLinks(
 	// reporterA -> reporterB -> compatible scope -> unique canonical reporter
 	// ports where A learns aliases of B.
 	pairs := make(map[string]map[string]map[string]map[string]bridgePortRef)
-	for _, attachment := range attachments {
-		if !strings.EqualFold(strings.TrimSpace(attachment.Method), "fdb") {
+	for _, link := range macLinks {
+		if !strings.EqualFold(strings.TrimSpace(link.method), "fdb") {
 			continue
 		}
-		reporterID := strings.TrimSpace(attachment.DeviceID)
+		reporterID := strings.TrimSpace(link.port.deviceID)
 		if reporterID == "" {
 			continue
 		}
-		endpointID := normalizeFDBEndpointID(attachment.EndpointID)
+		endpointID := normalizeFDBEndpointID(link.endpointID)
 		if endpointID == "" {
 			continue
 		}
@@ -45,7 +45,7 @@ func inferFDBPairwiseBridgeLinks(
 		if len(owners) == 0 {
 			continue
 		}
-		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
+		port := link.port
 		portKey := bridgePortObservationKey(port)
 		scope := pairwiseCorrelationScope(port, vlanAliases)
 		if portKey == "" || scope == "" {

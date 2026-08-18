@@ -653,6 +653,101 @@ func TestProjectionCoalescesOverlappingFDBSourcesBeforeAssignment(t *testing.T) 
 	}
 }
 
+func TestProjectionKeepsUnmappedFDBBasePortOpaque(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:  "switch-a",
+			Hostname:  "switch-a",
+			ChassisID: "02:00:00:00:00:01",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 99, IfName: "7"},
+				{IfIndex: 98, IfName: "8"},
+			},
+			FDBEntries: []FDBObservation{
+				{MAC: "02:00:00:00:01:01", BridgePort: "7", Status: "learned"},
+				{MAC: "02:00:00:00:01:02", BridgePort: "7", Status: "learned"},
+				{MAC: "02:00:00:00:01:03", BridgePort: "8", Status: "learned"},
+			},
+		},
+		{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:01:01"},
+	}, DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+
+	projection := ToGraph(result, GraphOptions{Source: "snmp", Layer: "2"})
+	bridgeLinks := 0
+	directFDBLinks := 0
+	for _, link := range projection.Graph.Links {
+		if link.Src.SysName != "switch-a" {
+			continue
+		}
+		switch link.Protocol {
+		case "bridge":
+			bridgeLinks++
+			require.Zero(t, link.Src.IfIndex)
+			require.Empty(t, link.Src.IfName)
+			require.Equal(t, "7", link.Src.BridgePort)
+		case "fdb":
+			directFDBLinks++
+			require.Zero(t, link.Src.IfIndex)
+			require.Empty(t, link.Src.IfName)
+			require.Equal(t, "8", link.Src.BridgePort)
+		}
+	}
+	require.Equal(t, 1, bridgeLinks)
+	require.Equal(t, 1, directFDBLinks)
+}
+
+func TestProjectionPairwiseCoalescesOverlappingFDBSources(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:    "switch-a",
+			Hostname:    "switch-a",
+			ChassisID:   "02:00:00:00:00:01",
+			Interfaces:  []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts: []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries: []FDBObservation{
+				{MAC: "02:00:00:00:00:02", BridgePort: "1", Status: "learned"},
+				{MAC: "02:00:00:00:00:02", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:500", VLANID: "100"},
+				{MAC: "02:00:00:00:01:01", BridgePort: "1", Status: "learned"},
+			},
+		},
+		{
+			DeviceID:    "switch-b",
+			Hostname:    "switch-b",
+			ChassisID:   "02:00:00:00:00:02",
+			Interfaces:  []ObservedInterface{{IfIndex: 2, IfName: "Ethernet2"}},
+			BridgePorts: []BridgePortObservation{{BasePort: "2", IfIndex: 2}},
+			FDBEntries: []FDBObservation{
+				{MAC: "02:00:00:00:00:01", BridgePort: "2", Status: "learned"},
+				{MAC: "02:00:00:00:00:01", BridgePort: "2", Status: "learned", FDBDomainID: "fdb:900", VLANID: "100"},
+				{MAC: "02:00:00:00:01:02", BridgePort: "2", Status: "learned"},
+			},
+		},
+	}, DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+
+	for _, strategy := range []string{
+		"fdb_pairwise_minimum_knowledge",
+		"stp_fdb_correlated",
+		"cdp_fdb_hybrid",
+	} {
+		t.Run(strategy, func(t *testing.T) {
+			projection := ToGraph(result, GraphOptions{
+				Source:            "snmp",
+				Layer:             "2",
+				InferenceStrategy: strategy,
+			})
+			multiParentSegments := 0
+			for _, detail := range projection.ActorDetails {
+				if len(detail.Segment.ParentDevices) == 2 {
+					multiParentSegments++
+				}
+			}
+			require.Equal(t, 1, multiParentSegments)
+		})
+	}
+}
+
 func TestProjectionCorrelatesBridgeMIBWithCanonicalSTPPort(t *testing.T) {
 	result, err := BuildL2ResultFromObservations([]L2Observation{
 		{
