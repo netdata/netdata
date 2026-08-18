@@ -241,15 +241,30 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 
 		// Per-PID snapshot — second CGO call, same goroutine, no extra thread.
 		if store != nil {
-			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
-			if err != nil {
-				logPluginErr("cachestat.snapshot_apps", "cachestat", "snapshot-apps", err)
-				store.ClearCachestatApps()
+			publishSharedStore := func() {
+				// Cachestat is the elected publisher when it has apps/cgroup
+				// integration. Open its segment even when its own snapshot fails:
+				// dcstat/socket may still have healthy rows to publish.
+				if handle.SharedMemory == nil {
+					publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
+					if perr != nil {
+						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
+					} else {
+						handle.SharedMemory = publisher
+					}
+				}
 				if handle.SharedMemory != nil {
 					if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagCachestat); perr != nil {
 						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", perr)
 					}
 				}
+			}
+
+			apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
+			if err != nil {
+				logPluginErr("cachestat.snapshot_apps", "cachestat", "snapshot-apps", err)
+				store.ClearCachestatApps()
+				publishSharedStore()
 			} else {
 				staleCandidates := store.UpdateApps(apps)
 				if len(staleCandidates) > 0 {
@@ -275,25 +290,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 						}
 					}
 				}
-				// Lazy SHM open: allocate the publisher on the first
-				// cycle that reaches here, so the default config (no
-				// apps, no cgroups) never pays the 17.5 MB VMA cost —
-				// main.go leaves store nil in that case and the loop
-				// returns above.  The handle is mutated under the loop's
-				// single-goroutine guarantee so no extra lock is needed.
-				if handle.SharedMemory == nil {
-					publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
-					if perr != nil {
-						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
-					} else {
-						handle.SharedMemory = publisher
-					}
-				}
-				if handle.SharedMemory != nil {
-					if err := store.Publish(handle.SharedMemory, ebpfgoSHMFlagCachestat); err != nil {
-						logPluginErr("cachestat.publish", "cachestat", "shared memory publish", err)
-					}
-				}
+				publishSharedStore()
 			}
 		}
 	}
