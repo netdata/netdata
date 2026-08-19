@@ -303,7 +303,12 @@ static int netdata_claim_write_config(char *path)
     char data[WINDOWS_MAX_PATH + 1];
     char *filename;
     if (!extPath) {
-        snprintf(configPath, WINDOWS_MAX_PATH - 1, "%s\\etc\\netdata\\claim.conf", path);
+        // Refuse a truncated path instead of creating a file under a shortened name that the Agent
+        // would never read.
+        int pathLength = snprintf(configPath, sizeof(configPath), "%s\\etc\\netdata\\claim.conf", path);
+        if (pathLength < 0 || (size_t)pathLength >= sizeof(configPath))
+            return ND_CLAIM_INTERNAL;
+
         filename = configPath;
     } else {
         filename = path;
