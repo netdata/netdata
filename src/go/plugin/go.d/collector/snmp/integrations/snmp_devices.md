@@ -691,9 +691,9 @@ Use cases:
 |:-------|:------------|
 | Name | `Snmp:topology` |
 | Require Cloud | no |
-| Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows |
+| Performance | Uses cached SNMP data only; calling the function triggers no additional SNMP requests.<br/>• Each request builds and renders a topology snapshot from the current cache<br/>• CPU time, allocations, and payload size scale with cached devices, interfaces, FDB entries, neighbors, segments, and links<br/>• Large or concurrent requests can require materially more processing even though no device walk occurs |
 | Security | Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
-| Availability | Available when:<br/>• The collector has completed at least one successful topology refresh cycle<br/>• LLDP/CDP topology data is present in cache from the last successful topology refresh<br/>• Returns HTTP 503 if topology cache is not ready yet |
+| Availability | Available when:<br/>• At least one topology-enabled SNMP job has a fresh successful snapshot<br/>• That snapshot contains enough device identity to render a managed actor; LLDP/CDP rows are not required<br/>• Returns HTTP 503 if no current renderable topology snapshot is available |
 
 #### Prerequisites
 
@@ -704,7 +704,7 @@ No additional configuration is required.
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
 | Nodes Identity | select | Choose actor identity strategy. `ip` collapses nodes by management IP and removes non-IP inferred actors. `mac` keeps MAC-oriented identities. | yes | ip | IP (default), MAC |
-| Map | select | Select the topology map mode. Defaults to the managed-device LLDP/CDP view. Other modes progressively include inferred devices and lower-confidence links. | yes | lldp_cdp_managed | LLDP/CDP/Managed Devices Map (default), High Confidence Inferred Map, All Devices (Low Confidence) |
+| Map | select | Select the topology map mode. The default Managed Fabric Map keeps monitored devices, direct LLDP/CDP and managed STP links, and qualified FDB broadcast-domain paths. Logical L3 subnet, OSPF, and BGP relationships remain visible with distinct presentation. Legacy and broader inferred views remain selectable. | yes | managed_fabric | Managed Fabric Map (default), LLDP/CDP/Managed Devices Map, High Confidence Inferred Map, All Devices (Low Confidence) |
 | Infer Strategy | select | Select the inference algorithm used for FDB/STP/CDP correlation. | yes | fdb_minimum_knowledge | FDB Minimum-Knowledge (Baseline) (default), STP Parent Tree, FDB Pairwise Minimum-Knowledge, STP + FDB Correlated, CDP + FDB Hybrid |
 | Focus On | multiselect | Limit depth filtering to selected managed SNMP roots. The static default is `all_devices`; additional `ip:<address>` options are supplied dynamically from the current managed SNMP jobs. | yes | all_devices | All Devices (default) |
 | Focus Depth | select | Limit topology expansion hops from the focus roots. `all` disables depth filtering. | yes | all | All (default), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 |
