@@ -12,14 +12,6 @@ struct dictionary_stats dictionary_stats_category_other = {
 // ----------------------------------------------------------------------------
 // public locks API
 
-inline void dictionary_read_lock(DICTIONARY *dict) {
-    ll_recursive_lock(dict, DICTIONARY_LOCK_READ);
-}
-
-inline void dictionary_read_unlock(DICTIONARY *dict) {
-    ll_recursive_unlock(dict, DICTIONARY_LOCK_READ);
-}
-
 inline void dictionary_write_lock(DICTIONARY *dict) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 }
@@ -857,6 +849,17 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
 
 // ----------------------------------------------------------------------------
 // DUP/REL an item (increase/decrease its reference counter)
+
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_item_acquire_if_not_deleted(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {
+    if(unlikely(!dict || !item))
+        return NULL;
+
+    if(unlikely(!item_check_and_acquire(dict, item)))
+        return NULL;
+
+    api_internal_check(dict, item, false, false);
+    return item;
+}
 
 ALWAYS_INLINE
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item) {

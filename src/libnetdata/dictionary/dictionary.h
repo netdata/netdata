@@ -214,6 +214,17 @@ bool dictionary_del_advanced(DICTIONARY *dict, const char *name, ssize_t name_le
 
 void dictionary_acquired_item_release(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
 
+// Acquire a reference on an item reached through a secondary index rather than
+// through a dictionary lookup, so its value stays alive until it is released.
+// Returns NULL if the item is deleted or is currently being deleted.
+//
+// Unlike dictionary_acquired_item_dup(), the caller does not need to already
+// hold a reference. It MUST however serialize this call against the item's
+// removal from that secondary index, so the item memory is still valid here:
+// holding a dictionary lock is NOT enough, because dict_item_free_with_hooks()
+// runs after item_linked_list_remove() has released the items write lock.
+DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_item_acquire_if_not_deleted(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
+
 DICT_ITEM_CONST DICTIONARY_ITEM *dictionary_acquired_item_dup(DICTIONARY *dict, DICT_ITEM_CONST DICTIONARY_ITEM *item);
 
 const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item);
@@ -264,11 +275,6 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
 #define DICTIONARY_LOCK_READ      'r'
 #define DICTIONARY_LOCK_WRITE     'w'
 #define DICTIONARY_LOCK_REENTRANT 'z'
-
-// Hold the dictionary's items lock without traversing it. Useful to keep values
-// alive while resolving them through a secondary index. Read mode is recursive.
-void dictionary_read_lock(DICTIONARY *dict);
-void dictionary_read_unlock(DICTIONARY *dict);
 
 void dictionary_write_lock(DICTIONARY *dict);
 void dictionary_write_unlock(DICTIONARY *dict);

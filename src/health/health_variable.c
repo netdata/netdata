@@ -170,89 +170,75 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
 // Resolves an alert-name variable through the host's name index instead of
 // scanning every alert of the host.
 //
-// The host's alert dictionary read lock is held across the whole function: that
-// is what keeps the snapshotted RRDCALCs alive, exactly as the full traversal
-// this replaced did. The name-index lock is taken and released inside
-// rrdcalc_by_name_snapshot() and is deliberately NOT held while scoring, because
-// scoring acquires chart locks while rrdcalc_name_index_del() runs with
-// st->alerts.spinlock already held - holding both in the opposite order would be
-// a lock-order inversion.
+// Lifetime: rrdcalc_by_name_snapshot() returns ACQUIRED dictionary items, and
+// that reference - not any dictionary lock - is what keeps each RRDCALC alive
+// while we score it. A dictionary lock would not be enough: the free in
+// dict_item_free_or_mark_deleted() runs after item_linked_list_remove() has
+// already released the items write lock.
+//
+// The name-index lock is taken and released inside the snapshot and is
+// deliberately NOT held while scoring, because scoring acquires chart locks
+// while rrdcalc_name_index_del() runs with st->alerts.spinlock already held -
+// holding both in the opposite order would be a lock-order inversion.
+//
+// No dictionary lock is taken in this path at all.
 static bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd, bool snapshot_values) {
     bool found = false;
 
-    RRDCALC *onstack[ALERT_NAME_MATCHES_ONSTACK];
-    RRDCALC **matches = onstack, **allocated = NULL;
+    const DICTIONARY_ITEM *onstack[ALERT_NAME_MATCHES_ONSTACK];
+    const DICTIONARY_ITEM **matches = onstack, **allocated = NULL;
     size_t matches_size = ALERT_NAME_MATCHES_ONSTACK;
 
-    dictionary_read_lock(vbd->host->rrdcalc_root_index);
-
+    // Grow until the whole set fits. When it does not fit the snapshot acquires
+    // nothing, so there is never a partial set to release. This can only repeat
+    // if alerts of this name were added in between, so it terminates.
     size_t count = rrdcalc_by_name_snapshot(vbd->host, vbd->variable, matches, matches_size);
-    if(unlikely(count > matches_size)) {
-        // more alerts carry this name than the on-stack buffer holds
-        allocated = mallocz(sizeof(RRDCALC *) * count);
-        matches = allocated;
+    while(unlikely(count > matches_size)) {
         matches_size = count;
+        freez(allocated);
+        allocated = mallocz(sizeof(const DICTIONARY_ITEM *) * matches_size);
+        matches = allocated;
 
         count = rrdcalc_by_name_snapshot(vbd->host, vbd->variable, matches, matches_size);
-        if(unlikely(count > matches_size))
-            count = matches_size;
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    // A stale or missing index entry does not crash - it silently makes the
-    // variable unresolvable and takes the alert to UNDEFINED. Verify loudly here.
+    // Verify every alert of this name that the dictionary knows about against the
+    // index. Each alert is checked on its own, at one instant, under the index
+    // lock - see rrdcalc_name_index_verify() for why this must not be a
+    // set-versus-set comparison against the snapshot taken above.
     {
-        size_t scanned = 0;
         RRDCALC *check;
         foreach_rrdcalc_in_rrdhost_read(vbd->host, check) {
-            if(check->config.name != vbd->variable)
-                continue;
-
-            scanned++;
-
-            bool indexed = false;
-            for(size_t i = 0; i < count ; i++) {
-                if(matches[i] == check) {
-                    indexed = true;
-                    break;
-                }
-            }
-
-            if(!indexed)
-                fatal("HEALTH: alert name index on host '%s' is missing alert '%s' of chart '%s'",
-                      rrdhost_hostname(vbd->host), rrdcalc_name(check), rrdcalc_chart_name(check));
+            if(check->config.name == vbd->variable)
+                rrdcalc_name_index_verify(vbd->host, check);
         }
         foreach_rrdcalc_in_rrdhost_done(check);
-
-        if(scanned != count)
-            fatal("HEALTH: alert name index on host '%s' has %zu entries for '%s', full scan found %zu",
-                  rrdhost_hostname(vbd->host), count, string2str(vbd->variable), scanned);
     }
 #endif
 
     for(size_t i = 0; i < count ; i++) {
-        RRDCALC *rc = matches[i];
+        RRDCALC *rc = dictionary_acquired_item_value(matches[i]);
 
         RRDSET *st = NULL;
         RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(vbd->host, rc, &st);
-        if(!rsa)
-            continue;
+        if(rsa) {
+            NETDATA_DOUBLE value;
+            if(snapshot_values) {
+                RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                value = snapshot.value;
+            }
+            else
+                value = rc->value;
 
-        NETDATA_DOUBLE value;
-        if(snapshot_values) {
-            RRDCALC_RUNTIME_SNAPSHOT snapshot;
-            rrdcalc_runtime_snapshot_get(rc, &snapshot);
-            value = snapshot.value;
+            variable_lookup_add_result_with_score(vbd, value, st, "alarm value");
+            rrdset_acquired_release(rsa);
+            found = true;
         }
-        else
-            value = rc->value;
 
-        variable_lookup_add_result_with_score(vbd, value, st, "alarm value");
-        rrdset_acquired_release(rsa);
-        found = true;
+        dictionary_acquired_item_release(vbd->host->rrdcalc_root_index, matches[i]);
     }
-
-    dictionary_read_unlock(vbd->host->rrdcalc_root_index);
 
     freez(allocated);
     return found;
