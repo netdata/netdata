@@ -634,7 +634,7 @@ static int mrg_stale_peeked_id_unittest(void) {
         // Without a borrowed id there is nothing that can go stale, and the
         // assertion below would look up id 0 and pass vacuously. Stop here.
         fprintf(stderr, "ERROR: peek could not resolve a uuid that has a metric\n");
-        mrg_metric_release_and_delete(mrg, metric);
+        (void) mrg_metric_release_and_delete(mrg, metric);
         (void)mrg_destroy(mrg);
         fprintf(stderr, "Stale peeked id test: 1 ERROR(S)\n");
         return 1;
