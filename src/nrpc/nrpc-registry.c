@@ -276,6 +276,11 @@ static void nrpc_registries_insert_cb(const DICTIONARY_ITEM *item __maybe_unused
     registry->pending_dels.dict = dictionary_create(DICT_OPTION_SINGLE_THREADED); // guarded by pending_dels.spinlock
 
     spinlock_init(&registry->owner_spinlock);
+
+    // the operation gate opens with the entry; only the dispatcher counter is
+    // used (the entry-ref base stays with nobody - the outer index's item
+    // refcounts pin the struct instead)
+    nrpc_lifetime_init(&registry->lifetime);
 }
 
 static void nrpc_registries_index_init(void) {
@@ -504,13 +509,27 @@ void nrpc_registry_destroy(NRPC_OWNER owner) {
 
     spinlock_unlock(&registry->owner_spinlock);
 
-    // Destroy the inner dictionaries AFTER the entry left the index and
-    // outside the index locks, so one host's teardown cannot stall other
-    // hosts' lookups. The definitions dictionary's destroy defers while
-    // references exist (in-flight calls); pending_dels holds no references
-    // and dies immediately. The struct memory both are reached through stays
-    // pinned by any held outer handle, so a late release through call->held
-    // cannot dangle.
+    // Retire the operation gate: mark it dead (every later
+    // nrpc_registry_dispatcher_acquire fails, and keeps failing) and drain the
+    // readers already inside their gated sections. MUST run after
+    // owner_spinlock is released: gated sections snapshot the owner's epoch
+    // under owner_spinlock, so retiring while holding it would deadlock
+    // against the drain. The gated sections' side of the contract - they must
+    // never block indefinitely - is documented on the lifetime field
+    // (nrpc-internals.h).
+    nrpc_lifetime_retire(&registry->lifetime);
+
+    // Destroy the inner dictionaries AFTER the entry left the index and the
+    // gate drained, outside the index locks, so one host's teardown cannot
+    // stall other hosts' lookups. The gate is what makes this safe for every
+    // consumer holding only an OUTER handle: none of them can be inside the
+    // inner dictionaries now, and none can enter them again. pending_dels
+    // holds no item references, so its destroy is always the immediate-free
+    // branch - before the gate existed, that free raced the renderer's
+    // snapshot. The definitions dictionary still defers its free while
+    // in-flight calls hold their inner-item pins, which is what keeps the
+    // gate-exempt release through call->held safe; the struct memory both
+    // dictionaries are reached through stays pinned by any held outer handle.
     dictionary_destroy(registry->pending_dels.dict);
     dictionary_destroy(registry->dict);
 
@@ -519,6 +538,12 @@ void nrpc_registry_destroy(NRPC_OWNER owner) {
 }
 
 void nrpc_method_acquired_release_pair(struct nrpc_method_acquired *acquired) {
+    // Deliberately NOT behind the operation gate (the one exemption - see the
+    // lifetime field in nrpc-internals.h): the inner item ref this pair holds
+    // keeps the definitions dictionary on the deferred-destroy path, so the
+    // release below stays safe after destroy - and a late release must never
+    // be refused.
+    //
     // release order: inner (the method entry) first, then the outer handle
     // that pins the registry the inner dictionary belongs to
     if(acquired->inner_item) {
@@ -607,6 +632,17 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
         return;
     }
 
+    // the operation gate: held until the inner-dictionary work is done (the
+    // owner-changed notification fires outside it - a destroy in between
+    // finds the vtable disarmed and the notification degrades to a no-op)
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "NRPC: not registering method '%s': the host's function registry is being destroyed",
+               name ? name : "(unset)");
+        nrpc_registry_release(registry_item);
+        return;
+    }
+
     CLEAN_STRING *owner_name = nrpc_registry_owner_name_dup(registry);
     const char *host_name = owner_name ? string2str(owner_name) : "[disarmed]";
 
@@ -625,6 +661,7 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "NRPC: refusing to register method '%s' on host '%s': the name sanitizes to an empty string",
                name, host_name);
+        nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return;
     }
@@ -653,6 +690,7 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "NRPC: 'host:%s' attempted to register reserved dynamic-configuration method '%s' from a plugin. Ignoring it.",
                host_name, key);
+        nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return;
     }
@@ -692,16 +730,21 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
 
     const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(registry->dict, key, &tmp, sizeof(tmp));
     if(unlikely(!item)) {
-        // dictionary destroyed (host teardown or shutdown in progress) -
-        // neither the insert nor the conflict callback ran, so tmp's strings
-        // are still ours and no transport ref was taken; unwind cleanly
+        // dictionary destroyed - unreachable for THIS registry while the gate
+        // is held (destroy retires the gate before destroying the inner
+        // dictionaries), kept as a defensive unwind: neither the insert nor
+        // the conflict callback ran, so tmp's strings are still ours and no
+        // transport ref was taken
         string_freez(tmp.help);
         string_freez(tmp.tags);
+        nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return;
     }
 
     dictionary_acquired_item_release(registry->dict, item);
+
+    nrpc_registry_dispatcher_release(registry);
 
     // Notify the owner that the visible function set changed. Deliberately NO
     // cancellation of a queued pending_dels entry here: the queue is a
@@ -735,12 +778,21 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
     if(!registry)
         return false;
 
+    // the operation gate: held from the lookup through the pending_dels
+    // insert and the garbage collection (the owner-changed notification
+    // fires outside it)
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return false;
+    }
+
     size_t key_size = nrpc_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
     nrpc_sanitize_name(key, name, key_size);
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(registry->dict, key);
     if(!item) {
+        nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return false;
     }
@@ -756,6 +808,7 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
                    method->serving ? "another serving thread" : "unknown",
                    nrpc_thread_serving ? "current serving thread" : "a thread with no serving handle");
             dictionary_acquired_item_release(registry->dict, item);
+            nrpc_registry_dispatcher_release(registry);
             nrpc_registry_release(registry_item);
             return false;
         }
@@ -777,6 +830,7 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "NRPC: refusing to unregister dyncfg method '%s' via FUNCTION_DEL", name);
         dictionary_acquired_item_release(registry->dict, item);
+        nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return false;
     }
@@ -815,6 +869,8 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
     }
 
     dictionary_garbage_collect(registry->dict);
+
+    nrpc_registry_dispatcher_release(registry);
 
     // after the delete, so the report always follows the change; the manifest
     // is armed only for entries it can contain (not DYNCFG, not RESTRICTED)
@@ -937,6 +993,13 @@ bool nrpc_method_available(NRPC_OWNER owner, const char *function) {
     if(!registry)
         return false;
 
+    // the operation gate: a registry whose destroy started has no available
+    // methods - the same answer an absent registry gives
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return false;
+    }
+
     bool ret = false;
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(registry->dict, function);
     if(item) {
@@ -947,6 +1010,7 @@ bool nrpc_method_available(NRPC_OWNER owner, const char *function) {
         dictionary_acquired_item_release(registry->dict, item);
     }
 
+    nrpc_registry_dispatcher_release(registry);
     nrpc_registry_release(registry_item);
     return ret;
 }

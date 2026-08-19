@@ -490,8 +490,24 @@ static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const
                                        "This feature is not available on this host at this time.",
                                        HTTP_RESP_NOT_FOUND);
 
+    // the operation gate around the find (see the lifetime field in
+    // nrpc-internals.h): a registry whose destroy started answers exactly
+    // like an absent one
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return nrpc_call_error(result_wb,
+                                       "This feature is not available on this host at this time.",
+                                       HTTP_RESP_NOT_FOUND);
+    }
+
     const DICTIONARY_ITEM *inner_item = NULL;
     int code = nrpc_registry_find(registry, result_wb, sanitized_cmd, &inner_item);
+
+    // past the find, the gate is no longer needed: on success inner_item pins
+    // the method AND keeps the definitions dictionary on the deferred-destroy
+    // path, which is what makes the held pair's later release gate-exempt
+    nrpc_registry_dispatcher_release(registry);
+
     if(code != HTTP_RESP_OK) {
         nrpc_registry_release(registry_item);
         return code;

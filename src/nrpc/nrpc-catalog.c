@@ -78,8 +78,17 @@ size_t nrpc_catalog_host_foreach(NRPC_OWNER owner, NRPC_CATALOG_FILTER filter, n
     struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return 0;
 
+    // the operation gate (every catalog consumer takes it around its whole
+    // traversal): a registry whose destroy started visits nothing - the same
+    // answer an absent one gives
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return 0;
+    }
+
     size_t dyncfg_count = nrpc_catalog_registry_foreach(registry, filter, cb, data);
 
+    nrpc_registry_dispatcher_release(registry);
     nrpc_registry_release(registry_item);
     return dyncfg_count;
 }
@@ -136,6 +145,16 @@ size_t nrpc_catalog_render_global_functions(NRPC_OWNER owner, BUFFER *wb, bool c
     if(!registry)
         return 0;
 
+    // the operation gate, covering BOTH inner dictionaries: the pending_dels
+    // snapshot below is what makes destroy's immediate free of that
+    // dictionary safe (pending_dels.spinlock does not serialize against
+    // destroy - only the gate does). It ends when this renderer returns; the
+    // caller's commit happens outside it.
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return 0;
+    }
+
     spinlock_lock(&registry->pending_dels.spinlock);
     if(dictionary_entries(registry->pending_dels.dict)) {
         if(can_function_del) {
@@ -152,6 +171,7 @@ size_t nrpc_catalog_render_global_functions(NRPC_OWNER owner, BUFFER *wb, bool c
     size_t configs = nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_STREAM_GLOBAL,
                                                    stream_global_function_cb, wb);
 
+    nrpc_registry_dispatcher_release(registry);
     nrpc_registry_release(registry_item);
     return configs;
 }
@@ -188,12 +208,20 @@ void nrpc_catalog_host2json(NRPC_OWNER owner, BUFFER *wb) {
     struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return;
 
+    // the operation gate: a destroy in progress omits the key, exactly like
+    // an absent registry
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return;
+    }
+
     buffer_json_member_add_object(wb, "functions");
 
     nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_USER, host_function2json_cb, wb);
 
     buffer_json_object_close(wb);
 
+    nrpc_registry_dispatcher_release(registry);
     nrpc_registry_release(registry_item);
 }
 
@@ -251,7 +279,15 @@ void nrpc_catalog_host_to_dict(NRPC_OWNER owner, DICTIONARY *dst, void *value, s
     struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return;
 
+    // the operation gate - taken BEFORE the dictionary_entries() pre-check,
+    // which already dereferences the inner dictionary
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return;
+    }
+
     if(!dictionary_entries(registry->dict)) {
+        nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return;
     }
@@ -269,6 +305,7 @@ void nrpc_catalog_host_to_dict(NRPC_OWNER owner, DICTIONARY *dst, void *value, s
 
     nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_USER, host_function_to_dict_cb, &ctx);
 
+    nrpc_registry_dispatcher_release(registry);
     nrpc_registry_release(registry_item);
 }
 
@@ -304,9 +341,18 @@ DICTIONARY *nrpc_catalog_manifest_dict(NRPC_OWNER owner) {
     struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return dst;
 
+    // the operation gate - taken BEFORE the dictionary_entries() pre-check,
+    // which already dereferences the inner dictionary; a destroy in progress
+    // answers the empty manifest an absent registry answers
+    if(!nrpc_registry_dispatcher_acquire(registry)) {
+        nrpc_registry_release(registry_item);
+        return dst;
+    }
+
     if(dictionary_entries(registry->dict))
         nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_USER, manifest_entry_cb, dst);
 
+    nrpc_registry_dispatcher_release(registry);
     nrpc_registry_release(registry_item);
     return dst;
 }

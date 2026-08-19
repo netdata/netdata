@@ -2110,6 +2110,56 @@ static void reg_race_check_cb(const struct nrpc_method_view *v, void *data) {
         k->mismatches++;
 }
 
+// Drives a fake owner's WHOLE registry lifecycle in a loop, against readers
+// on the main thread: init -> register two methods -> unregister one (which
+// feeds pending_dels - the probe answers wants_del true) -> destroy. Only
+// this thread touches the probe's counters, so the plain increments in the
+// probe callbacks stay single-writer.
+#define REG_DESTROY_N 2000
+
+struct reg_destroy_ctx {
+    struct nrpc_ut_owner_probe probe;
+    struct nrpc_registry_owner owner_desc;
+    NRPC_OWNER synth;
+    bool done;
+};
+
+static void reg_destroy_worker(void *arg) {
+    struct reg_destroy_ctx *c = arg;
+
+    nrpc_serving_started();
+
+    struct nrpc_method_desc desc = {
+        .owner = c->synth,
+        .help = "destroy race",
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = 100,
+        .version = 1,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    };
+
+    for(size_t i = 0; i < REG_DESTROY_N; i++) {
+        nrpc_registry_init(&c->owner_desc);
+
+        desc.name = "reg-destroy-fn";
+        nrpc_method_register(&desc);
+
+        desc.name = "reg-destroy-del-fn";
+        nrpc_method_register(&desc);
+        nrpc_method_unregister(c->synth, "reg-destroy-del-fn", NRPC_SOURCE_DAEMON);
+
+        nrpc_registry_destroy(c->synth);
+    }
+
+    __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
+
+    nrpc_serving_finished();
+}
+
 int nrpc_registry_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
@@ -2638,6 +2688,73 @@ int nrpc_registry_unittest(void) {
         if(errors == before)
             fprintf(stderr, "  OK race: %zu consistent help/tags observations against %d re-registrations\n",
                     check.observations, REG_RACE_N);
+    }
+
+    // 7. destroy vs reader: registry destroy retires the operation gate (mark
+    //    dead + drain) before destroying the inner dictionaries, so a reader
+    //    that reached the entry through an outer handle either finishes its
+    //    gated section first or acquire-fails and answers like the registry is
+    //    absent - it can never dereference a freed inner dictionary. The
+    //    pending_dels dictionary is the sharpest edge (its destroy is always
+    //    the immediate-free branch), so the renderer - its only reader - runs
+    //    in the loop with FUNCTION_DELs queued. ASAN is the real judge here;
+    //    the hit counters only prove the readers genuinely overlapped live
+    //    windows instead of racing an always-absent entry.
+    {
+        int before = errors;
+
+        struct reg_destroy_ctx ctx = {
+            .probe = { .wants_del = true },
+            .done = false,
+        };
+        ctx.synth = (NRPC_OWNER){ .ptr = &ctx.probe };
+        ctx.owner_desc = (struct nrpc_registry_owner){
+            .id = ctx.synth,
+            .name = "reg-destroy-owner",
+            .epoch = &ctx.probe.epoch,
+            .changed = nrpc_ut_owner_changed,
+            .wants_del_journal = nrpc_ut_owner_wants_del,
+        };
+
+        ND_THREAD *t = nd_thread_create("reg-destroy", NETDATA_THREAD_OPTION_DONT_LOG, reg_destroy_worker, &ctx);
+        if(!t) {
+            fprintf(stderr, "  FAILED destroy-race: could not create the worker thread\n");
+            errors++;
+        }
+        else {
+            size_t available_hits = 0, rendered_hits = 0;
+
+            while(!__atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE)) {
+                if(nrpc_method_available(ctx.synth, "reg-destroy-fn"))
+                    available_hits++;
+
+                CLEAN_BUFFER *wb = buffer_create(0, NULL);
+                nrpc_catalog_render_global_functions(ctx.synth, wb, true);
+                if(strstr(buffer_tostring(wb), "\"reg-destroy-fn\""))
+                    rendered_hits++;
+            }
+
+            nd_thread_join(t);
+
+            if(!available_hits || !rendered_hits) {
+                fprintf(stderr, "  FAILED destroy-race: the readers never overlapped a live window "
+                                "(available %zu, rendered %zu) - the race was not exercised\n",
+                        available_hits, rendered_hits);
+                errors++;
+            }
+
+            const DICTIONARY_ITEM *leftover_item;
+            if(nrpc_registry_acquire(ctx.synth, &leftover_item)) {
+                fprintf(stderr, "  FAILED destroy-race: the fake owner's entry survived its last destroy\n");
+                errors++;
+                nrpc_registry_release(leftover_item);
+            }
+
+            if(errors == before)
+                fprintf(stderr, "  OK destroy-race: %zu available + %zu rendered observations across %d full "
+                                "init/register/destroy cycles, no reader ever met a freed dictionary\n",
+                        available_hits, rendered_hits, REG_DESTROY_N);
+        }
     }
 
     // leave localhost as found: every fixture above was deleted in its own

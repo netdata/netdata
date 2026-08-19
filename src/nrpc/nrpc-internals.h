@@ -46,6 +46,38 @@ struct nrpc_registry {
         bool (*wants_del_journal)(NRPC_OWNER id);
     } owner;
 
+    // The operation gate for the inner dictionaries below. Only the
+    // dispatcher half of the shell is used: the outer index's item refcounts
+    // already play the entry-ref role (a held outer handle is what pins this
+    // struct's memory - but NOT the objects it points to, which is exactly the
+    // gap this gate closes). Every public operation that reaches the inner
+    // dictionaries through an outer handle wraps its WHOLE inner-dictionary
+    // use in one dispatcher acquire-or-fail (nrpc_registry_dispatcher_acquire);
+    // a failed acquire is the ordinary "no live registry / not available"
+    // answer. nrpc_registry_destroy() retires the gate (mark dead + drain)
+    // after disarming and unlinking the entry, and only then destroys the
+    // inner dictionaries - so a reader that reached this struct through a
+    // handle acquired before the unlink can no longer be inside them, and can
+    // never enter them again.
+    //
+    // Exempt by design: nrpc_method_acquired_release_pair(). Its inner item
+    // ref keeps the definitions dictionary on the deferred-destroy path, which
+    // is the same survival guarantee without the gate - and a late release
+    // (async completion, shutdown unwind) must never be refused.
+    //
+    // INVARIANT: gated sections MUST NOT block indefinitely. Some destroy
+    // paths run under the rrd write lock
+    // (rrdhost_free___while_having_rrd_wrlock -> ... -> nrpc_registry_destroy)
+    // and the retire drain waits for every gated reader, so a gated section
+    // that blocks turns that wait into an agent-wide stall. No gated section
+    // takes an rrd lock today (in-gate owner access is limited to the
+    // owner_spinlock snapshots and the lock-free wants_del_journal callback;
+    // the changed callback fires outside the gate), so there is no lock cycle
+    // - keep it that way. Blocking includes I/O: logging inside gated
+    // sections stays level-filtered debug lines or rare warnings - a
+    // blocking log sink in a hot gated path would extend the drain.
+    NRPC_LIFETIME lifetime;
+
     DICTIONARY *dict;               // the function definitions, keyed by sanitized name
 
     // Pending FUNCTION_DEL queue towards the parent. Deleters (any thread)
@@ -196,6 +228,19 @@ static inline char *nrpc_sanitize_name_dupz(const char *src) {
 // or before the index exists).
 struct nrpc_registry *nrpc_registry_acquire(NRPC_OWNER owner, const DICTIONARY_ITEM **item_out);
 void nrpc_registry_release(const DICTIONARY_ITEM *item);
+
+// The operation gate around inner-dictionary use (see the lifetime field in
+// struct nrpc_registry): acquire-or-fail BEFORE touching registry->dict or
+// registry->pending_dels through an outer handle, release when the operation's
+// inner-dictionary work is done. False means destroy has started for this
+// entry - answer what an absent registry answers.
+static inline bool nrpc_registry_dispatcher_acquire(struct nrpc_registry *registry) {
+    return nrpc_lifetime_dispatcher_acquire(&registry->lifetime);
+}
+
+static inline void nrpc_registry_dispatcher_release(struct nrpc_registry *registry) {
+    nrpc_lifetime_dispatcher_release(&registry->lifetime);
+}
 
 // A held method entry: the outer item pins the registry, the inner item pins
 // the method. Self-contained - releasing needs no identity lookup, so a
