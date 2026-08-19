@@ -1106,7 +1106,7 @@ void diskspace_main(void *ptr) {
     diskspace_mountpoints_init();
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host_id = localhost->host_id,
+        .owner = rrdhost_nrpc_owner(localhost),
         .name = "mount-points",
         .help = FUNCTION_DISKSPACE_HELP,
         .tags = "top",

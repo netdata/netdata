@@ -338,7 +338,7 @@ int pluginsd_functions_unittest(void) {
 
         // COLLECTOR with transport: insert acquires -> 2
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
             .help = "mixed",
             .tags = "top",
@@ -359,7 +359,7 @@ int pluginsd_functions_unittest(void) {
 
         // INTERNAL displaces it: displaced pair released under COLLECTOR tag -> 1
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
             .help = "mixed",
             .tags = "top",
@@ -379,7 +379,7 @@ int pluginsd_functions_unittest(void) {
 
         // and back to COLLECTOR: installed pair acquired -> 2
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
             .help = "mixed",
             .tags = "top",
@@ -400,7 +400,7 @@ int pluginsd_functions_unittest(void) {
 
         // equal-pointer conflict (a re-sent function list): nets ZERO refs
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
             .help = "mixed",
             .tags = "top",
@@ -420,7 +420,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         // delete: the stored pair released under its stored tag -> 1
-        nrpc_method_unregister(host->host_id, "c6-mixed-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c6-mixed-fn", NRPC_SOURCE_DAEMON);
         if(refcount_references(&tr->entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after del, entry refs %d != 1\n",
                     refcount_references(&tr->entry_refcount));
@@ -448,7 +448,7 @@ int pluginsd_functions_unittest(void) {
 
         // the function is served by the pluginsd transport, as in production
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c6-gc-mid-defer-fn",
             .help = "gc",
             .tags = "top",
@@ -470,7 +470,7 @@ int pluginsd_functions_unittest(void) {
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         int code = nrpc_call(&(struct nrpc_call_spec) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .result_wb = wb,
             .cmd = "c6-gc-mid-defer-fn",
             .source = "unittest",
@@ -522,7 +522,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host->host_id, "c6-gc-mid-defer-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c6-gc-mid-defer-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK gc-mid-defer: GC delete mid-defer delivered exactly once, at RESULT_END\n");
@@ -663,7 +663,7 @@ int pluginsd_functions_unittest(void) {
         nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c6-gc-race-fn",
             .help = "gc",
             .tags = "top",
@@ -683,7 +683,7 @@ int pluginsd_functions_unittest(void) {
 
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             int code = nrpc_call(&(struct nrpc_call_spec) {
-                .host_id = host->host_id,
+                .owner = rrdhost_nrpc_owner(host),
                 .result_wb = wb,
                 .cmd = "c6-gc-race-fn",
                 .source = "unittest",
@@ -729,7 +729,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         parser_destroy(parser);
-        nrpc_method_unregister(host->host_id, "c6-gc-race-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c6-gc-race-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK gc-race: concurrent GC passes cancel and deliver exactly once\n");
@@ -746,7 +746,7 @@ int pluginsd_functions_unittest(void) {
         // fires only when less than FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT
         // remains)
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c5b-deadline-fn",
             .help = "deadline",
             .tags = "top",
@@ -761,7 +761,7 @@ int pluginsd_functions_unittest(void) {
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         int code = nrpc_call(&(struct nrpc_call_spec) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .result_wb = wb,
             .cmd = "c5b-deadline-fn",
             .source = "unittest",
@@ -800,7 +800,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host->host_id, "c5b-deadline-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c5b-deadline-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK deadline: accessor sees the deadline, the progress extension, and the completion\n");
@@ -818,7 +818,7 @@ int pluginsd_functions_unittest(void) {
         nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c7-dead-transport-fn",
             .help = "dead",
             .tags = "top",
@@ -839,7 +839,7 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         int code = nrpc_call(&(struct nrpc_call_spec) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .result_wb = wb,
             .cmd = "c7-dead-transport-fn",
             .source = "unittest",
@@ -865,7 +865,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host->host_id, "c7-dead-transport-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c7-dead-transport-fn", NRPC_SOURCE_DAEMON);
         nrpc_transport_owner_release(tr); // frees it; ASAN verifies the accounting
 
         if(errors == before)
@@ -956,7 +956,7 @@ int pluginsd_functions_unittest(void) {
         nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c7-dup-fn",
             .help = "dup",
             .tags = "top",
@@ -979,7 +979,7 @@ int pluginsd_functions_unittest(void) {
         CLEAN_BUFFER *wb2 = buffer_create(0, NULL);
 
         int c1 = nrpc_call(&(struct nrpc_call_spec) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .result_wb = wb1,
             .cmd = "c7-dup-fn",
             .source = "unittest",
@@ -992,7 +992,7 @@ int pluginsd_functions_unittest(void) {
             .result.data = &r1,
         });
         int c2 = nrpc_call(&(struct nrpc_call_spec) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .result_wb = wb2,
             .cmd = "c7-dup-fn",
             .source = "unittest",
@@ -1036,7 +1036,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host->host_id, "c7-dup-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c7-dup-fn", NRPC_SOURCE_DAEMON);
 
         // the same collision inside the parser's own dictionary
         {
@@ -1186,7 +1186,7 @@ int pluginsd_functions_unittest(void) {
         nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c7-grace-fn",
             .help = "grace",
             .tags = "top",
@@ -1203,7 +1203,7 @@ int pluginsd_functions_unittest(void) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         usec_t t0 = now_monotonic_usec();
         int code = nrpc_call(&(struct nrpc_call_spec) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .result_wb = wb,
             .cmd = "c7-grace-fn",
             .source = "unittest",
@@ -1240,7 +1240,7 @@ int pluginsd_functions_unittest(void) {
         }
 
         parser_destroy(parser);
-        nrpc_method_unregister(host->host_id, "c7-grace-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c7-grace-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK grace: the deadline is enforced one extension late, and exactly once\n");
@@ -1262,7 +1262,7 @@ int pluginsd_functions_unittest(void) {
         c7_pin.second = nrpc_transport_create(NULL);
 
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c7-pin-fn",
             .help = "pin",
             .tags = "top",
@@ -1278,7 +1278,7 @@ int pluginsd_functions_unittest(void) {
         struct c6ut_result res = { 0 };
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         int code = nrpc_call(&(struct nrpc_call_spec) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .result_wb = wb,
             .cmd = "c7-pin-fn",
             .source = "unittest",
@@ -1344,7 +1344,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host->host_id, "c7-pin-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c7-pin-fn", NRPC_SOURCE_DAEMON);
         nrpc_transport_mark_dead_and_drain(c7_pin.first);
         nrpc_transport_owner_release(c7_pin.first);
         nrpc_transport_mark_dead_and_drain(c7_pin.second);
@@ -1365,7 +1365,7 @@ int pluginsd_functions_unittest(void) {
         nrpc_inflight_calls_create(); // idempotent
 
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c7-timeout-fn",
             .help = "timeout",
             .tags = "top",
@@ -1388,7 +1388,7 @@ int pluginsd_functions_unittest(void) {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             usec_t t0 = now_monotonic_usec();
             int code = nrpc_call(&(struct nrpc_call_spec) {
-                .host_id = host->host_id,
+                .owner = rrdhost_nrpc_owner(host),
                 .result_wb = wb,
                 .cmd = "c7-timeout-fn",
                 .source = "unittest",
@@ -1417,11 +1417,11 @@ int pluginsd_functions_unittest(void) {
             c5b_capture.result_cb(c5b_capture.result_wb, HTTP_RESP_OK, c5b_capture.result_cb_data);
         }
 
-        nrpc_method_unregister(host->host_id, "c7-timeout-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c7-timeout-fn", NRPC_SOURCE_DAEMON);
 
         memset(&c7_sync, 0, sizeof(c7_sync));
         nrpc_method_register(&(struct nrpc_method_desc) {
-            .host_id = host->host_id,
+            .owner = rrdhost_nrpc_owner(host),
             .name = "c7-sync-fn",
             .help = "sync",
             .tags = "top",
@@ -1438,7 +1438,7 @@ int pluginsd_functions_unittest(void) {
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
             int code = nrpc_call(&(struct nrpc_call_spec) {
-                .host_id = host->host_id,
+                .owner = rrdhost_nrpc_owner(host),
                 .result_wb = wb,
                 .cmd = "c7-sync-fn",
                 .source = "unittest",
@@ -1473,7 +1473,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        nrpc_method_unregister(host->host_id, "c7-sync-fn", NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), "c7-sync-fn", NRPC_SOURCE_DAEMON);
 
         if(errors == before)
             fprintf(stderr, "  OK deadline/sync: the registered timeout is the fallback; a sync call leaves no transaction\n");

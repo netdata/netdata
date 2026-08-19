@@ -73,9 +73,9 @@ static size_t nrpc_catalog_registry_foreach(struct nrpc_registry *registry, NRPC
     return dyncfg_count;
 }
 
-size_t nrpc_catalog_host_foreach(ND_UUID host_id, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
+size_t nrpc_catalog_host_foreach(NRPC_OWNER owner, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data) {
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return 0;
 
     size_t dyncfg_count = nrpc_catalog_registry_foreach(registry, filter, cb, data);
@@ -128,13 +128,13 @@ static void stream_global_function_cb(const struct nrpc_method_view *v, void *da
 // global_functions_spinlock across {render + commit}, or a stale rendered
 // buffer could commit its FUNCTION_DEL lines after a fresh re-list (see the
 // lock's comment in stream-sender-internals.h).
-size_t nrpc_catalog_render_global_functions(ND_UUID host_id, BUFFER *wb, bool can_function_del) {
-    // a host identity without a live registry entry (an archived host racing
+size_t nrpc_catalog_render_global_functions(NRPC_OWNER owner, BUFFER *wb, bool can_function_del) {
+    // a host without a live registry entry (an archived host racing
     // the sender's flag poll) behaves exactly like the old NULL-tolerant
     // dictionary traversal: the caller already cleared the flag, nothing is
     // emitted here
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry)
         return 0;
 
@@ -183,11 +183,11 @@ static void host_function2json_cb(const struct nrpc_method_view *v, void *data) 
     buffer_json_object_close(wb);
 }
 
-void nrpc_catalog_host2json(ND_UUID host_id, BUFFER *wb) {
+void nrpc_catalog_host2json(NRPC_OWNER owner, BUFFER *wb) {
     // the "functions" key is OMITTED entirely when the host has no live
     // registry entry - the historical NULL-registry payload shape
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return;
 
     buffer_json_member_add_object(wb, "functions");
@@ -245,12 +245,12 @@ static void host_function_to_dict_cb(const struct nrpc_method_view *v, void *dat
     dictionary_set(ctx->dst, key, ctx->value, ctx->value_size);
 }
 
-void nrpc_catalog_host_to_dict(ND_UUID host_id, DICTIONARY *dst, void *value, size_t value_size,
+void nrpc_catalog_host_to_dict(NRPC_OWNER owner, DICTIONARY *dst, void *value, size_t value_size,
                             const char **help, const char **tags, HTTP_ACCESS *access, int *priority, uint32_t *version) {
     if(!dst) return;
 
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return;
 
     if(!dictionary_entries(registry->dict)) {
@@ -298,12 +298,12 @@ static void manifest_entry_cb(const struct nrpc_method_view *v, void *data) {
     dictionary_set(dst, v->name, &e, sizeof(e));
 }
 
-DICTIONARY *nrpc_catalog_manifest_dict(ND_UUID host_id) {
+DICTIONARY *nrpc_catalog_manifest_dict(NRPC_OWNER owner) {
     DICTIONARY *dst = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_register_delete_callback(dst, manifest_entry_delete_cb, NULL);
 
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return dst;
 
     if(dictionary_entries(registry->dict))

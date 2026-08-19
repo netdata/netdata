@@ -185,7 +185,7 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
     // rrdhost_free_unlinked() - that exposure is pre-existing and identical for build_node_info()
     // and build_node_collectors(), which dereference the host in this same loop.
     rrd_rdlock();
-    manifest.functions = nrpc_catalog_manifest_dict(host->host_id);
+    manifest.functions = nrpc_catalog_manifest_dict(rrdhost_nrpc_owner(host));
     rrd_rdunlock();
 
     // Suppress publishing a manifest identical to the one already published in this ACLK session.

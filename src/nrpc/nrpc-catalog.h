@@ -42,7 +42,7 @@ typedef void (*nrpc_method_view_cb_t)(const struct nrpc_method_view *v, void *da
 
 // returns the number of DYNCFG entries encountered (meaningful for
 // NRPC_CATALOG_FILTER_STREAM_GLOBAL, zero otherwise)
-size_t nrpc_catalog_host_foreach(ND_UUID host_id, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data);
+size_t nrpc_catalog_host_foreach(NRPC_OWNER owner, NRPC_CATALOG_FILTER filter, nrpc_method_view_cb_t cb, void *data);
 
 // ----------------------------------------------------------------------------
 // the consumers built on the iteration API
@@ -52,13 +52,13 @@ size_t nrpc_catalog_host_foreach(ND_UUID host_id, NRPC_CATALOG_FILTER filter, nr
 // Returns the number of dyncfg-backed entries encountered so the caller can
 // decide the synthetic "config" line (dyncfg is an application on top of
 // this component - the renderer emits no dyncfg output itself).
-size_t nrpc_catalog_render_global_functions(ND_UUID host_id, BUFFER *wb, bool can_function_del);
+size_t nrpc_catalog_render_global_functions(NRPC_OWNER owner, BUFFER *wb, bool can_function_del);
 
-void nrpc_catalog_host2json(ND_UUID host_id, BUFFER *wb);
+void nrpc_catalog_host2json(NRPC_OWNER owner, BUFFER *wb);
 
 // help/tags receive OWNED byte copies (strdupz) - the destination dictionary's
 // callbacks own freeing them (conflict losers and deleted entries)
-void nrpc_catalog_host_to_dict(ND_UUID host_id, DICTIONARY *dst, void *value, size_t value_size,
+void nrpc_catalog_host_to_dict(NRPC_OWNER owner, DICTIONARY *dst, void *value, size_t value_size,
                             const char **help, const char **tags, HTTP_ACCESS *access, int *priority, uint32_t *version);
 
 // the ACLK node-instance manifest content (see sqlite_aclk_node.c)
@@ -74,7 +74,7 @@ struct nrpc_manifest_entry {
 // struct nrpc_manifest_entry per available, user-visible function.
 // The caller owns it and must dictionary_destroy() it; the string copies are
 // released by a delete callback registered on the dictionary.
-DICTIONARY *nrpc_catalog_manifest_dict(ND_UUID host_id);
+DICTIONARY *nrpc_catalog_manifest_dict(NRPC_OWNER owner);
 
 // Content hash of a manifest dictionary plus the node identity it will be published under.
 // Covers exactly the fields generate_update_node_instance_manifest_message() transmits

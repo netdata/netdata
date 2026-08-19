@@ -85,7 +85,7 @@ int api_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused)
 
     buffer_flush(w->response.data);
     int code = nrpc_call(&(struct nrpc_call_spec) {
-        .host_id = host ? host->host_id : UUID_ZERO,
+        .owner = host ? rrdhost_nrpc_owner(host) : NRPC_OWNER_NONE,
         .result_wb = w->response.data,
         .cmd = cmd,
         .source = buffer_tostring(source),

@@ -56,7 +56,7 @@ ALWAYS_INLINE RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t w
         // clear the flag FIRST, then render: the streaming side's half of the
         // pending-dels ordering protocol (see stream_send_global_functions)
         rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
-        size_t configs = nrpc_catalog_render_global_functions(host->host_id, wb,
+        size_t configs = nrpc_catalog_render_global_functions(rrdhost_nrpc_owner(host), wb,
                                                     stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                         rrdhost_can_stream_metadata_to_parent(host));
         // the synthetic "config" line is the streaming side's to append (the

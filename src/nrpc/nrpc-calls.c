@@ -490,17 +490,17 @@ static inline int nrpc_call_async(struct nrpc_call *call, bool wait) {
 // out_pair is zeroed. UUID_ZERO answers 500 exactly as the old NULL host did;
 // an identity with no live registry entry answers 404 exactly as the old
 // NULL host->rpc_registry did.
-static int nrpc_method_authorize_pair(ND_UUID host_id, BUFFER *result_wb, const char *cmd,
+static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
                                       HTTP_ACCESS user_access, bool allow_restricted,
                                       struct nrpc_method_acquired *out_pair) {
     *out_pair = (struct nrpc_method_acquired){ 0 };
 
-    if(UUIDiszero(host_id))
+    if(!nrpc_owner_is_set(owner))
         return nrpc_call_error(result_wb, "No host given for routing this request to.",
                                        HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry)
         return nrpc_call_error(result_wb,
                                        "This feature is not available on this host at this time.",
@@ -570,14 +570,14 @@ static int nrpc_method_authorize_pair(ND_UUID host_id, BUFFER *result_wb, const 
     return HTTP_RESP_OK;
 }
 
-int nrpc_method_authorize(ND_UUID host_id, BUFFER *result_wb, const char *cmd,
+int nrpc_method_authorize(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
                               NRPC_METHOD_ACQUIRED **out_acquired) {
     if(out_acquired)
         *out_acquired = NULL;
 
     struct nrpc_method_acquired pair;
-    int code = nrpc_method_authorize_pair(host_id, result_wb, cmd, user_access, allow_restricted, &pair);
+    int code = nrpc_method_authorize_pair(owner, result_wb, cmd, user_access, allow_restricted, &pair);
     if(code != HTTP_RESP_OK)
         return code;
 
@@ -606,12 +606,12 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
 
     // ------------------------------------------------------------------------
     // find the function and verify the caller's access
-    // (a zero host_id answers 500 - the "no host given" sentinel)
+    // (an unset owner answers 500 - the "no host given" sentinel)
 
     size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, spec->cmd, sizeof(sanitized_cmd));
 
     struct nrpc_method_acquired held;
-    code = nrpc_method_authorize_pair(spec->host_id, result_wb, spec->cmd, spec->user_access,
+    code = nrpc_method_authorize_pair(spec->owner, result_wb, spec->cmd, spec->user_access,
                                       spec->allow_restricted, &held);
     if(code != HTTP_RESP_OK) {
 

@@ -11,39 +11,39 @@
 
 // The per-host function registry: the value of one entry of the
 // component-global registries index (see nrpc_registry_acquire), keyed by the
-// host's ND_UUID identity. It owns the definitions dictionary; everything it
-// may need from its owner lives in the embedded owner vtable, written only
-// under owner_spinlock (init, takeover, DISARM) and snapshotted under the
-// same lock by every reader. A held outer HANDLE deliberately outlives the
-// entry (that is the point of the in-flight held pair): a path reached
-// through such a handle after destroy finds the vtable DISARMED (name freed,
-// epoch NULL, callbacks NULL) and degrades to a no-op instead of calling
-// into a dying owner.
+// owning host OBJECT. It owns the definitions dictionary; everything it may
+// need from its owner lives in the embedded owner vtable, written only under
+// owner_spinlock (init, DISARM) and snapshotted under the same lock by every
+// reader. A held outer HANDLE deliberately outlives the entry (that is the
+// point of the in-flight held pair): a path reached through such a handle
+// after destroy finds the vtable DISARMED (name freed, epoch NULL, callbacks
+// NULL) and degrades to a no-op instead of calling into a dying owner.
 struct nrpc_registry {
-    ND_UUID host_id;                // the entry's own identity (the index key, parsed back)
+    // The entry's identity: the index key, and the argument the owner's
+    // callbacks receive. IMMUTABLE for the entry's whole lifetime - assigned
+    // before the entry enters the index and never rewritten, not even by
+    // disarm, so it is read lock-free (the key on delete, the label in logs).
+    // Disarm does not need to clear it: with the callbacks NULLed there is
+    // nobody left to hand it to.
+    NRPC_OWNER id;
 
-    // Serializes ownership transitions and every vtable access:
-    // nrpc_registry_init()'s takeover of a dying predecessor's entry,
-    // nrpc_registry_destroy()'s owner check + index delete + DISARM, and the
-    // reader snapshots (nrpc_registry_owner_*). LOCK RULE: order is this ->
-    // the outer index locks (destroy deletes while holding it) and this ->
-    // the inner dictionary locks (takeover flushes while holding it) - so it
-    // is NEVER taken while any inner dictionary lock is held: not in the
-    // inner insert/conflict callbacks (the epoch id is pre-stamped through
-    // the value bytes instead) and not inside a dfe traversal (the catalog
-    // snapshots the epoch once before iterating).
+    // Serializes every vtable access: nrpc_registry_destroy()'s index delete
+    // + DISARM, and the reader snapshots (nrpc_registry_owner_*). LOCK RULE:
+    // order is this -> the outer index locks (destroy deletes while holding
+    // it), so it is NEVER taken while any inner dictionary lock is held: not
+    // in the inner insert/conflict callbacks (the epoch id is pre-stamped
+    // through the value bytes instead) and not inside a dfe traversal (the
+    // catalog snapshots the epoch once before iterating).
     SPINLOCK owner_spinlock;
-    bool dead;                      // set under owner_spinlock when destroy unlinked the entry
 
     // the owner vtable (see struct nrpc_registry_owner). name is the
-    // component's OWN copy; epoch/data/callbacks are the owner's, valid
-    // while armed. Disarm clears every field.
+    // component's OWN copy; epoch/callbacks are the owner's, valid while
+    // armed. Disarm clears every field.
     struct {
         STRING *name;
         OBJECT_STATE *epoch;
-        void *data;
-        void (*changed)(void *data, bool arm_manifest);
-        bool (*wants_del_journal)(void *data);
+        void (*changed)(NRPC_OWNER id, bool arm_manifest);
+        bool (*wants_del_journal)(NRPC_OWNER id);
     } owner;
 
     DICTIONARY *dict;               // the function definitions, keyed by sanitized name
@@ -61,6 +61,16 @@ struct nrpc_registry {
         DICTIONARY *dict;           // keyed by sanitized name, no value (a set)
     } pending_dels;
 };
+
+// The index key of an owner, which doubles as its label in log lines: the
+// handle in hex. A dictionary key is a C string, so the raw pointer bytes
+// (which contain NULs) cannot be used directly; hex is printable, fixed width,
+// and stable for the entry's whole lifetime. The creation log line in
+// nrpc_registry_init() maps a label back to a hostname.
+#define NRPC_OWNER_KEY_LEN UINT64_HEX_MAX_LENGTH
+static inline void nrpc_owner_str(char out[NRPC_OWNER_KEY_LEN], NRPC_OWNER owner) {
+    print_uint64_hex_full(out, (uint64_t)(uintptr_t)owner.ptr);
+}
 
 struct nrpc_method {
     bool sync;                      // when true, the function is called synchronously
@@ -131,13 +141,13 @@ static inline size_t nrpc_strlen_bounded(const char *s, size_t max) {
 // ----------------------------------------------------------------------------
 // the component-global registries index
 
-// Acquire the registry entry of a host identity. The returned outer item pins
-// the struct nrpc_registry (and, through it, the inner dictionaries' memory)
-// until nrpc_registry_release() - a concurrent host teardown unlinks the entry
-// from the index but cannot reclaim it while handles are held. Returns NULL
-// when the identity has no live entry (unknown host, archived host,
-// UUID_ZERO, or before the index exists).
-struct nrpc_registry *nrpc_registry_acquire(ND_UUID host_id, const DICTIONARY_ITEM **item_out);
+// Acquire the registry entry of an owner. The returned outer item pins the
+// struct nrpc_registry (and, through it, the inner dictionaries' memory) until
+// nrpc_registry_release() - a concurrent host teardown unlinks the entry from
+// the index but cannot reclaim it while handles are held. Returns NULL when
+// the owner has no live entry (unknown host, archived host, NRPC_OWNER_NONE,
+// or before the index exists).
+struct nrpc_registry *nrpc_registry_acquire(NRPC_OWNER owner, const DICTIONARY_ITEM **item_out);
 void nrpc_registry_release(const DICTIONARY_ITEM *item);
 
 // A held method entry: the outer item pins the registry, the inner item pins
@@ -166,8 +176,7 @@ void nrpc_method_acquired_release_pair(struct nrpc_method_acquired *acquired);
 // _at() is PURE (no locks) - the form for traversals holding inner
 // dictionary locks; the registry form snapshots the epoch itself and MUST
 // NOT be called under inner dictionary locks (LOCK RULE: owner_spinlock is
-// never taken inner-side, because the takeover holds it across the inner
-// flush)
+// never taken inner-side)
 bool nrpc_method_is_available_at(struct nrpc_method *method, bool armed, OBJECT_STATE_ID epoch_id);
 bool nrpc_method_is_available(struct nrpc_registry *registry, struct nrpc_method *method);
 int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name, size_t key_length,

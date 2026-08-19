@@ -571,7 +571,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
         version = str2u(version_str);
 
     nrpc_method_register(&(struct nrpc_method_desc) {
-        .host_id = host->host_id,
+        .owner = rrdhost_nrpc_owner(host),
         .name = name,
         .help = help,
         .tags = tags,
@@ -610,7 +610,7 @@ PARSER_RC pluginsd_function_del(char **words, size_t num_words, PARSER *parser) 
 
     bool from_streaming = (parser->repertoire & PARSER_INIT_STREAMING) != 0;
 
-    if(!nrpc_method_unregister(host->host_id, name,
+    if(!nrpc_method_unregister(rrdhost_nrpc_owner(host), name,
                          from_streaming ? NRPC_SOURCE_STREAM : NRPC_SOURCE_PLUGIN)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "PLUGINSD: 'host:%s' FUNCTION_DEL '%s' - function not found or ownership mismatch",

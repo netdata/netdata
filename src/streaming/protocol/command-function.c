@@ -29,7 +29,7 @@ void stream_send_global_functions(RRDHOST *host) {
     // the renderer drains the pending FUNCTION_DEL queue too; it needs our
     // verdict on whether the parent can accept FUNCTION_DEL (absorbed from the
     // old stream_send_function_del gate)
-    size_t configs = nrpc_catalog_render_global_functions(host->host_id, wb,
+    size_t configs = nrpc_catalog_render_global_functions(rrdhost_nrpc_owner(host), wb,
                                                 stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                     rrdhost_can_stream_metadata_to_parent(host));
 

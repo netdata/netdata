@@ -79,7 +79,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         BUFFER *wb = buffer_create(1024, &nrpc_buffers_functions);
 
         struct nrpc_call_spec spec = {
-            .host_id = s->host->host_id,
+            .owner = rrdhost_nrpc_owner(s->host),
             .result_wb = wb,
             .cmd = function,
             .source = source,

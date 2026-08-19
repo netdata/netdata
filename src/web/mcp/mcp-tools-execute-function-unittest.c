@@ -110,7 +110,7 @@ int mcp_execute_function_access_unittest(void) {
 
     // A protected function mirroring systemd-journal's access requirements.
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host_id = host->host_id,
+        .owner = rrdhost_nrpc_owner(host),
         .name = MCP_UT_FN,
         .help = "unittest protected function",
         .tags = "logs",
@@ -192,7 +192,7 @@ int mcp_execute_function_access_unittest(void) {
         mcp_free_client(mcpc);
     }
 
-    nrpc_method_unregister(host->host_id, MCP_UT_FN, NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(rrdhost_nrpc_owner(host), MCP_UT_FN, NRPC_SOURCE_DAEMON);
     mcp_functions_registry_cleanup();
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

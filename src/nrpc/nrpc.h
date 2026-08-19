@@ -10,15 +10,15 @@
 // expose, and that users, parents and Netdata Cloud invoke on demand.
 //
 // Concept map:
-// - registry (struct nrpc_registry): per-host-identity table of methods; the
-//   registries live in a component-global index keyed by the host's ND_UUID,
-//   not inside RRDHOST.
+// - registry (struct nrpc_registry): per-host table of methods; the
+//   registries live in a component-global index keyed by the owning host
+//   OBJECT (NRPC_OWNER); the owner needs no component field of its own.
 // - method (struct nrpc_method): a named callable endpoint. Its static
 //   attribute bundle (name, help, tags, access, timeout, priority, version)
 //   is its DESCRIPTOR - never "metadata", which RPC reserves for per-call
 //   headers. Registration takes a caller-filled desc struct
 //   (struct nrpc_method_desc, struct nrpc_builtin_desc) that extends the
-//   attribute bundle with the owning host identity and the handler.
+//   attribute bundle with the owning host and the handler.
 // - call: one invocation of a method, tracked in the in-flight calls table
 //   (struct nrpc_inflight_calls) and correlated by a call_id. Calls carry a
 //   deadline and support cancel and progress.
@@ -131,6 +131,41 @@ struct nrpc_method;
 // freed while the handle is held
 typedef struct nrpc_method_acquired NRPC_METHOD_ACQUIRED;
 
+// The identity of a registry and of everyone who talks to it: the owning host
+// OBJECT, carried as an opaque token. It is BOTH the key of the component-
+// global registries index AND the argument handed back to the owner's
+// callbacks. The component never dereferences .ptr - only the owner knows the
+// pointee, and only the owner ever builds the token.
+//
+// Why the object and not the host's machine guid: two live hosts are two
+// distinct objects, so two owners can never collide, whatever their guids say.
+// A guid is text off the wire that several spellings can parse to, and an
+// entry keyed on it can be claimed by a host that merely looks like its owner.
+//
+// CONTRACT the owner must honour, in exchange:
+// - one token, one object, for as long as the entry exists;
+// - destroy runs before the object's memory is released, so a later object
+//   reusing the address finds no entry to inherit.
+//
+// init and destroy for one token MAY overlap; the component arbitrates them
+// itself (the index serializes create against delete, and the entry's own lock
+// serializes init's liveness check against destroy's disarm), so no
+// interleaving corrupts anything. What the component cannot repair is the
+// OUTCOME of losing that race: an init whose lookup landed just before a
+// destroy deleted the entry ends up creating a fresh one, but an init that
+// completed just before one leaves its owner with no registry until it
+// initializes again. An owner that cannot tolerate that must serialize its own
+// init and destroy - RRDHOST currently does not, and records why above
+// rrdhost_nrpc_registry_owner() in rrdhost.c.
+typedef struct {
+    void *ptr;
+} NRPC_OWNER;
+
+#define NRPC_OWNER_NONE ((NRPC_OWNER){ .ptr = NULL })
+
+static inline bool nrpc_owner_is_set(NRPC_OWNER o) { return o.ptr != NULL; }
+static inline bool nrpc_owner_eq(NRPC_OWNER a, NRPC_OWNER b) { return a.ptr == b.ptr; }
+
 typedef enum __attribute__((packed)) {
     NRPC_METHOD_FLAG_NONE = 0,
     NRPC_METHOD_FLAG_DYNCFG = (1 << 0),
@@ -151,43 +186,43 @@ typedef enum __attribute__((packed)) {
 } NRPC_SOURCE;
 
 // The owner vtable: everything the component may need from whoever owns a
-// registry entry, supplied at entry creation. The component copies `name`
-// (it keeps its own STRING, so an owner-side rename cannot free bytes under
-// a concurrent log line) and stores the rest verbatim. `epoch` is a LIVE
+// registry entry, supplied at entry creation. `id` is the identity - it keys
+// the entry and comes back as the callbacks' argument. The component copies
+// `name` (it keeps its own STRING, so an owner-side rename cannot free bytes
+// under a concurrent log line) and stores the rest verbatim. `epoch` is a LIVE
 // pointer, valid exactly while the entry is armed - entry disarm (inside
-// destroy) precedes owner teardown on every path. The callbacks receive
-// `data` back; `changed` reports that the host-wide visible function set
-// changed (`arm_manifest` is true when the change affects the cloud
-// manifest - the flag-update and the manifest-arm fire under different
-// per-entry conditions, so the component passes the verdict);
-// `wants_del_journal` answers whether deleted names should be queued for a
-// parent (a LIVE question - the owner's sender can appear and disappear).
+// destroy) precedes owner teardown on every path. `changed` reports that the
+// host-wide visible function set changed (`arm_manifest` is true when the
+// change affects the cloud manifest - the flag-update and the manifest-arm
+// fire under different per-entry conditions, so the component passes the
+// verdict); `wants_del_journal` answers whether deleted names should be queued
+// for a parent (a LIVE question - the owner's sender can appear and disappear).
 struct nrpc_registry_owner {
-    const char *name;                               // copied at entry creation
-    OBJECT_STATE *epoch;                            // live epoch pointer (see above)
-    void *data;                                     // opaque owner identity, passed to the callbacks
-    void (*changed)(void *data, bool arm_manifest); // the visible function set changed
-    bool (*wants_del_journal)(void *data);          // queue FUNCTION_DELs towards a parent?
+    NRPC_OWNER id;                                    // required: the identity - index key and callback argument
+    const char *name;                                 // copied at entry creation
+    OBJECT_STATE *epoch;                              // required: live epoch pointer (see above). Its NULL is
+                                                      // this component's DISARMED marker, so init refuses one
+    void (*changed)(NRPC_OWNER id, bool arm_manifest);// the visible function set changed
+    bool (*wants_del_journal)(NRPC_OWNER id);         // queue FUNCTION_DELs towards a parent?
 };
 
-// Registry entry lifecycle - called from the owner's lifecycle (rrdhost.c)
-// with a live owner: init creates the entry in the component-global
-// registries index (a zero host_id is refused with an ERROR), destroy
-// disarms and unlinks it. Both verify entry OWNERSHIP against owner `data`,
-// so the losing host of a machine-guid index collision can never touch the
-// winner's live entry, while a same-identity successor takes a dying
-// predecessor's entry over.
-void nrpc_registry_init(ND_UUID host_id, const struct nrpc_registry_owner *owner);
-void nrpc_registry_destroy(ND_UUID host_id, void *owner_data);
+// Registry entry lifecycle - called from the owner's own lifecycle with a live
+// owner: init creates the entry in the component-global registries index,
+// destroy disarms and unlinks it. Both are keyed on the owner itself,
+// so neither can reach another owner's entry: init on a live entry is
+// idempotent (it can only be a re-init of that same owner, e.g. un-archive),
+// and destroy for an owner that never got an entry simply finds nothing.
+void nrpc_registry_init(const struct nrpc_registry_owner *owner);
+void nrpc_registry_destroy(NRPC_OWNER owner);
 
-// destroy the (by then empty) component-global registries index at daemon
-// shutdown, after rrdhost_free_all(), so leak checking sees a clean heap
-// (the same contract as nrpc_inflight_calls_destroy)
+// destroy the (by then empty) component-global registries index at shutdown,
+// after every owner has destroyed its entry, so leak checking sees a clean
+// heap (the same contract as nrpc_inflight_calls_destroy)
 void nrpc_registries_destroy(void);
 
 // Release a handle acquired via nrpc_method_authorize(). The handle is
 // self-contained (it pins both the method and its registry entry), so release
-// needs no host identity and is safe even after the host's registry entry was
+// needs no owner and is safe even after the host's registry entry was
 // unlinked by a concurrent teardown.
 void nrpc_method_acquired_release(NRPC_METHOD_ACQUIRED *acquired);
 
@@ -198,7 +233,7 @@ void nrpc_method_acquired_release(NRPC_METHOD_ACQUIRED *acquired);
 // access, sync, timeout_s, priority, version) are written explicitly at every
 // site even when zero; pointer fields may be omitted when NULL.
 struct nrpc_method_desc {
-    ND_UUID host_id;               // required: the owning host's identity (host->host_id)
+    NRPC_OWNER owner;              // required: the owning host, as its owner token
     const char *name;              // required
     const char *help;              // required
     const char *tags;              // NULL normalizes to "top"; NRPC_TAG_HIDDEN derives RESTRICTED
@@ -215,7 +250,7 @@ struct nrpc_method_desc {
 // register a method, called from its serving thread
 void nrpc_method_register(const struct nrpc_method_desc *desc);
 
-bool nrpc_method_unregister(ND_UUID host_id, const char *name, NRPC_SOURCE source);
+bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE source);
 
 // true if name is a reserved dynamic-configuration method name ("config" or "config <id>")
 bool nrpc_method_name_is_dyncfg(const char *name);
@@ -230,7 +265,7 @@ bool nrpc_method_name_is_dyncfg(const char *name);
 // record, private to nrpc-calls.c) which the handler sees as
 // struct nrpc_request - three views of one invocation.
 struct nrpc_call_spec {
-    ND_UUID host_id;               // the target host's identity; UUID_ZERO = "no host given" (answers 500)
+    NRPC_OWNER owner;              // the target host; NRPC_OWNER_NONE = "no host given" (answers 500)
     BUFFER *result_wb;             // required; also the error sink
     const char *cmd;               // "name [args]"; NULL-tolerant: sanitizes to "" and fails the lookup (404)
     const char *source;            // provenance STRING (who is calling) - not NRPC_SOURCE
@@ -248,15 +283,15 @@ struct nrpc_call_spec {
 // invoke a method - callable from anywhere
 int nrpc_call(const struct nrpc_call_spec *spec);
 
-// Verify the caller may invoke `cmd` on the host identified by host_id, applying the same
+// Verify the caller may invoke `cmd` on the given host, applying the same
 // RESTRICTED and access-level checks nrpc_call() enforces, WITHOUT executing the method.
 // This lets non-execution paths (e.g. MCP descriptor/help generation) authorize a caller
-// before disclosing anything. UUID_ZERO is the "no host given" sentinel and answers 500.
+// before disclosing anything. NRPC_OWNER_NONE is the "no host given" sentinel and answers 500.
 // On success returns HTTP_RESP_OK; if out_acquired != NULL it receives an acquired registry
 // handle the caller MUST release with nrpc_method_acquired_release(*out_acquired),
 // otherwise the handle is released internally. On failure it writes the error into result_wb,
 // releases any acquired handle, sets *out_acquired (if any) to NULL, and returns the HTTP code.
-int nrpc_method_authorize(ND_UUID host_id, BUFFER *result_wb, const char *cmd,
+int nrpc_method_authorize(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
                               NRPC_METHOD_ACQUIRED **out_acquired);
 
@@ -269,7 +304,7 @@ int nrpc_del_unittest(void);
 int nrpc_registry_unittest(void);
 int nrpc_catalog_unittest(void);
 
-bool nrpc_method_available(ND_UUID host_id, const char *function);
+bool nrpc_method_available(NRPC_OWNER owner, const char *function);
 
 bool nrpc_call_has_result_cb(nd_uuid_t *call_id, nrpc_result_cb_t cb);
 

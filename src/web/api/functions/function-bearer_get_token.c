@@ -74,7 +74,7 @@ int call_function_bearer_get_token(RRDHOST *host, struct web_client *w, const ch
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction_str);
     return nrpc_call(&(struct nrpc_call_spec) {
-        .host_id = host ? host->host_id : UUID_ZERO,
+        .owner = host ? rrdhost_nrpc_owner(host) : NRPC_OWNER_NONE,
         .result_wb = w->response.data,
         .cmd = FUNCTION_BEARER_GET_TOKEN,
         .source = buffer_tostring(source),

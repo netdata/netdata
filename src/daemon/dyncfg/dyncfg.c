@@ -437,7 +437,7 @@ bool dyncfg_add_low_level(const struct dyncfg_add_spec *spec) {
 
     nrpc_serving_started();
     nrpc_method_register(&(struct nrpc_method_desc) {
-        .host_id = s.host->host_id,
+        .owner = rrdhost_nrpc_owner(s.host),
         .name = string2str(df->function),
         .help = "Dynamic configuration",
         .tags = "config",
@@ -477,7 +477,7 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(item) {
         DYNCFG *df = dictionary_acquired_item_value(item);
-        nrpc_method_unregister(host->host_id, string2str(df->function), NRPC_SOURCE_DAEMON);
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), string2str(df->function), NRPC_SOURCE_DAEMON);
 
         bool garbage_collect = false;
         if(df->dyncfg.saves == 0) {
@@ -532,7 +532,7 @@ bool dyncfg_available_for_rrdhost(RRDHOST *host) {
     if(host == localhost)
         return true;
 
-    return nrpc_method_available(host->host_id, PLUGINSD_FUNCTION_CONFIG);
+    return nrpc_method_available(rrdhost_nrpc_owner(host), PLUGINSD_FUNCTION_CONFIG);
 }
 
 // ----------------------------------------------------------------------------

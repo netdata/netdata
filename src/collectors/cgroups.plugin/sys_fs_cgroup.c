@@ -1415,7 +1415,7 @@ void cgroups_main(void *ptr) {
     }
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host_id = localhost->host_id,
+        .owner = rrdhost_nrpc_owner(localhost),
         .name = "containers-vms",
         .help = FUNCTION_CGTOP_HELP,
         .tags = "top",
@@ -1427,7 +1427,7 @@ void cgroups_main(void *ptr) {
     });
 
     nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-        .host_id = localhost->host_id,
+        .owner = rrdhost_nrpc_owner(localhost),
         .name = "systemd-services",
         .help = FUNCTION_SYSTEMD_SERVICES_HELP,
         .tags = "top",

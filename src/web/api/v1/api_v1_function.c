@@ -43,7 +43,7 @@ int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     user_auth_to_source_buffer(&w->user_auth, source);
 
     return nrpc_call(&(struct nrpc_call_spec) {
-        .host_id = host ? host->host_id : UUID_ZERO,
+        .owner = host ? rrdhost_nrpc_owner(host) : NRPC_OWNER_NONE,
         .result_wb = wb,
         .cmd = function,
         .source = buffer_tostring(source),

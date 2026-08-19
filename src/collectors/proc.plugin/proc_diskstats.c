@@ -1408,7 +1408,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 SIMPLE_PATTERN_EXACT, true);
 
         nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
-            .host_id = localhost->host_id,
+            .owner = rrdhost_nrpc_owner(localhost),
             .name = "block-devices",
             .help = FUNCTION_DISKSTATS_HELP,
             .tags = "top",

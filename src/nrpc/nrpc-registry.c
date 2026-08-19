@@ -10,20 +10,20 @@ struct dictionary_stats dictionary_stats_category_functions = { .name = "functio
 
 // ----------------------------------------------------------------------------
 
-// Each host identity owns a function registry (struct nrpc_registry) holding
-// its function definitions, keyed by sanitized method name. The registries
-// themselves live in a component-global index keyed by the host's ND_UUID,
-// so the component needs no field inside RRDHOST.
+// Each host owns a function registry (struct nrpc_registry) holding its
+// function definitions, keyed by sanitized method name. The registries
+// themselves live in a component-global index keyed by the host OBJECT
+// (NRPC_OWNER), so an owner needs no component field inside its own struct.
 
 // ----------------------------------------------------------------------------
 
-// LOCK RULE for this callback and the conflict callback below: they run
-// under the inner dictionary's index write lock, and the takeover in
-// nrpc_registry_init() flushes this dictionary while holding owner_spinlock
-// (owner -> inner). Taking owner_spinlock here (inner -> owner) would be an
-// ABBA deadlock, so these callbacks MUST NOT use the vtable snapshot helpers;
-// everything they need from the owner (the epoch id) is snapshotted by the
-// register path BEFORE the insert and travels in the value bytes.
+// LOCK RULE for this callback and the conflict callback below: they run under
+// the inner dictionary's index write lock, which is inner-side of
+// owner_spinlock. Taking owner_spinlock here would invert that order, so these
+// callbacks MUST NOT use the vtable snapshot helpers; everything they need
+// from the owner (the epoch id) is snapshotted by the register path BEFORE the
+// insert and travels in the value bytes. The log lines label the entry by its
+// IMMUTABLE id instead of the owner's name, which would need the lock.
 static void nrpc_registry_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *data __maybe_unused) {
     struct nrpc_method *method = func;
 
@@ -46,10 +46,6 @@ static void nrpc_registry_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 
     if(!method->priority)
         method->priority = NRPC_PRIORITY_DEFAULT;
-
-//    internal_error(true, "NRPC: registering method '%s' on host '%s', serving tid %d, %s",
-//                   dictionary_acquired_item_name(item), host_name,
-//                   method->serving->tid, method->serving->running ? "running" : "NOT running");
 }
 
 static void nrpc_method_cleanup(struct nrpc_method *method) {
@@ -80,11 +76,11 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     // NO vtable access here (see the LOCK RULE above the insert callback):
     // the epoch id arrives pre-stamped in new_method, and the log lines carry
-    // the entry's immutable host identity instead of a name that would need
+    // the entry's immutable identity instead of a name that would need
     // the owner lock to read safely
     OBJECT_STATE_ID state_id = new_method->epoch_id;
-    char host_name[UUID_COMPACT_STR_LEN];
-    uuid_unparse_lower_compact(registry->host_id.uuid, host_name);
+    char owner_str[NRPC_OWNER_KEY_LEN];
+    nrpc_owner_str(owner_str, registry->id);
 
     nrpc_serving_started();
 
@@ -97,8 +93,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->serving != nrpc_thread_serving) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed serving thread from %d to %d",
-               dictionary_acquired_item_name(item), host_name,
+               "NRPC: method '%s' of host %s changed serving thread from %d to %d",
+               dictionary_acquired_item_name(item), owner_str,
                nrpc_serving_tid(method->serving), nrpc_serving_tid(nrpc_thread_serving));
 
         new_method->serving = method->serving;
@@ -108,8 +104,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->epoch_id != state_id) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed state id from %u to %u",
-               dictionary_acquired_item_name(item), host_name,
+               "NRPC: method '%s' of host %s changed state id from %u to %u",
+               dictionary_acquired_item_name(item), owner_str,
                method->epoch_id, state_id);
 
         method->epoch_id = state_id;
@@ -126,8 +122,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->handler != new_method->handler) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed handler",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed handler",
+               dictionary_acquired_item_name(item), owner_str);
 
         SWAP(method->handler, new_method->handler);
         changed = true;
@@ -135,8 +131,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->help != new_method->help) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed help text",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed help text",
+               dictionary_acquired_item_name(item), owner_str);
 
         SWAP(method->help, new_method->help);
         changed = true;
@@ -144,8 +140,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->tags != new_method->tags) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed tags",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed tags",
+               dictionary_acquired_item_name(item), owner_str);
 
         SWAP(method->tags, new_method->tags);
         changed = true;
@@ -156,8 +152,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
         // keeping them in sync with the swapped tags is what makes a re-registration
         // with the "hidden" tag actually restrict the function
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed flags",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed flags",
+               dictionary_acquired_item_name(item), owner_str);
 
         SWAP(method->options, new_method->options);
         changed = true;
@@ -165,8 +161,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->timeout != new_method->timeout) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed timeout (from %d to %d)",
-               dictionary_acquired_item_name(item), host_name,
+               "NRPC: method '%s' of host %s changed timeout (from %d to %d)",
+               dictionary_acquired_item_name(item), owner_str,
                method->timeout, new_method->timeout);
 
         SWAP(method->timeout, new_method->timeout);
@@ -175,8 +171,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->version != new_method->version) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed version (from %"PRIu32", to %"PRIu32")",
-               dictionary_acquired_item_name(item), host_name,
+               "NRPC: method '%s' of host %s changed version (from %"PRIu32", to %"PRIu32")",
+               dictionary_acquired_item_name(item), owner_str,
                method->version, new_method->version);
 
         SWAP(method->version, new_method->version);
@@ -185,8 +181,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->priority != new_method->priority) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed priority",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed priority",
+               dictionary_acquired_item_name(item), owner_str);
 
         SWAP(method->priority, new_method->priority);
         changed = true;
@@ -194,8 +190,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->access != new_method->access) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed access level",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed access level",
+               dictionary_acquired_item_name(item), owner_str);
 
         SWAP(method->access, new_method->access);
         changed = true;
@@ -203,8 +199,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
     if(method->sync != new_method->sync) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed sync/async mode",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed sync/async mode",
+               dictionary_acquired_item_name(item), owner_str);
 
         SWAP(method->sync, new_method->sync);
         changed = true;
@@ -227,8 +223,8 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
     // release.
     if(method->handler_data != new_method->handler_data || method->source != new_method->source) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host '%s' changed handler data or registration source",
-               dictionary_acquired_item_name(item), host_name);
+               "NRPC: method '%s' of host %s changed handler data or registration source",
+               dictionary_acquired_item_name(item), owner_str);
 
         if(nrpc_source_has_transport(new_method->source) && new_method->handler_data)
             nrpc_transport_entry_acquire(new_method->handler_data);
@@ -241,10 +237,6 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
         new_method->handler_data = NULL;
         new_method->source = NRPC_SOURCE_DAEMON;
     }
-
-//    internal_error(true, "NRPC: registering method '%s' on host '%s', serving tid %d, %s",
-//                   dictionary_acquired_item_name(item), host_name,
-//                   method->serving->tid, method->serving->running ? "running" : "NOT running");
 
     // under the leaf lock: frees the DISPLACED strings/transport ref, which a
     // concurrent leaf-locked reader may otherwise still be copying
@@ -260,15 +252,11 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
 
 static struct {
     SPINLOCK spinlock;              // guards lazy creation of the index only
-    DICTIONARY *dict;               // compact host uuid -> struct nrpc_registry
+    DICTIONARY *dict;               // owner handle (hex) -> struct nrpc_registry
 } nrpc_registries = {
     .spinlock = SPINLOCK_INITIALIZER,
     .dict = NULL,
 };
-
-static inline void nrpc_registry_key(char out[UUID_COMPACT_STR_LEN], ND_UUID host_id) {
-    uuid_unparse_lower_compact(host_id.uuid, out);
-}
 
 // Runs under the outer index hooks while the entry is inserted, so a
 // concurrent acquire can never observe a half-initialized registry. The
@@ -290,7 +278,6 @@ static void nrpc_registries_insert_cb(const DICTIONARY_ITEM *item __maybe_unused
     registry->pending_dels.dict = dictionary_create(DICT_OPTION_SINGLE_THREADED); // guarded by pending_dels.spinlock
 
     spinlock_init(&registry->owner_spinlock);
-    registry->dead = false;
 }
 
 static void nrpc_registries_index_init(void) {
@@ -313,8 +300,8 @@ void nrpc_registries_destroy(void) {
     DICTIONARY *dict = __atomic_load_n(&nrpc_registries.dict, __ATOMIC_ACQUIRE);
     if(!dict) return;
 
-    // PRECONDITION: runs after rrdhost_free_all() (every entry deleted) and
-    // nrpc_inflight_calls_destroy() (every held pair released) - no outer
+    // PRECONDITION: runs after every owner destroyed its entry, and after
+    // nrpc_inflight_calls_destroy() released every held pair - no outer
     // handle may survive this point, or its release would reach a NULL index.
     // An entry surviving here would also silently leak its inner dictionaries
     // (the outer dict has no delete callback by design).
@@ -326,15 +313,15 @@ void nrpc_registries_destroy(void) {
     dictionary_destroy(dict);
 }
 
-struct nrpc_registry *nrpc_registry_acquire(ND_UUID host_id, const DICTIONARY_ITEM **item_out) {
+struct nrpc_registry *nrpc_registry_acquire(NRPC_OWNER owner, const DICTIONARY_ITEM **item_out) {
     *item_out = NULL;
 
     DICTIONARY *dict = __atomic_load_n(&nrpc_registries.dict, __ATOMIC_ACQUIRE);
-    if(!dict || UUIDiszero(host_id))
+    if(!dict || !nrpc_owner_is_set(owner))
         return NULL;
 
-    char key[UUID_COMPACT_STR_LEN];
-    nrpc_registry_key(key, host_id);
+    char key[NRPC_OWNER_KEY_LEN];
+    nrpc_owner_str(key, owner);
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict, key);
     if(!item)
@@ -356,21 +343,21 @@ void nrpc_registry_release(const DICTIONARY_ITEM *item) {
 
 void nrpc_registry_owner_changed(struct nrpc_registry *registry, bool arm_manifest) {
     spinlock_lock(&registry->owner_spinlock);
-    void (*cb)(void *, bool) = registry->owner.changed;
-    void *data = registry->owner.data;
+    void (*cb)(NRPC_OWNER, bool) = registry->owner.changed;
     spinlock_unlock(&registry->owner_spinlock);
 
+    // registry->id is immutable, so it needs no snapshot: a non-NULL callback
+    // means the entry was still armed, and the id it belongs to cannot change
     if(cb)
-        cb(data, arm_manifest);
+        cb(registry->id, arm_manifest);
 }
 
 bool nrpc_registry_owner_wants_del_journal(struct nrpc_registry *registry) {
     spinlock_lock(&registry->owner_spinlock);
-    bool (*cb)(void *) = registry->owner.wants_del_journal;
-    void *data = registry->owner.data;
+    bool (*cb)(NRPC_OWNER) = registry->owner.wants_del_journal;
     spinlock_unlock(&registry->owner_spinlock);
 
-    return cb ? cb(data) : false;
+    return cb ? cb(registry->id) : false;
 }
 
 bool nrpc_registry_owner_epoch(struct nrpc_registry *registry, OBJECT_STATE_ID *out_id) {
@@ -392,142 +379,105 @@ STRING *nrpc_registry_owner_name_dup(struct nrpc_registry *registry) {
     return name;
 }
 
-// assign the vtable fields under the caller-held owner_spinlock; the entry's
-// name copy is duplicated from the owner's
-static void nrpc_registry_owner_assign_unsafe(struct nrpc_registry *registry, const struct nrpc_registry_owner *owner) {
-    registry->owner.name = string_strdupz(owner->name);
-    registry->owner.epoch = owner->epoch;
-    registry->owner.data = owner->data;
-    registry->owner.changed = owner->changed;
-    registry->owner.wants_del_journal = owner->wants_del_journal;
-}
-
-void nrpc_registry_init(ND_UUID host_id, const struct nrpc_registry_owner *owner) {
-    nrpc_registries_index_init();
-
-    if(UUIDiszero(host_id)) {
-        // A host with an unparsable machine guid has no identity to key an
-        // entry on (two such hosts would collide on the zero key), so it gets
-        // no function registry - everything degrades to no-ops for it. Not
-        // internal_fatal: the dbengine unittest deliberately creates its
-        // fixture host with a non-uuid machine guid.
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "NRPC: not creating the function registry of host '%s': its machine guid did not parse, so it has no host identity",
-               owner->name ? owner->name : "(unset)");
+void nrpc_registry_init(const struct nrpc_registry_owner *owner) {
+    if(unlikely(!nrpc_owner_is_set(owner->id))) {
+        // a programming error, not a runtime condition: an unset owner would
+        // key an entry nothing can ever look up again (acquire refuses the
+        // unset handle), so it would sit in the index until shutdown
+        internal_fatal(true, "NRPC: registry init without an owner");
         return;
     }
 
+    if(unlikely(!owner->epoch)) {
+        // also load-bearing, not just a missing feature: a NULL epoch is how
+        // this component marks an entry DISARMED, so an entry created without
+        // one would read as permanently doomed - and the retry below would
+        // never converge. Refuse it in every build, not only in debug.
+        internal_fatal(true, "NRPC: registry init without an epoch");
+        return;
+    }
+
+    nrpc_registries_index_init();
+
     DICTIONARY *dict = __atomic_load_n(&nrpc_registries.dict, __ATOMIC_ACQUIRE);
 
-    char key[UUID_COMPACT_STR_LEN];
-    nrpc_registry_key(key, host_id);
+    char key[NRPC_OWNER_KEY_LEN];
+    nrpc_owner_str(key, owner->id);
 
+    // The key IS the owner, so a live entry under this key can only be THIS
+    // owner's - an owner re-initializing an entry it still holds (un-archive).
+    // There is no same-key-different-owner case to arbitrate; that only existed
+    // while entries were keyed on the machine guid, which two host objects
+    // could share.
+    //
+    // What DOES need arbitrating is this owner's own destroy running
+    // concurrently (owners are not required to prevent that - see the
+    // NRPC_OWNER contract in nrpc.h). A destroy disarms the entry and deletes
+    // it from the index inside ONE critical section under owner_spinlock, so
+    // taking that lock puts us unambiguously on one side of it:
+    //
+    // - armed  -> the entry is ours and alive; nothing to do.
+    // - disarmed -> a destroy owns it now, and because it deleted the entry
+    //   before releasing the lock we just waited on, the next lookup MUST
+    //   miss. So the retry is bounded to one extra pass and lands on create.
+    //
+    // Without this check an init whose lookup landed just before a destroy
+    // would return happily and then have its entry deleted underneath it,
+    // leaving the owner with no registry at all.
     for(;;) {
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict, key);
         if(!item)
             break;
 
         struct nrpc_registry *existing = dictionary_acquired_item_value(item);
-
-        spinlock_lock(&existing->owner_spinlock);
-
-        if(existing->dead) {
-            // a destroy unlinked this entry after our lookup found it; its
-            // index delete already ran (same critical section that set dead),
-            // so retrying the lookup now misses and we create fresh
-            spinlock_unlock(&existing->owner_spinlock);
-            dictionary_acquired_item_release(dict, item);
-            continue;
-        }
-
-        if(existing->owner.data == owner->data) {
-            // idempotency (e.g. un-archive re-init on the same RRDHOST)
-            spinlock_unlock(&existing->owner_spinlock);
-            dictionary_acquired_item_release(dict, item);
-            return;
-        }
-
-        // TAKEOVER: a dying same-identity predecessor was unlinked from the
-        // host index (rrd_wrlock released) but has not reached
-        // nrpc_registry_destroy() yet - the documented teardown gap of the
-        // unregister-node path. This owner won rrdhost_index_add_by_guid(),
-        // so the entry is rightfully its: flush the predecessor's methods
-        // and swap the whole vtable. The predecessor's destroy will then
-        // find OUR ownership under this same lock and leave the entry alone.
-        //
-        // The flush runs under rrd_wrlock + owner_spinlock, which is safe
-        // because the method delete callbacks are bounded and lock-free:
-        // nrpc_method_cleanup() only does refcount releases and freez/
-        // string_freez - no path back into any rrd or component lock.
-        dictionary_flush(existing->dict);
-        spinlock_lock(&existing->pending_dels.spinlock);
-        dictionary_flush(existing->pending_dels.dict);
-        spinlock_unlock(&existing->pending_dels.spinlock);
-        STRING *old_name = existing->owner.name;
-        nrpc_registry_owner_assign_unsafe(existing, owner);
-
-        spinlock_unlock(&existing->owner_spinlock);
-
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "NRPC: host '%s' took over the function-registry entry of dying same-identity predecessor '%s'",
-               owner->name ? owner->name : "(unset)", string2str(old_name));
-        string_freez(old_name);
-
+        OBJECT_STATE_ID ignored;
+        bool armed = nrpc_registry_owner_epoch(existing, &ignored);
         dictionary_acquired_item_release(dict, item);
-        return;
+
+        if(armed)
+            return;
     }
 
     struct nrpc_registry tmp = {
-        .host_id = host_id,
+        .id = owner->id,
         // the dictionaries and the owner spinlock are initialized by the
-        // outer insert callback, on the stored value; the vtable fields
-        // reach the stored value as tmp's bytes
+        // outer insert callback, on the stored value; the id and the vtable
+        // fields reach the stored value as tmp's bytes
         .owner = {
             .name = string_strdupz(owner->name),
             .epoch = owner->epoch,
-            .data = owner->data,
             .changed = owner->changed,
             .wants_del_journal = owner->wants_del_journal,
         },
     };
     struct nrpc_registry *stored = dictionary_set(dict, key, &tmp, sizeof(tmp));
     if(unlikely(!stored || stored->owner.name != tmp.owner.name)) {
-        // Not stored (index destroyed, or a concurrent creator won under
-        // DONT_OVERWRITE) - tmp's name copy is still ours to free. The
-        // lockless read of stored->owner.name is exact here: creates for one
-        // identity are serialized (rrd_wrlock in production, single-threaded
-        // in tests), and no takeover or disarm can touch a just-created
-        // entry between the set and this check - its owner is us.
+        // Either the index was destroyed under us, or a concurrent creator for
+        // this same owner won under DONT_OVERWRITE (the index has no conflict
+        // callback, so dictionary_set() hands back the entry that is already
+        // there). In both cases tmp's name copy never reached an entry and is
+        // still ours to free.
         string_freez(tmp.owner.name);
+        return;
     }
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "NRPC: function registry %s created for host '%s'",
+           key, owner->name ? owner->name : "(unset)");
 }
 
-void nrpc_registry_destroy(ND_UUID host_id, void *owner_data) {
+void nrpc_registry_destroy(NRPC_OWNER owner) {
     const DICTIONARY_ITEM *item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &item);
     if(!registry)
+        // this owner never had an entry, or it was already destroyed - both
+        // are ordinary: owners may be torn down without ever having been
+        // initialized, and an owner may run its teardown more than once.
+        // The index lookup is the whole guard: it is keyed on the caller's own
+        // token, so it can never reach anyone else's entry.
         return;
 
     spinlock_lock(&registry->owner_spinlock);
-
-    if(registry->owner.data != owner_data || registry->dead) {
-        // Ownership guard: either a machine-guid collision loser (freed
-        // without ever being indexed) that must never delete the winner's
-        // live entry, or a dying predecessor whose entry a same-identity
-        // successor already took over (init's takeover) - in both cases the
-        // entry belongs to someone else now and its inner dictionaries are
-        // that owner's to destroy.
-        spinlock_unlock(&registry->owner_spinlock);
-        nrpc_registry_release(item);
-        return;
-    }
-
-    // Delete from the index while still holding the owner lock: setting dead
-    // and unlinking in ONE critical section is what lets init's takeover path
-    // trust that once it observes dead, the stale item is already unlinked -
-    // a successor entry under the same key can only be created after this
-    // delete, so this delete can never hit a successor's entry.
-    registry->dead = true;
 
     // Synchronous DISARM, the load-bearing half of the teardown safety
     // argument: from this point every vtable snapshot answers the safe
@@ -537,15 +487,20 @@ void nrpc_registry_destroy(ND_UUID host_id, void *owner_data) {
     // owner. In-progress snapshots taken BEFORE the disarm are bounded by
     // the owner's thread lifecycle (sender joined before destroy; receiver
     // bounded wait; dyncfg calls resolve the entry per operation).
+    // registry->id is deliberately NOT cleared: it is the key this delete
+    // needs and the label the logs need, and with the callbacks gone there is
+    // nobody left to hand it to.
     string_freez(registry->owner.name);
     registry->owner.name = NULL;
     registry->owner.epoch = NULL;
-    registry->owner.data = NULL;
     registry->owner.changed = NULL;
     registry->owner.wants_del_journal = NULL;
 
-    char key[UUID_COMPACT_STR_LEN];
-    nrpc_registry_key(key, host_id);
+    // Delete from the index while still holding the owner lock, so disarming
+    // and unlinking are ONE critical section: nothing can observe an entry
+    // that is disarmed but still reachable.
+    char key[NRPC_OWNER_KEY_LEN];
+    nrpc_owner_str(key, owner);
     DICTIONARY *dict = __atomic_load_n(&nrpc_registries.dict, __ATOMIC_ACQUIRE);
     dictionary_del(dict, key);
 
@@ -636,7 +591,7 @@ static inline NRPC_METHOD_FLAGS nrpc_method_flags_for(const char *name, const ch
 }
 
 void nrpc_method_register(const struct nrpc_method_desc *desc) {
-    internal_fatal(UUIDiszero(desc->host_id), "NRPC: method registration without a host identity");
+    internal_fatal(!nrpc_owner_is_set(desc->owner), "NRPC: method registration without an owner");
     internal_fatal(!desc->name, "NRPC: method registration without a name");
     internal_fatal(!desc->help, "NRPC: method registration without help text");
     internal_fatal(!desc->handler, "NRPC: method registration without a handler");
@@ -645,11 +600,11 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     const char *name = desc->name;
 
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(desc->host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(desc->owner, &registry_item);
     if(!registry) {
-        // no live registry for this identity (unknown or archived host)
+        // no live registry for this owner (unknown or archived host)
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: not registering method '%s': the given host identity has no function registry",
+               "NRPC: not registering method '%s': the given host has no function registry",
                name ? name : "(unset)");
         return;
     }
@@ -687,7 +642,7 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     // Streaming is the exception and MUST be preserved: a child streams a single
     // synthetic "config" proxy (dyncfg_add_streaming()) so the parent can forward
     // config commands to it. That registration targets the child's host (never the
-    // parent's localhost built-in), so it cannot hijack anything. INTERNAL
+    // parent's own host), so it cannot hijack anything. INTERNAL
     // registrations ARE the dyncfg subsystem (dyncfg.c, dyncfg-tree.c).
     //
     // Enforced on the SANITIZED key: the registry is indexed by the sanitized
@@ -771,14 +726,14 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     nrpc_registry_release(registry_item);
 }
 
-bool nrpc_method_unregister(ND_UUID host_id, const char *name, NRPC_SOURCE source) {
+bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE source) {
     internal_fatal(source == NRPC_SOURCE_UNSET, "NRPC: method unregistration without a source");
 
     if(unlikely(!name || !*name))
         return false;
 
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry)
         return false;
 
@@ -976,9 +931,9 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
     return HTTP_RESP_OK;
 }
 
-bool nrpc_method_available(ND_UUID host_id, const char *function) {
+bool nrpc_method_available(NRPC_OWNER owner, const char *function) {
     const DICTIONARY_ITEM *registry_item;
-    struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
+    struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry)
         return false;
 
