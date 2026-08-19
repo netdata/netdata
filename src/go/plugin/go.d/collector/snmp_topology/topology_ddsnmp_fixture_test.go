@@ -106,6 +106,60 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 		"the broadcast segment should resolve the real learned MAC to the synthetic managed peer")
 }
 
+func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
+	pdus := []gosnmp.SnmpPDU{
+		{
+			Name:  "1.3.6.1.2.1.4.22.1.2.17.192.0.2.18",
+			Type:  gosnmp.OctetString,
+			Value: []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef},
+		},
+		{
+			Name:  "1.3.6.1.2.1.4.22.1.4.17.192.0.2.18",
+			Type:  gosnmp.Integer,
+			Value: 3,
+		},
+	}
+	handler := &topologySNMPRecHandler{
+		Handler: gosnmp.NewHandler(),
+		entries: pdus,
+		byOID:   make(map[string]gosnmp.SnmpPDU, len(pdus)),
+	}
+	for _, pdu := range pdus {
+		handler.byOID[pdu.Name] = pdu
+	}
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:       "192.0.2.10",
+		Port:           161,
+		SNMPVersion:    gosnmp.Version2c.String(),
+		SysObjectID:    "1.3.6.1.4.1.9.1.403",
+		SysName:        "legacy-arp-fixture",
+		MaxOIDs:        60,
+		MaxRepetitions: 25,
+	}
+	profiles := (&Collector{}).findTopologyProfiles(dev)
+	require.NotEmpty(t, profiles)
+
+	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		SnmpClient:  handler,
+		Profiles:    profiles,
+		Log:         newTestSNMPTopologyCollector().Logger,
+		SysObjectID: dev.SysObjectID,
+	}).Collect()
+	require.NoError(t, err)
+
+	cache := newTestTopologyCache(dev)
+	cache.ingestTopologyProfileMetrics(profileMetrics)
+	cache.finalizeTopologyCache()
+
+	observation := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, observation.ARPNDEntries, 1)
+	require.Equal(t, 17, observation.ARPNDEntries[0].IfIndex)
+	require.Equal(t, "192.0.2.18", observation.ARPNDEntries[0].IP)
+	require.Equal(t, "00:50:56:ab:cd:ef", observation.ARPNDEntries[0].MAC)
+	require.Equal(t, "dynamic", observation.ARPNDEntries[0].State)
+}
+
 type topologySNMPRecHandler struct {
 	gosnmp.Handler
 	entries           []gosnmp.SnmpPDU

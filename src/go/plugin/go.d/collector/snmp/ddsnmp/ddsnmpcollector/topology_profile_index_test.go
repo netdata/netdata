@@ -191,10 +191,8 @@ func TestTopologyProfile_LegacyARPUsesPhysicalAddressPresence(t *testing.T) {
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", nil)
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.35.1", nil)
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.22", []gosnmp.SnmpPDU{
-		createIntegerPDU("1.3.6.1.2.1.4.22.1.1.7.192.0.2.18", 7),
-		createPDU("1.3.6.1.2.1.4.22.1.2.7.192.0.2.18", gosnmp.OctetString, []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef}),
-		createPDU("1.3.6.1.2.1.4.22.1.3.7.192.0.2.18", gosnmp.IPAddress, "192.0.2.18"),
-		createIntegerPDU("1.3.6.1.2.1.4.22.1.4.7.192.0.2.18", 3),
+		createPDU("1.3.6.1.2.1.4.22.1.2.17.192.0.2.18", gosnmp.OctetString, []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef}),
+		createIntegerPDU("1.3.6.1.2.1.4.22.1.4.17.192.0.2.18", 3),
 	})
 
 	actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-arp-mib")
@@ -202,7 +200,7 @@ func TestTopologyProfile_LegacyARPUsesPhysicalAddressPresence(t *testing.T) {
 	assertTableMetricsEqual(t, []ddsnmp.Metric{{
 		Name:         "arp_legacy_entry",
 		Value:        0,
-		Tags:         map[string]string{"arp_if_index": "7", "arp_ip": "192.0.2.18", "arp_mac": "005056abcdef", "arp_type": "dynamic"},
+		Tags:         map[string]string{"arp_if_index": "17", "arp_ip": "192.0.2.18", "arp_mac": "005056abcdef", "arp_type": "dynamic"},
 		MetricType:   "gauge",
 		IsTable:      true,
 		Table:        "ipNetToMediaTable",
