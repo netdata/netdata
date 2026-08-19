@@ -25,25 +25,23 @@ type topologyCache struct {
 	lldpRemotes  map[string]*lldpRemote
 	cdpRemotes   map[string]*cdpRemote
 
-	ifNamesByIndex       map[string]string
-	ifStatusByIndex      map[string]ifStatus
-	ifIndexByIP          map[string]string
-	ifNetmaskByIP        map[string]string
-	l3InterfacesByIP     map[string]topologymodel.L3Interface
-	trapMatchMethodByIP  map[string]string
-	bridgePortToIf       map[string]string
-	fdbEntries           map[string]*fdbEntry
-	vlanByFDBID          map[string]fdbVLANMapping
-	vlanNameByID         map[string]vlanNameMapping
-	fdbRowsDroppedNoMAC  int
-	fdbRowsUnmappedPort  int
-	vtpVersion           string
-	stpBaseBridgeAddress string
-	stpDesignatedRoot    string
-	stpPorts             map[string]*stpPortEntry
-	arpEntries           map[string]*arpEntry
-	ospfNeighborsByKey   map[string]topologymodel.OSPFNeighbor
-	bgpPeersByKey        map[string]topologymodel.BGPPeer
+	ifNamesByIndex      map[string]string
+	ifStatusByIndex     map[string]ifStatus
+	ifIndexByIP         map[string]string
+	ifNetmaskByIP       map[string]string
+	l3InterfacesByIP    map[string]topologymodel.L3Interface
+	trapMatchMethodByIP map[string]string
+	bridgePortToIf      map[string]string
+	fdbEntries          map[string]*fdbEntry
+	vlanByFDBID         map[string]fdbVLANMapping
+	vlanNameByID        map[string]vlanNameMapping
+	fdbRowsDroppedNoMAC int
+	fdbRowsUnmappedPort int
+	bridgeBaseAddress   string
+	stpPorts            map[string]*stpPortEntry
+	arpEntries          map[string]*arpEntry
+	ospfNeighborsByKey  map[string]topologymodel.OSPFNeighbor
+	bgpPeersByKey       map[string]topologymodel.BGPPeer
 }
 
 type ifStatus struct {

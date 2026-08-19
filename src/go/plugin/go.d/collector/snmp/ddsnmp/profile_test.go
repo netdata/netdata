@@ -202,10 +202,7 @@ func TestDefaultCatalogResolveProject_LoadedProfilesSeparateConsumers(t *testing
 			wantTopologyKinds: []ddprofiledefinition.TopologyKind{
 				ddprofiledefinition.KindLldpRem,
 				ddprofiledefinition.KindCdpCache,
-				ddprofiledefinition.KindFdbEntry,
-				ddprofiledefinition.KindQbridgeFdbEntry,
-				ddprofiledefinition.KindStpPort,
-				ddprofiledefinition.KindVtpVlan,
+				ddprofiledefinition.KindIpIfIndex,
 			},
 			wantNoMetrics:   true,
 			wantNoLicensing: true,

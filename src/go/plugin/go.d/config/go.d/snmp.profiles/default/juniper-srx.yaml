@@ -18,6 +18,10 @@ extends:
   - _juniper-junos-generic.yaml
   - _juniper-ipsec-flow-monitor.yaml
   - _juniper.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-fdb-mib.yaml
+  - _std-topology-stp-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 metadata:
   device:

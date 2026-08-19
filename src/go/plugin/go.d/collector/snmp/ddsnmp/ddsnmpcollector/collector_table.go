@@ -23,7 +23,6 @@ type tableCollector struct {
 	missingOIDs     map[string]bool
 	tableCache      *tableCache
 	log             *logger.Logger
-	valProc         *valueProcessor
 	rowProcessor    *tableRowProcessor
 }
 
@@ -35,22 +34,28 @@ func newTableCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, t
 		missingOIDs:     missingOIDs,
 		tableCache:      tableCache,
 		log:             log,
-		valProc:         newValueProcessor(),
 		rowProcessor:    newTableRowProcessor(log),
 	}
 }
 
 // Collect gathers all table metrics from the profile
 func (tc *tableCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+	return tc.collectWithSymbolMode(prof, tableSymbolModeValue, stats)
+}
+
+func (tc *tableCollector) collectTopology(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+	return tc.collectWithSymbolMode(prof, tableSymbolModePresence, stats)
+}
+
+func (tc *tableCollector) collectWithSymbolMode(prof *ddsnmp.Profile, mode tableSymbolMode, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
 	walkResults, err := tc.walkTablesAsNeeded(prof, stats)
 	if err != nil {
 		return nil, err
 	}
 
-	return tc.processWalkResults(walkResults, stats)
+	return tc.processWalkResults(walkResults, mode, stats)
 }
 
-// tableWalkResult holds the walked data for a single table
 // tableWalkResult holds the walked data for a single table
 type tableWalkResult struct {
 	// tableOID is the base OID of the table (e.g., "1.3.6.1.2.1.2.2" for ifTable)
@@ -87,6 +92,8 @@ type (
 		// tableNameToOID maps table names to their OIDs
 		// Used to resolve cross-table references (e.g., "ifXTable" → "1.3.6.1.2.1.31.1.1")
 		tableNameToOID map[string]string
+
+		symbolMode tableSymbolMode
 
 		// === Computed during processing (set by various methods) ===
 
@@ -157,8 +164,16 @@ type cacheProcessingContext struct {
 	// Key: full OID (trimmed), Value: current PDU value
 	pdus map[string]gosnmp.SnmpPDU
 
-	tableName string
+	tableName  string
+	symbolMode tableSymbolMode
 }
+
+type tableSymbolMode uint8
+
+const (
+	tableSymbolModeValue tableSymbolMode = iota
+	tableSymbolModePresence
+)
 
 // walkTablesAsNeeded walks only tables that aren't fully cached
 func (tc *tableCollector) walkTablesAsNeeded(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]tableWalkResult, error) {
@@ -170,6 +185,9 @@ func (tc *tableCollector) walkTablesAsNeeded(prof *ddsnmp.Profile, stats *ddsnmp
 
 	if len(results) == 0 && len(errs) > 0 {
 		return nil, errors.Join(errs...)
+	}
+	if len(errs) > 0 {
+		tc.log.Warningf("failed to walk some SNMP tables: %v", errors.Join(errs...))
 	}
 
 	return results, nil
@@ -234,10 +252,8 @@ func (tc *tableCollector) walkTables(tablesToWalk map[string]bool, stats *ddsnmp
 			continue
 		}
 
-		if len(pdus) > 0 {
-			stats.SNMP.TablesWalked++
-			walkedData[tableOID] = pdus
-		}
+		stats.SNMP.TablesWalked++
+		walkedData[tableOID] = pdus
 	}
 
 	return walkedData, errs
@@ -271,7 +287,7 @@ func (tc *tableCollector) buildWalkResults(walkedData map[string]map[string]gosn
 }
 
 // processWalkResults processes all table walk results
-func (tc *tableCollector) processWalkResults(walkResults []tableWalkResult, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) processWalkResults(walkResults []tableWalkResult, mode tableSymbolMode, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
 	// Build lookup maps
 	walkedData := tc.buildWalkedDataMap(walkResults)
 	tableNameToOID := tc.buildTableNameMap(walkResults)
@@ -282,7 +298,7 @@ func (tc *tableCollector) processWalkResults(walkResults []tableWalkResult, stat
 	tablesSeen := make(map[string]bool)
 
 	for _, result := range walkResults {
-		tableMetrics, err := tc.processTableResult(result, walkedData, tableNameToOID, stats)
+		tableMetrics, err := tc.processTableResult(result, walkedData, tableNameToOID, mode, stats)
 		if err != nil {
 			stats.Errors.Processing.Table++
 			errs = append(errs, fmt.Errorf("table '%s': %w", result.config.Table.Name, err))
@@ -323,7 +339,7 @@ func (tc *tableCollector) buildTableNameMap(walkResults []tableWalkResult) map[s
 }
 
 // processTableResult processes a single table result
-func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string, mode tableSymbolMode, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
 	// Auxiliary table configs used only for cross-table tag lookups do not define
 	// own symbols and should not trigger cache/fallback collection paths.
 	// We still cache their presence so they are not re-walked on every cycle.
@@ -337,7 +353,7 @@ func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData 
 	}
 
 	// Try cache first
-	if metrics := tc.tryCollectFromCache(result.config, stats); metrics != nil {
+	if metrics := tc.tryCollectFromCache(result.config, mode, stats); metrics != nil {
 		stats.SNMP.TablesCached++
 		return metrics, nil
 	}
@@ -355,9 +371,7 @@ func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData 
 			}
 			stats.SNMP.TablesWalked++
 			walkedData[result.tableOID] = pdus
-			if len(pdus) > 0 {
-				result.pdus = pdus
-			}
+			result.pdus = pdus
 		}
 	}
 
@@ -368,6 +382,7 @@ func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData 
 			pdus:           result.pdus,
 			walkedData:     walkedData,
 			tableNameToOID: tableNameToOID,
+			symbolMode:     mode,
 		}
 		metrics, err := tc.processTableData(ctx, stats)
 		stats.Metrics.Rows += int64(len(ctx.rows))
@@ -378,7 +393,7 @@ func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData 
 }
 
 // tryCollectFromCache attempts to collect metrics using cached data
-func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsConfig, stats *ddsnmp.CollectionStats) []ddsnmp.Metric {
+func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsConfig, mode tableSymbolMode, stats *ddsnmp.CollectionStats) []ddsnmp.Metric {
 	cachedOIDs, cachedTags, ok := tc.tableCache.getCachedData(cfg)
 	if !ok {
 		return nil
@@ -392,6 +407,7 @@ func (tc *tableCollector) tryCollectFromCache(cfg ddprofiledefinition.MetricsCon
 		cachedTags: cachedTags,
 		columnOIDs: columnOIDs,
 		tableName:  cfg.Table.Name,
+		symbolMode: mode,
 	}
 
 	metrics, err := tc.collectWithCache(ctx, stats)
@@ -490,6 +506,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 			columnOIDs:    ctx.columnOIDs,
 			crossTableCtx: crossTableCtx,
 			orderedTags:   ctx.orderedTags,
+			symbolMode:    ctx.symbolMode,
 		}
 		rowMetrics, err := tc.rowProcessor.processRow(row, rowCtx)
 		if err != nil {
@@ -555,6 +572,11 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 		if tags, ok := ctx.cachedTags[index]; ok {
 			maps.Copy(rowTags, tags)
 		}
+		row := &tableRowData{
+			tags:       rowTags,
+			staticTags: staticTags,
+			tableName:  ctx.tableName,
+		}
 
 		// Process each metric column
 		for columnOID, fullOID := range columns {
@@ -570,20 +592,13 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 			}
 
 			for _, sym := range syms {
-				value, err := tc.valProc.processValue(sym, pdu)
-				if err != nil {
-					if errors.Is(err, errNoTextDateValue) {
-						continue
-					}
-					stats.Errors.Processing.Table++
-					tc.log.Debugf("Error processing value for %s: %v", sym.Name, err)
-					continue
-				}
-
-				metric, err := buildTableMetric(sym, pdu, value, rowTags, staticTags, ctx.tableName)
+				metric, err := tc.rowProcessor.createMetric(sym, pdu, row, ctx.symbolMode)
 				if err != nil {
 					stats.Errors.Processing.Table++
 					errs = append(errs, err)
+					continue
+				}
+				if metric == nil {
 					continue
 				}
 

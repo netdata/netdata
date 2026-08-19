@@ -40,8 +40,6 @@ var validMetadataResources = map[string]map[string]bool{
 		"lldp_loc_sys_cap_supported":  true,
 		"lldp_loc_sys_cap_enabled":    true,
 		"bridge_base_address":         true,
-		"stp_designated_root":         true,
-		"vtp_version":                 true,
 		"ospf_router_id":              true,
 	},
 	"interface": {

@@ -29,7 +29,7 @@ func (c *Collector) collectTopologyMetrics(prof *ddsnmp.Profile, stats *ddsnmp.C
 	if err != nil {
 		return nil, err
 	}
-	tableMetrics, err := c.tableCollector.collect(topologyProfile, stats)
+	tableMetrics, err := c.tableCollector.collectTopology(topologyProfile, stats)
 	if err != nil {
 		return nil, err
 	}

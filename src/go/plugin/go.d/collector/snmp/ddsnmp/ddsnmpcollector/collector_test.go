@@ -287,6 +287,7 @@ func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.
 	assert.Equal(t, "_privateMetric", pm.HiddenMetrics[0].Name)
 	require.Len(t, pm.TopologyMetrics, 1)
 	assert.Equal(t, "if_status", pm.TopologyMetrics[0].Name)
+	assert.Equal(t, int64(1), pm.TopologyMetrics[0].Value)
 	assert.Equal(t, ddsnmp.KindIfStatus, pm.TopologyMetrics[0].TopologyKind)
 	require.Empty(t, pm.Metrics)
 }

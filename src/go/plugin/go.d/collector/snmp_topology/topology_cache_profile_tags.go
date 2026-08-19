@@ -46,24 +46,6 @@ func (c *topologyCache) applyLLDPLocalDeviceProfileTags(tags map[string]string) 
 	}
 }
 
-func (c *topologyCache) applySTPProfileTags(tags map[string]string) {
-	if c == nil || len(tags) == 0 {
-		return
-	}
-	if v := stpBridgeAddressToMAC(tags[tagStpDesignatedRoot]); v != "" {
-		c.stpDesignatedRoot = v
-	}
-}
-
-func (c *topologyCache) applyVTPProfileTags(tags map[string]string) {
-	if c == nil || len(tags) == 0 {
-		return
-	}
-	if v := strings.TrimSpace(tags[tagVtpVersion]); v != "" {
-		c.vtpVersion = v
-	}
-}
-
 func (c *topologyCache) applyOSPFProfileTags(tags map[string]string) {
 	if c == nil || len(tags) == 0 {
 		return
@@ -80,16 +62,16 @@ func (c *topologyCache) applyAuthoritativeBridgeIdentity(mac string) {
 	if mac == "" || mac == "00:00:00:00:00:00" {
 		return
 	}
-	c.stpBaseBridgeAddress = mac
+	c.bridgeBaseAddress = mac
 	c.localDevice.ChassisID = mac
 	c.localDevice.ChassisIDType = "macAddress"
 }
 
-func (c *topologyCache) updateLocalBridgeIdentityFromTags(tags map[string]string) {
+func (c *topologyCache) applyBridgeProfileTags(tags map[string]string) {
 	if c == nil || len(tags) == 0 {
 		return
 	}
-	if v := stpBridgeAddressToMAC(topologyutil.FirstNonEmptyString(tags[tagBridgeBaseAddress], tags[tagLegacyStpBaseBridgeAddr])); v != "" {
+	if v := stpBridgeAddressToMAC(tags[tagBridgeBaseAddress]); v != "" {
 		c.applyAuthoritativeBridgeIdentity(v)
 	}
 }

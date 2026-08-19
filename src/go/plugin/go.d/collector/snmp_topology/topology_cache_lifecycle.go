@@ -56,9 +56,7 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.vlanNameByID = src.vlanNameByID
 	c.fdbRowsDroppedNoMAC = src.fdbRowsDroppedNoMAC
 	c.fdbRowsUnmappedPort = src.fdbRowsUnmappedPort
-	c.vtpVersion = src.vtpVersion
-	c.stpBaseBridgeAddress = src.stpBaseBridgeAddress
-	c.stpDesignatedRoot = src.stpDesignatedRoot
+	c.bridgeBaseAddress = src.bridgeBaseAddress
 	c.stpPorts = src.stpPorts
 	c.arpEntries = src.arpEntries
 	c.ospfNeighborsByKey = src.ospfNeighborsByKey

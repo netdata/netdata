@@ -36,6 +36,7 @@ type (
 		columnOIDs    map[string][]ddprofiledefinition.SymbolConfig
 		crossTableCtx *crossTableContext
 		orderedTags   []orderedTagConfig
+		symbolMode    tableSymbolMode
 	}
 )
 
@@ -203,7 +204,7 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 		}
 
 		for _, sym := range syms {
-			metric, err := p.createMetric(sym, pdu, row)
+			metric, err := p.createMetric(sym, pdu, row, ctx.symbolMode)
 			if err != nil {
 				p.log.Debugf("Error creating metric %s: %v", sym.Name, err)
 				continue
@@ -219,7 +220,11 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 	return metrics, nil
 }
 
-func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, row *tableRowData) (*ddsnmp.Metric, error) {
+func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, row *tableRowData, mode tableSymbolMode) (*ddsnmp.Metric, error) {
+	if mode == tableSymbolModePresence {
+		return buildTableMetric(sym, pdu, 0, row.tags, row.staticTags, row.tableName)
+	}
+
 	value, err := p.valProc.processValue(sym, pdu)
 	if err != nil {
 		if errors.Is(err, errNoTextDateValue) {

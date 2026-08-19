@@ -109,8 +109,6 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 }
 
 func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
-	c.updateLocalBridgeIdentityFromTags(tags)
-
 	basePort := strings.TrimSpace(tags[tagBridgeBasePort])
 	if basePort == "" {
 		return

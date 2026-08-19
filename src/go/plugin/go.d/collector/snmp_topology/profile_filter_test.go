@@ -14,7 +14,7 @@ import (
 
 func TestFindTopologyProfiles_UsesDeclarativeProfileExtensions(t *testing.T) {
 	profiles := (&Collector{}).findTopologyProfiles(ddsnmp.DeviceConnectionInfo{
-		SysObjectID: "1.3.6.1.4.1.9.1.1",
+		SysObjectID: "1.3.6.1.4.1.9.1.111",
 	})
 	require.NotEmpty(t, profiles)
 
@@ -64,7 +64,7 @@ func TestFindTopologyProfiles_UsesDeclarativeProfileExtensions(t *testing.T) {
 		field string
 	}{
 		"lldp-system-name": {field: "lldp_loc_sys_name"},
-		"vtp-version":      {field: "vtp_version"},
+		"bridge-address":   {field: "bridge_base_address"},
 	} {
 		t.Run("metadata/"+name, func(t *testing.T) {
 			assert.Contains(t, metadataFields, tc.field)
