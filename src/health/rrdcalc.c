@@ -506,13 +506,17 @@ static void rrdcalc_name_index_add(RRDHOST *host, RRDCALC *rc, const DICTIONARY_
 
     rw_spinlock_write_lock(&host->rrdcalc_by_name.spinlock);
 
-    Pvoid_t *PValue = JudyLIns(&host->rrdcalc_by_name.JudyL, (Word_t)rc->config.name, PJE0);
-    if(likely(PValue && PValue != PJERR && rc->name_index_state != RRDCALC_NAME_INDEX_LINKED)) {
-        RRDCALC *head = (RRDCALC *)*PValue;
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, rc, name_prev, name_next);
-        rc->name_item = item;
-        rc->name_index_state = RRDCALC_NAME_INDEX_LINKED;
-        *PValue = head;
+    // Decide before touching the JudyL: inserting first would leave a
+    // name -> NULL slot behind if we then declined to link.
+    if(likely(rc->name_index_state != RRDCALC_NAME_INDEX_LINKED)) {
+        Pvoid_t *PValue = JudyLIns(&host->rrdcalc_by_name.JudyL, (Word_t)rc->config.name, PJE0);
+        if(likely(PValue && PValue != PJERR)) {
+            RRDCALC *head = (RRDCALC *)*PValue;
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, rc, name_prev, name_next);
+            rc->name_item = item;
+            rc->name_index_state = RRDCALC_NAME_INDEX_LINKED;
+            *PValue = head;
+        }
     }
 
     rw_spinlock_write_unlock(&host->rrdcalc_by_name.spinlock);
