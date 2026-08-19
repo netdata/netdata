@@ -3,15 +3,25 @@
 package projector
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]model.Interface) graph.LinkEndpoint {
-	return adjacencySideToEndpointWithMatch(dev, buildDeviceEndpointMatch(dev), port, ifIndexByDeviceName, ifaceByDeviceIndex)
+func adjacencySideToEndpoint(
+	dev model.Device,
+	port string,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+) graph.LinkEndpoint {
+	return adjacencySideToEndpointWithMatch(
+		dev,
+		buildDeviceEndpointMatch(dev),
+		port,
+		ifIndexByDeviceName,
+		ifaceByDeviceIndex,
+	)
 }
 
 func adjacencySideToEndpointWithMatch(
@@ -21,39 +31,75 @@ func adjacencySideToEndpointWithMatch(
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
 ) graph.LinkEndpoint {
-
 	port = strings.TrimSpace(port)
-	ifName := ""
-	ifDescr := ""
 	ifIndex := 0
-	var iface model.Interface
-	hasIface := false
 	if port != "" {
 		ifIndex = resolveIfIndexByPortName(dev.ID, port, ifIndexByDeviceName)
 	}
+	endpoint := adjacencySideToEndpointWithResolvedPort(dev, match, port, "", ifIndex, "", ifaceByDeviceIndex)
+	if endpoint.IfName == "" {
+		endpoint.IfName = port
+	}
+	return endpoint
+}
+
+func adjacencySideToEndpointWithBridgePortRef(
+	dev model.Device,
+	match graph.Match,
+	rawPort string,
+	port bridgePortRef,
+	ifaceByDeviceIndex map[string]model.Interface,
+) graph.LinkEndpoint {
+	bridgePort := strings.TrimSpace(port.bridgePort)
+	endpoint := adjacencySideToEndpointWithResolvedPort(
+		dev,
+		match,
+		rawPort,
+		bridgePort,
+		port.ifIndex,
+		port.ifName,
+		ifaceByDeviceIndex,
+	)
+	if endpoint.IfIndex <= 0 && endpoint.IfName == "" {
+		endpoint.PortName = bridgePort
+	}
+	return endpoint
+}
+
+func adjacencySideToEndpointWithResolvedPort(
+	dev model.Device,
+	match graph.Match,
+	rawPort string,
+	bridgePort string,
+	ifIndex int,
+	ifName string,
+	ifaceByDeviceIndex map[string]model.Interface,
+) graph.LinkEndpoint {
+	rawPort = strings.TrimSpace(rawPort)
+	bridgePort = strings.TrimSpace(bridgePort)
+	ifName = strings.TrimSpace(ifName)
+	ifDescr := ""
+	var iface model.Interface
+	hasIface := false
 	if ifIndex > 0 {
 		if ifaceValue, ok := ifaceByDeviceIndex[deviceIfIndexKey(dev.ID, ifIndex)]; ok {
 			iface = ifaceValue
 			hasIface = true
-			ifName = strings.TrimSpace(iface.IfName)
+			if name := strings.TrimSpace(iface.IfName); name != "" {
+				ifName = name
+			}
 			ifDescr = strings.TrimSpace(iface.IfDescr)
 		}
 	}
 	if ifName == "" {
 		ifName = ifDescr
 	}
-	if ifName == "" {
-		ifName = port
-	}
-	if ifIndex > 0 && ifName == "" {
-		ifName = strconv.Itoa(ifIndex)
-	}
-
 	endpoint := graph.LinkEndpoint{
 		Match:        match,
 		IfIndex:      ifIndex,
 		IfName:       ifName,
-		PortID:       port,
+		PortID:       rawPort,
+		BridgePort:   bridgePort,
 		SysName:      strings.TrimSpace(dev.Hostname),
 		ManagementIP: selectedDeviceManagementIP(dev),
 	}
@@ -68,7 +114,6 @@ func adjacencySideToEndpointWithMatch(
 			endpoint.OperStatus = oper
 		}
 	}
-
 	return endpoint
 }
 

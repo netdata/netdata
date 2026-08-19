@@ -55,3 +55,45 @@ func TestBuildFDBCandidates_DoesNotReintroduceDuplicateEndpoint(t *testing.T) {
 
 	require.Empty(t, candidates)
 }
+
+func TestBuildFDBCandidates_KeepsDistinctForwardingDomainsWithoutDisplayVLAN(t *testing.T) {
+	candidates := buildFDBCandidates([]model.FDBObservation{
+		{
+			MAC:         "70:49:a2:65:72:cd",
+			BridgePort:  "1",
+			Status:      "learned",
+			FDBDomainID: "fdb:100",
+		},
+		{
+			MAC:         "70:49:a2:65:72:cd",
+			BridgePort:  "2",
+			Status:      "learned",
+			FDBDomainID: "fdb:200",
+		},
+	}, map[string]int{"1": 1, "2": 2})
+
+	require.Len(t, candidates, 2)
+	require.Empty(t, candidates[0].vlanID)
+	require.Empty(t, candidates[1].vlanID)
+	require.Equal(t, "fdb:100", candidates[0].fdbDomainID)
+	require.Equal(t, "fdb:200", candidates[1].fdbDomainID)
+}
+
+func TestBuildFDBCandidates_DropsConflictingDestinationsWithinForwardingDomain(t *testing.T) {
+	candidates := buildFDBCandidates([]model.FDBObservation{
+		{
+			MAC:         "70:49:a2:65:72:cd",
+			BridgePort:  "1",
+			Status:      "learned",
+			FDBDomainID: "fdb:100",
+		},
+		{
+			MAC:         "70:49:a2:65:72:cd",
+			BridgePort:  "2",
+			Status:      "learned",
+			FDBDomainID: "fdb:100",
+		},
+	}, map[string]int{"1": 1, "2": 2})
+
+	require.Empty(t, candidates)
+}

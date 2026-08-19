@@ -53,11 +53,17 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				l2.Designated = true
 			}
 			b.out.links = append(b.out.links, graph.Link{
-				Layer:        b.layer,
-				Protocol:     "bridge",
-				LinkType:     "bridge",
-				Direction:    "bidirectional",
-				Src:          adjacencySideToEndpointWithMatch(device, deviceLinkEndpointMatch(device, b.deviceLinkMatchByID), localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+				Layer:     b.layer,
+				Protocol:  "bridge",
+				LinkType:  "bridge",
+				Direction: "bidirectional",
+				Src: adjacencySideToEndpointWithBridgePortRef(
+					device,
+					deviceLinkEndpointMatch(device, b.deviceLinkMatchByID),
+					localPort,
+					port,
+					b.ifaceByDeviceIndex,
+				),
 				Dst:          segmentEndpoint,
 				DiscoveredAt: topologyTimePtr(b.collectedAt),
 				LastSeen:     topologyTimePtr(b.collectedAt),
@@ -177,11 +183,17 @@ func (b *segmentProjectionBuilder) emitLinks() {
 								}
 							}
 							b.out.links = append(b.out.links, graph.Link{
-								Layer:        b.layer,
-								Protocol:     "fdb",
-								LinkType:     "fdb",
-								Direction:    "bidirectional",
-								Src:          adjacencySideToEndpointWithMatch(device, deviceLinkEndpointMatch(device, b.deviceLinkMatchByID), localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+								Layer:     b.layer,
+								Protocol:  "fdb",
+								LinkType:  "fdb",
+								Direction: "bidirectional",
+								Src: adjacencySideToEndpointWithBridgePortRef(
+									device,
+									deviceLinkEndpointMatch(device, b.deviceLinkMatchByID),
+									localPort,
+									owner.port,
+									b.ifaceByDeviceIndex,
+								),
 								Dst:          graph.LinkEndpoint{Match: endpointLinkMatch},
 								DiscoveredAt: topologyTimePtr(b.collectedAt),
 								LastSeen:     topologyTimePtr(b.collectedAt),

@@ -64,10 +64,78 @@ func TestBuildL2ResultFromObservations_LLDPAndCDP(t *testing.T) {
 
 	require.Equal(t, "cdp", result.Adjacencies[0].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[0].SourceID)
+	require.Equal(t, 8, result.Adjacencies[0].SourcePortEvidence.IfIndex)
+	require.Equal(t, "Gi0/0", result.Adjacencies[0].SourcePortEvidence.IfName)
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
 	require.Equal(t, "lldp", result.Adjacencies[1].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[1].SourceID)
 	require.Equal(t, "switch-b", result.Adjacencies[1].TargetID)
+}
+
+func TestBuildL2ResultFromObservations_PopulatesTypedLLDPPortEvidenceBySubtype(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{
+		{
+			DeviceID:  "switch-a",
+			Hostname:  "switch-a",
+			ChassisID: "02:00:00:00:00:01",
+			LLDPRemotes: []model.LLDPRemoteObservation{{
+				LocalPortID:        "7",
+				LocalPortIDSubtype: "local",
+				ChassisID:          "02:00:00:00:00:02",
+				SysName:            "switch-b",
+				PortID:             "Ethernet2",
+				PortIDSubtype:      "interfaceName",
+			}},
+		},
+		{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:00:02"},
+	}, model.DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 1)
+	require.Equal(t, "7", result.Adjacencies[0].SourcePort)
+	require.Equal(t, model.AdjacencyPortEvidence{}, result.Adjacencies[0].SourcePortEvidence)
+	require.Equal(t, "Ethernet2", result.Adjacencies[0].TargetPort)
+	require.Equal(t, model.AdjacencyPortEvidence{IfName: "Ethernet2"}, result.Adjacencies[0].TargetPortEvidence)
+}
+
+func TestBuildL2ResultFromObservations_PairedCDPCopiesObservedTargetPortEvidence(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]model.L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			CDPRemotes: []model.CDPRemoteObservation{{
+				LocalIfIndex: 1,
+				LocalIfName:  "Ethernet1",
+				DeviceID:     "switch-b",
+				SysName:      "switch-b",
+				DevicePort:   "Ethernet2",
+			}},
+		},
+		{
+			DeviceID: "switch-b",
+			Hostname: "switch-b",
+			CDPRemotes: []model.CDPRemoteObservation{{
+				LocalIfIndex: 2,
+				LocalIfName:  "Ethernet2",
+				DeviceID:     "switch-a",
+				SysName:      "switch-a",
+				DevicePort:   "Ethernet1",
+			}},
+		},
+	}, model.DiscoverOptions{EnableCDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 2)
+	for _, adjacency := range result.Adjacencies {
+		switch adjacency.SourceID {
+		case "switch-a":
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Ethernet1"}, adjacency.SourcePortEvidence)
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Ethernet2"}, adjacency.TargetPortEvidence)
+		case "switch-b":
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Ethernet2"}, adjacency.SourcePortEvidence)
+			require.Equal(t, model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Ethernet1"}, adjacency.TargetPortEvidence)
+		default:
+			t.Fatalf("unexpected source %q", adjacency.SourceID)
+		}
+	}
 }
 
 func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
@@ -482,6 +550,33 @@ func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossPortsWhenVLANDiffers
 	require.Equal(t, 2, result.Stats.AttachmentsFDB)
 }
 
+func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossRawDomainsWithoutDisplayVLAN(t *testing.T) {
+	observations := []model.L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			BridgePorts: []model.BridgePortObservation{
+				{BasePort: "1", IfIndex: 1},
+				{BasePort: "2", IfIndex: 2},
+			},
+			FDBEntries: []model.FDBObservation{
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "1", Status: "learned", FDBDomainID: "fdb:100"},
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "2", Status: "learned", FDBDomainID: "fdb:200"},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+	require.Len(t, result.Attachments, 2)
+	require.Equal(t, "mac:70:49:a2:65:72:cd", result.Attachments[0].EndpointID)
+	require.Equal(t, "mac:70:49:a2:65:72:cd", result.Attachments[1].EndpointID)
+	require.Empty(t, result.Attachments[0].Labels["vlan_id"])
+	require.Empty(t, result.Attachments[1].Labels["vlan_id"])
+	require.NotEqual(t, result.Attachments[0].Labels["fdb_domain_id"], result.Attachments[1].Labels["fdb_domain_id"])
+	require.Equal(t, 2, result.Stats.AttachmentsFDB)
+}
+
 func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
 	observations := []model.L2Observation{
 		{
@@ -544,10 +639,49 @@ func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
 	require.Equal(t, "stp", result.Adjacencies[0].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[0].SourceID)
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
-	require.Equal(t, "Port3", result.Adjacencies[0].SourcePort)
+	require.Equal(t, "3", result.Adjacencies[0].SourcePort)
+	require.Equal(t, 3, result.Adjacencies[0].SourcePortEvidence.IfIndex)
+	require.Equal(t, "Port3", result.Adjacencies[0].SourcePortEvidence.IfName)
+	require.Equal(t, "3", result.Adjacencies[0].SourcePortEvidence.BridgePort)
+	require.Equal(t, "8001", result.Adjacencies[0].TargetPort)
+	require.Equal(t, "1", result.Adjacencies[0].TargetPortEvidence.BridgePort)
 	require.Equal(t, "200", result.Adjacencies[0].Labels["vlan_id"])
 	require.Equal(t, "servers", result.Adjacencies[0].Labels["vlan_name"])
 	require.Equal(t, 1, result.Stats.LinksSTP)
+}
+
+func TestSTPBridgePortFromPortID(t *testing.T) {
+	require.Equal(t, "2", stpBridgePortFromPortID("8002"))
+	require.Equal(t, "2", stpBridgePortFromPortID("2"))
+	require.Empty(t, stpBridgePortFromPortID("8000"))
+}
+
+func TestBuildL2ResultFromObservations_STPPreservesVLANScopes(t *testing.T) {
+	observations := []model.L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			BaseBridgeAddress: "00:11:22:33:44:55",
+			Interfaces:        []model.ObservedInterface{{IfIndex: 3, IfName: "Ethernet1"}},
+			BridgePorts:       []model.BridgePortObservation{{BasePort: "1", IfIndex: 3}},
+			STPPorts: []model.STPPortObservation{
+				{Port: "1", VLANID: "100", DesignatedBridge: "66:77:88:99:aa:bb", DesignatedPort: "8001"},
+				{Port: "1", VLANID: "200", DesignatedBridge: "66:77:88:99:aa:bb", DesignatedPort: "8001"},
+			},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			BaseBridgeAddress: "66:77:88:99:aa:bb",
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, model.DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 2)
+	require.Equal(t, "100", result.Adjacencies[0].Labels["vlan_id"])
+	require.Equal(t, "200", result.Adjacencies[1].Labels["vlan_id"])
+	require.Equal(t, 2, result.Stats.LinksSTP)
 }
 
 func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testing.T) {

@@ -64,14 +64,7 @@ func snapshotTopologyCacheForTestWithOptions(cache *topologyCache, options topol
 }
 
 func defaultTopologyQueryOptionsForTest() topologyoptions.QueryOptions {
-	return topologyoptions.QueryOptions{
-		CollapseActorsByIP:     true,
-		EliminateNonIPInferred: true,
-		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
-		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
-		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
-		Depth:                  topologyoptions.DepthAllInternal,
-	}
+	return topologyoptions.DefaultQueryOptions()
 }
 
 func containsMgmtAddr(snapshot topologymodel.Data, addrs map[string]struct{}) bool {

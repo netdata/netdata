@@ -14,6 +14,7 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 	lldpPairs := matchLLDPLinksEnlinkdPassOrder(lldpLinks)
 	lldpTargetOverrides := buildLLDPTargetOverrides(lldpLinks, lldpPairs)
 	lldpPairMetadata := buildLLDPPairMetadata(lldpLinks, lldpPairs)
+	lldpPairedTargetPortEvidence := buildLLDPPairedTargetPortEvidence(lldpLinks, lldpPairs)
 
 	for _, link := range lldpLinks {
 		managementIP := canonicalUsableIPAddress(link.remoteManagement)
@@ -28,11 +29,16 @@ func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 		s.recordRemoteManagementAddress(targetID, managementIPValue)
 
 		adj := model.Adjacency{
-			Protocol:   "lldp",
-			SourceID:   link.sourceDeviceID,
-			SourcePort: link.sourcePort,
-			TargetID:   targetID,
-			TargetPort: link.targetPort,
+			Protocol:           "lldp",
+			SourceID:           link.sourceDeviceID,
+			SourcePort:         link.sourcePort,
+			SourcePortEvidence: lldpLocalPortEvidence(link),
+			TargetID:           targetID,
+			TargetPort:         link.targetPort,
+			TargetPortEvidence: mergeAdjacencyPortEvidence(
+				lldpPairedTargetPortEvidence[link.index],
+				lldpRemotePortEvidence(link),
+			),
 		}
 		applyAdjacencyPairMetadata(&adj, lldpPairMetadata[link.index])
 		if addAdjacency(s.adjacencies, adj) {
@@ -46,6 +52,7 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 	cdpPairs := matchCDPLinksEnlinkdPassOrder(cdpLinks)
 	cdpTargetOverrides := buildCDPTargetOverrides(cdpLinks, cdpPairs)
 	cdpPairMetadata := buildCDPPairMetadata(cdpLinks, cdpPairs)
+	cdpPairedTargetPortEvidence := buildCDPPairedTargetPortEvidence(cdpLinks, cdpPairs)
 
 	for _, link := range cdpLinks {
 		managementAddr := canonicalUsableIPAddress(link.remoteManagementIP)
@@ -61,11 +68,13 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 		s.recordRemoteManagementAddress(targetID, managementIP)
 
 		adj := model.Adjacency{
-			Protocol:   "cdp",
-			SourceID:   link.sourceDeviceID,
-			SourcePort: link.localInterfaceName,
-			TargetID:   targetID,
-			TargetPort: link.remoteDevicePort,
+			Protocol:           "cdp",
+			SourceID:           link.sourceDeviceID,
+			SourcePort:         link.localInterfaceName,
+			SourcePortEvidence: cdpLocalPortEvidence(link),
+			TargetID:           targetID,
+			TargetPort:         link.remoteDevicePort,
+			TargetPortEvidence: cdpPairedTargetPortEvidence[link.index],
 		}
 		if managementIP != "" || strings.TrimSpace(rawAddress) != "" {
 			adj.Labels = make(map[string]string, 2)
@@ -114,29 +123,33 @@ func (s *l2BuildState) applySTP(observations []model.L2Observation) {
 				continue
 			}
 
+			sourcePort := strings.TrimSpace(entry.Port)
 			ifIndex := entry.IfIndex
 			if ifIndex <= 0 {
-				ifIndex = bridgePortToIfIndex[strings.TrimSpace(entry.Port)]
+				ifIndex = bridgePortToIfIndex[sourcePort]
 			}
-			sourcePort := strings.TrimSpace(entry.IfName)
-			if sourcePort == "" && ifIndex > 0 {
-				sourcePort = strings.TrimSpace(s.ifNameByDeviceIfIndex[deviceIfIndexKey(sourceID, ifIndex)])
+			sourceIfName := strings.TrimSpace(entry.IfName)
+			if sourceIfName == "" && ifIndex > 0 {
+				sourceIfName = strings.TrimSpace(s.ifNameByDeviceIfIndex[deviceIfIndexKey(sourceID, ifIndex)])
 			}
-			if sourcePort == "" {
-				sourcePort = strings.TrimSpace(entry.Port)
-			}
+			targetPort := strings.TrimSpace(entry.DesignatedPort)
 
 			adj := model.Adjacency{
 				Protocol:   "stp",
 				SourceID:   sourceID,
 				SourcePort: sourcePort,
+				SourcePortEvidence: model.AdjacencyPortEvidence{
+					IfIndex:    ifIndex,
+					IfName:     sourceIfName,
+					BridgePort: sourcePort,
+				},
 				TargetID:   targetID,
-				TargetPort: strings.TrimSpace(entry.DesignatedPort),
+				TargetPort: targetPort,
+				TargetPortEvidence: model.AdjacencyPortEvidence{
+					BridgePort: stpBridgePortFromPortID(targetPort),
+				},
 			}
 			labels := make(map[string]string)
-			if v := strings.TrimSpace(entry.Port); v != "" {
-				labels["stp_port"] = v
-			}
 			if v := strings.TrimSpace(entry.State); v != "" {
 				labels["stp_state"] = v
 			}

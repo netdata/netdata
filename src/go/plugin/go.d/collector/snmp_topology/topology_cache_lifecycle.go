@@ -22,8 +22,8 @@ func newTopologyCache() *topologyCache {
 		l3InterfacesByIP:   make(map[string]topologymodel.L3Interface),
 		bridgePortToIf:     make(map[string]string),
 		fdbEntries:         make(map[string]*fdbEntry),
-		fdbIDToVlanID:      make(map[string]string),
-		vlanIDToName:       make(map[string]string),
+		vlanByFDBID:        make(map[string]fdbVLANMapping),
+		vlanNameByID:       make(map[string]vlanNameMapping),
 		stpPorts:           make(map[string]*stpPortEntry),
 		arpEntries:         make(map[string]*arpEntry),
 		ospfNeighborsByKey: make(map[string]topologymodel.OSPFNeighbor),
@@ -52,8 +52,8 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.trapMatchMethodByIP = src.trapMatchMethodByIP
 	c.bridgePortToIf = src.bridgePortToIf
 	c.fdbEntries = src.fdbEntries
-	c.fdbIDToVlanID = src.fdbIDToVlanID
-	c.vlanIDToName = src.vlanIDToName
+	c.vlanByFDBID = src.vlanByFDBID
+	c.vlanNameByID = src.vlanNameByID
 	c.fdbRowsDroppedNoMAC = src.fdbRowsDroppedNoMAC
 	c.fdbRowsUnmappedPort = src.fdbRowsUnmappedPort
 	c.vtpVersion = src.vtpVersion
@@ -124,6 +124,7 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 
 	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
 	c.rebuildTrapSourceMatchMethods()
+	c.finalizeFDBVLANs()
 	c.updateFDBDiagnostics()
 	stats := topologyCacheFinalizeStats{
 		agentID:      c.agentID,

@@ -266,6 +266,22 @@ For the low-confidence map type, the builder creates a strict map and a
 probable map, marks probable-only link deltas, then applies the same L3/OSPF/BGP
 enrichment and depth/focus filtering to the probable map.
 
+The default `managed_fabric` map keeps every monitored SNMP device, the legacy
+direct LLDP/CDP discovery surface, direct STP adjacencies between monitored
+devices, and bridge/FDB legs for broadcast-domain segments adjacent to at least
+two distinct monitored devices. Multiple legs from one device do not satisfy
+that threshold. Endpoint actors, endpoint-only or sparse segments, direct FDB
+shortcuts, and segment-to-segment paths are excluded. The selectable legacy
+`lldp_cdp_managed`, `high_confidence_inferred`, and
+`all_devices_low_confidence` policies retain their existing semantics.
+
+Map-type shaping applies to the Layer 2 graph. Logical Layer 3 enrichment runs
+after shaping and is preserved for every map type: `/24` through `/29` subnet
+segments, `/30` and `/31` direct subnet links, OSPF adjacencies, and BGP
+adjacencies. Their topology presentation uses distinct dashed logical/control
+links, so Layer 2 acceptance and statistics must be checked by link type rather
+than by treating any non-empty graph as Layer 2 success.
+
 Local actor augmentation indexes the pre-policy actor generation once by its
 local identity subset: chassis id, system name, and selected management IP.
 Policy shaping can collapse, remove, and reorder actors, so that index is

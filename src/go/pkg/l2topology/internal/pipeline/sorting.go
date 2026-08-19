@@ -240,7 +240,10 @@ func sortedAdjacencies(in map[string]model.Adjacency) []model.Adjacency {
 		if a.TargetID != b.TargetID {
 			return a.TargetID < b.TargetID
 		}
-		return a.TargetPort < b.TargetPort
+		if a.TargetPort != b.TargetPort {
+			return a.TargetPort < b.TargetPort
+		}
+		return adjacencyKey(a) < adjacencyKey(b)
 	})
 	return out
 }
@@ -261,7 +264,10 @@ func sortedAttachments(in map[string]model.Attachment) []model.Attachment {
 		if a.EndpointID != b.EndpointID {
 			return a.EndpointID < b.EndpointID
 		}
-		return a.Method < b.Method
+		if a.Method != b.Method {
+			return a.Method < b.Method
+		}
+		return attachmentKey(a) < attachmentKey(b)
 	})
 	return out
 }

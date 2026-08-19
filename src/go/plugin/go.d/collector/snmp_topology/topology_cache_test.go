@@ -3,8 +3,11 @@
 package snmptopology
 
 import (
+	"fmt"
+	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -958,14 +961,16 @@ func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
 		tagDot1qVlanID:    "200",
 		tagDot1qVlanFdbID: "100",
 	})
+	cache.finalizeTopologyCache()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
 	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
 	require.Equal(t, "70:49:a2:65:72:cd", obs.FDBEntries[0].MAC)
 }
 
-func TestTopologyCache_Dot1qVLANFallbackUsesFDBIDWhenMapMissing(t *testing.T) {
+func TestTopologyCache_Dot1qUnmappedFDBKeepsDomainWithoutFalseVLAN(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
@@ -986,10 +991,216 @@ func TestTopologyCache_Dot1qVLANFallbackUsesFDBIDWhenMapMissing(t *testing.T) {
 		tagDot1qFdbPort:   "7",
 		tagDot1qFdbStatus: "learned",
 	})
+	cache.finalizeTopologyCache()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
-	require.Equal(t, "100", obs.FDBEntries[0].VLANID)
+	require.Empty(t, obs.FDBEntries[0].VLANID)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+}
+
+func TestTopologyCache_Dot1qAmbiguousFDBMappingKeepsDomainWithoutFalseVLAN(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+	cache.updateDot1qVlanMap(map[string]string{tagDot1qVlanID: "10", tagDot1qVlanFdbID: "100"})
+	cache.updateDot1qVlanMap(map[string]string{tagDot1qVlanID: "20", tagDot1qVlanFdbID: "100"})
+	cache.vlanNameByID["10"] = vlanNameMapping{name: "users"}
+	cache.vlanNameByID["20"] = vlanNameMapping{name: "servers"}
+
+	cache.finalizeTopologyCache()
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+	require.Empty(t, obs.FDBEntries[0].VLANID)
+	require.Empty(t, obs.FDBEntries[0].VLANName)
+}
+
+func TestTopologyCache_Dot1qRepeatedTimeMarkRowsKeepUniqueMapping(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID1:   "1",
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID1:   "2",
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+}
+
+func TestTopologyCache_FDBVLANFinalizationIsCollectionOrderIndependent(t *testing.T) {
+	operations := []func(*topologyCache){
+		func(cache *topologyCache) {
+			cache.updateFdbEntry(map[string]string{
+				tagDot1qFdbID:     "100",
+				tagDot1qFdbMac:    "7049a26572cd",
+				tagDot1qFdbPort:   "7",
+				tagDot1qFdbStatus: "learned",
+			})
+		},
+		func(cache *topologyCache) {
+			cache.updateDot1qVlanMap(map[string]string{
+				tagDot1qVlanID:    "200",
+				tagDot1qVlanFdbID: "100",
+			})
+		},
+		func(cache *topologyCache) {
+			cache.updateVtpVlanEntry(map[string]string{
+				tagVtpVlanIndex: "200",
+				tagVtpVlanState: "operational",
+				tagVtpVlanType:  "1",
+				tagVtpVlanName:  "servers",
+			})
+		},
+	}
+	orders := [][]int{
+		{0, 1, 2}, {0, 2, 1},
+		{1, 0, 2}, {1, 2, 0},
+		{2, 0, 1}, {2, 1, 0},
+	}
+
+	for _, order := range orders {
+		t.Run(strconv.Itoa(order[0])+strconv.Itoa(order[1])+strconv.Itoa(order[2]), func(t *testing.T) {
+			cache := newTopologyCache()
+			for _, index := range order {
+				operations[index](cache)
+			}
+			cache.finalizeTopologyCache()
+			cache.finalizeTopologyCache()
+
+			obs := cache.buildEngineObservation(cache.localDevice)
+			require.Len(t, obs.FDBEntries, 1)
+			require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+			require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+			require.Equal(t, "servers", obs.FDBEntries[0].VLANName)
+		})
+	}
+}
+
+func TestTopologyCache_FDBVLANFinalizationPreservesExplicitContext(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.updateVtpVlanEntry(map[string]string{
+		tagVtpVlanIndex: "200",
+		tagVtpVlanName:  "derived-name",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:              "100",
+		tagDot1qFdbMac:             "7049a26572cd",
+		tagDot1qFdbPort:            "7",
+		tagDot1qFdbStatus:          "learned",
+		tagTopologyContextVLANID:   "300",
+		tagTopologyContextVLANName: "explicit-name",
+	})
+
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "fdb:100", obs.FDBEntries[0].FDBDomainID)
+	require.Equal(t, "300", obs.FDBEntries[0].VLANID)
+	require.Equal(t, "explicit-name", obs.FDBEntries[0].VLANName)
+}
+
+func TestTopologyCache_VTPVLANNameConflictRemainsUnresolved(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.updateVtpVlanEntry(map[string]string{
+		tagVtpVlanIndex: "200",
+		tagVtpVlanState: "operational",
+		tagVtpVlanType:  "ethernet",
+		tagVtpVlanName:  "servers",
+	})
+	cache.updateVtpVlanEntry(map[string]string{
+		tagVtpVlanIndex: "200",
+		tagVtpVlanState: "operational",
+		tagVtpVlanType:  "ethernet",
+		tagVtpVlanName:  "storage",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+
+	cache.finalizeTopologyCache()
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+	require.Empty(t, obs.FDBEntries[0].VLANName)
+	require.Equal(t, []topologyVLANContext{{vlanID: "200"}}, cache.vtpVLANContexts())
+}
+
+func BenchmarkTopologyCache_FinalizeFDBVLANsScaling(b *testing.B) {
+	for _, tc := range []struct {
+		vlans      int
+		fdbEntries int
+	}{
+		{vlans: 16, fdbEntries: 16},
+		{vlans: 256, fdbEntries: 64},
+		{vlans: 4095, fdbEntries: 323},
+		{vlans: 4095, fdbEntries: 4095},
+	} {
+		b.Run(fmt.Sprintf("vlans=%d/fdb_entries=%d", tc.vlans, tc.fdbEntries), func(b *testing.B) {
+			published := newTopologyCache()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				b.StopTimer()
+				cache := newTopologyCache()
+				for index := 1; index <= tc.fdbEntries; index++ {
+					cache.updateFdbEntry(map[string]string{
+						tagDot1qFdbID:     strconv.Itoa((index-1)%tc.vlans + 1),
+						tagDot1qFdbMac:    fmt.Sprintf("02:00:00:%02x:%02x:%02x", (index>>16)&0xff, (index>>8)&0xff, index&0xff),
+						tagDot1qFdbPort:   strconv.Itoa(index),
+						tagDot1qFdbStatus: "learned",
+					})
+				}
+				for vlanID := 1; vlanID <= tc.vlans; vlanID++ {
+					cache.updateDot1qVlanMap(map[string]string{
+						tagDot1qVlanID:    strconv.Itoa(vlanID),
+						tagDot1qVlanFdbID: strconv.Itoa(vlanID),
+					})
+				}
+				b.StartTimer()
+				cache.finalizeTopologyCache()
+				b.StopTimer()
+				published.mu.Lock()
+				published.replaceWith(cache)
+				published.mu.Unlock()
+				b.StartTimer()
+			}
+			b.StopTimer()
+			runtime.KeepAlive(published)
+		})
+	}
 }
 
 func TestTopologyCache_FDBDiagnostics(t *testing.T) {
@@ -1050,6 +1261,7 @@ func TestTopologyCache_VTPVLANNameEnrichment(t *testing.T) {
 		tagDot1qFdbPort:   "7",
 		tagDot1qFdbStatus: "learned",
 	})
+	cache.finalizeTopologyCache()
 
 	obs := cache.buildEngineObservation(cache.localDevice)
 	require.Len(t, obs.FDBEntries, 1)
@@ -1224,10 +1436,10 @@ func TestStpBridgeAddressToMAC_ParsesAndRejectsSentinels(t *testing.T) {
 
 func TestTopologyCache_VTPVLANContexts_SortedAndValidated(t *testing.T) {
 	cache := newTopologyCache()
-	cache.vlanIDToName["200"] = "servers"
-	cache.vlanIDToName["10"] = "users"
-	cache.vlanIDToName["abc"] = "invalid"
-	cache.vlanIDToName[""] = "invalid-empty"
+	cache.vlanNameByID["200"] = vlanNameMapping{name: "servers"}
+	cache.vlanNameByID["10"] = vlanNameMapping{name: "users"}
+	cache.vlanNameByID["abc"] = vlanNameMapping{name: "invalid"}
+	cache.vlanNameByID[""] = vlanNameMapping{name: "invalid-empty"}
 
 	contexts := cache.vtpVLANContexts()
 	require.Len(t, contexts, 2)
@@ -1269,6 +1481,91 @@ func TestTopologyCache_VLANContextFDBEntriesRemainDistinct(t *testing.T) {
 	require.Equal(t, "users", obs.FDBEntries[0].VLANName)
 	require.Equal(t, "200", obs.FDBEntries[1].VLANID)
 	require.Equal(t, "servers", obs.FDBEntries[1].VLANName)
+}
+
+func TestTopologyCache_OverlappingFDBSourcesRemainUsableInProjection(t *testing.T) {
+	tests := map[string]struct {
+		addOverlap func(*topologyCache)
+	}{
+		"bridge and q-bridge": {
+			addOverlap: func(cache *topologyCache) {
+				cache.updateFdbEntry(map[string]string{
+					tagFdbMac:        "020000000101",
+					tagFdbBridgePort: "7",
+					tagFdbStatus:     "learned",
+				})
+			},
+		},
+		"q-bridge and vlan context": {
+			addOverlap: func(cache *topologyCache) {
+				cache.ingestTopologyVLANContextMetrics("100", "users", []*ddsnmp.ProfileMetrics{{
+					TopologyMetrics: []ddsnmp.Metric{{
+						TopologyKind: ddsnmp.KindFdbEntry,
+						Tags: map[string]string{
+							tagFdbMac:        "020000000101",
+							tagFdbBridgePort: "7",
+							tagFdbStatus:     "learned",
+						},
+					}},
+				}})
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyCache()
+			cache.localDevice = topologymodel.Device{
+				ChassisID:     "02:00:00:00:00:01",
+				ChassisIDType: "macAddress",
+				SysName:       "switch-a",
+			}
+			cache.updateBridgePortMap(map[string]string{
+				tagBridgeBasePort: "7",
+				tagBridgeIfIndex:  "1",
+			})
+			cache.updateIfNameByIndex(map[string]string{
+				tagTopoIfIndex: "1",
+				tagTopoIfName:  "Ethernet1",
+			})
+			cache.updateFdbEntry(map[string]string{
+				tagDot1qFdbID:     "500",
+				tagDot1qFdbMac:    "020000000101",
+				tagDot1qFdbPort:   "7",
+				tagDot1qFdbStatus: "learned",
+			})
+			cache.updateDot1qVlanMap(map[string]string{
+				tagDot1qVlanID:    "100",
+				tagDot1qVlanFdbID: "500",
+			})
+			tt.addOverlap(cache)
+			cache.finalizeTopologyCache()
+
+			local := cache.buildEngineObservation(cache.localDevice)
+			require.Len(t, local.FDBEntries, 2)
+			result, err := topologyengine.BuildL2ResultFromObservations([]topologyengine.L2Observation{
+				local,
+				{DeviceID: "switch-b", Hostname: "switch-b", ChassisID: "02:00:00:00:01:01"},
+			}, topologyengine.DiscoverOptions{EnableBridge: true})
+			require.NoError(t, err)
+
+			projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{Source: "snmp", Layer: "2"})
+			segments := 0
+			fdbLinks := 0
+			for _, actor := range projection.Graph.Actors {
+				if actor.ActorType == "segment" {
+					segments++
+				}
+			}
+			for _, link := range projection.Graph.Links {
+				if link.Protocol == "fdb" {
+					fdbLinks++
+				}
+			}
+			require.Equal(t, 1, segments)
+			require.Equal(t, 1, fdbLinks)
+		})
+	}
 }
 
 func TestPickManagementIP_DeterministicAcrossInputOrder(t *testing.T) {

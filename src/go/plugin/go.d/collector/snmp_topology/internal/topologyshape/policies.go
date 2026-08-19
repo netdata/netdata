@@ -14,9 +14,6 @@ func ApplyPolicies(data *topologymodel.Data, options topologyoptions.QueryOption
 		return
 	}
 	mapType := topologyoptions.NormalizeMapType(options.MapType)
-	if mapType == "" {
-		mapType = topologyoptions.MapTypeAllDevicesLowConfidence
-	}
 	options.MapType = mapType
 
 	collapsed := 0

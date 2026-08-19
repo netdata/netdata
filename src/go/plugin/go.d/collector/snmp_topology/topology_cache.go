@@ -33,8 +33,8 @@ type topologyCache struct {
 	trapMatchMethodByIP  map[string]string
 	bridgePortToIf       map[string]string
 	fdbEntries           map[string]*fdbEntry
-	fdbIDToVlanID        map[string]string
-	vlanIDToName         map[string]string
+	vlanByFDBID          map[string]fdbVLANMapping
+	vlanNameByID         map[string]vlanNameMapping
 	fdbRowsDroppedNoMAC  int
 	fdbRowsUnmappedPort  int
 	vtpVersion           string
@@ -103,12 +103,24 @@ type cdpRemote struct {
 }
 
 type fdbEntry struct {
-	mac        string
-	bridgePort string
-	status     string
-	fdbID      string
-	vlanID     string
-	vlanName   string
+	mac              string
+	bridgePort       string
+	status           string
+	fdbID            string
+	vlanID           string
+	vlanName         string
+	vlanIDExplicit   bool
+	vlanNameExplicit bool
+}
+
+type fdbVLANMapping struct {
+	vlanID    string
+	ambiguous bool
+}
+
+type vlanNameMapping struct {
+	name      string
+	ambiguous bool
 }
 
 type stpPortEntry struct {

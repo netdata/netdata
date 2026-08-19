@@ -85,6 +85,8 @@ func suppressInferredBridgeLinksOnDeterministicDiscovery(
 func buildDeterministicTransitPortKeySet(
 	adjacencies []model.Adjacency,
 	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
 ) map[string]struct{} {
 	if len(adjacencies) == 0 {
 		return nil
@@ -97,8 +99,7 @@ func buildDeterministicTransitPortKeySet(
 			continue
 		}
 
-		src := bridgePortFromAdjacencySide(adj.SourceID, adj.SourcePort, ifIndexByDeviceName)
-		dst := bridgePortFromAdjacencySide(adj.TargetID, adj.TargetPort, ifIndexByDeviceName)
+		src, dst := bridgePortsFromAdjacency(adj, ifIndexByDeviceName, ifaceByDeviceIndex, aliases)
 		addBridgePortObservationKeys(out, src)
 		addBridgePortObservationKeys(out, dst)
 	}

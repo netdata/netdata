@@ -23,17 +23,21 @@ func inferFDBPairwiseBridgeLinks(
 		return nil
 	}
 
-	// reporterA -> reporterB -> unique reporter ports where A learns aliases of B.
-	pairs := make(map[string]map[string]map[string]bridgePortRef)
-	for _, attachment := range attachments {
-		if !strings.EqualFold(strings.TrimSpace(attachment.Method), "fdb") {
+	macLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, nil)
+	vlanAliases := buildBridgeVLANAliasIndex(macLinks)
+
+	// reporterA -> reporterB -> compatible scope -> unique canonical reporter
+	// ports where A learns aliases of B.
+	pairs := make(map[string]map[string]map[string]map[string]bridgePortRef)
+	for _, link := range macLinks {
+		if !strings.EqualFold(strings.TrimSpace(link.method), "fdb") {
 			continue
 		}
-		reporterID := strings.TrimSpace(attachment.DeviceID)
+		reporterID := strings.TrimSpace(link.port.deviceID)
 		if reporterID == "" {
 			continue
 		}
-		endpointID := normalizeFDBEndpointID(attachment.EndpointID)
+		endpointID := normalizeFDBEndpointID(link.endpointID)
 		if endpointID == "" {
 			continue
 		}
@@ -41,9 +45,10 @@ func inferFDBPairwiseBridgeLinks(
 		if len(owners) == 0 {
 			continue
 		}
-		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
+		port := link.port
 		portKey := bridgePortObservationKey(port)
-		if portKey == "" {
+		scope := pairwiseCorrelationScope(port, vlanAliases)
+		if portKey == "" || scope == "" {
 			continue
 		}
 		for ownerID := range owners {
@@ -53,13 +58,18 @@ func inferFDBPairwiseBridgeLinks(
 			}
 			byPeer := pairs[reporterID]
 			if byPeer == nil {
-				byPeer = make(map[string]map[string]bridgePortRef)
+				byPeer = make(map[string]map[string]map[string]bridgePortRef)
 				pairs[reporterID] = byPeer
 			}
-			ports := byPeer[ownerID]
+			byScope := byPeer[ownerID]
+			if byScope == nil {
+				byScope = make(map[string]map[string]bridgePortRef)
+				byPeer[ownerID] = byScope
+			}
+			ports := byScope[scope]
 			if ports == nil {
 				ports = make(map[string]bridgePortRef)
-				byPeer[ownerID] = ports
+				byScope[scope] = ports
 			}
 			ports[portKey] = port
 		}
@@ -89,38 +99,42 @@ func inferFDBPairwiseBridgeLinks(
 			if leftID >= rightID {
 				continue
 			}
-			leftPorts := pairs[leftID][rightID]
-			rightPorts := pairs[rightID][leftID]
-			if len(leftPorts) != 1 || len(rightPorts) != 1 {
-				// Conservative rule: infer direct bridge link only when each side reports
-				// exactly one reciprocal managed-alias learning port.
-				continue
-			}
-			leftPort := firstSortedBridgePort(leftPorts)
-			rightPort := firstSortedBridgePort(rightPorts)
-			if bridgePortObservationKey(leftPort) == "" || bridgePortObservationKey(rightPort) == "" {
-				continue
-			}
-			key := bridgePairKey(leftPort, rightPort)
-			if key == "" {
-				continue
-			}
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
+			leftByScope := pairs[leftID][rightID]
+			rightByScope := pairs[rightID][leftID]
+			for _, scope := range compatiblePairwiseScopes(leftByScope, rightByScope) {
+				leftPorts := leftByScope[scope]
+				rightPorts := rightByScope[scope]
+				if len(leftPorts) != 1 || len(rightPorts) != 1 {
+					// Conservative rule: infer a bridge segment only when each side reports
+					// exactly one reciprocal managed-alias learning port in this scope.
+					continue
+				}
+				leftPort := firstSortedBridgePort(leftPorts)
+				rightPort := firstSortedBridgePort(rightPorts)
+				if bridgePortObservationKey(leftPort) == "" || bridgePortObservationKey(rightPort) == "" {
+					continue
+				}
+				key := bridgeScopedPairKey(leftPort, rightPort)
+				if key == "" {
+					continue
+				}
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
 
-			designated := leftPort
-			other := rightPort
-			if bridgePortRefSortKey(leftPort) > bridgePortRefSortKey(rightPort) {
-				designated = rightPort
-				other = leftPort
+				designated := leftPort
+				other := rightPort
+				if bridgePortRefSortKey(leftPort) > bridgePortRefSortKey(rightPort) {
+					designated = rightPort
+					other = leftPort
+				}
+				records = append(records, bridgeBridgeLinkRecord{
+					port:           other,
+					designatedPort: designated,
+					method:         "fdb_pairwise",
+				})
 			}
-			records = append(records, bridgeBridgeLinkRecord{
-				port:           other,
-				designatedPort: designated,
-				method:         "fdb_pairwise",
-			})
 		}
 	}
 	if len(records) == 0 {
@@ -132,6 +146,37 @@ func inferFDBPairwiseBridgeLinks(
 		return li < lj
 	})
 	return records
+}
+
+func pairwiseCorrelationScope(port bridgePortRef, aliases bridgeVLANAliasIndex) string {
+	rawScope := bridgePortForwardingDomain(port)
+	vlanScope := bridgePortVLANScope(port)
+	if rawScope == "" && vlanScope == "" {
+		return "domainless"
+	}
+	if vlanScope == "" {
+		return ""
+	}
+	if rawScope == vlanScope || aliases.uniqueAliasKey(port) != "" {
+		return vlanScope
+	}
+	return ""
+}
+
+func compatiblePairwiseScopes(
+	left, right map[string]map[string]bridgePortRef,
+) []string {
+	if len(left) == 0 || len(right) == 0 {
+		return nil
+	}
+	scopes := make([]string, 0, len(left))
+	for scope := range left {
+		if _, ok := right[scope]; ok {
+			scopes = append(scopes, scope)
+		}
+	}
+	sort.Strings(scopes)
+	return scopes
 }
 
 func firstSortedBridgePort(ports map[string]bridgePortRef) bridgePortRef {

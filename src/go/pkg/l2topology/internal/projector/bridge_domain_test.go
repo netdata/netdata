@@ -111,23 +111,27 @@ func TestMergeRootDomainSets_MergesTwoNonRootMembersAcrossDomains(t *testing.T) 
 func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "lldp",
-			SourceID:   "a",
-			SourcePort: "Gi0/1",
-			TargetID:   "b",
-			TargetPort: "Gi0/2",
+			Protocol:           "lldp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/1",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+			TargetID:           "b",
+			TargetPort:         "Gi0/2",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
 		},
 		{
-			Protocol:   "lldp",
-			SourceID:   "b",
-			SourcePort: "Gi0/2",
-			TargetID:   "a",
-			TargetPort: "Gi0/1",
+			Protocol:           "lldp",
+			SourceID:           "b",
+			SourcePort:         "Gi0/2",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
+			TargetID:           "a",
+			TargetPort:         "Gi0/1",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
 		},
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,
 		deviceIfNameKey("b", "Gi0/2"): 2,
-	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyFDBMinimumKnowledge))
+	}, nil, bridgePortAliasIndex{}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyFDBMinimumKnowledge))
 
 	require.Len(t, records, 1)
 	require.Equal(t, "a", records[0].designatedPort.deviceID)
@@ -137,15 +141,16 @@ func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T
 func TestCollectBridgeLinkRecords_SkipsAdjacencyWithoutRemotePort(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "lldp",
-			SourceID:   "a",
-			SourcePort: "Gi0/1",
-			TargetID:   "b",
-			TargetPort: "",
+			Protocol:           "lldp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/1",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+			TargetID:           "b",
+			TargetPort:         "",
 		},
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,
-	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyFDBMinimumKnowledge))
+	}, nil, bridgePortAliasIndex{}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyFDBMinimumKnowledge))
 
 	require.Empty(t, records)
 }
@@ -153,16 +158,18 @@ func TestCollectBridgeLinkRecords_SkipsAdjacencyWithoutRemotePort(t *testing.T) 
 func TestCollectBridgeLinkRecords_STPParentTreeUsesDesignatedTargetPort(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "stp",
-			SourceID:   "child",
-			SourcePort: "Gi0/10",
-			TargetID:   "root",
-			TargetPort: "Gi0/1",
+			Protocol:           "stp",
+			SourceID:           "child",
+			SourcePort:         "10",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 10, IfName: "Gi0/10", BridgePort: "10"},
+			TargetID:           "root",
+			TargetPort:         "8001",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1", BridgePort: "1"},
 		},
 	}, map[string]int{
 		deviceIfNameKey("child", "Gi0/10"): 10,
 		deviceIfNameKey("root", "Gi0/1"):   1,
-	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategySTPParentTree))
+	}, nil, bridgePortAliasIndex{}, topologyInferenceStrategyConfigFor(topologyInferenceStrategySTPParentTree))
 
 	require.Len(t, records, 1)
 	require.Equal(t, "root", records[0].designatedPort.deviceID)
@@ -170,28 +177,59 @@ func TestCollectBridgeLinkRecords_STPParentTreeUsesDesignatedTargetPort(t *testi
 	require.Equal(t, "stp", records[0].method)
 }
 
+func TestCollectBridgeLinkRecords_STPPreservesVLANScopes(t *testing.T) {
+	adjacencies := []model.Adjacency{
+		{
+			Protocol: "stp", SourceID: "child", SourcePort: "10",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 10, IfName: "Gi0/10", BridgePort: "10"},
+			TargetID:           "root", TargetPort: "8001",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1", BridgePort: "1"},
+			Labels:             map[string]string{"vlan_id": "100"},
+		},
+		{
+			Protocol: "stp", SourceID: "child", SourcePort: "10",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 10, IfName: "Gi0/10", BridgePort: "10"},
+			TargetID:           "root", TargetPort: "8001",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1", BridgePort: "1"},
+			Labels:             map[string]string{"vlan_id": "200"},
+		},
+	}
+	records := collectBridgeLinkRecords(adjacencies, map[string]int{
+		deviceIfNameKey("child", "Gi0/10"): 10,
+		deviceIfNameKey("root", "Gi0/1"):   1,
+	}, nil, bridgePortAliasIndex{}, topologyInferenceStrategyConfigFor(topologyInferenceStrategySTPParentTree))
+
+	require.Len(t, records, 2)
+	require.Equal(t, "vlan:100", bridgePortForwardingDomain(records[0].designatedPort))
+	require.Equal(t, "vlan:200", bridgePortForwardingDomain(records[1].designatedPort))
+}
+
 func TestCollectBridgeLinkRecords_CDPHybridSkipsLLDPAdjacencies(t *testing.T) {
 	records := collectBridgeLinkRecords([]model.Adjacency{
 		{
-			Protocol:   "lldp",
-			SourceID:   "a",
-			SourcePort: "Gi0/1",
-			TargetID:   "b",
-			TargetPort: "Gi0/2",
+			Protocol:           "lldp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/1",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 1, IfName: "Gi0/1"},
+			TargetID:           "b",
+			TargetPort:         "Gi0/2",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 2, IfName: "Gi0/2"},
 		},
 		{
-			Protocol:   "cdp",
-			SourceID:   "a",
-			SourcePort: "Gi0/3",
-			TargetID:   "c",
-			TargetPort: "Gi0/4",
+			Protocol:           "cdp",
+			SourceID:           "a",
+			SourcePort:         "Gi0/3",
+			SourcePortEvidence: model.AdjacencyPortEvidence{IfIndex: 3, IfName: "Gi0/3"},
+			TargetID:           "c",
+			TargetPort:         "Gi0/4",
+			TargetPortEvidence: model.AdjacencyPortEvidence{IfIndex: 4, IfName: "Gi0/4"},
 		},
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,
 		deviceIfNameKey("b", "Gi0/2"): 2,
 		deviceIfNameKey("a", "Gi0/3"): 3,
 		deviceIfNameKey("c", "Gi0/4"): 4,
-	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyCDPFDBHybrid))
+	}, nil, bridgePortAliasIndex{}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyCDPFDBHybrid))
 
 	require.Len(t, records, 1)
 	require.Equal(t, "cdp", records[0].method)
@@ -228,4 +266,61 @@ func TestInferFDBPairwiseBridgeLinks_ReciprocalUniquePortPerSide(t *testing.T) {
 	require.Equal(t, "fdb_pairwise", records[0].method)
 	require.Equal(t, "sw-a", records[0].designatedPort.deviceID)
 	require.Equal(t, "sw-b", records[0].port.deviceID)
+}
+
+func TestInferFDBPairwiseBridgeLinks_EmitsOneRecordPerCompatibleVLANScope(t *testing.T) {
+	attachments := []model.Attachment{
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:10", "vlan_id": "100"}},
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:20", "vlan_id": "200"}},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:30", "vlan_id": "100"}},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:40", "vlan_id": "200"}},
+	}
+	ifaceByDeviceIndex := map[string]model.Interface{
+		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
+	}
+	reporterAliases := map[string][]string{
+		"sw-a": {"mac:aa:aa:aa:aa:aa:aa"},
+		"sw-b": {"mac:bb:bb:bb:bb:bb:bb"},
+	}
+
+	records := inferFDBPairwiseBridgeLinks(attachments, ifaceByDeviceIndex, reporterAliases)
+	require.Len(t, records, 2)
+	require.Equal(t, "100", records[0].designatedPort.vlanID)
+	require.Equal(t, "200", records[1].designatedPort.vlanID)
+}
+
+func TestInferFDBPairwiseBridgeLinks_RejectsIncompatibleDeviceLocalRawDomains(t *testing.T) {
+	attachments := []model.Attachment{
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:500", "vlan_id": "100"}},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:500", "vlan_id": "200"}},
+	}
+	ifaceByDeviceIndex := map[string]model.Interface{
+		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
+	}
+	reporterAliases := map[string][]string{
+		"sw-a": {"mac:aa:aa:aa:aa:aa:aa"},
+		"sw-b": {"mac:bb:bb:bb:bb:bb:bb"},
+	}
+
+	require.Empty(t, inferFDBPairwiseBridgeLinks(attachments, ifaceByDeviceIndex, reporterAliases))
+}
+
+func TestInferFDBPairwiseBridgeLinks_RejectsAmbiguousVLANAlias(t *testing.T) {
+	attachments := []model.Attachment{
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:10", "vlan_id": "100"}},
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:20", "vlan_id": "100"}},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb", Labels: map[string]string{"fdb_domain_id": "fdb:30", "vlan_id": "100"}},
+	}
+	ifaceByDeviceIndex := map[string]model.Interface{
+		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
+	}
+	reporterAliases := map[string][]string{
+		"sw-a": {"mac:aa:aa:aa:aa:aa:aa"},
+		"sw-b": {"mac:bb:bb:bb:bb:bb:bb"},
+	}
+
+	require.Empty(t, inferFDBPairwiseBridgeLinks(attachments, ifaceByDeviceIndex, reporterAliases))
 }
