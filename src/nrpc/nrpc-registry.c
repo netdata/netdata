@@ -2,8 +2,6 @@
 
 #include "nrpc-internals.h"
 
-#define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
-
 // the component-owned "functions" memory-attribution category, read by the
 // daemon's pulse charts (declared in nrpc.h)
 struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
@@ -854,12 +852,21 @@ bool nrpc_method_is_available(struct nrpc_registry *registry, struct nrpc_method
     return nrpc_method_is_available_at(method, armed, epoch_id);
 }
 
-int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name, size_t key_length,
+int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name,
                        const DICTIONARY_ITEM **out_inner_item) {
-    char buffer[MAX_FUNCTION_LENGTH + 1];
-    strncpyz(buffer, name, sizeof(buffer) - 1);
-    key_length = strnlen(buffer, sizeof(buffer));
-    char *s = NULL;
+    // A MUTABLE right-sized copy: the loop below strips one trailing word at a
+    // time, so "fn arg1 arg2" degrades to "fn arg1" and then to "fn". The
+    // caller's string must survive intact - the in-flight record keeps it.
+    size_t key_length = strnlen(name, MAX_FUNCTION_LENGTH);
+    CLEAN_CHAR_P *buffer = mallocz(key_length + 1);
+    memcpy(buffer, name, key_length);
+    buffer[key_length] = '\0';
+
+    // an INDEX, not a pointer: the strip walks down to the start of the buffer
+    // and a pointer form would have to form `buffer - 1` to terminate, which is
+    // undefined behaviour (harmless in practice, but it is one-past-the-start
+    // of a heap block)
+    size_t strip = key_length;
 
     OBJECT_STATE_ID state_id = 0;
     bool armed = nrpc_registry_owner_epoch(registry, &state_id);
@@ -893,16 +900,11 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
             }
         }
 
-        // if s == NULL, set it to the end of the buffer;
-        // this should happen only the first time
-        if (unlikely(!s))
-            s = &buffer[key_length - 1];
+        // strip a word from the end
+        while (strip > 0 && !isspace((uint8_t)buffer[strip - 1])) buffer[--strip] = '\0';
 
-        // skip a word from the end
-        while (s >= buffer && !isspace((uint8_t)*s)) *s-- = '\0';
-
-        // skip all spaces
-        while (s >= buffer && isspace((uint8_t)*s)) *s-- = '\0';
+        // strip all spaces
+        while (strip > 0 && isspace((uint8_t)buffer[strip - 1])) buffer[--strip] = '\0';
     }
 
     buffer_flush(wb);

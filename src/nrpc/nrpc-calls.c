@@ -20,11 +20,8 @@ struct nrpc_call {
 
     nd_uuid_t call_id_uuid;
     const char *call_id;
-    const char *cmd;
     const char *sanitized_cmd;
     const char *source;
-    size_t sanitized_cmd_length;
-    int timeout;
     bool cancelled;
     usec_t stop_monotonic_ut;
 
@@ -102,7 +99,6 @@ static void nrpc_call_cancel_internal(struct nrpc_call *call);
 static void nrpc_call_cleanup(struct nrpc_call *call) {
     buffer_free(call->payload);
     freez((void *)call->call_id);
-    freez((void *)call->cmd);
     freez((void *)call->sanitized_cmd);
     freez((void *)call->source);
 
@@ -121,7 +117,6 @@ static void nrpc_call_cleanup(struct nrpc_call *call) {
 
     call->payload = NULL;
     call->call_id = NULL;
-    call->cmd = NULL;
     call->sanitized_cmd = NULL;
 }
 
@@ -473,7 +468,13 @@ static inline int nrpc_call_async(struct nrpc_call *call, bool wait) {
 // handle + inner method item). On failure everything acquired is released and
 // out_pair is zeroed. An unset owner answers 500 ("no host given"); an owner
 // with no live registry entry answers 404.
-static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
+//
+// `sanitized_cmd` MUST already be sanitized - each entry point sanitizes once,
+// on its own, and hands the result down. That is why this takes the sanitized
+// form rather than re-deriving it: nrpc_call() needs the sanitized command for
+// the in-flight record anyway, so sanitizing here too would do the same work
+// twice on every call.
+static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const char *sanitized_cmd,
                                       HTTP_ACCESS user_access, bool allow_restricted,
                                       struct nrpc_method_acquired *out_pair) {
     *out_pair = (struct nrpc_method_acquired){ 0 };
@@ -489,11 +490,8 @@ static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const
                                        "This feature is not available on this host at this time.",
                                        HTTP_RESP_NOT_FOUND);
 
-    char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
-    size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, cmd, sizeof(sanitized_cmd));
-
     const DICTIONARY_ITEM *inner_item = NULL;
-    int code = nrpc_registry_find(registry, result_wb, sanitized_cmd, sanitized_cmd_length, &inner_item);
+    int code = nrpc_registry_find(registry, result_wb, sanitized_cmd, &inner_item);
     if(code != HTTP_RESP_OK) {
         nrpc_registry_release(registry_item);
         return code;
@@ -559,8 +557,11 @@ int nrpc_method_authorize(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
     if(out_acquired)
         *out_acquired = NULL;
 
+    // this entry point owns the sanitize; _pair() takes the sanitized form
+    CLEAN_CHAR_P *sanitized_cmd = nrpc_sanitize_name_dupz(cmd);
+
     struct nrpc_method_acquired pair;
-    int code = nrpc_method_authorize_pair(owner, result_wb, cmd, user_access, allow_restricted, &pair);
+    int code = nrpc_method_authorize_pair(owner, result_wb, sanitized_cmd, user_access, allow_restricted, &pair);
     if(code != HTTP_RESP_OK)
         return code;
 
@@ -580,21 +581,24 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     BUFFER *result_wb = spec->result_wb;
 
     int code;
-    char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
 
     const char *source_to_sanitize = spec->source ? spec->source : "";
     size_t sanitized_source_size = nrpc_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *sanitized_source = mallocz(sanitized_source_size);
     nrpc_sanitize_name(sanitized_source, source_to_sanitize, sanitized_source_size);
 
+    // Sanitized ONCE, here, and moved into the in-flight record below; the
+    // authorize path is handed the result instead of re-deriving it. The local
+    // is disarmed after the move, so the early returns in between free it and
+    // nothing double-frees.
+    CLEAN_CHAR_P *sanitized_cmd = nrpc_sanitize_name_dupz(spec->cmd);
+
     // ------------------------------------------------------------------------
     // find the function and verify the caller's access
     // (an unset owner answers 500 - the "no host given" sentinel)
 
-    size_t sanitized_cmd_length = nrpc_sanitize_name(sanitized_cmd, spec->cmd, sizeof(sanitized_cmd));
-
     struct nrpc_method_acquired held;
-    code = nrpc_method_authorize_pair(spec->owner, result_wb, spec->cmd, spec->user_access,
+    code = nrpc_method_authorize_pair(spec->owner, result_wb, sanitized_cmd, spec->user_access,
                                       spec->allow_restricted, &held);
     if(code != HTTP_RESP_OK) {
 
@@ -628,14 +632,11 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
 
     struct nrpc_call t = {
         .held = held,
-        .cmd = strdupz(spec->cmd),
-        .sanitized_cmd = strdupz(sanitized_cmd),
-        .sanitized_cmd_length = sanitized_cmd_length,
+        .sanitized_cmd = sanitized_cmd,
         .call_id = strdupz(call_id),
         .user_access = spec->user_access,
         .source = sanitized_source,
         .payload = buffer_dup(spec->payload),
-        .timeout = timeout_s,
         .cancelled = false,
         .stop_monotonic_ut = now_monotonic_usec() + timeout_s * USEC_PER_SEC,
         .method = method,
@@ -654,6 +655,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         },
     };
     sanitized_source = NULL;
+    sanitized_cmd = NULL;
     uuid_copy(t.call_id_uuid, uuid);
 
     // capture the execute pair NOW, under the entry's leaf lock, pinning the
@@ -680,8 +682,10 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
 
     if(duplicate_call_id) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               // the SANITIZED command: a raw one can carry control characters
+               // or newlines and inject lines into the journal
                "NRPC: duplicate call_id '%s', method: '%s'",
-               t.call_id, t.cmd);
+               t.call_id, t.sanitized_cmd);
 
         code = nrpc_call_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
 

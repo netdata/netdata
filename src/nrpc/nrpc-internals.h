@@ -138,6 +138,53 @@ static inline size_t nrpc_strlen_bounded(const char *s, size_t max) {
     return len;
 }
 
+// the longest command we will carry: PLUGINSD_LINE_MAX minus room for the rest
+// of the FUNCTION line (keyword, transaction id, timeout, access, source and
+// quoting). A command longer than this cannot be forwarded to a plugin - the
+// plugin's line reader is PLUGINSD_LINE_MAX and it gives up, and its whole
+// process exits, on a line it cannot terminate.
+#define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512)
+
+// Sanitize a CALLER-SUPPLIED command into an owned buffer; NULL-tolerant
+// (sanitizes to ""). The caller owns the result - CLEAN_CHAR_P frees it.
+//
+// TRUNCATES rather than refusing, and that is why it does NOT use
+// nrpc_strlen_bounded(): a command arrives from an HTTP query parameter, so
+// fatal()ing on an over-long one would hand any caller a way to kill the agent.
+// Do NOT reuse this for strings the daemon itself controls - those keep
+// nrpc_strlen_bounded(), whose fatal() is a real assertion about our callers.
+//
+// Two things the size has to respect:
+//
+// - the bound is MAX_FUNCTION_LENGTH, not PLUGINSD_LINE_MAX. An over-long
+//   command does NOT simply fail: the lookup strips trailing words, so
+//   "<real-function> <15KB of junk>" still resolves, and the WHOLE sanitized
+//   command is then forwarded to the plugin as its function argument. Keeping
+//   it under MAX_FUNCTION_LENGTH is what leaves the 512 bytes that constant
+//   reserves for the rest of the FUNCTION line. This is hardening, not a fix
+//   for an observed failure - forwarding a maximal name was attempted against
+//   a real plugin at several lengths and the plugin survived every time - but
+//   the plugin's line reader does give up and exit its process on a line it
+//   cannot terminate, so staying inside the documented budget is cheap
+//   insurance.
+//
+// - the destination is sized for the sanitizer's worst-case GROWTH, not for
+//   the input length. text_sanitize() hex-encodes each byte of an invalid
+//   UTF-8 sequence into two characters, so output can be twice the input.
+//   Sizing on the input alone would truncate expansion the fixed-size buffer
+//   this replaced had room for - and a truncated command can resolve to a
+//   DIFFERENT function than the caller named.
+static inline char *nrpc_sanitize_name_dupz(const char *src) {
+    if(!src) src = "";
+
+    size_t len = strnlen(src, MAX_FUNCTION_LENGTH);
+    size_t size = (len * 2 < MAX_FUNCTION_LENGTH ? len * 2 : MAX_FUNCTION_LENGTH) + 1;
+
+    char *dst = mallocz(size);
+    nrpc_sanitize_name(dst, src, size);
+    return dst;
+}
+
 // ----------------------------------------------------------------------------
 // the component-global registries index
 
@@ -179,7 +226,9 @@ void nrpc_method_acquired_release_pair(struct nrpc_method_acquired *acquired);
 // never taken inner-side)
 bool nrpc_method_is_available_at(struct nrpc_method *method, bool armed, OBJECT_STATE_ID epoch_id);
 bool nrpc_method_is_available(struct nrpc_registry *registry, struct nrpc_method *method);
-int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name, size_t key_length,
+// `name` must already be sanitized; it is not modified (the traversal works on
+// an internal copy)
+int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name,
                        const DICTIONARY_ITEM **out_inner_item);
 
 // vtable snapshots - each takes owner_spinlock, copies what it needs,
