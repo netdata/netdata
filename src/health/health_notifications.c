@@ -12,6 +12,7 @@ static ALARM_ENTRY *alarm_notifications_in_progress = NULL;
 struct health_raised_summary {
     RRDHOST *host;
     DICTIONARY *rrdcalc_dict;
+    bool populated;
 
     struct {
         size_t size;
@@ -303,7 +304,20 @@ struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host) {
     return hrm;
 }
 
+// Builds the sorted list of the host's active alerts, used only to render the
+// "other alerts currently raised" section of a notification. It walks every
+// alert of the host and sorts the collected ones, so it is built on first use
+// rather than once per health iteration - a host with no notification to send
+// never pays for it.
+//
+// It takes the host's alert dictionary read lock, so it MUST NOT be called
+// while the health-log lock is held - see the lock-order note in
+// health_alarm_log_process_to_send_notifications().
 void alerts_raised_summary_populate(struct health_raised_summary *hrm) {
+    if(hrm->populated)
+        return;
+    hrm->populated = true;
+
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(hrm->host, rc) {
         RRDSET *st = rrdcalc_rrdset_read_lock(rc);
@@ -441,6 +455,12 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
 
+    // Built here, past every bail-out above, so it costs nothing unless a
+    // notification is actually rendered. Idempotent across repeated calls.
+    // Callers must not hold the health-log lock (see the note on
+    // alerts_raised_summary_populate()).
+    alerts_raised_summary_populate(hrm);
+
     BUFFER *warn_alarms = buffer_create(1024, &netdata_buffers_statistics.buffers_health);
     BUFFER *crit_alarms = buffer_create(1024, &netdata_buffers_statistics.buffers_health);
 
@@ -518,10 +538,26 @@ done:
 
 void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
     time_t now = now_realtime_sec();
+    uint32_t first_waiting;
 
+    // Lock order matters below. The raised summary walk takes the host's alert
+    // dictionary read lock, while chart alert teardown takes that dictionary's
+    // write lock first and then the health-log write lock:
+    //   rrdcalc_unlink_and_delete_all_rrdset_alerts()  [alert dict write]
+    //     -> rrdcalc_unlink_and_delete()
+    //       -> rrdcalc_unlink_from_rrdset()
+    //         -> health_alarm_log_add_entry()          [health log write]
+    // Building the summary while holding the health-log lock would invert that
+    // order and deadlock the health thread against a concurrent chart removal.
+    //
+    // So the first entry that needs a notification drops the lock, builds the
+    // summary, and restarts the pass. Entries already notified have
+    // HEALTH_ENTRY_FLAG_PROCESSED set and are skipped on the retry, and the
+    // summary is built at most once, so this restarts at most once.
+restart:
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
-    uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
+    first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
 
     for(ALARM_ENTRY *ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
         if(unlikely(
@@ -531,8 +567,19 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
             if(unlikely(ae->unique_id < first_waiting))
                 first_waiting = ae->unique_id;
 
-            if(likely(now >= ae->delay_up_to_timestamp))
+            if(likely(now >= ae->delay_up_to_timestamp)) {
+                if(unlikely(!hrm->populated)) {
+                    rw_spinlock_read_unlock(&host->health_log.spinlock);
+                    alerts_raised_summary_populate(hrm);
+
+                    // re-sample: building the summary walks and sorts the host's
+                    // whole alert list, so entries can become due while it runs
+                    now = now_realtime_sec();
+                    goto restart;
+                }
+
                 health_send_notification(host, ae, hrm);
+            }
         }
     }
 
