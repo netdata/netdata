@@ -77,10 +77,7 @@ func applyManagedFabricMapPolicy(data *topologymodel.Data) int {
 			_, dstManaged := managedHandles[link.DstActorHandle]
 			keep = srcManaged && dstManaged
 		case "bridge", "fdb":
-			segmentHandle, _, ok := managedFabricSegmentLeg(link, qualifiedSegments, managedHandles)
-			if ok {
-				_, keep = qualifiedSegments[segmentHandle]
-			}
+			_, _, keep = managedFabricSegmentLeg(link, qualifiedSegments, managedHandles)
 		}
 		if !keep {
 			continue

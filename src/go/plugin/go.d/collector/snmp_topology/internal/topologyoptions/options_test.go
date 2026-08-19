@@ -82,10 +82,26 @@ func TestNormalizeQueryOptions(t *testing.T) {
 }
 
 func TestNormalizeMapTypeUsesOneManagedFabricFallback(t *testing.T) {
-	for _, value := range []string{"", "invalid", "  INVALID  "} {
-		assert.Equal(t, MapTypeManagedFabric, NormalizeMapType(value))
+	tests := map[string]struct {
+		value string
+		want  string
+	}{
+		"empty":                    {want: MapTypeManagedFabric},
+		"invalid":                  {value: "invalid", want: MapTypeManagedFabric},
+		"trimmed-invalid":          {value: "  INVALID  ", want: MapTypeManagedFabric},
+		"managed-fabric":           {value: MapTypeManagedFabric, want: MapTypeManagedFabric},
+		"case-folded-managed":      {value: "MANAGED_FABRIC", want: MapTypeManagedFabric},
+		"lldp-cdp-managed":         {value: MapTypeLLDPCDPManaged, want: MapTypeLLDPCDPManaged},
+		"high-confidence-inferred": {value: MapTypeHighConfidenceInferred, want: MapTypeHighConfidenceInferred},
+		"all-devices-low-confidence": {
+			value: MapTypeAllDevicesLowConfidence,
+			want:  MapTypeAllDevicesLowConfidence,
+		},
 	}
-	assert.Equal(t, MapTypeLLDPCDPManaged, NormalizeMapType(MapTypeLLDPCDPManaged))
-	assert.Equal(t, MapTypeHighConfidenceInferred, NormalizeMapType(MapTypeHighConfidenceInferred))
-	assert.Equal(t, MapTypeAllDevicesLowConfidence, NormalizeMapType(MapTypeAllDevicesLowConfidence))
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, NormalizeMapType(tc.value))
+		})
+	}
 }

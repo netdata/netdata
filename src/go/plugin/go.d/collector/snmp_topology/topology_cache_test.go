@@ -1173,6 +1173,7 @@ func BenchmarkTopologyCache_FinalizeFDBVLANsScaling(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
+				b.StopTimer()
 				cache := newTopologyCache()
 				for index := 1; index <= tc.fdbEntries; index++ {
 					cache.updateFdbEntry(map[string]string{
@@ -1188,11 +1189,15 @@ func BenchmarkTopologyCache_FinalizeFDBVLANsScaling(b *testing.B) {
 						tagDot1qVlanFdbID: strconv.Itoa(vlanID),
 					})
 				}
+				b.StartTimer()
 				cache.finalizeTopologyCache()
+				b.StopTimer()
 				published.mu.Lock()
 				published.replaceWith(cache)
 				published.mu.Unlock()
+				b.StartTimer()
 			}
+			b.StopTimer()
 			runtime.KeepAlive(published)
 		})
 	}

@@ -3,15 +3,25 @@
 package projector
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 )
 
-func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]model.Interface) graph.LinkEndpoint {
-	return adjacencySideToEndpointWithMatch(dev, buildDeviceEndpointMatch(dev), port, ifIndexByDeviceName, ifaceByDeviceIndex)
+func adjacencySideToEndpoint(
+	dev model.Device,
+	port string,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+) graph.LinkEndpoint {
+	return adjacencySideToEndpointWithMatch(
+		dev,
+		buildDeviceEndpointMatch(dev),
+		port,
+		ifIndexByDeviceName,
+		ifaceByDeviceIndex,
+	)
 }
 
 func adjacencySideToEndpointWithMatch(
@@ -21,54 +31,15 @@ func adjacencySideToEndpointWithMatch(
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
 ) graph.LinkEndpoint {
-
 	port = strings.TrimSpace(port)
-	ifName := ""
-	ifDescr := ""
 	ifIndex := 0
-	var iface model.Interface
-	hasIface := false
 	if port != "" {
 		ifIndex = resolveIfIndexByPortName(dev.ID, port, ifIndexByDeviceName)
 	}
-	if ifIndex > 0 {
-		if ifaceValue, ok := ifaceByDeviceIndex[deviceIfIndexKey(dev.ID, ifIndex)]; ok {
-			iface = ifaceValue
-			hasIface = true
-			ifName = strings.TrimSpace(iface.IfName)
-			ifDescr = strings.TrimSpace(iface.IfDescr)
-		}
+	endpoint := adjacencySideToEndpointWithResolvedPort(dev, match, port, "", ifIndex, "", ifaceByDeviceIndex)
+	if endpoint.IfName == "" {
+		endpoint.IfName = port
 	}
-	if ifName == "" {
-		ifName = ifDescr
-	}
-	if ifName == "" {
-		ifName = port
-	}
-	if ifIndex > 0 && ifName == "" {
-		ifName = strconv.Itoa(ifIndex)
-	}
-
-	endpoint := graph.LinkEndpoint{
-		Match:        match,
-		IfIndex:      ifIndex,
-		IfName:       ifName,
-		PortID:       port,
-		SysName:      strings.TrimSpace(dev.Hostname),
-		ManagementIP: selectedDeviceManagementIP(dev),
-	}
-	if ifDescr != "" {
-		endpoint.IfDescr = ifDescr
-	}
-	if ifIndex > 0 && hasIface {
-		if admin := strings.TrimSpace(iface.Labels["admin_status"]); admin != "" {
-			endpoint.AdminStatus = admin
-		}
-		if oper := strings.TrimSpace(iface.Labels["oper_status"]); oper != "" {
-			endpoint.OperStatus = oper
-		}
-	}
-
 	return endpoint
 }
 
@@ -79,8 +50,34 @@ func adjacencySideToEndpointWithBridgePortRef(
 	port bridgePortRef,
 	ifaceByDeviceIndex map[string]model.Interface,
 ) graph.LinkEndpoint {
-	ifIndex := port.ifIndex
-	ifName := strings.TrimSpace(port.ifName)
+	bridgePort := strings.TrimSpace(port.bridgePort)
+	endpoint := adjacencySideToEndpointWithResolvedPort(
+		dev,
+		match,
+		rawPort,
+		bridgePort,
+		port.ifIndex,
+		port.ifName,
+		ifaceByDeviceIndex,
+	)
+	if endpoint.IfIndex <= 0 && endpoint.IfName == "" {
+		endpoint.PortName = bridgePort
+	}
+	return endpoint
+}
+
+func adjacencySideToEndpointWithResolvedPort(
+	dev model.Device,
+	match graph.Match,
+	rawPort string,
+	bridgePort string,
+	ifIndex int,
+	ifName string,
+	ifaceByDeviceIndex map[string]model.Interface,
+) graph.LinkEndpoint {
+	rawPort = strings.TrimSpace(rawPort)
+	bridgePort = strings.TrimSpace(bridgePort)
+	ifName = strings.TrimSpace(ifName)
 	ifDescr := ""
 	var iface model.Interface
 	hasIface := false
@@ -97,21 +94,17 @@ func adjacencySideToEndpointWithBridgePortRef(
 	if ifName == "" {
 		ifName = ifDescr
 	}
-	bridgePort := strings.TrimSpace(port.bridgePort)
 	endpoint := graph.LinkEndpoint{
 		Match:        match,
 		IfIndex:      ifIndex,
 		IfName:       ifName,
-		PortID:       strings.TrimSpace(rawPort),
+		PortID:       rawPort,
 		BridgePort:   bridgePort,
 		SysName:      strings.TrimSpace(dev.Hostname),
 		ManagementIP: selectedDeviceManagementIP(dev),
 	}
 	if ifDescr != "" {
 		endpoint.IfDescr = ifDescr
-	}
-	if ifIndex <= 0 && ifName == "" {
-		endpoint.PortName = bridgePort
 	}
 	if ifIndex > 0 && hasIface {
 		if admin := strings.TrimSpace(iface.Labels["admin_status"]); admin != "" {

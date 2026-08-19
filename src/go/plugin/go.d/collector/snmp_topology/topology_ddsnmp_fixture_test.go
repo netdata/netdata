@@ -202,42 +202,108 @@ func (h *topologySNMPRecHandler) isHiddenOID(oid string) bool {
 func (h *topologySNMPRecHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
 func (h *topologySNMPRecHandler) MaxOids() int                { return 60 }
 
+func TestTopologySNMPRecPDURejectsMalformedValues(t *testing.T) {
+	tests := map[string]struct {
+		typeCode string
+		raw      string
+	}{
+		"integer":    {typeCode: "2", raw: "invalid"},
+		"octets":     {typeCode: "4x", raw: "not-hex"},
+		"counter32":  {typeCode: "65", raw: "4294967296"},
+		"gauge32":    {typeCode: "66", raw: "4294967296"},
+		"time-ticks": {typeCode: "67", raw: "4294967296"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			pdu, err := topologySNMPRecPDU("1.2.3", tc.typeCode, tc.raw)
+			require.Error(t, err)
+			require.Equal(t, gosnmp.SnmpPDU{}, pdu)
+		})
+	}
+}
+
 func topologySNMPRecPDU(name, typeCode, raw string) (gosnmp.SnmpPDU, error) {
-	pdu := gosnmp.SnmpPDU{Name: strings.TrimPrefix(name, ".")}
+	name = strings.TrimPrefix(name, ".")
 	switch typeCode {
 	case "2":
 		value, err := strconv.Atoi(raw)
-		pdu.Type, pdu.Value = gosnmp.Integer, value
-		return pdu, err
+		if err != nil {
+			return gosnmp.SnmpPDU{}, err
+		}
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.Integer,
+			Value: value,
+		}, nil
 	case "4":
-		pdu.Type, pdu.Value = gosnmp.OctetString, []byte(raw)
-		return pdu, nil
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.OctetString,
+			Value: []byte(raw),
+		}, nil
 	case "4x":
 		value, err := hex.DecodeString(raw)
-		pdu.Type, pdu.Value = gosnmp.OctetString, value
-		return pdu, err
+		if err != nil {
+			return gosnmp.SnmpPDU{}, err
+		}
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.OctetString,
+			Value: value,
+		}, nil
 	case "6":
-		pdu.Type, pdu.Value = gosnmp.ObjectIdentifier, strings.TrimPrefix(raw, ".")
-		return pdu, nil
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.ObjectIdentifier,
+			Value: strings.TrimPrefix(raw, "."),
+		}, nil
 	case "64":
-		pdu.Type, pdu.Value = gosnmp.IPAddress, raw
-		return pdu, nil
-	case "65", "66", "67", "70":
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.IPAddress,
+			Value: raw,
+		}, nil
+	case "65":
+		value, err := strconv.ParseUint(raw, 10, 32)
+		if err != nil {
+			return gosnmp.SnmpPDU{}, err
+		}
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.Counter32,
+			Value: uint(value),
+		}, nil
+	case "66":
+		value, err := strconv.ParseUint(raw, 10, 32)
+		if err != nil {
+			return gosnmp.SnmpPDU{}, err
+		}
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.Gauge32,
+			Value: uint(value),
+		}, nil
+	case "67":
+		value, err := strconv.ParseUint(raw, 10, 32)
+		if err != nil {
+			return gosnmp.SnmpPDU{}, err
+		}
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.TimeTicks,
+			Value: uint32(value),
+		}, nil
+	case "70":
 		value, err := strconv.ParseUint(raw, 10, 64)
 		if err != nil {
 			return gosnmp.SnmpPDU{}, err
 		}
-		switch typeCode {
-		case "65":
-			pdu.Type, pdu.Value = gosnmp.Counter32, uint(value)
-		case "66":
-			pdu.Type, pdu.Value = gosnmp.Gauge32, uint(value)
-		case "67":
-			pdu.Type, pdu.Value = gosnmp.TimeTicks, uint32(value)
-		case "70":
-			pdu.Type, pdu.Value = gosnmp.Counter64, value
-		}
-		return pdu, nil
+		return gosnmp.SnmpPDU{
+			Name:  name,
+			Type:  gosnmp.Counter64,
+			Value: value,
+		}, nil
 	default:
 		return gosnmp.SnmpPDU{}, fmt.Errorf("unsupported snmprec type %q", typeCode)
 	}

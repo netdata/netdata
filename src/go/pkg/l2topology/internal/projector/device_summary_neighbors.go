@@ -34,10 +34,11 @@ func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, devic
 	switch {
 	case strings.TrimSpace(adj.TargetPortEvidence.IfName) != "":
 		remotePort = strings.TrimSpace(adj.TargetPortEvidence.IfName)
-	case adj.TargetPortEvidence.IfIndex > 0:
-		remotePort = strconv.Itoa(adj.TargetPortEvidence.IfIndex)
+	case remotePort != "":
 	case strings.TrimSpace(adj.TargetPortEvidence.BridgePort) != "":
 		remotePort = strings.TrimSpace(adj.TargetPortEvidence.BridgePort)
+	case adj.TargetPortEvidence.IfIndex > 0:
+		remotePort = strconv.Itoa(adj.TargetPortEvidence.IfIndex)
 	}
 
 	neighbor := topologyPortNeighborStatus{
