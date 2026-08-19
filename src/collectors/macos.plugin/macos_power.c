@@ -339,10 +339,15 @@ static void macos_power_source_update_from_description(struct macos_power_source
     if (ps->has_current)
         ps->current_ma = (collected_number)current_ma;
 
+    // kIOPSTemperatureKey was added in the macOS 10.10 SDK; older SDKs simply never report the temperature.
+#ifdef kIOPSTemperatureKey
     int64_t temperature_c = 0;
     ps->has_temperature = cf_dictionary_get_int64(desc, CFSTR(kIOPSTemperatureKey), &temperature_c);
     if (ps->has_temperature)
         ps->temperature_mc = (collected_number)(temperature_c * 1000);
+#else
+    ps->has_temperature = false;
+#endif
 
     int64_t cycles = 0;
     ps->has_cycles =
