@@ -985,6 +985,7 @@ set(INICFG_FILES
         src/libnetdata/inicfg/inicfg_migrate.c
         src/libnetdata/inicfg/inicfg_traversal.c
         src/libnetdata/inicfg/inicfg_api.c
+        src/libnetdata/inicfg/inicfg-unittest.c
         src/libnetdata/inicfg/dyncfg.c
         src/libnetdata/inicfg/dyncfg.h
 )
