@@ -19,6 +19,7 @@ type segmentProjectionBuilder struct {
 	deviceLinkMatchByID       map[string]graph.Match
 	ifaceByDeviceIndex        map[string]model.Interface
 	ifIndexByDeviceName       map[string]int
+	bridgePortAliases         bridgePortAliasIndex
 	bridgeLinks               []bridgeBridgeLinkRecord
 	reporterAliases           map[string][]string
 	endpointMatchByID         map[string]graph.Match
@@ -66,6 +67,7 @@ func newSegmentProjectionBuilder(
 	deviceLinkMatchByID map[string]graph.Match,
 	ifaceByDeviceIndex map[string]model.Interface,
 	ifIndexByDeviceName map[string]int,
+	bridgePortAliases bridgePortAliasIndex,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
 	endpointMatchByID map[string]graph.Match,
@@ -85,6 +87,7 @@ func newSegmentProjectionBuilder(
 		deviceLinkMatchByID:       deviceLinkMatchByID,
 		ifaceByDeviceIndex:        ifaceByDeviceIndex,
 		ifIndexByDeviceName:       ifIndexByDeviceName,
+		bridgePortAliases:         bridgePortAliases,
 		bridgeLinks:               bridgeLinks,
 		reporterAliases:           reporterAliases,
 		endpointMatchByID:         endpointMatchByID,

@@ -48,6 +48,57 @@ func TestSortedTopologyPortNeighbors_NormalizesAndOrders(t *testing.T) {
 	require.Equal(t, []string{"bridge", "router"}, sorted[1].RemoteCapabilities)
 }
 
+func TestBuildTopologyPortNeighborStatus_PreservesTextualPortBeforeIfIndex(t *testing.T) {
+	tests := map[string]struct {
+		adj  model.Adjacency
+		want string
+	}{
+		"observed-interface-name": {
+			adj: model.Adjacency{
+				TargetPort: "remote-port-id",
+				TargetPortEvidence: model.AdjacencyPortEvidence{
+					IfIndex: 7,
+					IfName:  "Ethernet7",
+				},
+			},
+			want: "Ethernet7",
+		},
+		"raw-protocol-port": {
+			adj: model.Adjacency{
+				TargetPort: "Ethernet2",
+				TargetPortEvidence: model.AdjacencyPortEvidence{
+					IfIndex: 2,
+				},
+			},
+			want: "Ethernet2",
+		},
+		"bridge-base-port": {
+			adj: model.Adjacency{
+				TargetPortEvidence: model.AdjacencyPortEvidence{
+					IfIndex:    2,
+					BridgePort: "24",
+				},
+			},
+			want: "24",
+		},
+		"ifindex-fallback": {
+			adj: model.Adjacency{
+				TargetPortEvidence: model.AdjacencyPortEvidence{
+					IfIndex: 2,
+				},
+			},
+			want: "2",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := buildTopologyPortNeighborStatus("cdp", tc.adj, nil)
+			require.Equal(t, tc.want, got.RemotePort)
+		})
+	}
+}
+
 func TestBuildTopologyDevicePortDetail_RendersOptionalFields(t *testing.T) {
 	status := topologyDevicePortStatus{
 		IfIndex:        7,

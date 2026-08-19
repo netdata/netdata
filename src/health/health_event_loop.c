@@ -797,7 +797,9 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
 
-        alerts_raised_summary_populate(hrm);
+        // the raised summary is no longer built here - health_send_notification()
+        // populates it on first use, so a host with nothing to notify never
+        // walks and sorts its whole alert list
 
         // process repeating alarms
         foreach_rrdcalc_in_rrdhost_read(host, rc) {

@@ -206,6 +206,10 @@ func (s *topologyScenario) FDBARP(port *topologyScenarioPort, mac, ip string) *t
 	return s
 }
 
+func (s *topologyScenario) FDB(port *topologyScenarioPort, mac string) *topologyScenario {
+	return s.FDBARP(port, mac, "")
+}
+
 func (s *topologyScenario) render(t testing.TB) topologyapi.Data {
 	t.Helper()
 
@@ -337,21 +341,21 @@ func (s *topologyScenario) topologyMetricsForDevice(dev *topologyScenarioDevice)
 	}
 	for _, attachment := range s.fdbARP {
 		if attachment.port.device == dev {
-			metrics = append(metrics,
-				topologyScenarioMetric(ddsnmp.KindFdbEntry, map[string]string{
-					tagBridgeBaseAddress: dev.chassisMAC,
-					tagFdbMac:            attachment.mac,
-					tagFdbBridgePort:     attachment.port.bridgePort,
-					tagFdbStatus:         "learned",
-				}),
-				topologyScenarioMetric(ddsnmp.KindArpEntry, map[string]string{
+			metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindFdbEntry, map[string]string{
+				tagBridgeBaseAddress: dev.chassisMAC,
+				tagFdbMac:            attachment.mac,
+				tagFdbBridgePort:     attachment.port.bridgePort,
+				tagFdbStatus:         "learned",
+			}))
+			if attachment.ip != "" {
+				metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindArpEntry, map[string]string{
 					tagArpIfIndex: strconv.Itoa(attachment.port.ifIndex),
 					tagArpIfName:  attachment.port.name,
 					tagArpIP:      attachment.ip,
 					tagArpMac:     attachment.mac,
 					tagArpState:   "reachable",
-				}),
-			)
+				}))
+			}
 		}
 	}
 	return metrics
@@ -434,8 +438,16 @@ func topologyScenarioSTPTags(local, designated *topologyScenarioPort) map[string
 		tagStpPortPathCost:         "4",
 		tagStpPortDesignatedRoot:   designated.device.chassisMAC,
 		tagStpPortDesignatedBridge: designated.device.chassisMAC,
-		tagStpPortDesignatedPort:   designated.bridgePort,
+		tagStpPortDesignatedPort:   topologyScenarioSTPPortID(designated.bridgePort),
 	}
+}
+
+func topologyScenarioSTPPortID(basePort string) string {
+	port, err := strconv.ParseUint(strings.TrimSpace(basePort), 10, 12)
+	if err != nil || port == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%04x", 0x8000|port)
 }
 
 func topologyScenarioOSPFTags(local, remote *topologyScenarioPort) map[string]string {

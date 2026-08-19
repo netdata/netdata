@@ -52,14 +52,26 @@ type Interface struct {
 	Labels   map[string]string
 }
 
+// AdjacencyPortEvidence keeps observed port namespaces distinct from the raw
+// protocol port identifier carried by Adjacency.
+type AdjacencyPortEvidence struct {
+	IfIndex    int
+	IfName     string
+	BridgePort string
+}
+
 // Adjacency represents a direct device-to-device neighbor relation.
 type Adjacency struct {
-	Protocol   string
-	SourceID   string
-	SourcePort string
-	TargetID   string
-	TargetPort string
-	Labels     map[string]string
+	Protocol string
+	SourceID string
+	// SourcePort and TargetPort preserve protocol-reported identifiers; typed
+	// interface and bridge identities belong in their evidence fields.
+	SourcePort         string
+	SourcePortEvidence AdjacencyPortEvidence
+	TargetID           string
+	TargetPort         string
+	TargetPortEvidence AdjacencyPortEvidence
+	Labels             map[string]string
 }
 
 // Attachment ties an endpoint to a device interface.
@@ -155,12 +167,13 @@ type BridgePortObservation struct {
 
 // FDBObservation captures one forwarding database entry from a bridge table.
 type FDBObservation struct {
-	MAC        string
-	BridgePort string
-	IfIndex    int
-	Status     string
-	VLANID     string
-	VLANName   string
+	MAC         string
+	BridgePort  string
+	IfIndex     int
+	Status      string
+	FDBDomainID string
+	VLANID      string
+	VLANName    string
 }
 
 // STPPortObservation captures one spanning-tree port row.

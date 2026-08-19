@@ -29,21 +29,20 @@ func (c *topologyCache) appendObservedFDBEntries(observation *topologyengine.L2O
 			continue
 		}
 		ifIndex := topologyutil.ParseIndex(c.bridgePortToIf[strings.TrimSpace(entry.bridgePort)])
-		vlanID := strings.TrimSpace(entry.vlanID)
-		if vlanID == "" && strings.TrimSpace(entry.fdbID) != "" {
-			fdbID := strings.TrimSpace(entry.fdbID)
-			vlanID = strings.TrimSpace(c.fdbIDToVlanID[fdbID])
-			if vlanID == "" {
-				vlanID = fdbID
-			}
+		fdbDomainID := ""
+		if fdbID := strings.TrimSpace(entry.fdbID); fdbID != "" {
+			fdbDomainID = "fdb:" + strings.ToLower(fdbID)
+		} else if vlanID := strings.TrimSpace(entry.vlanID); vlanID != "" {
+			fdbDomainID = "vlan:" + strings.ToLower(vlanID)
 		}
 		observation.FDBEntries = append(observation.FDBEntries, topologyengine.FDBObservation{
-			MAC:        strings.TrimSpace(entry.mac),
-			BridgePort: strings.TrimSpace(entry.bridgePort),
-			IfIndex:    ifIndex,
-			Status:     strings.TrimSpace(entry.status),
-			VLANID:     vlanID,
-			VLANName:   strings.TrimSpace(entry.vlanName),
+			MAC:         strings.TrimSpace(entry.mac),
+			BridgePort:  strings.TrimSpace(entry.bridgePort),
+			IfIndex:     ifIndex,
+			Status:      strings.TrimSpace(entry.status),
+			FDBDomainID: fdbDomainID,
+			VLANID:      strings.TrimSpace(entry.vlanID),
+			VLANName:    strings.TrimSpace(entry.vlanName),
 		})
 	}
 }

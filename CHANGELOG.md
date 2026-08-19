@@ -37,6 +37,15 @@
 - Fix(go.d/smartctl): normalize device chart identity ([#23529](https://github.com/netdata/netdata/issues/23529))
 - Include full page identity in PGC cache fatal messages ([#23522](https://github.com/netdata/netdata/issues/23522))
 - Increment label version only on actual label mutations ([#23513](https://github.com/netdata/netdata/issues/23513))
+- Fix(dbengine): synchronize merged extent query teardown ([#23521](https://github.com/netdata/netdata/issues/23521))
+- Docs(mcp): fix stale netdata-build-mcp setup/auth docs ([#23537](https://github.com/netdata/netdata/issues/23537))
+- Fix(health): avoid reinitializing alerts for unchanged charts ([#23515](https://github.com/netdata/netdata/issues/23515))
+- Fix(go.d/snmp_topology): select usable management IPs ([#23536](https://github.com/netdata/netdata/issues/23536))
+- Fix(go.d): remove unaligned chartengine atomics ([#23540](https://github.com/netdata/netdata/issues/23540))
+- Update SQLite version to 3.53.4  ([#23511](https://github.com/netdata/netdata/issues/23511))
+- Improve timeout handling for HTTPS and MQTT clients ([#23105](https://github.com/netdata/netdata/issues/23105))
+- Fix(mrg): avoid UUID map create/free churn during metric lookups ([#23538](https://github.com/netdata/netdata/issues/23538))
+- Fix(rrdcalc): clarify health initialization flag behavior on child disconnect ([#23541](https://github.com/netdata/netdata/issues/23541))
 
 ## [2.11.0] - 2026-08-12
 

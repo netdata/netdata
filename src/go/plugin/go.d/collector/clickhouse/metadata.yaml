@@ -542,7 +542,7 @@ modules:
                 - name: fetch
                 - name: send
                 - name: check
-            - name: clickhouse.replicas_max_absolute_dela
+            - name: clickhouse.replicas_max_absolute_delay
               description: Replicas max absolute delay
               unit: seconds
               chart_type: line

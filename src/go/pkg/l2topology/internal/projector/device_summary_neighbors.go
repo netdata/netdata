@@ -4,6 +4,7 @@ package projector
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -29,11 +30,21 @@ func topologyNeighborCapabilitiesFromLabels(labels map[string]string) []string {
 func buildTopologyPortNeighborStatus(protocol string, adj model.Adjacency, deviceByID map[string]model.Device) topologyPortNeighborStatus {
 	protocol = strings.ToLower(strings.TrimSpace(protocol))
 	targetID := strings.TrimSpace(adj.TargetID)
+	remotePort := strings.TrimSpace(adj.TargetPort)
+	switch {
+	case strings.TrimSpace(adj.TargetPortEvidence.IfName) != "":
+		remotePort = strings.TrimSpace(adj.TargetPortEvidence.IfName)
+	case remotePort != "":
+	case strings.TrimSpace(adj.TargetPortEvidence.BridgePort) != "":
+		remotePort = strings.TrimSpace(adj.TargetPortEvidence.BridgePort)
+	case adj.TargetPortEvidence.IfIndex > 0:
+		remotePort = strconv.Itoa(adj.TargetPortEvidence.IfIndex)
+	}
 
 	neighbor := topologyPortNeighborStatus{
 		Protocol:     protocol,
 		RemoteDevice: targetID,
-		RemotePort:   strings.TrimSpace(adj.TargetPort),
+		RemotePort:   remotePort,
 	}
 	if targetID == "" {
 		return neighbor

@@ -19,7 +19,12 @@ func (b *segmentProjectionBuilder) initializeSegments() bool {
 	// switch-facing/trunk classification must not suppress endpoint ownership.
 	// It is a topology correlation/confidence signal, not a hard endpoint
 	// placement filter.
-	deterministicTransitPortKeys := buildDeterministicTransitPortKeySet(b.adjacencies, b.ifIndexByDeviceName)
+	deterministicTransitPortKeys := buildDeterministicTransitPortKeySet(
+		b.adjacencies,
+		b.ifIndexByDeviceName,
+		b.ifaceByDeviceIndex,
+		b.bridgePortAliases,
+	)
 	seedMacLinks := collectBridgeMacLinkRecords(b.attachments, b.ifaceByDeviceIndex, deterministicTransitPortKeys)
 	b.rawFDBObservations = buildFDBReporterObservations(seedMacLinks)
 	model := buildBridgeDomainModel(b.bridgeLinks, seedMacLinks)

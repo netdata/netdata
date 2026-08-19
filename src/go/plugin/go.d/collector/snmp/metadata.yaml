@@ -912,14 +912,16 @@ modules:
                   name: MAC
             - id: map_type
               name: Map
-              description: Select the topology map mode. Defaults to the managed-device LLDP/CDP view. Other modes progressively include inferred devices and lower-confidence links.
+              description: Select the topology map mode. The default Managed Fabric Map keeps monitored devices, direct LLDP/CDP and managed STP links, and qualified FDB broadcast-domain paths. Logical L3 subnet, OSPF, and BGP relationships remain visible with distinct presentation. Legacy and broader inferred views remain selectable.
               type: select
               required: true
-              default: lldp_cdp_managed
+              default: managed_fabric
               options:
+                - id: managed_fabric
+                  name: Managed Fabric Map
+                  default: true
                 - id: lldp_cdp_managed
                   name: LLDP/CDP/Managed Devices Map
-                  default: true
                 - id: high_confidence_inferred
                   name: High Confidence Inferred Map
                 - id: all_devices_low_confidence
@@ -1036,11 +1038,11 @@ modules:
                 unit: ""
                 description: Summary stats for collected observations, actors, links, and pruning/filtering decisions.
           performance: |
-            Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows
+            Uses cached SNMP data only; calling the function triggers no additional SNMP requests.<br/>• Each request builds and renders a topology snapshot from the current cache<br/>• CPU time, allocations, and payload size scale with cached devices, interfaces, FDB entries, neighbors, segments, and links<br/>• Large or concurrent requests can require materially more processing even though no device walk occurs
           security: |
             Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
           availability: |
-            Available when:<br/>• The collector has completed at least one successful topology refresh cycle<br/>• LLDP/CDP topology data is present in cache from the last successful topology refresh<br/>• Returns HTTP 503 if topology cache is not ready yet
+            Available when:<br/>• At least one topology-enabled SNMP job has a fresh successful snapshot<br/>• That snapshot contains enough device identity to render a managed actor; LLDP/CDP rows are not required<br/>• Returns HTTP 503 if no current renderable topology snapshot is available
 
         - id: licenses
           name: Licenses

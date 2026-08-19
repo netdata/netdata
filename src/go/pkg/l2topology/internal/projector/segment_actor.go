@@ -56,7 +56,7 @@ func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, lay
 		detail.PortsTotal = model.OptionalValue[int]{Value: len(segment.ports), Has: true}
 		detail.EndpointsTotal = model.OptionalValue[int]{Value: len(segment.endpointIDs), Has: true}
 		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
-			detail.DesignatedPort = bridgePortRefSortKey(segment.designatedPort)
+			detail.DesignatedPort = bridgePortRefDisplayKey(segment.designatedPort)
 		}
 	}
 
