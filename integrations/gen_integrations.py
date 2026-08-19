@@ -7,10 +7,6 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
-SELF = Path(__file__)
-
-sys.path.insert(0, str(SELF.parent.parent / 'packaging' / 'data'))
-
 from jsonschema import ValidationError
 
 from _common import (
@@ -28,7 +24,11 @@ from _common import (
     warn,
 )
 
-import distros
+sys.path.insert(0, str(SELF.parent.parent / 'packaging' / 'data'))
+
+import distros  # noqa: E402
+
+SELF = Path(__file__)
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'

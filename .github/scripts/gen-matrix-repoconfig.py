@@ -9,7 +9,7 @@ SELF = Path(__file__)
 
 sys.path.insert(0, str(SELF.parent.parent.parent / 'packaging' / 'data'))
 
-import distros
+import distros  # noqa: E402
 
 data = distros.load_distro_data()
 entries = list()
