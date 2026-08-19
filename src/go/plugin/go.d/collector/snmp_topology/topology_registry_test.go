@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyenrich"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -99,6 +101,131 @@ func TestBuildSNMPTopologySnapshotPreservesL2BuildError(t *testing.T) {
 	}, topologyoptions.DefaultQueryOptions())
 	require.ErrorContains(t, err, "empty device id")
 	require.False(t, ok)
+}
+
+func TestBuildProbableTopologySnapshotMatchesIndependentLegacyPath(t *testing.T) {
+	collectedAt := time.Date(2026, time.August, 19, 12, 0, 0, 0, time.UTC)
+	observations := []topologyengine.L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ManagementIP:      "192.0.2.1",
+			ManagementAliases: []string{"10.0.0.1", "192.0.2.1"},
+			ChassisID:         "00:11:22:33:44:55",
+			Labels:            map[string]string{"device_category": "Switch", "site": "lab-a"},
+			Interfaces: []topologyengine.ObservedInterface{{
+				IfIndex: 1, IfName: "Gi0/1", IfDescr: "uplink", MAC: "00:11:22:33:44:56",
+				SpeedBps: 1_000_000_000, AdminStatus: "up", OperStatus: "up",
+			}},
+			BridgePorts: []topologyengine.BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			LLDPRemotes: []topologyengine.LLDPRemoteObservation{{
+				LocalPortNum: "1", LocalPortID: "Gi0/1", ChassisID: "aa:bb:cc:dd:ee:ff",
+				SysName: "switch-b", PortID: "Gi0/2", ManagementIP: "192.0.2.2",
+			}},
+			FDBEntries: []topologyengine.FDBObservation{{
+				MAC: "02:00:00:00:00:10", BridgePort: "1", IfIndex: 1, Status: "learned", VLANID: "10",
+			}},
+			ARPNDEntries: []topologyengine.ARPNDObservation{{
+				Protocol: "arp", IfIndex: 1, IfName: "Gi0/1", IP: "198.51.100.10",
+				MAC: "02:00:00:00:00:10", State: "reachable", AddrType: "ipv4",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ManagementIP:      "192.0.2.2",
+			ManagementAliases: []string{"10.0.0.2", "192.0.2.2"},
+			ChassisID:         "aa:bb:cc:dd:ee:ff",
+			Labels:            map[string]string{"device_category": "Switch", "site": "lab-b"},
+			Interfaces: []topologyengine.ObservedInterface{{
+				IfIndex: 2, IfName: "Gi0/2", IfDescr: "downlink", MAC: "aa:bb:cc:dd:ee:fe",
+				SpeedBps: 1_000_000_000, AdminStatus: "up", OperStatus: "up",
+			}},
+			BridgePorts: []topologyengine.BridgePortObservation{{BasePort: "2", IfIndex: 2}},
+			FDBEntries: []topologyengine.FDBObservation{{
+				MAC: "02:00:00:00:00:10", BridgePort: "2", IfIndex: 2, Status: "learned", VLANID: "10",
+			}},
+		},
+	}
+	aggregate := topologymodel.ObservationAggregate{
+		L2Observations: observations,
+		L3Interfaces: []topologymodel.L3Interface{
+			{DeviceID: "switch-a", IP: "203.0.113.1", Netmask: "255.255.255.0", IfIndex: "1", IfName: "Gi0/1"},
+			{DeviceID: "switch-b", IP: "203.0.113.2", Netmask: "255.255.255.0", IfIndex: "2", IfName: "Gi0/2"},
+		},
+		Snapshots: []topologymodel.ObservationSnapshot{
+			{
+				LocalDeviceID: "switch-a",
+				LocalDevice: topologymodel.Device{
+					ChassisID: "00:11:22:33:44:55", ChassisIDType: "macAddress", SysName: "switch-a",
+					ManagementIP: "192.0.2.1", Labels: map[string]string{"site": "lab-a"},
+				},
+			},
+			{
+				LocalDeviceID: "switch-b",
+				LocalDevice: topologymodel.Device{
+					ChassisID: "aa:bb:cc:dd:ee:ff", ChassisIDType: "macAddress", SysName: "switch-b",
+					ManagementIP: "192.0.2.2", Labels: map[string]string{"site": "lab-b"},
+				},
+			},
+		},
+		LocalDeviceID: "switch-a",
+		AgentID:       "agent-1",
+		CollectedAt:   collectedAt,
+	}
+	options := topologyoptions.DefaultQueryOptions()
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
+
+	got, ok, err := buildProbableTopologySnapshot(aggregate, options)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	want := buildProbableTopologySnapshotIndependentLegacyForTest(t, aggregate, options)
+	require.Equal(t, want, got)
+	wantPayload, err := topologyv1renderer.Render(want)
+	require.NoError(t, err)
+	gotPayload, err := topologyv1renderer.Render(got)
+	require.NoError(t, err)
+	wantJSON := topologyv1test.CanonicalJSON(t, topologyv1test.NormalizeData(t, wantPayload))
+	gotJSON := topologyv1test.CanonicalJSON(t, topologyv1test.NormalizeData(t, gotPayload))
+	require.Equal(t, wantJSON, gotJSON)
+}
+
+func buildProbableTopologySnapshotIndependentLegacyForTest(
+	t *testing.T,
+	aggregate topologymodel.ObservationAggregate,
+	options topologyoptions.QueryOptions,
+) topologymodel.Data {
+	t.Helper()
+
+	strictResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	require.NoError(t, err)
+	require.True(t, ok)
+	strictOptions := options
+	strictOptions.MapType = topologyoptions.MapTypeHighConfidenceInferred
+	strictData, err := projectSNMPL2TopologyData(
+		strictResult, aggregate.AgentID, aggregate.LocalDeviceID, aggregate.CollectedAt, strictOptions,
+	)
+	require.NoError(t, err)
+	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
+	topologyshape.ApplyPolicies(&strictData, strictOptions)
+
+	probableResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	require.NoError(t, err)
+	require.True(t, ok)
+	probableOptions := options
+	probableOptions.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
+	probableData, err := projectSNMPL2TopologyData(
+		probableResult, aggregate.AgentID, aggregate.LocalDeviceID, aggregate.CollectedAt, probableOptions,
+	)
+	require.NoError(t, err)
+	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
+	topologyshape.ApplyPolicies(&probableData, probableOptions)
+
+	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
+	topologyenrich.ApplyLayer3(&probableData, aggregate)
+	topologyshape.ApplyDepthFocusFilter(&probableData, options)
+	return probableData
 }
 
 func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCandidates(t *testing.T) {

@@ -39,6 +39,8 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.lastUpdate = src.lastUpdate
 	c.updateTime = src.updateTime
 	c.staleAfter = src.staleAfter
+	c.preparedSnapshot = src.preparedSnapshot
+	c.hasPreparedSnapshot = src.hasPreparedSnapshot
 	c.agentID = src.agentID
 	c.localDevice = src.localDevice
 	c.lldpLocPorts = src.lldpLocPorts
@@ -121,6 +123,7 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 	defer c.mu.Unlock()
 
 	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
+	c.localManagementAddressKeys = nil
 	c.rebuildTrapSourceMatchMethods()
 	c.finalizeFDBVLANs()
 	c.updateFDBDiagnostics()
@@ -130,6 +133,7 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 		unmappedPort: c.fdbRowsUnmappedPort,
 	}
 	c.lastUpdate = c.updateTime
+	c.preparedSnapshot, c.hasPreparedSnapshot = c.buildObservationSnapshotLocked()
 	return stats
 }
 

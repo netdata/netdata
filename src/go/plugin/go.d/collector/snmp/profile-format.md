@@ -427,6 +427,10 @@ topology:
 - Topology rows do not use chart/export-only fields such as `chart_meta`,
   `metric_type`, `mapping`, `transform`, `scale_factor`, `format`, or
   `constant_value_one` on the row value symbol.
+- Table topology row symbols also reject `extract_value`, `match_pattern`, and
+  `match_value` because structural presence mode intentionally ignores the
+  anchor PDU value. These transformations remain valid for scalar topology
+  symbols and for `metric_tags`.
 - `metric_tags` inside a topology row work like table metric tags and identify
   or enrich the topology row.
 - `systemUptime` stays under `metrics:` for regular SNMP collection. It is not a
@@ -1485,7 +1489,7 @@ They work the same in **both** places:
 - `format`
     ```yaml
     symbol:
-      OID: 1.3.6.1.2.1.17.1.1
+      OID: 1.3.6.1.2.1.17.1.1.0
       name: dot1dBaseBridgeAddress
       format: hex
     ```
@@ -1521,7 +1525,7 @@ metadata:
     fields:
       bridge_base_address:
         symbol:
-          OID: 1.3.6.1.2.1.17.1.1
+          OID: 1.3.6.1.2.1.17.1.1.0
           name: dot1dBaseBridgeAddress
           format: hex
 ```

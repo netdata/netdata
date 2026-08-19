@@ -16,8 +16,14 @@ type topologyCache struct {
 	updateTime time.Time
 	staleAfter time.Duration
 
+	preparedSnapshot    topologymodel.ObservationSnapshot
+	hasPreparedSnapshot bool
+
 	agentID     string
 	localDevice topologymodel.Device
+	// localManagementAddressKeys deduplicates high-cardinality IP-MIB rows during collection.
+	// It is build-only state and is released when the cache is finalized.
+	localManagementAddressKeys map[managementAddressKey]struct{}
 	// targetManagementIPs is private pre-finalization selection evidence.
 	targetManagementIPs []netip.Addr
 

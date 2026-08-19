@@ -23,7 +23,14 @@ func (c *topologyCache) snapshotEngineObservations() (topologymodel.ObservationS
 	if !c.hasFreshSnapshotAt(time.Now()) {
 		return topologymodel.ObservationSnapshot{}, false
 	}
+	if c.hasPreparedSnapshot {
+		return c.preparedSnapshot, true
+	}
 
+	return c.buildObservationSnapshotLocked()
+}
+
+func (c *topologyCache) buildObservationSnapshotLocked() (topologymodel.ObservationSnapshot, bool) {
 	local := normalizeTopologyDevice(c.localDevice)
 	localObservation := c.buildEngineObservation(local)
 	localObservation.DeviceID = strings.TrimSpace(localObservation.DeviceID)

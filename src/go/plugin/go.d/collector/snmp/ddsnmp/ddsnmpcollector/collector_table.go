@@ -8,12 +8,18 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+)
+
+const (
+	tableRowsPartialErrorLogKey = "snmp-table-rows-partial-error:"
+	tableRowsErrorLogEvery      = time.Hour
 )
 
 // tableCollector handles collection of SNMP table metrics
@@ -187,7 +193,8 @@ func (tc *tableCollector) walkTablesAsNeeded(prof *ddsnmp.Profile, stats *ddsnmp
 		return nil, errors.Join(errs...)
 	}
 	if len(errs) > 0 {
-		tc.log.Warningf("failed to walk some SNMP tables: %v", errors.Join(errs...))
+		tc.log.Limit(tableRowsPartialErrorLogKey+prof.SourceFile, 1, tableRowsErrorLogEvery).
+			Warningf("failed to walk some SNMP tables: %v", errors.Join(errs...))
 	}
 
 	return results, nil

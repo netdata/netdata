@@ -48,25 +48,66 @@ func managementAddressTypeFromIP(ip string) string {
 	return "ipv6"
 }
 
-func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
+type managementAddressKey struct {
+	address     string
+	addressType string
+	source      string
+}
+
+func normalizeManagementAddress(addr topologymodel.ManagementAddress) (topologymodel.ManagementAddress, managementAddressKey, bool) {
 	addr.Address = strings.TrimSpace(addr.Address)
 	addr.AddressType = strings.TrimSpace(addr.AddressType)
 	if addr.Address == "" {
-		return addrs
+		return topologymodel.ManagementAddress{}, managementAddressKey{}, false
 	}
 	if ip, ok := managementAddressIP(addr); ok {
 		if !isEligibleTopologyIPAddress(ip) {
-			return addrs
+			return topologymodel.ManagementAddress{}, managementAddressKey{}, false
 		}
 		addr.Address = ip.String()
 		addr.AddressType = managementAddressTypeFromIP(addr.Address)
 	}
+	return addr, managementAddressKey{
+		address:     addr.Address,
+		addressType: addr.AddressType,
+		source:      addr.Source,
+	}, true
+}
+
+func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
+	addr, key, ok := normalizeManagementAddress(addr)
+	if !ok {
+		return addrs
+	}
 	for _, existing := range addrs {
-		if existing.Address == addr.Address && existing.AddressType == addr.AddressType && existing.Source == addr.Source {
+		if existing.Address == key.address && existing.AddressType == key.addressType && existing.Source == key.source {
 			return addrs
 		}
 	}
 	return append(addrs, addr)
+}
+
+func (c *topologyCache) appendLocalManagementAddress(addr topologymodel.ManagementAddress) {
+	if c == nil {
+		return
+	}
+	addr, key, ok := normalizeManagementAddress(addr)
+	if !ok {
+		return
+	}
+	if c.localManagementAddressKeys == nil {
+		c.localManagementAddressKeys = make(map[managementAddressKey]struct{}, len(c.localDevice.ManagementAddresses)+1)
+		for _, existing := range c.localDevice.ManagementAddresses {
+			if _, existingKey, ok := normalizeManagementAddress(existing); ok {
+				c.localManagementAddressKeys[existingKey] = struct{}{}
+			}
+		}
+	}
+	if _, exists := c.localManagementAddressKeys[key]; exists {
+		return
+	}
+	c.localManagementAddressKeys[key] = struct{}{}
+	c.localDevice.ManagementAddresses = append(c.localDevice.ManagementAddresses, addr)
 }
 
 func appendCdpManagementAddresses(tags map[string]string, current []topologymodel.ManagementAddress) []topologymodel.ManagementAddress {

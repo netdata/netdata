@@ -357,6 +357,44 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testi
 	})
 }
 
+func TestTopologyCacheFinalizePreparesStableObservationSnapshot(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.staleAfter = time.Hour
+	cache.agentID = "agent-test"
+	cache.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "192.0.2.1",
+	}
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIfName:  "Ethernet7",
+		tagTopoIfAdmin: "up",
+		tagTopoIfOper:  "up",
+	})
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIPAddr:  "192.0.2.1",
+		tagTopoIPMask:  "255.255.255.255",
+	})
+	cache.finalizeTopologyCache()
+
+	require.True(t, cache.hasPreparedSnapshot)
+	prepared := cache.preparedSnapshot
+	rebuilt, ok := cache.buildObservationSnapshotLocked()
+	require.True(t, ok)
+	require.Equal(t, rebuilt, prepared)
+
+	first, ok := cache.snapshotEngineObservations()
+	require.True(t, ok)
+	second, ok := cache.snapshotEngineObservations()
+	require.True(t, ok)
+	require.Equal(t, prepared, first)
+	require.Equal(t, first, second)
+}
+
 func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testing.T) {
 	tests := map[string]struct {
 		update func(*topologyCache)

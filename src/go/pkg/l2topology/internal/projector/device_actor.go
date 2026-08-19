@@ -3,6 +3,7 @@
 package projector
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
@@ -22,13 +23,23 @@ func topologyDeviceInferred(dev model.Device) bool {
 }
 
 func buildDeviceActorMatch(dev model.Device, reporterAliases []string) graph.Match {
+	return buildDeviceActorMatchWithAddresses(dev, reporterAliases, deviceAddressStrings(dev))
+}
+
+func buildDeviceActorMatchWithAddresses(dev model.Device, reporterAliases, addresses []string) graph.Match {
 	match := buildDeviceBaseMatch(dev, reporterAliases)
-	match.IPAddresses = deviceAddressStrings(dev)
+	match.IPAddresses = slices.Clone(addresses)
 	return match
 }
 
 func buildDeviceEndpointMatch(dev model.Device) graph.Match {
-	return graph.LinkEndpointMatch(buildDeviceActorMatch(dev, nil), selectedDeviceManagementIP(dev))
+	return buildDeviceEndpointMatchWithAddresses(dev, deviceAddressStrings(dev))
+}
+
+func buildDeviceEndpointMatchWithAddresses(dev model.Device, addresses []string) graph.Match {
+	match := buildDeviceBaseMatch(dev, nil)
+	match.IPAddresses = addresses
+	return graph.LinkEndpointMatch(match, selectedDeviceManagementIP(dev))
 }
 
 func buildDeviceBaseMatch(dev model.Device, reporterAliases []string) graph.Match {
@@ -72,6 +83,7 @@ func buildDeviceActorDetail(
 	localDeviceID string,
 	ifaceSummary topologyDeviceInterfaceSummary,
 	match graph.Match,
+	addresses []string,
 ) model.ProjectionDeviceActorDetail {
 	discovered := strings.TrimSpace(localDeviceID) == "" || dev.ID != localDeviceID
 
@@ -80,7 +92,7 @@ func buildDeviceActorDetail(
 		Discovered:            discovered,
 		Inferred:              topologyDeviceInferred(dev),
 		ManagementIP:          selectedDeviceManagementIP(dev),
-		ManagementAddresses:   deviceAddressStrings(dev),
+		ManagementAddresses:   slices.Clone(addresses),
 		Protocols:             labelsCSVToSlice(dev.Labels, "protocols_observed"),
 		ProtocolsCollected:    labelsCSVToSlice(dev.Labels, "protocols_observed"),
 		Capabilities:          labelsCSVToSlice(dev.Labels, "capabilities"),

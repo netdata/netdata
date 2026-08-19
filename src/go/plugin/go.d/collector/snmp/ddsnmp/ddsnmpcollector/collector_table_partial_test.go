@@ -3,7 +3,9 @@
 package ddsnmpcollector
 
 import (
+	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
@@ -53,6 +55,33 @@ func TestTableCollector_Collect_AllWalksFailedStillErrors(t *testing.T) {
 	assert.Equal(t, int64(0), stats.SNMP.TablesWalked)
 	assert.Equal(t, int64(2), stats.SNMP.WalkRequests)
 	assert.Equal(t, int64(2), stats.Errors.SNMP)
+}
+
+func TestTableCollector_Collect_PartialWalkWarningIsRateLimitedPerProfile(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	profileA := profileWithTwoTableMetrics()
+	profileB := profileWithTwoTableMetrics()
+	profileB.SourceFile = "other-two-table-profile.yaml"
+	for range 3 {
+		expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.2.2", nil)
+		expectSNMPWalkError(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.20", errors.New("timeout"))
+	}
+
+	var logs bytes.Buffer
+	collector := newTableCollector(mockHandler, make(map[string]bool), newTableCache(0, 0), logger.NewWithWriter(&logs), false)
+	for _, profile := range []*ddsnmp.Profile{profileA, profileA, profileB} {
+		var stats ddsnmp.CollectionStats
+		metrics, err := collector.collect(profile, &stats)
+		require.NoError(t, err)
+		assert.Empty(t, metrics)
+		assert.Equal(t, int64(1), stats.SNMP.TablesWalked)
+		assert.Equal(t, int64(2), stats.SNMP.WalkRequests)
+		assert.Equal(t, int64(1), stats.Errors.SNMP)
+	}
+
+	assert.Equal(t, 2, strings.Count(logs.String(), "failed to walk some SNMP tables"), logs.String())
 }
 
 func profileWithTwoTableMetrics() *ddsnmp.Profile {
