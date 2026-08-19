@@ -26,11 +26,11 @@ from _common import (
 )
 from prometheus_profile_docs import project_prometheus_profile_coverage
 
+SELF = Path(__file__)
+
 sys.path.insert(0, str(SELF.parent.parent / 'packaging' / 'data'))
 
 import distros  # noqa: E402
-
-SELF = Path(__file__)
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
