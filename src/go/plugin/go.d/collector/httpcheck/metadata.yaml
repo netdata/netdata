@@ -207,6 +207,17 @@ modules:
             title: Config
             enabled: true
           list:
+            - name: Ceph RGW endpoint liveness
+              description: Basic unauthenticated liveness check for a Ceph RGW HTTP endpoint. This does not verify authenticated S3 operations.
+              config: |
+                jobs:
+                  - name: ceph-rgw-local
+                    url: http://127.0.0.1:8080
+                    status_accepted:
+                      - 200
+                      - 204
+                      - 403
+                      - 405
             - name: Basic
               description: A basic example configuration.
               config: |
