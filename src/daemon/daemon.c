@@ -6,60 +6,102 @@
 
 char *pidfile = NULL;
 
-static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
+// Fix ownership of the entries inside an already-opened directory.
+// Consumes dir_fd (fdopendir()/closedir() close it); dirname is used for log
+// messages only. Everything goes through the descriptor with AT_SYMLINK_NOFOLLOW,
+// so a symlinked entry is chowned as the link itself and is never followed to a
+// target chosen by whoever can write into the directory.
+static void fix_directory_file_permissions_at(int dir_fd, const char *dirname, uid_t uid, gid_t gid, bool recursive)
 {
-    char filename[FILENAME_MAX + 1];
-
-    DIR *dir = opendir(dirname);
-    if (!dir)
+    DIR *dir = fdopendir(dir_fd);
+    if (!dir) {
+        close(dir_fd);
         return;
+    }
 
     struct dirent *de = NULL;
 
     while ((de = readdir(dir))) {
-        if (de->d_type == DT_DIR && (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")))
+        // Skipped without consulting d_type, unlike the tests below: '..' must
+        // never be chowned - that would escape into the parent directory - and a
+        // filesystem is free to report DT_UNKNOWN for it.
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
             continue;
 
-        (void) snprintfz(filename, FILENAME_MAX, "%s/%s", dirname, de->d_name);
         if (de->d_type == DT_REG || recursive) {
-            if (chown(filename, uid, gid) == -1)
-                netdata_log_error("Cannot chown %s '%s' to %u:%u", de->d_type == DT_DIR ? "directory" : "file", filename, (unsigned int)uid, (unsigned int)gid);
+            if (fchownat(dirfd(dir), de->d_name, uid, gid, AT_SYMLINK_NOFOLLOW) == -1)
+                netdata_log_error("Cannot chown %s '%s/%s' to %u:%u", de->d_type == DT_DIR ? "directory" : "file", dirname, de->d_name, (unsigned int)uid, (unsigned int)gid);
         }
 
-        if (de->d_type == DT_DIR && recursive)
-            fix_directory_file_permissions(filename, uid, gid, recursive);
+        if (de->d_type == DT_DIR && recursive) {
+            int sub_fd = openat(dirfd(dir), de->d_name, O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC);
+            if (sub_fd != -1) {
+                char sub_name[FILENAME_MAX + 1];
+                (void) snprintfz(sub_name, FILENAME_MAX, "%s/%s", dirname, de->d_name);
+                fix_directory_file_permissions_at(sub_fd, sub_name, uid, gid, recursive);
+            }
+            else
+                netdata_log_error(
+                    "Not fixing ownership inside directory '%s/%s': cannot open it without following symlinks",
+                    dirname, de->d_name);
+        }
+
+        // A symlink is never followed: whoever can write into this directory could
+        // have planted it, and we are still root. Reported only in the recursive
+        // mode, because that is the only mode whose handling changed: there we now
+        // chown the link itself and stop, where we used to chown whatever it
+        // pointed at, so the files behind it keep the ownership they had - which is
+        // what an operator who relocated a directory with a symlink needs to be
+        // told. Relocate with a bind mount, or with the matching option in the
+        // [directories] section of netdata.conf, instead.
+        // The non-recursive mode only ever chowns regular files, so a symlink was
+        // never fixed there and nothing has changed for it. Reporting it anyway
+        // means an error per symlink on every single start: the shipped container
+        // image points all 7 files in its log directory at /dev/stdout.
+        if (recursive && de->d_type == DT_LNK)
+            netdata_log_error(
+                "Not fixing ownership through symbolic link '%s/%s': its target is left as it is",
+                dirname, de->d_name);
     }
 
     closedir(dir);
 }
 
+// Best-effort ownership repair, exactly like before the privilege drop always
+// was: failures are logged and startup continues, since netdata may legitimately
+// be unable to chown (root-squashed NFS, no CAP_CHOWN, a read-only bind mount)
+// and still work fine with the ownership already in place.
 static void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive) {
     if(!dir || !*dir) return;
 
-    if (chown(dir, uid, gid) == -1)
+    // Opens the directory itself, never a symlink someone else planted at its
+    // name: os_open_dir_privileged() follows a final-component symlink only when
+    // the directory holding it is ours and writable by no one else. So
+    // /var/cache/netdata may still point to another filesystem, while
+    // /var/lib/netdata/cloud.d may not - the netdata user can write its parent,
+    // and a symlink there would have us chown its target while still root
+    int fd = os_open_dir_privileged(dir);
+    if (fd == -1) {
+        netdata_log_error("Cannot open directory '%s' to fix ownership", dir);
+        return;
+    }
+
+    if (fchown(fd, uid, gid) == -1)
         netdata_log_error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
 
-    fix_directory_file_permissions(dir, uid, gid, recursive);
-}
-
-static inline void clean_directory(const char *dirname)
-{
-    DIR *dir = opendir(dirname);
-    if(!dir) return;
-
-    int dir_fd = dirfd(dir);
-    struct dirent *de = NULL;
-
-    while((de = readdir(dir)))
-        if(de->d_type == DT_REG)
-            if (unlinkat(dir_fd, de->d_name, 0))
-                netdata_log_error("Cannot delete %s/%s", dirname, de->d_name);
-
-    closedir(dir);
+    // consumes fd; the entries inside are fixed best-effort even when the
+    // top-level chown failed
+    fix_directory_file_permissions_at(fd, dir, uid, gid, recursive);
 }
 
 static void prepare_required_directories(uid_t uid, gid_t gid) {
+    // The run dir needs no ownership guard here: os_run_dir() already refused
+    // any directory another account could control, so by this point it is either
+    // ours or netdata never got a run dir at all (main() exits in that case).
     change_dir_ownership(os_run_dir(true), uid, gid, false);
+
+    // Ownership is repaired unconditionally, so a changed "run as user" or a
+    // recreated netdata account is migrated.
     change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
     change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_log_dir, uid, gid, false);
@@ -84,10 +126,8 @@ static int become_user(const char *username, int pid_fd) {
 
     prepare_required_directories(uid, gid);
 
-    if(pidfile && *pidfile) {
-        if(chown(pidfile, uid, gid) == -1)
-            netdata_log_error("Cannot chown '%s' to %u:%u", pidfile, (unsigned int)uid, (unsigned int)gid);
-    }
+    // the pidfile is chowned through its still-open descriptor, by
+    // chown_open_file(pid_fd) below - never by path, which would follow a symlink
 
     int ngroups = (int)sysconf(_SC_NGROUPS_MAX);
     gid_t *supplementary_groups = NULL;
