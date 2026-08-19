@@ -280,7 +280,9 @@ func addTopologyStatsCensusLLDP(cache *topologyCache, localPortID, remoteChassis
 		portID:           remotePortID,
 		portIDSubtype:    "interfaceName",
 		sysName:          remoteSysName,
-		managementAddr:   remoteMgmtIP,
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: remoteMgmtIP, AddressType: managementAddressTypeFromIP(remoteMgmtIP), Source: "lldp_remote"},
+		},
 	}
 }
 

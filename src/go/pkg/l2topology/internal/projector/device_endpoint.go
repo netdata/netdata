@@ -11,7 +11,16 @@ import (
 )
 
 func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]model.Interface) graph.LinkEndpoint {
-	match := buildDeviceActorMatch(dev, nil)
+	return adjacencySideToEndpointWithMatch(dev, buildDeviceEndpointMatch(dev), port, ifIndexByDeviceName, ifaceByDeviceIndex)
+}
+
+func adjacencySideToEndpointWithMatch(
+	dev model.Device,
+	match graph.Match,
+	port string,
+	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+) graph.LinkEndpoint {
 
 	port = strings.TrimSpace(port)
 	ifName := ""
@@ -46,7 +55,7 @@ func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName 
 		IfName:       ifName,
 		PortID:       port,
 		SysName:      strings.TrimSpace(dev.Hostname),
-		ManagementIP: firstAddress(dev.Addresses),
+		ManagementIP: selectedDeviceManagementIP(dev),
 	}
 	if ifDescr != "" {
 		endpoint.IfDescr = ifDescr
@@ -61,4 +70,11 @@ func adjacencySideToEndpoint(dev model.Device, port string, ifIndexByDeviceName 
 	}
 
 	return endpoint
+}
+
+func deviceLinkEndpointMatch(dev model.Device, matchByDeviceID map[string]graph.Match) graph.Match {
+	if match, ok := matchByDeviceID[dev.ID]; ok {
+		return match
+	}
+	return buildDeviceEndpointMatch(dev)
 }

@@ -10,16 +10,22 @@ import (
 
 func (s *l2BuildState) applyLLDP(observations []model.L2Observation) {
 	lldpLinks := buildLLDPMatchLinks(observations)
-	annotateLLDPLinkMatchIdentities(lldpLinks, s.hostToID, s.chassisToID, s.ipToID)
+	annotateLLDPLinkMatchIdentities(lldpLinks, s.hostToID, s.chassisToID, s.directIPToID)
 	lldpPairs := matchLLDPLinksEnlinkdPassOrder(lldpLinks)
 	lldpTargetOverrides := buildLLDPTargetOverrides(lldpLinks, lldpPairs)
 	lldpPairMetadata := buildLLDPPairMetadata(lldpLinks, lldpPairs)
 
 	for _, link := range lldpLinks {
+		managementIP := canonicalUsableIPAddress(link.remoteManagement)
+		managementIPValue := ""
+		if managementIP.IsValid() {
+			managementIPValue = managementIP.String()
+		}
 		targetID := strings.TrimSpace(lldpTargetOverrides[link.index])
 		if targetID == "" {
-			targetID = s.resolveRemote(link.remoteSysName, link.remoteChassisID, link.remoteManagement, link.remoteFallbackID)
+			targetID = s.resolveRemote(link.remoteSysName, link.remoteChassisID, managementIPValue, link.remoteFallbackID)
 		}
+		s.recordRemoteManagementAddress(targetID, managementIPValue)
 
 		adj := model.Adjacency{
 			Protocol:   "lldp",
@@ -42,12 +48,17 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 	cdpPairMetadata := buildCDPPairMetadata(cdpLinks, cdpPairs)
 
 	for _, link := range cdpLinks {
-		rawAddress := strings.TrimSpace(link.remoteAddressRaw)
+		managementAddr := canonicalUsableIPAddress(link.remoteManagementIP)
+		managementIP := ""
+		if managementAddr.IsValid() {
+			managementIP = managementAddr.String()
+		}
+		rawAddress := link.remoteAddressRaw
 		targetID := strings.TrimSpace(cdpTargetOverrides[link.index])
 		if targetID == "" {
-			targetIP := canonicalIP(rawAddress)
-			targetID = s.resolveRemoteEnforcingHostnameMACGuard(link.remoteHost, link.remoteDeviceID, targetIP, link.remoteDeviceID)
+			targetID = s.resolveRemoteEnforcingHostnameMACGuard(link.remoteHost, link.remoteDeviceID, managementIP, link.remoteDeviceID)
 		}
+		s.recordRemoteManagementAddress(targetID, managementIP)
 
 		adj := model.Adjacency{
 			Protocol:   "cdp",
@@ -56,9 +67,13 @@ func (s *l2BuildState) applyCDP(observations []model.L2Observation) {
 			TargetID:   targetID,
 			TargetPort: link.remoteDevicePort,
 		}
-		if rawAddress != "" {
-			adj.Labels = map[string]string{
-				"remote_address_raw": strings.ToLower(rawAddress),
+		if managementIP != "" || strings.TrimSpace(rawAddress) != "" {
+			adj.Labels = make(map[string]string, 2)
+			if managementIP != "" {
+				adj.Labels[adjacencyLabelRemoteManagementIP] = managementIP
+			}
+			if strings.TrimSpace(rawAddress) != "" {
+				adj.Labels[adjacencyLabelRemoteAddressRaw] = rawAddress
 			}
 		}
 		applyAdjacencyPairMetadata(&adj, cdpPairMetadata[link.index])

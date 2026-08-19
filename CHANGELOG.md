@@ -20,6 +20,23 @@
 - Regenerate integrations docs ([#23488](https://github.com/netdata/netdata/issues/23488))
 - Aclk: report MQTT PUBACK timeouts separately ([#23486](https://github.com/netdata/netdata/issues/23486))
 - ACLK: Add TLS hostname and IP verification for HTTPS requests ([#23463](https://github.com/netdata/netdata/issues/23463))
+- Build(deps): bump github.com/catonetworks/cato-go-sdk from 0.3.2 to 0.3.3 in /src/go ([#23517](https://github.com/netdata/netdata/issues/23517))
+- Build(deps): bump golang.org/x/net from 0.57.0 to 0.58.0 in /src/go ([#23519](https://github.com/netdata/netdata/issues/23519))
+- Build(deps): bump github.com/golangsnmp/gomib from 0.12.0 to 0.13.2 in /src/go ([#23520](https://github.com/netdata/netdata/issues/23520))
+- Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azcore from 1.22.0 to 1.23.0 in /src/go ([#23518](https://github.com/netdata/netdata/issues/23518))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.35.5 to 1.36.0 in /src/go ([#23523](https://github.com/netdata/netdata/issues/23523))
+- Feat(go.d/prometheus): support Ceph Tentacle hardware and PG rebuild metrics ([#23524](https://github.com/netdata/netdata/issues/23524))
+- Regenerate integrations docs ([#23527](https://github.com/netdata/netdata/issues/23527))
+- Ci: avoid package builds for Go-only changes ([#23530](https://github.com/netdata/netdata/issues/23530))
+- Fix(go.d/snmp): correct MikroTik gauge transform ([#23525](https://github.com/netdata/netdata/issues/23525))
+- OTel traces: ingestion, storage, and the otel-traces query Function ([#23479](https://github.com/netdata/netdata/issues/23479))
+- Fix handling of package publishing detection in updater script. ([#22027](https://github.com/netdata/netdata/issues/22027))
+- Make attempting to update unsupported installs fatal in kickstart.sh. ([#23253](https://github.com/netdata/netdata/issues/23253))
+- Add basic handling for release candidate versions in build system. ([#23211](https://github.com/netdata/netdata/issues/23211))
+- Remove RHEL 7.x and Amazon Linux 2 from CI and package builds. ([#22930](https://github.com/netdata/netdata/issues/22930))
+- Fix(go.d/smartctl): normalize device chart identity ([#23529](https://github.com/netdata/netdata/issues/23529))
+- Include full page identity in PGC cache fatal messages ([#23522](https://github.com/netdata/netdata/issues/23522))
+- Increment label version only on actual label mutations ([#23513](https://github.com/netdata/netdata/issues/23513))
 
 ## [2.11.0] - 2026-08-12
 

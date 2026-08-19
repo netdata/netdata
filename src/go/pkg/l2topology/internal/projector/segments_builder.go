@@ -16,11 +16,13 @@ type segmentProjectionBuilder struct {
 	source                    string
 	collectedAt               time.Time
 	deviceByID                map[string]model.Device
+	deviceLinkMatchByID       map[string]graph.Match
 	ifaceByDeviceIndex        map[string]model.Interface
 	ifIndexByDeviceName       map[string]int
 	bridgeLinks               []bridgeBridgeLinkRecord
 	reporterAliases           map[string][]string
 	endpointMatchByID         map[string]graph.Match
+	endpointLinkMatchByID     map[string]graph.Match
 	endpointLabelsByID        map[string]map[string]string
 	actorIndex                map[string]struct{}
 	probabilisticConnectivity bool
@@ -61,11 +63,13 @@ func newSegmentProjectionBuilder(
 	source string,
 	collectedAt time.Time,
 	deviceByID map[string]model.Device,
+	deviceLinkMatchByID map[string]graph.Match,
 	ifaceByDeviceIndex map[string]model.Interface,
 	ifIndexByDeviceName map[string]int,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
 	endpointMatchByID map[string]graph.Match,
+	endpointLinkMatchByID map[string]graph.Match,
 	endpointLabelsByID map[string]map[string]string,
 	actorIndex map[string]struct{},
 	probabilisticConnectivity bool,
@@ -78,11 +82,13 @@ func newSegmentProjectionBuilder(
 		source:                    source,
 		collectedAt:               collectedAt,
 		deviceByID:                deviceByID,
+		deviceLinkMatchByID:       deviceLinkMatchByID,
 		ifaceByDeviceIndex:        ifaceByDeviceIndex,
 		ifIndexByDeviceName:       ifIndexByDeviceName,
 		bridgeLinks:               bridgeLinks,
 		reporterAliases:           reporterAliases,
 		endpointMatchByID:         endpointMatchByID,
+		endpointLinkMatchByID:     endpointLinkMatchByID,
 		endpointLabelsByID:        endpointLabelsByID,
 		actorIndex:                actorIndex,
 		probabilisticConnectivity: probabilisticConnectivity,

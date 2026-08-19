@@ -67,7 +67,7 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		groupMembers[root] = append(groupMembers[root], idx)
 	}
 
-	replaceActorID := make(map[string]string)
+	replaceActor := make(map[topologymodel.ActorHandle]topologymodel.ActorHandle)
 	keep := make([]bool, len(data.Actors))
 	for i := range keep {
 		keep[i] = true
@@ -86,6 +86,9 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 		}
 
 		repActor := data.Actors[rep]
+		var matchLists topologyMatchCollapseLists
+		matchLists.add(repActor.Match)
+		clearTopologyMatchCollapseLists(&repActor.Match)
 		collapsedCount := 1
 		for _, idx := range members {
 			if idx == rep {
@@ -93,13 +96,17 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 			}
 			collapsedCount++
 			collapsed++
-			replaceActorID[data.Actors[idx].ActorID] = repActor.ActorID
-			repActor.Match = mergeTopologyMatch(repActor.Match, data.Actors[idx].Match)
-			repActor.Labels = mergeTopologyStringMap(repActor.Labels, data.Actors[idx].Labels)
-			repActor.SegmentKind = topologyutil.FirstNonEmptyString(repActor.SegmentKind, data.Actors[idx].SegmentKind)
-			repActor.Detail = mergeTopologyActorDetail(repActor.Detail, data.Actors[idx].Detail)
+			replaceActor[data.Actors[idx].ActorHandle] = repActor.ActorHandle
+			member := data.Actors[idx]
+			matchLists.add(member.Match)
+			clearTopologyMatchCollapseLists(&member.Match)
+			repActor.Match = mergeTopologyMatch(repActor.Match, member.Match)
+			repActor.Labels = mergeTopologyStringMap(repActor.Labels, member.Labels)
+			repActor.SegmentKind = topologyutil.FirstNonEmptyString(repActor.SegmentKind, member.SegmentKind)
+			repActor.Detail = mergeTopologyActorDetail(repActor.Detail, member.Detail)
 			keep[idx] = false
 		}
+		matchLists.apply(&repActor.Match)
 		if collapsedCount > 1 {
 			repActor.Detail.L2.CollapsedByIP = true
 			repActor.Detail.L2.CollapsedCount = collapsedCount
@@ -121,18 +128,18 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 	data.Actors = actors
 
 	links := make([]topologymodel.Link, 0, len(data.Links))
-	seen := make(map[string]struct{}, len(data.Links))
+	seen := make(map[topologyLinkActorKeyValue]struct{}, len(data.Links))
 	for _, link := range data.Links {
-		if replacement, ok := replaceActorID[link.SrcActorID]; ok && replacement != "" {
-			link.SrcActorID = replacement
+		if replacement, ok := replaceActor[link.SrcActorHandle]; ok {
+			link.SrcActorHandle = replacement
 		}
-		if replacement, ok := replaceActorID[link.DstActorID]; ok && replacement != "" {
-			link.DstActorID = replacement
+		if replacement, ok := replaceActor[link.DstActorHandle]; ok {
+			link.DstActorHandle = replacement
 		}
-		if strings.TrimSpace(link.SrcActorID) == "" || strings.TrimSpace(link.DstActorID) == "" {
+		if link.SrcActorHandle.IsZero() || link.DstActorHandle.IsZero() {
 			continue
 		}
-		if link.SrcActorID == link.DstActorID {
+		if link.SrcActorHandle == link.DstActorHandle {
 			continue
 		}
 		key := topologyLinkActorKey(link)

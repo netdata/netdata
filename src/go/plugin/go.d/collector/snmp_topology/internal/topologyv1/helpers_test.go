@@ -5,6 +5,7 @@ package topologyv1
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/assert"
@@ -44,32 +45,40 @@ func TestBuildSNMPTopologyV1Actors_UsesStableFallbackActorID(t *testing.T) {
 		{ActorType: "device", Match: topologymodel.Match{IPAddresses: []string{"10.0.0.1"}}},
 	}
 	reorderedActors := []topologymodel.Actor{actors[1], actors[0]}
+	handles := graph.NewActorHandleAllocator()
+	actors[0].ActorHandle = handles.Next()
+	actors[1].ActorHandle = handles.Next()
+	reorderedActors = []topologymodel.Actor{actors[1], actors[0]}
 
-	_, actorIndex := buildSNMPTopologyV1Actors(actors, topologyapi.NewStringDictionary(""))
-	_, reorderedActorIndex := buildSNMPTopologyV1Actors(reorderedActors, topologyapi.NewStringDictionary(""))
+	stringsDict := topologyapi.NewStringDictionary("")
+	buildSNMPTopologyV1Actors(actors, stringsDict)
+	reorderedStringsDict := topologyapi.NewStringDictionary("")
+	buildSNMPTopologyV1Actors(reorderedActors, reorderedStringsDict)
 
-	require.Contains(t, actorIndex, "generated:device:ip:x_10.0.0.1")
-	require.Contains(t, actorIndex, "generated:device:ip:x_10.0.0.2")
-	require.Contains(t, reorderedActorIndex, "generated:device:ip:x_10.0.0.1")
-	require.Contains(t, reorderedActorIndex, "generated:device:ip:x_10.0.0.2")
+	require.Contains(t, stringsDict.Values(), "generated:device:ip:x_10.0.0.1")
+	require.Contains(t, stringsDict.Values(), "generated:device:ip:x_10.0.0.2")
+	require.Contains(t, reorderedStringsDict.Values(), "generated:device:ip:x_10.0.0.1")
+	require.Contains(t, reorderedStringsDict.Values(), "generated:device:ip:x_10.0.0.2")
 }
 
 func TestBuildSNMPTopologyV1Actors_FallbackDoesNotCollideWithExplicitActorID(t *testing.T) {
-	_, actorIndex := buildSNMPTopologyV1Actors([]topologymodel.Actor{
+	handles := graph.NewActorHandleAllocator()
+	stringsDict := topologyapi.NewStringDictionary("")
+	buildSNMPTopologyV1Actors([]topologymodel.Actor{
 		{
-			ActorType: "device",
-			Match:     topologymodel.Match{IPAddresses: []string{"10.0.0.1"}},
+			ActorHandle: handles.Next(),
+			ActorType:   "device",
+			Match:       topologymodel.Match{IPAddresses: []string{"10.0.0.1"}},
 		},
 		{
-			ActorID:   "generated:device:ip:x_10.0.0.1",
-			ActorType: "device",
+			ActorHandle: handles.Next(),
+			ActorID:     "generated:device:ip:x_10.0.0.1",
+			ActorType:   "device",
 		},
-	}, topologyapi.NewStringDictionary(""))
+	}, stringsDict)
 
-	assert.Equal(t, map[string]int{
-		"generated:device:ip:x_10.0.0.1_2": 0,
-		"generated:device:ip:x_10.0.0.1":   1,
-	}, actorIndex)
+	require.Contains(t, stringsDict.Values(), "generated:device:ip:x_10.0.0.1_2")
+	require.Contains(t, stringsDict.Values(), "generated:device:ip:x_10.0.0.1")
 }
 
 func TestBuildSNMPTopologyV1PortNeighborSummaries_RemotePortName(t *testing.T) {
@@ -95,7 +104,14 @@ func TestBuildSNMPTopologyV1PortNeighborSummaries_RemotePortName(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			summaries := buildSNMPTopologyV1PortNeighborSummaries(tc.links, map[string]int{"device-a": 0, "device-b": 1})
+			handles := graph.NewActorHandleAllocator()
+			deviceA := handles.Next()
+			deviceB := handles.Next()
+			for i := range tc.links {
+				tc.links[i].SrcActorHandle = deviceA
+				tc.links[i].DstActorHandle = deviceB
+			}
+			summaries := buildSNMPTopologyV1PortNeighborSummaries(tc.links, topologyV1ActorIndex{deviceA: 0, deviceB: 1})
 
 			summary, ok := summaries[snmpTopologyV1PortNeighborKey{actorRef: 0, ifIndex: 1}]
 			require.True(t, ok)
@@ -107,9 +123,9 @@ func TestBuildSNMPTopologyV1PortNeighborSummaries_RemotePortName(t *testing.T) {
 
 func topologyV1PortNeighborSummaryLinkForTest(remotePortName string) topologymodel.Link {
 	link := topologymodel.Link{
-		SrcActorID: "device-a",
-		DstActorID: "device-b",
-		Src:        topologymodel.LinkEndpoint{IfIndex: 1, PortName: "Gi0/1"},
+		SrcActorHandle: topologyV1TestActorHandle("device-a"),
+		DstActorHandle: topologyV1TestActorHandle("device-b"),
+		Src:            topologymodel.LinkEndpoint{IfIndex: 1, PortName: "Gi0/1"},
 	}
 	if remotePortName != "" {
 		link.Dst = topologymodel.LinkEndpoint{PortName: remotePortName}

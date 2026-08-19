@@ -358,6 +358,13 @@ static void pulse_child_chart_labels(RRDSET *st, RRDHOST *host) {
     if(node_id[0])
         rrdlabels_add(st->rrdlabels, "node_id", node_id, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "hops", hops, RRDLABEL_SRC_AUTO);
+
+    // Chart labels are a prototype matching input, and these are written with the
+    // rrdlabels_* primitives directly rather than through rrdset_update_rrdlabels(),
+    // which is what normally raises these flags. The caller only invokes us when the
+    // labels actually need re-applying, so tell health to re-evaluate this chart.
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 }
 
 static void pulse_child_charts_update(RRDHOST *host, PULSE_INBOUND_STATE state) {

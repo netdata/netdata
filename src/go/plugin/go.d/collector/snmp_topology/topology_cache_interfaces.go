@@ -90,18 +90,21 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 	}
 
 	c.ifIndexByIP[ip] = ifIndex
-	c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
-		Address:     ip,
-		AddressType: managementAddressTypeFromIP(ip),
-		Source:      "ip_mib",
-	})
-	if mask := topologyutil.NormalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
+	mask := topologyutil.NormalizeIPAddress(tags[tagTopoIPMask])
+	if mask != "" {
 		c.ifNetmaskByIP[ip] = mask
 		c.l3InterfacesByIP[ip] = topologymodel.L3Interface{
 			IP:      ip,
 			Netmask: mask,
 			IfIndex: ifIndex,
 		}
+	}
+	if isEligibleManagementInterfaceAddress(ip, mask) {
+		c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
+			Address:     ip,
+			AddressType: managementAddressTypeFromIP(ip),
+			Source:      "ip_mib",
+		})
 	}
 }
 

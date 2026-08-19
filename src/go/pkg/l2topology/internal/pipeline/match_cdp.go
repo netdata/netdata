@@ -17,10 +17,11 @@ type cdpMatchLink struct {
 
 	localInterfaceName string
 
-	remoteDeviceID   string
-	remoteDevicePort string
-	remoteHost       string
-	remoteAddressRaw string
+	remoteDeviceID     string
+	remoteDevicePort   string
+	remoteHost         string
+	remoteManagementIP string
+	remoteAddressRaw   string
 }
 
 type cdpMatchedPair struct {
@@ -58,6 +59,10 @@ func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 				remoteDeviceID = remoteHost
 			}
 
+			rawAddress := remote.RawAddress
+			if strings.TrimSpace(rawAddress) == "" {
+				rawAddress = remote.Address
+			}
 			links = append(links, cdpMatchLink{
 				index:              len(links),
 				sourceDeviceID:     sourceID,
@@ -66,7 +71,8 @@ func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 				remoteDeviceID:     remoteDeviceID,
 				remoteDevicePort:   strings.TrimSpace(remote.DevicePort),
 				remoteHost:         remoteHost,
-				remoteAddressRaw:   strings.TrimSpace(remote.Address),
+				remoteManagementIP: strings.TrimSpace(remote.Address),
+				remoteAddressRaw:   rawAddress,
 			})
 		}
 	}

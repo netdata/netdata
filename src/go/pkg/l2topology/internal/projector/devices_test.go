@@ -41,3 +41,18 @@ func TestAdjacencySideToEndpoint_FallsBackToRequestedPort(t *testing.T) {
 	require.Equal(t, "10.0.0.1", endpoint.ManagementIP)
 	require.Empty(t, endpoint.IfDescr)
 }
+
+func TestAdjacencySideToEndpoint_UsesOneDeterministicIPHintWithoutSelectedPrimary(t *testing.T) {
+	dev := model.Device{
+		ID:       "switch-a",
+		Hostname: "switch-a",
+		Addresses: []netip.Addr{
+			netip.MustParseAddr("10.0.0.10"),
+			netip.MustParseAddr("10.0.0.2"),
+		},
+	}
+
+	endpoint := adjacencySideToEndpoint(dev, "", nil, nil)
+	require.Equal(t, []string{"10.0.0.2"}, endpoint.Match.IPAddresses)
+	require.Empty(t, endpoint.ManagementIP)
+}

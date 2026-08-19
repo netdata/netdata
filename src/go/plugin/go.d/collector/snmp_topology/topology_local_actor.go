@@ -11,40 +11,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func augmentLocalActorFromCache(data *topologymodel.Data, local topologymodel.Device) bool {
-	if data == nil || len(data.Actors) == 0 {
-		return false
+func augmentLocalActor(actor *topologymodel.Actor, local topologymodel.Device) {
+	if actor == nil {
+		return
 	}
-
-	for i := range data.Actors {
-		actor := &data.Actors[i]
-		if !topologyengine.IsDeviceActorType(actor.ActorType) {
-			continue
-		}
-		if !topologymodel.MatchLocalActor(actor.Match, local) {
-			continue
-		}
-
-		actor.Detail.SNMP = topologySNMPActorDetailFromDevice(local)
-		applyLocalActorLabels(actor, local)
-		enrichLocalActorChartReferences(actor, local.InterfaceCharts)
-		return true
-	}
-
-	return false
+	actor.Detail.SNMP = topologySNMPActorDetailFromDevice(local)
+	applyLocalActorLabels(actor, local)
+	enrichLocalActorChartReferences(actor, local.InterfaceCharts)
 }
 
-func addLocalActorFromCache(data *topologymodel.Data, localDeviceID string, local topologymodel.Device) bool {
-	if data == nil {
-		return false
-	}
-
+func topologyLocalActorFromCache(localDeviceID string, local topologymodel.Device) (topologymodel.Actor, bool) {
 	actorID := strings.TrimSpace(localDeviceID)
 	if actorID == "" {
 		actorID = ensureTopologyObservationDeviceID(local, "")
 	}
-	if actorID == "" || topologyLocalActorExists(data.Actors, actorID) {
-		return false
+	if actorID == "" {
+		return topologymodel.Actor{}, false
 	}
 
 	labels := cloneTopologyLabels(local.Labels)
@@ -62,17 +44,7 @@ func addLocalActorFromCache(data *topologymodel.Data, localDeviceID string, loca
 	if actor.ActorType == "" {
 		actor.ActorType = "device"
 	}
-	data.Actors = append(data.Actors, actor)
-	return true
-}
-
-func topologyLocalActorExists(actors []topologymodel.Actor, actorID string) bool {
-	for _, actor := range actors {
-		if strings.TrimSpace(actor.ActorID) == actorID {
-			return true
-		}
-	}
-	return false
+	return actor, true
 }
 
 func topologyLocalActorMatch(local topologymodel.Device) topologymodel.Match {
@@ -87,16 +59,9 @@ func topologyLocalActorMatch(local topologymodel.Device) topologymodel.Match {
 		}
 	}
 
-	ips := make([]string, 0, 1+len(local.ManagementAddresses))
 	if ip := topologyutil.NormalizeIPAddress(local.ManagementIP); ip != "" {
-		ips = append(ips, ip)
+		match.IPAddresses = []string{ip}
 	}
-	for _, addr := range local.ManagementAddresses {
-		if ip := topologyutil.NormalizeIPAddress(addr.Address); ip != "" {
-			ips = append(ips, ip)
-		}
-	}
-	match.IPAddresses = topologyutil.DeduplicateSortedStrings(ips)
 
 	return match
 }

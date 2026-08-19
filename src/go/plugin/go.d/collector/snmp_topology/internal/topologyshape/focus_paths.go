@@ -4,43 +4,43 @@ package topologyshape
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
 func topologyShortestPathUnion(
 	data *topologymodel.Data,
-	roots map[string]struct{},
-) (map[string]struct{}, map[string]struct{}) {
-	includedActors := make(map[string]struct{})
-	includedPairs := make(map[string]struct{})
+	roots map[topologymodel.ActorHandle]struct{},
+) (map[topologymodel.ActorHandle]struct{}, map[topologyActorPair]struct{}) {
+	includedActors := make(map[topologymodel.ActorHandle]struct{})
+	includedPairs := make(map[topologyActorPair]struct{})
 	if data == nil || len(roots) < 2 {
 		return includedActors, includedPairs
 	}
 
-	adjacency := make(map[string]map[string]struct{})
+	adjacency := make(map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{})
 	for _, link := range data.Links {
-		src := strings.TrimSpace(link.SrcActorID)
-		dst := strings.TrimSpace(link.DstActorID)
-		if src == "" || dst == "" || src == dst {
+		src := link.SrcActorHandle
+		dst := link.DstActorHandle
+		if src.IsZero() || dst.IsZero() || src == dst {
 			continue
 		}
 		if _, ok := adjacency[src]; !ok {
-			adjacency[src] = make(map[string]struct{})
+			adjacency[src] = make(map[topologymodel.ActorHandle]struct{})
 		}
 		if _, ok := adjacency[dst]; !ok {
-			adjacency[dst] = make(map[string]struct{})
+			adjacency[dst] = make(map[topologymodel.ActorHandle]struct{})
 		}
 		adjacency[src][dst] = struct{}{}
 		adjacency[dst][src] = struct{}{}
 	}
 
-	rootIDs := make([]string, 0, len(roots))
-	for actorID := range roots {
-		rootIDs = append(rootIDs, actorID)
+	actorOrder := topologyActorLexicalOrder(data.Actors)
+	rootIDs := make([]topologymodel.ActorHandle, 0, len(roots))
+	for actorHandle := range roots {
+		rootIDs = append(rootIDs, actorHandle)
 	}
-	sort.Strings(rootIDs)
+	sort.Slice(rootIDs, func(i, j int) bool { return actorOrder[rootIDs[i]] < actorOrder[rootIDs[j]] })
 
 	for i := 0; i < len(rootIDs); i++ {
 		source := rootIDs[i]
@@ -48,15 +48,15 @@ func topologyShortestPathUnion(
 			continue
 		}
 
-		parents, distance := topologyShortestParents(adjacency, source)
+		parents, distance := topologyShortestParents(adjacency, actorOrder, source)
 		for j := i + 1; j < len(rootIDs); j++ {
 			target := rootIDs[j]
 			if _, ok := distance[target]; !ok {
 				continue
 			}
 
-			visited := make(map[string]struct{})
-			stack := []string{target}
+			visited := make(map[topologymodel.ActorHandle]struct{})
+			stack := []topologymodel.ActorHandle{target}
 			for len(stack) > 0 {
 				node := stack[len(stack)-1]
 				stack = stack[:len(stack)-1]
@@ -71,7 +71,8 @@ func topologyShortestPathUnion(
 
 				for _, parent := range parents[node] {
 					includedActors[parent] = struct{}{}
-					includedPairs[topologyActorPairKey(node, parent)] = struct{}{}
+					includedPairs[topologyActorPair{src: node, dst: parent}] = struct{}{}
+					includedPairs[topologyActorPair{src: parent, dst: node}] = struct{}{}
 					stack = append(stack, parent)
 				}
 			}
@@ -82,26 +83,27 @@ func topologyShortestPathUnion(
 }
 
 func topologyShortestParents(
-	adjacency map[string]map[string]struct{},
-	source string,
-) (map[string][]string, map[string]int) {
-	parents := make(map[string][]string)
-	distance := map[string]int{source: 0}
-	queue := []string{source}
+	adjacency map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{},
+	actorOrder map[topologymodel.ActorHandle]int,
+	source topologymodel.ActorHandle,
+) (map[topologymodel.ActorHandle][]topologymodel.ActorHandle, map[topologymodel.ActorHandle]int) {
+	parents := make(map[topologymodel.ActorHandle][]topologymodel.ActorHandle)
+	distance := map[topologymodel.ActorHandle]int{source: 0}
+	queue := []topologymodel.ActorHandle{source}
 
 	for head := 0; head < len(queue); head++ {
 		current := queue[head]
-		neighbors := make([]string, 0, len(adjacency[current]))
+		neighbors := make([]topologymodel.ActorHandle, 0, len(adjacency[current]))
 		for neighbor := range adjacency[current] {
 			neighbors = append(neighbors, neighbor)
 		}
-		sort.Strings(neighbors)
+		sort.Slice(neighbors, func(i, j int) bool { return actorOrder[neighbors[i]] < actorOrder[neighbors[j]] })
 		for _, neighbor := range neighbors {
 			nextDepth := distance[current] + 1
 			currentDepth, seen := distance[neighbor]
 			if !seen {
 				distance[neighbor] = nextDepth
-				parents[neighbor] = []string{current}
+				parents[neighbor] = []topologymodel.ActorHandle{current}
 				queue = append(queue, neighbor)
 				continue
 			}
@@ -112,20 +114,13 @@ func topologyShortestParents(
 	}
 
 	for node := range parents {
-		sort.Strings(parents[node])
+		sort.Slice(parents[node], func(i, j int) bool { return actorOrder[parents[node][i]] < actorOrder[parents[node][j]] })
 	}
 
 	return parents, distance
 }
 
-func topologyActorPairKey(left, right string) string {
-	left = strings.TrimSpace(left)
-	right = strings.TrimSpace(right)
-	if left == "" || right == "" {
-		return ""
-	}
-	if left > right {
-		left, right = right, left
-	}
-	return left + "|" + right
+type topologyActorPair struct {
+	src topologymodel.ActorHandle
+	dst topologymodel.ActorHandle
 }

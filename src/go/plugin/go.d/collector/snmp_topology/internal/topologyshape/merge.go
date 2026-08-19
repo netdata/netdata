@@ -24,6 +24,38 @@ func mergeTopologyMatch(base, other topologymodel.Match) topologymodel.Match {
 	return base
 }
 
+type topologyMatchCollapseLists struct {
+	chassisIDs   []string
+	macAddresses []string
+	ipAddresses  []string
+	hostnames    []string
+	dnsNames     []string
+}
+
+func (a *topologyMatchCollapseLists) add(match topologymodel.Match) {
+	a.chassisIDs = append(a.chassisIDs, match.ChassisIDs...)
+	a.macAddresses = append(a.macAddresses, match.MacAddresses...)
+	a.ipAddresses = append(a.ipAddresses, match.IPAddresses...)
+	a.hostnames = append(a.hostnames, match.Hostnames...)
+	a.dnsNames = append(a.dnsNames, match.DNSNames...)
+}
+
+func (a *topologyMatchCollapseLists) apply(match *topologymodel.Match) {
+	match.ChassisIDs = appendUniqueTopologyStrings(nil, a.chassisIDs...)
+	match.MacAddresses = appendUniqueTopologyStrings(nil, a.macAddresses...)
+	match.IPAddresses = appendUniqueTopologyStrings(nil, a.ipAddresses...)
+	match.Hostnames = appendUniqueTopologyStrings(nil, a.hostnames...)
+	match.DNSNames = appendUniqueTopologyStrings(nil, a.dnsNames...)
+}
+
+func clearTopologyMatchCollapseLists(match *topologymodel.Match) {
+	match.ChassisIDs = nil
+	match.MacAddresses = nil
+	match.IPAddresses = nil
+	match.Hostnames = nil
+	match.DNSNames = nil
+}
+
 func mergeTopologyStringMap(base, other map[string]string) map[string]string {
 	if len(other) == 0 {
 		return base

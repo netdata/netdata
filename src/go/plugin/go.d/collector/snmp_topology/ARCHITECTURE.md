@@ -71,6 +71,7 @@ flowchart TD
     Tick["initial refresh, then every update_every"]
     Devices["read devices from DeviceStore"]
     Fresh{"new or refresh_every elapsed?"}
+    Resolve["resolve DNS targets<br/>up to 8 workers, shared 5s budget"]
     Walk["SNMP walk topology profiles"]
     Next["build fresh topologyCache off-registry"]
     Swap["swap fresh cache into registered cache"]
@@ -79,7 +80,7 @@ flowchart TD
     Metrics["write internal metrics only"]
 
     Run --> Publish --> Tick --> Devices --> Fresh
-    Fresh -->|"yes"| Walk --> Next --> Swap --> Prune --> Tick
+    Fresh -->|"yes"| Resolve --> Walk --> Next --> Swap --> Prune --> Tick
     Fresh -->|"no"| Prune
     Collect --> Metrics
 ```
@@ -93,24 +94,36 @@ Run(ctx)
 
 refreshTopology(ctx)
   read registered SNMP devices from ddsnmp.DeviceStore
-  for each new or stale device:
-    refreshDeviceTopology(ctx, key, device)
+  build a plan of new or stale devices
+  resolve planned DNS targets with up to eight workers under one shared 5s budget
+  for each planned device, in DeviceStore snapshot order:
+    refreshDeviceTopology(ctx, key, device, targetManagementIPs)
   prune caches for devices no longer registered
 
-refreshDeviceTopology(ctx, key, device)
+refreshDeviceTopology(ctx, key, device, targetManagementIPs)
   connect to the device with gosnmp
   select topology profiles
   collect topology ProfileMetrics with ddsnmpcollector
   query sysUpTime
-  build a fresh per-device topologyCache off-registry
+  build a fresh per-device topologyCache off-registry with private target candidates
   ingest topology metrics into the fresh cache
   collect VTP VLAN contexts when needed
-  finalize diagnostics
+  filter target and observed addresses with collected masks, select one management IP, and finalize diagnostics
   swap the fresh cache into the registered cache
 ```
 
 The refresh loop checks devices every `update_every` seconds, but a device is
 fully refreshed only when it is new or older than `refresh_every`.
+
+Only due DNS targets enter the lookup phase; IP literals bypass the resolver.
+The workers are joined before SNMP collection begins, stop with the refresh
+context, and use a lookup-only child context, so expiry of the shared lookup
+budget does not cancel the parent refresh or the subsequent serial SNMP walks.
+All normalized DNS answers remain private refresh evidence until collection has
+provided interface masks. Finalization rejects mask-proven network and broadcast
+addresses, then uses one selector across the surviving targets, LLDP/CDP
+addresses, and IP-MIB addresses. Only the selected target enters public identity
+or trap matching; alternate DNS answers are never published as aliases.
 
 The important safety property is that a device refresh builds the next cache
 off-registry and only swaps it into the registered cache after ingestion
@@ -167,6 +180,62 @@ Each cache snapshot is converted into:
   peers;
 - local device detail used to enrich the selected local actor.
 
+Each direct SNMP observation gives the generic L2 builder one selected
+`ManagementIP` plus vetted `ManagementAliases`. Raw typed SNMP management rows
+remain diagnostic evidence; valid IP-family rows also remain trap-matching
+evidence. Public match, focus, and collapse identity consume the reconciled L2
+result.
+
+The generic L2 builder resolves address authority before neighbor matching:
+
+- a selected primary owns its address over another device's alias;
+- an alias claimed by multiple direct devices is removed from their public
+  identity, while selected-primary collisions keep the existing IP-collapse
+  behavior;
+- every direct primary and alias claim seeds immutable ownership before
+  neighbor resolution, including claims removed from public identity;
+- actors retain the complete reconciled alias set for match, focus, and
+  collapse, while each repeated link endpoint carries only the selected primary
+  or one numerically deterministic canonical alias as its IP identity hint;
+- FDB ownership and L3 correlation use complete actor matches, then precompute
+  bounded link-only match views once per endpoint or actor;
+- addresses from inferred observations and LLDP/CDP neighbors are accumulated
+  as claims and enter device identity only after the complete claim set proves
+  exclusive ownership;
+- adjacency `remote_management_ip` and `remote_address_raw` labels remain
+  internal evidence and never bypass the reconciled device when projecting
+  public match or `RemoteIP` fields.
+
+Consequently, remote-only observations with different hostname or chassis
+identities do not merge solely because they advertise the same IP. They still
+correlate through matching strong identity or a uniquely owned direct-device
+address.
+
+IP collapse preserves complete actor aliases. Within each collision group, the
+generic projector unions every union-merged list field once and the SNMP shaping
+pass unions its match lists once; scalar, map, optional, attachment, and ordered
+protocol detail precedence remains representative-first and actor-index ordered.
+This keeps alias-rich shared-primary groups linear in their input plus the final
+deduplication sort instead of rebuilding the growing union after every actor.
+
+Public actor IDs retain the complete reconciled identity and remain unchanged.
+Internal graph traversal and link ownership use opaque, nonzero actor handles
+instead of copying or hashing those IDs per link:
+
+- handles are generation-local, nonserialized, and unrelated to public actor
+  IDs or rendered actor row references;
+- the generic projector assigns final actor and link handles at its centralized
+  identity boundary, while later local and L3 actors receive fresh handles from
+  the same generation high-water mark;
+- shaping, collapse, focus, L3/OSPF/BGP enrichment, and rendering use handles
+  for equality and lookup, while public actor-ID ordering remains the
+  deterministic presentation order;
+- strict and probable graphs never compare raw handles across generations;
+  probable-link marking interns their public actor IDs once into request-local
+  comparison tokens;
+- the renderer validates unique actors and resolved link handles, then maps
+  handles to final actor rows without serializing the handles.
+
 The aggregate also carries the producer scope id read from the parent Agent
 registry id. L3 subnet segment actor ids use that scope so identical private
 subnets observed by different Agents do not collide after Cloud aggregation.
@@ -189,15 +258,23 @@ aggregate observations
   -> convert generic graph to topologymodel.Data
   -> augment local actors with SNMP device/cache detail
   -> topologyshape.ApplyPolicies
-  -> topologyenrich.ApplyL3Subnet
-  -> topologyenrich.ApplyOSPFAdjacency
-  -> topologyenrich.ApplyBGPAdjacency
+  -> topologyenrich.ApplyLayer3 (L3 subnet, OSPF, BGP)
   -> topologyshape.ApplyDepthFocusFilter
 ```
 
 For the low-confidence map type, the builder creates a strict map and a
 probable map, marks probable-only link deltas, then applies the same L3/OSPF/BGP
 enrichment and depth/focus filtering to the probable map.
+
+Local actor augmentation indexes the pre-policy actor generation once by its
+local identity subset: chassis id, system name, and selected management IP.
+Policy shaping can collapse, remove, and reorder actors, so that index is
+discarded before `ApplyPolicies`. `ApplyLayer3` then builds one post-policy
+resolver from copied managed-actor references and shares it across L3 subnet,
+OSPF, and BGP enrichment. BGP runs last because it extends the resolver with
+BGP-local identifiers and interface addresses. This keeps actor-alias work
+linear in the indexed identities instead of repeating the complete alias scan
+for every cache snapshot and logical L3 enricher.
 
 L3 subnet enrichment has two grains:
 

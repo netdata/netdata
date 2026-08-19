@@ -25,12 +25,12 @@ func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
 		return 0
 	}
 
-	managedIDs := make(map[string]struct{})
+	managedHandles := make(map[topologymodel.ActorHandle]struct{})
 	for _, actor := range data.Actors {
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
 		}
-		managedIDs[actor.ActorID] = struct{}{}
+		managedHandles[actor.ActorHandle] = struct{}{}
 	}
 
 	keepLink := func(link topologymodel.Link) bool {
@@ -39,20 +39,20 @@ func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
 	}
 
 	keptLinks := make([]topologymodel.Link, 0, len(data.Links))
-	linkedIDs := make(map[string]struct{}, len(managedIDs))
-	for managedID := range managedIDs {
-		linkedIDs[managedID] = struct{}{}
+	linkedHandles := make(map[topologymodel.ActorHandle]struct{}, len(managedHandles))
+	for managedHandle := range managedHandles {
+		linkedHandles[managedHandle] = struct{}{}
 	}
 	for _, link := range data.Links {
 		if !keepLink(link) {
 			continue
 		}
 		keptLinks = append(keptLinks, link)
-		if strings.TrimSpace(link.SrcActorID) != "" {
-			linkedIDs[link.SrcActorID] = struct{}{}
+		if !link.SrcActorHandle.IsZero() {
+			linkedHandles[link.SrcActorHandle] = struct{}{}
 		}
-		if strings.TrimSpace(link.DstActorID) != "" {
-			linkedIDs[link.DstActorID] = struct{}{}
+		if !link.DstActorHandle.IsZero() {
+			linkedHandles[link.DstActorHandle] = struct{}{}
 		}
 	}
 	data.Links = keptLinks
@@ -60,7 +60,7 @@ func applyLLDPCDPManagedMapPolicy(data *topologymodel.Data) int {
 	keptActors := make([]topologymodel.Actor, 0, len(data.Actors))
 	removed := 0
 	for _, actor := range data.Actors {
-		if _, ok := linkedIDs[actor.ActorID]; ok {
+		if _, ok := linkedHandles[actor.ActorHandle]; ok {
 			keptActors = append(keptActors, actor)
 			continue
 		}
@@ -75,30 +75,30 @@ func suppressUnlinkedInferredEndpoints(data *topologymodel.Data) int {
 		return 0
 	}
 
-	linked := make(map[string]struct{}, len(data.Links)*2)
+	linked := make(map[topologymodel.ActorHandle]struct{}, len(data.Links)*2)
 	for _, link := range data.Links {
-		if strings.TrimSpace(link.SrcActorID) != "" {
-			linked[link.SrcActorID] = struct{}{}
+		if !link.SrcActorHandle.IsZero() {
+			linked[link.SrcActorHandle] = struct{}{}
 		}
-		if strings.TrimSpace(link.DstActorID) != "" {
-			linked[link.DstActorID] = struct{}{}
+		if !link.DstActorHandle.IsZero() {
+			linked[link.DstActorHandle] = struct{}{}
 		}
 	}
 
 	removed := 0
-	removedIDs := make(map[string]struct{})
+	removedHandles := make(map[topologymodel.ActorHandle]struct{})
 	kept := make([]topologymodel.Actor, 0, len(data.Actors))
 	for _, actor := range data.Actors {
 		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
 			kept = append(kept, actor)
 			continue
 		}
-		if _, ok := linked[actor.ActorID]; ok {
+		if _, ok := linked[actor.ActorHandle]; ok {
 			kept = append(kept, actor)
 			continue
 		}
 		removed++
-		removedIDs[actor.ActorID] = struct{}{}
+		removedHandles[actor.ActorHandle] = struct{}{}
 	}
 	if removed == 0 {
 		return 0
@@ -109,10 +109,10 @@ func suppressUnlinkedInferredEndpoints(data *topologymodel.Data) int {
 	}
 	filtered := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
-		if _, drop := removedIDs[link.SrcActorID]; drop {
+		if _, drop := removedHandles[link.SrcActorHandle]; drop {
 			continue
 		}
-		if _, drop := removedIDs[link.DstActorID]; drop {
+		if _, drop := removedHandles[link.DstActorHandle]; drop {
 			continue
 		}
 		filtered = append(filtered, link)

@@ -15,3 +15,10 @@ func normalizeMAC(value string) string {
 func parseAddr(value string) netip.Addr {
 	return addrnorm.ParseAddr(value)
 }
+
+func canonicalIP(value string) string {
+	if addr := parseAddr(value); addr.IsValid() {
+		return addr.String()
+	}
+	return ""
+}

@@ -12,10 +12,7 @@ import (
 )
 
 func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
-	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
-	if localManagementIP == "" {
-		localManagementIP = pickManagementIP(local.ManagementAddresses)
-	}
+	localManagementIP := normalizeEligibleManagementIP(local.ManagementIP)
 
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
 	if baseBridgeAddress != "" && topologyutil.NormalizeMAC(local.ChassisID) == "" {
@@ -27,6 +24,7 @@ func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topol
 		DeviceID:          ensureTopologyObservationDeviceID(local, baseBridgeAddress),
 		Hostname:          strings.TrimSpace(local.SysName),
 		ManagementIP:      localManagementIP,
+		ManagementAliases: engineManagementAliases(local.ManagementAddresses),
 		SysObjectID:       strings.TrimSpace(local.SysObjectID),
 		ChassisID:         strings.TrimSpace(local.ChassisID),
 		BaseBridgeAddress: baseBridgeAddress,
@@ -45,4 +43,18 @@ func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topol
 	c.appendObservedCDPRemotes(&observation)
 
 	return observation
+}
+
+func engineManagementAliases(addresses []topologymodel.ManagementAddress) []string {
+	aliases := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		addr, ok := topologymodel.ParseManagementAddressIP(address)
+		if !ok {
+			continue
+		}
+		if ip := normalizeEligibleManagementIP(addr.String()); ip != "" {
+			aliases = append(aliases, ip)
+		}
+	}
+	return topologyutil.DeduplicateSortedStrings(aliases)
 }

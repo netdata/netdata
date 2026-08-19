@@ -15,6 +15,7 @@ func projectAdjacencyLinks(
 	layer string,
 	collectedAt time.Time,
 	deviceByID map[string]model.Device,
+	deviceLinkMatchByID map[string]graph.Match,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
 ) projectedLinks {
@@ -30,7 +31,7 @@ func projectAdjacencyLinks(
 
 	for _, adj := range adjacencies {
 		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
-		link := adjacencyToTopologyLink(adj, protocol, layer, collectedAt, deviceByID, ifIndexByDeviceName, ifaceByDeviceIndex)
+		link := adjacencyToTopologyLink(adj, protocol, layer, collectedAt, deviceByID, deviceLinkMatchByID, ifIndexByDeviceName, ifaceByDeviceIndex)
 
 		pairID := strings.TrimSpace(adj.Labels[adjacencyLabelPairID])
 		if pairID != "" {
@@ -211,14 +212,14 @@ func adjacencyToTopologyLink(
 	layer string,
 	collectedAt time.Time,
 	deviceByID map[string]model.Device,
+	deviceLinkMatchByID map[string]graph.Match,
 	ifIndexByDeviceName map[string]int,
 	ifaceByDeviceIndex map[string]model.Interface,
 ) graph.Link {
-	src := adjacencySideToEndpoint(deviceByID[adj.SourceID], adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
-	dst := adjacencySideToEndpoint(deviceByID[adj.TargetID], adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
-	if rawAddress := strings.TrimSpace(adj.Labels["remote_address_raw"]); rawAddress != "" {
-		dst.Match.IPAddresses = uniqueTopologyStrings(append(dst.Match.IPAddresses, rawAddress))
-	}
+	srcDevice := deviceByID[adj.SourceID]
+	dstDevice := deviceByID[adj.TargetID]
+	src := adjacencySideToEndpointWithMatch(srcDevice, deviceLinkEndpointMatch(srcDevice, deviceLinkMatchByID), adj.SourcePort, ifIndexByDeviceName, ifaceByDeviceIndex)
+	dst := adjacencySideToEndpointWithMatch(dstDevice, deviceLinkEndpointMatch(dstDevice, deviceLinkMatchByID), adj.TargetPort, ifIndexByDeviceName, ifaceByDeviceIndex)
 
 	link := graph.Link{
 		Layer:        layer,

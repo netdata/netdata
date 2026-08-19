@@ -23,7 +23,6 @@ type engineState struct {
 	// plannerBuildSeq is runtime-mode build-cycle sequence used only by
 	// per-build dedupe/scratch bookkeeping.
 	plannerBuildSeq uint64
-	stats           engineStats
 	runtimeStore    metrix.RuntimeStore
 	runtimeStats    *runtimeMetrics
 	log             *logger.Logger
