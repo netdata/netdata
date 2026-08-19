@@ -67,7 +67,7 @@ func TestTopologyProfiles_FormerUmbrellaCapabilityMatrix(t *testing.T) {
 			assert.Contains(t, names, tc.profile)
 			assert.Equal(t, tc.want, topologyCapabilityString(kinds))
 		})
-		for _, capability := range strings.Split(tc.want, ",") {
+		for capability := range strings.SplitSeq(tc.want, ",") {
 			if capability != "" {
 				counts[capability]++
 			}

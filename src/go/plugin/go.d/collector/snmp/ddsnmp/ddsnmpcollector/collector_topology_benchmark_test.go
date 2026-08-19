@@ -13,6 +13,52 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+func BenchmarkTableCollector_OrganizeRowsByCacheEligibility(b *testing.B) {
+	const (
+		tableOID  = "1.3.6.1.4.1.99999.90"
+		columnOID = tableOID + ".1"
+	)
+	config := ddprofiledefinition.MetricsConfig{
+		Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: "allocationTable"},
+		Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "value"}},
+	}
+	collector := newTableCollector(nil, make(map[string]bool), nil, logger.New(), false)
+
+	for _, rowCount := range []int{256, 4096} {
+		pdus := make(map[string]gosnmp.SnmpPDU, rowCount)
+		for i := range rowCount {
+			rowOID := fmt.Sprintf("%s.%d", columnOID, i+1)
+			pdus[rowOID] = createGauge32PDU(rowOID, uint(i+1))
+		}
+		for _, cacheStructure := range []bool{false, true} {
+			name := "ineligible"
+			if cacheStructure {
+				name = "ordinary-value"
+			}
+			b.Run(fmt.Sprintf("%s/rows=%d", name, rowCount), func(b *testing.B) {
+				ctx := &tableProcessingContext{
+					config:         config,
+					pdus:           pdus,
+					columnOIDs:     buildColumnOIDs(config),
+					orderedTags:    buildOrderedTags(config),
+					cacheStructure: cacheStructure,
+				}
+				b.ReportAllocs()
+				b.ReportMetric(float64(rowCount), "rows/op")
+				b.ResetTimer()
+				for range b.N {
+					rows, oidCache, tagCache := collector.organizePDUsByRow(ctx)
+					if len(rows) != rowCount {
+						b.Fatalf("expected %d rows, got %d", rowCount, len(rows))
+					}
+					runtime.KeepAlive(oidCache)
+					runtime.KeepAlive(tagCache)
+				}
+			})
+		}
+	}
+}
+
 func BenchmarkTableRowProcessor_IPTopologyPresence(b *testing.B) {
 	const (
 		ifIndexOID = "1.3.6.1.2.1.4.20.1.2"

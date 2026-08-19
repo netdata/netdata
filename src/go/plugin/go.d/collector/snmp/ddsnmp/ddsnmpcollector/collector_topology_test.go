@@ -14,7 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresence(t *testing.T) {
+func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStructureCache(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
@@ -26,7 +26,7 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresence(t *testing.
 
 	pdu := createPDU(rowOID, gosnmp.OctetString, []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef})
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{pdu})
-	expectSNMPGet(mockHandler, []string{rowOID}, []gosnmp.SnmpPDU{pdu})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{pdu})
 
 	profile := &ddsnmp.Profile{
 		SourceFile: "topology-presence-profile.yaml",
@@ -82,11 +82,13 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresence(t *testing.
 	require.Equal(t, int64(0), walkStats.SNMP.GetRequests)
 	require.Equal(t, int64(0), walkStats.SNMP.TablesCached)
 
-	var cacheStats ddsnmp.CollectionStats
-	cachedMetrics, err := collector.collectTopologyMetrics(profile, &cacheStats)
+	var secondWalkStats ddsnmp.CollectionStats
+	secondWalkMetrics, err := collector.collectTopologyMetrics(profile, &secondWalkStats)
 	require.NoError(t, err)
-	require.Equal(t, expected, cachedMetrics)
-	require.Equal(t, int64(0), cacheStats.SNMP.WalkRequests)
-	require.Equal(t, int64(1), cacheStats.SNMP.GetRequests)
-	require.Equal(t, int64(1), cacheStats.SNMP.TablesCached)
+	require.Equal(t, expected, secondWalkMetrics)
+	require.Equal(t, int64(1), secondWalkStats.SNMP.WalkRequests)
+	require.Equal(t, int64(0), secondWalkStats.SNMP.GetRequests)
+	require.Equal(t, int64(0), secondWalkStats.SNMP.TablesCached)
+	require.Zero(t, secondWalkStats.TableCache.Hits)
+	require.Zero(t, secondWalkStats.TableCache.Misses)
 }

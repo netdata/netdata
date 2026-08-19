@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"strings"
 
@@ -28,50 +29,18 @@ func (r *crossTableResolver) resolveLookupIndexByValue(
 		return "", fmt.Errorf("value '%s' could not be normalized for lookup column %s", lookupValue, tagCfg.LookupSymbol.OID)
 	}
 
-	cacheKey := crossTableLookupKey{
-		refTableOID:     refTableOID,
-		lookupColumnOID: trimOID(tagCfg.LookupSymbol.OID),
-		targetColumnOID: trimOID(tagCfg.Symbol.OID),
-		lookupValue:     normalizedLookupValue,
-	}
-	if rowIndex, ok := ctx.lookupIndexCache[cacheKey]; ok {
-		if rowIndex == "" {
-			return "", fmt.Errorf("value '%s' not found in lookup column %s", normalizedLookupValue, tagCfg.LookupSymbol.OID)
-		}
-		return rowIndex, nil
-	}
-
-	rowIndex, err := r.findRowIndexByLookupValue(tagCfg, normalizedLookupValue, refTablePDUs)
-	if err != nil {
-		return "", err
-	}
-
-	ctx.lookupIndexCache[cacheKey] = rowIndex
-	return rowIndex, nil
+	valueIndex := r.lookupValueIndex(tagCfg, refTableOID, refTablePDUs, ctx)
+	return r.findRowIndexByLookupValue(tagCfg, normalizedLookupValue, valueIndex.rowsByValue, refTablePDUs)
 }
 
 func (r *crossTableResolver) findRowIndexByLookupValue(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	lookupValue string,
+	rowsByValue map[string][]string,
 	refTablePDUs map[string]gosnmp.SnmpPDU,
 ) (string, error) {
 	lookupSym := tagCfg.LookupSymbol
-	lookupColumnOID := trimOID(lookupSym.OID)
-	prefix := lookupColumnOID + "."
-	matchedIndexes := make([]string, 0, 1)
-
-	for fullOID, pdu := range refTablePDUs {
-		if !strings.HasPrefix(fullOID, prefix) {
-			continue
-		}
-
-		val, ok := r.processLookupSymbolValue(ddprofiledefinition.SymbolConfig(lookupSym), pdu)
-		if !ok || val != lookupValue {
-			continue
-		}
-
-		matchedIndexes = append(matchedIndexes, strings.TrimPrefix(fullOID, prefix))
-	}
+	matchedIndexes := rowsByValue[lookupValue]
 
 	switch len(matchedIndexes) {
 	case 0:
@@ -91,6 +60,65 @@ func (r *crossTableResolver) findRowIndexByLookupValue(
 		lookupSym.OID,
 		tagCfg.Symbol.OID,
 	)
+}
+
+func (r *crossTableResolver) lookupValueIndex(
+	tagCfg ddprofiledefinition.MetricTagConfig,
+	refTableOID string,
+	refTablePDUs map[string]gosnmp.SnmpPDU,
+	ctx *crossTableContext,
+) *crossTableLookupValueIndex {
+	lookupSym := ddprofiledefinition.SymbolConfig(tagCfg.LookupSymbol)
+	extractPattern := ""
+	if lookupSym.ExtractValueCompiled != nil {
+		extractPattern = lookupSym.ExtractValueCompiled.String()
+	}
+	matchPattern := ""
+	if lookupSym.MatchPatternCompiled != nil {
+		matchPattern = lookupSym.MatchPatternCompiled.String()
+	}
+	key := crossTableLookupValueIndexKey{
+		refTableOID:     trimOID(refTableOID),
+		lookupColumnOID: trimOID(lookupSym.OID),
+		format:          lookupSym.Format,
+		extractPattern:  extractPattern,
+		matchPattern:    matchPattern,
+		matchValue:      lookupSym.MatchValue,
+	}
+
+	for _, index := range ctx.lookupValueIndexes[key] {
+		if lookupMappingsEqual(index.mapping, lookupSym.Mapping) {
+			return index
+		}
+	}
+
+	rowsByValue := make(map[string][]string)
+	prefix := key.lookupColumnOID + "."
+	for fullOID, pdu := range refTablePDUs {
+		if !strings.HasPrefix(fullOID, prefix) {
+			continue
+		}
+
+		value, ok := r.processLookupSymbolValue(lookupSym, pdu)
+		if !ok {
+			continue
+		}
+		rowsByValue[value] = append(rowsByValue[value], strings.TrimPrefix(fullOID, prefix))
+	}
+
+	if ctx.lookupValueIndexes == nil {
+		ctx.lookupValueIndexes = make(map[crossTableLookupValueIndexKey][]*crossTableLookupValueIndex)
+	}
+	index := &crossTableLookupValueIndex{
+		mapping:     lookupSym.Mapping.Clone(),
+		rowsByValue: rowsByValue,
+	}
+	ctx.lookupValueIndexes[key] = append(ctx.lookupValueIndexes[key], index)
+	return index
+}
+
+func lookupMappingsEqual(a, b ddprofiledefinition.MappingConfig) bool {
+	return a.EffectiveMode() == b.EffectiveMode() && maps.Equal(a.Items, b.Items)
 }
 
 func (r *crossTableResolver) processLookupSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (string, bool) {

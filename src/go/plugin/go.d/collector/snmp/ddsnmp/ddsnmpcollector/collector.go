@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 type Config struct {
@@ -27,10 +29,11 @@ type Config struct {
 
 func New(cfg Config) *Collector {
 	coll := &Collector{
-		log:         cfg.Log.With(slog.String("ddsnmp", "collector")),
-		profiles:    make(map[string]*profileState),
-		missingOIDs: make(map[string]bool),
-		tableCache:  newTableCache(30*time.Minute, 1),
+		log:           cfg.Log.With(slog.String("ddsnmp", "collector")),
+		profiles:      make(map[string]*profileState),
+		missingOIDs:   make(map[string]bool),
+		tableCache:    newTableCache(30*time.Minute, 1),
+		tableIdentity: buildTableIdentity(cfg.Profiles),
 	}
 
 	for _, prof := range cfg.Profiles {
@@ -48,10 +51,11 @@ func New(cfg Config) *Collector {
 
 type (
 	Collector struct {
-		log         *logger.Logger
-		profiles    map[string]*profileState
-		missingOIDs map[string]bool
-		tableCache  *tableCache
+		log           *logger.Logger
+		profiles      map[string]*profileState
+		missingOIDs   map[string]bool
+		tableCache    *tableCache
+		tableIdentity *tableIdentity
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -66,6 +70,14 @@ type (
 			globalTags     map[string]string
 			deviceMetadata map[string]ddsnmp.MetaTag
 		}
+	}
+	preparedProfileCollection struct {
+		state           *profileState
+		metrics         *ddsnmp.ProfileMetrics
+		topologyProfile *ddsnmp.Profile
+		topologyKinds   map[topologyMetricLookupKey]ddprofiledefinition.TopologyKind
+		regularScope    *tableCollectionScope
+		topologyScope   *tableCollectionScope
 	}
 )
 
@@ -87,7 +99,7 @@ func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 }
 
 func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
-	var metrics []*ddsnmp.ProfileMetrics
+	var prepared []*preparedProfileCollection
 	var errs []error
 
 	expired := c.tableCache.clearExpired()
@@ -95,30 +107,56 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 		c.log.Debugf("Cleared %d expired table cache entries", len(expired))
 	}
 
-	for _, prof := range c.profiles {
-		pm, err := c.collectProfile(prof)
+	for _, state := range c.sortedProfileStates() {
+		profile, err := c.prepareProfileCollection(state)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
+		prepared = append(prepared, profile)
+	}
 
-		c.updateProfileMetrics(pm)
+	session := newTableCollectionSession(c.tableCollector, c.tableIdentity)
+	for _, profile := range prepared {
+		profile.regularScope = session.addScope(profile.state.profile, tableSymbolModeValue, &profile.metrics.Stats)
+		if profile.topologyProfile != nil {
+			profile.topologyScope = session.addScope(
+				profile.topologyProfile,
+				tableSymbolModePresence,
+				&profile.metrics.Stats,
+			)
+		}
+	}
+	session.resolve()
 
-		metrics = append(metrics, pm)
-
-		now := time.Now()
-		if vmetrics := c.vmetricsCollector.collect(prof.profile.Definition, pm.Metrics); len(vmetrics) > 0 {
-			for i := range vmetrics {
-				vmetrics[i].Profile = pm
-			}
-
-			pm.Metrics = append(pm.Metrics, vmetrics...)
-			pm.Stats.Metrics.Virtual += int64(len(vmetrics))
-			pm.Stats.Timing.VirtualMetrics = time.Since(now)
+	var metrics []*ddsnmp.ProfileMetrics
+	for _, profile := range prepared {
+		if err := c.collectPreparedProfileTables(profile, session); err != nil {
+			errs = append(errs, err)
+			continue
 		}
 
-		pm.HiddenMetrics = collectHiddenMetrics(pm.Metrics)
-		pm.Metrics = slices.DeleteFunc(pm.Metrics, func(m ddsnmp.Metric) bool { return strings.HasPrefix(m.Name, "_") })
+		c.collectPreparedProfileRows(profile)
+		c.attachProfileMetrics(profile.metrics)
+		c.updateProfileMetrics(profile.metrics)
+		metrics = append(metrics, profile.metrics)
+
+		now := time.Now()
+		vmetrics := c.vmetricsCollector.collect(profile.state.profile.Definition, profile.metrics.Metrics)
+		if len(vmetrics) > 0 {
+			for i := range vmetrics {
+				vmetrics[i].Profile = profile.metrics
+			}
+
+			profile.metrics.Metrics = append(profile.metrics.Metrics, vmetrics...)
+			profile.metrics.Stats.Metrics.Virtual += int64(len(vmetrics))
+			profile.metrics.Stats.Timing.VirtualMetrics = time.Since(now)
+		}
+
+		profile.metrics.HiddenMetrics = collectHiddenMetrics(profile.metrics.Metrics)
+		profile.metrics.Metrics = slices.DeleteFunc(profile.metrics.Metrics, func(m ddsnmp.Metric) bool {
+			return strings.HasPrefix(m.Name, "_")
+		})
 	}
 
 	if len(metrics) == 0 && len(errs) > 0 {
@@ -129,6 +167,20 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	}
 
 	return metrics, nil
+}
+
+func (c *Collector) sortedProfileStates() []*profileState {
+	keys := make([]string, 0, len(c.profiles))
+	for source := range c.profiles {
+		keys = append(keys, source)
+	}
+	sort.Strings(keys)
+
+	profiles := make([]*profileState, 0, len(keys))
+	for _, source := range keys {
+		profiles = append(profiles, c.profiles[source])
+	}
+	return profiles
 }
 
 func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
@@ -156,10 +208,8 @@ func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
 	}
 }
 
-func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, error) {
-	pm := &ddsnmp.ProfileMetrics{
-		Source: ps.profile.SourceFile,
-	}
+func (c *Collector) prepareProfileCollection(ps *profileState) (*preparedProfileCollection, error) {
+	pm := &ddsnmp.ProfileMetrics{Source: ps.profile.SourceFile}
 
 	if !ps.initialized {
 		globalTag, err := c.globalTagsCollector.collect(ps.profile)
@@ -173,7 +223,6 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 			return nil, fmt.Errorf("failed to collect device metadata: %w", err)
 		}
 		ps.cache.deviceMetadata = deviceMeta
-
 		ps.initialized = true
 	}
 
@@ -189,22 +238,56 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	pm.Stats.Timing.Scalar = time.Since(now)
 	pm.Stats.Metrics.Scalar += int64(len(scalarMetrics))
 
-	now = time.Now()
-	tableMetrics, err := c.tableCollector.collect(ps.profile, &pm.Stats)
-	if err != nil {
-		return nil, err
+	topologyProfile, topologyKinds := buildTopologyProfile(ps.profile)
+	if topologyProfile != nil {
+		topologyScalars, err := c.scalarCollector.collect(topologyProfile, &pm.Stats)
+		if err != nil {
+			return nil, err
+		}
+		assignTopologyKinds(topologyScalars, topologyKinds)
+		pm.TopologyMetrics = append(pm.TopologyMetrics, topologyScalars...)
 	}
-	pm.Metrics = append(pm.Metrics, tableMetrics...)
-	pm.Stats.Timing.Table = time.Since(now)
-	pm.Stats.Metrics.Table += int64(len(tableMetrics))
 
-	topologyMetrics, err := c.collectTopologyMetrics(ps.profile, &pm.Stats)
+	return &preparedProfileCollection{
+		state:           ps,
+		metrics:         pm,
+		topologyProfile: topologyProfile,
+		topologyKinds:   topologyKinds,
+	}, nil
+}
+
+func (c *Collector) collectPreparedProfileTables(
+	profile *preparedProfileCollection,
+	session *tableCollectionSession,
+) error {
+	now := time.Now()
+	tableMetrics, err := session.collectScope(profile.regularScope)
+	profile.metrics.Stats.Timing.Table += time.Since(now)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	pm.TopologyMetrics = append(pm.TopologyMetrics, topologyMetrics...)
+	profile.metrics.Metrics = append(profile.metrics.Metrics, tableMetrics...)
+	profile.metrics.Stats.Metrics.Table += int64(len(tableMetrics))
 
+	if profile.topologyScope == nil {
+		return nil
+	}
 	now = time.Now()
+	topologyMetrics, err := session.collectScope(profile.topologyScope)
+	profile.metrics.Stats.Timing.Table += time.Since(now)
+	if err != nil {
+		return err
+	}
+	assignTopologyKinds(topologyMetrics, profile.topologyKinds)
+	profile.metrics.TopologyMetrics = append(profile.metrics.TopologyMetrics, topologyMetrics...)
+	return nil
+}
+
+func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollection) {
+	ps := profile.state
+	pm := profile.metrics
+
+	now := time.Now()
 	licenseRows, err := c.collectLicenseRows(ps.profile, &pm.Stats)
 	if err != nil {
 		c.log.Limit(licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
@@ -224,15 +307,15 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	pm.BGPRows = append(pm.BGPRows, bgpRows...)
 	pm.Stats.Metrics.BGP += int64(len(bgpRows))
 	pm.Stats.Timing.BGP = time.Since(now)
+}
 
+func (c *Collector) attachProfileMetrics(pm *ddsnmp.ProfileMetrics) {
 	for i := range pm.Metrics {
 		pm.Metrics[i].Profile = pm
 	}
 	for i := range pm.TopologyMetrics {
 		pm.TopologyMetrics[i].Profile = pm
 	}
-
-	return pm, nil
 }
 
 func (c *Collector) updateProfileMetrics(pm *ddsnmp.ProfileMetrics) {
