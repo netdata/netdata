@@ -509,14 +509,24 @@ static void rrdcalc_name_index_add(RRDHOST *host, RRDCALC *rc, const DICTIONARY_
     // Decide before touching the JudyL: inserting first would leave a
     // name -> NULL slot behind if we then declined to link.
     if(likely(rc->name_index_state != RRDCALC_NAME_INDEX_LINKED)) {
-        Pvoid_t *PValue = JudyLIns(&host->rrdcalc_by_name.JudyL, (Word_t)rc->config.name, PJE0);
-        if(likely(PValue && PValue != PJERR)) {
-            RRDCALC *head = (RRDCALC *)*PValue;
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, rc, name_prev, name_next);
-            rc->name_item = item;
-            rc->name_index_state = RRDCALC_NAME_INDEX_LINKED;
-            *PValue = head;
-        }
+        JError_t J_Error;
+        Pvoid_t *PValue = JudyLIns(&host->rrdcalc_by_name.JudyL, (Word_t)rc->config.name, &J_Error);
+
+        // A failed insert cannot be recovered from and nothing retries it: the
+        // alert would stay invisible to every name lookup, silently taking
+        // dependent alerts to UNDEFINED. Same handling as the other structural
+        // Judy indexes (see string.c and uuidmap.c).
+        if(unlikely(!PValue || PValue == PJERR))
+            fatal("HEALTH: cannot insert alert '%s' of chart '%s' on host '%s' into the alert name index, "
+                  "JU_ERRNO_* == %u, ID == %d",
+                  rrdcalc_name(rc), rrdcalc_chart_name(rc), rrdhost_hostname(host),
+                  JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+
+        RRDCALC *head = (RRDCALC *)*PValue;
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(head, rc, name_prev, name_next);
+        rc->name_item = item;
+        rc->name_index_state = RRDCALC_NAME_INDEX_LINKED;
+        *PValue = head;
     }
 
     rw_spinlock_write_unlock(&host->rrdcalc_by_name.spinlock);
@@ -670,8 +680,15 @@ void rrdcalc_rrdhost_index_destroy(RRDHOST *host) {
     // deletion path bypassed rrdcalc_name_index_del()
     rw_spinlock_write_lock(&host->rrdcalc_by_name.spinlock);
     Word_t idx = 0;
-    Pvoid_t *PValue = JudyLFirst(host->rrdcalc_by_name.JudyL, &idx, PJE0);
-    if(unlikely(PValue))
+    JError_t J_Error;
+    Pvoid_t *PValue = JudyLFirst(host->rrdcalc_by_name.JudyL, &idx, &J_Error);
+    if(unlikely(PValue == PJERR))
+        // a corrupted index is not residue - do not report it as such
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "HEALTH: cannot walk the alert name index of host '%s' at teardown, "
+               "JU_ERRNO_* == %u, ID == %d",
+               rrdhost_hostname(host), JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+    else if(unlikely(PValue))
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "HEALTH: host '%s' still has entries in the alert name index at teardown",
                rrdhost_hostname(host));
