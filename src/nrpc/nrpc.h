@@ -52,6 +52,7 @@
 // reverse (precedent: dictionary_stats_category_other in dictionary.c).
 extern struct dictionary_stats dictionary_stats_category_functions;
 extern size_t nrpc_buffers_functions;
+extern size_t nrpc_methods_functions;   // bytes held by method descriptors (heap, outside the dictionary stats)
 
 #define NRPC_PRIORITY_DEFAULT 100
 #define NRPC_VERSION_DEFAULT 0
@@ -220,25 +221,27 @@ void nrpc_registry_destroy(NRPC_OWNER owner);
 // heap (the same contract as nrpc_inflight_calls_destroy)
 void nrpc_registries_destroy(void);
 
-// Release a handle acquired via nrpc_method_authorize(). The handle is
-// self-contained (it pins both the method and its registry entry), so release
-// needs no owner and is safe even after the host's registry entry was
-// unlinked by a concurrent teardown.
+// Release a handle acquired via nrpc_method_authorize(). The handle is an
+// owned reference to the method's immutable descriptor - self-contained and
+// touching no registry state - so release needs no owner and is safe even
+// after the host's registry entry was destroyed by a concurrent teardown.
 void nrpc_method_acquired_release(NRPC_METHOD_ACQUIRED *acquired);
 
 // Registration descriptor: the method's attribute bundle plus its owner
 // and handler. Stack-filled by the caller; the registry copies what it
-// keeps. Every field's zero keeps the meaning a zero positional argument had -
-// the registry adds NO defaulting. Style rule: policy-valued fields (source,
-// access, sync, timeout_s, priority, version) are written explicitly at every
-// site even when zero; pointer fields may be omitted when NULL.
+// keeps. The registry applies exactly TWO normalizations - tags NULL ->
+// "top" and priority 0 -> NRPC_PRIORITY_DEFAULT, both noted on their fields;
+// every other field's zero keeps the meaning a zero positional argument had.
+// Style rule: policy-valued fields (source, access, sync, timeout_s,
+// priority, version) are written explicitly at every site even when zero;
+// pointer fields may be omitted when NULL.
 struct nrpc_method_desc {
     NRPC_OWNER owner;              // required: the owning host, as its owner token
     const char *name;              // required
     const char *help;              // required
     const char *tags;              // NULL normalizes to "top"; NRPC_TAG_HIDDEN derives RESTRICTED
     int timeout_s;                 // stored raw - a zero is a 0s deadline, not "default"
-    int priority;                  // stored raw; 0 is a real value (not NRPC_PRIORITY_DEFAULT)
+    int priority;                  // 0 normalizes to NRPC_PRIORITY_DEFAULT on every registration
     uint32_t version;              // 0 == NRPC_VERSION_DEFAULT (the production default)
     HTTP_ACCESS access;            // HTTP_ACCESS_NONE (0) is a real, permissive value
     bool sync;                     // false = async handler

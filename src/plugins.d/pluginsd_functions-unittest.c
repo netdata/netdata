@@ -336,7 +336,7 @@ int pluginsd_functions_unittest(void) {
         struct nrpc_transport *tr = nrpc_transport_create(NULL);
         // base ref == 1
 
-        // COLLECTOR with transport: insert acquires -> 2
+        // COLLECTOR with transport: descriptor construction acquires -> 2
         nrpc_method_register(&(struct nrpc_method_desc) {
             .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
@@ -357,7 +357,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        // INTERNAL displaces it: displaced pair released under COLLECTOR tag -> 1
+        // INTERNAL displaces it: the displaced descriptor's destructor releases under its stored tag -> 1
         nrpc_method_register(&(struct nrpc_method_desc) {
             .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
@@ -377,7 +377,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        // and back to COLLECTOR: installed pair acquired -> 2
+        // and back to COLLECTOR: the installed descriptor holds its ref -> 2
         nrpc_method_register(&(struct nrpc_method_desc) {
             .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
@@ -398,7 +398,9 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        // equal-pointer conflict (a re-sent function list): nets ZERO refs
+        // identical re-registration (a re-sent function list): the incoming
+        // descriptor's ref and the displaced one's release cancel out - nets
+        // ZERO refs
         nrpc_method_register(&(struct nrpc_method_desc) {
             .owner = rrdhost_nrpc_owner(host),
             .name = "c6-mixed-fn",
@@ -419,7 +421,7 @@ int pluginsd_functions_unittest(void) {
             errors++;
         }
 
-        // delete: the stored pair released under its stored tag -> 1
+        // delete: the stored descriptor released under its stored tag -> 1
         nrpc_method_unregister(rrdhost_nrpc_owner(host), "c6-mixed-fn", NRPC_SOURCE_DAEMON);
         if(refcount_references(&tr->lifetime.entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after del, entry refs %d != 1\n",

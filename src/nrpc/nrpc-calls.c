@@ -11,13 +11,6 @@
 size_t nrpc_buffers_functions = 0;
 
 struct nrpc_call {
-    // The held method pair: the outer item pins the registry entry, the inner
-    // item pins the method. Self-contained, so the completion paths (async
-    // result, shutdown unwind, delete callback) release through it without
-    // any host lookup - a host teardown that unlinked the registry entry
-    // cannot make the release dangle.
-    struct nrpc_method_acquired held;
-
     nd_uuid_t call_id_uuid;
     const char *call_id;
     const char *sanitized_cmd;
@@ -29,17 +22,18 @@ struct nrpc_call {
 
     BUFFER *payload;
 
-    // the method being called
-    // we acquire this structure at the beginning,
-    // and we release it at the end
+    // The method being called: an OWNED reference to the immutable
+    // descriptor of the registration this call was authorized against,
+    // acquired at call start and released when the record leaves the table.
+    // It is the ONLY view executors, cancel and progress ever have - a
+    // concurrent re-registration swaps the registry's slot to a new
+    // descriptor but can never change or free THIS one, so the handler
+    // pair, the sync/async fork and the serving-handle dispatch gate are
+    // all decided by the registration whose handler actually runs. The
+    // descriptor entry-pins its transport; a call outliving the
+    // registration degrades to a clean 503 via the transport's
+    // acquire-or-fail, exactly as before.
     struct nrpc_method *method;
-
-    // capture-at-find (see nrpc_method_capture): executors use THIS
-    // pair, never method->handler / handler_data re-read at call time - a
-    // concurrent re-registration swaps those and frees the displaced
-    // transport; the captured pin keeps ours alive and a stale capture
-    // degrades to a clean 503 via the transport's acquire-or-fail
-    struct nrpc_capture captured;
 
     struct {
         BUFFER *wb;
@@ -85,7 +79,8 @@ struct nrpc_call {
 
 // The in-flight calls table: every in-flight call, keyed by its compact
 // call_id. One global instance - in-flight calls are process-wide, not
-// per-host (the record carries its host).
+// per-host (the record's descriptor ref carries everything a completion,
+// cancel or progress ever needs; no host lookup is involved).
 struct nrpc_inflight_calls {
     DICTIONARY *dict;
 };
@@ -101,9 +96,6 @@ static void nrpc_call_cleanup(struct nrpc_call *call) {
     freez((void *)call->call_id);
     freez((void *)call->sanitized_cmd);
     freez((void *)call->source);
-
-    // the execute capture's transport pin (NULL for INTERNAL sources)
-    nrpc_capture_release(&call->captured);
 
     // the cancel_hook/progress_hook registration pins: per the
     // nrpc_cancel_hook_cb_t contract their data is a transport, entry-
@@ -126,7 +118,8 @@ static void nrpc_inflight_calls_delete_cb(const DICTIONARY_ITEM *item __maybe_un
     // internal_error(true, "NRPC: call_id '%s' finished", call->call_id);
 
     nrpc_call_cleanup(call);
-    nrpc_method_acquired_release_pair(&call->held);
+    nrpc_method_release(call->method);
+    call->method = NULL;
 }
 
 static void nrpc_inflight_calls_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -338,7 +331,7 @@ static inline int nrpc_call_async_nowait(struct nrpc_call *call) {
     struct nrpc_request req = nrpc_request_for(call, call->result.wb,
                                                nrpc_call_nowait_finished, call, true);
 
-    return call->captured.handler(&req, call->captured.handler_data);
+    return call->method->handler(&req, call->method->handler_data);
 }
 
 static int nrpc_call_async_wait(struct nrpc_call *call) {
@@ -359,7 +352,7 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
     // the result callbacks are ours, not the caller's: they signal this thread
     // and own the cleanup of the temporary buffer and the wait record
     struct nrpc_request req = nrpc_request_for(call, temp_wb, nrpc_call_signal_ready, tmp, true);
-    int code = call->captured.handler(&req, call->captured.handler_data);
+    int code = call->method->handler(&req, call->method->handler_data);
 
     // this has to happen after we execute the callback
     // because if an async call is responded in sync mode, there will be a deadlock.
@@ -464,20 +457,20 @@ static inline int nrpc_call_async(struct nrpc_call *call, bool wait) {
 
 // ----------------------------------------------------------------------------
 
-// Internal: authorize and fill a caller-owned held pair (outer registry
-// handle + inner method item). On failure everything acquired is released and
-// out_pair is zeroed. An unset owner answers 500 ("no host given"); an owner
-// with no live registry entry answers 404.
+// Internal: authorize and hand out an OWNED descriptor reference for the
+// method. On failure everything acquired is released and *out_method is
+// NULL. An unset owner answers 500 ("no host given"); an owner with no live
+// registry entry answers 404.
 //
 // `sanitized_cmd` MUST already be sanitized - each entry point sanitizes once,
 // on its own, and hands the result down. That is why this takes the sanitized
 // form rather than re-deriving it: nrpc_call() needs the sanitized command for
 // the in-flight record anyway, so sanitizing here too would do the same work
 // twice on every call.
-static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const char *sanitized_cmd,
-                                      HTTP_ACCESS user_access, bool allow_restricted,
-                                      struct nrpc_method_acquired *out_pair) {
-    *out_pair = (struct nrpc_method_acquired){ 0 };
+static int nrpc_method_authorize_acquire(NRPC_OWNER owner, BUFFER *result_wb, const char *sanitized_cmd,
+                                         HTTP_ACCESS user_access, bool allow_restricted,
+                                         struct nrpc_method **out_method) {
+    *out_method = NULL;
 
     if(!nrpc_owner_is_set(owner))
         return nrpc_call_error(result_wb, "No host given for routing this request to.",
@@ -500,29 +493,23 @@ static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const
                                        HTTP_RESP_NOT_FOUND);
     }
 
-    const DICTIONARY_ITEM *inner_item = NULL;
-    int code = nrpc_registry_find(registry, result_wb, sanitized_cmd, &inner_item);
+    struct nrpc_method *method = NULL;
+    int code = nrpc_registry_find(registry, result_wb, sanitized_cmd, &method);
 
-    // past the find, the gate is no longer needed: on success inner_item pins
-    // the method AND keeps the definitions dictionary on the deferred-destroy
-    // path, which is what makes the held pair's later release gate-exempt
+    // past the find, neither the gate nor the registry handle is needed: the
+    // find returned an owned descriptor reference, independent of the
+    // registry and its dictionaries
     nrpc_registry_dispatcher_release(registry);
+    nrpc_registry_release(registry_item);
 
-    if(code != HTTP_RESP_OK) {
-        nrpc_registry_release(registry_item);
+    if(code != HTTP_RESP_OK)
         return code;
-    }
-
-    out_pair->outer_item = registry_item;
-    out_pair->inner_item = inner_item;
-
-    struct nrpc_method *method = nrpc_method_acquired_value(out_pair);
 
     if((method->options & NRPC_METHOD_FLAG_RESTRICTED) && !allow_restricted) {
         code = nrpc_call_error(result_wb,
                                        "This feature is not available via this API.",
                                        HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
-        nrpc_method_acquired_release_pair(out_pair);
+        nrpc_method_release(method);
         return code;
     }
 
@@ -560,10 +547,11 @@ static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
         }
 
-        nrpc_method_acquired_release_pair(out_pair);
+        nrpc_method_release(method);
         return code;
     }
 
+    *out_method = method;
     return HTTP_RESP_OK;
 }
 
@@ -573,20 +561,20 @@ int nrpc_method_authorize(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
     if(out_acquired)
         *out_acquired = NULL;
 
-    // this entry point owns the sanitize; _pair() takes the sanitized form
+    // this entry point owns the sanitize; _acquire() takes the sanitized form
     CLEAN_CHAR_P *sanitized_cmd = nrpc_sanitize_name_dupz(cmd);
 
-    struct nrpc_method_acquired pair;
-    int code = nrpc_method_authorize_pair(owner, result_wb, sanitized_cmd, user_access, allow_restricted, &pair);
+    struct nrpc_method *method = NULL;
+    int code = nrpc_method_authorize_acquire(owner, result_wb, sanitized_cmd, user_access, allow_restricted, &method);
     if(code != HTTP_RESP_OK)
         return code;
 
     if(out_acquired) {
-        *out_acquired = mallocz(sizeof(pair));
-        **out_acquired = pair;
+        *out_acquired = mallocz(sizeof(**out_acquired));
+        (*out_acquired)->method = method;
     }
     else
-        nrpc_method_acquired_release_pair(&pair);
+        nrpc_method_release(method);
 
     return HTTP_RESP_OK;
 }
@@ -613,9 +601,9 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     // find the function and verify the caller's access
     // (an unset owner answers 500 - the "no host given" sentinel)
 
-    struct nrpc_method_acquired held;
-    code = nrpc_method_authorize_pair(spec->owner, result_wb, sanitized_cmd, spec->user_access,
-                                      spec->allow_restricted, &held);
+    struct nrpc_method *method = NULL;
+    code = nrpc_method_authorize_acquire(spec->owner, result_wb, sanitized_cmd, spec->user_access,
+                                         spec->allow_restricted, &method);
     if(code != HTTP_RESP_OK) {
 
         if(spec->result.cb)
@@ -623,8 +611,6 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
 
         return code;
     }
-
-    struct nrpc_method *method = nrpc_method_acquired_value(&held);
 
     int timeout_s = spec->timeout_s;
     if(timeout_s <= 0)
@@ -647,7 +633,6 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     // put the function into the inflight requests
 
     struct nrpc_call t = {
-        .held = held,
         .sanitized_cmd = sanitized_cmd,
         .call_id = strdupz(call_id),
         .user_access = spec->user_access,
@@ -674,12 +659,6 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     sanitized_cmd = NULL;
     uuid_copy(t.call_id_uuid, uuid);
 
-    // capture the execute pair NOW, under the entry's leaf lock, pinning the
-    // transport - executors must never re-read method's pair at call time (see
-    // struct nrpc_call.captured). The early error paths below
-    // release the pin via nrpc_call_cleanup(&t).
-    nrpc_method_capture(&t.held, &t.captured);
-
     bool duplicate_call_id = false;
     struct nrpc_call *call = dictionary_set_advanced(
         nrpc_inflight_calls.dict, call_id, -1, &t, sizeof(t), &duplicate_call_id);
@@ -688,7 +667,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         code = nrpc_call_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
 
         nrpc_call_cleanup(&t);
-        nrpc_method_acquired_release_pair(&t.held);
+        nrpc_method_release(t.method);
 
         if(spec->result.cb)
             spec->result.cb(result_wb, code, spec->result.data);
@@ -706,7 +685,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
         code = nrpc_call_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
 
         nrpc_call_cleanup(&t);
-        nrpc_method_acquired_release_pair(&t.held);
+        nrpc_method_release(t.method);
 
         if(spec->result.cb)
             spec->result.cb(result_wb, code, spec->result.data);
@@ -720,7 +699,7 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
 
         struct nrpc_request req = nrpc_request_for(call, call->result.wb,
                                                    call->result.cb, call->result.data, false);
-        code = call->captured.handler(&req, call->captured.handler_data);
+        code = call->method->handler(&req, call->method->handler_data);
 
         nrpc_inflight_calls_del(call->call_id);
         return code;
@@ -758,6 +737,11 @@ static void nrpc_call_cancel_internal(struct nrpc_call *call) {
 
     __atomic_store_n(&call->cancelled, true, __ATOMIC_RELAXED);
 
+    // Dispatch gates on the serving handle of the CALL's descriptor - the
+    // registration whose handler actually ran - not on whatever the registry
+    // currently holds for this name. The descriptor is immutable and the
+    // call owns a ref, so this acquire and the release below always address
+    // the same handle, and the handle cannot be freed in between.
     if(!nrpc_serving_dispatcher_acquire(call->method->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "NRPC: received a CANCEL request for call_id '%s', but the serving thread is not running.",
@@ -806,6 +790,8 @@ void nrpc_call_progress(const char *call_id) {
 
     struct nrpc_call *call = dictionary_acquired_item_value(item);
 
+    // same gate as cancel: the CALL's descriptor decides, and acquire and
+    // release always address the same, pinned serving handle
     if(!nrpc_serving_dispatcher_acquire(call->method->serving)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "NRPC: received a PROGRESS request for call_id '%s', but the serving thread is not running.",

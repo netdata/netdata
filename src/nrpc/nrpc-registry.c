@@ -6,6 +6,12 @@
 // daemon's pulse charts (declared in nrpc.h)
 struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
 
+// Bytes currently held by method descriptors. They are heap allocations, not
+// dictionary values, so they fall outside dictionary_stats_category_functions
+// - this counter is what keeps them visible in the pulse "functions" memory
+// attribution (precedent: nrpc_buffers_functions for the call BUFFERs).
+size_t nrpc_methods_functions = 0;
+
 // ----------------------------------------------------------------------------
 
 // Each host owns a function registry (struct nrpc_registry) holding its
@@ -15,232 +21,163 @@ struct dictionary_stats dictionary_stats_category_functions = { .name = "functio
 
 // ----------------------------------------------------------------------------
 
-// LOCK RULE for this callback and the conflict callback below: they run under
-// the inner dictionary's index write lock, which is inner-side of
-// owner_spinlock. Taking owner_spinlock here would invert that order, so these
-// callbacks MUST NOT use the vtable snapshot helpers; everything they need
-// from the owner (the epoch id) is snapshotted by the register path BEFORE the
-// insert and travels in the value bytes. The log lines label the entry by its
-// IMMUTABLE id instead of the owner's name, which would need the lock.
-static void nrpc_registry_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *data __maybe_unused) {
-    struct nrpc_method *method = func;
+// ----------------------------------------------------------------------------
+// the descriptor lifecycle: construct -> (swap) -> release; ONE destructor
 
-    nrpc_serving_started();
-    method->serving = nrpc_serving_current_thread_acquire();
+// Build one immutable descriptor from an already-validated registration.
+// Runs on the register path, OUTSIDE all dictionary callbacks - which is
+// what lets it acquire everything the descriptor references (the LOCK RULE
+// at the insert callback forbids owner_spinlock inside inner-dict callbacks,
+// and the epoch snapshot needs it). The ONLY release path, for every
+// outcome (stored, displaced, deleted, unwound), is nrpc_method_release().
+static struct nrpc_method *nrpc_method_create(const struct nrpc_method_desc *desc, const char *tags,
+                                              NRPC_METHOD_FLAGS options, struct nrpc_registry *registry) {
+    struct nrpc_method *method = callocz(1, sizeof(*method));
+    __atomic_add_fetch(&nrpc_methods_functions, sizeof(*method), __ATOMIC_RELAXED);
 
-    // method->epoch_id was pre-stamped by nrpc_method_register() from the
-    // owner's epoch (0 when the entry was already disarmed - such a method is
-    // never available, the correct degradation for a registration racing the
-    // owner's teardown)
-    method->unregistered = false;
+    method->refcount = 1; // the slot's ref, transferred with the pointer on store
+    method->sync = desc->sync;
+    method->options = options;
+    method->source = desc->source;
+    method->access = desc->access;
+    method->help = string_strdupz(desc->help);
+    method->tags = string_strdupz(tags);
+    method->timeout = desc->timeout_s;
+    method->priority = desc->priority;
+    method->version = desc->version;
+    method->handler = desc->handler;
+    method->handler_data = desc->handler_data;
 
-    spinlock_init(&method->leaf_spinlock);
+    // Normalization lives HERE so first- and re-registration agree.
+    // Deliberate, wire-observable change: the old code normalized only in
+    // the insert callback and swapped raw on conflicts, so a
+    // RE-registration with priority 0 stored 0 where the first registration
+    // stored 100 - that split behavior was the bug.
+    if(!method->priority)
+        method->priority = NRPC_PRIORITY_DEFAULT;
 
-    // the entry stores the transport (handler_data) for transport-bearing
-    // sources - take the entry ref this storage owns; released by
-    // nrpc_method_cleanup() under the stored tag
+    // the descriptor stores the transport (handler_data) for transport-
+    // bearing sources - take the entry ref this storage owns; released by
+    // the destructor under the stored tag. INTERNAL data is caller-owned
+    // and never pinned.
     if(nrpc_source_has_transport(method->source) && method->handler_data)
         nrpc_transport_entry_acquire(method->handler_data);
 
-    if(!method->priority)
-        method->priority = NRPC_PRIORITY_DEFAULT;
+    method->serving = nrpc_serving_current_thread_acquire();
+
+    // 0 when the entry is already disarmed - such a descriptor is never
+    // available. Under a concurrent epoch transition the stamp can be one
+    // epoch stale, which degrades to "unavailable until the next
+    // re-registration" - the safe direction.
+    nrpc_registry_owner_epoch(registry, &method->epoch_id);
+
+    return method;
 }
 
-static void nrpc_method_cleanup(struct nrpc_method *method) {
+static void nrpc_method_free(struct nrpc_method *method) {
     nrpc_serving_release(method->serving);
 
-    // release the transport ref this (tag, data) pair owns - keyed on the tag
-    // the struct actually HOLDS (the conflict callback swaps them as one pair,
-    // so the displaced pair always lands here together). NULL-safe; INTERNAL
-    // data is caller-owned and never released.
+    // release the transport ref this descriptor owns - keyed on the tag it
+    // holds (descriptors are immutable, so tag and data can never diverge).
+    // NULL-safe; INTERNAL data is caller-owned and never released.
     if(nrpc_source_has_transport(method->source))
         nrpc_transport_entry_release(method->handler_data);
 
     string_freez(method->help);
     string_freez(method->tags);
+
+    __atomic_sub_fetch(&nrpc_methods_functions, sizeof(*method), __ATOMIC_RELAXED);
+    freez(method);
 }
 
-static void nrpc_registry_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *func,
+void nrpc_method_release(struct nrpc_method *method) {
+    if(!method) return;
+    if(refcount_release(&method->refcount) == 0)
+        nrpc_method_free(method);
+}
+
+// Descriptors are compared by CONTENT to derive the conflict callback's
+// changed verdict. STRING pointer equality IS content equality (strings are
+// interned). epoch_id and serving are deliberately included: a reconnect
+// re-registration carries a fresh serving handle (and usually a fresh
+// epoch), so it always reports changed - which is correct, the function's
+// availability just changed hands.
+static bool nrpc_method_equal(struct nrpc_method *a, struct nrpc_method *b) {
+    return a->sync == b->sync &&
+           a->options == b->options &&
+           a->source == b->source &&
+           a->access == b->access &&
+           a->help == b->help &&
+           a->tags == b->tags &&
+           a->timeout == b->timeout &&
+           a->priority == b->priority &&
+           a->version == b->version &&
+           a->handler == b->handler &&
+           a->handler_data == b->handler_data &&
+           a->epoch_id == b->epoch_id &&
+           a->serving == b->serving;
+}
+
+// ----------------------------------------------------------------------------
+// the inner dictionary's callbacks - the value is a SLOT
+
+// LOCK RULE for these callbacks: they run under the inner dictionary's index
+// write lock, which is inner-side of owner_spinlock. Taking owner_spinlock
+// here would invert that order, so they MUST NOT use the vtable snapshot
+// helpers; everything owner-derived (the epoch id) was stamped into the
+// descriptor at construction, before the insert.
+static void nrpc_registry_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct nrpc_method_slot *slot = value;
+
+    // the descriptor pointer arrived in the value bytes with its ref already
+    // owned by this slot; only the slot's own machinery is born here
+    spinlock_init(&slot->spinlock);
+    slot->unregistered = false;
+}
+
+static void nrpc_registry_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                                           void *data __maybe_unused) {
-    struct nrpc_method *method = func;
-    nrpc_method_cleanup(method);
+    struct nrpc_method_slot *slot = value;
+    nrpc_method_release(slot->method);
+    slot->method = NULL;
 }
 
-static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *func,
-                                            void *new_func, void *data) {
+static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
+                                            void *new_value, void *data) {
     struct nrpc_registry *registry = data;
-    struct nrpc_method *method = func;
-    struct nrpc_method *new_method = new_func;
+    struct nrpc_method_slot *slot = value;
+    struct nrpc_method_slot *incoming = new_value;
 
-    // NO vtable access here (see the LOCK RULE above the insert callback):
-    // the epoch id arrives pre-stamped in new_method, and the log lines carry
-    // the entry's immutable identity instead of a name that would need
-    // the owner lock to read safely
-    OBJECT_STATE_ID state_id = new_method->epoch_id;
-    char owner_str[NRPC_OWNER_KEY_LEN];
-    nrpc_owner_str(owner_str, registry->id);
+    // The incoming descriptor replaces the current one as ONE unit - no
+    // field surgery, so there is no window in which a reader can observe a
+    // half-updated registration, and nothing here needs the owner vtable.
+    struct nrpc_method *installed = incoming->method;
+    struct nrpc_method *displaced = nrpc_slot_swap(slot, installed);
+    incoming->method = NULL; // ownership moved into the slot
 
-    nrpc_serving_started();
+    // The changed verdict feeds the dictionary's version counter and react
+    // callback only - this dictionary registers no react callback and
+    // nothing reads its version, so the equality-driven verdict is inert
+    // beyond its own bookkeeping (do not build on it without checking).
+    bool changed = !nrpc_method_equal(displaced, installed);
 
-    bool changed = false;
-
-    if(__atomic_load_n(&method->unregistered, __ATOMIC_ACQUIRE)) {
-        __atomic_store_n(&method->unregistered, false, __ATOMIC_RELEASE);
-        changed = true;
-    }
-
-    if(method->serving != nrpc_thread_serving) {
+    if(changed) {
+        char owner_str[NRPC_OWNER_KEY_LEN];
+        nrpc_owner_str(owner_str, registry->id);
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed serving thread from %d to %d",
-               dictionary_acquired_item_name(item), owner_str,
-               nrpc_serving_tid(method->serving), nrpc_serving_tid(nrpc_thread_serving));
-
-        new_method->serving = method->serving;
-        method->serving = nrpc_serving_current_thread_acquire();
-        changed = true;
-    }
-
-    if(method->epoch_id != state_id) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed state id from %u to %u",
-               dictionary_acquired_item_name(item), owner_str,
-               method->epoch_id, state_id);
-
-        method->epoch_id = state_id;
-        changed = true;
-    }
-
-    // Everything from here to the end swaps fields that concurrent readers
-    // capture or byte-copy under the entry's leaf spinlock (an item reference
-    // pins the entry memory but NOT the swapped contents - a displaced STRING
-    // or transport can be freed the moment it leaves the entry). Take the leaf
-    // lock around the swaps AND the displaced releases/frees below, so a
-    // reader either sees the old consistent contents or the new ones.
-    spinlock_lock(&method->leaf_spinlock);
-
-    if(method->handler != new_method->handler) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed handler",
+               "NRPC: method '%s' of host %s re-registered with changes",
                dictionary_acquired_item_name(item), owner_str);
-
-        SWAP(method->handler, new_method->handler);
-        changed = true;
     }
 
-    if(method->help != new_method->help) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed help text",
-               dictionary_acquired_item_name(item), owner_str);
-
-        SWAP(method->help, new_method->help);
-        changed = true;
-    }
-
-    if(method->tags != new_method->tags) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed tags",
-               dictionary_acquired_item_name(item), owner_str);
-
-        SWAP(method->tags, new_method->tags);
-        changed = true;
-    }
-
-    if(method->options != new_method->options) {
-        // options are derived from the name and the tags (nrpc_method_flags_for());
-        // keeping them in sync with the swapped tags is what makes a re-registration
-        // with the "hidden" tag actually restrict the function
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed flags",
-               dictionary_acquired_item_name(item), owner_str);
-
-        SWAP(method->options, new_method->options);
-        changed = true;
-    }
-
-    if(method->timeout != new_method->timeout) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed timeout (from %d to %d)",
-               dictionary_acquired_item_name(item), owner_str,
-               method->timeout, new_method->timeout);
-
-        SWAP(method->timeout, new_method->timeout);
-        changed = true;
-    }
-
-    if(method->version != new_method->version) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed version (from %"PRIu32", to %"PRIu32")",
-               dictionary_acquired_item_name(item), owner_str,
-               method->version, new_method->version);
-
-        SWAP(method->version, new_method->version);
-        changed = true;
-    }
-
-    if(method->priority != new_method->priority) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed priority",
-               dictionary_acquired_item_name(item), owner_str);
-
-        SWAP(method->priority, new_method->priority);
-        changed = true;
-    }
-
-    if(method->access != new_method->access) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed access level",
-               dictionary_acquired_item_name(item), owner_str);
-
-        SWAP(method->access, new_method->access);
-        changed = true;
-    }
-
-    if(method->sync != new_method->sync) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed sync/async mode",
-               dictionary_acquired_item_name(item), owner_str);
-
-        SWAP(method->sync, new_method->sync);
-        changed = true;
-    }
-
-    // (source, handler_data) swap as ONE pair inside one conditional - never
-    // as two independently-conditional swaps - so a later cleanup/release always
-    // keys on the ownership tag matching the data it actually holds.
-    //
-    // Transport accounting (the serving-handle pattern in this same callback, see
-    // new_method->serving above): when a DIFFERENT pair is installed, acquire
-    // an entry ref iff the INSTALLED tag is transport-bearing; the displaced
-    // pair lands in new_method for nrpc_method_cleanup(new_method) below to
-    // release under the DISPLACED tag. When NO swap occurs (equal pair -
-    // routine: a child re-sends its whole function list on every flag set and
-    // reconnect, and the dictionary fires this callback even for identical
-    // values), NEUTRALIZE new_method (data NULL, non-transport tag) so the
-    // unconditional cleanup release is a no-op. Invariant: an equal-pair
-    // conflict nets ZERO refs - by neutralization, not by skipping the
-    // release.
-    if(method->handler_data != new_method->handler_data || method->source != new_method->source) {
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "NRPC: method '%s' of host %s changed handler data or registration source",
-               dictionary_acquired_item_name(item), owner_str);
-
-        if(nrpc_source_has_transport(new_method->source) && new_method->handler_data)
-            nrpc_transport_entry_acquire(new_method->handler_data);
-
-        SWAP(method->handler_data, new_method->handler_data);
-        SWAP(method->source, new_method->source);
-        changed = true;
-    }
-    else {
-        new_method->handler_data = NULL;
-        new_method->source = NRPC_SOURCE_DAEMON;
-    }
-
-    // under the leaf lock: frees the DISPLACED strings/transport ref, which a
-    // concurrent leaf-locked reader may otherwise still be copying
-    nrpc_method_cleanup(new_method);
-
-    spinlock_unlock(&method->leaf_spinlock);
+    // Releasing the displaced descriptor here runs under the index write
+    // lock (strictly less locking than the old cleanup, which needed the
+    // index write lock plus a per-entry leaf lock). The routine case is an
+    // IDENTICAL re-registration - a child re-sends its whole function list
+    // on every flag set and reconnect, and the dictionary fires this
+    // callback even for identical values - which now allocates and frees
+    // one small descriptor per function: accepted churn, paid for deleting
+    // the per-field swap machinery and its race windows.
+    nrpc_method_release(displaced);
 
     return changed;
 }
@@ -264,7 +201,7 @@ static void nrpc_registries_insert_cb(const DICTIONARY_ITEM *item __maybe_unused
     struct nrpc_registry *registry = value;
 
     registry->dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                                                &dictionary_stats_category_functions, sizeof(struct nrpc_method));
+                                                &dictionary_stats_category_functions, sizeof(struct nrpc_method_slot));
 
     dictionary_register_insert_callback(registry->dict, nrpc_registry_insert_cb, registry);
     dictionary_register_delete_callback(registry->dict, nrpc_registry_delete_cb, registry);
@@ -303,11 +240,12 @@ void nrpc_registries_destroy(void) {
     DICTIONARY *dict = __atomic_load_n(&nrpc_registries.dict, __ATOMIC_ACQUIRE);
     if(!dict) return;
 
-    // PRECONDITION: runs after every owner destroyed its entry, and after
-    // nrpc_inflight_calls_destroy() released every held pair - no outer
-    // handle may survive this point, or its release would reach a NULL index.
-    // An entry surviving here would also silently leak its inner dictionaries
-    // (the outer dict has no delete callback by design).
+    // PRECONDITION: runs after every owner destroyed its entry. An entry
+    // surviving here would silently leak its inner dictionaries (the outer
+    // dict has no delete callback by design). In-flight calls hold
+    // descriptor references, never registry handles, so call teardown
+    // ordering does not matter here; only transient operation handles reach
+    // this index, and shutdown is single-threaded by this point.
     internal_fatal(dictionary_entries(dict) != 0,
                    "NRPC: the registries index still has %zu entries at shutdown",
                    (size_t)dictionary_entries(dict));
@@ -475,9 +413,13 @@ void nrpc_registry_destroy(NRPC_OWNER owner) {
     if(!registry)
         // this owner never had an entry, or it was already destroyed - both
         // are ordinary: owners may be torn down without ever having been
-        // initialized, and an owner may run its teardown more than once.
-        // The index lookup is the whole guard: it is keyed on the caller's own
-        // token, so it can never reach anyone else's entry.
+        // initialized, and an owner may run its teardown more than once
+        // SEQUENTIALLY (the index lookup is the guard for repeats, and it is
+        // keyed on the caller's own token, so it can never reach anyone
+        // else's entry). CONCURRENT destroys of the same owner are the
+        // owner's to serialize - two could both pass this lookup and reach
+        // the dictionary destroys below twice; the only production caller
+        // runs under the rrd write lock, which serializes them today.
         return;
 
     spinlock_lock(&registry->owner_spinlock);
@@ -521,15 +463,17 @@ void nrpc_registry_destroy(NRPC_OWNER owner) {
 
     // Destroy the inner dictionaries AFTER the entry left the index and the
     // gate drained, outside the index locks, so one host's teardown cannot
-    // stall other hosts' lookups. The gate is what makes this safe for every
-    // consumer holding only an OUTER handle: none of them can be inside the
-    // inner dictionaries now, and none can enter them again. pending_dels
-    // holds no item references, so its destroy is always the immediate-free
-    // branch - before the gate existed, that free raced the renderer's
-    // snapshot. The definitions dictionary still defers its free while
-    // in-flight calls hold their inner-item pins, which is what keeps the
-    // gate-exempt release through call->held safe; the struct memory both
-    // dictionaries are reached through stays pinned by any held outer handle.
+    // stall other hosts' lookups. The gate is the whole safety story AGAINST
+    // READERS (it does nothing for a concurrent same-owner destroy - see the
+    // early-return comment above): in-flight calls hold descriptor
+    // references, not dictionary items, so nothing outside this function
+    // keeps either dictionary alive and both destroys run the immediate-free
+    // branch - and no consumer can be inside them now, or enter them again.
+    // The definitions dictionary's
+    // delete callbacks release the slots' descriptor refs here; descriptors
+    // still pinned by in-flight calls simply outlive their dictionary. The
+    // struct memory both dictionaries are reached through stays pinned by
+    // any held outer handle.
     dictionary_destroy(registry->pending_dels.dict);
     dictionary_destroy(registry->dict);
 
@@ -537,49 +481,12 @@ void nrpc_registry_destroy(NRPC_OWNER owner) {
     dictionary_garbage_collect(dict);
 }
 
-void nrpc_method_acquired_release_pair(struct nrpc_method_acquired *acquired) {
-    // Deliberately NOT behind the operation gate (the one exemption - see the
-    // lifetime field in nrpc-internals.h): the inner item ref this pair holds
-    // keeps the definitions dictionary on the deferred-destroy path, so the
-    // release below stays safe after destroy - and a late release must never
-    // be refused.
-    //
-    // release order: inner (the method entry) first, then the outer handle
-    // that pins the registry the inner dictionary belongs to
-    if(acquired->inner_item) {
-        struct nrpc_registry *registry = nrpc_method_acquired_registry(acquired);
-        dictionary_acquired_item_release(registry->dict, acquired->inner_item);
-        acquired->inner_item = NULL;
-    }
-    if(acquired->outer_item) {
-        nrpc_registry_release(acquired->outer_item);
-        acquired->outer_item = NULL;
-    }
-}
-
 void nrpc_method_acquired_release(NRPC_METHOD_ACQUIRED *acquired) {
     if(!acquired) return;
-    nrpc_method_acquired_release_pair(acquired);
+    // an owned descriptor ref, nothing else - no dictionary is touched, so
+    // this needs no operation gate and is safe at any point after destroy
+    nrpc_method_release(acquired->method);
     freez(acquired);
-}
-
-// Capture-at-find: snapshot the execute pair under the entry's leaf spinlock,
-// entry-pinning the transport for transport-bearing sources. The caller holds
-// the acquired item (pinning the entry memory); the leaf lock closes the
-// window where a concurrent re-registration swaps the pair and frees the
-// displaced transport between our read and our pin. The pin attaches ONLY to
-// the entry the find returned - never to prefix-retry intermediates, which
-// are released inside the find loop before this can run.
-void nrpc_method_capture(NRPC_METHOD_ACQUIRED *acquired, struct nrpc_capture *out) {
-    struct nrpc_method *method = nrpc_method_acquired_value(acquired);
-
-    spinlock_lock(&method->leaf_spinlock);
-    out->handler = method->handler;
-    out->handler_data = method->handler_data;
-    out->transport_pin = (nrpc_source_has_transport(method->source) && method->handler_data)
-                             ? nrpc_transport_entry_acquire(method->handler_data)
-                             : NULL;
-    spinlock_unlock(&method->leaf_spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -698,51 +605,31 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     // Classify from the sanitized key, not the raw name: the key is what the dictionary is
     // indexed by, so classifying the raw name lets " config" land on the "config" key without
     // the DYNCFG option, which would hand a dyncfg-reserved entry to a regular function.
-    // Captured before the insert because the conflict callback swaps options with the
-    // previous value, leaving tmp.options holding the old one.
     NRPC_METHOD_FLAGS options = nrpc_method_flags_for(key, tags);
 
-    struct nrpc_method tmp = {
-        .serving = NULL,
-        .sync = desc->sync,
-        .timeout = desc->timeout_s,
-        .version = desc->version,
-        .priority = desc->priority,
-        .options = options,
-        .access = desc->access,
-        .source = desc->source,
-        .handler = desc->handler,
-        .handler_data = desc->handler_data,
-        .help = string_strdupz(desc->help),
-        .tags = string_strdupz(tags),
-    };
+    // The complete descriptor is built HERE, outside all dictionary
+    // callbacks: construction owns the epoch snapshot (LOCK RULE at the
+    // insert callback), the serving-handle ref and the transport ref. On
+    // insert the slot takes the ref over via the value bytes; on conflict
+    // the callback swaps it in and releases the displaced one.
+    struct nrpc_method *method = nrpc_method_create(desc, tags, options, registry);
 
-    // Snapshot the owner's epoch as close to the insert as possible: the
-    // insert and conflict callbacks run under the inner index write lock and
-    // must not touch the vtable (LOCK RULE at the insert callback), so the id
-    // travels in the value bytes. 0 when the entry is already disarmed - such
-    // a method is never available. Under a concurrent epoch transition the
-    // stamp can be one epoch stale, which degrades to "unavailable until the
-    // next re-registration" - the safe direction, and the same race class the
-    // old in-callback read had (the epoch is mutated by threads that never
-    // hold the inner lock).
-    nrpc_registry_owner_epoch(registry, &tmp.epoch_id);
+    struct nrpc_method_slot tmp = { .method = method };
 
-    const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(registry->dict, key, &tmp, sizeof(tmp));
-    if(unlikely(!item)) {
-        // dictionary destroyed - unreachable for THIS registry while the gate
-        // is held (destroy retires the gate before destroying the inner
-        // dictionaries), kept as a defensive unwind: neither the insert nor
-        // the conflict callback ran, so tmp's strings are still ours and no
-        // transport ref was taken
-        string_freez(tmp.help);
-        string_freez(tmp.tags);
+    struct nrpc_method_slot *slot = dictionary_set(registry->dict, key, &tmp, sizeof(tmp));
+    if(unlikely(!slot)) {
+        // Dictionary destroyed - unreachable for THIS registry while the
+        // gate is held (destroy retires the gate before destroying the
+        // inner dictionaries), kept as a defensive unwind. ONE destructor,
+        // every path: the full release also returns the serving ref
+        // construction took - anything less would leak it, and a leaked
+        // serving ref permanently hangs that thread's
+        // nrpc_serving_finished() drain.
+        nrpc_method_release(method);
         nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return;
     }
-
-    dictionary_acquired_item_release(registry->dict, item);
 
     nrpc_registry_dispatcher_release(registry);
 
@@ -797,7 +684,13 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
         return false;
     }
 
-    struct nrpc_method *method = dictionary_acquired_item_value(item);
+    struct nrpc_method_slot *slot = dictionary_acquired_item_value(item);
+
+    // Pin the descriptor this delete is authorized against. Every check
+    // below reads THIS descriptor - immutable, so none of them can race a
+    // concurrent re-registration - and the identity check further down
+    // verifies the slot still holds it before anything is tombstoned.
+    struct nrpc_method *method = nrpc_slot_acquire(slot, NULL);
 
     if(source == NRPC_SOURCE_PLUGIN) {
         if(!nrpc_thread_serving || method->serving != nrpc_thread_serving) {
@@ -807,6 +700,7 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
                    name,
                    method->serving ? "another serving thread" : "unknown",
                    nrpc_thread_serving ? "current serving thread" : "a thread with no serving handle");
+            nrpc_method_release(method);
             dictionary_acquired_item_release(registry->dict, item);
             nrpc_registry_dispatcher_release(registry);
             nrpc_registry_release(registry_item);
@@ -814,13 +708,17 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
         }
     }
 
+    // Both del verdicts come from the descriptor the identity check below
+    // authorizes - never from a fresh slot read, which could belong to a
+    // registration this delete has no business judging:
+    //
     // dyncfg config functions are intentionally never streamed to parents
     // (nrpc_catalog_render_global_functions skips NRPC_METHOD_FLAG_DYNCFG),
-    // so their removals must not be streamed either. Capture this before releasing.
+    // so their removals must not be streamed either;
     bool is_dyncfg = (method->options & NRPC_METHOD_FLAG_DYNCFG);
 
-    // whether this function is part of the cloud manifest; captured here because
-    // method is released (and may be freed) before we can queue the manifest refresh
+    // and whether this function is part of the cloud manifest, deciding the
+    // manifest arm after the delete
     bool in_manifest = !(method->options & (NRPC_METHOD_FLAG_DYNCFG | NRPC_METHOD_FLAG_RESTRICTED));
 
     // The FUNCTION_DEL protocol command (from external plugins or streaming
@@ -829,24 +727,52 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
     if(source != NRPC_SOURCE_DAEMON && is_dyncfg) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "NRPC: refusing to unregister dyncfg method '%s' via FUNCTION_DEL", name);
+        nrpc_method_release(method);
         dictionary_acquired_item_release(registry->dict, item);
         nrpc_registry_dispatcher_release(registry);
         nrpc_registry_release(registry_item);
         return false;
     }
 
-    // Mark the function unregistered before removing it from the dictionary.
-    // The flag makes the function unavailable to any thread that already holds
-    // an acquired reference during the delete window (it cannot be freed until
-    // that reference is released), and lets nrpc_registry_find() report
-    // a specific "unregistered by the plugin" error in that window.
-    __atomic_store_n(&method->unregistered, true, __ATOMIC_RELEASE);
+    // IDENTITY CHECK + tombstone, one slot-locked section: verify the slot
+    // still holds the descriptor the checks above authorized (pointer
+    // compare - ABA-free, our ref prevents recycling) before tombstoning.
+    // This closes the check-then-delete TOCTOU: a re-registration landing
+    // between our checks and this point makes the compare fail and the
+    // delete aborts, instead of removing a registration it never judged.
+    // The tombstone makes the function unavailable to concurrent lookups in
+    // the delete window and lets nrpc_registry_find() report the specific
+    // "unregistered by the plugin" error there.
+    spinlock_lock(&slot->spinlock);
+    bool still_current = (slot->method == method);
+    if(still_current)
+        slot->unregistered = true;
+    spinlock_unlock(&slot->spinlock);
 
-    // Delete from the index while still holding our acquired reference, then
-    // release: this unlinks the item before any concurrent re-registration could
-    // resurrect it through the conflict callback (a re-add now allocates a fresh
-    // item). The value is freed once the last reference - this one plus any
-    // in-flight execution - is released.
+    if(!still_current) {
+        // The refusal window includes byte-identical re-sends: every
+        // registration event builds a fresh descriptor, so an identical
+        // re-list racing this delete also fails the pointer compare. The
+        // registration stays (the delete judged a superseded event), no
+        // FUNCTION_DEL is queued, and the next full re-list re-affirms the
+        // function - both sides converge on the re-list as ground truth.
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "NRPC: not unregistering method '%s' - it was re-registered while the delete was validating", name);
+        nrpc_method_release(method);
+        dictionary_acquired_item_release(registry->dict, item);
+        nrpc_registry_dispatcher_release(registry);
+        nrpc_registry_release(registry_item);
+        return false;
+    }
+
+    // ACCEPTED RESIDUAL (exact parity with the pre-descriptor code): between
+    // the slot unlock above and the del below, a conflict re-registration
+    // can swap in a fresh descriptor (clearing the tombstone) and the
+    // key-based del still removes it. The slot lock cannot be held across
+    // dictionary_del - lock order is index -> slot, and the inversion would
+    // ABBA against the conflict callback. The loss self-heals on the next
+    // full FUNCTION re-list: the re-list is ground truth, DELs are a
+    // change-log.
     dictionary_del(registry->dict, key);
     dictionary_acquired_item_release(registry->dict, item);
 
@@ -870,6 +796,7 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
 
     dictionary_garbage_collect(registry->dict);
 
+    nrpc_method_release(method);
     nrpc_registry_dispatcher_release(registry);
 
     // after the delete, so the report always follows the change; the manifest
@@ -880,13 +807,12 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
     return true;
 }
 
-// PURE availability check against a pre-snapshotted epoch - safe under any
-// dictionary lock (takes none). armed == false (a disarmed entry, its owner
-// tearing down) makes every method unavailable.
+// PURE availability check on a PINNED descriptor against a pre-snapshotted
+// epoch - takes no locks, safe under any dictionary lock. The delete-window
+// tombstone lives slot-side and is the CALLER's check (nrpc_slot_acquire
+// hands it out atomically with the descriptor). armed == false (a disarmed
+// entry, its owner tearing down) makes every method unavailable.
 bool nrpc_method_is_available_at(struct nrpc_method *method, bool armed, OBJECT_STATE_ID epoch_id) {
-    if(__atomic_load_n(&method->unregistered, __ATOMIC_ACQUIRE))
-        return false;
-
     if(!nrpc_serving_running(method->serving))
         return false;
 
@@ -909,7 +835,7 @@ bool nrpc_method_is_available(struct nrpc_registry *registry, struct nrpc_method
 }
 
 int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name,
-                       const DICTIONARY_ITEM **out_inner_item) {
+                       struct nrpc_method **out_method) {
     // A MUTABLE right-sized copy: the loop below strips one trailing word at a
     // time, so "fn arg1 arg2" degrades to "fn arg1" and then to "fn". The
     // caller's string must survive intact - the in-flight record keeps it.
@@ -929,13 +855,21 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
 
     bool found = false;
     bool was_unregistered = false;
-    const DICTIONARY_ITEM *item = NULL;
+    struct nrpc_method *method = NULL;
     while (buffer[0]) {
-        if((item = dictionary_get_and_acquire_item(registry->dict, buffer))) {
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(registry->dict, buffer);
+        if(item) {
             found = true;
 
-            struct nrpc_method *method = dictionary_acquired_item_value(item);
-            if(nrpc_method_is_available_at(method, armed, state_id)) {
+            struct nrpc_method_slot *slot = dictionary_acquired_item_value(item);
+            bool unregistered;
+            method = nrpc_slot_acquire(slot, &unregistered);
+
+            // the descriptor ref IS the pin - the item can go at once, and
+            // prefix-retry intermediates never leak a ref past this loop
+            dictionary_acquired_item_release(registry->dict, item);
+
+            if(!unregistered && nrpc_method_is_available_at(method, armed, state_id)) {
                 break;
             }
             else {
@@ -950,9 +884,9 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
                        state_id, method->epoch_id
                        );
 
-                was_unregistered = __atomic_load_n(&method->unregistered, __ATOMIC_ACQUIRE);
-                dictionary_acquired_item_release(registry->dict, item);
-                item = NULL;
+                was_unregistered = unregistered;
+                nrpc_method_release(method);
+                method = NULL;
             }
         }
 
@@ -965,9 +899,9 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
 
     buffer_flush(wb);
 
-    *out_inner_item = item;
+    *out_method = method;
 
-    if(!item) {
+    if(!method) {
         if(found) {
             if(was_unregistered)
                 return nrpc_call_error(wb,
@@ -1003,10 +937,13 @@ bool nrpc_method_available(NRPC_OWNER owner, const char *function) {
     bool ret = false;
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(registry->dict, function);
     if(item) {
-        struct nrpc_method *method = dictionary_acquired_item_value(item);
-        if(nrpc_method_is_available(registry, method))
+        struct nrpc_method_slot *slot = dictionary_acquired_item_value(item);
+        bool unregistered;
+        struct nrpc_method *method = nrpc_slot_acquire(slot, &unregistered);
+        if(!unregistered && nrpc_method_is_available(registry, method))
             ret = true;
 
+        nrpc_method_release(method);
         dictionary_acquired_item_release(registry->dict, item);
     }
 

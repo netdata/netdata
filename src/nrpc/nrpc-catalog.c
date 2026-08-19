@@ -7,12 +7,13 @@
 // the iteration core
 
 // Walks the host's registry dictionary and hands the callback a
-// self-contained snapshot of every visited entry.
+// self-contained view of every visited entry.
 //
-// The snapshot - including the help/tags byte copies - is taken under the
-// entry's LEAF spinlock: an item reference pins the entry memory but NOT the
-// swapped contents, and the conflict callback frees displaced STRINGs under
-// that same lock, so a copy taken outside it could read freed bytes.
+// Each visit pins the entry's CURRENT descriptor once (nrpc_slot_acquire)
+// and reads it lock-free: the descriptor is immutable, so the view's
+// help/tags are borrowed pointers valid for the whole visit - no byte
+// copies, no per-entry lock. A concurrent re-registration swaps the slot to
+// a new descriptor but cannot touch or free the pinned one.
 static size_t nrpc_catalog_registry_foreach(struct nrpc_registry *registry, NRPC_CATALOG_FILTER filter,
                                             nrpc_method_view_cb_t cb, void *data) {
     size_t dyncfg_count = 0;
@@ -25,17 +26,18 @@ static size_t nrpc_catalog_registry_foreach(struct nrpc_registry *registry, NRPC
     OBJECT_STATE_ID epoch_id = 0;
     bool armed = nrpc_registry_owner_epoch(registry, &epoch_id);
 
-    struct nrpc_method *t;
-    dfe_start_read(registry->dict, t) {
-        if(!nrpc_method_is_available_at(t, armed, epoch_id)) continue;
+    struct nrpc_method_slot *slot;
+    dfe_start_read(registry->dict, slot) {
+        bool unregistered;
+        struct nrpc_method *m = nrpc_slot_acquire(slot, &unregistered);
 
-        struct nrpc_method_view v = { .name = t_dfe.name };
-        char *help = NULL, *tags = NULL;
+        if(unregistered || !nrpc_method_is_available_at(m, armed, epoch_id)) {
+            nrpc_method_release(m);
+            continue;
+        }
+
+        struct nrpc_method_view v = { .name = slot_dfe.name, .options = m->options };
         bool visit = false;
-
-        spinlock_lock(&t->leaf_spinlock);
-
-        v.options = t->options;
 
         switch(filter) {
             case NRPC_CATALOG_FILTER_USER:
@@ -50,25 +52,18 @@ static size_t nrpc_catalog_registry_foreach(struct nrpc_registry *registry, NRPC
         }
 
         if(visit) {
-            v.timeout = t->timeout;
-            v.access = t->access;
-            v.priority = t->priority;
-            v.version = t->version;
-            help = strdupz(string2str(t->help));
-            tags = strdupz(string2str(t->tags));
-        }
-
-        spinlock_unlock(&t->leaf_spinlock);
-
-        if(visit) {
-            v.help = help;
-            v.tags = tags;
+            v.timeout = m->timeout;
+            v.access = m->access;
+            v.priority = m->priority;
+            v.version = m->version;
+            v.help = string2str(m->help);
+            v.tags = string2str(m->tags);
             cb(&v, data);
-            freez(help);
-            freez(tags);
         }
+
+        nrpc_method_release(m);
     }
-    dfe_done(t);
+    dfe_done(slot);
 
     return dyncfg_count;
 }

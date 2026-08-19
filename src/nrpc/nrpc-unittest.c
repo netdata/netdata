@@ -39,6 +39,24 @@ static struct nrpc_registry *nrpc_ut_registry(RRDHOST *host) {
     return registry;
 }
 
+// Borrow the CURRENT descriptor of a method for direct-inspection assertions.
+// The dictionary value is a SLOT pointing at an immutable descriptor, so
+// inspection goes through a descriptor pin; the suites run these blocks with
+// no concurrent re-registration, so the borrow (pin + immediate release)
+// cannot dangle within a test block - the same discipline as
+// nrpc_ut_registry() above.
+static struct nrpc_method *nrpc_ut_method(RRDHOST *host, const char *name) {
+    struct nrpc_registry *registry = nrpc_ut_registry(host);
+    if(!registry) return NULL;
+
+    struct nrpc_method_slot *slot = dictionary_get(registry->dict, name);
+    if(!slot) return NULL;
+
+    struct nrpc_method *method = nrpc_slot_acquire(slot, NULL);
+    nrpc_method_release(method);
+    return method;
+}
+
 // A fake registry owner: observes the owner protocol (changed calls with the
 // component's manifest verdict, wants_del_journal queries) without any
 // RRDHOST at all - the registry is host-agnostic, so a whole lifecycle can
@@ -290,7 +308,7 @@ int nrpc_manifest_unittest(void) {
     {
         int enforce_errors_before = errors;
 
-        struct nrpc_method *live = dictionary_get(nrpc_ut_registry(host)->dict, "config");
+        struct nrpc_method *live = nrpc_ut_method(host, "config");
         nrpc_handler_cb_t live_cb = live ? live->handler : NULL;
 
         const char *rejected[] = {
@@ -320,9 +338,9 @@ int nrpc_manifest_unittest(void) {
             nrpc_method_unregister(rrdhost_nrpc_owner(host), "config c2-reject:job", NRPC_SOURCE_DAEMON);
         }
 
-        // fixed-size dictionary slots keep the value pointer stable across conflicts, so a
-        // hijack is visible only through the swapped handler - compare against the capture
-        struct nrpc_method *live_after = dictionary_get(nrpc_ut_registry(host)->dict, "config");
+        // the slot keeps its place across conflicts while descriptors are swapped whole, so a
+        // hijack is visible through the slot's CURRENT descriptor - compare against the capture
+        struct nrpc_method *live_after = nrpc_ut_method(host, "config");
         if(live && (!live_after || live_after->handler != live_cb ||
                     live_after->handler == nrpc_unittest_noop_cb)) {
             fprintf(stderr, "  FAILED enforcement: PLUGIN-source registration of 'config' touched the live dyncfg entry\n");
@@ -1961,14 +1979,14 @@ int nrpc_catalog_unittest(void) {
 //   3. deletion is gated the same way: FUNCTION_DEL (PLUGIN/STREAM source) can
 //      never remove a dyncfg entry, and a PLUGIN-source delete may only remove what its
 //      OWN serving thread registered;
-//   4. the conflict callback swaps every changed field of an existing entry -
-//      including options, which are derived from the tags, so a
-//      re-registration that adds the "hidden" tag actually restricts the
-//      function (and removing it un-restricts it);
+//   4. a re-registration replaces the entry's whole descriptor - including
+//      options, which are derived from the tags, so a re-registration that
+//      adds the "hidden" tag actually restricts the function (and removing
+//      it un-restricts it);
 //   5. a function whose serving thread stopped stays in the registry but disappears
 //      from every view and answers 503;
-//   6. help/tags are handed to consumers as byte copies taken under the
-//      entry's leaf lock, so a concurrent re-registration can never hand out a
+//   6. help/tags are handed to consumers borrowed from a pinned immutable
+//      descriptor, so a concurrent re-registration can never hand out a
 //      mixed or freed pair.
 
 struct reg_probe {
@@ -2100,9 +2118,9 @@ static void reg_race_check_cb(const struct nrpc_method_view *v, void *data) {
 
     k->observations++;
 
-    // help and tags are swapped as a pair under the entry's leaf lock and
-    // copied under that same lock, so a consumer must never see one field of
-    // one registration next to the other field of the other one (and must
+    // help and tags travel inside ONE immutable descriptor that is swapped
+    // whole and pinned for the visit, so a consumer must never see one field
+    // of one registration next to the other field of the other one (and must
     // never see freed bytes - that half is what ASAN builds catch here)
     bool a = (strcmp(v->help, REG_RACE_HELP_A) == 0 && strcmp(v->tags, REG_RACE_TAGS_A) == 0);
     bool b = (strcmp(v->help, REG_RACE_HELP_B) == 0 && strcmp(v->tags, REG_RACE_TAGS_B) == 0);
@@ -2158,6 +2176,124 @@ static void reg_destroy_worker(void *arg) {
     __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
 
     nrpc_serving_finished();
+}
+
+// Section 8 machinery: the restart race. An in-flight call's cancel and
+// progress dispatch through the CALL's own descriptor, so a re-registration
+// storm on another thread can neither free the serving handle they gate on
+// nor make acquire and release address different handles - and after the
+// registering thread exits, dispatch gates on ITS handle (the thread whose
+// handler actually ran), regardless of the fresher registration.
+struct rr_state {
+    RRDHOST *host;
+
+    // captured by the handler (runs on the caller's thread inside nrpc_call)
+    nrpc_result_cb_t result_cb;
+    void *result_data;
+    BUFFER *result_wb;
+
+    size_t cancel_hooks;
+    size_t progress_hooks;
+    size_t results;
+
+    bool a_registered;
+    bool a_may_finish;
+    bool b_done;
+};
+
+static struct rr_state rr_state;
+
+static void rr_cancel_hook(const char *call_id __maybe_unused, void *data __maybe_unused) {
+    __atomic_add_fetch(&rr_state.cancel_hooks, 1, __ATOMIC_RELAXED);
+}
+
+static void rr_progress_hook(const char *call_id __maybe_unused, void *data __maybe_unused) {
+    __atomic_add_fetch(&rr_state.progress_hooks, 1, __ATOMIC_RELAXED);
+}
+
+static void rr_result_cb(BUFFER *wb __maybe_unused, int code __maybe_unused, void *data __maybe_unused) {
+    rr_state.results++;
+}
+
+static int rr_execute_cb(struct nrpc_request *req, void *data __maybe_unused) {
+    rr_state.result_cb = req->result.cb;
+    rr_state.result_data = req->result.data;
+    rr_state.result_wb = req->result.wb;
+
+    if(req->register_cancel_hook.cb)
+        req->register_cancel_hook.cb(req->register_cancel_hook.data, rr_cancel_hook, NULL);
+    if(req->register_progress_hook.cb)
+        req->register_progress_hook.cb(req->register_progress_hook.data, rr_progress_hook, NULL);
+
+    return HTTP_RESP_OK;
+}
+
+static void rr_register(RRDHOST *host, uint32_t version) {
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .owner = rrdhost_nrpc_owner(host),
+        .name = "rr-fn",
+        .help = "restart race",
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = 100,
+        .version = version,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = false,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = rr_execute_cb,
+    });
+}
+
+static void rr_worker_a(void *arg) {
+    RRDHOST *host = arg;
+    nrpc_serving_started();
+    rr_register(host, 1);
+    __atomic_store_n(&rr_state.a_registered, true, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&rr_state.a_may_finish, __ATOMIC_ACQUIRE))
+        sleep_usec(1 * USEC_PER_MS);
+
+    nrpc_serving_finished();
+}
+
+#define RR_B_N 10000
+static void rr_worker_b(void *arg) {
+    RRDHOST *host = arg;
+    nrpc_serving_started();
+    for(size_t i = 0; i < RR_B_N; i++)
+        rr_register(host, 2 + (uint32_t)(i & 1));
+    nrpc_serving_finished();
+    __atomic_store_n(&rr_state.b_done, true, __ATOMIC_RELEASE);
+}
+
+// Section 9 machinery: unregister authorizes against a pinned descriptor and
+// verifies, under the slot lock, that the slot still holds THAT descriptor
+// before tombstoning and deleting.
+#define REG_IDRACE_N 20000
+struct reg_idrace_ctx {
+    RRDHOST *host;
+    bool done;
+};
+
+static void reg_idrace_worker(void *arg) {
+    struct reg_idrace_ctx *c = arg;
+    nrpc_serving_started();
+    for(size_t i = 0; i < REG_IDRACE_N; i++)
+        nrpc_method_register(&(struct nrpc_method_desc) {
+            .owner = rrdhost_nrpc_owner(c->host),
+            .name = "reg-idrace-fn",
+            .help = "identity race",
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = 100,
+            .version = 1 + (uint32_t)(i & 1),
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .sync = true,
+            .source = NRPC_SOURCE_DAEMON,
+            .handler = nrpc_unittest_noop_cb,
+        });
+    nrpc_serving_finished();
+    __atomic_store_n(&c->done, true, __ATOMIC_RELEASE);
 }
 
 int nrpc_registry_unittest(void) {
@@ -2305,7 +2441,7 @@ int nrpc_registry_unittest(void) {
             .handler = reg_execute_cb_a,
         });
 
-        struct nrpc_method *entry = dictionary_get(nrpc_ut_registry(host)->dict, fn);
+        struct nrpc_method *entry = nrpc_ut_method(host, fn);
         if(!entry) {
             fprintf(stderr, "  FAILED namespace: a STREAMING registration of a reserved name was rejected\n");
             errors++;
@@ -2332,7 +2468,7 @@ int nrpc_registry_unittest(void) {
                 .handler = reg_execute_cb_b,
             });
 
-            struct nrpc_method *after = dictionary_get(nrpc_ut_registry(host)->dict, fn);
+            struct nrpc_method *after = nrpc_ut_method(host, fn);
             if(!after || after->handler != reg_execute_cb_a) {
                 fprintf(stderr, "  FAILED namespace: a PLUGIN-source registration hijacked a reserved name\n");
                 errors++;
@@ -2418,7 +2554,7 @@ int nrpc_registry_unittest(void) {
             fprintf(stderr, "  OK del: unknown/empty names, and PLUGIN-source deletes are scoped to the registering serving thread\n");
     }
 
-    // 4. the conflict callback swaps every changed field - including the
+    // 4. a re-registration replaces the whole descriptor - including the
     //    options derived from the tags
     {
         int before = errors;
@@ -2639,9 +2775,9 @@ int nrpc_registry_unittest(void) {
             fprintf(stderr, "  OK serving: a stopped serving thread hides its methods everywhere and answers 503\n");
     }
 
-    // 6. help/tags are byte copies taken under the entry's leaf lock: a
-    //    consumer iterating while another thread re-registers must never see a
-    //    mixed pair (nor freed bytes)
+    // 6. help/tags are borrowed from the visit's pinned immutable descriptor:
+    //    a consumer iterating while another thread re-registers must never
+    //    see a mixed pair (nor freed bytes)
     {
         int before = errors;
         struct reg_race_ctx ctx = { .host = host, .done = false };
@@ -2754,6 +2890,166 @@ int nrpc_registry_unittest(void) {
                 fprintf(stderr, "  OK destroy-race: %zu available + %zu rendered observations across %d full "
                                 "init/register/destroy cycles, no reader ever met a freed dictionary\n",
                         available_hits, rendered_hits, REG_DESTROY_N);
+        }
+    }
+
+    // 8. the restart race: cancel and progress dispatch through the CALL's
+    //    descriptor - thread A registers and serves an async call, thread B
+    //    re-registers the same method in a storm. Dispatch must keep working
+    //    (gated on A's live handle) through the storm with no fatal and no
+    //    hang, and once A exits, dispatch must GATE - even though B's fresher
+    //    registration is still live. The dangerous interleaving this pins
+    //    closed: a swap between a dispatch's acquire and its release could
+    //    previously pair them on different handles (a refcount fatal on one,
+    //    a leaked dispatcher ref hanging the other's serving drain forever).
+    {
+        int before = errors;
+
+        memset(&rr_state, 0, sizeof(rr_state));
+        rr_state.host = host;
+
+        ND_THREAD *ta = nd_thread_create("rr-a", NETDATA_THREAD_OPTION_DONT_LOG, rr_worker_a, host);
+        if(!ta) {
+            fprintf(stderr, "  FAILED restart-race: could not create worker A\n");
+            errors++;
+        }
+        else {
+            while(!__atomic_load_n(&rr_state.a_registered, __ATOMIC_ACQUIRE))
+                sleep_usec(1 * USEC_PER_MS);
+
+            nd_uuid_t uuid;
+            uuid_generate_random(uuid);
+            char tx[UUID_COMPACT_STR_LEN];
+            uuid_unparse_lower_compact(uuid, tx);
+
+            CLEAN_BUFFER *wb = buffer_create(0, NULL);
+            int code = nrpc_call(&(struct nrpc_call_spec) {
+                .owner = rrdhost_nrpc_owner(host),
+                .result_wb = wb,
+                .cmd = "rr-fn",
+                .source = "unittest",
+                .user_access = HTTP_ACCESS_ALL,
+                .timeout_s = 60,
+                .wait = false,
+                .allow_restricted = false,
+                .call_id = tx,
+                .result.cb = rr_result_cb,
+            });
+
+            if(code != HTTP_RESP_OK || !rr_state.result_cb) {
+                fprintf(stderr, "  FAILED restart-race: async call setup returned %d (handler ran: %s)\n",
+                        code, rr_state.result_cb ? "yes" : "no");
+                errors++;
+                __atomic_store_n(&rr_state.a_may_finish, true, __ATOMIC_RELEASE);
+                nd_thread_join(ta);
+            }
+            else {
+                ND_THREAD *tb = nd_thread_create("rr-b", NETDATA_THREAD_OPTION_DONT_LOG, rr_worker_b, host);
+                if(!tb) {
+                    fprintf(stderr, "  FAILED restart-race: could not create worker B\n");
+                    errors++;
+                }
+                else {
+                    // progress storm against B's re-registration storm; A is
+                    // alive, so every dispatch must go through
+                    do {
+                        nrpc_call_progress(tx);
+                    } while(!__atomic_load_n(&rr_state.b_done, __ATOMIC_ACQUIRE));
+                    nd_thread_join(tb);
+
+                    if(!rr_state.progress_hooks) {
+                        fprintf(stderr, "  FAILED restart-race: no progress dispatch went through during the storm\n");
+                        errors++;
+                    }
+
+                    nrpc_call_cancel(tx);
+                    if(rr_state.cancel_hooks != 1) {
+                        fprintf(stderr, "  FAILED restart-race: cancel dispatched %zu times, expected exactly 1\n",
+                                rr_state.cancel_hooks);
+                        errors++;
+                    }
+                }
+
+                // A exits; its handle retires. The call's descriptor is still
+                // A's registration, so dispatch must now GATE - B's fresher
+                // live registration must not be consulted.
+                __atomic_store_n(&rr_state.a_may_finish, true, __ATOMIC_RELEASE);
+                nd_thread_join(ta);
+
+                size_t frozen = rr_state.progress_hooks;
+                nrpc_call_progress(tx);
+                if(rr_state.progress_hooks != frozen) {
+                    fprintf(stderr, "  FAILED restart-race: progress dispatched after the serving thread exited\n");
+                    errors++;
+                }
+
+                // deliver the result to retire the in-flight record (and
+                // release the call's descriptor ref - ASAN pins the balance)
+                rr_state.result_cb(rr_state.result_wb, HTTP_RESP_OK, rr_state.result_data);
+                if(rr_state.results != 1) {
+                    fprintf(stderr, "  FAILED restart-race: result delivered %zu times, expected exactly once\n",
+                            rr_state.results);
+                    errors++;
+                }
+            }
+
+            nrpc_method_unregister(rrdhost_nrpc_owner(host), "rr-fn", NRPC_SOURCE_DAEMON);
+        }
+
+        if(errors == before)
+            fprintf(stderr, "  OK restart-race: %zu progress dispatches through a %d-swap storm, cancel exactly once, "
+                            "gated after the serving thread exited\n",
+                    rr_state.progress_hooks, RR_B_N);
+    }
+
+    // 9. unregister vs concurrent re-register: the delete authorizes against
+    //    a pinned descriptor and, under the slot lock, verifies the slot
+    //    still holds THAT descriptor before tombstoning + deleting - so a
+    //    stale authorization can never remove a registration it did not
+    //    judge. HONEST SCOPE: this closes the authorization half only. The
+    //    tombstone->del interval residual REMAINS (exact parity with the
+    //    pre-descriptor code): a re-registration landing in that interval is
+    //    still removed by the key-based del and self-heals on the next full
+    //    re-list. The assertions here are the structural ones - no fatal, no
+    //    hang, deletes really land, and the entry converges to absent -
+    //    while ASAN judges the memory half. This test does NOT claim the
+    //    interval race fixed.
+    {
+        int before = errors;
+
+        struct reg_idrace_ctx ctx = { .host = host, .done = false };
+        ND_THREAD *t = nd_thread_create("reg-idrace", NETDATA_THREAD_OPTION_DONT_LOG, reg_idrace_worker, &ctx);
+        if(!t) {
+            fprintf(stderr, "  FAILED identity-race: could not create the worker thread\n");
+            errors++;
+        }
+        else {
+            size_t removed = 0, missed = 0;
+            while(!__atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE)) {
+                if(nrpc_method_unregister(rrdhost_nrpc_owner(host), "reg-idrace-fn", NRPC_SOURCE_DAEMON))
+                    removed++;
+                else
+                    missed++;
+            }
+            nd_thread_join(t);
+
+            if(!removed) {
+                fprintf(stderr, "  FAILED identity-race: no delete ever landed against the storm\n");
+                errors++;
+            }
+
+            // converge: the worker stopped, so deletes drain the entry
+            while(nrpc_method_unregister(rrdhost_nrpc_owner(host), "reg-idrace-fn", NRPC_SOURCE_DAEMON))
+                ;
+            if(dictionary_get(nrpc_ut_registry(host)->dict, "reg-idrace-fn")) {
+                fprintf(stderr, "  FAILED identity-race: the entry did not converge to absent\n");
+                errors++;
+            }
+
+            if(errors == before)
+                fprintf(stderr, "  OK identity-race: %zu deletes landed, %zu refused/absent, against %d "
+                                "re-registrations; converged to absent\n",
+                        removed, missed, REG_IDRACE_N);
         }
     }
 

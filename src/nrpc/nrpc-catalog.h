@@ -23,10 +23,10 @@ typedef enum {
                                             //   (the return value) for dyncfg_add_streaming()
 } NRPC_CATALOG_FILTER;
 
-// The view handed to the callback. help/tags are BYTE COPIES valid only for
-// the duration of the callback - the underlying STRINGs can be swapped and
-// freed by a concurrent re-registration the moment the entry's leaf lock is
-// released, so the copies are taken under it.
+// The view handed to the callback. help/tags are BORROWED from the visited
+// entry's pinned immutable descriptor - valid only for the duration of the
+// callback (the pin is dropped when the visit ends), so a callback that
+// keeps them must copy.
 struct nrpc_method_view {
     const char *name;
     const char *help;

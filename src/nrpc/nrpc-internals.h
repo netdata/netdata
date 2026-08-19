@@ -14,10 +14,11 @@
 // owning host OBJECT. It owns the definitions dictionary; everything it may
 // need from its owner lives in the embedded owner vtable, written only under
 // owner_spinlock (init, DISARM) and snapshotted under the same lock by every
-// reader. A held outer HANDLE deliberately outlives the entry (that is the
-// point of the in-flight held pair): a path reached through such a handle
-// after destroy finds the vtable DISARMED (name freed, epoch NULL, callbacks
-// NULL) and degrades to a no-op instead of calling into a dying owner.
+// reader. A held outer HANDLE may outlive the entry (destroy unlinks the
+// entry while transient operations still hold handles): a path reached
+// through such a handle after destroy finds the vtable DISARMED (name freed,
+// epoch NULL, callbacks NULL) and degrades to a no-op instead of calling
+// into a dying owner.
 struct nrpc_registry {
     // The entry's identity: the index key, and the argument the owner's
     // callbacks receive. IMMUTABLE for the entry's whole lifetime - assigned
@@ -60,10 +61,11 @@ struct nrpc_registry {
     // handle acquired before the unlink can no longer be inside them, and can
     // never enter them again.
     //
-    // Exempt by design: nrpc_method_acquired_release_pair(). Its inner item
-    // ref keeps the definitions dictionary on the deferred-destroy path, which
-    // is the same survival guarantee without the gate - and a late release
-    // (async completion, shutdown unwind) must never be refused.
+    // Held descriptors are gate-independent by design: a held method
+    // (NRPC_METHOD_ACQUIRED, the call record's descriptor ref) is an owned
+    // reference to the immutable descriptor and releasing it touches no
+    // dictionary, so late releases (async completion, shutdown unwind) need
+    // no gate and can never be refused.
     //
     // INVARIANT: gated sections MUST NOT block indefinitely. Some destroy
     // paths run under the rrd write lock
@@ -104,62 +106,105 @@ static inline void nrpc_owner_str(char out[NRPC_OWNER_KEY_LEN], NRPC_OWNER owner
     print_uint64_hex_full(out, (uint64_t)(uintptr_t)owner.ptr);
 }
 
+// The method value model splits IDENTITY from STATE. Identity is the
+// dictionary entry: the sanitized name keys a stable SLOT. State is one
+// registration event: an IMMUTABLE, refcounted DESCRIPTOR the slot points
+// to. A re-registration builds a complete new descriptor and the conflict
+// callback swaps the slot's pointer as ONE unit - no field is ever mutated
+// in place, so a reader that pinned a descriptor reads it lock-free for as
+// long as it holds the ref, and there is nothing mutable left to race on.
+
+// One per registration event. IMMUTABLE after construction; refcounted.
+// Construction (nrpc_method_create) acquires everything the descriptor
+// references - the help/tags STRING copies, the transport entry ref for
+// transport-bearing sources, the serving-handle entry ref, the epoch stamp -
+// and the destructor, run by whoever drops the last ref, releases them.
+// No other cleanup path exists: the register unwind, the conflict
+// displacement and the delete callback all funnel through
+// nrpc_method_release().
 struct nrpc_method {
+    REFCOUNT refcount;
+
     bool sync;                      // when true, the function is called synchronously
-    bool unregistered;              // when true, the function is unavailable
-    NRPC_METHOD_FLAGS options;   // NRPC_METHOD_FLAGS
-
-    // who registered this entry. Swapped together with handler_data as ONE
-    // pair by the conflict callback, so ownership decisions (who may overwrite,
-    // and later who releases the transport) always key on the value the entry
-    // actually holds.
-    NRPC_SOURCE source;
-
+    NRPC_METHOD_FLAGS options;      // NRPC_METHOD_FLAGS
+    NRPC_SOURCE source;             // who registered; decides whether handler_data is a transport
     HTTP_ACCESS access;
     STRING *help;
     STRING *tags;
     int timeout;                    // the default timeout of the function
-    int priority;
+    int priority;                   // normalized at construction: 0 -> NRPC_PRIORITY_DEFAULT
     uint32_t version;
 
     nrpc_handler_cb_t handler;
-    void *handler_data;
+    void *handler_data;             // transport-bearing sources: entry-pinned for the descriptor's lifetime
 
+    // stamped at construction, BEFORE the insert (LOCK RULE: owner_spinlock
+    // is never taken inside inner-dictionary callbacks, so the id travels in
+    // the descriptor); 0 when the entry was already disarmed - such a
+    // descriptor is never available, the correct degradation for a
+    // registration racing the owner's teardown
     OBJECT_STATE_ID epoch_id;
-    struct nrpc_serving_handle *serving;
 
-    // LEAF spinlock guarding the entry's SWAPPED fields: the (source,
-    // handler_data) pair, handler, and the help/tags STRINGs. The
-    // conflict callback takes it (inside the dictionary index write lock)
-    // around the swaps and the displaced releases/frees; readers take it
-    // standalone AFTER the standard item acquire (the item ref pins the
-    // entry memory, this lock pins the swapped CONTENTS) to capture the
-    // execute pair or byte-copy the strings. Leaf: never acquire any other
-    // lock while holding it.
-    SPINLOCK leaf_spinlock;
+    struct nrpc_serving_handle *serving; // entry-pinned for the descriptor's lifetime
 };
+
+// The dictionary value. The spinlock guards ONE thing: the atomicity of
+// {load pointer + acquire ref [+ read tombstone]} against {swap pointer}.
+// Nothing is freed, copied or compared under it. Why a lock survives at all:
+// a lone refcount cannot make load-then-acquire safe (the swapper can drop
+// the last ref between the reader's load and its increment); the
+// alternatives are deferred reclamation - machinery this component should
+// not grow - or this four-line mutual-exclusion window.
+struct nrpc_method_slot {
+    SPINLOCK spinlock;
+    struct nrpc_method *method;
+    bool unregistered;              // the delete-window tombstone stays slot-side
+};
+
+// Safe ONLY while another ref provably pins the descriptor - the slot's own
+// ref under the slot lock (nrpc_slot_acquire), or a ref the caller already
+// holds. This counter CANNOT detect use-after-release: refcount_acquire()
+// from zero succeeds, so the mutual exclusion in nrpc_slot_acquire() is the
+// guarantee, not the count. The fatal below only catches a negative
+// (corrupted) counter - treat it as an assertion, never as protection.
+static inline void nrpc_method_acquire(struct nrpc_method *method) {
+    if(!refcount_acquire(&method->refcount))
+        fatal("NRPC: method descriptor acquire on a corrupted refcount");
+}
+
+// drops one ref; the last holder runs the destructor (nrpc-registry.c)
+void nrpc_method_release(struct nrpc_method *method);
+
+// Pin the slot's current descriptor. The returned ref is the caller's to
+// release. The tombstone is read as one atomic pair with the pointer (out
+// param, NULL-tolerant), so the delete-window error text can never misreport
+// against a descriptor the tombstone does not belong to.
+static inline struct nrpc_method *nrpc_slot_acquire(struct nrpc_method_slot *slot, bool *unregistered_out) {
+    spinlock_lock(&slot->spinlock);
+    struct nrpc_method *method = slot->method;
+    nrpc_method_acquire(method); // cannot fail: the slot's own ref is live under the lock
+    if(unregistered_out)
+        *unregistered_out = slot->unregistered;
+    spinlock_unlock(&slot->spinlock);
+    return method;
+}
+
+// Install a new descriptor, clearing the tombstone (a registration always
+// revives the entry), and hand the displaced one back - its release NEVER
+// runs under the slot lock.
+static inline struct nrpc_method *nrpc_slot_swap(struct nrpc_method_slot *slot, struct nrpc_method *method) {
+    spinlock_lock(&slot->spinlock);
+    struct nrpc_method *displaced = slot->method;
+    slot->method = method;
+    slot->unregistered = false;
+    spinlock_unlock(&slot->spinlock);
+    return displaced;
+}
 
 // does the registration source store a transport in handler_data?
 // (INTERNAL data is caller-owned and never a transport)
 static inline bool nrpc_source_has_transport(NRPC_SOURCE source) {
     return source == NRPC_SOURCE_PLUGIN || source == NRPC_SOURCE_STREAM;
-}
-
-// Capture-at-find: the execute pair captured under the leaf spinlock, with the
-// transport entry-pinned iff the source is transport-bearing. Executors NEVER
-// re-read method->handler / handler_data at call time - a stale capture
-// degrades to a clean 503 via the transport's acquire-or-fail.
-struct nrpc_capture {
-    nrpc_handler_cb_t handler;
-    void *handler_data;
-    struct nrpc_transport *transport_pin;   // entry-pinned; NULL for INTERNAL sources
-};
-
-void nrpc_method_capture(NRPC_METHOD_ACQUIRED *acquired, struct nrpc_capture *out);
-
-static inline void nrpc_capture_release(struct nrpc_capture *c) {
-    nrpc_transport_entry_release(c->transport_pin);
-    c->transport_pin = NULL;
 }
 
 static inline size_t nrpc_strlen_bounded(const char *s, size_t max) {
@@ -242,39 +287,30 @@ static inline void nrpc_registry_dispatcher_release(struct nrpc_registry *regist
     nrpc_lifetime_dispatcher_release(&registry->lifetime);
 }
 
-// A held method entry: the outer item pins the registry, the inner item pins
-// the method. Self-contained - releasing needs no identity lookup, so a
-// release AFTER the host's registry entry was unlinked (async completion,
-// shutdown unwind) cannot dangle. Release order is inner-then-outer.
-// The public opaque handle NRPC_METHOD_ACQUIRED is this struct; the call
-// record embeds it by value, nrpc_method_authorize() heap-allocates it for
-// its out_acquired callers.
+// A held method: an OWNED descriptor reference, nothing else. Self-contained
+// - releasing touches no dictionary at all, so a release AFTER the host's
+// registry entry was destroyed (async completion, shutdown unwind) cannot
+// dangle. The public opaque handle NRPC_METHOD_ACQUIRED is this struct;
+// nrpc_method_authorize() heap-allocates it for its out_acquired callers,
+// the call record holds the descriptor pointer directly.
 struct nrpc_method_acquired {
-    const DICTIONARY_ITEM *outer_item;  // pins the struct nrpc_registry
-    const DICTIONARY_ITEM *inner_item;  // pins the struct nrpc_method
+    struct nrpc_method *method;
 };
 
-static inline struct nrpc_method *nrpc_method_acquired_value(NRPC_METHOD_ACQUIRED *acquired) {
-    return dictionary_acquired_item_value(acquired->inner_item);
-}
-
-static inline struct nrpc_registry *nrpc_method_acquired_registry(NRPC_METHOD_ACQUIRED *acquired) {
-    return dictionary_acquired_item_value(acquired->outer_item);
-}
-
-// release the held pair WITHOUT freeing the struct (for by-value holders)
-void nrpc_method_acquired_release_pair(struct nrpc_method_acquired *acquired);
-
-// _at() is PURE (no locks) - the form for traversals holding inner
-// dictionary locks; the registry form snapshots the epoch itself and MUST
+// _at() is PURE (no locks) on a PINNED descriptor - safe under any
+// dictionary lock. The delete-window tombstone lives slot-side and is the
+// CALLER's check: nrpc_slot_acquire() hands descriptor and tombstone out as
+// one atomic pair. The registry form snapshots the epoch itself and MUST
 // NOT be called under inner dictionary locks (LOCK RULE: owner_spinlock is
-// never taken inner-side)
+// never taken inner-side).
 bool nrpc_method_is_available_at(struct nrpc_method *method, bool armed, OBJECT_STATE_ID epoch_id);
 bool nrpc_method_is_available(struct nrpc_registry *registry, struct nrpc_method *method);
-// `name` must already be sanitized; it is not modified (the traversal works on
-// an internal copy)
+// `name` must already be sanitized; it is not modified (the traversal works
+// on an internal copy). On HTTP_RESP_OK, *out_method is an OWNED descriptor
+// ref (the caller releases it); the dictionary item is already released -
+// the ref is the pin. MUST be called inside the registry's operation gate.
 int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *name,
-                       const DICTIONARY_ITEM **out_inner_item);
+                       struct nrpc_method **out_method);
 
 // vtable snapshots - each takes owner_spinlock, copies what it needs,
 // releases, then acts; a DISARMED entry answers the safe default
