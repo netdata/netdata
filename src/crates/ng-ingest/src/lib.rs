@@ -120,59 +120,42 @@ pub fn count_spans(req: &ExportTraceServiceRequest) -> usize {
         .sum()
 }
 
-/// Normalize span timestamps/ids, flatten `req`, and append it as a single WAL frame
-/// in the flattened **traces** frame format, returning the number of spans written.
-/// The traces analog of [`write_request`].
-///
-/// `req` is normalized in place first: [`ng_flatten::normalize_span_timestamps`]
-/// resolves each span's `start_time_unix_nano`, and [`ng_flatten::normalize_trace_ids`]
-/// drops malformed trace/span/parent ids. The request is then flattened
-/// ([`ng_flatten::flatten_trace_request`]), each entry's `xxhash64(key=value)` is
-/// pre-computed at emit time by the flattener (exactly as the logs path), and
-/// the result is bincode-encoded as the frame payload — so
-/// the seal rides the interner's fast path. A request with zero spans writes no
-/// frame and returns `0`.
+/// Prepare `req` as a flattened **traces** frame
+/// ([`ng_flatten::prepare_trace_frame`]: one normalize walk, then flatten —
+/// which hashes each entry at emit time — and bincode-encode) and append it as
+/// a single WAL frame, returning the number of spans written. The traces
+/// analog of [`write_request`]. The frame's `log_min/max_ts` carry the
+/// resolved span-start time range. A request with zero spans writes no frame
+/// and returns `0`.
 pub fn write_trace_request(
     writer: &mut wal::Writer,
     clock: &mut MonotonicClock,
-    mut req: ExportTraceServiceRequest,
+    req: ExportTraceServiceRequest,
 ) -> anyhow::Result<usize> {
-    let span_count = count_spans(&req);
-    if span_count == 0 {
+    // One clock tick for the synthetic-timestamp base; normalization then runs
+    // lock-free (base + offset for any span lacking a start time).
+    let fallback_base_ns = clock.now_ns().as_u64();
+    // `None` bounds: this dev/bench tool enforces no ingestion time window — the
+    // production window is applied only by the otel-ingestor service.
+    let frame = ng_flatten::prepare_trace_frame(req, fallback_base_ns, None)
+        .context("prepare flattened trace frame")?;
+    // `ts_range` is None exactly when the request has no spans.
+    if frame.ts_range.is_none() {
         return Ok(0);
     }
-    let fallback_base_ns = clock.now_ns().as_u64();
-    ng_flatten::normalize_span_timestamps(&mut req, fallback_base_ns);
-    let bad_ids = ng_flatten::normalize_trace_ids(&mut req);
-    if bad_ids.any() {
-        tracing::warn!(
-            bad_trace_ids = bad_ids.trace,
-            bad_span_ids = bad_ids.span,
-            "dropped malformed trace/span ids at ingest (expected {}/{} bytes); stored as zero",
-            ng_flatten::TRACE_ID_LEN,
-            ng_flatten::SPAN_ID_LEN,
-        );
-    }
-    let (flattened, sanitized_keys) = ng_flatten::flatten_trace_request(req);
-    if sanitized_keys > 0 {
-        tracing::warn!(
-            sanitized_keys,
-            "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
-        );
-    }
-    let data =
-        ng_flatten::encode_trace_frame(&flattened).context("encode flattened trace frame")?;
     writer.write_frame(
         PART_KEY,
         &[],
-        &data,
+        &frame.data,
         wal::FrameMeta {
-            entry_count: span_count,
+            entry_count: frame.records,
             ingestion_ns: clock.now_ns(),
-            log_ts_range: None,
+            log_ts_range: frame
+                .ts_range
+                .map(|(min, max)| (TimestampNs(min), TimestampNs(max))),
         },
     )?;
-    Ok(span_count)
+    Ok(frame.records)
 }
 
 #[cfg(test)]

@@ -14,26 +14,33 @@ func isOSPFNeighborFull(row topologymodel.OSPFNeighbor) bool {
 	return strings.EqualFold(topologyutil.NormalizeOSPFNeighborState(row.State), "full")
 }
 
-func topologyOSPFNeighborLinkKeyParts(row topologymodel.OSPFNeighbor, srcActorID, dstActorID string) string {
-	srcActorID = strings.TrimSpace(srcActorID)
-	dstActorID = strings.TrimSpace(dstActorID)
-	if srcActorID > dstActorID {
-		srcActorID, dstActorID = dstActorID, srcActorID
-	}
+type topologyOSPFNeighborLinkKey struct {
+	srcActor       topologymodel.ActorHandle
+	dstActor       topologymodel.ActorHandle
+	localRouterID  string
+	remoteRouterID string
+	discriminator  string
+}
 
+func (k topologyOSPFNeighborLinkKey) reversed() topologyOSPFNeighborLinkKey {
+	k.srcActor, k.dstActor = k.dstActor, k.srcActor
+	return k
+}
+
+func topologyOSPFNeighborLinkKeyParts(row topologymodel.OSPFNeighbor, srcActor, dstActor topologymodel.ActorHandle) topologyOSPFNeighborLinkKey {
 	localRouterID := topologyutil.NormalizeTopologyRouterID(row.LocalRouterID)
 	neighborRouterID := topologyutil.NormalizeTopologyRouterID(row.NeighborRouterID)
 	if localRouterID > neighborRouterID {
 		localRouterID, neighborRouterID = neighborRouterID, localRouterID
 	}
 
-	return topologyutil.JoinKeyParts(
-		srcActorID,
-		dstActorID,
-		localRouterID,
-		neighborRouterID,
-		topologyOSPFAdjacencyDiscriminator(row),
-	)
+	return topologyOSPFNeighborLinkKey{
+		srcActor:       srcActor,
+		dstActor:       dstActor,
+		localRouterID:  localRouterID,
+		remoteRouterID: neighborRouterID,
+		discriminator:  topologyOSPFAdjacencyDiscriminator(row),
+	}
 }
 
 func topologyOSPFAdjacencyDiscriminator(row topologymodel.OSPFNeighbor) string {

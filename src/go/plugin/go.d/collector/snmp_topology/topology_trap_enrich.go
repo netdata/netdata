@@ -70,10 +70,11 @@ func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *Trap
 		return nil
 	}
 
-	ip = topologyutil.NormalizeIPAddress(ip)
-	if ip == "" {
+	addr, ok := topologyutil.ParseIPAddress(ip)
+	if !ok {
 		return nil
 	}
+	ip = addr.String()
 
 	caches := r.activeCaches()
 	if len(caches) == 0 {
@@ -82,7 +83,7 @@ func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *Trap
 
 	matches := make([]*TrapTopologyEnrichment, 0, 1)
 	for _, cache := range caches {
-		if enrichment := cache.trapEnrichmentForSource(ip, trapIfIndex); enrichment != nil {
+		if enrichment := cache.trapEnrichmentForCanonicalSource(ip, trapIfIndex); enrichment != nil {
 			matches = append(matches, enrichment)
 		}
 	}
@@ -102,6 +103,14 @@ func (r *topologyRegistry) trapEnrichmentForSource(ip, trapIfIndex string) *Trap
 }
 
 func (c *topologyCache) trapEnrichmentForSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
+	addr, ok := topologyutil.ParseIPAddress(ip)
+	if !ok {
+		return nil
+	}
+	return c.trapEnrichmentForCanonicalSource(addr.String(), trapIfIndex)
+}
+
+func (c *topologyCache) trapEnrichmentForCanonicalSource(ip, trapIfIndex string) *TrapTopologyEnrichment {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -203,16 +212,5 @@ func cdpRemoteIfIndex(key string, r *cdpRemote) string {
 }
 
 func (c *topologyCache) localDeviceIPMatchMethod(ip string) string {
-	if topologyutil.NormalizeIPAddress(c.localDevice.ManagementIP) == ip {
-		return "management_ip"
-	}
-	for _, addr := range c.localDevice.ManagementAddresses {
-		if topologyutil.NormalizeIPAddress(addr.Address) == ip {
-			return "management_address"
-		}
-	}
-	if _, ok := c.ifIndexByIP[ip]; ok {
-		return "local_interface_ip"
-	}
-	return ""
+	return c.trapMatchMethodByIP[ip]
 }

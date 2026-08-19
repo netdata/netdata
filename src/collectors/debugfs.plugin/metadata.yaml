@@ -395,6 +395,7 @@ modules:
       module_name: audit
       monitored_instance:
         name: Linux Audit Subsystem
+        description: 'Monitor Linux kernel audit status, backlog utilization, lost events, failure mode, and enabled state.'
         link: 'https://man7.org/linux/man-pages/man8/auditd.8.html'
         categories:
           - data-collection.operating-systems
@@ -542,6 +543,7 @@ modules:
         categories:
           - data-collection.hardware-and-sensors
         icon_filename: 'microchip.svg'
+        description: 'Collect hardware sensor readings from Linux hwmon chips, including temperature, voltage, current, fan speed, power, energy, humidity, and intrusion state.'
       related_resources:
         integrations:
           list: []

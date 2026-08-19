@@ -7,6 +7,7 @@ meta:
   categories:
     - export
   icon_filename: 'opentsdb.png'
+  description: 'Export Netdata metrics to OpenTSDB for long-term storage, further analysis, and correlation with other data sources.'
 keywords:
   - exporter
   - OpenTSDB

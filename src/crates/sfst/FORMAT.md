@@ -101,6 +101,10 @@ within its tier in the trailing bytes.
     "PSPN"      8-byte arena (per-row parent_span_id)         No (per-row column)
     "DURN"      Vec<i64>  (per-row span duration, ns)         No (per-row column)
     "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional)
+    "TBLM"      TraceIdBloom  (per-file trace-id bloom filter)  No (optional)
+    "EVNB"      EventIndex  (per-row span event structure)    No (optional)
+    "LNKB"      LinkIndex  (per-row span link structure)      No (optional)
+    "TRSU"      TraceRollup  (per-file trace rollup rows)      No (optional)
     "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
@@ -125,6 +129,100 @@ contiguous run in `sort_perm`. It lives in the cold region after the per-row
 columns, requires the `TRCE` column it indexes, and is detected via the TOC
 (`IndexReader::has_trace_id_index`), not the `ColumnsTable`. Presence is independent
 of any per-row column except its required `TRCE`.
+
+The optional `TBLM` chunk is the **per-file trace-id bloom**: a serialized
+[`fastbloom`] filter over the file's DISTINCT set trace ids, plus that distinct
+count for validation. It answers "is trace X definitely NOT in this file?" so a
+cross-file trace-by-id skips a file with one small chunk read, never touching
+`TIDX`/`TRCE` (the single-file `trace_by_id` uses it as the same pre-check).
+False negatives are impossible; false positives (~5% build-time target,
+≈6.25 bits per distinct id) merely fall through to the exact `TIDX` lookup.
+The payload is self-describing — the filter's bit length, hash count, and
+seeded hasher state all serialize with it — so readers never depend on the
+build-time constants; the build uses a fixed seed, making identical inputs
+seal to identical bytes. It lives in the cold region after `TIDX` and before
+`EVNB`, so a reader that ignores it skips it like any other optional chunk.
+Written only when the file has at least one set (non-zero) trace id, and only
+together with `TIDX` (the bloom is derived from the index's sorted
+permutation; the writer rejects TBLM-without-TIDX at declaration, and the
+reader symmetrically rejects a bloom in a file without the index). Detected
+via the TOC (`IndexReader::has_trace_id_bloom`).
+
+[`fastbloom`]: https://crates.io/crates/fastbloom
+
+The optional `EVNB` / `LNKB` chunks are the **span event / link structures**
+(traces signal). Rows carry event/link *values* as ordinary interned tokens
+(searchable through the field tiers, listed in the row's stream-batch entry
+list, under the reserved `events.` / `links.` path namespaces); these chunks
+store the *structure* the flat token list cannot express — which tokens form
+which event/link, in what order, with what per-item scalars. Layout: per-row
+prefix-sum `row_offsets` (`record_count + 1`) plus a per-row `row_dropped`
+array (the span-level OTLP `dropped_events_count` / `dropped_links_count`),
+then parallel per-item arrays — events: raw `time_unix_nano`,
+`dropped_attributes_count`, a name token ref (`events.name=<name>`; always
+present per event); links: linked `trace_id` (16-byte arena), `span_id`
+(8-byte arena), `flags`, `dropped_attributes_count`, and a verbatim
+`trace_state` byte arena with its own prefix-sum offsets — and finally
+per-item attribute token refs behind a second prefix-sum (`attr_offsets`).
+Token refs are **bare `KvId`s** into the same id space as the stream batches
+(written through the same slot→id translation): values are stored once, and
+value typing is field-level via the schema tree — there is no per-occurrence
+type ref (the platform fidelity bar). Consequence, stated explicitly: the
+`key=value` rendering is not type-unique, so same-rendering values of
+different kinds under one path intern to ONE token — `Int 3` ↔ `Str "3"`,
+`Bool true` ↔ `Str "true"`, `Null` ↔ `Str ""`, `Bytes []` ↔ `Str ""`,
+hex-looking strings ↔ `Bytes`. A mono-kind field recovers its type exactly
+from its schema-tree kind; a poly-kind field coalesces (`Int ⊔ Double =
+Double`; any other mix → `Str`) and its occurrences reconstruct at the
+coalesced kind. This is sufficient for display/search consumers;
+type-faithful OTLP re-export of poly-kind fields is out of scope by design.
+Both chunks live after `TIDX`
+(`EVNB` before `LNKB`), are written only when meaningful (≥1 item, or a
+nonzero dropped count that must survive), and are detected via the TOC
+(`IndexReader::has_event_index` / `has_link_index`). Rows are chronological
+like every per-row column; items within a row keep their original OTLP order.
+
+The optional `TRSU` chunk is the **per-file trace rollup** (traces signal):
+one row per DISTINCT set trace id in the file — the trace-level aggregate
+that lets a consumer fold trace counts/envelopes/roots across files WITHOUT
+assembling traces. A struct-of-arrays, index-parallel across every field,
+sorted ascending by trace id: `trace_ids` (16-byte arena), `root_span_ids`
+(8-byte arena; UNSET when the file holds no true root for the trace),
+`min_start_ns` / `max_end_ns` (`Vec<i64>`, the stored envelope — end is
+`start ⊕ duration`, saturating), `span_counts` / `error_counts` (`Vec<u32>`),
+`root_kinds` (`Vec<i32>`, raw OTLP kind; 0 when no true root),
+`root_is_true_root` (`Vec<u8>`, the tri-state claim flag: `0` = no
+unset-parent span of the trace is stored in this file — PROOF of local
+root absence; `1` = the root columns carry the file's claim; `2` = the
+claim was WITHHELD on an ambiguous tie — unset-parent spans exist but
+their pick is undecidable from recorded facets, so the root is unknown,
+neither absent nor any particular value), and `root_service_refs` /
+`root_name_refs` (`Vec<u32>`, file `KvId`s of the root's resource
+`service.name` / span `name` tokens, or the `u32::MAX` sentinel for absent).
+
+Semantics are deliberate and part of the contract:
+
+- Counts are **stored-row statistics**: a resent span counts every time it
+  is stored. The canonical `(span_id, kind)` resend dedup belongs to
+  assembly (`trace_combine`) and is NOT replicated here; consumers must
+  label rollup-derived numbers accordingly.
+- The root columns are **honest-or-absent**: populated only from a span
+  with a genuinely unset parent stored in THIS file (the earliest such span
+  wins; equal starts tie-break by ascending span id — the `summary_root`
+  convention). A full `(start_ns, span_id)` tie between candidates with
+  DIFFERENT recorded facets (kind, service, name) records `2` (WITHHELD)
+  instead of guessing a storage-order-dependent pick. For flags `0` and
+  `2` the other root columns are sentinels; a reader never synthesizes a
+  root, and only flag `0` may be read as proof that no root exists here.
+- The all-zero "unset" trace id is excluded (the `TIDX` rule).
+
+It lives after the span structures (`LNKB`), requires the `TRCE` column its
+data derives from, is written only when the file holds at least one set
+trace id, and is detected via the TOC (`IndexReader::has_trace_rollup`).
+Readers validate index-parallelism across all ten arrays at decode
+(`IndexReader::trace_rollup`). Same additive TOC-indexed contract as
+`TIDX`: presence needs no format version bump, and pre-rollup readers
+ignore it.
 
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
@@ -260,7 +358,8 @@ Heavy query-time metadata:
     // the file carries no per-row columns.
     pub struct ColumnEntry {
         pub name: String,        // "observed_ts" | "trace_id" | "span_id" | "flags"
-                                 //   | "dropped_attributes_count"
+                                 //   | "dropped_attributes_count" | "parent_span_id"
+                                 //   | "duration"
         pub ty:   ColumnType,    // I64 | U32 | FixedBytes(n)
     }
 
@@ -488,9 +587,10 @@ introduce one.
 A new **optional, TOC-indexed** chunk id is additive: it changes no
 existing chunk's bincode layout, a file without it simply omits it,
 and a reader that does not know it reads the rest unchanged. Adding
-one therefore needs **no version bump**. The optional per-row columns
-and the `TIDX` trace_id index (see [§ Chunk Ids](#chunk-ids)) follow
-exactly this rule.
+one therefore needs **no version bump**. The optional per-row columns,
+the `TIDX` trace_id index, the `TBLM` trace-id bloom, and the
+`EVNB`/`LNKB` span event/link structures (see [§ Chunk Ids](#chunk-ids))
+follow exactly this rule.
 
 ### When to bump the version
 

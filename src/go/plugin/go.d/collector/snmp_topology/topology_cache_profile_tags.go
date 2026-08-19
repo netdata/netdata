@@ -89,7 +89,7 @@ func (c *topologyCache) updateLocalBridgeIdentityFromTags(tags map[string]string
 	if c == nil || len(tags) == 0 {
 		return
 	}
-	if v := stpBridgeAddressToMAC(firstNonEmpty(tags[tagBridgeBaseAddress], tags[tagLegacyStpBaseBridgeAddr])); v != "" {
+	if v := stpBridgeAddressToMAC(topologyutil.FirstNonEmptyString(tags[tagBridgeBaseAddress], tags[tagLegacyStpBaseBridgeAddr])); v != "" {
 		c.applyAuthoritativeBridgeIdentity(v)
 	}
 }

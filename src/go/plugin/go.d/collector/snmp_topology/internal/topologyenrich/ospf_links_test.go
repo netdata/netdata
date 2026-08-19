@@ -22,6 +22,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentEmitsFullManagedLink(t *testing.T) 
 			ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "198.51.100.2", "full"),
 		},
 	}
+	handles := assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyOSPFAdjacency(&data, aggregate)
 
@@ -37,7 +38,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentEmitsFullManagedLink(t *testing.T) 
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["ospf_adjacency_emitted_links"])
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["ospf_adjacency_visible_links"])
 	require.Len(t, data.Actors[0].Detail.OSPF, 1)
-	require.Equal(t, "router-b", data.Actors[0].Detail.OSPF[0].RemoteActorID)
+	require.Equal(t, handles["router-b"], data.Actors[0].Detail.OSPF[0].RemoteActorHandle)
 }
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnly(t *testing.T) {
@@ -116,6 +117,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			handles := assignTopologyEnrichTestHandles(t, &tc.data)
 			stats := ApplyOSPFAdjacency(&tc.data, tc.aggregate)
 
 			require.Zero(t, stats.EmittedLinks)
@@ -129,10 +131,10 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsSuppressedNeighborsAsDetailOnl
 				require.Equal(t, tc.wantDetailState, row.State)
 			}
 			if tc.wantRemoteActorID != "" {
-				require.Equal(t, tc.wantRemoteActorID, row.RemoteActorID)
+				require.Equal(t, handles[tc.wantRemoteActorID], row.RemoteActorHandle)
 			}
 			if tc.wantRemoteActorIDAbsent {
-				require.Empty(t, row.RemoteActorID)
+				require.True(t, row.RemoteActorHandle.IsZero())
 			}
 			if tc.wantSuppressedStatsCounter != "" {
 				require.Equal(t, 1, topologyStatsToV1ForTest(t, tc.data.Stats)[tc.wantSuppressedStatsCounter])
@@ -154,6 +156,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalObservatio
 			ospfNeighborForTest("device-b", "2.2.2.2", "1.1.1.1", "198.51.100.1", "full"),
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyOSPFAdjacency(&data, aggregate)
 
@@ -166,10 +169,10 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalObservatio
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testing.T) {
 	l3Link := topologymodel.Link{
-		Protocol:   topologymodel.L3SubnetLinkType,
-		LinkType:   topologymodel.L3SubnetLinkType,
-		SrcActorID: "router-a",
-		DstActorID: "router-b",
+		Protocol:       topologymodel.L3SubnetLinkType,
+		LinkType:       topologymodel.L3SubnetLinkType,
+		SrcActorHandle: topologyEnrichTestActorHandle("router-a"),
+		DstActorHandle: topologyEnrichTestActorHandle("router-b"),
 		Src: topologymodel.LinkEndpoint{
 			Match: topologymodel.Match{IPAddresses: []string{"198.51.100.1"}},
 		},
@@ -199,6 +202,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testin
 			ospfNeighborForTest("device-a", "1.1.1.1", "2.2.2.2", "198.51.100.2", "full"),
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyOSPFAdjacency(&data, aggregate)
 
@@ -212,10 +216,10 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsMatchingL3SubnetEdge(t *testin
 
 func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testing.T) {
 	l3Link := topologymodel.Link{
-		Protocol:   topologymodel.L3SubnetLinkType,
-		LinkType:   topologymodel.L3SubnetLinkType,
-		SrcActorID: "router-a",
-		DstActorID: "router-b",
+		Protocol:       topologymodel.L3SubnetLinkType,
+		LinkType:       topologymodel.L3SubnetLinkType,
+		SrcActorHandle: topologyEnrichTestActorHandle("router-a"),
+		DstActorHandle: topologyEnrichTestActorHandle("router-b"),
 		Src: topologymodel.LinkEndpoint{
 			Match: topologymodel.Match{IPAddresses: []string{"203.0.113.1"}},
 		},
@@ -248,6 +252,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentKeepsUnrelatedL3SubnetEdge(t *testi
 	aggregate := topologymodel.ObservationAggregate{
 		OSPFNeighbors: []topologymodel.OSPFNeighbor{neighbor},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyOSPFAdjacency(&data, aggregate)
 
@@ -278,6 +283,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentResolvesUnnumberedNeighborByRouterI
 			},
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyOSPFAdjacency(&data, aggregate)
 
@@ -316,6 +322,7 @@ func TestApplyTopologyOSPFAdjacencyEnrichmentDeduplicatesBidirectionalUnnumbered
 			},
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyOSPFAdjacency(&data, aggregate)
 

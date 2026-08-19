@@ -13,10 +13,11 @@ import (
 )
 
 type builtEndpointActors struct {
-	actors             []projectedActor
-	count              int
-	matchByEndpointID  map[string]graph.Match
-	labelsByEndpointID map[string]map[string]string
+	actors                []projectedActor
+	count                 int
+	matchByEndpointID     map[string]graph.Match
+	linkMatchByEndpointID map[string]graph.Match
+	labelsByEndpointID    map[string]map[string]string
 }
 
 func buildEndpointActors(
@@ -93,8 +94,9 @@ func buildEndpointActors(
 
 	if len(accumulators) == 0 {
 		return builtEndpointActors{
-			matchByEndpointID:  map[string]graph.Match{},
-			labelsByEndpointID: map[string]map[string]string{},
+			matchByEndpointID:     map[string]graph.Match{},
+			linkMatchByEndpointID: map[string]graph.Match{},
+			labelsByEndpointID:    map[string]map[string]string{},
 		}
 	}
 
@@ -107,6 +109,7 @@ func buildEndpointActors(
 	actors := make([]projectedActor, 0, len(keys))
 	endpointCount := 0
 	matchByEndpointID := make(map[string]graph.Match, len(keys))
+	linkMatchByEndpointID := make(map[string]graph.Match, len(keys))
 	labelsByEndpointID := make(map[string]map[string]string, len(keys))
 	for _, endpointID := range keys {
 		acc := accumulators[endpointID]
@@ -121,6 +124,7 @@ func buildEndpointActors(
 		}
 		match.IPAddresses = sortedEndpointIPs(acc.ips)
 		matchByEndpointID[endpointID] = match
+		linkMatchByEndpointID[endpointID] = graph.LinkEndpointMatch(match, "")
 		labelsByEndpointID[endpointID] = map[string]string{
 			"learned_sources":    strings.Join(sortedTopologySet(acc.sources), ","),
 			"learned_device_ids": strings.Join(sortedTopologySet(acc.deviceIDs), ","),
@@ -178,10 +182,11 @@ func buildEndpointActors(
 	}
 
 	return builtEndpointActors{
-		actors:             actors,
-		count:              endpointCount,
-		matchByEndpointID:  matchByEndpointID,
-		labelsByEndpointID: labelsByEndpointID,
+		actors:                actors,
+		count:                 endpointCount,
+		matchByEndpointID:     matchByEndpointID,
+		linkMatchByEndpointID: linkMatchByEndpointID,
+		labelsByEndpointID:    labelsByEndpointID,
 	}
 }
 

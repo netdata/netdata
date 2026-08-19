@@ -47,8 +47,8 @@ use super::{OtelLogsHandler, RemoteRead};
 
 /// Minimum records per chunk when indexing an active WAL's prefix at
 /// query time. A fixed default for now; made configurable with the rest
-/// of chunk-cache governance. Logs-only (the traces stub has no query path).
-const CHUNK_MIN_ENTRIES: u64 = 16_384;
+/// of chunk-cache governance.
+pub(crate) const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// Maximum time startup waits on remote object storage (LIST/stat
 /// reconciliation) per tenant before proceeding to Ready. A slow/unreachable
 /// remote must not delay ingestion — on timeout the remote reconcile is skipped
@@ -370,7 +370,11 @@ pub(crate) async fn build_logs_pipeline(
     chunk_cache: Arc<ChunkCache>,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    let indexer = ComponentHandle::spawn::<Indexer>((), cancel.child_token());
+    // The logs seal: decode ng-flatten log frames into a full split-FST index.
+    let indexer = ComponentHandle::spawn::<Indexer>(
+        ng_index::build_sfst_file as crate::indexer::SealFn,
+        cancel.child_token(),
+    );
 
     // Owned clones for the handler closure: the builder body borrows `storage`
     // for recovery, while the handler needs its own `RemoteRead` (storage +

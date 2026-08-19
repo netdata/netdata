@@ -1,6 +1,6 @@
 ---
 name: pr-reviews
-description: Address pull-request comments and reviews iteratively until the PR is clean — fetch all comments with paranoid pagination, classify by author (AI bot vs human), verify each finding, address it, find similar patterns, reply per-thread, resolve threads, check CI before pushing, retrigger AI reviewers (cubic-dev-ai, copilot), and wait for new feedback. Use when the user says "address PR comments", "look at the reviews on PR N", "deal with the bot comments", "iterate on PR N until clean", or anything mentioning PR comments / reviews / cubic / copilot.
+description: Address pull-request comments and reviews iteratively until the PR is clean — fetch all comments with paranoid pagination, classify by author (AI bot vs human), verify each finding, address it, find similar patterns, reply per-thread, resolve threads, pull SonarCloud findings, check CI before pushing, retrigger AI reviewers (cubic-dev-ai, coderabbitai), and wait for new feedback. Use when the user says "address PR comments", "look at the reviews on PR N", "deal with the bot comments", "there is a coderabbit review", "another review", "iterate on PR N until clean", or anything mentioning PR comments / reviews / cubic / cubic-dev-ai / coderabbit / coderabbitai / copilot / sonar findings on a PR.
 ---
 
 # PR review handler skill
@@ -21,7 +21,7 @@ something to surface as a chat message.
 Sources of findings, in priority order:
 
 1. **Human review comments** -- maintainers / devs / community.
-2. **AI bot review comments** -- cubic-dev-ai, copilot, etc.
+2. **AI bot review comments** -- cubic-dev-ai, coderabbitai, etc.
 3. **SonarCloud PR findings** -- new code-smell / vulnerability /
    security-hotspot issues introduced by this PR. SonarCloud does NOT
    post these as inline GitHub review-comments; only a QualityGate
@@ -78,10 +78,21 @@ These are non-negotiable. Skipping any of them will cost the user time.
      re-check `ci-status.sh`. If checks are still running, that's normal,
      surface to the user. If there are failures, fix and iterate.
 8. **Re-trigger AI reviewers explicitly.** They do NOT react to thread
-   replies or pushed commits the way humans do.
-   - Copilot: re-add as a requested reviewer (`trigger-copilot.sh`).
+   replies or pushed commits the way humans do. Re-trigger every reviewer the
+   exit condition waits on -- if such a reviewer is never re-triggered it can
+   never post its "no new findings" pass, so the loop cannot end. A reviewer
+   that is deliberately excluded from the loop (see Copilot below) must also
+   be excluded from the exit condition, so the two lists always match.
    - cubic-dev-ai: post a new top-level comment mentioning it
      (`trigger-cubic.sh`).
+   - coderabbitai: post a new top-level comment with a command
+     (`trigger-coderabbit.sh`; `@coderabbitai review` is incremental,
+     `full review` re-reads the whole PR).
+   - Copilot: NOT re-triggered. Its billing model means the org normally has
+     no credits for it, so a re-request produces nothing and only adds
+     latency. `trigger-copilot.sh` is kept for the case where credits exist,
+     but it is not part of the loop and Copilot never blocks the exit
+     condition. Address any comments it does post like any other AI bot.
 9. **Don't loop forever on silent bots.** Some assistants stop responding.
    That's fine. Use `wait-for-activity.sh` with the 30-min timeout and
    move on if nothing changes.
@@ -117,11 +128,12 @@ These are non-negotiable. Skipping any of them will cost the user time.
 
 ## Author classes -- different handling per class
 
-- **AI bots** (`cubic-dev-ai[bot]`, `copilot[bot]` and variants): handle
+- **AI bots** (`cubic-dev-ai[bot]`, `coderabbitai[bot]`, `copilot[bot]` and
+  variants): handle
   autonomously. Verify the finding, fix or push back with reasoning, reply
   in-thread, resolve thread.
 - **Informational bots** (`sonarqubecloud[bot]`, `github-actions[bot]`,
-  `netdata-bot[bot]`, `coderabbitai[bot]`): read for signal (e.g. quality
+  `netdata-bot[bot]`): read for signal (e.g. quality
   gate status). They don't usually require a reply.
 - **Humans** (developers, maintainers, community): consult the user.
   Maintainer comments matter most -- in this project, we are usually
@@ -220,7 +232,10 @@ For thread N:
    ```
    `<comment-id>` is the `databaseId` of the FIRST comment in the thread
    (from `review-threads.json` -> `.[].comments.nodes[0].databaseId`).
-6. **Resolve the thread immediately after the reply succeeds.**
+6. **Resolve the thread immediately after the reply succeeds.** "Succeeds"
+   means you saw `posted reply id=...`. Resolving a thread whose reply failed
+   hides it from the needs-attention view with nothing written in it, which
+   reads to a human as a silently dismissed review.
    ```
    bash .agents/skills/pr-reviews/scripts/resolve-thread.sh <thread-id>
    ```
@@ -314,7 +329,7 @@ context is what gives an honest second look.
 
 Why this is non-negotiable:
 
-- AI reviewers (cubic-dev-ai, copilot, sonarqube) only surface their
+- AI reviewers (cubic-dev-ai, coderabbitai, sonarqube) only surface their
   top 3-7 findings. The full set of similar issues remains hidden.
 - Each fix can introduce its own new problems (a printf format-string
   fix that breaks color rendering, a portability fix that drops a
@@ -377,12 +392,14 @@ user, move on. Do not make drive-by fixes here.
 After pushing the fix commit(s):
 
 ```
-bash .agents/skills/pr-reviews/scripts/trigger-copilot.sh <PR_NUMBER>
-bash .agents/skills/pr-reviews/scripts/trigger-cubic.sh   <PR_NUMBER>
+bash .agents/skills/pr-reviews/scripts/trigger-cubic.sh      <PR_NUMBER>
+bash .agents/skills/pr-reviews/scripts/trigger-coderabbit.sh <PR_NUMBER>
 ```
 
-Copilot re-runs when re-requested as a reviewer. cubic re-reviews when
-mentioned in a new top-level PR comment.
+cubic and coderabbit re-review when mentioned in a new top-level PR comment.
+Copilot is deliberately absent: see rule 8. If you add a reviewer to
+`PR_AI_BOT_RE`, add its re-trigger here in the same change -- a classified
+reviewer with no re-trigger is silently skipped every iteration.
 
 ### 6. Wait for new activity
 
@@ -409,8 +426,9 @@ Go back to step 1. Continue until ALL of these are true:
 - `fetch-sonar-findings.sh` reports zero open issues / hotspots that
   this PR introduced (or the remaining ones are explicitly marked FP /
   WontFix).
-- The AI bots have posted a "no new findings" or equivalent comment
-  after their most recent re-trigger.
+- The re-triggered AI bots (cubic-dev-ai, coderabbitai) have posted a
+  "no new findings" or equivalent comment after their most recent
+  re-trigger. Copilot is not re-triggered and never gates this.
 - `ci-status.sh` reports no failures caused by this PR (failures
   unrelated to the PR are noted, surfaced to the user, but not fixed).
 
@@ -474,13 +492,36 @@ behalf without explicit direction.
 | Bot                          | Role                                       | Re-trigger                                       |
 |------------------------------|--------------------------------------------|--------------------------------------------------|
 | `cubic-dev-ai[bot]`          | Line-level code review                     | New PR comment mentioning `@cubic-dev-ai`        |
-| `copilot[bot]`               | Line-level code review                     | Re-add as requested reviewer (`gh pr edit`)      |
+| `coderabbitai[bot]`          | Line-level code review                     | `trigger-coderabbit.sh` (`@coderabbitai review`) -- NEVER `@coderabbit`, that is a different, unrelated GitHub user |
+| `copilot[bot]`               | Line-level code review                     | Not re-triggered -- no credits (see rule 8)      |
 | `sonarqubecloud[bot]`        | Quality-gate status                        | Auto, on each scan run -- read its issue comment |
 | `github-actions[bot]`        | CI status / labels                         | Auto, on each workflow run                        |
 | `netdata-bot[bot]`           | Repo automation (labels, etc.)             | Auto                                              |
 
 If a new AI reviewer appears in the project, classify it by adding to
 `PR_AI_BOT_RE` in `_lib.sh` so the skill recognizes it.
+
+## Reviewer-specific notes
+
+- **The mention is `@coderabbitai`, never `@coderabbit`.** `@coderabbit` is a
+  real, unrelated GitHub user; mentioning it pings a stranger on every
+  iteration and never reaches the bot. `trigger-coderabbit.sh` hardcodes the
+  correct handle -- do not hand-write the mention. The same care applies to
+  `@cubic-dev-ai`. Before posting any comment containing an `@`, check the
+  handle against the bot directory above.
+
+- **`coderabbitai[bot]` posts line-level findings**, not just summaries. It was
+  originally classified here as informational; it is an AI reviewer and its
+  threads need the same verify-reply-resolve treatment as cubic's.
+- coderabbit cites external URLs (learn.netdata.cloud, upstream GitHub) as
+  evidence. Those citations are often *directionally* right but not
+  authoritative for the branch under review -- verify against the source in the
+  checkout before acting. Example: it correctly flagged that a Function needs a
+  signed-in identity, but the proof is the `HTTP_ACCESS_*` flags in the
+  producer, not the doc page it linked.
+- Both reviewers will flag a generated page's *content* when the real defect is
+  in the generator or the shared template. Fix the producer, regenerate, and say
+  so in the reply -- otherwise the same finding returns on the next vendor page.
 
 ## Failure modes -- quick diagnosis
 
@@ -489,8 +530,10 @@ If a new AI reviewer appears in the project, classify it by adding to
 | `fetch-all.sh` returns suspiciously round counts       | Pagination missed pages. Re-run; fetch-all auto-probes when count is a multiple of 100. |
 | A GraphQL helper script fails with `cursor_args[@]: unbound variable` | macOS Bash 3.2 plus `set -u` treats empty array expansion as unbound. Keep `gh api` argument arrays non-empty before expansion or branch the first-page GraphQL call. This affected both `fetch-all.sh` and `wait-for-activity.sh`. |
 | `reply-thread.sh` -> 404                               | Wrong comment id (use `databaseId` from `review-threads.json`, not the GraphQL node id). |
+| `reply-thread.sh` -> `line N: 2: usage`, yet the thread ends up resolved | The comment id expanded to empty AND the resolve ran anyway. Never chain reply and resolve so that resolve can run after reply fails: run `reply-thread.sh`, confirm it printed `posted reply id=...`, THEN resolve. See the bash-vs-zsh note below. |
+| An associative-array lookup (`${MAP[key]}`) is empty in a helper loop | The interactive shell here is zsh, not bash. `declare -A` plus `${MAP[key]}` does not behave the same, so ids silently expand to nothing. Pass literal ids, or drive the loop from `python3` output one line at a time, rather than building a shell map. |
 | `resolve-thread.sh` -> "thread not found"              | Used REST id instead of GraphQL node id.                              |
-| `trigger-copilot.sh` succeeds but no new review        | Reviewer was already requested -- script removes-then-adds to force a fresh run. If still nothing, copilot may be quota-limited; wait. |
+| `trigger-copilot.sh` succeeds but no new review        | Expected. The org has no Copilot review credits, which is why it is not in the loop. Do not wait on it. |
 | `trigger-cubic.sh` succeeds but no new review          | cubic ignores comments without an explicit `@cubic-dev-ai` mention. The script always prepends it. |
 | `ci-status.sh` exits 2 (running)                       | CI hasn't finished. Push anyway -- waiting on CI between iterations destroys throughput. The next push triggers a fresh CI run on the new code, which is what matters. (See Step 4b.) |
 | Bot keeps re-flagging the same line after a fix push   | The bot didn't see the new commit because it wasn't re-triggered.    |

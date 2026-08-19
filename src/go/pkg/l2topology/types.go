@@ -24,6 +24,10 @@ type Interface = model.Interface
 // Adjacency represents a direct device-to-device neighbor relation.
 type Adjacency = model.Adjacency
 
+// AdjacencyPortEvidence keeps observed port namespaces distinct from raw
+// protocol port identifiers.
+type AdjacencyPortEvidence = model.AdjacencyPortEvidence
+
 // Attachment ties an endpoint to a device interface.
 type Attachment = model.Attachment
 

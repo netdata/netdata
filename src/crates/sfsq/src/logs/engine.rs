@@ -31,28 +31,10 @@ use super::query::LogsQuery;
 use super::result::LogsData;
 use super::wal_scan::WalScan;
 
-/// Where an SFST candidate's bytes come from.
-///
-/// `File` is the steady-state case — a sealed index on disk, memory-
-/// mapped lazily. `Memory` is an in-memory SFST built from a chunk of an
-/// active WAL (`ng_index::build_sfst_range`); the bytes are shared (`Arc`) so a
-/// query holds them alive even if the producing cache evicts the entry
-/// mid-query.
-#[derive(Clone)]
-pub enum Source {
-    File(PathBuf),
-    Memory(Arc<Vec<u8>>),
-}
-
-impl Source {
-    /// A short label for log/error context.
-    pub(super) fn describe(&self) -> std::borrow::Cow<'_, str> {
-        match self {
-            Source::File(p) => p.display().to_string().into(),
-            Source::Memory(_) => "<in-memory chunk>".into(),
-        }
-    }
-}
+// The bytes-provenance type is signal-neutral and shared with the traces
+// engine; re-exported here so `sfsq::logs::Source` stays a valid path for
+// existing consumers (otel-ledger, sfsq-cli).
+pub use crate::source::Source;
 
 /// A query candidate: an SFST whose time range overlaps the request
 /// window — either a sealed on-disk file or an in-memory chunk built

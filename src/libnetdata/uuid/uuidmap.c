@@ -67,7 +67,8 @@ static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
         fatal("UUIDMAP: Maximum ID limit reached for partition %u. UUIDs exhausted.",
               (unsigned int)(partition - uuid_map.p));
 
-    // IDs are never reused, so the sequence space is lifetime capacity.
+    // IDs are never reused while the map lives (uuidmap_destroy() restarts the
+    // sequence), so the sequence space is this map's lifetime capacity.
     // next_id is monotonic and only changes under the partition write lock,
     // so the equality check fires exactly once per partition.
     if (unlikely(partition->next_id == (UUIDMAP_ID_SEQ_MASK / 10) * 9))
@@ -82,23 +83,30 @@ static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
     return uuidmap_make_id(partition - uuid_map.p, ++partition->next_id);
 }
 
-static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
-    UUIDMAP_ID id = 0;
+// Resolves uuid -> id through the uuid_to_id index. The caller MUST already hold
+// the partition lock. Returns 0 when the uuid is not indexed.
+//
+// This does no refcount work at all: on its own the returned id is only a key,
+// not a handle. Callers that need the entry to stay alive must acquire a
+// reference themselves while still holding the lock.
+static ALWAYS_INLINE UUIDMAP_ID uuidmap_id_by_uuid_locked(const nd_uuid_t uuid, uint8_t partition) {
+    Pvoid_t *PValue = JudyHSGet(uuid_map.p[partition].uuid_to_id, (void *)uuid, sizeof(nd_uuid_t));
+    if(unlikely(PValue == PJERR))
+        fatal("UUIDMAP: corrupted JudyHS array");
 
+    return (PValue && *PValue) ? *(UUIDMAP_ID *)PValue : 0;
+}
+
+static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     uint8_t partition = uuid_to_uuidmap_partition(uuid);
 
     // try to find it in the JudyHS - we may have it already
     rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
-    Pvoid_t *PValue = JudyHSGet(uuid_map.p[partition].uuid_to_id, (void *)uuid, sizeof(nd_uuid_t));
-    if(PValue == PJERR)
-        fatal("UUIDMAP: corrupted JudyHS array");
 
-    if(PValue && *PValue) {
-        // it is found
-
-        id = *(UUIDMAP_ID *)PValue;
-
-        PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
+    UUIDMAP_ID id = uuidmap_id_by_uuid_locked(uuid, partition);
+    if(id) {
+        // it is found - take a reference before we drop the lock
+        Pvoid_t *PValue = JudyLGet(uuid_map.p[partition].id_to_uuid, id, PJE0);
         if (!PValue || PValue == PJERR)
             fatal("UUIDMAP: corrupted JudyL array");
 
@@ -108,6 +116,16 @@ static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
     }
 
     rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+    return id;
+}
+
+UUIDMAP_ID uuidmap_peek_id(const nd_uuid_t uuid) {
+    uint8_t partition = uuid_to_uuidmap_partition(uuid);
+
+    rw_spinlock_read_lock(&uuid_map.p[partition].spinlock);
+    UUIDMAP_ID id = uuidmap_id_by_uuid_locked(uuid, partition);
+    rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+
     return id;
 }
 
@@ -463,6 +481,23 @@ static int uuidmap_destroy_referenced_entry_unittest(void) {
         errors++;
     }
 
+    // A destroy that could not proceed must ALSO not have restarted the id
+    // sequence. This is the guarantee that makes a borrowed, unreferenced id
+    // (uuidmap_peek_id) safe: ids are unique per map lifetime, and a map cannot
+    // be torn down underneath a live reference. If a failed destroy reset
+    // next_id, the id issued below would collide with the one still held above.
+    nd_uuid_t same_partition_uuid;
+    uuid_generate_random(same_partition_uuid);
+    same_partition_uuid[15] = test_uuid[15];    // same partition => same id sequence
+
+    UUIDMAP_ID id2 = uuidmap_create(same_partition_uuid);
+    if(id2 == id) {
+        fprintf(stderr, "ERROR: id sequence restarted despite a failed destroy - "
+                        "id %u was issued twice for different UUIDs\n", id);
+        errors++;
+    }
+    uuidmap_free(id2);
+
     uuidmap_free(id);
 
     referenced = uuidmap_destroy();
@@ -716,11 +751,88 @@ static int uuidmap_concurrent_unittest(void) {
     return errors;
 }
 
+// Verifies the uuidmap_peek_id() contract: it resolves a uuid to its id WITHOUT
+// creating it and WITHOUT taking a reference. Both halves matter -- a leaked
+// reference would keep entries alive forever, and a created-on-miss entry would
+// reintroduce the create/delete churn peek exists to avoid.
+static int uuidmap_peek_id_unittest(void) {
+    fprintf(stderr, "\nTesting UUID Map peek (non-owning lookup)...\n");
+    int errors = 0;
+
+    nd_uuid_t uuid;
+    uuid_generate_random(uuid);
+
+    // 1. an unknown uuid must miss, and must NOT be inserted as a side effect
+    UUIDMAP_ID id = uuidmap_peek_id(uuid);
+    if(id != 0) {
+        fprintf(stderr, "ERROR: peek returned id %u for an unknown UUID (expected 0)\n", id);
+        errors++;
+    }
+    if(uuidmap_peek_id(uuid) != 0) {
+        fprintf(stderr, "ERROR: peek created the UUID it was asked to look up\n");
+        errors++;
+    }
+
+    // 2. a known uuid must resolve to exactly the id create() handed out
+    UUIDMAP_ID created = uuidmap_create(uuid);
+    if(!created) {
+        fprintf(stderr, "ERROR: cannot create UUID for the peek test\n");
+        return errors + 1;
+    }
+
+    if((id = uuidmap_peek_id(uuid)) != created) {
+        fprintf(stderr, "ERROR: peek returned %u, expected %u\n", id, created);
+        errors++;
+    }
+
+    // 3. peek must take no reference: after many peeks, the SINGLE outstanding
+    //    reference from create() must still be enough to delete the entry
+    for(size_t i = 0; i < 1000 ;i++) {
+        if(uuidmap_peek_id(uuid) != created) {
+            fprintf(stderr, "ERROR: peek became unstable at iteration %zu\n", i);
+            errors++;
+            break;
+        }
+    }
+
+    uuidmap_free(created);
+
+    if(uuidmap_uuid_ptr(created) != NULL) {
+        fprintf(stderr, "ERROR: entry survived its last free - peek leaked a reference\n");
+        errors++;
+    }
+
+    // 4. peek must not report (or resurrect) a deleted entry
+    if((id = uuidmap_peek_id(uuid)) != 0) {
+        fprintf(stderr, "ERROR: peek returned id %u for a deleted UUID (expected 0)\n", id);
+        errors++;
+    }
+
+    // 5. within a map lifetime ids are never reused - this is what makes a stale
+    //    peeked id safe as a bare lookup key: it can only miss, never alias.
+    //    (uuidmap_destroy() does restart the sequence, but cannot succeed while
+    //    anything holds a reference - covered by the destroy test above.)
+    UUIDMAP_ID recreated = uuidmap_create(uuid);
+    if(recreated == created) {
+        fprintf(stderr, "ERROR: recreate reused id %u - ids must never be reused\n", created);
+        errors++;
+    }
+    uuidmap_free(recreated);
+
+    if(errors)
+        fprintf(stderr, "UUID Map peek test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "UUID Map peek test: OK\n");
+
+    return errors;
+}
+
 int uuidmap_unittest(void) {
     fprintf(stderr, "\nTesting UUID Map...\n");
 
     const size_t ENTRIES = 100000;
     int errors = uuidmap_destroy_referenced_entry_unittest();
+    errors += uuidmap_peek_id_unittest();
     errors += uuidmap_locked_lookup_delete_interleaving_unittest();
     errors += uuidmap_concurrent_unittest();
 

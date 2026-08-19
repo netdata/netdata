@@ -24,7 +24,10 @@ func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topolog
 	if dnsCandidates != nil {
 		options.ResolveDNSName = dnsCandidates.lookupCached
 	}
-	data, ok := a.registry.snapshotWithOptions(options)
+	data, ok, err := a.registry.snapshotWithOptions(options)
+	if err != nil {
+		return topologyv1.Data{}, false, err
+	}
 	if !ok {
 		return topologyv1.Data{}, false, nil
 	}

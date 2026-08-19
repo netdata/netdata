@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
@@ -22,6 +23,7 @@ func TestTopologyL3ActorResolverSuppressesAmbiguousIP(t *testing.T) {
 			topologyL3ManagedActorForTest("router-b", nil, "198.51.100.1"),
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	resolver := newTopologyL3ActorResolver(&data, nil)
 	_, ok := resolver.resolve(topologymodel.L3Interface{
@@ -30,6 +32,53 @@ func TestTopologyL3ActorResolverSuppressesAmbiguousIP(t *testing.T) {
 	})
 
 	require.False(t, ok)
+}
+
+func TestTopologyL3ActorResolverSuppressesAmbiguousSnapshotIdentity(t *testing.T) {
+	data := topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			topologyL3ManagedActorForTest("router-a", nil, "198.51.100.1"),
+			topologyL3ManagedActorForTest("router-b", nil, "198.51.100.2"),
+		},
+	}
+	data.Actors[0].Match.SysName = "shared-router"
+	data.Actors[1].Match.SysName = "shared-router"
+	snapshots := []topologymodel.ObservationSnapshot{{
+		LocalDeviceID: "shared-device-id",
+		LocalDevice: topologymodel.Device{
+			SysName:      "shared-router",
+			OSPFRouterID: "192.0.2.100",
+		},
+	}}
+	assignTopologyEnrichTestHandles(t, &data)
+
+	resolver := newTopologyL3ActorResolver(&data, snapshots)
+	_, deviceOK := resolver.resolveDeviceID("shared-device-id")
+	_, routerOK := resolver.resolveRouterID("192.0.2.100")
+
+	require.False(t, deviceOK)
+	require.False(t, routerOK)
+}
+
+func TestTopologyL3ActorResolverIndexesOnlyManagedSNMPDevices(t *testing.T) {
+	managed := topologyL3ManagedActorForTest("managed", nil, "198.51.100.1")
+	nonSNMP := topologyL3ManagedActorForTest("non-snmp", nil, "198.51.100.1")
+	nonSNMP.Source = "lldp"
+	inferred := topologyL3ManagedActorForTest("inferred", map[string]any{"inferred": true}, "198.51.100.1")
+	endpoint := topologyL3ManagedActorForTest("endpoint", nil, "198.51.100.1")
+	endpoint.ActorType = "endpoint"
+	data := topologymodel.Data{Actors: []topologymodel.Actor{nonSNMP, inferred, endpoint, managed}}
+	snapshots := []topologymodel.ObservationSnapshot{{
+		LocalDeviceID: "polled-device",
+		LocalDevice:   topologymodel.Device{ManagementIP: "198.51.100.1"},
+	}}
+	assignTopologyEnrichTestHandles(t, &data)
+
+	resolver := newTopologyL3ActorResolver(&data, snapshots)
+	ref, ok := resolver.resolveDeviceID("polled-device")
+
+	require.True(t, ok)
+	require.Equal(t, "managed", ref.actorID)
 }
 
 func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
@@ -96,6 +145,7 @@ func TestApplyTopologyL3SubnetEnrichmentSuppressions(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			assignTopologyEnrichTestHandles(t, &tc.data)
 			stats := ApplyL3Subnet(&tc.data, tc.aggregate)
 
 			if tc.wantLinks == nil {
@@ -131,6 +181,7 @@ func TestApplyTopologyL3SubnetEnrichmentEmitsSegmentMemberships(t *testing.T) {
 			{DeviceID: "unmanaged", IP: "203.0.113.4", Netmask: "255.255.255.0", IfIndex: "4", IfName: "xe-0/0/4", IfDescr: "unmanaged"},
 		},
 	}
+	handles := assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyL3Subnet(&data, aggregate)
 
@@ -153,8 +204,8 @@ func TestApplyTopologyL3SubnetEnrichmentEmitsSegmentMemberships(t *testing.T) {
 
 	memberships := topologyLinksByTypeForTest(data.Links, topologymodel.L3SubnetMembershipLinkType)
 	require.Len(t, memberships, 3)
-	require.Equal(t, "router-a", memberships[0].SrcActorID)
-	require.Equal(t, segments[0].ActorID, memberships[0].DstActorID)
+	require.Equal(t, handles["router-a"], memberships[0].SrcActorHandle)
+	require.Equal(t, segments[0].ActorHandle, memberships[0].DstActorHandle)
 	require.NotNil(t, memberships[0].Detail.L3SubnetMembership)
 	require.Equal(t, "203.0.113.0/24", memberships[0].Detail.L3SubnetMembership.Subnet)
 	require.Equal(t, []topologymodel.L3SubnetMembershipInterface{
@@ -180,6 +231,7 @@ func TestApplyTopologyL3SubnetEnrichmentDropsDuplicateSegmentMemberIP(t *testing
 			{DeviceID: "router-b", IP: "203.0.113.2", Netmask: "255.255.255.0", IfIndex: "2", IfName: "xe-0/0/2"},
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyL3Subnet(&data, aggregate)
 
@@ -192,7 +244,11 @@ func TestApplyTopologyL3SubnetEnrichmentDropsDuplicateSegmentMemberIP(t *testing
 
 	memberships := topologyLinksByTypeForTest(data.Links, topologymodel.L3SubnetMembershipLinkType)
 	require.Len(t, memberships, 3)
-	require.Equal(t, []string{"router-a", "router-b", "router-d"}, topologyLinkSrcActorIDsForTest(memberships))
+	require.Equal(t, []topologymodel.ActorHandle{
+		topologyEnrichTestActorHandle("router-a"),
+		topologyEnrichTestActorHandle("router-b"),
+		topologyEnrichTestActorHandle("router-d"),
+	}, topologyLinkSrcActorHandlesForTest(memberships))
 }
 
 func TestApplyTopologyL3SubnetEnrichmentAggregatesMultipleMemberInterfaces(t *testing.T) {
@@ -210,6 +266,7 @@ func TestApplyTopologyL3SubnetEnrichmentAggregatesMultipleMemberInterfaces(t *te
 			{DeviceID: "router-a", IP: "203.0.113.1", Netmask: "255.255.255.0", IfIndex: "1", IfName: "xe-0/0/1", IfDescr: "transit-a-primary"},
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyL3Subnet(&data, aggregate)
 
@@ -245,6 +302,7 @@ func TestApplyTopologyL3SubnetEnrichmentOmitsSegmentsWithoutProducerScope(t *tes
 			l3InterfaceForTest("router-b", "203.0.113.2", "255.255.255.0", "2"),
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyL3Subnet(&data, aggregate)
 
@@ -257,10 +315,10 @@ func TestApplyTopologyL3SubnetEnrichmentOmitsSegmentsWithoutProducerScope(t *tes
 
 func topologyL3SubnetLinkForTest(srcActorID, dstActorID, subnet string, prefix any) topologymodel.Link {
 	return topologymodel.Link{
-		Protocol:   topologymodel.L3SubnetLinkType,
-		LinkType:   topologymodel.L3SubnetLinkType,
-		SrcActorID: srcActorID,
-		DstActorID: dstActorID,
+		Protocol:       topologymodel.L3SubnetLinkType,
+		LinkType:       topologymodel.L3SubnetLinkType,
+		SrcActorHandle: topologyEnrichTestActorHandle(srcActorID),
+		DstActorHandle: topologyEnrichTestActorHandle(dstActorID),
 		Detail: topologymodel.LinkDetail{
 			L3Subnet: &topologymodel.L3SubnetLinkDetail{
 				Subnet: subnet,
@@ -290,18 +348,19 @@ func topologyLinksByTypeForTest(links []topologymodel.Link, linkType string) []t
 	return out
 }
 
-func topologyLinkSrcActorIDsForTest(links []topologymodel.Link) []string {
-	out := make([]string, 0, len(links))
+func topologyLinkSrcActorHandlesForTest(links []topologymodel.Link) []topologymodel.ActorHandle {
+	out := make([]topologymodel.ActorHandle, 0, len(links))
 	for _, link := range links {
-		out = append(out, link.SrcActorID)
+		out = append(out, link.SrcActorHandle)
 	}
 	return out
 }
 
 func requireTopologyLinkBySrcActorIDForTest(t *testing.T, links []topologymodel.Link, actorID string) topologymodel.Link {
 	t.Helper()
+	want := topologyEnrichTestActorHandle(actorID)
 	for _, link := range links {
-		if link.SrcActorID == actorID {
+		if link.SrcActorHandle == want {
 			return link
 		}
 	}
@@ -310,9 +369,13 @@ func requireTopologyLinkBySrcActorIDForTest(t *testing.T, links []topologymodel.
 }
 
 func TestTopologyL3SubnetLinkKeySeparatesDelimitedFields(t *testing.T) {
+	handles := graph.NewActorHandleAllocator()
+	first := handles.Next()
+	second := handles.Next()
+	third := handles.Next()
 	left := topologymodel.Link{
-		SrcActorID: "a|b",
-		DstActorID: "c",
+		SrcActorHandle: first,
+		DstActorHandle: second,
 		Detail: topologymodel.LinkDetail{
 			L3Subnet: &topologymodel.L3SubnetLinkDetail{
 				Subnet: "198.51.100.0/30",
@@ -321,8 +384,8 @@ func TestTopologyL3SubnetLinkKeySeparatesDelimitedFields(t *testing.T) {
 		},
 	}
 	right := topologymodel.Link{
-		SrcActorID: "a",
-		DstActorID: "b|c",
+		SrcActorHandle: first,
+		DstActorHandle: third,
 		Detail: topologymodel.LinkDetail{
 			L3Subnet: &topologymodel.L3SubnetLinkDetail{
 				Subnet: "198.51.100.0/30",
@@ -346,10 +409,10 @@ func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Protocol:   topologymodel.L3SubnetLinkType,
-				LinkType:   topologymodel.L3SubnetLinkType,
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
+				Protocol:       topologymodel.L3SubnetLinkType,
+				LinkType:       topologymodel.L3SubnetLinkType,
+				SrcActorHandle: topologyEnrichTestActorHandle("router-a"),
+				DstActorHandle: topologyEnrichTestActorHandle("router-b"),
 				Detail: topologymodel.LinkDetail{
 					L3Subnet: &topologymodel.L3SubnetLinkDetail{
 						Subnet: "198.51.100.0/30",
@@ -359,6 +422,7 @@ func TestApplyTopologyDepthFocusFilterKeepsIncidentL3SubnetLink(t *testing.T) {
 			},
 		},
 	}
+	assignTopologyEnrichTestHandles(t, &data)
 
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:198.51.100.1",

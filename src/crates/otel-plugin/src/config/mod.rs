@@ -891,6 +891,16 @@ logs:
         );
     }
 
+    #[test]
+    fn tempo_key_is_rejected() {
+        // The Tempo shim was removed; strict parsing refuses its former key
+        // so a stale config fails loudly instead of silently not listening.
+        let err = resolve_with_user("traces:\n  tempo:\n    enabled: true\n").unwrap_err();
+        assert!(format!("{err:#}").contains("unknown field `tempo`"), "{err:#}");
+        let err = resolve_with_user("logs:\n  tempo:\n    enabled: true\n").unwrap_err();
+        assert!(format!("{err:#}").contains("unknown field `tempo`"), "{err:#}");
+    }
+
     // -- Validation --
 
     #[test]
@@ -1453,11 +1463,11 @@ logs:
         );
         assert!(!config.auth.enabled);
 
-        // The shipped file intentionally has NO traces section (feature under
-        // active development); traces must resolve entirely from the schema's
-        // code defaults, which the shared loop below pins to the shipped logs
-        // values (the lockstep guard for the two sources of the same numbers).
-        assert!(!substituted.contains("\ntraces:"));
+        // The shipped file documents the traces section (visible since the
+        // phase-3 production cutover, plan decision D8) with the same tuning
+        // as logs; the shared loop below pins both signals to those shipped
+        // values (and the hidden knobs to their code defaults).
+        assert!(substituted.contains("\ntraces:"));
         // And no internal storage vocabulary: the public schema is flat
         // (rotation/retention/catalog directly under the signal).
         assert!(!substituted.contains("wal:"));

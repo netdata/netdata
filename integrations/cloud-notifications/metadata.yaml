@@ -3,6 +3,7 @@
 - id: "notify-cloud-mobile-app"
   meta:
     name: "Netdata Mobile App"
+    description: "Receive Netdata Cloud alert notifications on linked Android and iOS devices through the Netdata Mobile App."
     link: "https://netdata.cloud"
     categories:
       - notify.cloud
@@ -34,6 +35,7 @@
 - id: "notify-cloud-discord"
   meta:
     name: "Discord"
+    description: "Send Netdata Cloud alert notifications to Discord channels through an incoming webhook."
     link: "https://discord.com/"
     categories:
       - notify.cloud
@@ -73,6 +75,7 @@
 - id: "notify-cloud-pagerduty"
   meta:
     name: "PagerDuty"
+    description: "Send Netdata Cloud alert notifications to PagerDuty services through the Events API v2 integration."
     link: "https://www.pagerduty.com/"
     categories:
       - notify.cloud
@@ -112,6 +115,7 @@
 - id: "notify-cloud-slack"
   meta:
     name: "Slack"
+    description: "Send Netdata Cloud alert notifications to selected Slack channels through incoming webhooks."
     link: "https://slack.com/"
     categories:
       - notify.cloud
@@ -156,6 +160,7 @@
 - id: "notify-cloud-opsgenie"
   meta:
     name: "Opsgenie"
+    description: "Send Netdata Cloud alert notifications to an Opsgenie team through its API integration."
     link: "https://www.atlassian.com/software/opsgenie"
     categories:
       - notify.cloud
@@ -194,6 +199,7 @@
 - id: "notify-cloud-mattermost"
   meta:
     name: "Mattermost"
+    description: "Send Netdata Cloud alert notifications to a Mattermost channel through an incoming webhook."
     link: "https://mattermost.com/"
     categories:
       - notify.cloud
@@ -236,6 +242,7 @@
 - id: "notify-cloud-rocketchat"
   meta:
     name: "RocketChat"
+    description: "Send Netdata Cloud alert notifications to Rocket.Chat channels through an incoming webhook."
     link: "https://www.rocket.chat/"
     categories:
       - notify.cloud
@@ -279,6 +286,7 @@
 - id: "notify-cloud-awssns"
   meta:
     name: "Amazon SNS"
+    description: "Publish Netdata Cloud alert notifications to an Amazon SNS topic for downstream delivery and processing."
     link: "https://aws.amazon.com/sns/"
     categories:
       - notify.cloud
@@ -320,6 +328,7 @@
 - id: "notify-cloud-microsoftteams"
   meta:
     name: "Microsoft Teams"
+    description: "Send Netdata Cloud alert notifications to Microsoft Teams channels through webhook workflows."
     link: "https://www.microsoft.com/en-us/microsoft-teams"
     categories:
       - notify.cloud
@@ -363,6 +372,7 @@
 - id: "notify-cloud-telegram"
   meta:
     name: "Telegram"
+    description: "Send Netdata Cloud alert notifications to Telegram chats and topics through a configured bot."
     link: "https://telegram.org/"
     categories:
       - notify.cloud
@@ -405,6 +415,7 @@
 - id: "notify-cloud-splunk"
   meta:
     name: "Splunk"
+    description: "Send Netdata Cloud alert notifications to Splunk through its HTTP Event Collector endpoint."
     link: "https://splunk.com/"
     categories:
       - notify.cloud
@@ -438,6 +449,7 @@
 - id: "notify-cloud-victorops"
   meta:
     name: "Splunk VictorOps"
+    description: "Send Netdata Cloud alert notifications to Splunk VictorOps through a REST endpoint integration."
     link: "https://www.splunk.com/en_us/about-splunk/acquisitions/splunk-on-call.html"
     categories:
       - notify.cloud
@@ -472,6 +484,7 @@
 - id: "notify-cloud-webhook"
   meta:
     name: "Webhook"
+    description: "Send Netdata Cloud alert notifications to a custom HTTPS webhook with configurable authentication."
     link: "https://en.wikipedia.org/wiki/Webhook"
     categories:
       - notify.cloud
@@ -667,6 +680,7 @@
 - id: "notify-cloud-ilert"
   meta:
     name: "ilert"
+    description: "Send Netdata Cloud alert notifications to an ilert alert source through its API integration."
     link: "https://www.ilert.com/"
     categories:
       - notify.cloud
@@ -711,6 +725,7 @@
 - id: "notify-cloud-servicenow"
   meta:
     name: "ServiceNow"
+    description: "Send Netdata Cloud alert notifications to ServiceNow Event Management through its event API."
     link: "https://www.servicenow.com/"
     categories:
       - notify.cloud
@@ -756,6 +771,7 @@
     categories:
       - notify.cloud
     icon_filename: "group_email.svg"
+    description: "Group Email sends Space-wide alert notifications to a shared group or mailing-list address, independently of each member's notification settings."
   keywords:
     - group email
     - mailing list

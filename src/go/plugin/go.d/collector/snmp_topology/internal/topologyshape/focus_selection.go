@@ -5,23 +5,29 @@ package topologyshape
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-	"slices"
 )
 
-func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[string]struct{} {
-	roots := make(map[string]struct{})
-	for actorID, actor := range graph.actorByID {
-		if _, ok := graph.nonSegmentSet[actorID]; !ok {
+func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[topologymodel.ActorHandle]struct{} {
+	roots := make(map[topologymodel.ActorHandle]struct{})
+	normalizedFocusIPs := make(map[string]struct{}, len(focusIPs))
+	for _, focusIP := range focusIPs {
+		if ip := topologyutil.NormalizeIPAddress(focusIP); ip != "" {
+			normalizedFocusIPs[ip] = struct{}{}
+		}
+	}
+	for actorHandle, actor := range graph.actorByHandle {
+		if _, ok := graph.nonSegmentSet[actorHandle]; !ok {
 			continue
 		}
 		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
 			continue
 		}
-		for _, focusIP := range focusIPs {
-			if !topologyActorHasIP(actor, focusIP) {
+		actorIPs := topologyActorIPs(actor)
+		for focusIP := range normalizedFocusIPs {
+			if _, ok := actorIPs[focusIP]; !ok {
 				continue
 			}
-			roots[actorID] = struct{}{}
+			roots[actorHandle] = struct{}{}
 			break
 		}
 	}
@@ -33,8 +39,19 @@ func topologyActorHasIP(actor topologymodel.Actor, ip string) bool {
 	if ip == "" {
 		return false
 	}
-	if slices.Contains(topologymodel.NormalizedMatchIPs(actor.Match), ip) {
-		return true
+	_, ok := topologyActorIPs(actor)[ip]
+	return ok
+}
+
+func topologyActorIPs(actor topologymodel.Actor) map[string]struct{} {
+	matchIPs := topologymodel.NormalizedMatchIPs(actor.Match)
+	managementIPs := topologymodel.ActorDetailManagementIPs(actor)
+	ips := make(map[string]struct{}, len(matchIPs)+len(managementIPs))
+	for _, ip := range matchIPs {
+		ips[ip] = struct{}{}
 	}
-	return slices.Contains(topologymodel.ActorDetailManagementIPs(actor), ip)
+	for _, ip := range managementIPs {
+		ips[ip] = struct{}{}
+	}
+	return ips
 }

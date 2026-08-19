@@ -116,6 +116,13 @@ pub enum Error {
     #[error("invalid bucket width: {0} (must be > 0)")]
     InvalidBucketWidth(i64),
 
+    /// A trace lookup was asked for the all-zero (UNSET) trace id — the
+    /// OTLP/W3C "unset/invalid" sentinel. TIDX deliberately omits UNSET
+    /// ids, so the id is not queryable; callers reject it at their request
+    /// boundary rather than getting layout-dependent emptiness.
+    #[error("the all-zero (unset) trace id is not queryable")]
+    UnsetTraceId,
+
     /// A consumer found the file's chunks internally inconsistent — e.g. a
     /// matched log position has no corresponding entry in the timestamps
     /// chunk, or a chunk's crc32 trailer doesn't match its payload.

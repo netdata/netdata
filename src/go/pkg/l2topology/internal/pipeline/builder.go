@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"net/netip"
 	"strings"
 	"time"
 
@@ -12,17 +13,21 @@ import (
 type l2BuildState struct {
 	devices                      map[string]model.Device
 	managedObservationByDeviceID map[string]bool
+	directManagementIPByDeviceID map[string]bool
+	remoteManagementByDeviceID   map[string]map[string]netip.Addr
 	interfaces                   map[string]model.Interface
 	adjacencies                  map[string]model.Adjacency
 	attachments                  map[string]model.Attachment
 	enrichments                  map[string]*enrichmentAccumulator
 	ifNameByDeviceIfIndex        map[string]string
 
-	hostToID       map[string]string
-	ipToID         map[string]string
-	chassisToID    map[string]string
-	macToID        map[string]string
-	bridgeAddrToID map[string]string
+	hostToID                map[string]string
+	directAddressClaimsByIP map[string]*directAddressClaims
+	directOwnersByIP        map[string]map[string]struct{}
+	directIPToID            map[string]string
+	chassisToID             map[string]string
+	macToID                 map[string]string
+	bridgeAddrToID          map[string]string
 
 	linksLLDP        int
 	linksCDP         int
@@ -34,17 +39,24 @@ type l2BuildState struct {
 	endpointIDs   map[string]struct{}
 }
 
+type directAddressClaims struct {
+	primaryOwners map[string]struct{}
+	aliasOwners   map[string]struct{}
+}
+
 func newL2BuildState(observationCount int) *l2BuildState {
 	return &l2BuildState{
 		devices:                      make(map[string]model.Device, observationCount),
 		managedObservationByDeviceID: make(map[string]bool, observationCount),
+		directManagementIPByDeviceID: make(map[string]bool, observationCount),
+		remoteManagementByDeviceID:   make(map[string]map[string]netip.Addr),
 		interfaces:                   make(map[string]model.Interface),
 		adjacencies:                  make(map[string]model.Adjacency),
 		attachments:                  make(map[string]model.Attachment),
 		enrichments:                  make(map[string]*enrichmentAccumulator),
 		ifNameByDeviceIfIndex:        make(map[string]string),
 		hostToID:                     make(map[string]string, observationCount),
-		ipToID:                       make(map[string]string, observationCount),
+		directAddressClaimsByIP:      make(map[string]*directAddressClaims, observationCount),
 		chassisToID:                  make(map[string]string, observationCount),
 		macToID:                      make(map[string]string, observationCount),
 		bridgeAddrToID:               make(map[string]string, observationCount),

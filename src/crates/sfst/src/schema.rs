@@ -540,6 +540,27 @@ fn tier_rank(tier: FieldTier) -> u8 {
     }
 }
 
+/// Join two ALREADY-COALESCED scalar kinds across files/sources with the
+/// same lattice [`SchemaTree::derive_scalar_kinds`] applies within one
+/// tree (equal → itself; Int ⊔ Double → Double; any other mix → Str) —
+/// the cross-source half of the field→kind map trace/search results
+/// carry. Inputs come from `derive_scalar_kinds`, so they are always
+/// value-bearing kinds and the join always exists.
+pub fn join_value_kinds(a: ValueKind, b: ValueKind) -> ValueKind {
+    let mut set = ScalarSet::default();
+    set.add(a);
+    set.add(b);
+    // Non-scalar inputs cannot arise from derive_scalar_kinds (asserted in
+    // dev builds); in release, degrade to the universal string fallback
+    // rather than panicking.
+    let joined = set.coalesce();
+    debug_assert!(
+        joined.is_some(),
+        "join_value_kinds called with non-scalar kinds {a:?}/{b:?}"
+    );
+    joined.unwrap_or(ValueKind::Str)
+}
+
 /// Accumulates which scalar kinds a path's leaves carry, for coalescing.
 #[derive(Default)]
 struct ScalarSet {
@@ -671,23 +692,27 @@ impl HighField {
     }
 
     /// Recompute `offsets` from `key_lens`. Called after deserialize (where
-    /// `offsets` is skipped and so arrives empty).
-    pub(crate) fn rebuild_offsets(&mut self) {
+    /// `offsets` is skipped and so arrives empty). Returns `false` for a
+    /// CRC-valid but structurally corrupt chunk — summed key lengths
+    /// overflowing or disagreeing with `keys_blob` — so the reader can
+    /// surface corruption instead of `key()` slicing out of bounds (a
+    /// panic) or, worse, a wrapped sum slicing the WRONG bytes silently.
+    #[must_use]
+    pub(crate) fn rebuild_offsets(&mut self) -> bool {
         self.offsets.clear();
         self.offsets.reserve(self.key_lens.len() + 1);
         let mut acc = 0u32;
         self.offsets.push(0);
         for &len in &self.key_lens {
-            acc += len;
+            let Some(next) = acc.checked_add(len) else {
+                return false;
+            };
+            acc = next;
             self.offsets.push(acc);
         }
-        // `keys_blob` concatenates every key, so its length must equal the summed
-        // key lengths; a mismatch means a truncated/corrupt chunk.
-        debug_assert_eq!(
-            self.keys_blob.len(),
-            acc as usize,
-            "HighField keys_blob length inconsistent with key_lens (corrupt)"
-        );
+        // `keys_blob` concatenates every key, so its length must equal the
+        // summed key lengths.
+        self.keys_blob.len() == acc as usize
     }
 
     /// Number of keys.
@@ -813,22 +838,28 @@ impl StreamBatch {
     }
 
     /// Recompute `row_offsets` from `row_lens`. Called after deserialize.
-    pub(crate) fn rebuild_offsets(&mut self) {
+    /// Returns `false` for a CRC-valid but structurally corrupt chunk —
+    /// summed row lengths overflowing or disagreeing with `kv_bytes` — so
+    /// the reader can surface corruption instead of `row()` slicing out
+    /// of bounds (same contract as `HighField::rebuild_offsets`).
+    #[must_use]
+    pub(crate) fn rebuild_offsets(&mut self) -> bool {
         self.row_offsets.clear();
         self.row_offsets.reserve(self.row_lens.len() + 1);
         let mut acc = 0u32;
         self.row_offsets.push(0);
         for &len in &self.row_lens {
-            acc += len;
+            let Some(next) = acc.checked_add(len) else {
+                return false;
+            };
+            acc = next;
             self.row_offsets.push(acc);
         }
         // Every KvId is a fixed 4 bytes, so the buffer must hold exactly
-        // `total_ids * 4`; a mismatch means a truncated/corrupt chunk.
-        debug_assert_eq!(
-            self.kv_bytes.len(),
-            acc as usize * 4,
-            "StreamBatch kv_bytes length inconsistent with row_lens (corrupt)"
-        );
+        // `total_ids * 4` — compared in u64 so a 32-bit `usize` (the
+        // armv6/armv7 static builds) cannot wrap the multiply; a check
+        // that passes also proves every `row()` slice bound fits usize.
+        self.kv_bytes.len() as u64 == u64::from(acc) * 4
     }
 
     /// Number of log rows in this batch.
@@ -1100,12 +1131,12 @@ pub struct ParentSpanIds {
 /// OTLP/W3C "unset/invalid" sentinel ([`TraceId::is_unset`]). `Copy` + `Ord` +
 /// `Hash` so it sorts (the `trace_id` index) and keys maps (the trace tree)
 /// directly; the on-disk [`TraceIds`] column stores these as a packed byte arena.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize)]
 pub struct TraceId([u8; TraceIds::WIDTH]);
 
 /// A W3C span id: a fixed 8-byte identifier. See [`TraceId`] for the shared
 /// semantics (unset sentinel, ordering, packed [`SpanIds`] storage).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize)]
 pub struct SpanId([u8; SpanIds::WIDTH]);
 
 /// Generate the shared id-value API (`from_bytes`/`as_bytes`/`is_unset`/`UNSET`,
@@ -1199,6 +1230,13 @@ macro_rules! id_arena {
             /// Whether the arena is empty.
             pub fn is_empty(&self) -> bool {
                 self.bytes.is_empty()
+            }
+
+            /// Whether any id in the arena is set (not the all-zero sentinel).
+            pub fn any_set(&self) -> bool {
+                self.bytes
+                    .chunks_exact(Self::WIDTH)
+                    .any(|c| c.iter().any(|&b| b != 0))
             }
 
             /// Whether the backing buffer is a whole number of `WIDTH`-byte ids.

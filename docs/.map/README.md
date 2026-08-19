@@ -37,7 +37,7 @@ Each node is either:
 | **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
 | **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
 | **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
-| **description** | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                                                         |
+| **description** | Page description used by Learn metadata, search, and social previews.          | Write an accurate plain-text summary. Generated integration descriptions are not authored in this map; their metadata sources and validation contract are documented in [Integration description authoring](../../.agents/skills/integrations-lifecycle/description-authoring.md).          |
 
 #### Path Reconstruction
 
@@ -60,7 +60,7 @@ Placeholders are positional: the ingest pipeline replaces them in-place with gen
 - meta:
     label: "Linux"
     edit_url: "https://github.com/netdata/netdata/edit/master/docs/installation/linux.md"
-    description: "How to install Netdata Agent on Linux"
+    description: "Install Netdata Agent on Linux systems and choose the installation method that fits your environment."
     keywords:
       - "install"
       - "linux"

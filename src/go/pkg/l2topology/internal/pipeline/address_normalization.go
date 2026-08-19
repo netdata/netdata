@@ -28,13 +28,17 @@ func primaryL2MACIdentity(chassisID, baseBridgeAddress string) string {
 }
 
 func canonicalIP(v string) string {
-	if ip := parseAddr(v); ip.IsValid() {
-		return ip.String()
-	}
-	if ip := parseAddr(decodeHexIP(v)); ip.IsValid() {
+	if ip := canonicalAddr(v); ip.IsValid() {
 		return ip.String()
 	}
 	return ""
+}
+
+func canonicalAddr(v string) netip.Addr {
+	if ip := parseAddr(v).Unmap(); ip.IsValid() {
+		return ip
+	}
+	return parseAddr(decodeHexIP(v)).Unmap()
 }
 
 func parseAddr(v string) netip.Addr {

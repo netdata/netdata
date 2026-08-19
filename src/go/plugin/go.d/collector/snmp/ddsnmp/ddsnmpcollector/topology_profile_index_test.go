@@ -38,6 +38,58 @@ func TestTopologyProfile_QBridgeFDBUsesMACFromIndex(t *testing.T) {
 	}
 }
 
+func TestTopologyProfile_BridgeFDBUsesMACFromIndex(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.2.2", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.10.7.2", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.20", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.17.1.4", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.17.4.3", []gosnmp.SnmpPDU{
+		createIntegerPDU("1.3.6.1.2.1.17.4.3.1.2.120.133.23.132.11.153", 1),
+		createIntegerPDU("1.3.6.1.2.1.17.4.3.1.3.120.133.23.132.11.153", 3),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.35.1", nil)
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.22", nil)
+
+	actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-fdb-arp-mib")
+
+	assertTableMetricsEqual(t, []ddsnmp.Metric{{
+		Name:         "fdb_entry",
+		Value:        1,
+		Tags:         map[string]string{"fdb_mac": "78:85:17:84:0b:99", "fdb_bridge_port": "1", "fdb_status": "3"},
+		MetricType:   "gauge",
+		IsTable:      true,
+		Table:        "dot1dTpFdbTable",
+		TopologyKind: ddsnmp.KindFdbEntry,
+	}}, actual)
+}
+
+func TestTopologyProfile_CiscoVTPUsesVLANIndexComponent(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.46.1.3.1.1", []gosnmp.SnmpPDU{
+		createIntegerPDU("1.3.6.1.4.1.9.9.46.1.3.1.1.2.1.200", 1),
+		createIntegerPDU("1.3.6.1.4.1.9.9.46.1.3.1.1.3.1.200", 1),
+		createStringPDU("1.3.6.1.4.1.9.9.46.1.3.1.1.4.1.200", "servers"),
+	})
+
+	actual := collectTopologyProfileTables(t, mockHandler, "_std-topology-cisco-vtp-mib")
+
+	assertTableMetricsEqual(t, []ddsnmp.Metric{{
+		Name:         "vtp_vlan",
+		Value:        1,
+		Tags:         map[string]string{"vtp_vlan_index": "200", "vtp_vlan_state": "1", "vtp_vlan_type": "1", "vtp_vlan_name": "servers"},
+		MetricType:   "gauge",
+		IsTable:      true,
+		Table:        "vtpVlanTable",
+		TopologyKind: ddsnmp.KindVtpVlan,
+	}}, actual)
+}
+
 func TestTopologyProfile_IPNetToPhysicalUsesIndexFields(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()

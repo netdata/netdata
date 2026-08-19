@@ -35,6 +35,9 @@ const (
 )
 
 func Render(data topologymodel.Data) (topologyapi.Data, error) {
+	if err := data.ValidateActorHandles(); err != nil {
+		return topologyapi.Data{}, err
+	}
 	stringsDict := topologyapi.NewStringDictionary("")
 	actorRows, actorIndex := buildSNMPTopologyV1Actors(data.Actors, stringsDict)
 

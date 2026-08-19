@@ -13,26 +13,34 @@ import (
 )
 
 func ApplyOSPFAdjacency(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.OSPFEnrichmentStats {
+	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
+	return applyOSPFAdjacencyWithResolver(data, aggregate, resolver)
+}
+
+func applyOSPFAdjacencyWithResolver(
+	data *topologymodel.Data,
+	aggregate topologymodel.ObservationAggregate,
+	resolver *topologyL3ActorResolverProvider,
+) topologymodel.OSPFEnrichmentStats {
 	var stats topologymodel.OSPFEnrichmentStats
 	if data == nil || len(aggregate.OSPFNeighbors) == 0 {
 		return finishTopologyOSPFAdjacencyEnrichment(data, stats)
 	}
 
-	resolver := newTopologyL3ActorResolver(data, aggregate.Snapshots)
+	actorResolver := resolver.resolve()
 	seen := existingTopologyOSPFLinkKeys(data.Links)
-	neighborRowsByActor := make(map[string][]topologymodel.OSPFNeighborDetailRow)
+	neighborRowsByActor := make(map[topologymodel.ActorHandle][]topologymodel.OSPFNeighborDetailRow)
 
 	for _, row := range aggregate.OSPFNeighbors {
 		stats.ObservedRows++
-		localRef, localOK := resolver.resolveDeviceID(row.DeviceID)
-		remoteRef, remoteOK := resolver.resolveRouterEndpoint(row.NeighborRouterID, row.NeighborIP)
+		localRef, localOK := actorResolver.resolveDeviceID(row.DeviceID)
+		remoteRef, remoteOK := actorResolver.resolveRouterEndpoint(row.NeighborRouterID, row.NeighborIP)
 		if localOK {
 			modalRow := topologyOSPFNeighborActorRow(row)
 			if remoteOK {
-				row.RemoteActorID = remoteRef.actorID
-				modalRow.RemoteActorID = remoteRef.actorID
+				modalRow.RemoteActorHandle = remoteRef.actorHandle
 			}
-			neighborRowsByActor[localRef.actorID] = append(neighborRowsByActor[localRef.actorID], modalRow)
+			neighborRowsByActor[localRef.actorHandle] = append(neighborRowsByActor[localRef.actorHandle], modalRow)
 			stats.AttachedNeighborRows++
 		}
 
@@ -48,18 +56,19 @@ func ApplyOSPFAdjacency(data *topologymodel.Data, aggregate topologymodel.Observ
 			stats.SuppressedUnresolvedNeighbor++
 			continue
 		}
-		if localRef.actorID == remoteRef.actorID {
+		if localRef.actorHandle == remoteRef.actorHandle {
 			stats.SuppressedSelfActor++
 			continue
 		}
 
 		link := topologyOSPFAdjacencyLink(row, localRef, remoteRef)
-		key := topologyOSPFNeighborLinkKeyParts(row, localRef.actorID, remoteRef.actorID)
+		key := topologyOSPFNeighborLinkKeyParts(row, localRef.actorHandle, remoteRef.actorHandle)
 		if _, exists := seen[key]; exists {
 			stats.SuppressedDuplicateLink++
 			continue
 		}
 		seen[key] = struct{}{}
+		seen[key.reversed()] = struct{}{}
 		data.Links = append(data.Links, link)
 		stats.EmittedLinks++
 	}
@@ -79,18 +88,18 @@ func finishTopologyOSPFAdjacencyEnrichment(data *topologymodel.Data, stats topol
 
 func topologyOSPFAdjacencyLink(row topologymodel.OSPFNeighbor, srcRef, dstRef topologyL3ActorRef) topologymodel.Link {
 	return topologymodel.Link{
-		Layer:      "3",
-		Protocol:   topologymodel.OSPFAdjacencyLinkType,
-		LinkType:   topologymodel.OSPFAdjacencyLinkType,
-		Direction:  "observed",
-		State:      "full",
-		SrcActorID: srcRef.actorID,
-		DstActorID: dstRef.actorID,
+		Layer:          "3",
+		Protocol:       topologymodel.OSPFAdjacencyLinkType,
+		LinkType:       topologymodel.OSPFAdjacencyLinkType,
+		Direction:      "observed",
+		State:          "full",
+		SrcActorHandle: srcRef.actorHandle,
+		DstActorHandle: dstRef.actorHandle,
 		Src: topologymodel.LinkEndpoint{
-			Match: srcRef.match,
+			Match: srcRef.endpointMatch,
 		},
 		Dst: topologymodel.LinkEndpoint{
-			Match: dstRef.match,
+			Match: dstRef.endpointMatch,
 		},
 		Inference: &graph.LinkInference{
 			Inference:      "ospf_full_adjacency",
@@ -141,8 +150,8 @@ func topologyOSPFNeighborActorRowSortKey(row topologymodel.OSPFNeighborDetailRow
 	}, "\x00")
 }
 
-func existingTopologyOSPFLinkKeys(links []topologymodel.Link) map[string]struct{} {
-	seen := make(map[string]struct{})
+func existingTopologyOSPFLinkKeys(links []topologymodel.Link) map[topologyOSPFNeighborLinkKey]struct{} {
+	seen := make(map[topologyOSPFNeighborLinkKey]struct{})
 	for _, link := range links {
 		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.OSPFAdjacencyLinkType) {
 			row := topologymodel.OSPFNeighbor{
@@ -154,7 +163,9 @@ func existingTopologyOSPFLinkKeys(links []topologymodel.Link) map[string]struct{
 				Subnet:           topologyOSPFSubnet(link),
 				Prefix:           topologyOSPFPrefix(link),
 			}
-			seen[topologyOSPFNeighborLinkKeyParts(row, link.SrcActorID, link.DstActorID)] = struct{}{}
+			key := topologyOSPFNeighborLinkKeyParts(row, link.SrcActorHandle, link.DstActorHandle)
+			seen[key] = struct{}{}
+			seen[key.reversed()] = struct{}{}
 		}
 	}
 	return seen

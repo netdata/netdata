@@ -8,10 +8,21 @@
 //! 3. Load secondary chunks on demand (mid-card FST or high-card blob).
 //! 4. Load per-stream log entries for attribute resolution.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::PrefixMap;
 use crate::reader::ChunkReader;
+
+mod rollup_resolver;
+mod session;
+mod trace_plan;
+
+pub use rollup_resolver::{RollupRefOutcome, RollupRootResolver};
+pub use session::TraceFileSession;
+pub use trace_plan::{
+    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm,
+    ScanWork, TracePlan, numeric_token_matches,
+};
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
@@ -31,44 +42,146 @@ pub struct IndexReader<'a> {
 }
 
 /// One materialized span of a trace reconstructed by [`IndexReader::trace_by_id`]:
-/// its ids, timing, per-row scalars, and attribute facets (`name`, `kind`,
-/// `status_code`, `attributes.*`) as flat `(key, value)` pairs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// its ids, timing, per-row scalars, attribute facets (`name`, `kind`,
+/// `status_code`, `trace_state`, `status_message`, `attributes.*`) as flat
+/// `(key, value)` pairs, and its structured events/links (from the `EVNB`/`LNKB`
+/// chunks; empty when the file predates them or the span has none).
+/// `Serialize` exists for the combiner's canonical encoding
+/// ([`crate::trace_combine::canonical_bytes`]) — the field ORDER of this
+/// struct is part of that encoding and thus of the canonical-copy
+/// contract (pre-release changeable, frozen at release).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct TraceSpan {
     pub span_id: SpanId,
     pub parent_span_id: SpanId,
     pub start_ns: i64,
     pub duration_ns: i64,
+    /// Raw OTLP span kind int (0 = UNSPECIFIED/absent), parsed once from
+    /// the `_kind` facet at materialization — part of the combiner's
+    /// dedup key (shared client/server span ids are real). The readable
+    /// `kind` label stays in [`fields`](Self::fields).
+    pub kind: i32,
     /// W3C trace flags (the low byte carries the sampled bit).
     pub flags: u32,
     pub dropped_attributes_count: u32,
+    /// Zero when the file carries no `EVNB` chunk (no chunk ⇒ no drops to
+    /// preserve, by the producer's `is_meaningful` rule).
+    pub dropped_events_count: u32,
+    /// Zero when the file carries no `LNKB` chunk (same rule).
+    pub dropped_links_count: u32,
+    /// Row facets, `events.`/`links.`-prefixed tokens excluded when the file
+    /// carries the corresponding structure (they appear structured instead).
     pub fields: Vec<(String, String)>,
+    pub events: Vec<TraceEvent>,
+    pub links: Vec<TraceLink>,
 }
 
-/// A trace reconstructed by [`IndexReader::trace_by_id`]: the trace's spans plus the
-/// in-memory parent/child tree over them.
+/// One span event, resolved to strings (platform fidelity: values are the
+/// rendered token strings; field-level types live in the schema tree).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct TraceEvent {
+    /// Raw OTLP `time_unix_nano` (never normalized; zero stays zero).
+    pub time_unix_nano: u64,
+    pub name: String,
+    pub dropped_attributes_count: u32,
+    /// Attribute pairs with the `events.attributes.` path prefix stripped.
+    pub attributes: Vec<(String, String)>,
+}
+
+/// One span link, resolved to strings (see [`TraceEvent`]).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct TraceLink {
+    pub trace_id: TraceId,
+    pub span_id: SpanId,
+    /// Verbatim W3C `trace_state`.
+    pub trace_state: String,
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
+    /// Attribute pairs with the `links.attributes.` path prefix stripped.
+    pub attributes: Vec<(String, String)>,
+}
+
+/// A trace assembled by the shared combiner ([`crate::trace_combine`]) —
+/// via the single-file [`IndexReader::trace_by_id`] or the cross-source
+/// engine: the trace's spans plus the in-memory parent/child graph over
+/// them.
 ///
-/// The tree is a flat adjacency (no owned nesting, no recursion): walk from
-/// [`roots`](Self::roots) via [`children`](Self::children). Because a trace's spans
-/// can scatter across files/time (and this reader sees only one file), a span whose
-/// `parent_span_id` is unset OR absent from this set is a **root** — so a partial
-/// trace still forms a forest rather than dropping spans.
+/// The graph is node-index adjacency (no owned nesting, no recursion, no
+/// id-keyed maps — span ids are NOT unique node identities: shared
+/// client/server-id pairs are real): walk from [`roots`](Self::roots) via
+/// [`children`](Self::children). Because a trace's spans can scatter
+/// across files/time, a span whose `parent_span_id` is unset OR absent
+/// from this set is a **graph root** — a partial trace still forms a
+/// forest rather than dropping spans. A parent id carried by several
+/// spans resolves to the SERVER-kind candidate, else the earliest.
 ///
-/// Normal traces are a forest. **Every span is reachable from some root** even for
-/// pathological input: a parent cycle (or a cyclic component with no external entry)
-/// has no natural root, so the earliest still-unreached span is promoted to a root
-/// until all spans are reachable. In that case [`children`](Self::children) still
-/// contains the cycle's edges, so a walker MUST guard against revisiting a node.
+/// **Every span is reachable from some root** even for pathological
+/// input: a parent cycle with no external entry has no natural root, so
+/// the earliest still-unreached span is promoted to a root until all
+/// spans are reachable. In that case [`children`](Self::children) still
+/// contains the cycle's edges, so a walker MUST guard against revisiting
+/// a node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
-    /// The trace's spans, sorted by `start_ns` (ties broken by `span_id`) — the
-    /// clock-skew-safe display order. Duplicate `span_id`s (resends) are collapsed
-    /// to the first seen.
+    /// The trace's spans in the combiner's total order —
+    /// `(start_ns, span_id, kind, content)` — the clock-skew-safe display
+    /// order. Duplicate `(span_id, kind)` copies (resends) are collapsed
+    /// to the canonical (chronological-first) copy; UNSET span ids never
+    /// collapse.
     pub spans: Vec<TraceSpan>,
-    /// Indices into [`spans`](Self::spans) of the root spans (unset/missing/self parent).
+    /// Indices into [`spans`](Self::spans) of the graph roots
+    /// (unset/missing/self parent, plus any cycle promotions).
     pub roots: Vec<usize>,
-    /// `span_id` → indices into [`spans`](Self::spans) of its direct children.
-    pub children: HashMap<SpanId, Vec<usize>>,
+    /// Parallel to [`spans`](Self::spans): `children[i]` are the indices
+    /// of the spans whose resolved parent is span `i`.
+    pub children: Vec<Vec<usize>>,
+}
+
+impl Trace {
+    /// The SUMMARY root — a separate derivation from the graph roots
+    /// (which exist for reachability): the earliest span with a genuinely
+    /// unset parent (the OTLP root convention; multi-root → earliest
+    /// start wins), else the earliest graph root (orphan/cycle promotion).
+    /// `None` only for an empty trace.
+    pub fn summary_root(&self) -> Option<usize> {
+        self.spans
+            .iter()
+            .position(|s| s.parent_span_id.is_unset())
+            .or_else(|| self.roots.iter().copied().min())
+    }
+
+    /// The empty trace (an absent id resolves to this, not an error).
+    pub(crate) fn empty() -> Self {
+        Trace {
+            spans: Vec::new(),
+            roots: Vec::new(),
+            children: Vec::new(),
+        }
+    }
+}
+
+/// The value half of a resolved `key=value` token (split on the FIRST `=`, so
+/// value-embedded `=` bytes are preserved — e.g. `trace_state=ot=th:8` yields
+/// `ot=th:8`), or empty for an unresolvable ref (corrupt file — the row path
+/// renders those empty too rather than failing the trace).
+fn kv_value(strings: &HashMap<u32, String>, id: crate::KvId) -> String {
+    strings
+        .get(&id.0)
+        .and_then(|s| s.split_once('=').map(|(_, v)| v.to_string()))
+        .unwrap_or_default()
+}
+
+/// A resolved attribute token as a `(key, value)` pair with `prefix` stripped
+/// from the key (`events.attributes.` / `links.attributes.`). A key that lacks
+/// the prefix (corrupt file) is kept as-is rather than dropped.
+fn kv_attr(strings: &HashMap<u32, String>, id: crate::KvId, prefix: &str) -> (String, String) {
+    match strings.get(&id.0).and_then(|s| s.split_once('=')) {
+        Some((k, v)) => (
+            k.strip_prefix(prefix).unwrap_or(k).to_string(),
+            v.to_string(),
+        ),
+        None => (String::new(), String::new()),
+    }
 }
 
 impl<'a> IndexReader<'a> {
@@ -143,9 +256,10 @@ impl<'a> IndexReader<'a> {
     }
 
     /// Byte span of the cold suffix (optional per-row columns + optional
-    /// `trace_id` index + mid/high field chunks + stream batches) a query
-    /// releases from the page cache once done. See
-    /// the chunk reader's cold-region rule.
+    /// `trace_id` index, trace-id bloom, and span event/link structures +
+    /// mid/high field chunks + stream batches) a query releases from the page
+    /// cache once done — advising it away also evicts the small `TBLM` chunk.
+    /// See the chunk reader's cold-region rule.
     pub fn cold_region(&self) -> Option<(usize, usize)> {
         self.sfst.cold_region()
     }
@@ -262,9 +376,51 @@ impl<'a> IndexReader<'a> {
         self.sfst.durations()
     }
 
+    /// Whether the file carries the optional per-file trace rollup (`TRSU`).
+    pub fn has_trace_rollup(&self) -> bool {
+        self.sfst.has_trace_rollup()
+    }
+
+    /// Decode and validate the per-file trace rollup (`TRSU`).
+    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, crate::Error> {
+        self.sfst.trace_rollup()
+    }
+
     /// Whether the file carries the optional `trace_id` index (`TIDX`).
     pub fn has_trace_id_index(&self) -> bool {
         self.sfst.has_trace_id_index()
+    }
+
+    /// Whether the file carries the optional per-file trace-id bloom (`TBLM`).
+    pub fn has_trace_id_bloom(&self) -> bool {
+        self.sfst.has_trace_id_bloom()
+    }
+
+    /// The trace-id bloom. Gate on [`has_trace_id_bloom`](Self::has_trace_id_bloom).
+    /// `might_contain == false` is definitive; cross-file callers use this to
+    /// skip the file without touching `TIDX`/`TRCE`.
+    pub fn trace_id_bloom(&self) -> Result<crate::TraceIdBloom, crate::Error> {
+        self.sfst.trace_id_bloom()
+    }
+
+    /// Whether the file carries the optional span event structure (`EVNB`).
+    pub fn has_event_index(&self) -> bool {
+        self.sfst.has_event_index()
+    }
+
+    /// Whether the file carries the optional span link structure (`LNKB`).
+    pub fn has_link_index(&self) -> bool {
+        self.sfst.has_link_index()
+    }
+
+    /// The span event structure. Gate on [`has_event_index`](Self::has_event_index).
+    pub fn event_index(&self) -> Result<crate::EventIndex, crate::Error> {
+        self.sfst.event_index()
+    }
+
+    /// The span link structure. Gate on [`has_link_index`](Self::has_link_index).
+    pub fn link_index(&self) -> Result<crate::LinkIndex, crate::Error> {
+        self.sfst.link_index()
     }
 
     /// The `trace_id` index. Positions it yields index the chronological
@@ -346,6 +502,59 @@ impl<'a> IndexReader<'a> {
         }
 
         Ok(table)
+    }
+
+    /// Enumerate the distinct stored values of one field, in the
+    /// dictionary's sorted order, with the `field=` prefix stripped by
+    /// LENGTH (values may themselves contain `=`; splitting on the first
+    /// `=` would truncate them).
+    ///
+    /// Reads only the field's own dictionary chunk (primary FST prefix
+    /// scan, MF FST, or HF arena) — never stream batches, per-row
+    /// columns, or the trace index/bloom — which is what makes tag-value
+    /// enumeration affordable across whole retention. A field absent
+    /// from this file's field table is [`Error::UnknownField`] (callers
+    /// consult [`field_table`](Self::field_table) first; filtering-style
+    /// absent-matches-nothing is the caller's call to make, not this
+    /// accessor's).
+    pub fn field_values(&self, field_name: &str) -> Result<Vec<String>, crate::Error> {
+        // Storage field names never contain '=' (the flattener rewrites it
+        // to '_' at intern time). A '='-containing name therefore can
+        // never match this file's field table, so the locate_field gate
+        // below returns UnknownField before any prefix work — in release
+        // builds included; the length strip is unreachable for such
+        // names on well-formed files. The assert documents the invariant
+        // loudly for development.
+        debug_assert!(
+            !field_name.contains('='),
+            "field names must not contain '=' (flattener invariant)"
+        );
+        let prefix_len = field_name.len() + 1; // strip "field=" → the value bytes
+        let mut out = Vec::new();
+        match self.locate_field(field_name) {
+            None => return Err(crate::Error::UnknownField(field_name.to_string())),
+            Some(FieldLocation::Low) => {
+                let prefix = format!("{field_name}=");
+                for (kv_bytes, _) in self.primary.prefix_pairs(prefix.as_bytes()) {
+                    out.push(String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned());
+                }
+            }
+            // Every key in a mid/high chunk belongs to this one field.
+            Some(FieldLocation::Mid(idx)) => {
+                let chunk = self.sfst.mid_field(idx)?;
+                chunk.for_each(|kv_bytes, _| {
+                    out.push(String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned());
+                });
+            }
+            Some(FieldLocation::High(idx)) => {
+                let hf = self.sfst.high_field(idx)?;
+                out.extend(
+                    hf.keys()
+                        .map(|k| String::from_utf8_lossy(&k[prefix_len..]).into_owned()),
+                );
+            }
+        }
+        Ok(out)
     }
 
     /// Resolve sorted, deduplicated KvIds to their `key=value` strings,
@@ -523,132 +732,43 @@ impl<'a> IndexReader<'a> {
         Ok(rows)
     }
 
-    /// Reconstruct one trace by its `trace_id`: look up the trace's span row
-    /// positions via the `TIDX` index, materialize each span (ids + timing +
-    /// attribute facets), and rebuild the parent/child tree in memory.
+    /// Reconstruct one trace by its `trace_id` from THIS file — the
+    /// single-file convenience over the shared machinery: a
+    /// [`TraceFileSession`](crate::TraceFileSession) (bloom gate, columns
+    /// decoded once, cached strings) driven through the shared combiner
+    /// ([`crate::trace_combine::combine`]), which owns the dedup
+    /// (`(span_id, kind)`, canonical chronological-first copy, UNSET never
+    /// collapsed), the total order, and the graph build. Cross-source
+    /// callers use the session directly (one per file, many ids) instead
+    /// of this per-id entry point.
     ///
-    /// Returns an empty [`Trace`] if the id is absent. Errors if the file carries no
-    /// `trace_id` index (not a traces file).
-    ///
-    /// The tree build is **iterative** and defensive (a trace's spans can be partial
-    /// or malformed): spans are sorted by start time (clock-skew-safe), duplicate
-    /// `span_id`s are collapsed, and a span whose parent is unset, self-referential,
-    /// or absent from this file becomes a root — yielding a forest, never a dropped
-    /// span or an unbounded recursion.
+    /// Returns an empty [`Trace`] if the id is absent (the TBLM bloom
+    /// answers a definite miss without decoding TIDX/TRCE; a corrupt
+    /// bloom degrades to the exact lookup with one warning per session).
+    /// Errors if the file carries no `trace_id` index (not a traces file)
+    /// or is corrupt.
     pub fn trace_by_id(&self, trace_id: TraceId) -> Result<Trace, crate::Error> {
-        let index = self.sfst.trace_id_index()?;
-        let trace_ids = self.sfst.trace_ids()?;
-        let positions = index.positions(trace_id, &trace_ids);
-        if positions.is_empty() {
-            return Ok(Trace {
-                spans: Vec::new(),
-                roots: Vec::new(),
-                children: HashMap::new(),
-            });
+        // The UNSET id is not a trace (TIDX omits it); this convenience
+        // entry resolves it to the documented empty rather than the
+        // session's request error, preserving its long-standing contract.
+        if trace_id.is_unset() {
+            return Ok(Trace::empty());
         }
-
-        let span_ids = self.sfst.span_ids()?;
-        let parents = self.sfst.parent_span_ids()?;
-        let durations = self.sfst.durations()?;
-        let flags = self.sfst.flags()?;
-        let dropped = self.sfst.dropped_attribute_counts()?;
-        // `materialize_rows` returns one row per position and already validated each
-        // `pos < record_count`; every per-row column has `record_count` entries (a
-        // build-time invariant, CRC-guarded), so indexing them at `pos` is in-bounds.
-        let rows = self.materialize_rows(positions)?;
-
-        // Assemble spans, collapsing duplicate span_ids (resends) to the first seen.
-        // All positions share `trace_id`, so dedup by span_id == dedup by
-        // (trace_id, span_id).
-        let mut seen: HashSet<SpanId> = HashSet::new();
-        let mut spans: Vec<TraceSpan> = Vec::with_capacity(positions.len());
-        for (i, &pos) in positions.iter().enumerate() {
-            let span_id = span_ids.get(pos as usize);
-            // Dedup real span ids (resends) to the first seen, but NEVER collapse
-            // UNSET (all-zero) ids: those are distinct spans that merely lack a valid
-            // span_id (malformed/absent), not one span sent twice.
-            if !span_id.is_unset() && !seen.insert(span_id) {
-                continue;
-            }
-            spans.push(TraceSpan {
-                span_id,
-                parent_span_id: parents.get(pos as usize),
-                start_ns: rows[i].timestamp_ns,
-                duration_ns: durations.0[pos as usize],
-                flags: flags.0[pos as usize],
-                dropped_attributes_count: dropped.0[pos as usize],
-                fields: rows[i].fields.clone(),
-            });
+        let mut session = crate::TraceFileSession::open(self);
+        if !session.might_contain(trace_id) {
+            return Ok(Trace::empty());
         }
-
-        // Clock-skew-safe display order; span_id breaks ties deterministically.
-        spans.sort_by(|a, b| {
-            a.start_ns
-                .cmp(&b.start_ns)
-                .then_with(|| a.span_id.cmp(&b.span_id))
-        });
-
-        // Iterative tree build over the sorted spans: parent present in this set →
-        // edge; otherwise (unset / missing / self) → root.
-        // Exclude UNSET span ids: a parent lookup below guards `!is_unset()` first, so
-        // UNSET is never queried here — indexing it would only cause a meaningless
-        // last-writer-wins overwrite when several spans lack a valid span_id.
-        let idx_of: HashMap<SpanId, usize> = spans
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| !s.span_id.is_unset())
-            .map(|(i, s)| (s.span_id, i))
-            .collect();
-        let mut children: HashMap<SpanId, Vec<usize>> = HashMap::new();
-        let mut roots: Vec<usize> = Vec::new();
-        for (i, s) in spans.iter().enumerate() {
-            let has_parent = !s.parent_span_id.is_unset()
-                && s.parent_span_id != s.span_id
-                && idx_of.contains_key(&s.parent_span_id);
-            if has_parent {
-                children.entry(s.parent_span_id).or_default().push(i);
-            } else {
-                roots.push(i);
-            }
+        let mut sources: [&mut dyn crate::trace_combine::SpanSource; 1] = [&mut session];
+        let mut outcome = crate::trace_combine::combine(&mut sources, trace_id, None, &|| false);
+        // Single source: any failure IS the result — propagate (the
+        // cross-source engine instead reports failures as a partial
+        // status; with one file there is nothing left to serve).
+        if let Some((_, e)) = outcome.failures.pop() {
+            return Err(e);
         }
-
-        // Reachability guard: guarantee every span is reachable from some root, so a
-        // root-first walk visits all of them. Spans with an unset/missing/self parent
-        // are already roots; but a pathological parent *cycle* (or a cyclic component
-        // with no external entry) would leave its members reachable from no root even
-        // though they are present in `spans`. Promote the earliest unreached span to a
-        // root until everything is reachable. O(V+E): each node is marked once (the
-        // `reachable` guard), each edge is followed once, and `cursor` scans the span
-        // list monotonically across all rounds.
-        let mut reachable = vec![false; spans.len()];
-        let mut stack: Vec<usize> = roots.clone();
-        let mut cursor = 0usize;
-        loop {
-            while let Some(i) = stack.pop() {
-                if reachable[i] {
-                    continue;
-                }
-                reachable[i] = true;
-                if let Some(kids) = children.get(&spans[i].span_id) {
-                    stack.extend(kids.iter().copied().filter(|&c| !reachable[c]));
-                }
-            }
-            while cursor < spans.len() && reachable[cursor] {
-                cursor += 1;
-            }
-            if cursor == spans.len() {
-                break;
-            }
-            roots.push(cursor); // earliest (start-sorted) unreached span
-            stack.push(cursor);
-        }
-
-        Ok(Trace {
-            spans,
-            roots,
-            children,
-        })
+        Ok(outcome.trace)
     }
+
 
     /// Resolve a **single** field's values at `positions`, decoding only that
     /// field's chunk. Thin wrapper over [`materialize_fields`](Self::materialize_fields).
@@ -1181,33 +1301,11 @@ impl<'a> IndexReader<'a> {
             FieldLocation::High(idx) => {
                 // High-card values are addressed by KvId; the set is built by
                 // scanning the SB batches indicated by the union of the matched
-                // values' batch masks. Exact values are found by binary search
-                // over the sorted key dictionary, patterns by a linear scan of
-                // it. Matched positions are ascending (batch start increases,
-                // position within increases), so they feed `from_sorted`.
-                let hf = self.sfst.high_field(idx)?;
-                // Matched KvIds for this field fall in the contiguous range
-                // [base, base + cardinality); `base` is fixed for the field, so
-                // resolve it once rather than per matched value.
-                let base = self.high_kv_id(idx, 0).0;
-                let mut targets = KvIdSet::new(base, hf.len() as u32);
-                let mut combined_mask: u8 = 0;
-                for value in &exacts {
-                    let kv = format!("{field}={value}");
-                    if let Ok(local) = hf.binary_search(kv.as_bytes()) {
-                        targets.insert(KvId(base + local as u32));
-                        combined_mask |= hf.masks[local];
-                    }
-                }
-                if !patterns.is_empty() {
-                    for (local, key) in hf.keys().enumerate() {
-                        if value_matches(key) {
-                            targets.insert(KvId(base + local as u32));
-                            combined_mask |= hf.masks[local];
-                        }
-                    }
-                }
-                self.scan_high_positions(&targets, combined_mask, total)
+                // values' batch masks. Matched positions are ascending (batch
+                // start increases, position within increases), so they feed
+                // `from_sorted`.
+                let (targets, mask) = self.high_targets(field, idx, &exacts, &patterns)?;
+                self.scan_high_positions(&targets, mask, total)
             }
         }
     }
@@ -1277,12 +1375,52 @@ impl<'a> IndexReader<'a> {
         Ok(result)
     }
 
+    /// One high-card field's matched-value targets: the [`KvIdSet`] of
+    /// KvIds whose value is in `exacts` (binary search over the sorted
+    /// key dictionary) or matches any of `patterns` (a linear dictionary
+    /// scan), plus the OR of the matched values' per-value batch masks.
+    /// Dictionary work only — no stream batch is touched here.
+    fn high_targets(
+        &self,
+        field: &str,
+        idx: u16,
+        exacts: &[&str],
+        patterns: &[regex::bytes::Regex],
+    ) -> Result<(KvIdSet, u8), crate::Error> {
+        let prefix_len = field.len() + 1;
+        let hf = self.sfst.high_field(idx)?;
+        // Matched KvIds for this field fall in the contiguous range
+        // [base, base + cardinality); `base` is fixed for the field, so
+        // resolve it once rather than per matched value.
+        let base = self.high_kv_id(idx, 0).0;
+        let mut targets = KvIdSet::new(base, hf.len() as u32);
+        let mut mask: u8 = 0;
+        for value in exacts {
+            let kv = format!("{field}={value}");
+            if let Ok(local) = hf.binary_search(kv.as_bytes()) {
+                targets.insert(KvId(base + local as u32));
+                mask |= hf.masks[local];
+            }
+        }
+        if !patterns.is_empty() {
+            for (local, key) in hf.keys().enumerate() {
+                let value = &key[prefix_len..];
+                if patterns.iter().any(|regex| regex.is_match(value)) {
+                    targets.insert(KvId(base + local as u32));
+                    mask |= hf.masks[local];
+                }
+            }
+        }
+        Ok((targets, mask))
+    }
+
     /// Positions of rows containing any KvId in `targets`, scanning only the
     /// stream batches selected by `mask` (bit `b` set ⇒ batch `b` may hold a
     /// target — the OR of the matched values' per-value batch masks). Empty
     /// `targets` yields an empty set. Shared by the high-card paths of
     /// [`field_values_or`](Self::field_values_or) and
-    /// [`query_positions`](Self::query_positions).
+    /// [`query_positions`](Self::query_positions), which have no work
+    /// ceiling to feed (hence the throwaway counter).
     fn scan_high_positions(
         &self,
         targets: &KvIdSet,
@@ -1292,22 +1430,58 @@ impl<'a> IndexReader<'a> {
         if targets.is_empty() {
             return Ok(PosSet::empty(total));
         }
+        let mut rows_visited = 0u64;
+        Ok(self
+            .scan_high_multi(&[(targets, mask)], total, u64::MAX, &mut rows_visited)?
+            .expect("an unbounded scan cannot run out of budget")
+            .pop()
+            .expect("one term in → one set out"))
+    }
+
+    /// Position sets for SEVERAL high-card terms resolved in ONE
+    /// stream-batch pass over the union of their batch masks (the
+    /// `materialize_fields` precedent) — the traces search plan counts
+    /// each visited row once into `rows_visited` however many terms
+    /// probe it, and the scan STOPS (returning `Ok(None)`) as soon as
+    /// the count exceeds `ceiling`: a work ceiling enforced only between
+    /// whole scans could overshoot by an entire file. A `None` result
+    /// means the per-term sets are incomplete and must not be used.
+    /// Matched positions ascend (batch start increases, position within
+    /// increases), so they feed `from_sorted`.
+    fn scan_high_multi(
+        &self,
+        terms: &[(&KvIdSet, u8)],
+        total: u32,
+        ceiling: u64,
+        rows_visited: &mut u64,
+    ) -> Result<Option<Vec<PosSet>>, crate::Error> {
+        let union_mask = terms.iter().fold(0u8, |m, &(_, term_mask)| m | term_mask);
+        let mut per_term: Vec<Vec<u32>> = vec![Vec::new(); terms.len()];
         let batch_size = crate::stream_batch_size(total);
-        let num_batches = crate::num_stream_batches(total);
-        let mut positions: Vec<u32> = Vec::new();
-        for b in 0..num_batches {
-            if (mask >> b) & 1 == 0 {
+        for b in 0..crate::num_stream_batches(total) {
+            if (union_mask >> b) & 1 == 0 {
                 continue;
             }
             let batch_start = u32::from(b) * batch_size;
             let batch = self.sfst.stream_batch(b)?;
             for i in 0..batch.num_rows() {
-                if batch.row(i).any(|id| targets.contains(id)) {
-                    positions.push(batch_start + i as u32);
+                *rows_visited += 1;
+                if *rows_visited > ceiling {
+                    return Ok(None);
+                }
+                for (t, &(targets, _)) in terms.iter().enumerate() {
+                    if batch.row(i).any(|id| targets.contains(id)) {
+                        per_term[t].push(batch_start + i as u32);
+                    }
                 }
             }
         }
-        Ok(PosSet::from_sorted(positions, total))
+        Ok(Some(
+            per_term
+                .into_iter()
+                .map(|positions| PosSet::from_sorted(positions, total))
+                .collect(),
+        ))
     }
 
     /// Per-value `(value, count)` pairs for `field` restricted to `scope`.
@@ -1598,6 +1772,16 @@ impl PosSet {
         self.bitmap = self
             .bitmap
             .and(&self.data, &other.bitmap, &other.data, &mut out);
+        self.data = out;
+    }
+
+    /// In-place difference (`self \= other`) — negation's
+    /// `presence ∩ complement(match)`.
+    fn and_not_assign(&mut self, other: &Self) {
+        let mut out = Vec::new();
+        self.bitmap = self
+            .bitmap
+            .and_not(&self.data, &other.bitmap, &other.data, &mut out);
         self.data = out;
     }
 

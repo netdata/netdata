@@ -2,19 +2,15 @@
 
 package topologyenrich
 
-import (
-	"strings"
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-)
-
-func attachTopologyOSPFNeighborRows(data *topologymodel.Data, rowsByActor map[string][]topologymodel.OSPFNeighborDetailRow) {
+func attachTopologyOSPFNeighborRows(data *topologymodel.Data, rowsByActor map[topologymodel.ActorHandle][]topologymodel.OSPFNeighborDetailRow) {
 	if data == nil || len(rowsByActor) == 0 {
 		return
 	}
 	for i := range data.Actors {
 		actor := &data.Actors[i]
-		rows := rowsByActor[strings.TrimSpace(actor.ActorID)]
+		rows := rowsByActor[actor.ActorHandle]
 		if len(rows) == 0 {
 			continue
 		}
@@ -23,13 +19,13 @@ func attachTopologyOSPFNeighborRows(data *topologymodel.Data, rowsByActor map[st
 	}
 }
 
-func attachTopologyBGPPeerRows(data *topologymodel.Data, rowsByActor map[string][]topologymodel.BGPPeerDetailRow) {
+func attachTopologyBGPPeerRows(data *topologymodel.Data, rowsByActor map[topologymodel.ActorHandle][]topologymodel.BGPPeerDetailRow) {
 	if data == nil || len(rowsByActor) == 0 {
 		return
 	}
 	for i := range data.Actors {
 		actor := &data.Actors[i]
-		rows := rowsByActor[strings.TrimSpace(actor.ActorID)]
+		rows := rowsByActor[actor.ActorHandle]
 		if len(rows) == 0 {
 			continue
 		}

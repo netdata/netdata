@@ -1,9 +1,9 @@
-//! PROOF SCAFFOLD (otel traces-proof SOW; revert with the skeleton).
-//!
 //! Send a deterministic synthetic batch of OTLP **traces** to an endpoint — the
-//! traces analogue of the `synth` bin, used to drive the skeletal traces
-//! pipeline end-to-end. Self-contained (does not reuse the logs `Sender`, which
-//! is `LogsServiceClient`-typed): it connects a `TraceServiceClient` and exports
+//! traces analogue of the `synth` bin. Generates real trace trees with events,
+//! links, and (behind explicit knobs) the edge cases the read path must survive
+//! (orphans, extra roots, resends) — see [`otel_streams::synth_traces`].
+//! Self-contained (does not reuse the logs `Sender`, which is
+//! `LogsServiceClient`-typed): it connects a `TraceServiceClient` and exports
 //! the spans in `--batch-size` chunks, one export request per chunk.
 
 use std::time::Duration;
@@ -20,9 +20,7 @@ use otel_streams::synth_traces::{SynthTraceParams, build_request, generate};
 
 #[derive(Parser)]
 #[command(name = "synth-traces")]
-#[command(
-    about = "Send a deterministic synthetic batch of OTLP traces to an endpoint (proof scaffold)"
-)]
+#[command(about = "Send a deterministic synthetic batch of OTLP traces to an endpoint")]
 struct Args {
     #[command(flatten)]
     common: CommonArgs,
@@ -47,6 +45,31 @@ struct Args {
     #[arg(long, default_value_t = 0)]
     seed: u64,
 
+    /// Spans per trace: 1 = flat (each span its own trace); >1 = a root plus a
+    /// binary-ish tree of children.
+    #[arg(long, default_value_t = 1)]
+    spans_per_trace: usize,
+
+    /// Events per span (0 = none; the first is exception-shaped).
+    #[arg(long, default_value_t = 0)]
+    events_per_span: usize,
+
+    /// Every Nth span links to the previous trace's root (0 = never).
+    #[arg(long, default_value_t = 0)]
+    links_every: usize,
+
+    /// Every Nth trace's last span parents a nonexistent id (0 = never).
+    #[arg(long, default_value_t = 0)]
+    orphan_every: usize,
+
+    /// Every Nth trace's last span becomes a second root (0 = never).
+    #[arg(long, default_value_t = 0)]
+    extra_root_every: usize,
+
+    /// Every Nth span is sent twice (0 = never).
+    #[arg(long, default_value_t = 0)]
+    resend_every: usize,
+
     /// Resource `service.name`.
     #[arg(long, default_value = "otel-streams-synth-traces")]
     service_name: String,
@@ -67,6 +90,28 @@ async fn main() -> anyhow::Result<()> {
     if args.count == 0 || args.count > MAX_COUNT {
         anyhow::bail!("--count must be between 1 and {MAX_COUNT}");
     }
+    // The whole corpus is materialized in memory before the first batch
+    // is sent, so the event total needs the same bound as the span count.
+    if args.count.saturating_mul(args.events_per_span) > MAX_COUNT {
+        anyhow::bail!(
+            "--count x --events-per-span must not exceed {MAX_COUNT} total events"
+        );
+    }
+    // span_id packs the position into 20 bits and the trace index into
+    // bits 20..63: beyond either range, distinct spans silently collide
+    // (colliding ids read as resends and corrupt the intended tree).
+    const MAX_SPANS_PER_TRACE: usize = (1 << 20) - 1;
+    // Zero would be silently coerced to 1 by generate()'s max(1) —
+    // the documented flat-mode minimum is 1, so reject the typo instead
+    // of producing a different corpus than asked.
+    if args.spans_per_trace == 0 || args.spans_per_trace > MAX_SPANS_PER_TRACE {
+        anyhow::bail!("--spans-per-trace must be between 1 and {MAX_SPANS_PER_TRACE}");
+    }
+    let max_trace_index =
+        (args.count.saturating_sub(1) as u64) / (args.spans_per_trace.max(1) as u64);
+    if args.seed.saturating_add(max_trace_index) >= 1u64 << 43 {
+        anyhow::bail!("--seed + trace count must stay below 2^43 (id bit budget)");
+    }
     args::init_tls_and_logging(&args.common.log_level);
 
     let spread = (args.count as u64).saturating_mul(args.spacing_nanos);
@@ -79,6 +124,12 @@ async fn main() -> anyhow::Result<()> {
         spacing_nanos: args.spacing_nanos,
         duration_nanos: args.duration_nanos,
         seed: args.seed,
+        spans_per_trace: args.spans_per_trace,
+        events_per_span: args.events_per_span,
+        links_every: args.links_every,
+        orphan_every: args.orphan_every,
+        extra_root_every: args.extra_root_every,
+        resend_every: args.resend_every,
     });
     let total = spans.len();
 

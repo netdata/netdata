@@ -14,6 +14,10 @@ fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
     ChunkCounts {
         columns: ColumnsPresent::default(),
         trace_id_index: false,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: mid,
         high_fields: high,
         stream_batches: batches,
@@ -339,6 +343,10 @@ fn col_counts(columns: ColumnsPresent) -> ChunkCounts {
     ChunkCounts {
         columns,
         trace_id_index: false,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -549,6 +557,10 @@ fn idx_counts() -> ChunkCounts {
             ..Default::default()
         },
         trace_id_index: true,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -631,6 +643,10 @@ fn trace_id_index_without_its_column_is_rejected() {
     let bad = ChunkCounts {
         columns: ColumnsPresent::default(),
         trace_id_index: true,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -721,4 +737,84 @@ fn all_columns_are_wired_into_columns_present_has() {
     }
     assert_eq!(present_all().count() as usize, ALL_COLUMNS.len());
     assert_eq!(present_all().present().count(), ALL_COLUMNS.len());
+}
+
+// ── trace-id bloom (TBLM) ────────────────────────────────────────
+
+/// Chunk counts for a file carrying the trace_id column + index + bloom.
+fn bloom_counts() -> ChunkCounts {
+    ChunkCounts {
+        trace_id_bloom: true,
+        ..idx_counts()
+    }
+}
+
+#[test]
+fn trace_id_bloom_round_trips_and_answers() {
+    let (trace, a, b) = three_span_traces();
+    let index = TraceIdIndex::build(&trace);
+    let bloom = crate::TraceIdBloom::build(&index, &trace).expect("set ids");
+
+    let mut w = writer(bloom_counts());
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
+        .unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(entries()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    w.trace_id_index(&index).unwrap();
+    w.trace_id_bloom(&bloom).unwrap();
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
+    assert!(reader.has_trace_id_bloom());
+    let got = reader.trace_id_bloom().unwrap();
+    assert_eq!(got, bloom);
+    assert!(got.might_contain(a) && got.might_contain(b));
+    assert_eq!(got.distinct_ids(), 2);
+}
+
+#[test]
+fn trace_id_bloom_absent_by_default() {
+    // Index without a declared bloom → no TBLM chunk.
+    let (trace, _a, _b) = three_span_traces();
+    let index = TraceIdIndex::build(&trace);
+    let mut w = writer(idx_counts());
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), trace_id_manifest()))
+        .unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(entries()).unwrap();
+    w.trace_ids(&trace).unwrap();
+    w.trace_id_index(&index).unwrap();
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
+    assert!(!reader.has_trace_id_bloom());
+    assert!(reader.trace_id_bloom().is_err());
+}
+
+#[test]
+fn trace_id_bloom_without_index_is_rejected() {
+    // The bloom derives from the index; declaring it alone fails at new().
+    let bad = ChunkCounts {
+        columns: ColumnsPresent {
+            trace_id: true,
+            ..Default::default()
+        },
+        trace_id_index: false,
+        trace_id_bloom: true,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
+        mid_fields: 0,
+        high_fields: 0,
+        stream_batches: 1,
+    };
+    assert!(matches!(
+        ChunkWriter::new(Cursor::new(Vec::new()), bad),
+        Err(Error::WriterMisuse(_)),
+    ));
 }

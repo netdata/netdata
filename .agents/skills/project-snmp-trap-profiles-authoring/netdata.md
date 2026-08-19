@@ -147,7 +147,7 @@ The implementation language is **Go** (user decision recorded on 2026-05-25). Th
 **Process model** (accepted by SOW-0035 M1 ADR-0001): The trap plugin is a **standard in-process go.d collector V2 module** at `src/go/plugin/go.d/collector/snmp_traps/`, registered as `snmp_traps`. No separate process, no CGo, no subprocess bridge.
 
 **Journal writer backend**: The trap collector uses the Go systemd journal SDK module
-`github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.8.0` behind `internal/output.Writer`.
+`github.com/netdata/systemd-journal-sdk/go/journal` at `go/v0.8.1` behind `internal/output.Writer`.
 `internal/output/journal.Prepare()` constructs `journal.NewLog()` with `LogOpenEager` and `LogIdentityStrict`, so journal
 directory creation/open, active file creation, writer lock acquisition, machine ID parsing, boot ID parsing, rotation
 policy validation, and retention policy validation are proven during job creation. `Writer.Start()` launches the queue
@@ -1255,7 +1255,7 @@ trap-derived state gauges; see `trap-metrics-profiles.md` and
 
 Phase B resolved most of the original questions. What remains:
 
-1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended through 2026-08-02 for SDK `go/v0.8.0`, Netdata log directory placement, raw-payload serialization, and internal output ownership)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.8.0`. No separate process, no CGo, no subprocess bridge. See `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`.
+1. **Go process / writer backend** — **ACCEPTED (SOW-0035 M1, ADR-0001; amended through 2026-08-12 for SDK `go/v0.8.1`, Netdata log directory placement, raw-payload serialization, and internal output ownership)**: Standard in-process go.d collector V2 module with a thin SDK-backed Go journal adapter over `github.com/netdata/systemd-journal-sdk/go/journal` `go/v0.8.1`. No separate process, no CGo, no subprocess bridge. See `.agents/skills/project-snmp-trap-profiles-authoring/decisions/0001-go-process-and-trapwriter.md`.
 
 2. **Profile YAML lifecycle — ACCEPTED (superseded 2026-08-02)**: operators add or edit YAML files under
    `/etc/netdata/go.d/snmp.trap-profiles/`. Profiles are immutable while the plugin-scoped catalog epoch has active job

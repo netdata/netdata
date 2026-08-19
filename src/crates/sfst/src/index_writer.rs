@@ -48,17 +48,4 @@ impl IndexWriter {
         build::build_into(row_index, sink, content_meta)
     }
 
-    /// Write a minimal, content-light SFST containing only the `SUMR` summary
-    /// chunk.
-    ///
-    /// The full build mandates the logs-shaped chunk set (primary FST, per-log
-    /// timestamps, ≥1 stream batch) and refuses an underfilled file. A signal
-    /// whose content is not logs-shaped (e.g. traces) uses this to produce a
-    /// sealed file that carries only its [`Summary`] (`record_count`,
-    /// timestamps, opaque `content_meta`) and no queryable content.
-    /// `summary.record_count` must be `> 0` to be tracked rather than
-    /// discarded.
-    pub fn write_summary_only<W: Write + Seek>(sink: W, summary: &Summary) -> Result<W, Error> {
-        crate::writer::write_summary_only(sink, summary)
-    }
 }

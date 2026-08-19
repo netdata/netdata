@@ -126,4 +126,17 @@ int aclk_proxy_negotiation_connect(int sockfd, enum mqtt_wss_proxy_type proxy_ty
 void aclk_sensitive_memzero(void *ptr, size_t len);
 void aclk_sensitive_free(char **ptr);
 
+// True once at least budget_ut has elapsed since start_ut. Inclusive: the budget is spent when
+// exactly that much has passed. Single predicate for every monotonic deadline in ACLK - the
+// request budget in https_client.c and the I/O watchdog in mqtt_wss_client.c both use it, so
+// there is one boundary convention rather than one per call site. A backward clock reading
+// counts as no elapsed time.
+static inline bool aclk_usec_budget_spent(usec_t start_ut, usec_t budget_ut, usec_t now_ut) {
+    return clocks_usec_delta_or_zero(now_ut, start_ut) >= budget_ut;
+}
+
+// Monotonic budget left out of timeout_ms, or 0 once spent. Expiry is inclusive, and the result
+// is >= 1 while time remains so callers never poll() with a 0 timeout.
+int aclk_timeout_remaining_ms(usec_t start_ut, int timeout_ms);
+
 #endif /* ACLK_UTIL_H */

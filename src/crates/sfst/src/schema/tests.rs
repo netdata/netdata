@@ -10,7 +10,7 @@ fn high_field_arena_round_trips() {
     let bytes = bincode::serde::encode_to_vec(&high, bincode::config::standard()).unwrap();
     let (mut decoded, _): (crate::HighField, _) =
         bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
-    decoded.rebuild_offsets();
+    assert!(decoded.rebuild_offsets(), "consistent chunk rebuilds");
 
     assert_eq!(decoded, high);
     assert_eq!(decoded.len(), 3);
@@ -33,7 +33,7 @@ fn stream_batch_arena_round_trips() {
     let bytes = bincode::serde::encode_to_vec(&batch, bincode::config::standard()).unwrap();
     let (mut decoded, _): (crate::StreamBatch, _) =
         bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
-    decoded.rebuild_offsets();
+    assert!(decoded.rebuild_offsets(), "consistent chunk rebuilds");
 
     assert_eq!(decoded, batch);
     assert_eq!(decoded.num_rows(), 3);
@@ -400,4 +400,30 @@ fn fill_field_stats_then_derive_matches_fields() {
         *derived, *fields,
         "derived table must reproduce the input fields"
     );
+}
+
+/// A CRC cannot catch a decodable-but-inconsistent arena: mismatched or
+/// overflowing lengths must FAIL the rebuild (never a later panic or a
+/// silently wrong slice).
+#[test]
+fn inconsistent_arenas_fail_the_offset_rebuild() {
+    let keys = ["alpha", "bravo"];
+    let high = crate::HighField::for_write(&keys, vec![1, 1]);
+    let bytes = bincode::serde::encode_to_vec(&high, bincode::config::standard()).unwrap();
+    let (mut decoded, _): (crate::HighField, _) =
+        bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+    decoded.key_lens[1] = 100; // claims more bytes than the blob holds
+    assert!(!decoded.rebuild_offsets(), "length mismatch is corruption");
+    decoded.key_lens[1] = u32::MAX; // wrapping sum
+    assert!(!decoded.rebuild_offsets(), "overflow is corruption");
+
+    use crate::KvId;
+    let batch = crate::StreamBatch::for_write(&[vec![KvId(1)], vec![KvId(2)]]);
+    let bytes = bincode::serde::encode_to_vec(&batch, bincode::config::standard()).unwrap();
+    let (mut decoded, _): (crate::StreamBatch, _) =
+        bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+    decoded.row_lens[0] = 7;
+    assert!(!decoded.rebuild_offsets(), "length mismatch is corruption");
+    decoded.row_lens[0] = u32::MAX;
+    assert!(!decoded.rebuild_offsets(), "overflow is corruption");
 }

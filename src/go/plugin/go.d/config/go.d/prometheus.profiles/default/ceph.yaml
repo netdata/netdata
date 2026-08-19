@@ -922,6 +922,121 @@ template:
           by_labels:
           - ceph_daemon
           optional_by_labels: []
+  - family: Node Hardware
+    context_namespace: node_hardware
+    groups:
+    - family: Processors
+      context_namespace: processors
+      metrics:
+      - ceph_hardware_cpu_cores
+      charts:
+      - title: CPU Cores
+        context: cpu_cores
+        units: cpu cores
+        label_promotion: []
+        dimensions:
+        - selector: ceph_hardware_cpu_cores
+          name: value
+        instances:
+          by_labels:
+          - hostname
+          - cpu
+          - manufacturer
+          - model
+          - total_threads
+          optional_by_labels: []
+    - family: Cooling
+      context_namespace: cooling
+      metrics:
+      - ceph_hardware_fan_rpm
+      charts:
+      - title: Fan Speed
+        context: fan_speed
+        units: fan revolutions per minute
+        label_promotion: []
+        dimensions:
+        - selector: ceph_hardware_fan_rpm
+          name: value
+        instances:
+          by_labels:
+          - hostname
+          - fan_name
+          optional_by_labels: []
+    - family: Health
+      context_namespace: health
+      metrics:
+      - ceph_hardware_health
+      charts:
+      - title: Hardware Health
+        context: state
+        units: '{status}'
+        label_promotion: []
+        dimensions:
+        - selector: ceph_hardware_health
+          name: value
+        instances:
+          by_labels:
+          - hostname
+          - category
+          - component
+          optional_by_labels: []
+    - family: Memory
+      context_namespace: memory
+      metrics:
+      - ceph_hardware_memory_capacity_bytes
+      charts:
+      - title: Memory Module Capacity
+        context: capacity
+        units: bytes
+        label_promotion: []
+        dimensions:
+        - selector: ceph_hardware_memory_capacity_bytes
+          name: value
+        instances:
+          by_labels:
+          - hostname
+          - dimm
+          - type
+          optional_by_labels: []
+    - family: Storage
+      context_namespace: storage
+      metrics:
+      - ceph_hardware_storage_capacity_bytes
+      charts:
+      - title: Storage Device Capacity
+        context: capacity
+        units: bytes
+        label_promotion: []
+        dimensions:
+        - selector: ceph_hardware_storage_capacity_bytes
+          name: value
+        instances:
+          by_labels:
+          - hostname
+          - device
+          - model
+          - protocol
+          - firmware_version
+          - slot
+          - serial_number
+          optional_by_labels: []
+    - family: Temperature
+      context_namespace: temperature
+      metrics:
+      - ceph_hardware_temperature_celsius
+      charts:
+      - title: Sensor Temperature
+        context: temperature
+        units: Celsius
+        label_promotion: []
+        dimensions:
+        - selector: ceph_hardware_temperature_celsius
+          name: value
+        instances:
+          by_labels:
+          - hostname
+          - sensor_name
+          optional_by_labels: []
   - family: OSD Overview
     context_namespace: osd_overview
     metrics:
@@ -5242,6 +5357,10 @@ template:
     - ceph_osd_l_osd_recovery_scan_queue_latency_sum
     - ceph_osd_recovery_bytes
     - ceph_osd_recovery_ops
+    - ceph_recoverystate_perf_pg_rebuild_duration_count
+    - ceph_recoverystate_perf_pg_rebuild_duration_sum
+    - ceph_recoverystate_perf_pg_rebuild_max_secs
+    - ceph_recoverystate_perf_pg_rebuild_min_secs
     charts:
     - title: Latency Measurements
       context: latency_measurements
@@ -5312,6 +5431,42 @@ template:
       dimensions:
       - selector: ceph_osd_recovery_ops
         name: value
+      instances:
+        by_labels:
+        - ceph_daemon
+        optional_by_labels: []
+    - title: PG Rebuild Duration Measurements
+      context: pg_rebuild_duration_measurements
+      units: duration measurements/s
+      label_promotion: []
+      dimensions:
+      - selector: ceph_recoverystate_perf_pg_rebuild_duration_count
+        name: value
+      instances:
+        by_labels:
+        - ceph_daemon
+        optional_by_labels: []
+    - title: PG Rebuild Accumulated Duration
+      context: pg_rebuild_accumulated_duration
+      units: seconds/s
+      label_promotion: []
+      dimensions:
+      - selector: ceph_recoverystate_perf_pg_rebuild_duration_sum
+        name: value
+      instances:
+        by_labels:
+        - ceph_daemon
+        optional_by_labels: []
+      algorithm: incremental
+    - title: PG Rebuild Duration Range
+      context: pg_rebuild_duration_range
+      units: seconds
+      label_promotion: []
+      dimensions:
+      - selector: ceph_recoverystate_perf_pg_rebuild_max_secs
+        name: maximum
+      - selector: ceph_recoverystate_perf_pg_rebuild_min_secs
+        name: minimum
       instances:
         by_labels:
         - ceph_daemon

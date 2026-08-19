@@ -56,15 +56,15 @@ func (r *topologyRegistry) unregister(cache *topologyCache) {
 	r.mu.Unlock()
 }
 
-func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
+func (r *topologyRegistry) snapshotWithOptions(options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
 	if r == nil {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, nil
 	}
 	options = topologyoptions.NormalizeQueryOptions(options)
 
 	aggregate, ok := aggregateTopologyObservationSnapshots(r.observationSnapshots())
 	if !ok {
-		return topologymodel.Data{}, false
+		return topologymodel.Data{}, false, nil
 	}
 	aggregate.ProducerScopeID = r.producerScope()
 
@@ -171,7 +171,7 @@ func (r *topologyRegistry) enqueueReverseDNSWarmFromDefaultSnapshot() bool {
 		}
 		options := topologyoptions.DefaultQueryOptions()
 		options.ResolveDNSName = collector.lookupCached
-		if _, ok := r.snapshotWithOptions(options); !ok {
+		if _, ok, err := r.snapshotWithOptions(options); err != nil || !ok {
 			return
 		}
 		r.reverseDNSWarmer.warm(ctx, collector.collectedCandidates())

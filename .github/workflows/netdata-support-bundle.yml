@@ -69,6 +69,12 @@ jobs:
           sudo install -d -m 755 /etc/netdata
           sudo sh -c 'printf "%s\n" "KEEP-NONSECRET-CONTENT" "password=SENTINEL-E2E-PASSWORD" > /etc/netdata/netdata.conf'
           sudo chmod 644 /etc/netdata/netdata.conf
+          # stream.conf fixture: a UTF-8 BOM, CRLF endings and NO final newline,
+          # so the encoding-preservation and streaming-api-key contracts are
+          # exercised end to end (netdata/netdata#23448)
+          printf '\357\273\277[stream]\r\n    enabled = yes\r\n    api key = 11111111-2222-3333-4444-555555555555\r\n    password = SENTINEL-E2E-STREAMPW\r\n[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]\r\n    enabled = yes' > /tmp/stream.conf
+          sudo cp /tmp/stream.conf /etc/netdata/stream.conf
+          sudo chmod 644 /etc/netdata/stream.conf
           output=$(mktemp -d)
           extract=$(mktemp -d)
           sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 -o "$output"
@@ -89,6 +95,17 @@ jobs:
           fi
           jq -e '.schema == "netdata-support-bundle/v1" and (.files | length > 0)' "$root/MANIFEST.json"
           jq -e '.files[] | select(.path == "04-config/netdata.conf" and .bytes > 0)' "$root/MANIFEST.json"
+
+          test -s "$root/09-permissions/plugins-d.txt"
+
+          # streaming api key kept verbatim, other stream.conf secrets redacted,
+          # and the source bytes (BOM + CRLF + no final newline) preserved
+          sc="$root/04-config/stream.conf"
+          grep -qF 'api key = 11111111-2222-3333-4444-555555555555' "$sc"
+          grep -qF '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]' "$sc"
+          grep -q 'SENTINEL-E2E-STREAMPW' "$sc" && { echo 'a non-api-key secret survived in stream.conf' >&2; exit 1; }
+          [ "$(head -c 3 "$sc" | od -An -tx1 | tr -d ' \n')" = efbbbf ] || { echo 'the UTF-8 BOM was not preserved' >&2; exit 1; }
+          [ "$(tr -dc '\r' < "$sc" | wc -c)" -ge 4 ] || { echo 'CRLF line endings were not preserved' >&2; exit 1; }
 
   macos-posix:
     name: macOS POSIX sanitization
@@ -130,6 +147,13 @@ jobs:
               (Join-Path $confDir 'netdata.conf'),
               "KEEP-NONSECRET-CONTENT`npassword=SENTINEL-E2E-PASSWORD`n",
               $utf8)
+          # stream.conf fixture: a UTF-8 BOM, CRLF endings and NO final newline,
+          # so the encoding-preservation and streaming-api-key contracts are
+          # exercised end to end (netdata/netdata#23448)
+          $streamText = "[stream]`r`n    enabled = yes`r`n    api key = 11111111-2222-3333-4444-555555555555`r`n    password = SENTINEL-E2E-STREAMPW`r`n[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]`r`n    enabled = yes"
+          [System.IO.File]::WriteAllBytes(
+              (Join-Path $confDir 'stream.conf'),
+              [byte[]](@(0xEF, 0xBB, 0xBF) + $utf8.GetBytes($streamText)))
           $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
           .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1
           $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
@@ -154,4 +178,32 @@ jobs:
               if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
               $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
               if ($manifest.schema -ne 'netdata-support-bundle/v1' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+
+              # streaming api key kept verbatim, other stream.conf secrets redacted,
+              # and the source bytes (BOM + CRLF + no final newline) preserved
+              $streamEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])04-config[\\/]stream.conf$' } | Select-Object -First 1
+              if (-not $streamEntry) { throw 'stream.conf was not collected' }
+              $ms = New-Object System.IO.MemoryStream
+              $es = $streamEntry.Open()
+              try { $es.CopyTo($ms) } finally { $es.Dispose() }
+              $sb = $ms.ToArray(); $ms.Dispose()
+              $stext = $utf8.GetString($sb)
+              if ($stext -notmatch 'api key = 11111111-2222-3333-4444-555555555555') { throw 'the streaming api key was redacted' }
+              if ($stext -match 'SENTINEL-E2E-STREAMPW') { throw 'a non-api-key secret survived in stream.conf' }
+              if (-not ($sb.Length -ge 3 -and $sb[0] -eq 0xEF -and $sb[1] -eq 0xBB -and $sb[2] -eq 0xBF)) { throw 'the UTF-8 BOM was not preserved' }
+              if (@([regex]::Matches($stext, "`r`n")).Count -lt 4) { throw 'CRLF line endings were not preserved' }
+              if ($sb[$sb.Length - 1] -eq 10) { throw 'a final newline was added to a source that had none' }
+
+              # the ETW channels are actually queried - they are where a Windows
+              # agent logs by default, and querying only NetdataWEL found nothing
+              $elEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])05-logs[\\/]eventlog-netdata.txt$' } | Select-Object -First 1
+              if (-not $elEntry) { throw 'the event log capture is missing' }
+              $er = New-Object System.IO.StreamReader($elEntry.Open(), $utf8, $true)
+              try { $eltext = $er.ReadToEnd() } finally { $er.Dispose() }
+              foreach ($ch in @('Netdata/Daemon', 'Netdata/Collectors', 'Netdata/Health', 'Netdata/Aclk', 'Netdata/Access', 'NetdataWEL')) {
+                  if ($eltext -notmatch [regex]::Escape($ch)) { throw "the event log capture never queried $ch" }
+              }
+              if (-not ($archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])09-permissions[\\/]plugins-d.txt$' })) {
+                  throw '09-permissions/plugins-d.txt is missing'
+              }
           } finally { $archive.Dispose() }

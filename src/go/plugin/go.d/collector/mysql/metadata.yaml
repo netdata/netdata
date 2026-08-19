@@ -7,6 +7,7 @@ modules:
       module_name: mysql
       monitored_instance:
         name: MySQL
+        description: "Monitor MySQL queries, connections, replication, users, InnoDB, storage, and resource performance metrics."
         link: https://www.mysql.com/
         categories:
           - data-collection.databases
@@ -35,9 +36,9 @@ modules:
           This collector monitors the health and performance of MySQL servers and collects general statistics, replication and user metrics.
         method_description: |
           It connects to the MySQL instance via a TCP or UNIX socket and executes the following commands:
-          
+
           Executed queries:
-          
+
           - `SELECT VERSION();`
           - `SHOW GLOBAL STATUS;`
           - `SHOW ENGINE INNODB STATUS;`
@@ -231,7 +232,7 @@ modules:
                 jobs:
                   - name: local
                     dsn: netdata@tcp(127.0.0.1:3306)/
-                
+
                   - name: remote
                     dsn: netconfig:password@tcp(203.0.113.0:3306)/
     troubleshooting:
@@ -1315,6 +1316,7 @@ modules:
       id: collector-go.d.plugin-mariadb
       monitored_instance:
         name: MariaDB
+        description: "Monitor MariaDB queries, connections, replication, users, InnoDB, storage, and resource performance metrics."
         link: https://mariadb.org/
         icon_filename: mariadb.svg
         categories:
@@ -1325,6 +1327,7 @@ modules:
       id: collector-go.d.plugin-percona_mysql
       monitored_instance:
         name: Percona MySQL
+        description: "Monitor Percona MySQL queries, connections, replication, users, InnoDB, storage, and resource performance metrics."
         link: https://www.percona.com/software/mysql-database/percona-server
         icon_filename: percona.svg
         categories:

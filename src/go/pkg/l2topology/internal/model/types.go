@@ -33,12 +33,13 @@ type Result struct {
 
 // Device is a discovered network device.
 type Device struct {
-	ID        string
-	Hostname  string
-	Addresses []netip.Addr
-	SysObject string
-	ChassisID string
-	Labels    map[string]string
+	ID           string
+	Hostname     string
+	ManagementIP netip.Addr
+	Addresses    []netip.Addr
+	SysObject    string
+	ChassisID    string
+	Labels       map[string]string
 }
 
 // Interface is a discovered interface on a device.
@@ -51,14 +52,26 @@ type Interface struct {
 	Labels   map[string]string
 }
 
+// AdjacencyPortEvidence keeps observed port namespaces distinct from the raw
+// protocol port identifier carried by Adjacency.
+type AdjacencyPortEvidence struct {
+	IfIndex    int
+	IfName     string
+	BridgePort string
+}
+
 // Adjacency represents a direct device-to-device neighbor relation.
 type Adjacency struct {
-	Protocol   string
-	SourceID   string
-	SourcePort string
-	TargetID   string
-	TargetPort string
-	Labels     map[string]string
+	Protocol string
+	SourceID string
+	// SourcePort and TargetPort preserve protocol-reported identifiers; typed
+	// interface and bridge identities belong in their evidence fields.
+	SourcePort         string
+	SourcePortEvidence AdjacencyPortEvidence
+	TargetID           string
+	TargetPort         string
+	TargetPortEvidence AdjacencyPortEvidence
+	Labels             map[string]string
 }
 
 // Attachment ties an endpoint to a device interface.
@@ -83,9 +96,12 @@ type L2Observation struct {
 	DeviceID string
 	// Inferred marks observations synthesized from neighbor advertisements
 	// (for example LLDP/CDP remotes), not directly observed local devices.
-	Inferred          bool
-	Hostname          string
-	ManagementIP      string
+	Inferred     bool
+	Hostname     string
+	ManagementIP string
+	// ManagementAliases contains vetted canonical IP identity aliases. Raw or
+	// typed diagnostic address observations must not use this field.
+	ManagementAliases []string
 	SysObjectID       string
 	ChassisID         string
 	BaseBridgeAddress string
@@ -137,7 +153,10 @@ type CDPRemoteObservation struct {
 	DeviceID     string
 	SysName      string
 	DevicePort   string
-	Address      string
+	// Address is the normalized management identity selected for matching.
+	Address string
+	// RawAddress is the exact cdpCacheAddress observation for diagnostics.
+	RawAddress string
 }
 
 // BridgePortObservation maps one bridge base port to an interface index.
@@ -148,12 +167,13 @@ type BridgePortObservation struct {
 
 // FDBObservation captures one forwarding database entry from a bridge table.
 type FDBObservation struct {
-	MAC        string
-	BridgePort string
-	IfIndex    int
-	Status     string
-	VLANID     string
-	VLANName   string
+	MAC         string
+	BridgePort  string
+	IfIndex     int
+	Status      string
+	FDBDomainID string
+	VLANID      string
+	VLANName    string
 }
 
 // STPPortObservation captures one spanning-tree port row.

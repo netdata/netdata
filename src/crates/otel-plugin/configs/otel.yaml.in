@@ -1,5 +1,6 @@
 # OpenTelemetry Plugin Configuration
-# This file configures the OpenTelemetry metrics and logs ingestion for Netdata
+# This file configures the OpenTelemetry metrics, logs, and traces ingestion
+# for Netdata
 #
 # To customize, run: edit-config otel.yaml
 # Only include the fields you want to change — missing fields keep their defaults.
@@ -84,6 +85,30 @@ logs:
 
   retention:
     # How much log data to keep on local disk; the oldest files are deleted
+    # when any of these limits is exceeded.
+    default:
+      max_files: 100000
+      max_total_size: "1GB"
+      max_age: "7 days"
+
+    # Per-tenant overrides (any subset of the fields above):
+    # my-tenant:
+    #   max_age: "30 days"
+
+traces:
+  rotation:
+    # Incoming spans are appended to a current file; a new file starts when
+    # any of these limits is reached.
+    default:
+      max_file_size: "25MB"
+      max_entries: 50000
+
+    # Per-tenant overrides (any subset of the fields above):
+    # my-tenant:
+    #   max_file_size: "100MB"
+
+  retention:
+    # How much trace data to keep on local disk; the oldest files are deleted
     # when any of these limits is exceeded.
     default:
       max_files: 100000
