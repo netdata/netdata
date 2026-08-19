@@ -1758,6 +1758,7 @@ set(PLUGINSD_PLUGIN_FILES
 set(NRPC_FILES
         src/nrpc/nrpc.h
         src/nrpc/nrpc-internals.h
+        src/nrpc/nrpc-lifetime.h
         src/nrpc/nrpc-builtin.c
         src/nrpc/nrpc-builtin.h
         src/nrpc/nrpc-calls.c

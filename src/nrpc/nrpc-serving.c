@@ -2,19 +2,20 @@
 
 #include "nrpc-serving.h"
 #include "nrpc-serving-internals.h"
+#include "nrpc-lifetime.h"
 
-// Each function points to this serving handle
-// so that when the serving thread exits, all of them will
-// be invalidated (running == false)
-// The last function using this serving handle
-// frees the structure too (or when the serving thread calls
-// nrpc_serving_finished()).
-
+// The liveness token of a thread that registers functions. Every method
+// registered by that thread points at its handle, so when the thread exits,
+// all of them become unavailable at once.
+//
+// It is the shared two-counter shell (nrpc-lifetime.h): the thread holds the
+// base entry ref between nrpc_serving_started() and nrpc_serving_finished(),
+// each registered method holds one more, and whoever drops the last one frees
+// the handle - which is routinely AFTER the thread is gone, because methods
+// outlive their serving thread until something unregisters them.
 struct nrpc_serving_handle {
-    REFCOUNT entry_refcount;
-    REFCOUNT dispatcher_refcount;
+    NRPC_LIFETIME lifetime;
     pid_t tid;
-    bool running;
 };
 
 // Each thread that registers functions has to call
@@ -24,7 +25,7 @@ struct nrpc_serving_handle {
 __thread struct nrpc_serving_handle *nrpc_thread_serving = NULL;
 
 inline bool nrpc_serving_running(struct nrpc_serving_handle *serving) {
-    return __atomic_load_n(&serving->running, __ATOMIC_RELAXED);
+    return nrpc_lifetime_alive(&serving->lifetime);
 }
 
 inline pid_t nrpc_serving_tid(struct nrpc_serving_handle *serving) {
@@ -32,30 +33,22 @@ inline pid_t nrpc_serving_tid(struct nrpc_serving_handle *serving) {
 }
 
 bool nrpc_serving_dispatcher_acquire(struct nrpc_serving_handle *serving) {
-    return refcount_acquire(&serving->dispatcher_refcount);
+    return nrpc_lifetime_dispatcher_acquire(&serving->lifetime);
 }
 
 void nrpc_serving_dispatcher_release(struct nrpc_serving_handle *serving) {
-    refcount_release(&serving->dispatcher_refcount);
+    nrpc_lifetime_dispatcher_release(&serving->lifetime);
 }
 
-static void nrpc_serving_free(struct nrpc_serving_handle *serving) {
-    if(nrpc_serving_running(serving) || !refcount_acquire_for_deletion(&serving->entry_refcount))
-        // the serving handle is still referenced by registered methods.
-        // leave it hanging there, the last method will actually free it.
-        return;
-
-    // we can free it now
-    freez(serving);
-}
-
-// called once per serving thread
+// called once per serving thread (idempotent - the registration paths call it
+// on every register, which only refreshes the tid)
 void nrpc_serving_started(void) {
-    if(!nrpc_thread_serving)
+    if(!nrpc_thread_serving) {
         nrpc_thread_serving = callocz(1, sizeof(struct nrpc_serving_handle));
+        nrpc_lifetime_init(&nrpc_thread_serving->lifetime);
+    }
 
     nrpc_thread_serving->tid = gettid_cached();
-    __atomic_store_n(&nrpc_thread_serving->running, true, __ATOMIC_RELAXED);
 }
 
 // called once per serving thread
@@ -63,35 +56,27 @@ void nrpc_serving_finished(void) {
     if(!nrpc_thread_serving)
         return;
 
-    __atomic_store_n(&nrpc_thread_serving->running, false, __ATOMIC_RELAXED);
+    // The canonical teardown (nrpc-lifetime.h). Retiring first is what delays
+    // the thread's exit until every in-flight cancel/progress dispatch has
+    // left: those dispatches read a structure this thread owns, so the thread
+    // must not vanish underneath them. Marking and waiting is one step, so new
+    // dispatchers cannot keep extending the drain.
+    nrpc_lifetime_retire(&nrpc_thread_serving->lifetime);
 
-    // wait for any cancellation requests to be dispatched;
-    // the problem is that cancellation requests require a structure allocated by the serving thread,
-    // so, while cancellation requests are being dispatched, this structure is accessed.
-    // delaying the exit of the thread is required to avoid cleaning up this structure.
-    //
-    // mark-for-deletion + wait in one step: new dispatcher acquisitions fail
-    // from the CAS on, so the drain cannot be extended by new dispatches (the
-    // old 1ms-sleep retry loop left the count at 0 between retries, letting
-    // new dispatchers in indefinitely)
-    (void)refcount_acquire_for_deletion_and_wait(&nrpc_thread_serving->dispatcher_refcount);
+    // drop the thread's base ref; registered methods may still hold theirs, and
+    // then the last of them frees the handle
+    if(nrpc_lifetime_entry_release(&nrpc_thread_serving->lifetime))
+        freez(nrpc_thread_serving);
 
-    nrpc_serving_free(nrpc_thread_serving);
     nrpc_thread_serving = NULL;
-}
-
-static bool nrpc_serving_acquire(struct nrpc_serving_handle *serving) {
-    if(!serving || !nrpc_serving_running(serving))
-        return false;
-
-    return refcount_acquire(&serving->entry_refcount);
 }
 
 struct nrpc_serving_handle *nrpc_serving_current_thread_acquire(void) {
     nrpc_serving_started();
 
-    if(!nrpc_serving_acquire(nrpc_thread_serving))
-        internal_fatal(true, "NRPC: trying to acquire the current thread's serving handle while it is exiting.");
+    // cannot fail: the thread-local is non-NULL only while this thread holds
+    // the base ref (nrpc_serving_finished() clears it)
+    nrpc_lifetime_entry_acquire(&nrpc_thread_serving->lifetime);
 
     return nrpc_thread_serving;
 }
@@ -99,6 +84,6 @@ struct nrpc_serving_handle *nrpc_serving_current_thread_acquire(void) {
 void nrpc_serving_release(struct nrpc_serving_handle *serving) {
     if(unlikely(!serving)) return;
 
-    if(refcount_release(&serving->entry_refcount) == 0)
-        nrpc_serving_free(serving);
+    if(nrpc_lifetime_entry_release(&serving->lifetime))
+        freez(serving);
 }

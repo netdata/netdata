@@ -351,9 +351,9 @@ int pluginsd_functions_unittest(void) {
             .handler = c6ut_noop_execute_cb,
             .handler_data = tr,
         });
-        if(refcount_references(&tr->entry_refcount) != 2) {
+        if(refcount_references(&tr->lifetime.entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: after COLLECTOR add, entry refs %d != 2\n",
-                    refcount_references(&tr->entry_refcount));
+                    refcount_references(&tr->lifetime.entry_refcount));
             errors++;
         }
 
@@ -371,9 +371,9 @@ int pluginsd_functions_unittest(void) {
             .source = NRPC_SOURCE_DAEMON,
             .handler = c6ut_noop_execute_cb,
         });
-        if(refcount_references(&tr->entry_refcount) != 1) {
+        if(refcount_references(&tr->lifetime.entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after INTERNAL re-add, entry refs %d != 1\n",
-                    refcount_references(&tr->entry_refcount));
+                    refcount_references(&tr->lifetime.entry_refcount));
             errors++;
         }
 
@@ -392,9 +392,9 @@ int pluginsd_functions_unittest(void) {
             .handler = c6ut_noop_execute_cb,
             .handler_data = tr,
         });
-        if(refcount_references(&tr->entry_refcount) != 2) {
+        if(refcount_references(&tr->lifetime.entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: after COLLECTOR re-add, entry refs %d != 2\n",
-                    refcount_references(&tr->entry_refcount));
+                    refcount_references(&tr->lifetime.entry_refcount));
             errors++;
         }
 
@@ -413,17 +413,17 @@ int pluginsd_functions_unittest(void) {
             .handler = c6ut_noop_execute_cb,
             .handler_data = tr,
         });
-        if(refcount_references(&tr->entry_refcount) != 2) {
+        if(refcount_references(&tr->lifetime.entry_refcount) != 2) {
             fprintf(stderr, "  FAILED refs: equal-pointer conflict changed entry refs to %d (expected 2 - must net zero)\n",
-                    refcount_references(&tr->entry_refcount));
+                    refcount_references(&tr->lifetime.entry_refcount));
             errors++;
         }
 
         // delete: the stored pair released under its stored tag -> 1
         nrpc_method_unregister(rrdhost_nrpc_owner(host), "c6-mixed-fn", NRPC_SOURCE_DAEMON);
-        if(refcount_references(&tr->entry_refcount) != 1) {
+        if(refcount_references(&tr->lifetime.entry_refcount) != 1) {
             fprintf(stderr, "  FAILED refs: after del, entry refs %d != 1\n",
-                    refcount_references(&tr->entry_refcount));
+                    refcount_references(&tr->lifetime.entry_refcount));
             errors++;
         }
 
@@ -565,9 +565,9 @@ int pluginsd_functions_unittest(void) {
 
             // node pin (+1) - the registry "config c6test:node" entry is
             // INTERNAL with data NULL and takes no ref
-            if(refcount_references(&tr->entry_refcount) != 2) {
+            if(refcount_references(&tr->lifetime.entry_refcount) != 2) {
                 fprintf(stderr, "  FAILED dyncfg-pin: after CREATE, entry refs %d != 2\n",
-                        refcount_references(&tr->entry_refcount));
+                        refcount_references(&tr->lifetime.entry_refcount));
                 errors++;
             }
 
@@ -590,9 +590,9 @@ int pluginsd_functions_unittest(void) {
                 .transport = tr,
             });
 
-            if(refcount_references(&tr->entry_refcount) != 2) {
+            if(refcount_references(&tr->lifetime.entry_refcount) != 2) {
                 fprintf(stderr, "  FAILED dyncfg-pin: re-CREATE changed entry refs to %d (expected 2 - must net zero)\n",
-                        refcount_references(&tr->entry_refcount));
+                        refcount_references(&tr->lifetime.entry_refcount));
                 errors++;
             }
 
@@ -619,23 +619,23 @@ int pluginsd_functions_unittest(void) {
                 .transport = tr2,
             });
 
-            if(refcount_references(&tr->entry_refcount) != 1) {
+            if(refcount_references(&tr->lifetime.entry_refcount) != 1) {
                 fprintf(stderr, "  FAILED dyncfg-pin: the displaced transport was not released (entry refs %d != 1)\n",
-                        refcount_references(&tr->entry_refcount));
+                        refcount_references(&tr->lifetime.entry_refcount));
                 errors++;
             }
-            if(refcount_references(&tr2->entry_refcount) != 2) {
+            if(refcount_references(&tr2->lifetime.entry_refcount) != 2) {
                 fprintf(stderr, "  FAILED dyncfg-pin: the installed transport was not pinned (entry refs %d != 2)\n",
-                        refcount_references(&tr2->entry_refcount));
+                        refcount_references(&tr2->lifetime.entry_refcount));
                 errors++;
             }
 
             dyncfg_del_low_level(host, "c6test:node");
 
-            if(refcount_references(&tr->entry_refcount) != 1 ||
-               refcount_references(&tr2->entry_refcount) != 1) {
+            if(refcount_references(&tr->lifetime.entry_refcount) != 1 ||
+               refcount_references(&tr2->lifetime.entry_refcount) != 1) {
                 fprintf(stderr, "  FAILED dyncfg-pin: after DELETE, entry refs %d/%d != 1/1\n",
-                        refcount_references(&tr->entry_refcount), refcount_references(&tr2->entry_refcount));
+                        refcount_references(&tr->lifetime.entry_refcount), refcount_references(&tr2->lifetime.entry_refcount));
                 errors++;
             }
 
@@ -1295,15 +1295,15 @@ int pluginsd_functions_unittest(void) {
         }
 
         // first: base ref only (the cancel_hook re-registration released its pin)
-        if(refcount_references(&c7_pin.first->entry_refcount) != 1) {
+        if(refcount_references(&c7_pin.first->lifetime.entry_refcount) != 1) {
             fprintf(stderr, "  FAILED pins: a cancel_hook re-registration leaked the previous pin (refs %d != 1)\n",
-                    refcount_references(&c7_pin.first->entry_refcount));
+                    refcount_references(&c7_pin.first->lifetime.entry_refcount));
             errors++;
         }
         // second: base + the cancel_hook pin + the progress_hook pin
-        if(refcount_references(&c7_pin.second->entry_refcount) != 3) {
+        if(refcount_references(&c7_pin.second->lifetime.entry_refcount) != 3) {
             fprintf(stderr, "  FAILED pins: the cancel_hook/progress_hook pins are %d, expected 3 (base + 2)\n",
-                    refcount_references(&c7_pin.second->entry_refcount));
+                    refcount_references(&c7_pin.second->lifetime.entry_refcount));
             errors++;
         }
 
@@ -1336,11 +1336,11 @@ int pluginsd_functions_unittest(void) {
             fprintf(stderr, "  FAILED pins: the caller was delivered %zu times, expected once\n", res.calls);
             errors++;
         }
-        if(refcount_references(&c7_pin.second->entry_refcount) != 1 ||
-           refcount_references(&c7_pin.first->entry_refcount) != 1) {
+        if(refcount_references(&c7_pin.second->lifetime.entry_refcount) != 1 ||
+           refcount_references(&c7_pin.first->lifetime.entry_refcount) != 1) {
             fprintf(stderr, "  FAILED pins: after completion the pins are %d/%d, expected 1/1\n",
-                    refcount_references(&c7_pin.first->entry_refcount),
-                    refcount_references(&c7_pin.second->entry_refcount));
+                    refcount_references(&c7_pin.first->lifetime.entry_refcount),
+                    refcount_references(&c7_pin.second->lifetime.entry_refcount));
             errors++;
         }
 
