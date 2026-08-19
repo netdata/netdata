@@ -4633,6 +4633,58 @@ modules:
                     max_time_series: 20000
                     max_time_series_per_metric: 4000
     alerts:
+      - name: ceph_nvmeof_subsystem_open_security
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.subsystems.state_metadata
+        info: 'Every available sample in the 5-minute observation window reports an NVMe-oF subsystem configured without host security.'
+      - name: ceph_nvmeof_gateway_cpu_10m
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.gateways.time_accumulation
+        info: 'Internal helper holding the lowest local reactor busy-rate sample observed over ten minutes; it does not notify.'
+      - name: ceph_nvmeof_gateway_cpu
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.gateways.time_accumulation
+        info: 'The current lowest local reactor busy-rate sample in the 10-minute observation window is above 80 percent.'
+      - name: ceph_nvmeof_read_latency_1m
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
+        info: 'Internal helper holding the local one-minute per-block-device read service-time rate; it does not notify.'
+      - name: ceph_nvmeof_read_operations_1m
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.operations
+        info: 'Internal helper holding the local one-minute per-block-device completed-read rate; it does not notify.'
+      - name: ceph_nvmeof_high_read_latency
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
+        info: 'The current local one-minute read service-time ratio exceeds 10 milliseconds per completed read.'
+      - name: ceph_nvmeof_write_latency_1m
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
+        info: 'Internal helper holding the local one-minute per-block-device write service-time rate; it does not notify.'
+      - name: ceph_nvmeof_write_operations_1m
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.operations
+        info: 'Internal helper holding the local one-minute per-block-device completed-write rate; it does not notify.'
+      - name: ceph_nvmeof_high_write_latency
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
+        info: 'The current local one-minute write service-time ratio exceeds 20 milliseconds per completed write.'
+      - name: ceph_nvmeof_host_keepalive_timeout
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.hosts.keepalive_timeout_state
+        info: 'The exporter currently reports a host disconnected by keepalive timeout. Exporter refresh reads and clears this one-shot state.'
+      - name: ceph_nvmeof_subsystem_namespace_limit
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.subsystems.namespace_capacity
+        info: 'The current subsystem namespace count is at or above its configured limit.'
+      - name: ceph_nvmeof_gateway_namespaces
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.gateways.namespace_count
+        info: 'Internal helper summing subsystem namespace counts inside the local exporter endpoint; it does not notify.'
+      - name: ceph_nvmeof_too_many_namespaces
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.gateways.namespace_count
+        info: 'The current local exporter namespace inventory is at or above the supported maximum of 4096.'
       - name: ceph_health_error
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.cluster_status.state

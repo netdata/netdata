@@ -1701,6 +1701,195 @@ func TestCollector_CephMGRClusterAlertBoundaries(t *testing.T) {
 	}
 }
 
+func TestCollector_CephNVMeoFMaterializesLocalAlertIdentities(t *testing.T) {
+	input, err := os.ReadFile(promtestutil.Require(t, "prometheus/profiles/ceph/fixtures/ceph_nvmeof.prom"))
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(input)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	byContext := make(map[string][]chartengine.CreateChartAction)
+	updates := make(map[string]chartengine.UpdateChartAction)
+	for _, action := range plan.Actions {
+		switch action := action.(type) {
+		case chartengine.CreateChartAction:
+			byContext[action.Meta.Context] = append(byContext[action.Meta.Context], action)
+		case chartengine.UpdateChartAction:
+			updates[action.ChartID] = action
+		}
+	}
+
+	require.Len(t, byContext["prometheus.ceph.nvme_of.subsystems.state_metadata"], 3)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.gateways.time_accumulation"], 2)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.block_devices.operations"], 2)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.block_devices.time_accumulation"], 2)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.hosts.keepalive_timeout_state"], 2)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.subsystems.state_namespace_metadata"], 4)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.subsystems.namespace_capacity"], 2)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.subsystems.namespace_count"], 2)
+	require.Len(t, byContext["prometheus.ceph.nvme_of.gateways.namespace_count"], 1)
+
+	open := byContext["prometheus.ceph.nvme_of.subsystems.state_metadata"][0]
+	for _, create := range byContext["prometheus.ceph.nvme_of.subsystems.state_metadata"] {
+		if create.Labels["allow_any_host"] == "yes" {
+			open = create
+		}
+	}
+	require.Equal(t, "yes", open.Labels["allow_any_host"])
+
+	chartValues := func(chart chartengine.CreateChartAction) map[string]float64 {
+		t.Helper()
+		update, ok := updates[chart.ChartID]
+		require.Truef(t, ok, "chart %q has no update", chart.ChartID)
+		values := make(map[string]float64)
+		for _, value := range update.Values {
+			if value.IsFloat {
+				values[value.Name] = value.Float64
+			} else {
+				values[value.Name] = float64(value.Int64)
+			}
+		}
+		return values
+	}
+	for _, reactor := range byContext["prometheus.ceph.nvme_of.gateways.time_accumulation"] {
+		require.Contains(t, chartValues(reactor), "busy")
+		require.Contains(t, chartValues(reactor), "idle")
+	}
+
+	for _, bdev := range byContext["prometheus.ceph.nvme_of.block_devices.operations"] {
+		values := chartValues(bdev)
+		require.Contains(t, values, "reads_completed")
+		require.Contains(t, values, "writes_completed")
+		require.Greater(t, values["reads_completed"], float64(0))
+	}
+
+	gatewayNamespaces := make(map[string]float64)
+	for _, gateway := range byContext["prometheus.ceph.nvme_of.gateways.namespace_count"] {
+		gatewayNamespaces[gateway.ChartID] = chartValues(gateway)["namespace_count"]
+	}
+	assert.InDeltaMapValues(t, map[string]float64{"prometheus_ceph_nvme_of_gateways_namespace_count": 3}, gatewayNamespaces, 1e-12)
+}
+
+func TestCollector_CephNVMeoFAlertBoundaries(t *testing.T) {
+	cpuPercent := func(minimumBusyRate float64) float64 {
+		if math.IsNaN(minimumBusyRate) || math.IsInf(minimumBusyRate, 0) || minimumBusyRate < 0 || minimumBusyRate > 1 {
+			return math.NaN()
+		}
+		return minimumBusyRate * 100
+	}
+	for _, tc := range []struct {
+		name  string
+		busy  float64
+		want  float64
+		actor bool
+		undef bool
+	}{
+		{name: "invalid NaN busy", busy: math.NaN(), undef: true},
+		{name: "negative busy", busy: -0.01, undef: true},
+		{name: "busy above one core", busy: 1.01, undef: true},
+		{name: "exactly eighty does not act", busy: .8, want: 80},
+		{name: "above eighty acts", busy: .81, want: 81, actor: true},
+	} {
+		t.Run("cpu "+tc.name, func(t *testing.T) {
+			value := cpuPercent(tc.busy)
+			if tc.undef {
+				assert.True(t, math.IsNaN(value))
+				return
+			}
+			assert.InDelta(t, tc.want, value, 1e-12)
+			assert.Equal(t, tc.actor, value > 80)
+		})
+	}
+
+	latency := func(secondsPerSecond, operationsPerSecond float64) float64 {
+		if math.IsNaN(secondsPerSecond) || math.IsInf(secondsPerSecond, 0) ||
+			math.IsNaN(operationsPerSecond) || math.IsInf(operationsPerSecond, 0) || operationsPerSecond <= 0 {
+			return math.NaN()
+		}
+		return secondsPerSecond / operationsPerSecond
+	}
+	for _, tc := range []struct {
+		name                           string
+		secondsPerSecond, opsPerSecond float64
+		want                           float64
+		read, write                    bool
+		undef                          bool
+	}{
+		{name: "invalid NaN time", secondsPerSecond: math.NaN(), opsPerSecond: 1, undef: true},
+		{name: "zero denominator", secondsPerSecond: 1, opsPerSecond: 0, undef: true},
+		{name: "normal read", secondsPerSecond: .005, opsPerSecond: 1, want: .005},
+		{name: "read boundary", secondsPerSecond: .01, opsPerSecond: 1, want: .01},
+		{name: "normal write", secondsPerSecond: .015, opsPerSecond: 1, want: .015, read: true},
+		{name: "write threshold", secondsPerSecond: .021, opsPerSecond: 1, want: .021, read: true, write: true},
+	} {
+		t.Run("latency "+tc.name, func(t *testing.T) {
+			value := latency(tc.secondsPerSecond, tc.opsPerSecond)
+			if tc.undef {
+				assert.True(t, math.IsNaN(value))
+				return
+			}
+			assert.InDelta(t, tc.want, value, 1e-12)
+			assert.Equal(t, tc.read, value > .01)
+			assert.Equal(t, tc.write, value > .02)
+		})
+	}
+
+	namespaceLimit := func(count, limit float64) (float64, bool) {
+		if math.IsNaN(count) || math.IsInf(count, 0) || math.IsNaN(limit) || math.IsInf(limit, 0) ||
+			count < 0 || limit < 0 {
+			return math.NaN(), false
+		}
+		return count, count >= limit
+	}
+	for _, tc := range []struct {
+		name    string
+		count   float64
+		limit   float64
+		want    float64
+		reached bool
+		undef   bool
+	}{
+		{name: "invalid negative count", count: -1, limit: 1, undef: true},
+		{name: "invalid negative limit", count: 1, limit: -1, undef: true},
+		{name: "below limit", count: 1, limit: 2, want: 1},
+		{name: "at limit", count: 2, limit: 2, want: 2, reached: true},
+		{name: "above limit", count: 3, limit: 2, want: 3, reached: true},
+	} {
+		t.Run("namespace "+tc.name, func(t *testing.T) {
+			value, reached := namespaceLimit(tc.count, tc.limit)
+			if tc.undef {
+				assert.True(t, math.IsNaN(value))
+				return
+			}
+			assert.InDelta(t, tc.want, value, 1e-12)
+			assert.Equal(t, tc.reached, reached)
+		})
+	}
+}
+
 func TestCollector_CephMGRAlertContract(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	templates := cephHealthAlertTemplates(t)
@@ -1739,6 +1928,9 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		"CEPH-056", "CEPH-057", "CEPH-058", "CEPH-104", "CEPH-040", "CEPH-040-HELPER", "CEPH-041", "CEPH-043", "CEPH-044", "CEPH-045",
 		"CEPH-046", "CEPH-046-HELPER", "CEPH-047", "CEPH-047-HELPER", "CEPH-048", "CEPH-049", "CEPH-050",
 		"CEPH-051", "CEPH-052", "CEPH-054", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
+		"CEPH-078", "CEPH-080", "CEPH-080-HELPER-PERSIST", "CEPH-082", "CEPH-082-HELPER-READ-TIME",
+		"CEPH-082-HELPER-READ-OPS", "CEPH-083", "CEPH-083-HELPER-WRITE-TIME", "CEPH-083-HELPER-WRITE-OPS",
+		"CEPH-084", "CEPH-092", "CEPH-094", "CEPH-094-HELPER-GATEWAY",
 	}, cephManifestSOWIDs(manifest.Alerts))
 	require.ElementsMatch(t, []string{"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02"},
 		cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
@@ -1751,6 +1943,12 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 			require.Truef(t, ok, "%s references unknown adaptation %q", name, extension.Adaptation)
 		}
 	}
+
+	inventoryAdaptation := manifest.AdaptationContracts["local_nvmeof_inventory_limit"]
+	require.NotContains(t, strings.Join(inventoryAdaptation.Preserved, "\n"), "one-minute observation",
+		"current-only namespace-capacity rule must not claim a persisted observation window")
+	require.NotContains(t, strings.Join(inventoryAdaptation.Differences, "\n"), "persistence uses every available sample",
+		"current-only namespace-capacity rule must disclose that source persistence is not represented")
 
 	for name, mapping := range manifest.Alerts {
 		require.Truef(t, mapping.SourceAlert != "" || len(mapping.SourceAlerts) > 0,

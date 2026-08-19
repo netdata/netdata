@@ -231,10 +231,15 @@ cases:
         perf_priority_limit: 0
         mgr_perf_counters: disabled
         mgr_rbd_stats: disabled
-    fixture: fixtures/ceph_nvmeof.prom
     coverage: true
-    expected:
-      verdict: PASS
+    steps:
+    - fixture: fixtures/ceph_nvmeof.prom
+      expected:
+        verdict: PASS
+      observations:
+        nvme_of.gateways.time_accumulation#value:
+          state: current
+          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   reef_ceph_exporter_limit0:
     environment:
       ceph:
