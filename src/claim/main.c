@@ -345,8 +345,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int ret;
     if (nd_claim_interactive) {
         ret = netdata_claim_window_loop(hInstance, nCmdShow);
-    } else if (!nd_claim_parse_args(argc, argv) || netdata_claim_prepare_strings()) {
+    } else if (!nd_claim_parse_args(argc, argv)) {
         ret = ND_CLAIM_BAD_ARGS;
+    } else if (netdata_claim_prepare_strings()) {
+        // The token is already known to be present, so the only failure left here is an allocation.
+        ret = ND_CLAIM_INTERNAL;
     } else {
         char basePath[WINDOWS_MAX_PATH];
         ret = (netdata_claim_get_path(basePath)) ? ND_CLAIM_INTERNAL : netdata_claim_write_config(basePath);

@@ -464,23 +464,24 @@
                 <Control Id="WarningLabel" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed! Click Next." HideCondition="NOT OS_HAS_FILE" />
 
                 <!-- The label column is 100 wide to fit "Rooms ID(s) (optional):"; the edit column starts after it.
+                     Rows advance by 20 because the edit controls are 18 tall: a smaller pitch overlaps them.
                      The token field is deliberately not length-capped: a cap silently truncates a pasted token
                      into a valid-looking but wrong value. -->
                 <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="100" Height="15" Text="Claim Token:" HideCondition="OS_HAS_FILE" />
                 <Control Id="Token" Type="Edit" X="113" Y="100" Width="242" Height="18" Property="TOKEN" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="100" Height="15" Text="Rooms ID(s) (optional):" HideCondition="OS_HAS_FILE" />
-                <Control Id="Rooms" Type="Edit" X="113" Y="115" Width="242" Height="18" Property="ROOMS" HideCondition="OS_HAS_FILE" />
+                <Control Id="RoomsLabel" Type="Text" X="10" Y="120" Width="100" Height="15" Text="Rooms ID(s) (optional):" HideCondition="OS_HAS_FILE" />
+                <Control Id="Rooms" Type="Edit" X="113" Y="120" Width="242" Height="18" Property="ROOMS" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="100" Height="15" Text="Proxy URL:" HideCondition="OS_HAS_FILE" />
-                <Control Id="Proxy" Type="Edit" X="113" Y="130" Width="242" Height="18" Property="PROXY" HideCondition="OS_HAS_FILE" />
+                <Control Id="ProxyLabel" Type="Text" X="10" Y="140" Width="100" Height="15" Text="Proxy URL:" HideCondition="OS_HAS_FILE" />
+                <Control Id="Proxy" Type="Edit" X="113" Y="140" Width="242" Height="18" Property="PROXY" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="100" Height="15" Text="Cloud URL:" HideCondition="OS_HAS_FILE" />
-                <Control Id="URL" Type="Edit" X="113" Y="145" Width="242" Height="18" Property="URL" HideCondition="OS_HAS_FILE" />
+                <Control Id="URLLabel" Type="Text" X="10" Y="160" Width="100" Height="15" Text="Cloud URL:" HideCondition="OS_HAS_FILE" />
+                <Control Id="URL" Type="Edit" X="113" Y="160" Width="242" Height="18" Property="URL" HideCondition="OS_HAS_FILE" />
 
                 <!-- CheckBoxValue must be 1: MSI sets the property to this value when checked and clears it when
                      unchecked, so a value of 0 made checking the box request a secure connection. -->
-                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="1"  Text="Insecure" HideCondition="OS_HAS_FILE" />
+                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="180" Width="290" Height="15" Property="INSECURE" CheckBoxValue="1"  Text="Insecure" HideCondition="OS_HAS_FILE" />
 
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
