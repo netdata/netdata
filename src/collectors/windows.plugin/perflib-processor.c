@@ -61,9 +61,45 @@ static void initialize(void)
     dictionary_register_insert_callback(processors, dict_processor_insert_cb, NULL);
 }
 
-static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every)
+static bool processor_information_instance_to_cpu_id(const char *instance_name, int *cpu_id)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Processor");
+    char *separator;
+    uint32_t processor_group = str2uint32_t(instance_name, &separator);
+    if (separator == instance_name || *separator != ',')
+        return false;
+
+    const char *processor_number = separator + 1;
+    if (strcmp(processor_number, "_Total") == 0)
+        return false;
+
+    char *end;
+    uint32_t processor = str2uint32_t(processor_number, &end);
+    if (end == processor_number || *end != '\0')
+        return false;
+
+    WORD processor_group_count = GetActiveProcessorGroupCount();
+    if (processor_group >= processor_group_count)
+        return false;
+
+    DWORD processors_in_group = GetActiveProcessorCount((WORD)processor_group);
+    if (processor >= processors_in_group)
+        return false;
+
+    uint64_t global_processor = processor;
+    for (WORD group = 0; group < processor_group; group++)
+        global_processor += GetActiveProcessorCount(group);
+
+    if (global_processor > INT_MAX)
+        return false;
+
+    *cpu_id = (int)global_processor;
+    return true;
+}
+
+static bool do_processors(
+    PERF_DATA_BLOCK *pDataBlock, const char *object_name, bool processor_information, int update_every)
+{
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, object_name);
     if (!pObjectType)
         return false;
 
@@ -88,9 +124,13 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every)
             is_total = true;
             cpu = -1;
         } else {
+            if (processor_information && !processor_information_instance_to_cpu_id(windows_shared_buffer, &cpu))
+                continue;
+
             p = dictionary_set(processors, windows_shared_buffer, NULL, sizeof(*p));
             is_total = false;
-            cpu = str2i(windows_shared_buffer);
+            if (!processor_information)
+                cpu = str2i(windows_shared_buffer);
             snprintfz(windows_shared_buffer, sizeof(windows_shared_buffer), "cpu%d", cpu);
 
             if (cpu + 1 > cores_found)
@@ -198,7 +238,15 @@ int do_PerflibProcessor(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    DWORD id = RegistryFindIDByName("Processor");
+    const char *object_name = "Processor Information";
+    DWORD id = RegistryFindIDByName(object_name);
+    bool processor_information = id != PERFLIB_REGISTRY_NAME_NOT_FOUND;
+
+    if (!processor_information) {
+        object_name = "Processor";
+        id = RegistryFindIDByName(object_name);
+    }
+
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
@@ -206,7 +254,7 @@ int do_PerflibProcessor(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return 0;
 
-    do_processors(pDataBlock, update_every);
+    do_processors(pDataBlock, object_name, processor_information, update_every);
 
     return 0;
 }
