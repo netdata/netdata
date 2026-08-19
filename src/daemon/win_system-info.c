@@ -423,12 +423,11 @@ static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD bui
 }
 
 void netdata_windows_format_os_id_like(char *out, size_t length, DWORD build, const char *edition_id,
-                                       const char *product_name, bool is_server)
+                                       bool is_server)
 {
     if (!length)
         return;
 
-    const char *edition = edition_id && *edition_id ? edition_id : product_name;
     const char *version = is_server ? netdata_windows_server_version_from_build(build)
                                     : netdata_windows_client_version_from_build(build);
     char base_id[64];
@@ -442,8 +441,8 @@ void netdata_windows_format_os_id_like(char *out, size_t length, DWORD build, co
                        is_server ? "Windows-Server" : NETDATA_WINDOWS_OS_PREFIX_CLIENT);
     }
 
-    if (edition && *edition)
-        (void)snprintf(out, length, "%s-%s", base_id, edition);
+    if (edition_id && *edition_id)
+        (void)snprintf(out, length, "%s-%s", base_id, edition_id);
     else
         (void)snprintf(out, length, "%s", base_id);
 }
@@ -500,8 +499,7 @@ static void netdata_windows_get_local_os_info(NETDATA_WINDOWS_OS_INFO *info)
     netdata_windows_discover_os_version(info->id, sizeof(info->id), build, product_name, display_version);
     snprintf(info->version, sizeof(info->version), "%s", info->id);
     snprintf(info->version_id, sizeof(info->version_id), "%s", info->id);
-    netdata_windows_format_os_id_like(info->id_like, sizeof(info->id_like), build, edition_id, product_name,
-                                      IsWindowsServer());
+    netdata_windows_format_os_id_like(info->id_like, sizeof(info->id_like), build, edition_id, IsWindowsServer());
     snprintf(info->detection, sizeof(info->detection), "%s", NETDATA_WIN_DETECTION_METHOD);
     netdata_windows_parse_os_labels(&info->labels, product_name, display_version, edition_id,
                                     build, ubr, has_ubr, IsWindowsServer());

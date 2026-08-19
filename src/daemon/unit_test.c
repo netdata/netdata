@@ -2580,12 +2580,13 @@ int unit_test_windows_os_version(void) {
         {26100, true, "ServerDatacenter", "Windows-Server-2025-ServerDatacenter"},
         {9600, true, "ServerDatacenter", "Windows-Server-2012R2-ServerDatacenter"},
         {26100, false, "Core", "Windows-11-Core"},
+        {19045, false, NULL, "Windows-10"},
     };
 
     for (size_t i = 0; i < sizeof(id_like_cases) / sizeof(id_like_cases[0]); i++) {
         char id_like[256];
         netdata_windows_format_os_id_like(id_like, sizeof(id_like), id_like_cases[i].build,
-                                          id_like_cases[i].edition_id, NULL, id_like_cases[i].is_server);
+                                          id_like_cases[i].edition_id, id_like_cases[i].is_server);
         if (strcmp(id_like, id_like_cases[i].expected)) {
             fprintf(stderr, "unit_test_windows_os_version: id-like build %u produced '%s'\n",
                     id_like_cases[i].build, id_like);
