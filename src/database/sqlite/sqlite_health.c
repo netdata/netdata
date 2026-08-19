@@ -1088,7 +1088,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
      rc = PREPARE_STATEMENT(db_meta, buffer_tostring(command), &stmt_query);
      buffer_free(command);
 
-     if (unlikely(rc != SQLITE_OK)) {
+     if (unlikely(!rc)) {
         error_report("Failed to prepare statement SQL_SELECT_HEALTH_LOG");
         return;
      }
