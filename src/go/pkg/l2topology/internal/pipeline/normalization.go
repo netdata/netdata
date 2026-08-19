@@ -2,7 +2,18 @@
 
 package pipeline
 
-import "strings"
+import (
+	"net/netip"
+	"strings"
+)
+
+func canonicalUsableIPAddress(value string) netip.Addr {
+	addr := canonicalAddr(value)
+	if !isUsableAliasIPAddress(addr) {
+		return netip.Addr{}
+	}
+	return addr.Unmap()
+}
 
 func canonicalARPProtocol(protocol string) string {
 	protocol = strings.TrimSpace(strings.ToLower(protocol))

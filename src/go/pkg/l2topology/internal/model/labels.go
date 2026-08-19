@@ -3,8 +3,10 @@
 package model
 
 const (
-	AdjacencyLabelPairID   = "pair_id"
-	AdjacencyLabelPairPass = "pair_pass"
+	AdjacencyLabelPairID             = "pair_id"
+	AdjacencyLabelPairPass           = "pair_pass"
+	AdjacencyLabelRemoteManagementIP = "remote_management_ip"
+	AdjacencyLabelRemoteAddressRaw   = "remote_address_raw"
 )
 
 const (

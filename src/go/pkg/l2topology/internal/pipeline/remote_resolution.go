@@ -43,7 +43,7 @@ func (s *l2BuildState) resolveKnownRemote(hostname, chassisID, mgmtIP, remoteMAC
 	candidates := []string{
 		s.hostToID[canonicalHost(hostname)],
 		s.chassisToID[canonicalToken(chassisID)],
-		s.ipToID[remoteIP],
+		s.directIPToID[remoteIP],
 	}
 	for _, candidateID := range candidates {
 		candidateID = strings.TrimSpace(candidateID)
@@ -101,9 +101,6 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 			if device.Hostname == "" {
 				device.Hostname = generatedID
 			}
-			if ip := parseAddr(mgmtIP); ip.IsValid() {
-				device.Addresses = []netip.Addr{ip}
-			}
 			s.devices[generatedID] = device
 		}
 
@@ -116,11 +113,6 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 				s.hostToID[host] = generatedID
 			}
 		}
-		if ip := canonicalIP(mgmtIP); ip != "" {
-			if existingID := strings.TrimSpace(s.ipToID[ip]); existingID == "" || s.isMACCompatibleWithDevice(existingID, remoteMAC) {
-				s.ipToID[ip] = generatedID
-			}
-		}
 		return generatedID
 	}
 
@@ -130,7 +122,7 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 	if id := s.chassisToID[canonicalToken(chassisID)]; id != "" {
 		return id
 	}
-	if id := s.ipToID[canonicalIP(mgmtIP)]; id != "" {
+	if id := s.directIPToID[canonicalIP(mgmtIP)]; id != "" {
 		return id
 	}
 
@@ -145,9 +137,6 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 		if device.Hostname == "" {
 			device.Hostname = generatedID
 		}
-		if ip := parseAddr(mgmtIP); ip.IsValid() {
-			device.Addresses = []netip.Addr{ip}
-		}
 		s.devices[generatedID] = device
 	}
 	if host := canonicalHost(hostname); host != "" {
@@ -160,10 +149,19 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 			s.chassisToID[chassis] = generatedID
 		}
 	}
-	if ip := canonicalIP(mgmtIP); ip != "" {
-		if _, exists := s.ipToID[ip]; !exists {
-			s.ipToID[ip] = generatedID
-		}
-	}
 	return generatedID
+}
+
+func (s *l2BuildState) recordRemoteManagementAddress(deviceID, value string) {
+	deviceID = strings.TrimSpace(deviceID)
+	addr := canonicalUsableIPAddress(value)
+	if deviceID == "" || !addr.IsValid() {
+		return
+	}
+	addresses := s.remoteManagementByDeviceID[deviceID]
+	if addresses == nil {
+		addresses = make(map[string]netip.Addr)
+		s.remoteManagementByDeviceID[deviceID] = addresses
+	}
+	addresses[addr.String()] = addr
 }

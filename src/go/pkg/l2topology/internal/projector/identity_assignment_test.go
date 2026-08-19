@@ -103,6 +103,13 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 	require.Equal(t, "ip:10.0.0.2", links[0].DstActorID)
 	require.Equal(t, "ip:10.0.0.2", links[1].SrcActorID)
 	require.Equal(t, "mac:00:11:22:33:44:55", links[1].DstActorID)
+	for _, actor := range actors {
+		require.False(t, actor.Actor.ActorHandle.IsZero())
+	}
+	require.Equal(t, actors[0].Actor.ActorHandle, links[0].SrcActorHandle)
+	require.Equal(t, actors[2].Actor.ActorHandle, links[0].DstActorHandle)
+	require.Equal(t, actors[2].Actor.ActorHandle, links[1].SrcActorHandle)
+	require.Equal(t, actors[0].Actor.ActorHandle, links[1].DstActorHandle)
 
 	sortProjectedTopologyActors(actors)
 	require.Equal(t, []string{
@@ -120,9 +127,12 @@ func TestAssignTopologyActorIDsAndLinkEndpoints_IsDeterministic(t *testing.T) {
 }
 
 func TestEnrichTopologyPortDetailsWithLinkCounts_AddsCountsToMatchingPorts(t *testing.T) {
+	handles := graph.NewActorHandleAllocator()
+	deviceAHandle := handles.Next()
+	deviceBHandle := handles.Next()
 	actors := []projectedActor{
 		{
-			Actor: graph.Actor{ActorID: "device-a"},
+			Actor: graph.Actor{ActorHandle: deviceAHandle, ActorID: "device-a"},
 			Detail: model.ProjectionActorDetail{
 				Device: model.ProjectionDeviceActorDetail{
 					Ports: []model.ProjectionPortDetail{
@@ -133,7 +143,7 @@ func TestEnrichTopologyPortDetailsWithLinkCounts_AddsCountsToMatchingPorts(t *te
 			},
 		},
 		{
-			Actor: graph.Actor{ActorID: "device-b"},
+			Actor: graph.Actor{ActorHandle: deviceBHandle, ActorID: "device-b"},
 			Detail: model.ProjectionActorDetail{
 				Device: model.ProjectionDeviceActorDetail{
 					Ports: []model.ProjectionPortDetail{
@@ -145,16 +155,20 @@ func TestEnrichTopologyPortDetailsWithLinkCounts_AddsCountsToMatchingPorts(t *te
 	}
 	links := []graph.Link{
 		{
-			SrcActorID: "device-a",
-			DstActorID: "device-b",
-			Src:        graph.LinkEndpoint{IfName: "eth0"},
-			Dst:        graph.LinkEndpoint{IfName: "xe-0/0/0"},
+			SrcActorHandle: deviceAHandle,
+			DstActorHandle: deviceBHandle,
+			SrcActorID:     "device-a",
+			DstActorID:     "device-b",
+			Src:            graph.LinkEndpoint{IfName: "eth0"},
+			Dst:            graph.LinkEndpoint{IfName: "xe-0/0/0"},
 		},
 		{
-			SrcActorID: "device-a",
-			DstActorID: "device-b",
-			Src:        graph.LinkEndpoint{IfName: "eth0"},
-			Dst:        graph.LinkEndpoint{IfName: "xe-0/0/0"},
+			SrcActorHandle: deviceAHandle,
+			DstActorHandle: deviceBHandle,
+			SrcActorID:     "device-a",
+			DstActorID:     "device-b",
+			Src:            graph.LinkEndpoint{IfName: "eth0"},
+			Dst:            graph.LinkEndpoint{IfName: "xe-0/0/0"},
 		},
 	}
 

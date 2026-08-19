@@ -7,6 +7,8 @@ import (
 	"net/netip"
 	"sort"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 )
 
 func cloneStringMap(in map[string]string) map[string]string {
@@ -36,12 +38,29 @@ func addressStrings(addresses []netip.Addr) []string {
 	return out
 }
 
-func firstAddress(addresses []netip.Addr) string {
-	values := addressStrings(addresses)
-	if len(values) == 0 {
-		return ""
+func deviceAddressValues(dev model.Device) []netip.Addr {
+	addresses := make([]netip.Addr, 0, len(dev.Addresses)+1)
+	if dev.ManagementIP.IsValid() {
+		addresses = append(addresses, dev.ManagementIP)
 	}
-	return values[0]
+	addresses = append(addresses, dev.Addresses...)
+	return addresses
+}
+
+func deviceAddressStrings(dev model.Device) []string {
+	return addressStrings(deviceAddressValues(dev))
+}
+
+func selectedDeviceManagementIP(dev model.Device) string {
+	if addr := dev.ManagementIP.Unmap(); addr.IsValid() {
+		return addr.String()
+	}
+	if len(dev.Addresses) == 1 {
+		if addr := dev.Addresses[0].Unmap(); addr.IsValid() {
+			return addr.String()
+		}
+	}
+	return ""
 }
 
 func uniqueTopologyStrings(values []string) []string {

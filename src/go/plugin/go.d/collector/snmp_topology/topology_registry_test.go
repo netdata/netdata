@@ -4,10 +4,12 @@ package snmptopology
 
 import (
 	"context"
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -44,7 +46,9 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	cacheB := newTopologyCache()
@@ -70,7 +74,9 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 		portID:           "Gi0/1",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-a",
-		managementAddr:   "10.0.0.1",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.1", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	registry.register(cacheA)
@@ -85,6 +91,14 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 	require.GreaterOrEqual(t, topologyStatsToV1ForTest(t, data.Stats)["devices_total"].(int), 2)
 	require.GreaterOrEqual(t, topologyStatsToV1ForTest(t, data.Stats)["links_total"].(int), 1)
 	require.GreaterOrEqual(t, topologyStatsToV1ForTest(t, data.Stats)["links_lldp"].(int), 1)
+}
+
+func TestBuildSNMPTopologySnapshotPreservesL2BuildError(t *testing.T) {
+	_, ok, err := buildSNMPTopologySnapshot(topologymodel.ObservationAggregate{
+		L2Observations: []topologyengine.L2Observation{{}},
+	}, topologyoptions.DefaultQueryOptions())
+	require.ErrorContains(t, err, "empty device id")
+	require.False(t, ok)
 }
 
 func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCandidates(t *testing.T) {
@@ -119,6 +133,61 @@ func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCan
 			return false
 		}
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestTopologyRegistry_ReverseDNSCandidatesExcludeDeviceAliases(t *testing.T) {
+	clock := newReverseDNSTestClock()
+	dns := newTestTopologyReverseDNSWarmer(testTopologyReverseDNSConfig{
+		now: clock.Now,
+		lookup: func(_ context.Context, ip string) ([]string, error) {
+			if ip == "198.51.100.8" {
+				return []string{"unrelated-alias.example"}, nil
+			}
+			return nil, nil
+		},
+	})
+	dns.warm(context.Background(), []string{"198.51.100.8"})
+
+	registry := newTopologyRegistry()
+	registry.reverseDNS = dns.resolver
+	cache := newTopologyCache()
+	seedPublishedEndpointSnapshot(cache)
+	cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{
+		{Address: "10.0.0.10", AddressType: "ipv4", Source: managementAddressSourceCollectorTarget},
+		{Address: "198.51.100.8", AddressType: "ipv4", Source: "lldp_local"},
+	}
+	registry.register(cache)
+
+	candidates := registry.reverseDNSCandidateCollector()
+	options := defaultTopologyQueryOptionsForTest()
+	options.ResolveDNSName = candidates.lookupCached
+	data, ok, err := registry.snapshotWithOptions(options)
+	require.NoError(t, err)
+
+	require.True(t, ok)
+	require.True(t, containsMgmtAddr(data, map[string]struct{}{"198.51.100.8": {}}))
+	require.Condition(t, func() bool {
+		for _, actor := range data.Actors {
+			if actor.Match.SysName == "switch-a" {
+				return topologymodel.ActorDetailDisplayName(actor) == "switch-a"
+			}
+		}
+		return false
+	})
+	require.Equal(t, []netip.Addr{
+		netip.MustParseAddr("10.0.0.10"),
+		netip.MustParseAddr("10.0.0.20"),
+	}, candidates.collectedCandidates())
+
+	payload, err := topologyv1renderer.Render(data)
+	require.NoError(t, err)
+	require.Contains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "display_name"), "switch-a")
+	require.NotContains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "display_name"), "unrelated-alias.example")
+	require.Contains(t, topologyV1ColumnValues(t, payload.Actors, "ip_addresses"), []any{
+		"10.0.0.10",
+		"198.51.100.8",
+	})
+	require.Contains(t, topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip"), "10.0.0.10")
 }
 
 func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
@@ -208,7 +277,9 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	registry.register(cache)
@@ -288,6 +359,36 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_emitted_links"])
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_visible_links"])
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["links_total"])
+}
+
+func TestTopologyRegistry_WeakDevicesUseSelectedManagementIPIdentity(t *testing.T) {
+	registry := newTopologyRegistry()
+	for i, ip := range []string{"192.0.2.10", "198.51.100.10"} {
+		cache := newTopologyCache()
+		cache.updateTime = time.Now().Add(time.Duration(i) * time.Millisecond)
+		cache.updateIfIndexByIP(map[string]string{
+			tagTopoIfIndex: "1",
+			tagTopoIPAddr:  ip,
+			tagTopoIPMask:  "255.255.255.0",
+		})
+		cache.finalizeTopologyCache()
+		registry.register(cache)
+	}
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 2)
+
+	got := make(map[string]struct{}, 2)
+	for _, actor := range data.Actors {
+		for _, ip := range actor.Match.IPAddresses {
+			got[ip] = struct{}{}
+		}
+	}
+	require.Equal(t, map[string]struct{}{
+		"192.0.2.10":    {},
+		"198.51.100.10": {},
+	}, got)
 }
 
 func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *testing.T) {
@@ -376,16 +477,16 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 	require.Equal(t, topologymodel.SegmentKindL3Subnet, segment.SegmentKind)
 	require.Equal(t, "203.0.113.0/24", topologymodel.ActorDetailDisplayName(*segment))
 
-	memberIDs := make([]string, 0, 3)
+	memberHandles := make([]topologymodel.ActorHandle, 0, 3)
 	for _, link := range data.Links {
 		if link.LinkType != topologymodel.L3SubnetMembershipLinkType {
 			continue
 		}
-		require.Equal(t, segment.ActorID, link.DstActorID)
+		require.Equal(t, segment.ActorHandle, link.DstActorHandle)
 		require.NotNil(t, link.Detail.L3SubnetMembership)
 		require.Equal(t, "203.0.113.0/24", link.Detail.L3SubnetMembership.Subnet)
 		require.Len(t, link.Detail.L3SubnetMembership.Interfaces, 1)
-		memberIDs = append(memberIDs, link.SrcActorID)
+		memberHandles = append(memberHandles, link.SrcActorHandle)
 	}
 	routerA := findDeviceActorBySysName(data, "router-a")
 	require.NotNil(t, routerA)
@@ -393,7 +494,7 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 	require.NotNil(t, routerB)
 	routerC := findDeviceActorBySysName(data, "router-c")
 	require.NotNil(t, routerC)
-	require.ElementsMatch(t, []string{routerA.ActorID, routerB.ActorID, routerC.ActorID}, memberIDs)
+	require.ElementsMatch(t, []topologymodel.ActorHandle{routerA.ActorHandle, routerB.ActorHandle, routerC.ActorHandle}, memberHandles)
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_segment_emitted_segments"])
 	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_emitted_links"])
 	require.Equal(t, 3, topologyStatsToV1ForTest(t, data.Stats)["l3_subnet_membership_visible_links"])
@@ -544,7 +645,7 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 	routerB := findDeviceActorBySysName(data, "router-b")
 	require.NotNil(t, routerB)
 	require.Len(t, routerA.Detail.BGP, 1)
-	require.Equal(t, routerB.ActorID, routerA.Detail.BGP[0].RemoteActorID)
+	require.Equal(t, routerB.ActorHandle, routerA.Detail.BGP[0].RemoteActorHandle)
 }
 
 func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDetails(t *testing.T) {
@@ -597,7 +698,7 @@ func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDet
 	require.NotNil(t, routerA)
 	require.Len(t, routerA.Detail.BGP, 2)
 	for _, row := range routerA.Detail.BGP {
-		require.Empty(t, row.RemoteActorID)
+		require.True(t, row.RemoteActorHandle.IsZero())
 	}
 }
 
@@ -616,16 +717,56 @@ func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t
 		"Gi0/2",
 	))
 
-	data, ok := registry.snapshotWithOptions(topologyoptions.QueryOptions{
+	data, ok, err := registry.snapshotWithOptions(topologyoptions.QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
 		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
 		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
 		Depth:                  topologyoptions.DepthAllInternal,
 	})
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, topologyoptions.MapTypeLLDPCDPManaged, topologyStatsToV1ForTest(t, data.Stats)["map_type"])
 	require.Equal(t, topologyoptions.InferenceStrategyFDBMinimumKnowledge, topologyStatsToV1ForTest(t, data.Stats)["inference_strategy"])
+}
+
+func TestTopologyRegistry_DefaultSnapshotSuppressesInferredNeighborWithOnlyIneligibleManagementAddress(t *testing.T) {
+	registry := newTopologyRegistry()
+	cache := newTopologyCache()
+	cache.updateTime = time.Now().UTC()
+	cache.agentID = "agent-test"
+	cache.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "switch-a",
+		ManagementIP:  "192.0.2.1",
+	}
+	cache.lldpLocPorts["1"] = &lldpLocPort{
+		portNum:       "1",
+		portID:        "Gi0/1",
+		portIDSubtype: "interfaceName",
+	}
+	cache.updateLldpRemote(map[string]string{
+		tagLldpLocPortNum:          "1",
+		tagLldpRemIndex:            "1",
+		tagLldpRemChassisID:        "aa:bb:cc:dd:ee:ff",
+		tagLldpRemChassisIDSubtype: "macAddress",
+		tagLldpRemPortID:           "Gi0/2",
+		tagLldpRemPortIDSubtype:    "interfaceName",
+		tagLldpRemSysName:          "switch-b",
+		tagLldpRemMgmtAddr:         "169.254.0.1",
+		tagLldpRemMgmtAddrSubtype:  "1",
+	})
+	cache.finalizeTopologyCache()
+	registry.register(cache)
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	require.NotNil(t, findDeviceActorBySysName(data, "switch-a"))
+	require.Nil(t, findDeviceActorBySysName(data, "switch-b"))
+	require.Empty(t, data.Links)
+	require.Empty(t, cache.lldpRemotes["1:1"].managementAddrs)
 }
 
 func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManagedOverlapPruning(t *testing.T) {
@@ -654,7 +795,9 @@ func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManaged
 		portID:           "9c:6b:00:7b:98:c7",
 		portIDSubtype:    "macAddress",
 		sysName:          "nova",
-		managementAddr:   "172.22.0.1",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "172.22.0.1", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 	cache.ifNamesByIndex["1"] = "Gi0/1"
 	cache.ifNamesByIndex["2"] = "Gi0/2"
@@ -671,20 +814,22 @@ func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManaged
 	}
 	registry.register(cache)
 
-	withoutCollapse, ok := registry.snapshotWithOptions(topologyoptions.QueryOptions{
+	withoutCollapse, ok, err := registry.snapshotWithOptions(topologyoptions.QueryOptions{
 		MapType:            topologyoptions.MapTypeAllDevicesLowConfidence,
 		ManagedDeviceFocus: topologyoptions.ManagedFocusAllDevices,
 		Depth:              topologyoptions.DepthAllInternal,
 	})
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.NotNil(t, findActorByMAC(withoutCollapse, "9c:6b:00:7b:98:c7"))
 
-	withCollapse, ok := registry.snapshotWithOptions(topologyoptions.QueryOptions{
+	withCollapse, ok, err := registry.snapshotWithOptions(topologyoptions.QueryOptions{
 		CollapseActorsByIP: true,
 		MapType:            topologyoptions.MapTypeAllDevicesLowConfidence,
 		ManagedDeviceFocus: topologyoptions.ManagedFocusAllDevices,
 		Depth:              topologyoptions.DepthAllInternal,
 	})
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.NotNil(t, findActorByMAC(withCollapse, "9c:6b:00:7b:98:c6"))
 	require.Nil(t, findActorByMAC(withCollapse, "9c:6b:00:7b:98:c7"))
@@ -712,6 +857,143 @@ func TestTopologyRegistry_ManagedDeviceFocusTargets_ReturnsPerDeviceIPTargets(t 
 	require.Equal(t, "sw-a (10.0.0.1)", targets[0].Name)
 }
 
+func TestTopologyRegistry_ManagedFocusRejectsTypedNonIPManagementEvidence(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now()
+	for _, device := range []topologymodel.Device{
+		{
+			ChassisID:     "00:11:22:33:44:55",
+			ChassisIDType: "macAddress",
+			SysName:       "sw-a",
+			ManagementIP:  "192.0.2.10",
+			ManagementAddresses: []topologymodel.ManagementAddress{
+				{Address: "c0000263", AddressType: "16", Source: "lldp_local"},
+			},
+		},
+		{
+			ChassisID:     "aa:bb:cc:dd:ee:ff",
+			ChassisIDType: "macAddress",
+			SysName:       "sw-b",
+			ManagementIP:  "192.0.2.20",
+		},
+	} {
+		cache := newTopologyCache()
+		cache.updateTime = now
+		cache.lastUpdate = now
+		cache.agentID = device.SysName
+		cache.localDevice = device
+		registry.register(cache)
+	}
+
+	options := defaultTopologyQueryOptionsForTest()
+	options.ManagedDeviceFocus = "ip:192.0.2.99"
+	options.Depth = 0
+	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
+
+	require.True(t, ok)
+	require.Len(t, data.Actors, 2)
+	require.NotNil(t, findDeviceActorBySysName(data, "sw-a"))
+	require.NotNil(t, findDeviceActorBySysName(data, "sw-b"))
+}
+
+func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now().UTC()
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = now
+	cacheA.lastUpdate = now
+	cacheA.agentID = "sw-a"
+	cacheA.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-a",
+		ManagementIP:  "192.0.2.10",
+	}
+	cacheA.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIPAddr:  "192.0.2.20",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = now
+	cacheB.lastUpdate = now
+	cacheB.agentID = "sw-b"
+	cacheB.localDevice = topologymodel.Device{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-b",
+		ManagementIP:  "192.0.2.20",
+	}
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+	baseline, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	baselineA := findDeviceActorBySysName(baseline, "sw-a")
+	require.NotNil(t, baselineA)
+	require.NotContains(t, baselineA.Match.IPAddresses, "192.0.2.20")
+	require.NotContains(t, baselineA.Detail.L2.Device.ManagementAddresses, "192.0.2.20")
+	require.NotEmpty(t, baselineA.Detail.SNMP.ManagementAddresses)
+	require.Equal(t, "192.0.2.20", baselineA.Detail.SNMP.ManagementAddresses[0].Address)
+
+	options := defaultTopologyQueryOptionsForTest()
+	options.ManagedDeviceFocus = "ip:192.0.2.20"
+	options.Depth = 0
+	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	require.Nil(t, findDeviceActorBySysName(data, "sw-a"))
+	require.NotNil(t, findDeviceActorBySysName(data, "sw-b"))
+}
+
+func TestTopologyRegistry_ManagedFocusRetainsUniqueReconciledLocalAlias(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now().UTC()
+
+	cacheA := newTopologyCache()
+	cacheA.updateTime = now
+	cacheA.lastUpdate = now
+	cacheA.agentID = "sw-a"
+	cacheA.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-a",
+		ManagementIP:  "192.0.2.10",
+	}
+	cacheA.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIPAddr:  "192.0.2.11",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+
+	cacheB := newTopologyCache()
+	cacheB.updateTime = now
+	cacheB.lastUpdate = now
+	cacheB.agentID = "sw-b"
+	cacheB.localDevice = topologymodel.Device{
+		ChassisID:     "aa:bb:cc:dd:ee:ff",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-b",
+		ManagementIP:  "192.0.2.20",
+	}
+
+	registry.register(cacheA)
+	registry.register(cacheB)
+
+	options := defaultTopologyQueryOptionsForTest()
+	options.ManagedDeviceFocus = "ip:192.0.2.11"
+	options.Depth = 0
+	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	actor := findDeviceActorBySysName(data, "sw-a")
+	require.NotNil(t, actor)
+	require.Contains(t, actor.Match.IPAddresses, "192.0.2.11")
+	require.Contains(t, actor.Detail.L2.Device.ManagementAddresses, "192.0.2.11")
+}
+
 func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
@@ -736,7 +1018,9 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 	cache.cdpRemotes["1:1"] = &cdpRemote{
 		ifIndex:    "1",
@@ -744,7 +1028,9 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 		deviceID:   "sw-b",
 		sysName:    "sw-b",
 		devicePort: "Gi0/2",
-		address:    "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "cdp_cache_address"},
+		},
 	}
 
 	snapshot, ok := cache.snapshotEngineObservations()
@@ -856,7 +1142,9 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	cacheB := newTopologyCache()
@@ -882,7 +1170,9 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 		portID:           "Gi0/1",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-a",
-		managementAddr:   "10.0.0.1",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.1", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	registry.register(cacheA)
@@ -926,7 +1216,9 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
+		managementAddrs: []topologymodel.ManagementAddress{
+			{Address: "10.0.0.2", AddressType: "ipv4", Source: "lldp_remote"},
+		},
 	}
 
 	cacheB := newTopologyCache()
@@ -946,6 +1238,37 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 	require.Len(t, data.Links, 1)
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["links_total"])
 	require.Equal(t, 2, countActorsByType(data, "device"))
+}
+
+func TestTopologyRegistry_DuplicateCachesPreserveReconciledManagementPrimary(t *testing.T) {
+	registry := newTopologyRegistry()
+	now := time.Now().UTC()
+
+	for _, managementIP := range []string{"192.0.2.30", "192.0.2.20"} {
+		cache := newTopologyCache()
+		cache.updateTime = now
+		cache.lastUpdate = now
+		cache.agentID = managementIP
+		cache.localDevice = topologymodel.Device{
+			ChassisID:     "00:11:22:33:44:55",
+			ChassisIDType: "macAddress",
+			SysName:       "sw-a",
+			ManagementIP:  managementIP,
+		}
+		registry.register(cache)
+	}
+
+	data, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+	require.Len(t, data.Actors, 1)
+	actor := findDeviceActorBySysName(data, "sw-a")
+	require.NotNil(t, actor)
+	require.Equal(t, "192.0.2.20", actor.Detail.L2.Device.ManagementIP)
+	require.Equal(t, "192.0.2.20", topologymodel.ActorDetailManagementIP(*actor))
+
+	payload, err := topologyv1renderer.Render(data)
+	require.NoError(t, err)
+	require.Equal(t, []string{"192.0.2.20"}, topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip"))
 }
 
 func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
@@ -979,14 +1302,15 @@ func TestApplySNMPTopologyShapePolicies_CollapsesActorsByIP(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "endpoint:b",
-				DstActorID: "device:a",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("endpoint:b"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:a"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		CollapseActorsByIP: true,
 		MapType:            topologyoptions.MapTypeHighConfidenceInferred,
@@ -1018,14 +1342,15 @@ func TestApplySNMPTopologyShapePolicies_EliminatesNonIPInferredActorsAndSparseSe
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		EliminateNonIPInferred: true,
 		MapType:                topologyoptions.MapTypeHighConfidenceInferred,
@@ -1061,14 +1386,15 @@ func TestApplySNMPTopologyShapePolicies_HighConfidenceSuppressesUnlinkedInferred
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "endpoint:linked",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:linked"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		MapType: topologyoptions.MapTypeHighConfidenceInferred,
 	})
@@ -1104,20 +1430,21 @@ func TestApplySNMPTopologyShapePolicies_LLDPManagedMapKeepsOnlyLLDPCDPAndManaged
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "device:d2",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:d2"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyPolicies(&data, topologyoptions.QueryOptions{
 		MapType: topologyoptions.MapTypeLLDPCDPManaged,
 	})
@@ -1132,26 +1459,26 @@ func TestMarkProbableDeltaLinks_MarksAllAddedLinksAsProbable(t *testing.T) {
 	strictData := topologymodel.Data{
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "device:d2",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:d2"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 	probableData := topologymodel.Data{
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "device:d2",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:d2"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:d1",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:d1"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 				L2: &graph.LinkL2{
 					BridgeDomain: "bridge-domain:s1",
 				},
@@ -1199,26 +1526,27 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthZero(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1",
 		Depth:                  0,
@@ -1262,26 +1590,27 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthOneIncludesDirectNeighbo
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "endpoint:e1",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:e1"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1",
 		Depth:                  1,
@@ -1325,32 +1654,33 @@ func TestApplyTopologyDepthFocusFilter_MultiFocusDepthZeroIncludesAllShortestPat
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-b",
-				DstActorID: "device:managed-c",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-c"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "segment:s1",
-				Protocol:   "bridge",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				Protocol:       "bridge",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "segment:s1",
-				DstActorID: "device:managed-c",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("segment:s1"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-c"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.3,ip:10.0.0.1",
 		Depth:                  0,
@@ -1401,26 +1731,27 @@ func TestApplyTopologyDepthFocusFilter_DepthExpandsFromSelectedRootsOnly(t *test
 		},
 		Links: []topologymodel.Link{
 			{
-				SrcActorID: "device:managed-a",
-				DstActorID: "device:managed-b",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-a"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-b",
-				DstActorID: "device:managed-c",
-				Protocol:   "lldp",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				DstActorHandle: snmpTopologyTestActorHandle("device:managed-c"),
+				Protocol:       "lldp",
+				Direction:      "bidirectional",
 			},
 			{
-				SrcActorID: "device:managed-b",
-				DstActorID: "endpoint:x",
-				Protocol:   "fdb",
-				Direction:  "bidirectional",
+				SrcActorHandle: snmpTopologyTestActorHandle("device:managed-b"),
+				DstActorHandle: snmpTopologyTestActorHandle("endpoint:x"),
+				Protocol:       "fdb",
+				Direction:      "bidirectional",
 			},
 		},
 	}
 
+	assignSNMPTopologyTestHandles(t, &data)
 	topologyshape.ApplyDepthFocusFilter(&data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus:     "ip:10.0.0.1,ip:10.0.0.3",
 		Depth:                  1,
@@ -1437,7 +1768,8 @@ func TestApplyTopologyDepthFocusFilter_DepthExpandsFromSelectedRootsOnly(t *test
 		actorIDs,
 	)
 	for _, link := range data.Links {
-		assert.False(t, link.SrcActorID == "endpoint:x" || link.DstActorID == "endpoint:x")
+		endpointHandle := snmpTopologyTestActorHandle("endpoint:x")
+		assert.False(t, link.SrcActorHandle == endpointHandle || link.DstActorHandle == endpointHandle)
 	}
 }
 

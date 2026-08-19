@@ -319,7 +319,54 @@ cleanup:
     return false;
 }
 
+// FreeBSD maintains ki_stat for every process. SSLEEP covers both
+// interruptible and uninterruptible sleep, distinguished by TDF_SINTR in
+// ki_tdflags (ps shows uninterruptible sleep as 'D'); SWAIT (waiting for an
+// interrupt) and SLOCK (blocked on a lock) are handled per-case below.
+// Zombies are present in the KERN_PROC_PROC data and are counted like any
+// other process.
+static inline void update_proc_state_count_freebsd(char ki_stat, long ki_tdflags) {
+    switch (ki_stat) {
+        case SRUN:
+            proc_state_count[PROC_STATUS_RUNNING] += 1;
+            break;
+        case SSLEEP:
+            if (ki_tdflags & TDF_SINTR)
+                proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            else
+                proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
+            break;
+        case SWAIT:
+            // Waiting for an interrupt to wake it (ps shows 'W'); on live
+            // systems these are idle kernel threads (clock, intr), so they are
+            // interruptible by definition.
+            proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            break;
+        case SLOCK:
+            // Blocked on a kernel lock (TD_ON_LOCK turnstile wait), not
+            // signal-interruptible; FreeBSD's own linprocfs maps SLOCK to
+            // Linux 'D', so count it as uninterruptible sleep.
+            proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
+            break;
+        case SZOMB:
+            proc_state_count[PROC_STATUS_ZOMBIE] += 1;
+            break;
+        case SSTOP:
+            proc_state_count[PROC_STATUS_STOPPED] += 1;
+            break;
+        default:
+            // SIDL (still being created) and any unrecognized states are not
+            // counted, mirroring the Linux default case.
+            break;
+    }
+}
+
 bool apps_os_collect_all_pids_freebsd(void) {
+#if (PROCESSES_HAVE_STATE == 1)
+    // clear process state counter
+    memset(proc_state_count, 0, sizeof proc_state_count);
+#endif
+
     // Mark all processes as unread before collecting new data
     struct pid_stat *p = NULL;
     int i, procnum;
@@ -364,6 +411,9 @@ bool apps_os_collect_all_pids_freebsd(void) {
     for (i = 0 ; i < procnum ; ++i) {
         pid_t pid = procbase[i].ki_pid;
         if (pid <= 0) continue;
+
+        update_proc_state_count_freebsd(procbase[i].ki_stat, procbase[i].ki_tdflags);
+
         incrementally_collect_data_for_pid(pid, &procbase[i]);
     }
 

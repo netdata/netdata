@@ -28,7 +28,7 @@ const snmpTopologyV1GoldenPayloadPath = "../../testdata/topology_v1_normalized_g
 // Refresh with:
 // go test -count=1 ./plugin/go.d/collector/snmp_topology/internal/topologyv1 -run TestSNMPTopologyToV1_NormalizedGolden -update-snmp-topology-v1-golden
 func TestSNMPTopologyToV1_NormalizedGolden(t *testing.T) {
-	data, err := Render(snmpTopologyV1GoldenInput())
+	data, err := Render(snmpTopologyV1GoldenInput(t))
 	require.NoError(t, err)
 	require.NoError(t, topologyv1test.ValidateData(data))
 
@@ -46,12 +46,13 @@ func TestSNMPTopologyToV1_NormalizedGolden(t *testing.T) {
 	}
 }
 
-func snmpTopologyV1GoldenInput() topologymodel.Data {
+func snmpTopologyV1GoldenInput(t testing.TB) topologymodel.Data {
+	t.Helper()
 	collectedAt := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
 	discoveredAt := time.Date(2026, time.January, 2, 2, 4, 5, 0, time.UTC)
 	lastSeen := time.Date(2026, time.January, 2, 3, 3, 5, 0, time.UTC)
 
-	return topologymodel.Data{
+	data := topologymodel.Data{
 		SchemaVersion: topologymodel.SchemaVersion,
 		Source:        "snmp_topology_test",
 		Layer:         "multi",
@@ -201,7 +202,6 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 							NeighborIP:            "203.0.113.2",
 							PeerIdentifier:        "10.255.0.2",
 							PeerType:              "external",
-							RemoteActorID:         "router-b",
 							RemoteAS:              "64513",
 							RoutingInstance:       "default",
 							Source:                "bgp_mib",
@@ -215,7 +215,6 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 							LocalRouterID:    "10.255.0.1",
 							NeighborIP:       "198.51.100.2",
 							NeighborRouterID: "10.255.0.2",
-							RemoteActorID:    "router-b",
 							Source:           "ospf_mib",
 							State:            "full",
 							Subnet:           "198.51.100.0/30",
@@ -261,7 +260,6 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 							NeighborIP:            "203.0.113.1",
 							PeerIdentifier:        "10.255.0.1",
 							PeerType:              "external",
-							RemoteActorID:         "router-a",
 							RemoteAS:              "64512",
 							RoutingInstance:       "default",
 							Source:                "bgp_mib",
@@ -275,7 +273,6 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 							LocalRouterID:    "10.255.0.2",
 							NeighborIP:       "198.51.100.1",
 							NeighborRouterID: "10.255.0.1",
-							RemoteActorID:    "router-a",
 							Source:           "ospf_mib",
 							State:            "full",
 							Subnet:           "198.51.100.0/30",
@@ -342,13 +339,13 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 		},
 		Links: []topologymodel.Link{
 			{
-				Layer:      "2",
-				Protocol:   "lldp",
-				LinkType:   "lldp",
-				Direction:  "observed",
-				State:      "up",
-				SrcActorID: "switch-a",
-				DstActorID: "router-a",
+				Layer:          "2",
+				Protocol:       "lldp",
+				LinkType:       "lldp",
+				Direction:      "observed",
+				State:          "up",
+				SrcActorHandle: topologyV1TestActorHandle("switch-a"),
+				DstActorHandle: topologyV1TestActorHandle("router-a"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex:      101,
 					IfName:       "Gi1/0/1",
@@ -370,13 +367,13 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 				},
 			},
 			{
-				Layer:      "2",
-				Protocol:   "fdb",
-				LinkType:   "bridge",
-				Direction:  "observed",
-				State:      "probable",
-				SrcActorID: "switch-a",
-				DstActorID: "server-a",
+				Layer:          "2",
+				Protocol:       "fdb",
+				LinkType:       "bridge",
+				Direction:      "observed",
+				State:          "probable",
+				SrcActorHandle: topologyV1TestActorHandle("switch-a"),
+				DstActorHandle: topologyV1TestActorHandle("server-a"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 102,
 					IfName:  "Gi1/0/2",
@@ -390,12 +387,12 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 				},
 			},
 			{
-				Layer:      "3",
-				Protocol:   topologymodel.L3SubnetLinkType,
-				LinkType:   topologymodel.L3SubnetLinkType,
-				Direction:  "observed",
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
+				Layer:          "3",
+				Protocol:       topologymodel.L3SubnetLinkType,
+				LinkType:       topologymodel.L3SubnetLinkType,
+				Direction:      "observed",
+				SrcActorHandle: topologyV1TestActorHandle("router-a"),
+				DstActorHandle: topologyV1TestActorHandle("router-b"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 301,
 					IfName:  "xe-0/0/0",
@@ -421,15 +418,15 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 				},
 			},
 			{
-				Layer:      "3",
-				Protocol:   topologymodel.OSPFAdjacencyLinkType,
-				LinkType:   topologymodel.OSPFAdjacencyLinkType,
-				Direction:  "observed",
-				State:      "full",
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
-				Src:        topologymodel.LinkEndpoint{},
-				Dst:        topologymodel.LinkEndpoint{},
+				Layer:          "3",
+				Protocol:       topologymodel.OSPFAdjacencyLinkType,
+				LinkType:       topologymodel.OSPFAdjacencyLinkType,
+				Direction:      "observed",
+				State:          "full",
+				SrcActorHandle: topologyV1TestActorHandle("router-a"),
+				DstActorHandle: topologyV1TestActorHandle("router-b"),
+				Src:            topologymodel.LinkEndpoint{},
+				Dst:            topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					AttachmentMode: "logical_ospf_adjacency",
 					Inference:      "ospf_neighbor",
@@ -449,15 +446,15 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 				},
 			},
 			{
-				Layer:      "3",
-				Protocol:   topologymodel.BGPAdjacencyLinkType,
-				LinkType:   topologymodel.BGPAdjacencyLinkType,
-				Direction:  "observed",
-				State:      "established",
-				SrcActorID: "router-a",
-				DstActorID: "router-b",
-				Src:        topologymodel.LinkEndpoint{},
-				Dst:        topologymodel.LinkEndpoint{},
+				Layer:          "3",
+				Protocol:       topologymodel.BGPAdjacencyLinkType,
+				LinkType:       topologymodel.BGPAdjacencyLinkType,
+				Direction:      "observed",
+				State:          "established",
+				SrcActorHandle: topologyV1TestActorHandle("router-a"),
+				DstActorHandle: topologyV1TestActorHandle("router-b"),
+				Src:            topologymodel.LinkEndpoint{},
+				Dst:            topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					AttachmentMode: "logical_bgp_adjacency",
 					Inference:      "bgp_peer",
@@ -476,12 +473,12 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 				},
 			},
 			{
-				Layer:      "3",
-				Protocol:   topologymodel.L3SubnetMembershipLinkType,
-				LinkType:   topologymodel.L3SubnetMembershipLinkType,
-				Direction:  "observed",
-				SrcActorID: "router-a",
-				DstActorID: "l3-subnet-segment-203-0-113-0-24",
+				Layer:          "3",
+				Protocol:       topologymodel.L3SubnetMembershipLinkType,
+				LinkType:       topologymodel.L3SubnetMembershipLinkType,
+				Direction:      "observed",
+				SrcActorHandle: topologyV1TestActorHandle("router-a"),
+				DstActorHandle: topologyV1TestActorHandle("l3-subnet-segment-203-0-113-0-24"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 302,
 					IfName:  "xe-0/0/2",
@@ -505,12 +502,12 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 				},
 			},
 			{
-				Layer:      "3",
-				Protocol:   topologymodel.L3SubnetMembershipLinkType,
-				LinkType:   topologymodel.L3SubnetMembershipLinkType,
-				Direction:  "observed",
-				SrcActorID: "router-b",
-				DstActorID: "l3-subnet-segment-203-0-113-0-24",
+				Layer:          "3",
+				Protocol:       topologymodel.L3SubnetMembershipLinkType,
+				LinkType:       topologymodel.L3SubnetMembershipLinkType,
+				Direction:      "observed",
+				SrcActorHandle: topologyV1TestActorHandle("router-b"),
+				DstActorHandle: topologyV1TestActorHandle("l3-subnet-segment-203-0-113-0-24"),
 				Src: topologymodel.LinkEndpoint{
 					IfIndex: 402,
 					IfName:  "xe-0/0/2",
@@ -577,4 +574,10 @@ func snmpTopologyV1GoldenInput() topologymodel.Data {
 			HasComputed: true,
 		},
 	}
+	handles := assignTopologyV1TestHandles(t, &data)
+	data.Actors[1].Detail.BGP[0].RemoteActorHandle = handles["router-b"]
+	data.Actors[1].Detail.OSPF[0].RemoteActorHandle = handles["router-b"]
+	data.Actors[2].Detail.BGP[0].RemoteActorHandle = handles["router-a"]
+	data.Actors[2].Detail.OSPF[0].RemoteActorHandle = handles["router-a"]
+	return data
 }

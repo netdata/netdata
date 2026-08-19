@@ -14,7 +14,7 @@ import (
 
 func buildSNMPTopologyV1Links(
 	links []topologymodel.Link,
-	actorIndex map[string]int,
+	actorIndex topologyV1ActorIndex,
 	stringsDict *topologyapi.StringDictionary,
 ) (topologyapi.Table, topologyapi.EvidenceMap, error) {
 	srcActors := make([]any, len(links))
@@ -31,13 +31,13 @@ func buildSNMPTopologyV1Links(
 	evidenceRowsByType := make(map[string]*snmpTopologyV1EvidenceRows)
 
 	for i, link := range links {
-		src, ok := actorIndex[strings.TrimSpace(link.SrcActorID)]
+		src, ok := actorIndex[link.SrcActorHandle]
 		if !ok {
-			return topologyapi.Table{}, nil, fmt.Errorf("link %d references unknown source actor %q", i, link.SrcActorID)
+			return topologyapi.Table{}, nil, fmt.Errorf("link %d references an unknown source actor handle", i)
 		}
-		dst, ok := actorIndex[strings.TrimSpace(link.DstActorID)]
+		dst, ok := actorIndex[link.DstActorHandle]
 		if !ok {
-			return topologyapi.Table{}, nil, fmt.Errorf("link %d references unknown destination actor %q", i, link.DstActorID)
+			return topologyapi.Table{}, nil, fmt.Errorf("link %d references an unknown destination actor handle", i)
 		}
 		protocol := topologyutil.FirstNonEmptyString(link.Protocol, link.LinkType, "l2")
 		linkType := snmpTopologyV1LinkType(link)

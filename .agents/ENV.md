@@ -40,11 +40,18 @@ Used by the build/run MCP server under `packaging/tools/automation/mcp`. When
 launches claims itself to Cloud as an ephemeral node named `mcp-<agent_id>`.
 Leave the token blank to launch unclaimed (local + MCP access still work).
 
+This server also requires `NETDATA_CLOUD_TOKEN` (see the table above) --
+`scripts/setup_mcp.py` / `ninja setup-mcp` fail without it, and at runtime it
+mints a per-agent Cloud bearer for the `netdata_agent_<name>` tools that
+forward calls into a running agent's own `/mcp`.
+
 | Key | Role | Where to find it | Sample format |
 |---|---|---|---|
 | `NETDATA_CLAIM_TOKEN` | Space claim token; enables auto-claim when set | app.netdata.cloud -> Space settings -> Connect Nodes -> the `--claim-token` value | long opaque token |
 | `NETDATA_CLAIM_ROOMS` | comma-separated Room id(s) for the node (optional) | same Connect Nodes dialog -> the `--claim-rooms` value | UUID[,UUID...] |
 | `NETDATA_CLAIM_URL` | Cloud base URL (optional) | defaults to `https://app.netdata.cloud` agent-side | URL |
+| `NETDATA_CLOUD_TOKEN` | Cloud REST token; required for setup and for the agent-forwarding tools | see the "Netdata Cloud + agents" table above | 36-char UUID-shaped token |
+| `NETDATA_CLOUD_HOSTNAME` | Cloud REST API host (optional) | see the table above; defaults to `app.netdata.cloud` | `app.netdata.cloud` |
 
 ### agent-events ingestion node
 
@@ -116,6 +123,13 @@ auth` instead.
 - `AGENT_EVENTS_HOSTNAME`
 - `AGENT_EVENTS_NODE_ID`
 - `AGENT_EVENTS_MACHINE_GUID`
+
+### netdata-build-mcp (ninja setup-mcp)
+
+- `NETDATA_CLAIM_TOKEN` (required)
+- `NETDATA_CLOUD_TOKEN` (required)
+- `NETDATA_CLAIM_ROOMS` / `NETDATA_CLAIM_URL` (optional)
+- `NETDATA_CLOUD_HOSTNAME` (optional; defaults to `app.netdata.cloud`)
 
 ### mirror-netdata-repos
 

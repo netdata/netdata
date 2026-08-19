@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	MapTypeManagedFabric                 = "managed_fabric"
 	MapTypeLLDPCDPManaged                = "lldp_cdp_managed"
 	MapTypeHighConfidenceInferred        = "high_confidence_inferred"
 	MapTypeAllDevicesLowConfidence       = "all_devices_low_confidence"
@@ -46,7 +47,7 @@ func DefaultQueryOptions() QueryOptions {
 	return QueryOptions{
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
-		MapType:                MapTypeLLDPCDPManaged,
+		MapType:                MapTypeManagedFabric,
 		InferenceStrategy:      InferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     ManagedFocusAllDevices,
 		Depth:                  DepthAllInternal,
@@ -55,9 +56,6 @@ func DefaultQueryOptions() QueryOptions {
 
 func NormalizeQueryOptions(options QueryOptions) QueryOptions {
 	options.MapType = NormalizeMapType(options.MapType)
-	if options.MapType == "" {
-		options.MapType = MapTypeLLDPCDPManaged
-	}
 	options.InferenceStrategy = NormalizeInferenceStrategy(options.InferenceStrategy)
 	if options.InferenceStrategy == "" {
 		options.InferenceStrategy = InferenceStrategyFDBMinimumKnowledge
@@ -69,14 +67,16 @@ func NormalizeQueryOptions(options QueryOptions) QueryOptions {
 
 func NormalizeMapType(v string) string {
 	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "", MapTypeLLDPCDPManaged:
+	case "", MapTypeManagedFabric:
+		return MapTypeManagedFabric
+	case MapTypeLLDPCDPManaged:
 		return MapTypeLLDPCDPManaged
 	case MapTypeHighConfidenceInferred:
 		return MapTypeHighConfidenceInferred
 	case MapTypeAllDevicesLowConfidence:
 		return MapTypeAllDevicesLowConfidence
 	default:
-		return ""
+		return MapTypeManagedFabric
 	}
 }
 
@@ -123,12 +123,7 @@ func ParseDepth(v string) int {
 }
 
 func IsMapTypeProbable(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "", MapTypeAllDevicesLowConfidence:
-		return true
-	default:
-		return false
-	}
+	return NormalizeMapType(v) == MapTypeAllDevicesLowConfidence
 }
 
 func NormalizeManagedFocusValue(v string) string {

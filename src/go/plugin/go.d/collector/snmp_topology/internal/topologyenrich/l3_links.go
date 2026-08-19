@@ -19,6 +19,15 @@ import (
 const topologyL3SubnetSource = "ip_mib"
 
 func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.ObservationAggregate) topologymodel.L3EnrichmentStats {
+	resolver := newTopologyL3ActorResolverProvider(data, aggregate.Snapshots)
+	return applyL3SubnetWithResolver(data, aggregate, resolver)
+}
+
+func applyL3SubnetWithResolver(
+	data *topologymodel.Data,
+	aggregate topologymodel.ObservationAggregate,
+	resolver *topologyL3ActorResolverProvider,
+) topologymodel.L3EnrichmentStats {
 	var stats topologymodel.L3EnrichmentStats
 	if data == nil || len(aggregate.L3Interfaces) == 0 {
 		return finishTopologyL3SubnetEnrichment(data, stats)
@@ -30,20 +39,20 @@ func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.Observation
 		return finishTopologyL3SubnetEnrichment(data, stats)
 	}
 
-	resolver := newTopologyL3ActorResolver(data, aggregate.Snapshots)
+	actorResolver := resolver.resolve()
 	directSeen := existingTopologyL3LinkKeys(data.Links)
 	for _, adjacency := range candidates.Adjacencies {
-		srcRef, ok := resolver.resolve(adjacency.A)
+		srcRef, ok := actorResolver.resolve(adjacency.A)
 		if !ok {
 			stats.SuppressedUnresolvedActor++
 			continue
 		}
-		dstRef, ok := resolver.resolve(adjacency.B)
+		dstRef, ok := actorResolver.resolve(adjacency.B)
 		if !ok {
 			stats.SuppressedUnresolvedActor++
 			continue
 		}
-		if srcRef.actorID == dstRef.actorID {
+		if srcRef.actorHandle == dstRef.actorHandle {
 			stats.SuppressedSelfActor++
 			continue
 		}
@@ -54,11 +63,12 @@ func ApplyL3Subnet(data *topologymodel.Data, aggregate topologymodel.Observation
 			continue
 		}
 		directSeen[key] = struct{}{}
+		directSeen[key.reversed()] = struct{}{}
 		data.Links = append(data.Links, link)
 		stats.EmittedLinks++
 	}
 
-	applyTopologyL3SubnetSegments(data, candidates.Segments, resolver, strings.TrimSpace(aggregate.ProducerScopeID), &stats)
+	applyTopologyL3SubnetSegments(data, candidates.Segments, actorResolver, strings.TrimSpace(aggregate.ProducerScopeID), &stats)
 
 	sort.Slice(data.Actors, func(i, j int) bool {
 		return strings.TrimSpace(data.Actors[i].ActorID) < strings.TrimSpace(data.Actors[j].ActorID)
@@ -77,20 +87,20 @@ func finishTopologyL3SubnetEnrichment(data *topologymodel.Data, stats topologymo
 
 func topologyL3SubnetLink(adjacency topologyL3SubnetAdjacency, srcRef, dstRef topologyL3ActorRef) topologymodel.Link {
 	return topologymodel.Link{
-		Layer:      "3",
-		Protocol:   topologymodel.L3SubnetLinkType,
-		LinkType:   topologymodel.L3SubnetLinkType,
-		Direction:  "observed",
-		SrcActorID: srcRef.actorID,
-		DstActorID: dstRef.actorID,
+		Layer:          "3",
+		Protocol:       topologymodel.L3SubnetLinkType,
+		LinkType:       topologymodel.L3SubnetLinkType,
+		Direction:      "observed",
+		SrcActorHandle: srcRef.actorHandle,
+		DstActorHandle: dstRef.actorHandle,
 		Src: topologymodel.LinkEndpoint{
-			Match:   srcRef.match,
+			Match:   srcRef.endpointMatch,
 			IfIndex: topologyutil.ParseIndex(adjacency.A.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.A.IfName),
 			IfDescr: strings.TrimSpace(adjacency.A.IfDescr),
 		},
 		Dst: topologymodel.LinkEndpoint{
-			Match:   dstRef.match,
+			Match:   dstRef.endpointMatch,
 			IfIndex: topologyutil.ParseIndex(adjacency.B.IfIndex),
 			IfName:  strings.TrimSpace(adjacency.B.IfName),
 			IfDescr: strings.TrimSpace(adjacency.B.IfDescr),
@@ -133,7 +143,7 @@ func applyTopologyL3SubnetSegments(
 		return
 	}
 
-	actorSeen := existingTopologyActorIDs(data.Actors)
+	actorSeen := existingTopologyActorRefs(data.Actors)
 	membershipSeen := existingTopologyL3MembershipLinkKeys(data.Links)
 	for _, segment := range segments {
 		members := topologyL3SubnetSegmentMembers(segment, resolver, stats)
@@ -144,18 +154,23 @@ func applyTopologyL3SubnetSegments(
 
 		segmentActor := topologyL3SubnetSegmentActor(producerScopeID, segment, members)
 		segmentActorID := strings.TrimSpace(segmentActor.ActorID)
+		segmentActorHandle, segmentActorExists := actorSeen[segmentActorID]
+		if !segmentActorExists {
+			segmentActorHandle = data.NextActorHandle()
+			segmentActor.ActorHandle = segmentActorHandle
+		}
 		segmentActorEmitted := false
 		for _, member := range members {
-			link := topologyL3SubnetMembershipLink(segment, segmentActorID, member)
+			link := topologyL3SubnetMembershipLink(segment, segmentActorHandle, member)
 			key := topologyL3SubnetMembershipLinkKey(link)
 			if _, exists := membershipSeen[key]; exists {
 				stats.SuppressedDuplicateMembershipLink++
 				continue
 			}
 			membershipSeen[key] = struct{}{}
-			if _, exists := actorSeen[segmentActorID]; !exists && !segmentActorEmitted {
+			if !segmentActorExists && !segmentActorEmitted {
 				data.Actors = append(data.Actors, segmentActor)
-				actorSeen[segmentActorID] = struct{}{}
+				actorSeen[segmentActorID] = segmentActorHandle
 				segmentActorEmitted = true
 				stats.EmittedSegments++
 			}
@@ -170,35 +185,36 @@ func topologyL3SubnetSegmentMembers(
 	resolver topologyL3ActorResolver,
 	stats *topologymodel.L3EnrichmentStats,
 ) []topologyL3SubnetMember {
-	byActor := make(map[string]*topologyL3SubnetMember, len(segment.Rows))
+	byActor := make(map[topologymodel.ActorHandle]*topologyL3SubnetMember, len(segment.Rows))
 	for _, row := range segment.Rows {
 		ref, ok := resolver.resolve(row)
 		if !ok {
 			stats.SuppressedMembershipUnresolvedActor++
 			continue
 		}
-		actorID := strings.TrimSpace(ref.actorID)
-		if actorID == "" {
+		if !ref.valid() {
 			stats.SuppressedMembershipUnresolvedActor++
 			continue
 		}
-		member := byActor[actorID]
+		member := byActor[ref.actorHandle]
 		if member == nil {
 			member = &topologyL3SubnetMember{ref: ref}
-			byActor[actorID] = member
+			byActor[ref.actorHandle] = member
 		}
 		member.interfaces = append(member.interfaces, topologyL3SubnetMembershipInterface(row))
 	}
 
-	actorIDs := make([]string, 0, len(byActor))
-	for actorID := range byActor {
-		actorIDs = append(actorIDs, actorID)
+	actorHandles := make([]topologymodel.ActorHandle, 0, len(byActor))
+	for actorHandle := range byActor {
+		actorHandles = append(actorHandles, actorHandle)
 	}
-	sort.Strings(actorIDs)
+	sort.Slice(actorHandles, func(i, j int) bool {
+		return byActor[actorHandles[i]].ref.actorOrder < byActor[actorHandles[j]].ref.actorOrder
+	})
 
-	out := make([]topologyL3SubnetMember, 0, len(actorIDs))
-	for _, actorID := range actorIDs {
-		member := byActor[actorID]
+	out := make([]topologyL3SubnetMember, 0, len(actorHandles))
+	for _, actorHandle := range actorHandles {
+		member := byActor[actorHandle]
 		sort.Slice(member.interfaces, func(i, j int) bool {
 			return topologyL3SubnetMembershipInterfaceSortKey(member.interfaces[i]) < topologyL3SubnetMembershipInterfaceSortKey(member.interfaces[j])
 		})
@@ -261,22 +277,22 @@ func topologyL3SubnetSegmentActorID(producerScopeID string, segment topologyL3Su
 	return "l3_subnet_segment:" + hex.EncodeToString(sum[:8])
 }
 
-func topologyL3SubnetMembershipLink(segment topologyL3SubnetSegment, segmentActorID string, member topologyL3SubnetMember) topologymodel.Link {
-	src := topologymodel.LinkEndpoint{Match: member.ref.match}
+func topologyL3SubnetMembershipLink(segment topologyL3SubnetSegment, segmentActorHandle topologymodel.ActorHandle, member topologyL3SubnetMember) topologymodel.Link {
+	src := topologymodel.LinkEndpoint{Match: member.ref.endpointMatch}
 	if len(member.interfaces) > 0 {
 		src.IfIndex = member.interfaces[0].IfIndex
 		src.IfName = member.interfaces[0].IfName
 		src.IfDescr = member.interfaces[0].IfDescr
 	}
 	return topologymodel.Link{
-		Layer:      "3",
-		Protocol:   topologymodel.L3SubnetMembershipLinkType,
-		LinkType:   topologymodel.L3SubnetMembershipLinkType,
-		Direction:  "observed",
-		SrcActorID: member.ref.actorID,
-		DstActorID: segmentActorID,
-		Src:        src,
-		Dst:        topologymodel.LinkEndpoint{},
+		Layer:          "3",
+		Protocol:       topologymodel.L3SubnetMembershipLinkType,
+		LinkType:       topologymodel.L3SubnetMembershipLinkType,
+		Direction:      "observed",
+		SrcActorHandle: member.ref.actorHandle,
+		DstActorHandle: segmentActorHandle,
+		Src:            src,
+		Dst:            topologymodel.LinkEndpoint{},
 		Inference: &graph.LinkInference{
 			Inference:      "shared_subnet_membership",
 			AttachmentMode: "logical_l3_subnet_membership",
@@ -294,18 +310,20 @@ func topologyL3SubnetMembershipLink(segment topologyL3SubnetSegment, segmentActo
 	}
 }
 
-func existingTopologyL3LinkKeys(links []topologymodel.Link) map[string]struct{} {
-	seen := make(map[string]struct{})
+func existingTopologyL3LinkKeys(links []topologymodel.Link) map[topologyL3SubnetLinkKeyValue]struct{} {
+	seen := make(map[topologyL3SubnetLinkKeyValue]struct{})
 	for _, link := range links {
 		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.L3SubnetLinkType) {
-			seen[topologyL3SubnetLinkKey(link)] = struct{}{}
+			key := topologyL3SubnetLinkKey(link)
+			seen[key] = struct{}{}
+			seen[key.reversed()] = struct{}{}
 		}
 	}
 	return seen
 }
 
-func existingTopologyL3MembershipLinkKeys(links []topologymodel.Link) map[string]struct{} {
-	seen := make(map[string]struct{})
+func existingTopologyL3MembershipLinkKeys(links []topologymodel.Link) map[topologyL3SubnetMembershipLinkKeyValue]struct{} {
+	seen := make(map[topologyL3SubnetMembershipLinkKeyValue]struct{})
 	for _, link := range links {
 		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.L3SubnetMembershipLinkType) {
 			seen[topologyL3SubnetMembershipLinkKey(link)] = struct{}{}
@@ -314,37 +332,51 @@ func existingTopologyL3MembershipLinkKeys(links []topologymodel.Link) map[string
 	return seen
 }
 
-func existingTopologyActorIDs(actors []topologymodel.Actor) map[string]struct{} {
-	seen := make(map[string]struct{}, len(actors))
+func existingTopologyActorRefs(actors []topologymodel.Actor) map[string]topologymodel.ActorHandle {
+	seen := make(map[string]topologymodel.ActorHandle, len(actors))
 	for _, actor := range actors {
 		if actorID := strings.TrimSpace(actor.ActorID); actorID != "" {
-			seen[actorID] = struct{}{}
+			seen[actorID] = actor.ActorHandle
 		}
 	}
 	return seen
 }
 
-func topologyL3SubnetLinkKey(link topologymodel.Link) string {
-	src := strings.TrimSpace(link.SrcActorID)
-	dst := strings.TrimSpace(link.DstActorID)
-	if src > dst {
-		src, dst = dst, src
-	}
-	return topologyutil.JoinKeyParts(
-		src,
-		dst,
-		topologyL3Subnet(link),
-		strconv.Itoa(topologyL3SubnetPrefix(link)),
-	)
+type topologyL3SubnetLinkKeyValue struct {
+	srcActor topologymodel.ActorHandle
+	dstActor topologymodel.ActorHandle
+	subnet   string
+	prefix   int
 }
 
-func topologyL3SubnetMembershipLinkKey(link topologymodel.Link) string {
-	return topologyutil.JoinKeyParts(
-		strings.TrimSpace(link.SrcActorID),
-		strings.TrimSpace(link.DstActorID),
-		topologyL3SubnetMembershipSubnet(link),
-		strconv.Itoa(topologyL3SubnetMembershipPrefix(link)),
-	)
+func (k topologyL3SubnetLinkKeyValue) reversed() topologyL3SubnetLinkKeyValue {
+	k.srcActor, k.dstActor = k.dstActor, k.srcActor
+	return k
+}
+
+func topologyL3SubnetLinkKey(link topologymodel.Link) topologyL3SubnetLinkKeyValue {
+	return topologyL3SubnetLinkKeyValue{
+		srcActor: link.SrcActorHandle,
+		dstActor: link.DstActorHandle,
+		subnet:   topologyL3Subnet(link),
+		prefix:   topologyL3SubnetPrefix(link),
+	}
+}
+
+type topologyL3SubnetMembershipLinkKeyValue struct {
+	srcActor topologymodel.ActorHandle
+	dstActor topologymodel.ActorHandle
+	subnet   string
+	prefix   int
+}
+
+func topologyL3SubnetMembershipLinkKey(link topologymodel.Link) topologyL3SubnetMembershipLinkKeyValue {
+	return topologyL3SubnetMembershipLinkKeyValue{
+		srcActor: link.SrcActorHandle,
+		dstActor: link.DstActorHandle,
+		subnet:   topologyL3SubnetMembershipSubnet(link),
+		prefix:   topologyL3SubnetMembershipPrefix(link),
+	}
 }
 
 func topologyL3Subnet(link topologymodel.Link) string {

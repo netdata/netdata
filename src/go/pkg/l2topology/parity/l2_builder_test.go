@@ -124,6 +124,46 @@ func TestBuildL2ResultFromWalks_CDP_NMS8000(t *testing.T) {
 	}
 }
 
+func TestParsedFixtureToCDPRemotesSeparatesSelectedAndRawAddress(t *testing.T) {
+	parsed := parsedFixture{cdpRemotes: map[string]cdpRemoteObs{
+		"8|1": {
+			ifIndex:     "8",
+			deviceIndex: "1",
+			deviceID:    "switch-b",
+			addressType: "1",
+			address:     "0A000002",
+		},
+	}}
+
+	remotes := parsed.toCDPRemotes()
+
+	require.Len(t, remotes, 1)
+	require.Equal(t, "10.0.0.2", remotes[0].Address)
+	require.Equal(t, "0A000002", remotes[0].RawAddress)
+}
+
+func TestNormalizeCDPFixtureAddressHonorsCiscoNetworkProtocol(t *testing.T) {
+	tests := map[string]struct {
+		value       string
+		addressType string
+		want        string
+	}{
+		"IPv4":                  {value: "0A000002", addressType: "1", want: "10.0.0.2"},
+		"IPv6":                  {value: "20010db8000000000000000000000001", addressType: "20", want: "2001:db8::1"},
+		"DECnet bytes":          {value: "0A000002", addressType: "2"},
+		"DECnet IP-like text":   {value: "10.0.0.2", addressType: "2"},
+		"family mismatch":       {value: "20010db8000000000000000000000001", addressType: "1"},
+		"missing family legacy": {value: "0A000002", want: "10.0.0.2"},
+		"ASCII-hex IPv4":        {value: "31302e302e302e31", addressType: "1", want: "10.0.0.1"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, normalizeCDPFixtureAddress(tc.value, tc.addressType))
+		})
+	}
+}
+
 func TestBuildL2ResultFromWalks_LLDP_NMS8000(t *testing.T) {
 	manifestPath := "../../../testdata/snmp/enlinkd/nms8000/manifest.yaml"
 	manifest, err := LoadManifest(manifestPath)
@@ -2200,7 +2240,7 @@ func TestBuildL2ResultFromWalks_CDP_NMS7563_SWITCH02(t *testing.T) {
 
 	final, buildErr := BuildL2ResultFromWalks(walks, BuildOptions{EnableCDP: true})
 	require.NoError(t, buildErr)
-	require.Len(t, final.Devices, 3)
+	require.Len(t, final.Devices, 4)
 	require.Len(t, final.Adjacencies, 3)
 	require.Equal(t, 3, final.Stats.LinksCDP)
 	require.Equal(t, 0, final.Stats.LinksLLDP)
@@ -2212,9 +2252,15 @@ func TestBuildL2ResultFromWalks_CDP_NMS7563_SWITCH02(t *testing.T) {
 	}
 	require.Contains(t, deviceByID, "switch02")
 	require.Contains(t, deviceByID, "cisco01")
+	require.Contains(t, deviceByID, "ac a0 16 bf 02 00")
 	require.Contains(t, deviceByID, "00 1f f2 07 99 4f")
 	require.Equal(t, "cisco01", deviceByID["cisco01"].Hostname)
+	require.Equal(t, "AC A0 16 BF 02 00", deviceByID["ac a0 16 bf 02 00"].Hostname)
 	require.Equal(t, "00 1F F2 07 99 4F", deviceByID["00 1f f2 07 99 4f"].Hostname)
+	require.False(t, deviceByID["cisco01"].ManagementIP.IsValid())
+	require.False(t, deviceByID["ac a0 16 bf 02 00"].ManagementIP.IsValid())
+	require.Empty(t, deviceByID["cisco01"].Addresses)
+	require.Empty(t, deviceByID["ac a0 16 bf 02 00"].Addresses)
 
 	for _, adj := range final.Adjacencies {
 		require.Equal(t, "cdp", adj.Protocol)
@@ -2231,12 +2277,12 @@ func TestBuildL2ResultFromWalks_CDP_NMS7563_SWITCH02(t *testing.T) {
 		raw := strings.TrimSpace(adj.Labels["remote_address_raw"])
 		ipByAdjacency[adj.SourcePort+"|"+adj.TargetID+"|"+adj.TargetPort] = decodeHexIP(raw)
 	}
-	require.Equal(t, "192.168.88.240", ipByAdjacency["24|cisco01|Fa0/8"])
+	require.Equal(t, "192.168.88.240", ipByAdjacency["24|ac a0 16 bf 02 00|Fa0/8"])
 	require.Equal(t, "192.168.88.240", ipByAdjacency["24|cisco01|FastEthernet0/8"])
 	require.Equal(t, "192.168.87.16", ipByAdjacency["7|00 1f f2 07 99 4f|00 1F F2 07 99 4F"])
 
 	expected := map[string]struct{}{
-		"cdp|switch02|24|cisco01|Fa0/8":                      {},
+		"cdp|switch02|24|ac a0 16 bf 02 00|Fa0/8":            {},
 		"cdp|switch02|24|cisco01|FastEthernet0/8":            {},
 		"cdp|switch02|7|00 1f f2 07 99 4f|00 1F F2 07 99 4F": {},
 	}
@@ -2249,6 +2295,11 @@ func TestBuildL2ResultFromWalks_CDP_NMS7563_SWITCH02(t *testing.T) {
 	for _, adj := range golden.Adjacencies {
 		expectedFromGolden[adj.Protocol+"|"+adj.SourceDevice+"|"+adj.SourcePort+"|"+adj.TargetDevice+"|"+adj.TargetPort] = struct{}{}
 	}
+	// The legacy golden merged these strong identities solely by their shared inferred IP.
+	legacyMergedKey := "cdp|switch02|24|cisco01|Fa0/8"
+	require.Contains(t, expectedFromGolden, legacyMergedKey)
+	delete(expectedFromGolden, legacyMergedKey)
+	expectedFromGolden["cdp|switch02|24|ac a0 16 bf 02 00|Fa0/8"] = struct{}{}
 	require.Equal(t, expectedFromGolden, adjacencyKeySet(final.Adjacencies))
 }
 

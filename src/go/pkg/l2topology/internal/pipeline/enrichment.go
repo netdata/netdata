@@ -81,17 +81,62 @@ func reconcileDeviceIdentityAliases(
 	devices map[string]model.Device,
 	interfaces map[string]model.Interface,
 	enrichments map[string]*enrichmentAccumulator,
+	directOwnersByIP map[string]map[string]struct{},
+	remoteManagementByDeviceID map[string]map[string]netip.Addr,
+	directManagementIPByDeviceID map[string]bool,
 ) identityAliasReconcileStats {
 	stats := identityAliasReconcileStats{}
-	if len(devices) == 0 || len(enrichments) == 0 {
+	if len(devices) == 0 {
 		return stats
+	}
+
+	ownersByIP := make(map[string]map[string]struct{}, len(directOwnersByIP))
+	for ip, owners := range directOwnersByIP {
+		copied := make(map[string]struct{}, len(owners))
+		maps.Copy(copied, owners)
+		ownersByIP[ip] = copied
+	}
+	addOwner := func(deviceID string, addr netip.Addr) {
+		deviceID = strings.TrimSpace(deviceID)
+		addr = addr.Unmap()
+		if deviceID == "" || !addr.IsValid() {
+			return
+		}
+		owners := ownersByIP[addr.String()]
+		if owners == nil {
+			owners = make(map[string]struct{})
+			ownersByIP[addr.String()] = owners
+		}
+		owners[deviceID] = struct{}{}
+	}
+	for deviceID, device := range devices {
+		addOwner(deviceID, device.ManagementIP)
+		for _, addr := range device.Addresses {
+			addOwner(deviceID, addr)
+		}
+	}
+
+	remoteClaims := make(map[string]map[string]netip.Addr)
+	for deviceID, candidates := range remoteManagementByDeviceID {
+		if _, ok := devices[deviceID]; !ok {
+			continue
+		}
+		for _, addr := range candidates {
+			if !isUsableAliasIPAddress(addr) {
+				continue
+			}
+			addr = addr.Unmap()
+			claims := remoteClaims[deviceID]
+			if claims == nil {
+				claims = make(map[string]netip.Addr)
+				remoteClaims[deviceID] = claims
+			}
+			claims[addr.String()] = addr
+			addOwner(deviceID, addr)
+		}
 	}
 
 	uniqueMACToDeviceID, ambiguousMACs := buildUniqueMACToDeviceIndex(devices, interfaces)
-	if len(uniqueMACToDeviceID) == 0 {
-		return stats
-	}
-
 	ipToMACs := make(map[string]map[string]struct{})
 	enrichmentKeys := make([]string, 0, len(enrichments))
 	for endpointID := range enrichments {
@@ -122,7 +167,14 @@ func reconcileDeviceIdentityAliases(
 		}
 	}
 
-	aliasIPsByDevice := make(map[string]map[string]netip.Addr)
+	conflictingIPs := make(map[string]struct{})
+	for ip, macs := range ipToMACs {
+		if len(macs) > 1 {
+			conflictingIPs[ip] = struct{}{}
+		}
+	}
+
+	arpClaims := make(map[string]map[string]netip.Addr)
 	for _, endpointID := range enrichmentKeys {
 		acc := enrichments[endpointID]
 		if acc == nil {
@@ -143,9 +195,6 @@ func reconcileDeviceIdentityAliases(
 		}
 		stats.endpointsMapped++
 
-		if aliasIPsByDevice[deviceID] == nil {
-			aliasIPsByDevice[deviceID] = make(map[string]netip.Addr)
-		}
 		for _, ipKey := range sortedIPKeys(acc.IPs) {
 			addr, ok := acc.IPs[ipKey]
 			if !ok || !isUsableAliasIPAddress(addr) {
@@ -155,47 +204,87 @@ func reconcileDeviceIdentityAliases(
 				stats.ipsConflictSkipped++
 				continue
 			}
-			aliasIPsByDevice[deviceID][addr.String()] = addr.Unmap()
+			addr = addr.Unmap()
+			claims := arpClaims[deviceID]
+			if claims == nil {
+				claims = make(map[string]netip.Addr)
+				arpClaims[deviceID] = claims
+			}
+			claims[addr.String()] = addr
+			addOwner(deviceID, addr)
 		}
 	}
 
-	for deviceID, aliasIPs := range aliasIPsByDevice {
-		device, ok := devices[deviceID]
-		if !ok || len(aliasIPs) == 0 {
-			continue
+	claimIsExclusive := func(deviceID, ip string) bool {
+		if _, conflict := conflictingIPs[ip]; conflict {
+			return false
 		}
+		for owner := range ownersByIP[ip] {
+			if owner != deviceID {
+				return false
+			}
+		}
+		return true
+	}
 
-		merged := make(map[string]netip.Addr, len(device.Addresses)+len(aliasIPs))
-		for _, addr := range device.Addresses {
-			if !isUsableAliasIPAddress(addr) {
+	for _, deviceID := range sortedDeviceClaimIDs(remoteClaims) {
+		device := devices[deviceID]
+		addresses := deviceIdentityAddressMap(device)
+		for _, ip := range sortedIPKeys(remoteClaims[deviceID]) {
+			addr := remoteClaims[deviceID][ip]
+			if !claimIsExclusive(deviceID, ip) {
 				continue
 			}
-			normalized := addr.Unmap()
-			merged[normalized.String()] = normalized
+			addresses[ip] = addr
+			if !directManagementIPByDeviceID[deviceID] {
+				device.ManagementIP, _ = selectObservedManagementIP(device.ManagementIP, addr, false, false)
+			}
 		}
-		before := len(merged)
-		maps.Copy(merged, aliasIPs)
-		added := len(merged) - before
-		if added <= 0 {
-			continue
-		}
-		stats.ipsMerged += added
+		device.Addresses = sortedAddrValues(addresses)
+		devices[deviceID] = device
+	}
 
-		keys := make([]string, 0, len(merged))
-		for key := range merged {
-			keys = append(keys, key)
+	for _, deviceID := range sortedDeviceClaimIDs(arpClaims) {
+		device := devices[deviceID]
+		addresses := deviceIdentityAddressMap(device)
+		for _, ip := range sortedIPKeys(arpClaims[deviceID]) {
+			if !claimIsExclusive(deviceID, ip) {
+				stats.ipsConflictSkipped++
+				continue
+			}
+			if _, exists := addresses[ip]; !exists {
+				addresses[ip] = arpClaims[deviceID][ip]
+				stats.ipsMerged++
+			}
 		}
-		sort.Strings(keys)
-
-		addresses := make([]netip.Addr, 0, len(keys))
-		for _, key := range keys {
-			addresses = append(addresses, merged[key])
-		}
-		device.Addresses = addresses
+		device.Addresses = sortedAddrValues(addresses)
 		devices[deviceID] = device
 	}
 
 	return stats
+}
+
+func sortedDeviceClaimIDs(claims map[string]map[string]netip.Addr) []string {
+	if len(claims) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(claims))
+	for deviceID := range claims {
+		ids = append(ids, deviceID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func deviceIdentityAddressMap(device model.Device) map[string]netip.Addr {
+	addresses := make(map[string]netip.Addr, len(device.Addresses))
+	for _, existing := range device.Addresses {
+		existing = existing.Unmap()
+		if existing.IsValid() {
+			addresses[existing.String()] = existing
+		}
+	}
+	return addresses
 }
 
 func buildUniqueMACToDeviceIndex(
@@ -240,10 +329,13 @@ func buildUniqueMACToDeviceIndex(
 
 func isUsableAliasIPAddress(addr netip.Addr) bool {
 	addr = addr.Unmap()
-	if !addr.IsValid() {
+	if !addr.IsValid() || addr.Zone() != "" {
 		return false
 	}
-	return !addr.IsUnspecified()
+	if addr.IsUnspecified() || addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsMulticast() {
+		return false
+	}
+	return !addr.Is4() || addr != netip.AddrFrom4([4]byte{255, 255, 255, 255})
 }
 
 func sortedIPKeys(in map[string]netip.Addr) []string {

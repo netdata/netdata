@@ -14,33 +14,33 @@ func eliminateNonIPInferredActors(data *topologymodel.Data) int {
 		return 0
 	}
 
-	removedIDs := make(map[string]struct{})
+	removedHandles := make(map[topologymodel.ActorHandle]struct{})
 	keptActors := make([]topologymodel.Actor, 0, len(data.Actors))
 	for _, actor := range data.Actors {
 		if topologymodel.ActorIsInferred(actor) && len(topologymodel.NormalizedMatchIPs(actor.Match)) == 0 {
-			removedIDs[strings.TrimSpace(actor.ActorID)] = struct{}{}
+			removedHandles[actor.ActorHandle] = struct{}{}
 			continue
 		}
 		keptActors = append(keptActors, actor)
 	}
 
-	if len(removedIDs) == 0 {
+	if len(removedHandles) == 0 {
 		return 0
 	}
 
 	data.Actors = keptActors
 	links := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
-		if _, removed := removedIDs[strings.TrimSpace(link.SrcActorID)]; removed {
+		if _, removed := removedHandles[link.SrcActorHandle]; removed {
 			continue
 		}
-		if _, removed := removedIDs[strings.TrimSpace(link.DstActorID)]; removed {
+		if _, removed := removedHandles[link.DstActorHandle]; removed {
 			continue
 		}
 		links = append(links, link)
 	}
 	data.Links = links
-	return len(removedIDs)
+	return len(removedHandles)
 }
 
 func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
@@ -50,48 +50,45 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 
 	removedTotal := 0
 	for {
-		segmentSet := make(map[string]struct{})
-		l3SegmentSet := make(map[string]struct{})
+		segmentSet := make(map[topologymodel.ActorHandle]struct{})
+		l3SegmentSet := make(map[topologymodel.ActorHandle]struct{})
 		for _, actor := range data.Actors {
 			if !topologymodel.ActorIsSegment(actor) {
 				continue
 			}
-			actorID := strings.TrimSpace(actor.ActorID)
-			if actorID == "" {
+			if actor.ActorHandle.IsZero() {
 				continue
 			}
-			segmentSet[actorID] = struct{}{}
+			segmentSet[actor.ActorHandle] = struct{}{}
 			if topologymodel.ActorIsL3SubnetSegment(actor) {
-				l3SegmentSet[actorID] = struct{}{}
+				l3SegmentSet[actor.ActorHandle] = struct{}{}
 			}
 		}
 		if len(segmentSet) == 0 {
 			return removedTotal
 		}
 
-		neighborSet := make(map[string]map[string]struct{}, len(segmentSet))
-		for segmentID := range segmentSet {
-			neighborSet[segmentID] = make(map[string]struct{})
+		neighborSet := make(map[topologymodel.ActorHandle]map[topologymodel.ActorHandle]struct{}, len(segmentSet))
+		for segmentHandle := range segmentSet {
+			neighborSet[segmentHandle] = make(map[topologymodel.ActorHandle]struct{})
 		}
 		for _, link := range data.Links {
-			srcActorID := strings.TrimSpace(link.SrcActorID)
-			dstActorID := strings.TrimSpace(link.DstActorID)
-			if _, ok := segmentSet[srcActorID]; ok {
-				neighborSet[srcActorID][dstActorID] = struct{}{}
+			if _, ok := segmentSet[link.SrcActorHandle]; ok {
+				neighborSet[link.SrcActorHandle][link.DstActorHandle] = struct{}{}
 			}
-			if _, ok := segmentSet[dstActorID]; ok {
-				neighborSet[dstActorID][srcActorID] = struct{}{}
+			if _, ok := segmentSet[link.DstActorHandle]; ok {
+				neighborSet[link.DstActorHandle][link.SrcActorHandle] = struct{}{}
 			}
 		}
 
 		protectedSegments := l3SubnetSegmentsWithMembershipLinks(data.Links, l3SegmentSet)
-		removeSegments := make(map[string]struct{})
-		for segmentID, neighbors := range neighborSet {
-			if _, protected := protectedSegments[segmentID]; protected {
+		removeSegments := make(map[topologymodel.ActorHandle]struct{})
+		for segmentHandle, neighbors := range neighborSet {
+			if _, protected := protectedSegments[segmentHandle]; protected {
 				continue
 			}
 			if len(neighbors) <= threshold {
-				removeSegments[segmentID] = struct{}{}
+				removeSegments[segmentHandle] = struct{}{}
 			}
 		}
 		if len(removeSegments) == 0 {
@@ -101,7 +98,7 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 
 		filteredActors := make([]topologymodel.Actor, 0, len(data.Actors)-len(removeSegments))
 		for _, actor := range data.Actors {
-			if _, drop := removeSegments[strings.TrimSpace(actor.ActorID)]; drop {
+			if _, drop := removeSegments[actor.ActorHandle]; drop {
 				continue
 			}
 			filteredActors = append(filteredActors, actor)
@@ -110,10 +107,10 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 
 		filteredLinks := make([]topologymodel.Link, 0, len(data.Links))
 		for _, link := range data.Links {
-			if _, drop := removeSegments[strings.TrimSpace(link.SrcActorID)]; drop {
+			if _, drop := removeSegments[link.SrcActorHandle]; drop {
 				continue
 			}
-			if _, drop := removeSegments[strings.TrimSpace(link.DstActorID)]; drop {
+			if _, drop := removeSegments[link.DstActorHandle]; drop {
 				continue
 			}
 			filteredLinks = append(filteredLinks, link)
@@ -122,8 +119,8 @@ func pruneSparseSegments(data *topologymodel.Data, threshold int) int {
 	}
 }
 
-func l3SubnetSegmentsWithMembershipLinks(links []topologymodel.Link, l3SegmentSet map[string]struct{}) map[string]struct{} {
-	protected := make(map[string]struct{})
+func l3SubnetSegmentsWithMembershipLinks(links []topologymodel.Link, l3SegmentSet map[topologymodel.ActorHandle]struct{}) map[topologymodel.ActorHandle]struct{} {
+	protected := make(map[topologymodel.ActorHandle]struct{})
 	if len(l3SegmentSet) == 0 {
 		return protected
 	}
@@ -131,11 +128,11 @@ func l3SubnetSegmentsWithMembershipLinks(links []topologymodel.Link, l3SegmentSe
 		if !strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.L3SubnetMembershipLinkType) {
 			continue
 		}
-		if _, ok := l3SegmentSet[strings.TrimSpace(link.SrcActorID)]; ok {
-			protected[strings.TrimSpace(link.SrcActorID)] = struct{}{}
+		if _, ok := l3SegmentSet[link.SrcActorHandle]; ok {
+			protected[link.SrcActorHandle] = struct{}{}
 		}
-		if _, ok := l3SegmentSet[strings.TrimSpace(link.DstActorID)]; ok {
-			protected[strings.TrimSpace(link.DstActorID)] = struct{}{}
+		if _, ok := l3SegmentSet[link.DstActorHandle]; ok {
+			protected[link.DstActorHandle] = struct{}{}
 		}
 	}
 	return protected
@@ -145,10 +142,10 @@ func filterDanglingLinks(data *topologymodel.Data) {
 	if data == nil || len(data.Links) == 0 {
 		return
 	}
-	actorSet := make(map[string]struct{}, len(data.Actors))
+	actorSet := make(map[topologymodel.ActorHandle]struct{}, len(data.Actors))
 	for _, actor := range data.Actors {
-		if id := strings.TrimSpace(actor.ActorID); id != "" {
-			actorSet[id] = struct{}{}
+		if !actor.ActorHandle.IsZero() {
+			actorSet[actor.ActorHandle] = struct{}{}
 		}
 	}
 	if len(actorSet) == 0 {
@@ -157,10 +154,10 @@ func filterDanglingLinks(data *topologymodel.Data) {
 	}
 	filtered := make([]topologymodel.Link, 0, len(data.Links))
 	for _, link := range data.Links {
-		if _, ok := actorSet[strings.TrimSpace(link.SrcActorID)]; !ok {
+		if _, ok := actorSet[link.SrcActorHandle]; !ok {
 			continue
 		}
-		if _, ok := actorSet[strings.TrimSpace(link.DstActorID)]; !ok {
+		if _, ok := actorSet[link.DstActorHandle]; !ok {
 			continue
 		}
 		filtered = append(filtered, link)

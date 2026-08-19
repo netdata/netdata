@@ -8,7 +8,8 @@
 typedef uint32_t UUIDMAP_ID;
 
 // 2^UUIDMAP_PARTITION_BITS partitions; the remaining bits of UUIDMAP_ID are
-// the per-partition ID sequence space. IDs are never reused, so raising the
+// the per-partition ID sequence space. IDs are never reused within the lifetime
+// of the map (uuidmap_destroy() restarts the sequence), so raising the
 // partition count proportionally lowers the per-partition lifetime ID
 // capacity - total lifetime capacity stays at 2^32 and random UUIDs
 // distribute evenly across partitions. The partition is also reused by MRG
@@ -42,6 +43,25 @@ size_t uuidmap_destroy(void);
 
 // delete a uuid from the map
 void uuidmap_free(UUIDMAP_ID id);
+
+// Look up the id of a uuid WITHOUT creating it and WITHOUT taking a reference,
+// so it needs no matching uuidmap_free(). Returns 0 when the uuid is unknown.
+//
+// The returned id is a key, not a handle: it must NOT be used to reach the
+// uuidmap entry (uuidmap_uuid(), uuidmap_uuid_ptr(), uuidmap_dup(), ...), because
+// nothing keeps that entry alive. It is safe to use as a lookup key in a
+// structure whose own entries hold uuidmap references: ids are unique for the
+// LIFETIME OF THE MAP, so a stale id can only ever miss, never alias a different
+// uuid.
+//
+// Uniqueness is per map lifetime, NOT global: uuidmap_destroy() restarts the
+// per-partition sequence, so ids handed out before it can be issued again after.
+// That is not a hazard for the borrowing pattern above only because a destroy
+// cannot succeed while anything still holds a reference (it returns the
+// referenced count and leaves the map intact), and any structure keyed by these
+// ids holds references for exactly as long as it keeps the keys. A caller that
+// stores a borrowed id across a successful uuidmap_destroy() WOULD alias.
+UUIDMAP_ID uuidmap_peek_id(const nd_uuid_t uuid);
 
 // returns true if found, false if not found
 // UUID is copied to out_uuid if found

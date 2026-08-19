@@ -53,9 +53,13 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     STRING *name_string = rrdset_fix_name(host, rrdset_id(st), rrdset_parts_type(st), string2str(st->name), name);
     if(!name_string) return 0;
 
+    bool renamed = false;
     if(st->name) {
         rrdset_index_del_name(host, st);
         SWAP(name_string, st->name);
+        // after the SWAP, name_string holds the old name; STRING is interned, so
+        // pointer inequality means the name really changed
+        renamed = (name_string != st->name);
         string_freez(name_string);
     }
     else
@@ -65,6 +69,20 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 
     rrdset_flag_clear(st, RRDSET_FLAG_EXPORTING_SEND|RRDSET_FLAG_EXPORTING_IGNORE|RRDSET_FLAG_UPSTREAM_SEND|RRDSET_FLAG_UPSTREAM_IGNORE);
     rrdset_metadata_updated(st);
+
+    // The name is a prototype matching input - prototype_matches_rrdset() compares
+    // ap->match.on.chart against both st->id and st->name - so a rename can both
+    // invalidate the alerts currently attached and enable new matches.
+    // This is the only place a rename is detected, and not all callers go through
+    // rrdset_create_custom() (tc.plugin renames its charts directly), so queue the
+    // re-evaluation here. It has to be the recheck flag: the incremental path only
+    // adds alerts, it never detaches the ones that stopped matching.
+    // Only on a real rename: this function is also called on every re-emission of
+    // every chart, and the recheck is a detach-and-reattach of all its alerts.
+    if(renamed) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 
     rrdcontext_updated_rrdset_name(st);
     return 2;

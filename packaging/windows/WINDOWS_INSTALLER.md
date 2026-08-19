@@ -50,10 +50,14 @@ Use silent mode to deploy Netdata without user interaction. Run the command prom
 | `/qn`           | Enables silent mode (no user interaction)                                 |
 | `/i`            | Specifies the path to the MSI installer                                   |
 | `TOKEN=`        | Claim token from your Netdata Cloud Space                                 |
-| `ROOMS=`        | Comma-separated Room IDs for your node                                    |
+| `ROOMS=`        | (Optional) Comma-separated Room IDs for your node                        |
 | `PROXY=`        | (Optional) Proxy address if required                                      |
 | `INSECURE=1`    | (Optional) Allow insecure connections (hostname verification disabled)    |
 | `REINSTALL=ALL` | (Optional) It forces a complete reinstallation of all Netdata components. |
+
+`TOKEN=` is the only option required to connect the Agent to your Space. When you omit `ROOMS=`, the
+node is added to your Space and appears under **All nodes**; you can move it into Rooms later from the
+Netdata Cloud UI.
 
 ### Example Command
 
@@ -67,6 +71,12 @@ Replace:
 
 - `<YOUR_TOKEN>` with your claim token
 - `<YOUR_ROOMS>` with your Room ID(s)
+
+To connect the node without assigning it to specific Rooms, pass the token alone:
+
+```bash
+msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>"
+```
 
 ### Download & Install in One Command (PowerShell)
 
@@ -87,8 +97,8 @@ During the wizard you'll see a **Connect to the Cloud** dialog. These fields reg
 
 | Field       | What it's for                                                                                     |
 |-------------|---------------------------------------------------------------------------------------------------|
-| Claim Token | The claim token from your Netdata Cloud Space.                                                    |
-| Rooms ID(s) | The Room(s) you want to add this Agent to.                                                        |
+| Claim Token | The claim token from your Netdata Cloud Space. This is the only required field.                    |
+| Rooms ID(s) | (Optional) The Room(s) you want to add this Agent to. Leave empty to use **All nodes**.            |
 | Proxy URL   | (Optional) A proxy address, if your network requires one to reach Netdata Cloud.                  |
 | Cloud URL   | The Netdata Cloud endpoint. Defaults to `https://app.netdata.cloud`.                              |
 | Insecure    | (Optional) Disables TLS hostname verification when the Agent contacts the Netdata Cloud endpoint. |
@@ -110,6 +120,52 @@ To stream to a local Parent, configure `stream.conf` on the Child instead. The s
 See the [Parent-Child Configuration Reference](../../src/streaming/README.md) for the full setup, and the [Streaming Routing Reference](../../docs/streaming-routing.md) for routing options.
 
 :::
+
+### Where the claim settings are stored
+
+The values you enter in the claim dialog (or pass to `msiexec`) are written to:
+
+```text
+C:\Program Files\Netdata\etc\netdata\claim.conf
+```
+
+The Agent reads this file on startup and connects to your Space. After a successful connection it also
+records the resulting identity in `C:\Program Files\Netdata\var\lib\netdata\cloud.d\cloud.conf`.
+
+### Connect a node that was installed without a token
+
+If the Agent is installed but not connected — no `claim.conf` exists, or it was installed without a
+token — you don't need to uninstall or reboot. Create the file yourself and restart the service.
+
+1. Open Notepad **as Administrator**.
+2. Create `C:\Program Files\Netdata\etc\netdata\claim.conf` with this content, replacing
+   `<YOUR_TOKEN>` with your claim token:
+
+   ```text
+   [global]
+       url = https://app.netdata.cloud
+       token = <YOUR_TOKEN>
+   #    rooms =
+   #    proxy =
+       insecure = no
+   ```
+
+   Set `rooms` to a comma-separated list of Room IDs if you want the node placed in specific Rooms, and
+   set `proxy` if your network requires one to reach Netdata Cloud. Both lines are optional — leave them
+   commented out to connect with defaults.
+
+3. Restart the Agent from an Administrator PowerShell prompt:
+
+   ```powershell
+   Restart-Service Netdata
+   ```
+
+The node should appear in your Space within a few seconds. If it does not, the Agent reports the
+claiming result to the Windows Event Log — a rejected or expired token is reported there:
+
+```powershell
+Get-WinEvent -LogName 'Netdata/Daemon' -MaxEvents 50 | Where-Object { $_.Message -match 'CLAIM' }
+```
 
 ## Offline (Air-gapped) Installation
 

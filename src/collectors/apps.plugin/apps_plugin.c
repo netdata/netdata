@@ -103,7 +103,7 @@ NETDATA_DOUBLE
 
 int update_every = 1;
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_STATE == 1)
 proc_state proc_state_count[PROC_STATUS_END];
 const char *proc_states[] = {
     [PROC_STATUS_RUNNING] = "running",

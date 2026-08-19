@@ -3,12 +3,110 @@
 package projector
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/l2topology/internal/model"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCollapseActorsByIPOnePassPreservesSequentialMergeSemantics(t *testing.T) {
+	expectedActors := richProjectedActorsForCollapseEquivalence()
+	rep := 0
+	for idx := 1; idx < len(expectedActors); idx++ {
+		if compareTopologyActorCollapsePriority(expectedActors[idx], expectedActors[rep]) < 0 {
+			rep = idx
+		}
+	}
+	require.Equal(t, 1, rep)
+
+	expected := expectedActors[rep]
+	for idx := range expectedActors {
+		if idx == rep {
+			continue
+		}
+		expected.Actor.Match = mergeTopologyActorMatch(expected.Actor.Match, expectedActors[idx].Actor.Match)
+		expected.Actor.Labels = mergeTopologyActorLabels(expected.Actor.Labels, expectedActors[idx].Actor.Labels)
+		expected.Detail = mergeProjectionActorDetail(expected.Detail, expectedActors[idx].Detail)
+	}
+	expected.Detail.CollapsedByIP = true
+	expected.Detail.CollapsedCount = len(expectedActors)
+
+	got := collapseActorsByIP(richProjectedActorsForCollapseEquivalence())
+
+	require.Equal(t, []projectedActor{expected}, got)
+}
+
+func richProjectedActorsForCollapseEquivalence() []projectedActor {
+	actors := make([]projectedActor, 0, 3)
+	for i := range 3 {
+		actorType := "device"
+		if i == 0 {
+			actorType = "endpoint"
+		}
+		chassis := fmt.Sprintf("chassis-%d", i)
+		if i == 1 {
+			chassis = "chassis-a"
+		}
+		if i == 2 {
+			chassis = "chassis-z"
+		}
+		actors = append(actors, projectedActor{
+			Actor: graph.Actor{
+				ActorID:   fmt.Sprintf("actor-%d", i),
+				ActorType: actorType,
+				Match: graph.Match{
+					ChassisIDs:   []string{chassis, " shared-chassis "},
+					MacAddresses: []string{fmt.Sprintf("02:00:00:00:00:%02d", i)},
+					IPAddresses:  []string{"192.0.2.1", fmt.Sprintf(" 10.0.%d.1 ", i)},
+					Hostnames:    []string{fmt.Sprintf(" host-%d ", i)},
+					DNSNames:     []string{fmt.Sprintf(" dns-%d.example ", i)},
+					SysName:      map[int]string{0: " first-sysname ", 2: "last-sysname"}[i],
+					SysObjectID:  map[int]string{0: "1.3.6.1.4.1.1", 2: "1.3.6.1.4.1.2"}[i],
+				},
+				Labels: map[string]string{
+					"shared":                   fmt.Sprintf("value-%d", i),
+					fmt.Sprintf("label-%d", i): fmt.Sprintf(" value-%d ", i),
+				},
+			},
+			Detail: model.ProjectionActorDetail{
+				DisplayName:   map[int]string{0: " first-display ", 2: "last-display"}[i],
+				DisplaySource: map[int]string{0: " first-source ", 2: "last-source"}[i],
+				Device: model.ProjectionDeviceActorDetail{
+					DeviceID:              map[int]string{0: " first-device ", 2: "last-device"}[i],
+					Inferred:              i == 2,
+					ManagementIP:          map[int]string{0: " 192.0.2.10 ", 2: "192.0.2.20"}[i],
+					ManagementAddresses:   []string{"192.0.2.1", fmt.Sprintf(" 10.0.%d.1 ", i)},
+					Protocols:             []string{"snmp", fmt.Sprintf("protocol-%d", i)},
+					ProtocolsCollected:    []string{fmt.Sprintf("collected-%d", i)},
+					Capabilities:          []string{fmt.Sprintf("capability-%d", i)},
+					CapabilitiesSupported: []string{fmt.Sprintf("supported-%d", i)},
+					CapabilitiesEnabled:   []string{fmt.Sprintf("enabled-%d", i)},
+					IfIndexes:             []string{fmt.Sprintf("%d", i+1)},
+					IfNames:               []string{fmt.Sprintf(" if-%d ", i)},
+				},
+				Endpoint: model.ProjectionEndpointActorDetail{
+					LearnedSources:   []string{fmt.Sprintf("source-%d", i)},
+					LearnedDeviceIDs: []string{fmt.Sprintf("device-%d", i)},
+					LearnedIfIndexes: []string{fmt.Sprintf("%d", i+1)},
+					LearnedIfNames:   []string{fmt.Sprintf("endpoint-if-%d", i)},
+					AttachmentSource: map[int]string{0: " first-attachment ", 2: "last-attachment"}[i],
+					AttachedDeviceID: fmt.Sprintf("attached-%d", i),
+				},
+				Segment: model.ProjectionSegmentActorDetail{
+					ParentDevices:  []string{fmt.Sprintf("parent-%d", i)},
+					IfNames:        []string{fmt.Sprintf("segment-if-%d", i)},
+					IfIndexes:      []string{fmt.Sprintf("%d", i+1)},
+					BridgePorts:    []string{fmt.Sprintf("bridge-%d", i)},
+					VLANIDs:        []string{fmt.Sprintf("%d", i+10)},
+					LearnedSources: []string{fmt.Sprintf("segment-source-%d", i)},
+				},
+			},
+		})
+	}
+	return actors
+}
 
 func TestBackfillPairGroupMissingEndpointPortsCopiesPeerInterfaceAttributes(t *testing.T) {
 	entries := []*builtAdjacencyLink{
