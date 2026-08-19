@@ -16,6 +16,7 @@
             "type": "string"
         },
         "ArchDataEntry": {
+            "additionalProperties": false,
             "properties": {
                 "qemu": {
                     "description": "Whether or not to use QEMU userspace emulation for this architecture.",

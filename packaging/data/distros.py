@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum, unique
 from pathlib import Path
@@ -54,6 +55,8 @@ class DockerArch(StrEnum):
 
 @dataclass(kw_only=True, frozen=True, slots=True)
 class ArchDataEntry:
+    __pydantic_config__ = PYDANTIC_CONFIG
+
     qemu: Annotated[bool, Field(
         title='Use QEMU',
         description='Whether or not to use QEMU userspace emulation for this architecture.',
@@ -248,56 +251,52 @@ class DistroData(BaseModel):
         description='Contains platform descriptions for platforms not included in CI',
     )]
 
-    @field_validator('static_arches', 'docker_arches', mode='after')
-    @classmethod
-    def check_unique_list[T](cls: type[DistroData], value: list[T]) -> list[T]:
+    @staticmethod
+    def _list_duplicates_check(value: Sequence, name: str) -> None:
         c = Counter(value)
 
         if s := {k for k, v in c.items() if v > 1}:
-            raise ValueError(f'Found duplicate values in list: {s}')
+            raise ValueError(f'Found duplicate values in {name}: {s}')
+
+    @staticmethod
+    def _require_all_arches(value: Sequence[Arch], name: str) -> None:
+        if s := set(Arch) - set(value):
+            raise ValueError(f'Missing values from {name}: {s}')
+
+    @field_validator('static_arches', mode='after')
+    @classmethod
+    def check_static_arches(cls: type[DistroData], value: list[Arch]) -> list[Arch]:
+        cls._list_duplicates_check(value, 'static_arches list')
+
+        return value
+
+    @field_validator('docker_arches', mode='after')
+    @classmethod
+    def check_docker_arches(cls: type[DistroData], value: list[Arch]) -> list[Arch]:
+        cls._list_duplicates_check(value, 'docker_arches list')
 
         return value
 
     @field_validator('platform_map', mode='after')
     @classmethod
     def check_platform_map(cls: type[DistroData], value: dict[Arch, DockerArch]) -> dict[Arch, DockerArch]:
-        s1 = set(value.keys())
-        s2 = set(Arch)
-
-        if s3 := s2 - s1:
-            raise ValueError(f'Missing values from platform_map mapping: {s3}')
+        cls._require_all_arches(value.keys(), 'platform_map keys')
 
         return value
 
     @field_validator('arch_order', mode='after')
     @classmethod
     def check_arch_list(cls: type[DistroData], value: list[Arch]) -> list[Arch]:
-        c = Counter(value)
-
-        if s := {k for k, v in c.items() if v > 1}:
-            raise ValueError(f'Found duplicate values in arch_order: {s}')
-
-        s1 = set(value)
-        s2 = set(Arch)
-
-        if s3 := s2 - s1:
-            raise ValueError(f'Missing values from arch_order list: {s3}')
+        cls._list_duplicates_check(value, 'arch_order')
+        cls._require_all_arches(value, 'arch_order list')
 
         return value
 
     @field_validator('arch_data', mode='after')
     @classmethod
     def check_arch_data(cls: type[DistroData], value: dict[Arch, ArchDataEntry]) -> dict[Arch, ArchDataEntry]:
-        c = Counter(value.keys())
-
-        if s := {k for k, v in c.items() if v > 1}:
-            raise ValueError(f'Found duplicate keys in arch_data mapping: {s}')
-
-        s1 = set(value.keys())
-        s2 = set(Arch)
-
-        if s3 := s2 - s1:
-            raise ValueError(f'Missing keys from arch_data mapping: {s3}')
+        cls._list_duplicates_check(value.keys(), 'arch_data keys')
+        cls._require_all_arches(value.keys(), 'arch_data keys')
 
         return value
 
@@ -316,7 +315,6 @@ if __name__ == '__main__':
     json.dump(
         DistroData.model_json_schema(
             by_alias=True,
-            union_format='any_of',
         ),
         sys.stdout,
         indent=4,
