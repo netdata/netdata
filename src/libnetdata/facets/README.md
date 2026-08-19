@@ -265,7 +265,7 @@ Log databases often contain out-of-order entries:
 ### Plugin Communication
 - The facets library runs within plugins (systemd-journal.plugin, windows-events.plugin)
 - Plugins can run anywhere in the Netdata ecosystem (parent nodes, child nodes, etc.)
-- Communication with plugins happens via **nRPC** (`src/database/nrpc.h`) - Netdata's RPC mechanism behind the "Functions" feature
+- Communication with plugins happens via **nRPC** (`src/nrpc/nrpc.h`) - Netdata's RPC mechanism behind the "Functions" feature
 - nRPC provides the transport layer to send requests to plugins and receive responses
 
 ### MCP (Model Context Protocol) Integration

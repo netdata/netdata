@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrd.h"
+#include "database/rrd.h"
 #include "nrpc-internals.h"
 #include "daemon/dyncfg/dyncfg.h"
-#include "sqlite/sqlite_aclk_node.h"
+#include "database/sqlite/sqlite_aclk_node.h"
 #include "aclk/aclk_query_queue.h"
 
 // ----------------------------------------------------------------------------

@@ -117,7 +117,7 @@ static inline uint32_t get_uint32_id() {
 //#include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
 #include "contexts/rrdcontext.h"
-#include "nrpc.h"
+#include "nrpc/nrpc.h"
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
 #endif

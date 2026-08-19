@@ -18,6 +18,7 @@ src/crates/ @vkalintiris
 src/exporting/ @thiagoftsm
 src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris
+src/nrpc/ @thiagoftsm @vkalintiris
 docs/ @Ancairon @kanelatechnical
 src/go/ @ilyam8
 src/health/ @thiagoftsm @vkalintiris

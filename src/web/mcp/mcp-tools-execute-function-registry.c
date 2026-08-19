@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mcp-tools-execute-function-registry.h"
-#include "database/nrpc.h"
+#include "nrpc/nrpc.h"
 
 // Parameter type string mappings
 ENUM_STR_MAP_DEFINE(MCP_REQUIRED_PARAMS_TYPE) = {

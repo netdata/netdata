@@ -4,7 +4,7 @@
 #define NETDATA_PLUGINSD_FUNCTIONS_H
 
 #include "pluginsd_internals.h"
-#include "database/nrpc-transport.h"
+#include "nrpc/nrpc-transport.h"
 
 struct pluginsd_call {
     nd_uuid_t transaction;

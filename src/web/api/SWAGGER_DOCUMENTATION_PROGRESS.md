@@ -2651,7 +2651,7 @@ Per dimension:
 **Source Code Locations:**
 - Registration: `src/web/api/web_api_v3.c:112-118`
 - Implementation: `src/web/api/v1/api_v1_function.c:29-226`
-- Function Execution: `src/database/nrpc-calls.c`
+- Function Execution: `src/nrpc/nrpc-calls.c`
 
 **Security Configuration:**
 - ACL: `HTTP_ACL_FUNCTIONS` - Requires function execution permission
@@ -4158,7 +4158,7 @@ Response structure is determined dynamically by the weights engine based on the 
 **Source Code Locations:**
 - Registration: `src/web/api/web_api_v1.c:118-125`
 - Implementation: `src/web/api/v1/api_v1_functions.c:5-19`
-- Response Generator: `src/database/nrpc-catalog.c:95-127`
+- Response Generator: `src/nrpc/nrpc-catalog.c:95-127`
 
 **Security Configuration:**
 - ACL: `HTTP_ACL_FUNCTIONS`

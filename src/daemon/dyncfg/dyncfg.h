@@ -5,7 +5,7 @@
 
 #include "../common.h"
 #include "database/rrd.h"
-#include "database/nrpc.h"
+#include "nrpc/nrpc.h"
 
 #define DYNCFG_FUNCTIONS_VERSION 0
 

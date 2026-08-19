@@ -4,7 +4,7 @@
 #include "mcp-tools-execute-function-internal.h"
 #include "mcp-tools-execute-function-registry.h"
 #include "mcp-params.h"
-#include "database/nrpc.h"
+#include "nrpc/nrpc.h"
 
 // Analyze the JSON response and determine its type
 MCP_FUNCTION_TYPE mcp_functions_analyze_response(struct json_object *json_obj, int *out_status) {

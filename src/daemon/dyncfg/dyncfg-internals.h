@@ -5,7 +5,7 @@
 
 #include "../common.h"
 #include "database/rrd.h"
-#include "database/nrpc.h"
+#include "nrpc/nrpc.h"
 
 typedef struct dyncfg {
     ND_UUID host_uuid;

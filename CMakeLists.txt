@@ -1755,6 +1755,23 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_replication.h
 )
 
+set(NRPC_FILES
+        src/nrpc/nrpc.h
+        src/nrpc/nrpc-internals.h
+        src/nrpc/nrpc-builtin.c
+        src/nrpc/nrpc-builtin.h
+        src/nrpc/nrpc-calls.c
+        src/nrpc/nrpc-calls.h
+        src/nrpc/nrpc-catalog.c
+        src/nrpc/nrpc-catalog.h
+        src/nrpc/nrpc-registry.c
+        src/nrpc/nrpc-serving.c
+        src/nrpc/nrpc-serving.h
+        src/nrpc/nrpc-serving-internals.h
+        src/nrpc/nrpc-transport.h
+        src/nrpc/nrpc-unittest.c
+)
+
 set(RRD_PLUGIN_FILES
         src/database/contexts/api_v1_contexts.c
         src/database/contexts/api_v2_contexts.c
@@ -1773,13 +1790,7 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
         src/database/contexts/rrdcontext-worker.c
-        src/database/nrpc-serving.c
-        src/database/nrpc-serving.h
         src/database/rrddim.c
-        src/database/nrpc-registry.c
-        src/database/nrpc.h
-        src/database/nrpc-builtin.c
-        src/database/nrpc-builtin.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
@@ -1813,14 +1824,6 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_alert.h
         src/web/api/queries/KolmogorovSmirnovDist.c
         src/web/api/queries/KolmogorovSmirnovDist.h
-        src/database/nrpc-calls.c
-        src/database/nrpc-calls.h
-        src/database/nrpc-catalog.c
-        src/database/nrpc-catalog.h
-        src/database/nrpc-unittest.c
-        src/database/nrpc-internals.h
-        src/database/nrpc-serving-internals.h
-        src/database/nrpc-transport.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
@@ -2303,6 +2306,7 @@ set(NETDATA_FILES
         ${IDLEJITTER_PLUGIN_FILES}
         ${ML_FILES}
         ${PLUGINSD_PLUGIN_FILES}
+        ${NRPC_FILES}
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
