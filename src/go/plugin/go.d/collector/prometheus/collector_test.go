@@ -1890,6 +1890,101 @@ func TestCollector_CephNVMeoFAlertBoundaries(t *testing.T) {
 	}
 }
 
+func TestCollector_CephRGWAlertChartsMaterialize(t *testing.T) {
+	input, err := os.ReadFile(promtestutil.Require(t,
+		"prometheus/profiles/ceph/fixtures/ceph_reef_ceph_exporter_limit11.prom"))
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(input)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	defer collr.Cleanup(context.Background())
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+
+	created := make(map[string]int)
+	for _, action := range plan.Actions {
+		if create, ok := action.(chartengine.CreateChartAction); ok {
+			created[create.Meta.Context]++
+		}
+	}
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.notifications.events"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.notifications.missing_configurations"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.lua.script_executions"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.requests_and_queue.failed_requests"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.notifications.failure_outcomes"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.notifications.pending_events"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.notifications.event_state"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway.requests_and_queue.current_requests"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway_multisite.object_work"])
+	require.Equal(t, 1, created["prometheus.ceph.object_gateway_multisite.replication_log_request_errors"])
+}
+
+func TestCollector_CephRGWAlertBoundaries(t *testing.T) {
+	templates := cephHealthAlertTemplates(t)
+	want := map[string]struct {
+		lookup    string
+		condition string
+	}{
+		"rgw_notification_event_lost":             {"min -1m unaligned of event_lost", "crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
+		"rgw_notification_missing_configuration":  {"min -1m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
+		"rgw_lua_script_failed":                   {"min -1m unaligned of failure", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
+		"rgw_failed_request_rate_fallback":        {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
+		"rgw_notification_push_or_store_failures": {"min -5m unaligned of push_failed,store_fail", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
+		"rgw_notification_inflight_pressure":      {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)"},
+		"rgw_notification_store_backlog":          {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)"},
+		"rgw_request_queue_pressure":              {"min -5m unaligned of qlen", "warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)"},
+		"rgw_multisite_fetch_errors":              {"min -5m unaligned of errors", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
+		"rgw_multisite_poll_errors":               {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
+	}
+	for name, expected := range want {
+		t.Run(name, func(t *testing.T) {
+			block, ok := templates[name]
+			require.Truef(t, ok, "template %s is absent", name)
+			assert.Equal(t, expected.lookup, block["lookup"])
+			assert.Equal(t, expected.condition, block["condition"])
+			assert.Equal(t, "silent", block["to"])
+		})
+	}
+
+	// min is the all-observed-samples time grouping: one recovery sample clears
+	// the rule even when earlier samples in the same window were active.
+	allSamples := func(samples []float64) float64 {
+		if len(samples) == 0 {
+			return math.NaN()
+		}
+		minimum := samples[0]
+		for _, sample := range samples[1:] {
+			if sample < minimum {
+				minimum = sample
+			}
+		}
+		return minimum
+	}
+	assert.InDelta(t, 0, allSamples([]float64{.1, 0, 0}), 1e-12)
+	assert.InDelta(t, 999, allSamples([]float64{1001, 1000, 999}), 1e-12)
+	assert.True(t, math.IsNaN(allSamples(nil)))
+}
+
 func TestCollector_CephMGRAlertContract(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	templates := cephHealthAlertTemplates(t)
@@ -1932,10 +2027,34 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		"CEPH-082-HELPER-READ-OPS", "CEPH-083", "CEPH-083-HELPER-WRITE-TIME", "CEPH-083-HELPER-WRITE-OPS",
 		"CEPH-084", "CEPH-092", "CEPH-094", "CEPH-094-HELPER-GATEWAY",
 	}, cephManifestSOWIDs(manifest.Alerts))
-	require.ElementsMatch(t, []string{"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02"},
-		cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
+	require.ElementsMatch(t, []string{
+		"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02", "RGW-M-08", "RGW-M-09", "RGW-M-10",
+		"RGW-S-04", "RGW-S-12", "RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20", "RGW-S-20",
+		"RGW-M-03", "RGW-M-04", "RGW-S-01", "RGW-S-02", "RGW-S-03", "RGW-S-09", "RGW-S-13", "RGW-S-14",
+		"RGW-S-15",
+	}, cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
 	for name, extension := range manifest.NetdataExtensions {
 		require.NotEmptyf(t, extension.Reason, "%s has no extension rationale", name)
+		if extension.Fidelity == "UNSUPPORTED" {
+			require.Empty(t, extension.Context)
+			require.NotContains(t, templates, name)
+			continue
+		}
+		block, hasTemplate := templates[name]
+		if hasTemplate && extension.Condition != "" {
+			require.NotEmpty(t, extension.Context)
+			assert.Equal(t, extension.Context, block["on"])
+			assert.Equal(t, extension.Lookup, block["lookup"])
+			assert.Equal(t, extension.Calc, block["calc"])
+			assert.Equal(t, extension.Units, block["units"])
+			assert.Equal(t, extension.Condition, block["condition"])
+			assert.Equal(t, extension.Recipient, block["to"])
+		} else {
+			require.Empty(t, extension.Lookup)
+			require.Empty(t, extension.Calc)
+			require.Empty(t, extension.Condition)
+			require.Empty(t, extension.Recipient)
+		}
 		require.NotEmptyf(t, extension.Fidelity, "%s has no extension fidelity", name)
 		require.NotEmptyf(t, extension.Owner, "%s has no extension owner", name)
 		if extension.Adaptation != "" {
@@ -2063,6 +2182,72 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 	assert.Equal(t, manifest.NetdataExtensions["ceph_component_collection_failed"].Context,
 		templates["ceph_component_collection_failed"]["on"])
 	assert.NotContains(t, templates, "ceph_mgr_prometheus_module_inactive")
+}
+
+func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
+	var metadata struct {
+		Modules []struct {
+			Setup struct {
+				Configuration struct {
+					Examples struct {
+						List []struct {
+							Name        string `yaml:"name"`
+							Description string `yaml:"description"`
+							Config      string `yaml:"config"`
+						} `yaml:"list"`
+					} `yaml:"examples"`
+				} `yaml:"configuration"`
+			} `yaml:"setup"`
+		} `yaml:"modules"`
+	}
+
+	for _, tc := range []struct {
+		module   string
+		example  string
+		contains string
+	}{
+		{module: "httpcheck", example: "Ceph RGW endpoint liveness", contains: "ceph-rgw-local"},
+		{module: "x509check", example: "Ceph RGW certificate", contains: "ceph_rgw_cert"},
+		{module: "weblog", example: "Ceph RGW access log", contains: "custom_numeric_fields"},
+	} {
+		t.Run(tc.module, func(t *testing.T) {
+			content, err := os.ReadFile(filepath.Join("..", tc.module, "metadata.yaml"))
+			require.NoError(t, err)
+
+			require.NoError(t, yaml.Unmarshal(content, &metadata))
+			require.NotEmpty(t, metadata.Modules)
+
+			found := false
+			for _, module := range metadata.Modules {
+				for _, example := range module.Setup.Configuration.Examples.List {
+					if example.Name != tc.example {
+						continue
+					}
+					found = true
+					assert.Contains(t, example.Config, tc.contains)
+					assert.Contains(t, example.Description, "Ceph RGW")
+					if tc.module == "x509check" {
+						assert.Contains(t, example.Config, "check_revocation_status: yes")
+					}
+				}
+			}
+			require.Truef(t, found, "%s example %q not found", tc.module, tc.example)
+		})
+	}
+
+	manifest := loadCephAlertManifest(t)
+	require.Equal(t, "x509check.revocation_status", manifest.NetdataExtensions["rgw_tls_certificate_revoked"].Context)
+	require.Equal(t, "httpcheck.status", manifest.NetdataExtensions["rgw_basic_endpoint_unavailable"].Context)
+	require.Equal(t,
+		"web_log.custom_numeric_field_total_time_summary",
+		manifest.NetdataExtensions["rgw_overall_request_latency"].Context)
+
+	x509Templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "x509check.conf"))
+	require.Equal(t, "x509check.revocation_status", x509Templates["x509check_revocation_status"]["on"])
+	httpcheckTemplates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "httpcheck.conf"))
+	require.Equal(t, "httpcheck.status", httpcheckTemplates["httpcheck_web_service_up"]["on"])
+	weblogTemplates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "web_log.conf"))
+	require.Equal(t, "web_log.request_processing_time", weblogTemplates["web_log_web_slow"]["on"])
 }
 
 func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
@@ -2458,6 +2643,11 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 		}
 	}
 	expected["ceph_unknown_health_check"] = manifest.NetdataExtensions["ceph_unknown_health_check"].Context
+	for name, extension := range manifest.NetdataExtensions {
+		if extension.Context != "" && extension.Condition != "" {
+			expected[name] = extension.Context
+		}
+	}
 	assert.Equal(t, expected, actual)
 	for name, metadataInfo := range info {
 		if name == "ceph_unknown_health_check" {
@@ -2502,6 +2692,7 @@ type cephNetdataExtension struct {
 	Context      string `yaml:"context"`
 	LabelsPolicy string `yaml:"labels_policy"`
 	Lookup       string `yaml:"lookup"`
+	Calc         string `yaml:"calc"`
 	Units        string `yaml:"units"`
 	Condition    string `yaml:"condition"`
 	Recipient    string `yaml:"recipient"`

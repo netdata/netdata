@@ -4685,6 +4685,46 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.gateways.namespace_count
         info: 'The current local exporter namespace inventory is at or above the supported maximum of 4096.'
+      - name: rgw_notification_event_lost
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.events
+        info: 'Every available sample in the 1-minute observation window reports a non-zero final notification-event loss rate.'
+      - name: rgw_notification_missing_configuration
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.missing_configurations
+        info: 'Every available sample in the 1-minute observation window reports a non-zero notification missing-configuration rate.'
+      - name: rgw_lua_script_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.lua.script_executions
+        info: 'Every available sample in the 1-minute observation window reports a non-zero Lua script failure rate.'
+      - name: rgw_failed_request_rate_fallback
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.requests_and_queue.failed_requests
+        info: 'Every available sample in the 5-minute observation window reports a non-zero aborted-request rate. This is a fallback signal and does not identify HTTP 5xx responses.'
+      - name: rgw_notification_push_or_store_failures
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.failure_outcomes
+        info: 'Every available sample in the 5-minute observation window reports non-zero retryable notification push or store failures.'
+      - name: rgw_notification_inflight_pressure
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.pending_events
+        info: 'Every available sample in the 5-minute observation window reports at least 1000 notification events pending endpoint reply. Tune this policy threshold for the endpoint.'
+      - name: rgw_notification_store_backlog
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.event_state
+        info: 'Every available sample in the 5-minute observation window reports at least 1000 events stored in the persistent notification store. Tune this policy threshold for the workload.'
+      - name: rgw_request_queue_pressure
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.requests_and_queue.current_requests
+        info: 'Every available sample in the 5-minute observation window reports at least 1000 queued requests. Tune this policy threshold for the RGW instance.'
+      - name: rgw_multisite_fetch_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway_multisite.object_work
+        info: 'Every available sample in the 5-minute observation window reports a non-zero multisite data-fetch error rate.'
+      - name: rgw_multisite_poll_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway_multisite.replication_log_request_errors
+        info: 'Every available sample in the 5-minute observation window reports a non-zero replication-log poll error rate.'
       - name: ceph_health_error
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.cluster_status.state

@@ -73,6 +73,28 @@ adaptation_contracts:
       - aggregation remains inside one exporter endpoint instead of combining gateways across a cluster
       - the compound count-versus-limit condition is evaluated from current stored dimensions; the source one-minute
         persistence window is not represented because a health lookup cannot persist this cross-dimension comparison
+  rgw_counter_rate_window:
+    preserved:
+      - source counter population and threshold direction
+      - recovery when no new source failures occur
+    differences:
+      - the health lookup evaluates the rendered counter rate over an observation window rather than treating the lifetime
+        cumulative total as currently active
+      - partial collection gaps do not reset the observation window
+  rgw_policy_pressure_window:
+    preserved:
+      - current source population and affected RGW instance identity
+      - silent-by-default policy
+    differences:
+      - the numeric threshold is a local operator policy rather than a source-provided limit
+      - the observation window uses every available sample and must be tuned with the endpoint or workload
+  rgw_multisite_retry_window:
+    preserved:
+      - affected source-zone-optional identity and error population
+      - retryable error classification
+    differences:
+      - a sustained non-zero rendered rate is required so isolated retries do not page
+      - source persistence timing is approximated with the observation window
   observed_binary_window:
     preserved:
       - source incident and predicate
@@ -2474,29 +2496,262 @@ alerts:
       adaptation: local_nvmeof_inventory_limit
 
 netdata_extensions:
+  rgw_tls_certificate_revoked:
+    sow_id: RGW-M-03
+    reason: revoked TLS certificates are owned by x509check when the RGW certificate endpoint
+      is explicitly configured and revocation checking is enabled
+    fidelity: CORRECTED-INTENT
+    owner: x509check
+    context: x509check.revocation_status
+
+  rgw_basic_endpoint_unavailable:
+    sow_id: RGW-M-04
+    reason: basic HTTP liveness is owned by httpcheck; this does not verify authenticated
+      S3 correctness
+    fidelity: CORRECTED-INTENT
+    owner: httpcheck
+    context: httpcheck.status
+
+  rgw_tls_certificate_expiring:
+    sow_id: RGW-S-01
+    reason: TLS lead-time policy is owned by x509check
+    fidelity: CORRECTED-INTENT
+    owner: x509check
+    context: x509check.time_until_expiration
+
+  rgw_http_5xx_rate:
+    sow_id: RGW-S-02
+    reason: server-error rate and error-budget policy are owned by web_log when complete
+      RGW access logs are configured
+    fidelity: CORRECTED-INTENT
+    owner: weblog
+    context: web_log.type_requests
+
+  rgw_http_4xx_rate:
+    sow_id: RGW-S-03
+    reason: client-error rate and policy are owned by web_log when complete RGW access
+      logs are configured
+    fidelity: CORRECTED-INTENT
+    owner: weblog
+    context: web_log.type_requests
+
+  rgw_overall_request_latency:
+    sow_id: RGW-S-09
+    reason: overall request latency is measured from the configured RGW access log total_time
+      numeric field
+    fidelity: CORRECTED-INTENT
+    owner: weblog
+    context: web_log.custom_numeric_field_total_time_summary
+
+  rgw_request_volume_change:
+    sow_id: RGW-S-13
+    reason: request volume anomalies are owned by web_log anomaly policies when complete
+      access logs are configured
+    fidelity: CORRECTED-INTENT
+    owner: weblog
+    context: web_log.type_requests
+
+  rgw_operation_throughput_anomaly:
+    sow_id: RGW-S-14
+    reason: aggregate GET/PUT request charts support Netdata anomaly detection without
+      a fixed throughput threshold
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.requests_and_queue.requests
+
+  rgw_selected_user_or_bucket_anomaly:
+    sow_id: RGW-S-15
+    reason: selected tenant/user/bucket detail requires an operator-enabled source-backed
+      companion; no active high-cardinality stock profile is enabled
+    fidelity: UNSUPPORTED
+    owner: none
+
+  rgw_notification_event_lost:
+    sow_id: RGW-M-08
+    reason: final notification event loss detected by aggregate counter rate
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.notifications.events
+    labels_policy: none
+    lookup: min -1m unaligned of event_lost
+    calc: ''
+    units: events/s
+    condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: rgw_counter_rate_window
+
+  rgw_notification_missing_configuration:
+    sow_id: RGW-M-09
+    reason: notification missing-configuration failure detected by aggregate counter rate
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.notifications.missing_configurations
+    labels_policy: none
+    lookup: min -1m unaligned of value
+    calc: ''
+    units: events/s
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: rgw_counter_rate_window
+
+  rgw_lua_script_failed:
+    sow_id: RGW-M-10
+    reason: Lua request script failure detected by aggregate counter rate
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.lua.script_executions
+    labels_policy: none
+    lookup: min -1m unaligned of failure
+    calc: ''
+    units: executions/s
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: rgw_counter_rate_window
+
+  rgw_failed_request_rate_fallback:
+    sow_id: RGW-S-04
+    reason: aborted-request fallback counter detects request failures when complete access
+      logs are absent
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.requests_and_queue.failed_requests
+    labels_policy: none
+    lookup: min -5m unaligned of value
+    calc: ''
+    units: requests/s
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: rgw_counter_rate_window
+
+  rgw_notification_push_or_store_failures:
+    sow_id: RGW-S-16
+    reason: retryable notification push/store failure rate detected separately from final
+      event loss
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.notifications.failure_outcomes
+    labels_policy: none
+    lookup: min -5m unaligned of push_failed,store_fail
+    calc: ''
+    units: events/s
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: rgw_counter_rate_window
+
+  rgw_notification_inflight_pressure:
+    sow_id: RGW-S-17
+    reason: operator policy for sustained notification in-flight pressure
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.notifications.pending_events
+    labels_policy: none
+    lookup: min -5m unaligned of value
+    calc: ''
+    units: events
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)'
+    recipient: silent
+    adaptation: rgw_policy_pressure_window
+
+  rgw_notification_store_backlog:
+    sow_id: RGW-S-18
+    reason: operator policy for sustained persistent notification store backlog
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.notifications.event_state
+    labels_policy: none
+    lookup: min -5m unaligned of value
+    calc: ''
+    units: events
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)'
+    recipient: silent
+    adaptation: rgw_policy_pressure_window
+
+  rgw_request_queue_pressure:
+    sow_id: RGW-S-12
+    reason: operator policy for sustained RGW request queue pressure
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway.requests_and_queue.current_requests
+    labels_policy: none
+    lookup: min -5m unaligned of qlen
+    calc: ''
+    units: requests
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)'
+    recipient: silent
+    adaptation: rgw_policy_pressure_window
+
+  rgw_multisite_fetch_errors:
+    sow_id: RGW-S-20
+    reason: sustained multisite fetch error rate
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway_multisite.object_work
+    labels_policy: none
+    lookup: min -5m unaligned of errors
+    calc: ''
+    units: objects/s
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: rgw_multisite_retry_window
+
+  rgw_multisite_poll_errors:
+    sow_id: RGW-S-20
+    reason: sustained replication-log poll error rate
+    fidelity: NETDATA-ADAPTED
+    owner: mgr_prometheus
+    context: prometheus.ceph.object_gateway_multisite.replication_log_request_errors
+    labels_policy: none
+    lookup: min -5m unaligned of value
+    calc: ''
+    units: requests/s
+    condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+    recipient: silent
+    adaptation: rgw_multisite_retry_window
+
+  rgw_persistent_topic_backlog:
+    sow_id: RGW-S-19
+    reason: No source-complete per-topic Prometheus numeric family exists; topic APIs
+      and persistent-topic dumps are not numeric exporter telemetry.
+    fidelity: UNSUPPORTED
+    owner: none
+    context: ''
+    labels_policy: none
+    lookup: ''
+    calc: ''
+    units: ''
+    condition: ''
+    recipient: ''
+    adaptation: rejected_rule
+
   ceph_unknown_health_check:
     sow_id: CEPH-ND-001
-    reason: forward-compatible warning for ordinary Ceph health-detail names without a dedicated rule
+    reason: forward-compatible warning for ordinary Ceph health-detail names without a
+      dedicated rule
     fidelity: NETDATA-ADAPTED
     owner: mgr_prometheus
     context: prometheus.ceph.health.health_checks.state
-    labels_policy: exclude every supported named health code and main-only certificate code, then match all remaining names
+    labels_policy: exclude every supported named health code and main-only certificate
+      code, then match all remaining names
     lookup: min -1m unaligned of value
     units: status
     condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
     recipient: silent
     adaptation: observed_binary_window
+
   ceph_component_collection_failed:
     sow_id: CEPH-ND-002
     reason: native Dashboard API component-integrity owner retained without an MGR duplicate
     fidelity: NETDATA-ADAPTED
     owner: native_ceph_dashboard
     context: ceph.component_collection_status
+
   rgw_daemon_failed:
     sow_id: RGW-M-01
-    reason: existing Cephadm and recent-crash health checks already identify failed RGW daemons
+    reason: existing Cephadm and recent-crash health checks already identify failed RGW
+      daemons
     fidelity: CORRECTED-INTENT
     owner: mgr_prometheus
+
   rgw_telemetry_missing:
     sow_id: RGW-M-02
     reason: generic configured-job collection health owns missing metric telemetry

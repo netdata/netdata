@@ -297,7 +297,23 @@ modules:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: Ceph RGW access log
+              description: Parse a Ceph RGW access log and expose its numeric total_time field explicitly as milliseconds.
+              config: |
+                jobs:
+                  - name: ceph_rgw_access_log
+                    path: /var/log/ceph/rgw/access.log
+                    log_type: json
+                    json_config:
+                      mapping:
+                        remote_addr: remote_addr
+                        uri: request
+                        http_status: status
+                        bytes_sent: bytes_sent
+                    custom_numeric_fields:
+                      - name: total_time
+                        units: milliseconds
     troubleshooting:
       problems:
         list:
