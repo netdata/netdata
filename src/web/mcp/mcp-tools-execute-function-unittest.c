@@ -2,7 +2,7 @@
 
 #include "mcp-tools-execute-function.h"
 #include "mcp-tools-execute-function-registry.h"
-#include "nrpc/nrpc-builtin.h"
+#include "nrpc/nrpc.h"
 
 // ----------------------------------------------------------------------------
 // Regression test for GHSA-6628-vxm3-4g8g.

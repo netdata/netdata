@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "nrpc-serving.h"
 #include "nrpc-serving-internals.h"
 #include "nrpc-lifetime.h"
 

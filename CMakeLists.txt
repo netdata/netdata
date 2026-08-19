@@ -1760,14 +1760,10 @@ set(NRPC_FILES
         src/nrpc/nrpc-internals.h
         src/nrpc/nrpc-lifetime.h
         src/nrpc/nrpc-builtin.c
-        src/nrpc/nrpc-builtin.h
         src/nrpc/nrpc-calls.c
-        src/nrpc/nrpc-calls.h
         src/nrpc/nrpc-catalog.c
-        src/nrpc/nrpc-catalog.h
         src/nrpc/nrpc-registry.c
         src/nrpc/nrpc-serving.c
-        src/nrpc/nrpc-serving.h
         src/nrpc/nrpc-serving-internals.h
         src/nrpc/nrpc-transport.h
         src/nrpc/nrpc-unittest.c

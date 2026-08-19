@@ -6,7 +6,6 @@
 
 #include "nrpc-serving-internals.h"
 #include "nrpc-internals.h"
-#include "nrpc-calls.h"
 
 // bytes currently held by call-related BUFFERs (charged atomically by the
 // buffer code via the pointer handed to buffer_create); the daemon's pulse

@@ -161,19 +161,22 @@ now.
 
 ## File map
 
-Reading order — each file leans only on the ones above it:
+Reading order — conceptual, the glossary and model before the mechanics
+(the two `-internals` headers and the transport are included by files
+listed above them):
 
 | File | Owns |
 |---|---|
-| `nrpc.h` | public API, concept glossary, the owner contract |
+| `nrpc.h` | the whole public API in one document (plus the transport header it includes for you): concept glossary, owner contract, registration, calls, serving threads, builtins, the catalog |
 | `nrpc-lifetime.h` | the two-counter lifetime shell — the vocabulary every teardown uses |
-| `nrpc-transport.h` | the transport: that shell plus the owner's payload |
-| `nrpc-serving.c` (+ its headers) | the serving handle: a registering thread's liveness token |
+| `nrpc-transport.h` | the transport: that shell plus the owner's payload (separate because it is legitimately included on its own) |
 | `nrpc-internals.h` | the internal contract: registry entry, gate, slot/descriptor model, registries index |
+| `nrpc-serving-internals.h` | the serving handle's internal surface (kept tiny so the implementation stays a leaf) |
 | `nrpc-registry.c` | registries index, descriptor lifecycle, register/unregister/find/availability |
 | `nrpc-calls.c` | in-flight calls table, authorization, the three execution modes, cancel/progress |
-| `nrpc-catalog.c` (+ header) | every consumer that iterates the registry: streaming re-list, JSON, dict export, cloud manifest, pending FUNCTION_DELs |
-| `nrpc-builtin.c` (+ header) | the thin adapter for daemon-implemented synchronous methods |
+| `nrpc-catalog.c` | every consumer that iterates the registry: streaming re-list, JSON, dict export, cloud manifest, pending FUNCTION_DELs |
+| `nrpc-serving.c` | the serving handle: a registering thread's liveness token |
+| `nrpc-builtin.c` | the thin adapter for daemon-implemented synchronous methods |
 | `nrpc-unittest.c` | the executable contract suite — the suite headers are prose documentation of what the component promises |
 
 Task index:

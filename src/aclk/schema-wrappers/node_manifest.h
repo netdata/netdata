@@ -18,7 +18,7 @@ struct update_node_instance_manifest {
     struct timeval updated_at;
 
     // dictionary keyed by function name -> struct nrpc_manifest_entry
-    // (see nrpc/nrpc-catalog.h, built by nrpc_catalog_manifest_dict())
+    // built by nrpc_catalog_manifest_dict()
     DICTIONARY *functions;
 };
 

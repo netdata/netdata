@@ -5,7 +5,6 @@
 // and the cloud node-instance manifest.
 
 #include "nrpc-internals.h"
-#include "nrpc-catalog.h"
 
 // ----------------------------------------------------------------------------
 // the iteration core
