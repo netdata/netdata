@@ -6,17 +6,24 @@
 #include "libnetdata/libnetdata.h"
 
 // The lifetime shell shared by the nRPC objects that outlive their creator:
-// the serving handle (nrpc-serving.c) and the transport (nrpc-transport.h).
-// Both had this shape written out separately; this is the one copy.
+// the serving handle, the transport, and the registry entry's operation
+// gate. The first two use the full shell; the registry entry uses only the
+// dispatcher half - its struct memory is pinned by dictionary item refcounts
+// instead of entry refs, so the three teardown steps below do not apply to
+// it (its own field comment carries that story).
+//
+// Every "gate" in this component IS this dispatcher counter - the registry's
+// operation gate, the serving handle's cancel/progress dispatch gate, the
+// transport's send gate; only the object being gated differs.
 //
 // Two counters, because they answer two different questions:
 //
-// - entry refs: one per party that STORES the object - registry entries,
+// - entry refs: one per party that STORES the object - method descriptors,
 //   in-flight-call hook pins, the dyncfg pin, the lookup-time pin - plus the
 //   BASE ref the creator holds. The object is freed when this reaches zero,
-//   which may be long after the creator died (normal for streaming: registry
-//   entries survive a disconnect). So nothing reachable through an entry ref
-//   alone may touch creator-owned memory.
+//   which may be long after the creator died (normal for streaming:
+//   registered methods survive a disconnect). So nothing reachable through
+//   an entry ref alone may touch creator-owned memory.
 //
 // - dispatcher refs: transient, taken around every USE, acquire-or-fail.
 //   The deletion mark on this counter IS the liveness gate - once retire()
@@ -24,7 +31,8 @@
 //   dispatcher ref is therefore the proof that the creator's memory is still
 //   valid for as long as the ref is held.
 //
-// Teardown is always the same three steps, in this order:
+// For the full-shell users, teardown is always the same three steps, in
+// this order:
 //   1. retire()          - mark dead and drain the dispatchers
 //   2. invalidate whatever the creator owned (it is now unreachable)
 //   3. entry_release()   - drop the base ref; the last holder frees the object

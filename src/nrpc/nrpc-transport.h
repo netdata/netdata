@@ -12,7 +12,7 @@
 // dereferencing it after death.
 //
 // The two-counter model, the teardown order and the reason `data` may only be
-// touched under a dispatcher ref are all documented once in nrpc-lifetime.h;
+// touched under a dispatcher ref are all documented once on NRPC_LIFETIME;
 // this is that shell plus the owner's payload.
 //
 // The owner's teardown is the canonical three steps: mark_dead_and_drain(),
@@ -29,7 +29,7 @@ struct nrpc_transport {
 };
 
 static inline struct nrpc_transport *nrpc_transport_create(void *data) {
-    // explicit cast: this header reaches C++ TUs through the nrpc.h umbrella
+    // explicit cast: this header reaches C++ TUs through the umbrella header
     struct nrpc_transport *t = (struct nrpc_transport *)callocz(1, sizeof(struct nrpc_transport));
     nrpc_lifetime_init(&t->lifetime);
     t->data = data;
@@ -61,8 +61,9 @@ static inline void nrpc_transport_dispatcher_release(struct nrpc_transport *t) {
     nrpc_lifetime_dispatcher_release(&t->lifetime);
 }
 
-// owner teardown, step 1: after this returns, no dispatcher holds or can
-// acquire the transport, so `data` may be freed by the owner
+// owner teardown, step 1 (the retire() of the canonical NRPC_LIFETIME
+// steps): after this returns, no dispatcher holds or can acquire the
+// transport, so `data` may be freed by the owner
 static inline void nrpc_transport_mark_dead_and_drain(struct nrpc_transport *t) {
     nrpc_lifetime_retire(&t->lifetime);
 }

@@ -11,8 +11,16 @@
 
 // The per-host function registry: the value of one entry of the
 // component-global registries index (see nrpc_registry_acquire), keyed by the
-// owning host OBJECT. It owns the definitions dictionary; everything it may
-// need from its owner lives in the embedded owner vtable, written only under
+// owning host OBJECT.
+//
+// Vocabulary used throughout: OUTER = that component-global index
+// (owner -> registry); INNER = this registry's own dictionaries (`dict`,
+// name -> slot, and `pending_dels.dict`). An "outer handle" is an acquired
+// item of the outer index: it pins this struct's memory, but NOT the
+// dictionaries it points to - that is the gate's job (the lifetime field).
+//
+// The registry owns the definitions dictionary; everything it may need from
+// its owner lives in the embedded owner vtable, written only under
 // owner_spinlock (init, DISARM) and snapshotted under the same lock by every
 // reader. A held outer HANDLE may outlive the entry (destroy unlinks the
 // entry while transient operations still hold handles): a path reached
@@ -47,42 +55,40 @@ struct nrpc_registry {
         bool (*wants_del_journal)(NRPC_OWNER id);
     } owner;
 
-    // The operation gate for the inner dictionaries below. Only the
-    // dispatcher half of the shell is used: the outer index's item refcounts
-    // already play the entry-ref role (a held outer handle is what pins this
-    // struct's memory - but NOT the objects it points to, which is exactly the
-    // gap this gate closes). Every public operation that reaches the inner
-    // dictionaries through an outer handle wraps its WHOLE inner-dictionary
-    // use in one dispatcher acquire-or-fail (nrpc_registry_dispatcher_acquire);
-    // a failed acquire is the ordinary "no live registry / not available"
-    // answer. nrpc_registry_destroy() retires the gate (mark dead + drain)
-    // after disarming and unlinking the entry, and only then destroys the
-    // inner dictionaries - so a reader that reached this struct through a
-    // handle acquired before the unlink can no longer be inside them, and can
-    // never enter them again.
+    // The operation GATE for the inner dictionaries below (only the
+    // dispatcher half of NRPC_LIFETIME is used - the outer index's item
+    // refcounts already play the entry-ref role):
     //
-    // Held descriptors are gate-independent by design: a held method
-    // (NRPC_METHOD_ACQUIRED, the call record's descriptor ref) is an owned
-    // reference to the immutable descriptor and releasing it touches no
-    // dictionary, so late releases (async completion, shutdown unwind) need
-    // no gate and can never be refused.
-    //
-    // INVARIANT: gated sections MUST NOT block indefinitely. Some destroy
-    // paths run under the rrd write lock
-    // (rrdhost_free___while_having_rrd_wrlock -> ... -> nrpc_registry_destroy)
-    // and the retire drain waits for every gated reader, so a gated section
-    // that blocks turns that wait into an agent-wide stall. No gated section
-    // takes an rrd lock today (in-gate owner access is limited to the
-    // owner_spinlock snapshots and the lock-free wants_del_journal callback;
-    // the changed callback fires outside the gate), so there is no lock cycle
-    // - keep it that way. Blocking includes I/O: logging inside gated
-    // sections stays level-filtered debug lines or rare warnings - a
-    // blocking log sink in a hot gated path would extend the drain.
+    // - What it closes: a held outer handle pins THIS STRUCT's memory, but
+    //   not the dictionaries it points to. The gate is what keeps them
+    //   alive while in use.
+    // - How it is taken: every public operation that reaches the inner
+    //   dictionaries through an outer handle wraps its WHOLE inner-
+    //   dictionary use in ONE dispatcher acquire-or-fail
+    //   (nrpc_registry_dispatcher_acquire); a failed acquire is the
+    //   ordinary "no live registry / not available" answer.
+    // - Teardown: nrpc_registry_destroy() disarms and unlinks the entry,
+    //   then retires the gate (mark dead + drain), and only then destroys
+    //   the inner dictionaries - a reader either finished before the drain
+    //   or can never enter again.
+    // - Exempt: held descriptors (NRPC_METHOD_ACQUIRED, the call record's
+    //   ref). Releasing one touches no dictionary, so late releases (async
+    //   completion, shutdown unwind) need no gate and can never be refused.
+    // - INVARIANT - gated sections MUST NOT block indefinitely: some
+    //   destroy paths run under the rrd write lock and the retire drain
+    //   waits for every gated reader, so a blocking gated section becomes
+    //   an agent-wide stall. No gated section takes an rrd lock (in-gate
+    //   owner access is limited to the owner_spinlock snapshots and the
+    //   lock-free wants_del_journal callback; the changed callback fires
+    //   outside the gate) - keep it that way. Blocking includes I/O:
+    //   logging in gated sections stays level-filtered debug lines or rare
+    //   warnings.
     NRPC_LIFETIME lifetime;
 
     DICTIONARY *dict;               // the function definitions, keyed by sanitized name
 
-    // Pending FUNCTION_DEL queue towards the parent. Deleters (any thread)
+    // Pending FUNCTION_DEL queue towards the parent (the owner callback
+    // name, wants_del_journal, refers to this same set). Deleters (any thread)
     // insert the sanitized name here BEFORE the owner's changed callback
     // updates the owner's changed flag; the streaming caller clears that flag
     // FIRST and the renderer then snapshots-and-clears this set under the
@@ -113,6 +119,10 @@ static inline void nrpc_owner_str(char out[NRPC_OWNER_KEY_LEN], NRPC_OWNER owner
 // callback swaps the slot's pointer as ONE unit - no field is ever mutated
 // in place, so a reader that pinned a descriptor reads it lock-free for as
 // long as it holds the ref, and there is nothing mutable left to race on.
+//
+// (Two "descriptor" nouns exist: struct nrpc_method_desc is the CALLER's
+// registration input, stack-filled and never stored; the DESCRIPTOR proper
+// is struct nrpc_method below, the immutable object built from it.)
 
 // One per registration event. IMMUTABLE after construction; refcounted.
 // Construction (nrpc_method_create) acquires everything the descriptor
@@ -158,7 +168,14 @@ struct nrpc_method {
 struct nrpc_method_slot {
     SPINLOCK spinlock;
     struct nrpc_method *method;
-    bool unregistered;              // the delete-window tombstone stays slot-side
+
+    // The delete-window TOMBSTONE: set by an unregister between its
+    // validation and its dictionary_del, cleared by any re-registration,
+    // read atomically with the pointer by nrpc_slot_acquire() - so lookups
+    // in that window answer "unregistered by the plugin" instead of using
+    // a dying entry. Slot-side, because it is a property of the NAME's
+    // current lifecycle, not of any one registration.
+    bool unregistered;
 };
 
 // Safe ONLY while another ref provably pins the descriptor - the slot's own
@@ -172,7 +189,7 @@ static inline void nrpc_method_acquire(struct nrpc_method *method) {
         fatal("NRPC: method descriptor acquire on a corrupted refcount");
 }
 
-// drops one ref; the last holder runs the destructor (nrpc-registry.c)
+// drops one ref; the last holder runs the destructor
 void nrpc_method_release(struct nrpc_method *method);
 
 // Pin the slot's current descriptor. The returned ref is the caller's to
@@ -202,7 +219,7 @@ static inline struct nrpc_method *nrpc_slot_swap(struct nrpc_method_slot *slot, 
 }
 
 // does the registration source store a transport in handler_data?
-// (INTERNAL data is caller-owned and never a transport)
+// (DAEMON-source data is caller-owned and never a transport)
 static inline bool nrpc_source_has_transport(NRPC_SOURCE source) {
     return source == NRPC_SOURCE_PLUGIN || source == NRPC_SOURCE_STREAM;
 }
@@ -238,19 +255,15 @@ static inline size_t nrpc_strlen_bounded(const char *s, size_t max) {
 //   "<real-function> <15KB of junk>" still resolves, and the WHOLE sanitized
 //   command is then forwarded to the plugin as its function argument. Keeping
 //   it under MAX_FUNCTION_LENGTH is what leaves the 512 bytes that constant
-//   reserves for the rest of the FUNCTION line. This is hardening, not a fix
-//   for an observed failure - forwarding a maximal name was attempted against
-//   a real plugin at several lengths and the plugin survived every time - but
-//   the plugin's line reader does give up and exit its process on a line it
-//   cannot terminate, so staying inside the documented budget is cheap
-//   insurance.
+//   reserves for the rest of the FUNCTION line - the plugin's line reader
+//   gives up and exits its process on a line it cannot terminate, so
+//   staying inside the documented budget is cheap insurance.
 //
 // - the destination is sized for the sanitizer's worst-case GROWTH, not for
 //   the input length. text_sanitize() hex-encodes each byte of an invalid
-//   UTF-8 sequence into two characters, so output can be twice the input.
-//   Sizing on the input alone would truncate expansion the fixed-size buffer
-//   this replaced had room for - and a truncated command can resolve to a
-//   DIFFERENT function than the caller named.
+//   UTF-8 sequence into two characters, so output can be twice the input -
+//   and a command truncated mid-expansion can resolve to a DIFFERENT
+//   function than the caller named.
 static inline char *nrpc_sanitize_name_dupz(const char *src) {
     if(!src) src = "";
 

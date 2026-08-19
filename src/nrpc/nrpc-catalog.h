@@ -23,10 +23,10 @@ typedef enum {
                                             //   (the return value) for dyncfg_add_streaming()
 } NRPC_CATALOG_FILTER;
 
-// The view handed to the callback. help/tags are BORROWED from the visited
-// entry's pinned immutable descriptor - valid only for the duration of the
-// callback (the pin is dropped when the visit ends), so a callback that
-// keeps them must copy.
+// The view handed to the callback. name, help and tags are ALL borrowed -
+// help/tags from the visited entry's pinned immutable descriptor, name from
+// the traversal - and are valid only for the duration of the callback, so a
+// callback that keeps any of them must copy.
 struct nrpc_method_view {
     const char *name;
     const char *help;

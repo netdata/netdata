@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Method definitions: the component-global registries index, per-owner
+// registry entries and their teardown, the descriptor lifecycle, and
+// register / unregister / lookup / availability.
+
 #include "nrpc-internals.h"
 
 // the component-owned "functions" memory-attribution category, read by the
-// daemon's pulse charts (declared in nrpc.h)
+// daemon's pulse charts
 struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
 
 // Bytes currently held by method descriptors. They are heap allocations, not
@@ -11,15 +15,6 @@ struct dictionary_stats dictionary_stats_category_functions = { .name = "functio
 // - this counter is what keeps them visible in the pulse "functions" memory
 // attribution (precedent: nrpc_buffers_functions for the call BUFFERs).
 size_t nrpc_methods_functions = 0;
-
-// ----------------------------------------------------------------------------
-
-// Each host owns a function registry (struct nrpc_registry) holding its
-// function definitions, keyed by sanitized method name. The registries
-// themselves live in a component-global index keyed by the host OBJECT
-// (NRPC_OWNER), so an owner needs no component field inside its own struct.
-
-// ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // the descriptor lifecycle: construct -> (swap) -> release; ONE destructor
@@ -48,17 +43,14 @@ static struct nrpc_method *nrpc_method_create(const struct nrpc_method_desc *des
     method->handler = desc->handler;
     method->handler_data = desc->handler_data;
 
-    // Normalization lives HERE so first- and re-registration agree.
-    // Deliberate, wire-observable change: the old code normalized only in
-    // the insert callback and swapped raw on conflicts, so a
-    // RE-registration with priority 0 stored 0 where the first registration
-    // stored 100 - that split behavior was the bug.
+    // normalized at construction so that first- and re-registration agree:
+    // a priority-0 registration renders as the default on every path
     if(!method->priority)
         method->priority = NRPC_PRIORITY_DEFAULT;
 
     // the descriptor stores the transport (handler_data) for transport-
     // bearing sources - take the entry ref this storage owns; released by
-    // the destructor under the stored tag. INTERNAL data is caller-owned
+    // the destructor under the stored tag. DAEMON-source data is caller-owned
     // and never pinned.
     if(nrpc_source_has_transport(method->source) && method->handler_data)
         nrpc_transport_entry_acquire(method->handler_data);
@@ -79,7 +71,7 @@ static void nrpc_method_free(struct nrpc_method *method) {
 
     // release the transport ref this descriptor owns - keyed on the tag it
     // holds (descriptors are immutable, so tag and data can never diverge).
-    // NULL-safe; INTERNAL data is caller-owned and never released.
+    // NULL-safe; DAEMON-source data is caller-owned and never released.
     if(nrpc_source_has_transport(method->source))
         nrpc_transport_entry_release(method->handler_data);
 
@@ -169,14 +161,11 @@ static bool nrpc_registry_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused
                dictionary_acquired_item_name(item), owner_str);
     }
 
-    // Releasing the displaced descriptor here runs under the index write
-    // lock (strictly less locking than the old cleanup, which needed the
-    // index write lock plus a per-entry leaf lock). The routine case is an
-    // IDENTICAL re-registration - a child re-sends its whole function list
-    // on every flag set and reconnect, and the dictionary fires this
-    // callback even for identical values - which now allocates and frees
-    // one small descriptor per function: accepted churn, paid for deleting
-    // the per-field swap machinery and its race windows.
+    // The routine case here is an IDENTICAL re-registration - a child
+    // re-sends its whole function list on every flag set and reconnect, and
+    // the dictionary fires this callback even for identical values - so one
+    // small descriptor is allocated and freed per function per re-send:
+    // accepted churn, the price of never mutating a live registration.
     nrpc_method_release(displaced);
 
     return changed;
@@ -353,7 +342,7 @@ void nrpc_registry_init(const struct nrpc_registry_owner *owner) {
     //
     // What DOES need arbitrating is this owner's own destroy running
     // concurrently (owners are not required to prevent that - see the
-    // NRPC_OWNER contract in nrpc.h). A destroy disarms the entry and deletes
+    // NRPC_OWNER contract). A destroy disarms the entry and deletes
     // it from the index inside ONE critical section under owner_spinlock, so
     // taking that lock puts us unambiguously on one side of it:
     //
@@ -457,8 +446,8 @@ void nrpc_registry_destroy(NRPC_OWNER owner) {
     // owner_spinlock is released: gated sections snapshot the owner's epoch
     // under owner_spinlock, so retiring while holding it would deadlock
     // against the drain. The gated sections' side of the contract - they must
-    // never block indefinitely - is documented on the lifetime field
-    // (nrpc-internals.h).
+    // never block indefinitely - is documented on the registry's lifetime
+    // field.
     nrpc_lifetime_retire(&registry->lifetime);
 
     // Destroy the inner dictionaries AFTER the entry left the index and the
@@ -469,15 +458,18 @@ void nrpc_registry_destroy(NRPC_OWNER owner) {
     // references, not dictionary items, so nothing outside this function
     // keeps either dictionary alive and both destroys run the immediate-free
     // branch - and no consumer can be inside them now, or enter them again.
-    // The definitions dictionary's
-    // delete callbacks release the slots' descriptor refs here; descriptors
-    // still pinned by in-flight calls simply outlive their dictionary. The
-    // struct memory both dictionaries are reached through stays pinned by
-    // any held outer handle.
+    // The definitions dictionary's delete callbacks release the slots'
+    // descriptor refs here; descriptors still pinned by in-flight calls
+    // simply outlive their dictionary. The struct memory both dictionaries
+    // are reached through stays pinned by any held outer handle.
     dictionary_destroy(registry->pending_dels.dict);
     dictionary_destroy(registry->dict);
 
     nrpc_registry_release(item);
+
+    // having dropped our handle, collect the deleted outer entry now (a
+    // transient operation may still hold a handle - then this collects
+    // nothing and the next collection gets it)
     dictionary_garbage_collect(dict);
 }
 
@@ -584,16 +576,16 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     // Streaming is the exception and MUST be preserved: a child streams a single
     // synthetic "config" proxy (dyncfg_add_streaming()) so the parent can forward
     // config commands to it. That registration targets the child's host (never the
-    // parent's own host), so it cannot hijack anything. INTERNAL
-    // registrations ARE the dyncfg subsystem (dyncfg.c, dyncfg-tree.c).
+    // parent's own host), so it cannot hijack anything. DAEMON-source
+    // registrations ARE the dyncfg subsystem itself.
     //
-    // Enforced on the SANITIZED key: the registry is indexed by the sanitized
-    // form, which strips leading spaces/control chars, so a raw name like
-    // " config" or "\tconfig" classifies exactly like the key it would land on.
+    // Everything from here on - this enforcement, the log line below, and the
+    // flags classification after it - keys on the SANITIZED name: the registry
+    // is indexed by the sanitized form, which strips leading spaces/control
+    // chars, so a raw name like " config" or "\tconfig" must classify exactly
+    // like the key it will land on (and a raw name in the log could carry
+    // newlines and malform the journal).
     if(desc->source == NRPC_SOURCE_PLUGIN && nrpc_method_name_is_dyncfg(key)) {
-        // Log the sanitized name (what we actually classify on), not the raw name:
-        // a raw name with leading whitespace/control chars or embedded newlines
-        // would make this log line misleading or malformed.
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "NRPC: 'host:%s' attempted to register reserved dynamic-configuration method '%s' from a plugin. Ignoring it.",
                host_name, key);
@@ -602,9 +594,6 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
         return;
     }
 
-    // Classify from the sanitized key, not the raw name: the key is what the dictionary is
-    // indexed by, so classifying the raw name lets " config" land on the "config" key without
-    // the DYNCFG option, which would hand a dyncfg-reserved entry to a regular function.
     NRPC_METHOD_FLAGS options = nrpc_method_flags_for(key, tags);
 
     // The complete descriptor is built HERE, outside all dictionary
@@ -634,15 +623,11 @@ void nrpc_method_register(const struct nrpc_method_desc *desc) {
     nrpc_registry_dispatcher_release(registry);
 
     // Notify the owner that the visible function set changed. Deliberately NO
-    // cancellation of a queued pending_dels entry here: the queue is a
-    // change-log and the renderer's full re-list is the ground truth in the
-    // same committed payload, so a stale DEL for a re-added function heals
-    // within one drain (DEL lines render first, then the re-list re-affirms
-    // it). Cancelling here can swallow the ONLY prune signal the parent will
-    // ever get: a concurrent del can land its registry delete AFTER this
-    // insert while its queue insert lands BEFORE the cancellation, leaving
-    // the function absent from the registry with no DEL queued - and parents
-    // prune only on FUNCTION_DEL, never on a re-list.
+    // cancellation of a queued pending_dels entry for a re-added name: a
+    // stale DEL is harmless (the re-list in the same committed payload is
+    // ground truth and re-affirms the function), while cancelling could
+    // swallow the ONLY prune signal the parent will ever get - parents prune
+    // on FUNCTION_DEL, never on a re-list.
     //
     // arm_manifest: only DYNCFG is excluded - it is derived from the key, so
     // such an entry can never enter or leave the manifest. RESTRICTED comes
@@ -723,7 +708,7 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
 
     // The FUNCTION_DEL protocol command (from external plugins or streaming
     // children) must never remove dyncfg config functions; those are owned and
-    // removed exclusively by the dyncfg subsystem (INTERNAL deletes).
+    // removed exclusively by the dyncfg subsystem (DAEMON-source deletes).
     if(source != NRPC_SOURCE_DAEMON && is_dyncfg) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "NRPC: refusing to unregister dyncfg method '%s' via FUNCTION_DEL", name);
@@ -743,6 +728,12 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
     // The tombstone makes the function unavailable to concurrent lookups in
     // the delete window and lets nrpc_registry_find() report the specific
     // "unregistered by the plugin" error there.
+    //
+    // Two CONCURRENT unregisters can both pass this check (the delete
+    // callback is deferred while item references are held, so the slot
+    // still points at the descriptor for both) and both return true - the
+    // del, the queue insert and the flag set are all idempotent, so that
+    // is harmless.
     spinlock_lock(&slot->spinlock);
     bool still_current = (slot->method == method);
     if(still_current)
@@ -765,14 +756,13 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
         return false;
     }
 
-    // ACCEPTED RESIDUAL (exact parity with the pre-descriptor code): between
-    // the slot unlock above and the del below, a conflict re-registration
-    // can swap in a fresh descriptor (clearing the tombstone) and the
-    // key-based del still removes it. The slot lock cannot be held across
-    // dictionary_del - lock order is index -> slot, and the inversion would
-    // ABBA against the conflict callback. The loss self-heals on the next
-    // full FUNCTION re-list: the re-list is ground truth, DELs are a
-    // change-log.
+    // KNOWN, ACCEPTED window: between the slot unlock above and the del
+    // below, a conflict re-registration can swap in a fresh descriptor
+    // (clearing the tombstone) and the key-based del still removes it. The
+    // slot lock cannot be held across dictionary_del - lock order is
+    // index -> slot, and the inversion would ABBA against the conflict
+    // callback. The loss self-heals on the next full FUNCTION re-list: the
+    // re-list is ground truth, DELs are a change-log.
     dictionary_del(registry->dict, key);
     dictionary_acquired_item_release(registry->dict, item);
 
@@ -782,7 +772,7 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
     // queue on the next flag poll or reconnect push. Ordering contract: insert
     // BEFORE the owner's changed callback updates the flag - the renderer
     // clears the flag first and then snapshots the set, so a del can never be
-    // stranded (see the struct comment in nrpc-internals.h). Not populated
+    // stranded (see the comment on pending_dels). Not populated
     // when the owner has no del journal consumer (a LIVE question through the
     // vtable - the owner's sender can appear and disappear), else it would
     // grow for the process lifetime on never-streaming hosts. dyncfg global
@@ -850,8 +840,8 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
     // of a heap block)
     size_t strip = key_length;
 
-    OBJECT_STATE_ID state_id = 0;
-    bool armed = nrpc_registry_owner_epoch(registry, &state_id);
+    OBJECT_STATE_ID epoch_id = 0;
+    bool armed = nrpc_registry_owner_epoch(registry, &epoch_id);
 
     bool found = false;
     bool was_unregistered = false;
@@ -869,19 +859,19 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
             // prefix-retry intermediates never leak a ref past this loop
             dictionary_acquired_item_release(registry->dict, item);
 
-            if(!unregistered && nrpc_method_is_available_at(method, armed, state_id)) {
+            if(!unregistered && nrpc_method_is_available_at(method, armed, epoch_id)) {
                 break;
             }
             else {
                 CLEAN_STRING *owner_name = nrpc_registry_owner_name_dup(registry);
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                       "Method '%s' is not available. "
-                       "host '%s', serving = { tid: %d, running: %s }, host state { id: %u, expected %u }",
+                       "NRPC: method '%s' is not available. "
+                       "host '%s', serving = { tid: %d, running: %s }, epoch { owner: %u, stamped: %u }",
                        name,
                        owner_name ? string2str(owner_name) : "[disarmed]",
                        nrpc_serving_tid(method->serving),
                        nrpc_serving_running(method->serving) ? "yes" : "no",
-                       state_id, method->epoch_id
+                       epoch_id, method->epoch_id
                        );
 
                 was_unregistered = unregistered;
@@ -890,7 +880,11 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
             }
         }
 
-        // strip a word from the end
+        // Strip a word from the end, so "fn arg1 arg2" resolves to "fn".
+        // Consequence worth knowing: an over-long command does not simply
+        // fail - "<real-fn> <junk>" still resolves, and the WHOLE sanitized
+        // command is forwarded to the plugin (which is why the sanitizer
+        // bounds it to MAX_FUNCTION_LENGTH).
         while (strip > 0 && !isspace((uint8_t)buffer[strip - 1])) buffer[--strip] = '\0';
 
         // strip all spaces

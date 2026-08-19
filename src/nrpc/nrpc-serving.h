@@ -5,9 +5,13 @@
 
 #include "libnetdata/libnetdata.h"
 
-// ----------------------------------------------------------------------------
-// public API
-
+// Every thread that registers methods brackets its registering life with
+// these two calls. The handle they manage is part of every method's
+// availability: once finished() runs, everything this thread registered
+// becomes unavailable in every view at once (the entries stay in the
+// registry until something unregisters or replaces them). started() is
+// idempotent; finished() also drains in-flight cancel/progress dispatches
+// aimed at this thread before it may exit.
 void nrpc_serving_started(void);
 void nrpc_serving_finished(void);
 

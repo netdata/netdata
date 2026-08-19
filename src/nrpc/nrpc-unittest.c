@@ -256,7 +256,7 @@ int nrpc_access_unittest(void) {
 // valid after the host functions read lock is released.
 //
 // Deliberately does NOT register the bare "config" name: that is the live dyncfg
-// function on localhost (dyncfg-tree.c), and registering plus deleting it here
+// function on localhost, and registering plus deleting it here
 // would tear down real dyncfg state for the tests that follow. The bare and
 // leading-space shapes are covered by the classifier assertions instead.
 
@@ -275,7 +275,7 @@ int nrpc_manifest_unittest(void) {
     //    strips the leading space, so it lands on the "config" key and must classify as dyncfg -
     //    classifying the raw name instead would hand a dyncfg-reserved key to a regular function.
     struct { const char *raw; bool expected_dyncfg; } names[] = {
-        { PLUGINSD_FUNCTION_CONFIG, true  },   // dyncfg-tree.c
+        { PLUGINSD_FUNCTION_CONFIG, true  },   // the live dyncfg catch-all name
         { "config test:job",        true  },   // dyncfg_insert_cb() builds "config <id>"
         { " config",                true  },   // sanitizes to "config"
         { "  config  ",             true  },
@@ -339,7 +339,7 @@ int nrpc_manifest_unittest(void) {
         }
 
         // the slot keeps its place across conflicts while descriptors are swapped whole, so a
-        // hijack is visible through the slot's CURRENT descriptor - compare against the capture
+        // hijack is visible through the slot's CURRENT descriptor - compare against the handler noted above
         struct nrpc_method *live_after = nrpc_ut_method(host, "config");
         if(live && (!live_after || live_after->handler != live_cb ||
                     live_after->handler == nrpc_unittest_noop_cb)) {
@@ -442,8 +442,8 @@ int nrpc_manifest_unittest(void) {
     //    test's localhost does not: sql_load_node_id() only calls set_host_node_id() when the query
     //    returns a row, so an unregistered host reaches neither it nor create_aclk_config(), the only
     //    place host->aclk_host_config is ever set. A test would have to call create_aclk_config()
-    //    itself (a plain callocz plus a publish CAS, no ACLK thread needed) and include
-    //    aclk/aclk_query_queue.h for struct aclk_manifest_publication. Untested; tracked in the SOW.
+    //    itself (a plain callocz plus a publish CAS, no ACLK thread needed) and reach
+    //    struct aclk_manifest_publication. Untested.
     {
         int hash_errors_before = errors;
         const char *node1 = "11111111-2222-3333-4444-555555555555";
@@ -707,7 +707,7 @@ int nrpc_manifest_unittest(void) {
 }
 
 // ----------------------------------------------------------------------------
-// The node-manifest pacer (MANIFEST_PACER in sqlite_aclk_node.h).
+// The node-manifest pacer (MANIFEST_PACER).
 //
 // aclk_check_node_info_collectors_and_manifest() publishes at most
 // MAX_NODE_MANIFESTS_PER_SCAN manifests per pass, and picks WHICH due hosts get those slots by
@@ -909,7 +909,7 @@ int nrpc_manifest_pacer_unittest(void) {
 }
 
 // ----------------------------------------------------------------------------
-// The streaming delete-path queue (C3).
+// The streaming delete-path queue.
 //
 // nrpc_method_unregister() no longer sends FUNCTION_DEL synchronously; it queues the
 // sanitized name in the registry's pending_dels set (only when the owner's
@@ -1025,7 +1025,7 @@ int nrpc_del_unittest(void) {
             { "tt-plain-fn",     true,  true,  true,  true  },
             // plain global function, no sender: NOT queued (never-streaming host)
             { "tt-nosender-fn",  false, true,  false, true  },
-            // dyncfg-shaped name (INTERNAL registration): flag quirk - no
+            // dyncfg-shaped name (DAEMON-source registration): flag quirk - no
             // FUNCTION_DEL, and dyncfg is never in the manifest
             { "config tt:job",   true,  false, false, false },
             // restricted function: streams (queued) but is not in the manifest.
@@ -1145,9 +1145,9 @@ int nrpc_del_unittest(void) {
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            // the streaming caller's half of the protocol: clear the changed
-            // flag FIRST, then render (since the inversion the renderer no
-            // longer touches the owner's flag)
+            // the streaming caller's half of the protocol: clear the
+            // changed flag FIRST, then render (the renderer never touches
+            // the owner's flag)
             rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
             nrpc_catalog_render_global_functions(rrdhost_nrpc_owner(host), wb, true);
             const char *out = buffer_tostring(wb);
@@ -1360,17 +1360,18 @@ int nrpc_del_unittest(void) {
 }
 
 // ----------------------------------------------------------------------------
-// Golden-output test for the streaming emitter (step 8 prerequisite).
+// Golden-output test for the streaming emitter.
 //
-// Pins the BYTES the post-C3 emitter produces for a controlled fixture set, so
-// the C4 iteration-API rewrite can be verified to reproduce them identically.
+// Pins the BYTES the emitter produces for a controlled fixture set, so
+// any rewrite of the iteration API can be verified to reproduce them
+// identically.
 // The expected lines are built here with their own copies of the format
 // strings - not by calling the emitter - so any rewrite that changes the
 // bytes fails this test. Covered: the FUNCTION_DEL-before-re-list order and
 // the dyncfg FUNCDEL quirk (dyncfg deletes never emit FUNCTION_DEL), the
 // dyncfg-count RETURN => the caller appends the dyncfg_add_streaming()
-// synthetic "config" line (since the inversion the renderer emits no dyncfg
-// output; these tests play the streaming caller and append it themselves),
+// synthetic "config" line (the renderer emits no dyncfg output; these tests
+// play the streaming caller and append it themselves),
 // RESTRICTED functions DO stream, and DYNCFG functions do not appear in the
 // global list.
 //
@@ -1381,8 +1382,8 @@ int nrpc_del_unittest(void) {
 // ("<version>|<name>") and an ownership rule (the destination dictionary frees
 // the copies) that nothing else pins.
 
-// mirrors struct function_v2_entry in api_v2_contexts.c: the destination
-// dictionary owns the help/tags copies nrpc_catalog_host_to_dict() writes
+// mirrors struct function_v2_entry (the /api/v2 consumer's shape): the
+// destination dictionary owns the help/tags copies nrpc_catalog_host_to_dict() writes
 struct e4_fn_entry {
     const char *help;
     const char *tags;
@@ -1522,8 +1523,9 @@ int nrpc_catalog_unittest(void) {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         size_t configs = nrpc_catalog_render_global_functions(rrdhost_nrpc_owner(host), wb, true /* can_function_del */);
-        // the caller's half since the inversion: a DYNCFG-capable parent gets
-        // the synthetic config line appended after the render, count-gated
+        // the caller's half of the contract: a DYNCFG-capable parent
+        // gets the synthetic config line appended after the render,
+        // count-gated
         if(configs)
             dyncfg_add_streaming(wb);
         const char *out = buffer_tostring(wb);
@@ -1555,9 +1557,9 @@ int nrpc_catalog_unittest(void) {
             fprintf(stderr, "  OK global emitter: DEL-first order, exact line bytes, quirk, dyncfg count, filters\n");
     }
 
-    // renderer-never-emits variant: since the inversion the synthetic config
-    // line is the caller's; the renderer must never emit it itself, while
-    // still reporting the dyncfg count a capability-lacking caller ignores
+    // renderer-never-emits variant: the synthetic config line is the
+    // caller's; the renderer must never emit it itself, while still
+    // reporting the dyncfg count a capability-lacking caller ignores
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
@@ -1615,7 +1617,7 @@ int nrpc_catalog_unittest(void) {
     {
         int before = errors;
 
-        // exactly how api_v2_contexts.c creates ctl.functions.dict
+        // exactly how the /api/v2 functions consumer creates its destination dictionary
         DICTIONARY *dst = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(struct e4_fn_entry));
@@ -1668,17 +1670,17 @@ int nrpc_catalog_unittest(void) {
     // CROSS-SUITE ISOLATION: this is the only block in any suite that
     // destroys localhost's registry entry. It MUST leave the entry
     // re-initialized and host-owned before returning - the suites run
-    // sequentially from one process (main.c dispatch and the aggregate
-    // unittest) and every later suite registers its fixtures into this
+    // sequentially from one process (the -W selector dispatch and the
+    // aggregate unittest) and every later suite registers its fixtures into this
     // same entry.
     {
         int before = errors;
 
         nrpc_registry_destroy(rrdhost_nrpc_owner(host));
 
-        // emulate the streaming caller: since the inversion, the caller owns
-        // the changed-flag clear (the streaming side's half of the ordering
-        // protocol) and the renderer only snapshots
+        // emulate the streaming caller: the caller owns the changed-flag
+        // clear (the streaming side's half of the ordering protocol) and
+        // the renderer only snapshots
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
         rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
@@ -1959,7 +1961,7 @@ int nrpc_catalog_unittest(void) {
 }
 
 // ----------------------------------------------------------------------------
-// The registry itself (C1/C2): what may be registered, what may be deleted and
+// The registry itself: what may be registered, what may be deleted and
 // by whom, what the conflict callback swaps, and how a serving thread
 // that goes away takes its functions out of every view.
 //
@@ -1973,9 +1975,9 @@ int nrpc_catalog_unittest(void) {
 //      lands on its collapsed key; lookups for execution strip trailing words,
 //      lookups for availability do not;
 //   2. the dyncfg namespace is per-SOURCE: STREAMING (a child's synthetic
-//      "config" proxy) and INTERNAL (the dyncfg subsystem) may register
-//      reserved names, a PLUGIN-source registration may not - and a rejected one
-//      registration must not disturb the entry that is already there;
+//      "config" proxy) and DAEMON-source (the dyncfg subsystem) may register
+//      reserved names, a PLUGIN-source registration may not - and a
+//      rejected registration must not disturb the entry already there;
 //   3. deletion is gated the same way: FUNCTION_DEL (PLUGIN/STREAM source) can
 //      never remove a dyncfg entry, and a PLUGIN-source delete may only remove what its
 //      OWN serving thread registered;

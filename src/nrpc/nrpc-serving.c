@@ -8,7 +8,7 @@
 // registered by that thread points at its handle, so when the thread exits,
 // all of them become unavailable at once.
 //
-// It is the shared two-counter shell (nrpc-lifetime.h): the thread holds the
+// It is the shared two-counter shell (NRPC_LIFETIME): the thread holds the
 // base entry ref between nrpc_serving_started() and nrpc_serving_finished(),
 // each registered method holds one more, and whoever drops the last one frees
 // the handle - which is routinely AFTER the thread is gone, because methods
@@ -17,10 +17,6 @@ struct nrpc_serving_handle {
     NRPC_LIFETIME lifetime;
     pid_t tid;
 };
-
-// Each thread that registers functions has to call
-// nrpc_serving_started() and nrpc_serving_finished()
-// to create and tear down the serving handle.
 
 __thread struct nrpc_serving_handle *nrpc_thread_serving = NULL;
 
@@ -56,7 +52,7 @@ void nrpc_serving_finished(void) {
     if(!nrpc_thread_serving)
         return;
 
-    // The canonical teardown (nrpc-lifetime.h). Retiring first is what delays
+    // The canonical NRPC_LIFETIME teardown. Retiring first is what delays
     // the thread's exit until every in-flight cancel/progress dispatch has
     // left: those dispatches read a structure this thread owns, so the thread
     // must not vanish underneath them. Marking and waiting is one step, so new

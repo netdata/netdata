@@ -9,16 +9,29 @@
 // callable endpoints that plugins, streaming children and the daemon itself
 // expose, and that users, parents and Netdata Cloud invoke on demand.
 //
+// START HERE: src/nrpc/README.md - the object model, the lifecycles, the
+// locking rules and the file map. This header is the public API; the map
+// below is its glossary.
+//
 // Concept map:
 // - registry (struct nrpc_registry): per-host table of methods; the
 //   registries live in a component-global index keyed by the owning host
 //   OBJECT (NRPC_OWNER); the owner needs no component field of its own.
-// - method (struct nrpc_method): a named callable endpoint. Its static
-//   attribute bundle (name, help, tags, access, timeout, priority, version)
-//   is its DESCRIPTOR - never "metadata", which RPC reserves for per-call
-//   headers. Registration takes a caller-filled desc struct
-//   (struct nrpc_method_desc, struct nrpc_builtin_desc) that extends the
-//   attribute bundle with the owning host and the handler.
+//   Teardown is disarm the owner vtable + unlink, then retire the entry's
+//   operation GATE (no new readers; drain current ones), then destroy.
+// - method (struct nrpc_method): a named callable endpoint. The dictionary
+//   keeps a stable SLOT per sanitized name, pointing at an IMMUTABLE,
+//   refcounted DESCRIPTOR (struct nrpc_method) that holds one registration's
+//   whole state - attributes (name, help, tags, access, timeout, priority,
+//   version; never "metadata", which RPC reserves for per-call headers) plus
+//   handler, transport and serving-handle references. A re-registration
+//   builds a new descriptor and swaps the slot's pointer as one unit.
+//   Registration takes a caller-filled registration struct
+//   (struct nrpc_method_desc, struct nrpc_builtin_desc); it is never stored.
+// - epoch: the owner's liveness generation. Descriptors are stamped with the
+//   epoch current at registration and are available only while it matches
+//   the owner's - a host reconnect silently retires the previous
+//   connection's registrations until they are re-registered.
 // - call: one invocation of a method, tracked in the in-flight calls table
 //   (struct nrpc_inflight_calls) and correlated by a call_id. Calls carry a
 //   deadline and support cancel and progress.
@@ -30,8 +43,8 @@
 //   thread serving a method - when that thread exits, its methods become
 //   unavailable.
 // - builtin: a daemon-implemented synchronous method (NRPC_SOURCE_DAEMON).
-// - catalog (nrpc-catalog.c): publishes the registry to users, parents and
-//   Cloud.
+// - catalog: publishes the registry to users, parents and Cloud (the
+//   streaming re-list, the JSON views, the cloud manifest).
 //
 // Wire <-> code terminology: the pluginsd/streaming wire and every plugin SDK
 // name the correlation id "transaction" - the SAME value this code names
@@ -49,7 +62,7 @@
 // pulse charts (daemon/pulse) - the daemon reads these, the component (and
 // any daemon code allocating on the component's behalf) charges them. This
 // is the allowed dependency direction: pulse depends on nrpc, never the
-// reverse (precedent: dictionary_stats_category_other in dictionary.c).
+// reverse (precedent: dictionary_stats_category_other).
 extern struct dictionary_stats dictionary_stats_category_functions;
 extern size_t nrpc_buffers_functions;
 extern size_t nrpc_methods_functions;   // bytes held by method descriptors (heap, outside the dictionary stats)
@@ -73,8 +86,9 @@ typedef bool (*nrpc_is_cancelled_cb_t)(void *is_cancelled_cb_data);
 // implementer is the pluginsd transport; plugin-side functions_evloop cancels
 // via a polled flag and registers no cancel hook). CONTRACT: cancel and
 // progress hooks are registered ONLY by transports - their `data` is a
-// struct nrpc_transport, and the in-flight calls table entry-pins it for the record's
-// lifetime.
+// struct nrpc_transport, and the in-flight calls table entry-pins it for the
+// record's lifetime. ("entry-pin": holds an NRPC_LIFETIME entry ref, the
+// counter that decides when the object is freed.)
 typedef void (*nrpc_cancel_hook_cb_t)(const char *call_id, void *data);
 typedef void (*nrpc_register_cancel_hook_cb_t)(void *register_cancel_hook_cb_data, nrpc_cancel_hook_cb_t cancel_hook_cb, void *cancel_hook_cb_data);
 typedef void (*nrpc_progress_cb_t)(nd_uuid_t *call_id, void *data, size_t done, size_t all);
@@ -121,6 +135,10 @@ struct nrpc_request {
     } register_progress_hook;
 };
 
+// CONTRACT for handlers: req->result.cb MUST be invoked exactly once, on
+// success and failure alike - for async methods possibly long after this
+// returns. That invocation is what retires the in-flight call record; the
+// return value only says whether the call was ACCEPTED, not answered.
 typedef int (*nrpc_handler_cb_t)(struct nrpc_request *req, void *data);
 
 
@@ -128,8 +146,9 @@ typedef int (*nrpc_handler_cb_t)(struct nrpc_request *req, void *data);
 
 struct nrpc_method;
 
-// opaque handle to an acquired method entry - the entry cannot be
-// freed while the handle is held
+// Opaque handle to an authorized method: an owned reference to the method's
+// immutable descriptor - the registration cannot be freed while the handle
+// is held, and release touches no registry state.
 typedef struct nrpc_method_acquired NRPC_METHOD_ACQUIRED;
 
 // The identity of a registry and of everyone who talks to it: the owning host
@@ -157,7 +176,7 @@ typedef struct nrpc_method_acquired NRPC_METHOD_ACQUIRED;
 // completed just before one leaves its owner with no registry until it
 // initializes again. An owner that cannot tolerate that must serialize its own
 // init and destroy - RRDHOST currently does not, and records why above
-// rrdhost_nrpc_registry_owner() in rrdhost.c.
+// rrdhost_nrpc_registry_owner().
 typedef struct {
     void *ptr;
 } NRPC_OWNER;
@@ -172,7 +191,7 @@ typedef enum __attribute__((packed)) {
     NRPC_METHOD_FLAG_DYNCFG = (1 << 0),
     NRPC_METHOD_FLAG_RESTRICTED = (1 << 1), // this method is restricted (hidden from users)
 
-    // this is 8-bit
+    // the enum is packed to one byte - keep the flags within 8 bits
 } NRPC_METHOD_FLAGS;
 
 // who is registering (or unregistering) a method - the registry enforces
@@ -190,14 +209,27 @@ typedef enum __attribute__((packed)) {
 // registry entry, supplied at entry creation. `id` is the identity - it keys
 // the entry and comes back as the callbacks' argument. The component copies
 // `name` (it keeps its own STRING, so an owner-side rename cannot free bytes
-// under a concurrent log line) and stores the rest verbatim. `epoch` is a LIVE
-// pointer, valid exactly while the entry is armed - entry disarm (inside
-// destroy) precedes owner teardown on every path. `changed` reports that the
-// host-wide visible function set changed (`arm_manifest` is true when the
-// change affects the cloud manifest - the flag-update and the manifest-arm
-// fire under different per-entry conditions, so the component passes the
-// verdict); `wants_del_journal` answers whether deleted names should be queued
-// for a parent (a LIVE question - the owner's sender can appear and disappear).
+// under a concurrent log line) and stores the rest verbatim.
+//
+// `epoch` is the owner's liveness GENERATION: an OBJECT_STATE counter the
+// owner bumps whenever the host goes unreachable and comes back - e.g. a
+// streaming child reconnect. Every
+// method descriptor is stamped with the epoch id current at its
+// registration and is available only while the two match, so a reconnect
+// silently retires everything the previous connection registered until it
+// re-registers under the new id. The pointer is LIVE, valid exactly while
+// the entry is armed - entry disarm (inside destroy) precedes owner
+// teardown on every path.
+//
+// `changed` reports that the host-wide visible function set changed
+// (`arm_manifest` is true when the change affects the cloud manifest - the
+// flag-update and the manifest-arm fire under different per-entry
+// conditions, so the component passes the verdict). Two unrelated "arm"
+// verbs: the ENTRY is armed while its vtable is populated; arm_manifest
+// means scheduling a cloud node-manifest refresh.
+//
+// `wants_del_journal` answers whether deleted names should be queued for a
+// parent (a LIVE question - the owner's sender can appear and disappear).
 struct nrpc_registry_owner {
     NRPC_OWNER id;                                    // required: the identity - index key and callback argument
     const char *name;                                 // copied at entry creation
@@ -265,7 +297,7 @@ bool nrpc_method_name_is_dyncfg(const char *name);
 // valued fields (user_access, timeout_s, wait, allow_restricted) are written
 // explicitly at every site even when zero; pointer fields may be omitted when
 // NULL. Naming: the spec (caller input) feeds struct nrpc_call (the in-flight
-// record, private to nrpc-calls.c) which the handler sees as
+// record, private to the component) which the handler sees as
 // struct nrpc_request - three views of one invocation.
 struct nrpc_call_spec {
     NRPC_OWNER owner;              // the target host; NRPC_OWNER_NONE = "no host given" (answers 500)
@@ -298,14 +330,15 @@ int nrpc_method_authorize(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
                               HTTP_ACCESS user_access, bool allow_restricted,
                               NRPC_METHOD_ACQUIRED **out_acquired);
 
-// Regression test for nrpc_method_authorize() access gating (GHSA-6628-vxm3-4g8g).
-// Requires a prepared RRD (localhost). Returns the number of failures (0 = pass).
-int nrpc_access_unittest(void);
-int nrpc_manifest_unittest(void);
-int nrpc_manifest_pacer_unittest(void);
-int nrpc_del_unittest(void);
-int nrpc_registry_unittest(void);
-int nrpc_catalog_unittest(void);
+// The contract suites (each requires a prepared RRD / localhost; each
+// returns its failure count, 0 = pass). Their suite-header comments double
+// as prose documentation of what the component promises:
+int nrpc_access_unittest(void);         // authorize() access gating (GHSA-6628-vxm3-4g8g regression)
+int nrpc_manifest_unittest(void);       // dyncfg-namespace enforcement + cloud-manifest membership/hash
+int nrpc_manifest_pacer_unittest(void); // manifest publish pacing
+int nrpc_del_unittest(void);            // the pending FUNCTION_DEL queue protocol
+int nrpc_registry_unittest(void);       // registration/deletion contracts + the lifecycle race suites
+int nrpc_catalog_unittest(void);        // the renderers: streaming re-list, JSON, export, owner protocol
 
 bool nrpc_method_available(NRPC_OWNER owner, const char *function);
 

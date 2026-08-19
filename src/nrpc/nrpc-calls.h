@@ -19,6 +19,8 @@ bool nrpc_call_deadline(const char *call_id, usec_t *out_stop_monotonic_ut);
 // cancel a running function, to be run from anywhere
 void nrpc_call_cancel(const char *call_id);
 
+// deliver a progress ping to a running function's progress hook (gated on
+// the serving thread of the call's own registration); from anywhere
 void nrpc_call_progress(const char *call_id);
 void nrpc_call_request_progress(nd_uuid_t *call_id);
 

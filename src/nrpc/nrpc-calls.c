@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Method invocations: the in-flight calls table, authorization, the three
+// execution modes (sync, async-nowait, async-wait), and cancel/progress
+// dispatch.
+
 #include "nrpc-serving-internals.h"
 #include "nrpc-internals.h"
 #include "nrpc-calls.h"
@@ -35,45 +39,44 @@ struct nrpc_call {
     // acquire-or-fail, exactly as before.
     struct nrpc_method *method;
 
+    // where the answer lands, and (async modes) who is told it arrived
     struct {
         BUFFER *wb;
-
-        // in async mode,
-        // the function to call to send the result back
         nrpc_result_cb_t cb;
         void *data;
     } result;
 
     struct {
-        SPINLOCK spinlock;
+        SPINLOCK spinlock;              // guards the two hook pairs below
     } callbacks;
 
+    // The CALLER's cancellation predicate. A sync handler polls it
+    // directly; in async modes the HANDLER instead sees the record's own
+    // cancelled flag - but the wait-mode waiter still polls this one, and
+    // it is what turns a caller hang-up into a cancel dispatch.
     struct {
-        // to be called in sync mode
-        // while the function is running
-        // to check if the function has been canceled
         nrpc_is_cancelled_cb_t cb;
         void *data;
     } is_cancelled;
 
+    // registered by the TRANSPORT while handling an async call: how to tell
+    // the remote side to stop working on this call_id
     struct {
-        // to be registered by the function itself
-        // used to signal the function to cancel
         nrpc_cancel_hook_cb_t cb;
-        void *data;
+        void *data;                     // a transport, entry-pinned for the record's lifetime
     } cancel_hook;
 
+    // the CALLER's sink for progress reports coming back from the function
     struct {
-        // callback to receive progress reports from function
         nrpc_progress_cb_t cb;
         void *data;
     } progress;
 
+    // registered by the TRANSPORT while handling an async call: how to ask
+    // the remote side for a progress update
     struct {
-        // to be registered by the function itself
-        // used to send progress requests to function
         nrpc_progress_hook_cb_t cb;
-        void *data;
+        void *data;                     // a transport, entry-pinned for the record's lifetime
     } progress_hook;
 };
 
@@ -90,6 +93,7 @@ static struct nrpc_inflight_calls nrpc_inflight_calls = { .dict = NULL };
 static void nrpc_call_cancel_internal(struct nrpc_call *call);
 
 // ----------------------------------------------------------------------------
+// the in-flight call record: cleanup, table callbacks, hook registration
 
 static void nrpc_call_cleanup(struct nrpc_call *call) {
     buffer_free(call->payload);
@@ -115,8 +119,6 @@ static void nrpc_call_cleanup(struct nrpc_call *call) {
 static void nrpc_inflight_calls_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct nrpc_call *call = value;
 
-    // internal_error(true, "NRPC: call_id '%s' finished", call->call_id);
-
     nrpc_call_cleanup(call);
     nrpc_method_release(call->method);
     call->method = NULL;
@@ -127,6 +129,9 @@ static void nrpc_inflight_calls_insert_cb(const DICTIONARY_ITEM *item __maybe_un
     spinlock_init(&call->callbacks.spinlock);
 }
 
+// Detects a call_id collision: on a second insert with the same call_id the
+// dictionary calls this instead of storing, we flag the caller through the
+// data out-param, and returning false leaves the existing record untouched.
 static bool nrpc_inflight_calls_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused,
                                                void *old_value __maybe_unused,
                                                void *new_value __maybe_unused,
@@ -168,7 +173,7 @@ bool nrpc_call_deadline(const char *call_id, usec_t *out_stop_monotonic_ut) {
     return true;
 }
 
-// called ONLY from the ASAN-gated shutdown path (daemon-shutdown.c): in normal
+// called ONLY from the ASAN-gated shutdown path: in normal
 // operation the table lives for the process lifetime and is never torn down -
 // the destroy exists so leak checking sees a clean heap
 void nrpc_inflight_calls_destroy(void) {
@@ -246,6 +251,11 @@ static void nrpc_call_wait_free(struct nrpc_call_wait *tmp) {
     freez(tmp);
 }
 
+// The completion side of the wait-mode ownership handoff (the full protocol
+// is on nrpc_call_async_wait): `tmp` and `temp_wb` are freed exactly once -
+// by US when the waiter already gave up (free_with_signal), by the WAITER
+// otherwise. The flag is written and read only under tmp->mutex; that is the
+// handoff.
 static void nrpc_call_signal_ready(BUFFER *temp_wb __maybe_unused, int code, void *callback_data) {
     struct nrpc_call_wait *tmp = callback_data;
     bool we_should_free = false;
@@ -334,6 +344,30 @@ static inline int nrpc_call_async_nowait(struct nrpc_call *call) {
     return call->method->handler(&req, call->method->handler_data);
 }
 
+// The "wait" mode: run an async handler, then block this thread until it
+// answers, the deadline passes, or the caller cancels.
+//
+// The hard part is ownership of `tmp` (the wait record) and `temp_wb` (the
+// temporary result buffer). Both are shared with nrpc_call_signal_ready(),
+// which runs on the HANDLER's thread, whenever that turns out to be.
+// Exactly one side frees them, decided under tmp->mutex before we let go
+// of it:
+//
+//   answered in time -> WE own the cleanup (free_with_signal stays false).
+//                       We copy temp_wb into the caller's buffer first,
+//                       because the caller's buffer is the one that
+//                       outlives us.
+//   timeout/cancel/  -> the COMPLETION CALLBACK owns the cleanup
+//   handler failure     (free_with_signal = true). We walk away - and the
+//                       callback always comes, because a handler MUST
+//                       invoke result.cb even when it fails. This is
+//                       why temp_wb exists at all: the caller's buffer may
+//                       be gone by the time a late handler answers - the
+//                       temporary buffer is required, not an optimization.
+//
+// The mutex is taken only AFTER the handler returns: a handler is allowed
+// to answer synchronously from inside its own invocation, and it would then
+// deadlock against a mutex we already held.
 static int nrpc_call_async_wait(struct nrpc_call *call) {
     struct nrpc_call_wait *tmp = mallocz(sizeof(struct nrpc_call_wait));
     tmp->free_with_signal = false;
@@ -341,9 +375,6 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
     tmp->call_id = strdupz(call->call_id);
     netdata_mutex_init(&tmp->mutex);
     netdata_cond_init(&tmp->cond);
-
-    // we need a temporary BUFFER, because we may time out and the caller supplied one may vanish,
-    // so we create a new one we guarantee will survive until the handler finishes...
 
     bool we_should_free = false;
     BUFFER *temp_wb  = buffer_create(1024, &nrpc_buffers_functions); // we need it because we may give up on it
@@ -354,9 +385,7 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
     struct nrpc_request req = nrpc_request_for(call, temp_wb, nrpc_call_signal_ready, tmp, true);
     int code = call->method->handler(&req, call->method->handler_data);
 
-    // this has to happen after we execute the callback
-    // because if an async call is responded in sync mode, there will be a deadlock.
-    netdata_mutex_lock(&tmp->mutex);
+    netdata_mutex_lock(&tmp->mutex); // only after the handler returned - see above
 
     if (code == HTTP_RESP_OK || tmp->data_are_ready) {
         bool cancelled = false;
@@ -380,8 +409,6 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
                 rc = 0;
                 if (!tmp->data_are_ready && call->is_cancelled.cb &&
                     call->is_cancelled.cb(call->is_cancelled.data)) {
-                    //                    internal_error(true, "NRPC: call_id '%s' is cancelled while waiting for response",
-                    //                                   call->call_id);
                     cancelled = true;
                     nrpc_call_cancel_internal(call);
                     break;
@@ -454,8 +481,8 @@ static inline int nrpc_call_async(struct nrpc_call *call, bool wait) {
         return nrpc_call_async_nowait(call);
 }
 
-
 // ----------------------------------------------------------------------------
+// authorization: resolve a command to a method the caller may invoke
 
 // Internal: authorize and hand out an OWNED descriptor reference for the
 // method. On failure everything acquired is released and *out_method is
@@ -483,9 +510,8 @@ static int nrpc_method_authorize_acquire(NRPC_OWNER owner, BUFFER *result_wb, co
                                        "This feature is not available on this host at this time.",
                                        HTTP_RESP_NOT_FOUND);
 
-    // the operation gate around the find (see the lifetime field in
-    // nrpc-internals.h): a registry whose destroy started answers exactly
-    // like an absent one
+    // the registry's operation gate around the find: a registry whose
+    // destroy started answers exactly like an absent one
     if(!nrpc_registry_dispatcher_acquire(registry)) {
         nrpc_registry_release(registry_item);
         return nrpc_call_error(result_wb,
@@ -629,8 +655,9 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     const char *call_id = uuid_str;
 
     // ------------------------------------------------------------------------
-    // the function can only be executed in async mode
-    // put the function into the inflight requests
+    // put the call into the in-flight table (every mode - sync included -
+    // runs through a record; the mode decides who retires it, see dispatch
+    // below)
 
     struct nrpc_call t = {
         .sanitized_cmd = sanitized_cmd,
@@ -659,6 +686,10 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     sanitized_cmd = NULL;
     uuid_copy(t.call_id_uuid, uuid);
 
+    // `call` is the dictionary's STORED copy (or, on a collision, the
+    // pre-existing record); `t` is our stack buffer. That is why the error
+    // paths below clean up `t` - including releasing t.method - and never
+    // touch `call`.
     bool duplicate_call_id = false;
     struct nrpc_call *call = dictionary_set_advanced(
         nrpc_inflight_calls.dict, call_id, -1, &t, sizeof(t), &duplicate_call_id);
@@ -692,10 +723,13 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
 
         return code;
     }
-    // internal_error(true, "NRPC: call_id '%s' started", call->call_id);
-
+    // Dispatch. Who deletes the in-flight record differs per mode:
+    // sync deletes it right here after the handler returns; async-nowait
+    // deletes it when the result arrives (nrpc_call_nowait_finished);
+    // async-wait deletes it through nrpc_call_wait_free(), on whichever
+    // side won the ownership handoff.
     if(call->method->sync) {
-        // the caller has to wait
+        // the handler answers inline, on this thread
 
         struct nrpc_request req = nrpc_request_for(call, call->result.wb,
                                                    call->result.cb, call->result.data, false);
@@ -764,8 +798,6 @@ static void nrpc_call_cancel_internal(struct nrpc_call *call) {
 }
 
 void nrpc_call_cancel(const char *call_id) {
-    // internal_error(true, "NRPC: request to cancel call_id '%s'", call_id);
-
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(nrpc_inflight_calls.dict, call_id);
     if(!item) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,

@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Publishing the registry: the shared iteration core plus every consumer -
+// the streaming FUNCTION re-list, the JSON views, the dictionary exporter,
+// and the cloud node-instance manifest.
+
 #include "nrpc-internals.h"
 #include "nrpc-catalog.h"
 
@@ -107,31 +111,33 @@ static void stream_global_function_cb(const struct nrpc_method_view *v, void *da
 }
 
 // Renders the parent-facing view of this host's global functions: first the
-// queued FUNCTION_DEL lines, then the full FUNCTION re-list - one buffer, one
-// commit by the caller. `can_function_del` is the streaming caller's verdict
-// (STREAM_CAP_FUNCTION_DEL + metadata readiness) - this renderer deliberately
-// knows nothing about streaming; when the verdict is false the snapshot is
-// DISCARDED, which is what prevents unbounded growth on parents without
-// FUNCDEL support.
-// Returns the count of dyncfg-backed entries seen: the caller appends the
-// synthetic "config" line (dyncfg_add_streaming) AFTER this returns and
-// BEFORE its commit, still under its render+commit lock, when the count is
-// non-zero and its peer has the DYNCFG capability - dyncfg is an application
-// on top of this component, so the verdict and the line are the caller's.
-// Ordering contract with nrpc_method_unregister(): the CALLER clears the
-// changed flag FIRST (that clear is the streaming side's half of the
-// protocol and stays with the host flag, outside this component), then this
-// renderer snapshots-and-clears the pending set under its lock. The deleter
-// inserts into the set BEFORE the owner's changed callback re-sets the flag,
-// so a del landing after our snapshot re-sets the flag with its entry
-// already queued - the next poll drains it; nothing is ever lost. NOTE: the
-// two streaming callers run on DIFFERENT threads (the flag poll on
-// collection/receiver threads, the reconnect push on the sender thread) and
-// can race each other too - the flag/spinlock protocol keeps the QUEUE
-// lossless, but the callers must additionally hold the sender's
-// global_functions_spinlock across {render + commit}, or a stale rendered
-// buffer could commit its FUNCTION_DEL lines after a fresh re-list (see the
-// lock's comment in stream-sender-internals.h).
+// queued FUNCTION_DEL lines, then the full FUNCTION re-list - one buffer,
+// one commit by the caller.
+//
+// CALLER DUTIES:
+// - clear the host's functions-changed flag BEFORE calling. That clear is
+//   the streaming side's half of the ordering protocol with
+//   nrpc_method_unregister(): the deleter queues its name BEFORE re-setting
+//   the flag, and this renderer snapshots-and-clears the queue under its
+//   lock - so a del landing after our snapshot re-sets the flag with its
+//   entry already queued, and the next poll drains it. Nothing is lost.
+// - hold the sender's global_functions_spinlock across {render + commit}.
+//   The two streaming callers run on DIFFERENT threads (the flag poll on
+//   collection/receiver threads, the reconnect push on the sender thread);
+//   without it, a stale rendered buffer could commit its FUNCTION_DEL lines
+//   after a fresh re-list.
+//
+// `can_function_del` is the streaming caller's verdict
+// (STREAM_CAP_FUNCTION_DEL + metadata readiness) - this renderer
+// deliberately knows nothing about streaming. When the verdict is false the
+// queue snapshot is DISCARDED, which is what prevents unbounded growth on
+// parents without FUNCDEL support.
+//
+// RETURNS the count of dyncfg-backed entries seen: the caller appends the
+// synthetic "config" line AFTER this returns and BEFORE its commit, still
+// under its render+commit lock, when the count is non-zero and its peer has
+// the DYNCFG capability - dyncfg is an application on top of this
+// component, so the verdict and the line are the caller's.
 size_t nrpc_catalog_render_global_functions(NRPC_OWNER owner, BUFFER *wb, bool can_function_del) {
     // a host without a live registry entry (an archived host racing the
     // sender's flag poll) emits nothing: the caller already cleared the flag
@@ -184,8 +190,9 @@ static void host_function2json_cb(const struct nrpc_method_view *v, void *data) 
         buffer_json_member_add_uint64(wb, "version", (uint64_t)v->version);
         buffer_json_member_add_array(wb, "options");
         {
-            // every registered method is host-wide; the constant keeps the
-            // payload byte-identical to the era when the flag existed
+            // every registered method is host-wide; the constant "GLOBAL"
+            // is a wire-compatibility artifact of the retired per-chart
+            // scope and consumers still expect it
             buffer_json_add_array_item_string(wb, "GLOBAL");
         }
         buffer_json_array_close(wb);
@@ -387,8 +394,10 @@ uint64_t nrpc_catalog_manifest_hash(DICTIONARY *dict, const char *node_id, const
         dfe_start_read(dict, e) {
             // padding-free by construction (three uint32_t), so the bytes hashed are only the
             // values - a member of a different width would need explicit packing. uint32_t is also
-            // wide enough for access: node_manifest.cc pins HTTP_ACCESS_ALL to contiguous bits from
-            // 0, so a value that would truncate here fails that build first.
+            // wide enough for access: the manifest proto writer
+            // (generate_update_node_instance_manifest_message) pins
+            // HTTP_ACCESS_ALL to contiguous bits from 0, so a value that
+            // would truncate here fails that build first.
             struct {
                 uint32_t access;
                 uint32_t priority;
