@@ -164,7 +164,7 @@ The node should appear in your Space within a few seconds. If it does not, the A
 claiming result to the Windows Event Log — a rejected or expired token is reported there:
 
 ```powershell
-Get-WinEvent -LogName Netdata -MaxEvents 50 | Where-Object { $_.Message -match 'CLAIM' }
+Get-WinEvent -LogName 'Netdata/Daemon' -MaxEvents 50 | Where-Object { $_.Message -match 'CLAIM' }
 ```
 
 ## Offline (Air-gapped) Installation
