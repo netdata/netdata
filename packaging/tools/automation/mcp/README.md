@@ -112,7 +112,11 @@ netdata_agent_query_metrics(agent_id="agent", metric="system.cpu", after=-60, be
   argument, or `find_anomalous_metrics` which needs ML — off in these profiles).
 - The tool schemas are **vendored** (`agent_tools.py`, snapshotted via
   `scripts/snapshot_agent_tools.py`); a pinned surface, refreshed on demand.
-- No auth/claim needed — localhost `/mcp` is open; forwarding is per-call.
+- Every forwarded call requires `NETDATA_CLOUD_TOKEN` in the server's
+  environment: it mints and attaches a per-agent Cloud bearer before
+  forwarding (agent functions stay access-gated even on localhost once the
+  agent is claimed). A missing token, or a failed mint, is a hard error —
+  there is no anonymous path.
 
 ## OTel logs: configure, feed, query
 
@@ -216,22 +220,27 @@ Wire the server into your agent client in one step (configures **opencode** and
 **Claude Code** in your **global** config, pointing at this checkout, over stdio):
 
 ```sh
-# claim creds are required (launched agents auto-claim to Cloud):
-export NETDATA_CLAIM_TOKEN=…   # and optionally NETDATA_CLAIM_ROOMS
+# both tokens are required (claim creds so launched agents auto-claim to
+# Cloud; the Cloud token so the server can mint per-agent bearers):
+export NETDATA_CLAIM_TOKEN=…   # and optionally NETDATA_CLAIM_ROOMS/NETDATA_CLAIM_URL
+export NETDATA_CLOUD_TOKEN=…   # and optionally NETDATA_CLOUD_HOSTNAME
 ninja setup-mcp                 # from your build dir, or:
 python3 packaging/tools/automation/mcp/scripts/setup_mcp.py --tool all
 # …or pass them explicitly (CLI beats env):
-#   setup_mcp.py --claim-token … [--claim-rooms …] [--claim-url …]
+#   setup_mcp.py --claim-token … [--claim-rooms …] [--claim-url …] \
+#                --cloud-token … [--cloud-hostname …]
 ```
 
 - It mutates **your** global config (`~/.config/opencode/opencode.json` via a
   safe merge; Claude via `claude mcp add --scope user`) — never the repo. It
   adds only the `netdata-build` server and is idempotent.
-- **Claim creds are wired into the client's per-server env** (opencode
-  `environment`, Claude `--env`), so launched agents auto-claim. The **token is
-  required** — `--claim-token` or `NETDATA_CLAIM_TOKEN`; setup **fails** if
-  neither is set. This writes the token into your global client config (the
-  intended cost of pinning it per-server).
+- **Both credentials are wired into the client's per-server env** (opencode
+  `environment`, Claude `--env`), so launched agents auto-claim and the
+  "Querying a running agent" tools (below) can mint bearers. **Both tokens
+  are required** — `--claim-token`/`NETDATA_CLAIM_TOKEN` and
+  `--cloud-token`/`NETDATA_CLOUD_TOKEN`; setup **fails** if either is unset.
+  This writes both tokens into your global client config (the intended cost
+  of pinning them per-server).
 - `--tool opencode|claude|all` selects which to configure; a missing client is
   skipped, not an error.
 - Global config points the server at **this checkout's code**, but the server
@@ -281,7 +290,7 @@ project regardless of the client's cwd):
 ## Development
 
 ```sh
-uv run pytest          # unit tests (profiles, runner, job registry)
+uv run pytest          # unit tests (build/run lifecycle, agent forwarding + bearer auth, OTel, setup_mcp)
 ```
 
 Layout — a transport-free core with no `mcp` imports, plus a thin MCP layer:
@@ -296,7 +305,9 @@ netdata_mcp/
   runtime.py       # agent run dir + netdata.conf gen, port, readiness probe ── core
   agents.py        # AgentRegistry (agent-id -> worktree/profile)  ── core
   run.py           # Run + RunRegistry (launch/readiness/stop)     ── core
-  bearer.py        # Cloud per-agent bearer minting/cache (otel-logs auth) ── core
+  bearer.py        # Cloud per-agent bearer minting/cache (agent forwarding + otel-logs auth) ── core
+  agentmcp.py      # forward a call to a running agent's own /mcp  ── core
+  agent_tools.py   # vendored agent /mcp tool schemas (AGENT_TOOLS) ── core
   agentfn.py       # call a netdata function over HTTP (otel-logs) ── core
   streams.py       # Stream + StreamRegistry, synth/stream cargo runners ── core
   journal.py       # /proc PID resolution + read-only journalctl wrapper ── core
@@ -308,6 +319,9 @@ netdata_mcp/
     agents.py      # netdata_agent_declare
     run.py         # netdata_run_start / _status / _logs / _stop
     logs.py        # netdata_agent_logs (journalctl wrapper; journald hosts only)
+    agent_mcp.py   # netdata_agent_<name> forwarding tools (Querying a running agent)
+    models.py      # shared response models (JobInfo, RunInfo, AgentLogs, ...)
+    vendored.py    # register_forwarding_tool() (vendored-schema tool registration)
     mint_bearer.py # netdata_agent_mint_bearer (per-agent bearer for the Playwright MCP)
     otel_config.py # netdata_agent_otel_config
     otel_logs.py   # netdata_agent_otel_logs

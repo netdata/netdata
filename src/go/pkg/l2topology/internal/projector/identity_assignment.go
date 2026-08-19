@@ -16,6 +16,11 @@ type topologyMatchLookup struct {
 	identityKeys []string
 }
 
+type topologyActorRef struct {
+	actorID     string
+	actorHandle graph.ActorHandle
+}
+
 type projectedTopologyActorSortEntry struct {
 	actor projectedActor
 	key   string
@@ -57,9 +62,10 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []gra
 	}
 
 	usedActorIDs := make(map[string]int, len(actors))
-	actorIDByCanonicalMatch := make(map[string]string, len(actors))
-	actorIDByIdentityKey := make(map[string]string, len(actors)*4)
+	actorRefByCanonicalMatch := make(map[string]topologyActorRef, len(actors))
+	actorRefByIdentityKey := make(map[string]topologyActorRef, len(actors)*4)
 	actorLookups := make([]topologyMatchLookup, len(actors))
+	handles := graph.NewActorHandleAllocator()
 
 	for i := range actors {
 		actorLookups[i] = newTopologyMatchLookup(actors[i].Actor.Match)
@@ -75,15 +81,17 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []gra
 
 		actorID := responseScopedActorID(baseID, usedActorIDs)
 		actors[i].Actor.ActorID = actorID
+		actors[i].Actor.ActorHandle = handles.Next()
+		actorRef := topologyActorRef{actorID: actorID, actorHandle: actors[i].Actor.ActorHandle}
 
 		if actorLookups[i].canonical != "" {
-			if _, exists := actorIDByCanonicalMatch[actorLookups[i].canonical]; !exists {
-				actorIDByCanonicalMatch[actorLookups[i].canonical] = actorID
+			if _, exists := actorRefByCanonicalMatch[actorLookups[i].canonical]; !exists {
+				actorRefByCanonicalMatch[actorLookups[i].canonical] = actorRef
 			}
 		}
 		for _, key := range actorLookups[i].identityKeys {
-			if _, exists := actorIDByIdentityKey[key]; !exists {
-				actorIDByIdentityKey[key] = actorID
+			if _, exists := actorRefByIdentityKey[key]; !exists {
+				actorRefByIdentityKey[key] = actorRef
 			}
 		}
 	}
@@ -91,8 +99,12 @@ func assignTopologyActorIDsAndLinkEndpoints(actors []projectedActor, links []gra
 	for i := range links {
 		srcLookup := newTopologyMatchLookup(links[i].Src.Match)
 		dstLookup := newTopologyMatchLookup(links[i].Dst.Match)
-		links[i].SrcActorID = resolveTopologyEndpointActorID(srcLookup, actorIDByCanonicalMatch, actorIDByIdentityKey)
-		links[i].DstActorID = resolveTopologyEndpointActorID(dstLookup, actorIDByCanonicalMatch, actorIDByIdentityKey)
+		srcRef := resolveTopologyEndpointActorRef(srcLookup, actorRefByCanonicalMatch, actorRefByIdentityKey)
+		dstRef := resolveTopologyEndpointActorRef(dstLookup, actorRefByCanonicalMatch, actorRefByIdentityKey)
+		links[i].SrcActorID = srcRef.actorID
+		links[i].SrcActorHandle = srcRef.actorHandle
+		links[i].DstActorID = dstRef.actorID
+		links[i].DstActorHandle = dstRef.actorHandle
 	}
 }
 
@@ -118,38 +130,38 @@ func responseScopedActorID(base string, used map[string]int) string {
 	return fmt.Sprintf("%s#%d", base, count)
 }
 
-func resolveTopologyEndpointActorID(lookup topologyMatchLookup, byCanonicalMatch map[string]string, byIdentityKey map[string]string) string {
+func resolveTopologyEndpointActorRef(lookup topologyMatchLookup, byCanonicalMatch map[string]topologyActorRef, byIdentityKey map[string]topologyActorRef) topologyActorRef {
 	if lookup.canonical != "" {
-		if actorID := strings.TrimSpace(byCanonicalMatch[lookup.canonical]); actorID != "" {
-			return actorID
+		if ref := byCanonicalMatch[lookup.canonical]; ref.actorID != "" {
+			return ref
 		}
 	}
 	for _, key := range lookup.identityKeys {
-		if actorID := strings.TrimSpace(byIdentityKey[key]); actorID != "" {
-			return actorID
+		if ref := byIdentityKey[key]; ref.actorID != "" {
+			return ref
 		}
 	}
-	return ""
+	return topologyActorRef{}
 }
 
 func enrichTopologyPortDetailsWithLinkCounts(actors []projectedActor, links []graph.Link) {
 	type actorPort struct {
-		actorID  string
-		portName string
+		actorHandle graph.ActorHandle
+		portName    string
 	}
 	counts := make(map[actorPort]int, len(links)*2)
 
 	for _, link := range links {
-		if link.SrcActorID != "" {
+		if !link.SrcActorHandle.IsZero() {
 			name := strings.TrimSpace(link.Src.IfName)
 			if name != "" {
-				counts[actorPort{link.SrcActorID, name}]++
+				counts[actorPort{link.SrcActorHandle, name}]++
 			}
 		}
-		if link.DstActorID != "" {
+		if !link.DstActorHandle.IsZero() {
 			name := strings.TrimSpace(link.Dst.IfName)
 			if name != "" {
-				counts[actorPort{link.DstActorID, name}]++
+				counts[actorPort{link.DstActorHandle, name}]++
 			}
 		}
 	}
@@ -164,7 +176,7 @@ func enrichTopologyPortDetailsWithLinkCounts(actors []projectedActor, links []gr
 			if name == "" {
 				continue
 			}
-			if c := counts[actorPort{actors[i].Actor.ActorID, name}]; c > 0 {
+			if c := counts[actorPort{actors[i].Actor.ActorHandle, name}]; c > 0 {
 				ports[j].LinkCount = model.OptionalValue[int]{Value: c, Has: true}
 			}
 		}

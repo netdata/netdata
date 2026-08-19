@@ -38,8 +38,8 @@ fn error_on_other_format_version() {
 
 #[test]
 fn read_summary_serves_summary_only_files() {
-    // A summary-only file (only the SUMR chunk) is exactly what the traces
-    // seal produces; `IndexReader::open` refuses it, `read_summary` must not.
+    // A summary-only file (only the SUMR chunk) is the format's minimal valid
+    // shape; `IndexReader::open` refuses it, `read_summary` must not.
     let summary = Summary {
         min_timestamp_s: 10,
         max_timestamp_s: 20,

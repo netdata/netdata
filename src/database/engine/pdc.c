@@ -11,6 +11,7 @@ struct extent_page_details_list {
     struct rrdengine_datafile *datafile;
 
     struct rrdeng_cmd *cmd;
+    EPDL_EXTENT *extent_base; // the extent this epdl is merged onto - resolved once by epdl_pending_add()
     bool head_to_datafile_extent_queries_pending_for_extent;
 
     struct {
@@ -526,8 +527,13 @@ static ALWAYS_INLINE EPDL_EXTENT *epdl_find_extent_base(EPDL *epdl) {
     return e;
 }
 
+// The epdls merged onto an extent are linked together via query.next, with e->base being the head.
+// The list keeps growing (other queries merging onto the same extent load) until it is detached
+// from the extent, by setting e->base to NULL. So, the list may only be traversed either while
+// holding e->spinlock, or after it has been detached.
 static ALWAYS_INLINE bool epdl_pending_add(EPDL *epdl) {
     EPDL_EXTENT *e = epdl_find_extent_base(epdl);
+    epdl->extent_base = e;
     spinlock_lock(&e->spinlock);
 
     bool added_new;
@@ -553,11 +559,54 @@ static ALWAYS_INLINE bool epdl_pending_add(EPDL *epdl) {
     return added_new;
 }
 
-static ALWAYS_INLINE void epdl_pending_del(EPDL *epdl) {
-    EPDL_EXTENT *e = epdl_find_extent_base(epdl);
-    spinlock_lock(&e->spinlock);
+// Detach the list of epdls from the extent, so that no more queries can merge onto it.
+// Must be called with e->spinlock locked.
+static ALWAYS_INLINE void epdl_detach_unsafe(EPDL_EXTENT *e, EPDL *epdl) {
+    internal_fatal(e->base != epdl, "DBENGINE: detaching an epdl list that is not attached");
     e->base = NULL;
+    epdl->head_to_datafile_extent_queries_pending_for_extent = false;
+}
+
+// Safe to call multiple times: only the head detaches, and only once - otherwise a later
+// call would detach the list of another query that started loading the same extent.
+static ALWAYS_INLINE void epdl_pending_del(EPDL *epdl) {
+    if(!epdl->head_to_datafile_extent_queries_pending_for_extent)
+        // not the head, or already detached
+        return;
+
+    EPDL_EXTENT *e = epdl->extent_base;
+    spinlock_lock(&e->spinlock);
+    epdl_detach_unsafe(e, epdl);
     spinlock_unlock(&e->spinlock);
+}
+
+// Check if all the queries merged onto this extent have been cancelled and, if so, detach the
+// list in the same critical section. The check and the detach have to be atomic: a query merging
+// onto the extent after the check would have its pages marked as cancelled by the cleanup of
+// epdl_find_extent_and_populate_pages(), although its pdc is still alive.
+static bool epdl_pending_del_if_all_should_stop(EPDL *epdl) {
+    EPDL_EXTENT *e = epdl->extent_base;
+
+    spinlock_lock(&e->spinlock);
+
+    bool should_stop = __atomic_load_n(&epdl->pdc->workers_should_stop, __ATOMIC_RELAXED);
+    for(EPDL *ep = epdl->query.next; ep ;ep = ep->query.next) {
+        internal_fatal(ep->datafile != epdl->datafile, "DBENGINE: datafiles do not match");
+        internal_fatal(ep->extent_block != epdl->extent_block, "DBENGINE: extent blocks do not match");
+        internal_fatal(ep->extent_size != epdl->extent_size, "DBENGINE: extent sizes do not match");
+
+        if(!__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)) {
+            should_stop = false;
+            break;
+        }
+    }
+
+    if(should_stop)
+        epdl_detach_unsafe(e, epdl);
+
+    spinlock_unlock(&e->spinlock);
+
+    return should_stop;
 }
 
 ALWAYS_INLINE_HOT void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)
@@ -929,12 +978,12 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 
 static ALWAYS_INLINE struct page_details *epdl_get_pd_load_link_list_from_metric_start_time(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
 
-    if(unlikely(epdl->head_to_datafile_extent_queries_pending_for_extent))
-        // stop appending more pages to this epdl
-        epdl_pending_del(epdl);
+    // stop appending more pages to this epdl
+    epdl_pending_del(epdl);
 
     struct page_details *pd_list = NULL;
 
+    // the list is detached above, so it is safe to traverse it without e->spinlock
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
         Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
@@ -1357,6 +1406,9 @@ static inline void datafile_extent_read_free(void *buffer) {
     posix_memalign_freez(buffer);
 }
 
+// epdl is always the head of the list of the epdls merged onto this extent (only the head is
+// dispatched for loading). More epdls keep being appended to it until the list is detached, so
+// see epdl_pending_add() for the rules of traversing it.
 NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
@@ -1364,19 +1416,7 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instanc
     size_t *statistics_counter = NULL;
     PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
 
-    bool should_stop = __atomic_load_n(&epdl->pdc->workers_should_stop, __ATOMIC_RELAXED);
-    for(EPDL *ep = epdl->query.next; ep ;ep = ep->query.next) {
-        internal_fatal(ep->datafile != epdl->datafile, "DBENGINE: datafiles do not match");
-        internal_fatal(ep->extent_block != epdl->extent_block, "DBENGINE: extent blocks do not match");
-        internal_fatal(ep->extent_size != epdl->extent_size, "DBENGINE: extent sizes do not match");
-
-        if(!__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)) {
-            should_stop = false;
-            break;
-        }
-    }
-
-    if(unlikely(should_stop)) {
+    if(unlikely(epdl_pending_del_if_all_should_stop(epdl))) {
         statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_cancelled;
         not_loaded_pages_tag = PDC_PAGE_CANCELLED;
         goto cleanup;
@@ -1467,6 +1507,7 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instanc
 cleanup:
     // remove it from the datafile extent_queries
     // this can be called multiple times safely
+    // it also makes the list below safe to traverse without e->spinlock
     epdl_pending_del(epdl);
 
     // mark all pending pages as failed

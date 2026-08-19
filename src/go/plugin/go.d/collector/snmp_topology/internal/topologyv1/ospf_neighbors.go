@@ -3,8 +3,6 @@
 package topologyv1
 
 import (
-	"strings"
-
 	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
@@ -12,7 +10,7 @@ import (
 
 func buildSNMPTopologyV1OSPFNeighborsTable(
 	rows []topologyV1DynamicRow,
-	actorIndex map[string]int,
+	actorIndex topologyV1ActorIndex,
 	stringsDict *topologyapi.StringDictionary,
 ) topologyapi.Table {
 	actorRefs := make([]any, len(rows))
@@ -28,7 +26,7 @@ func buildSNMPTopologyV1OSPFNeighborsTable(
 
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
-		remoteActors[i] = nullableActorRef(actorIndex, row.values["remote_actor_id"])
+		remoteActors[i] = nullableActorRef(actorIndex, row.remoteActorHandle)
 		localRouterIDs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeTopologyRouterID(topologyV1ScalarLabelValue(row.values["local_router_id"])))
 		neighborRouterIDs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeTopologyRouterID(topologyV1ScalarLabelValue(row.values["neighbor_router_id"])))
 		neighborIPs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeNonUnspecifiedIPAddress(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
@@ -53,12 +51,11 @@ func buildSNMPTopologyV1OSPFNeighborsTable(
 	})
 }
 
-func nullableActorRef(actorIndex map[string]int, value any) any {
-	actorID := strings.TrimSpace(topologyV1ScalarLabelValue(value))
-	if actorID == "" {
+func nullableActorRef(actorIndex topologyV1ActorIndex, actorHandle topologymodel.ActorHandle) any {
+	if actorHandle.IsZero() {
 		return nil
 	}
-	ref, ok := actorIndex[actorID]
+	ref, ok := actorIndex[actorHandle]
 	if !ok {
 		return nil
 	}
@@ -67,7 +64,6 @@ func nullableActorRef(actorIndex map[string]int, value any) any {
 
 func snmpTopologyV1OSPFNeighborValues(row topologymodel.OSPFNeighborDetailRow) map[string]any {
 	return pruneNilAttributes(map[string]any{
-		"remote_actor_id":    row.RemoteActorID,
 		"local_router_id":    row.LocalRouterID,
 		"neighbor_router_id": row.NeighborRouterID,
 		"neighbor_ip":        row.NeighborIP,

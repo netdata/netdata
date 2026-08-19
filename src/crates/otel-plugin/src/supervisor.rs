@@ -183,7 +183,7 @@ impl Supervisor {
     /// Send Configure to the ingestor and register the functions it reports.
     async fn configure_ingestor(&mut self, config: PluginConfig) -> anyhow::Result<()> {
         self.ingestor
-            .send(IngestorRequest::Configure(config))
+            .send(IngestorRequest::Configure(Box::new(config)))
             .await
             .context("failed to send Configure to ingestor")?;
 
@@ -200,7 +200,7 @@ impl Supervisor {
     /// Send Configure to the ledger and register the functions it reports.
     async fn configure_ledger(&mut self, config: PluginConfig) -> anyhow::Result<()> {
         self.ledger
-            .send(LedgerRequest::Configure(config))
+            .send(LedgerRequest::Configure(Box::new(config)))
             .await
             .context("failed to send Configure to ledger")?;
 

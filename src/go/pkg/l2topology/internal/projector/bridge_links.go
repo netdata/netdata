@@ -12,6 +12,8 @@ import (
 func collectBridgeLinkRecords(
 	adjacencies []model.Adjacency,
 	ifIndexByDeviceName map[string]int,
+	ifaceByDeviceIndex map[string]model.Interface,
+	aliases bridgePortAliasIndex,
 	strategy topologyInferenceStrategyConfig,
 ) []bridgeBridgeLinkRecord {
 	records := make([]bridgeBridgeLinkRecord, 0)
@@ -23,15 +25,14 @@ func collectBridgeLinkRecords(
 			continue
 		}
 
-		src := bridgePortFromAdjacencySide(adj.SourceID, adj.SourcePort, ifIndexByDeviceName)
-		dst := bridgePortFromAdjacencySide(adj.TargetID, adj.TargetPort, ifIndexByDeviceName)
+		src, dst := bridgePortsFromAdjacency(adj, ifIndexByDeviceName, ifaceByDeviceIndex, aliases)
 		srcKey := bridgePortRefKey(src, false, false)
 		dstKey := bridgePortRefKey(dst, false, false)
 		if srcKey == "" || dstKey == "" {
 			continue
 		}
 
-		pairKey := bridgePairKey(src, dst)
+		pairKey := bridgeScopedPairKey(src, dst)
 		if pairKey == "" {
 			continue
 		}
@@ -70,6 +71,107 @@ func collectBridgeLinkRecords(
 	return records
 }
 
+func normalizeBridgeMacLinkRecords(records []bridgeMacLinkRecord) []bridgeMacLinkRecord {
+	if len(records) == 0 {
+		return nil
+	}
+	if !bridgeMacLinksNeedNormalization(records) {
+		return records
+	}
+
+	aliases := buildBridgeVLANAliasIndex(records)
+	normalized := make([]bridgeMacLinkRecord, 0, len(records))
+	domainful := make(map[string]struct{}, len(records))
+	for _, record := range records {
+		record.port = aliases.canonicalizeVLANScopedPort(record.port)
+		identity := bridgePortCanonicalIdentity(record.port)
+		endpointID := strings.TrimSpace(record.endpointID)
+		method := strings.ToLower(strings.TrimSpace(record.method))
+		if identity == "" || endpointID == "" {
+			continue
+		}
+		if method == "" {
+			method = "fdb"
+		}
+		record.endpointID = endpointID
+		record.method = method
+		normalized = append(normalized, record)
+		if method == "fdb" && bridgePortForwardingDomain(record.port) != "" {
+			domainful[identity+keySep+endpointID] = struct{}{}
+		}
+	}
+
+	out := make([]bridgeMacLinkRecord, 0, len(normalized))
+	position := make(map[string]int, len(normalized))
+	for _, record := range normalized {
+		identity := bridgePortCanonicalIdentity(record.port)
+		if record.method == "fdb" && bridgePortForwardingDomain(record.port) == "" {
+			if _, superseded := domainful[identity+keySep+record.endpointID]; superseded {
+				continue
+			}
+		}
+
+		key := bridgePortRefKey(record.port, false, true) + keySep + record.endpointID + keySep + record.method
+		if index, exists := position[key]; exists {
+			mergeBridgeMacLinkPortEvidence(&out[index].port, record.port)
+			continue
+		}
+		position[key] = len(out)
+		out = append(out, record)
+	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		left := portSortKey(out[i].port) + keySep + out[i].endpointID + keySep + out[i].method
+		right := portSortKey(out[j].port) + keySep + out[j].endpointID + keySep + out[j].method
+		return left < right
+	})
+	return out
+}
+
+func bridgeMacLinksNeedNormalization(records []bridgeMacLinkRecord) bool {
+	hasDomainless := false
+	hasRawDomain := false
+	hasVLANScope := false
+	for _, record := range records {
+		method := strings.ToLower(strings.TrimSpace(record.method))
+		if method != "" && method != "fdb" {
+			continue
+		}
+		domain := bridgePortForwardingDomain(record.port)
+		vlanScope := bridgePortVLANScope(record.port)
+		switch {
+		case domain == "":
+			hasDomainless = true
+		case domain == vlanScope:
+			hasVLANScope = true
+		default:
+			hasRawDomain = true
+		}
+	}
+	return hasRawDomain && (hasDomainless || hasVLANScope) || hasDomainless && hasVLANScope
+}
+
+func mergeBridgeMacLinkPortEvidence(dst *bridgePortRef, src bridgePortRef) {
+	if dst == nil {
+		return
+	}
+	if dst.ifIndex <= 0 && src.ifIndex > 0 {
+		dst.ifIndex = src.ifIndex
+	}
+	if strings.TrimSpace(dst.ifName) == "" {
+		dst.ifName = strings.TrimSpace(src.ifName)
+	}
+	if strings.TrimSpace(dst.bridgePort) == "" {
+		dst.bridgePort = strings.TrimSpace(src.bridgePort)
+	}
+	if strings.TrimSpace(dst.fdbDomainID) == "" {
+		dst.fdbDomainID = strings.TrimSpace(src.fdbDomainID)
+	}
+	if strings.TrimSpace(dst.vlanID) == "" {
+		dst.vlanID = strings.TrimSpace(src.vlanID)
+	}
+}
+
 func (s topologyInferenceStrategyConfig) acceptsBridgeProtocol(protocol string) bool {
 	switch strings.ToLower(strings.TrimSpace(protocol)) {
 	case "lldp":
@@ -91,12 +193,12 @@ func mergeBridgeLinkRecordSets(base, extra []bridgeBridgeLinkRecord) []bridgeBri
 	out = append(out, base...)
 	seen := make(map[string]struct{}, len(base)+len(extra))
 	for _, link := range out {
-		if key := bridgePairKey(link.designatedPort, link.port); key != "" {
+		if key := bridgeScopedPairKey(link.designatedPort, link.port); key != "" {
 			seen[key] = struct{}{}
 		}
 	}
 	for _, link := range extra {
-		key := bridgePairKey(link.designatedPort, link.port)
+		key := bridgeScopedPairKey(link.designatedPort, link.port)
 		if key == "" {
 			continue
 		}
@@ -129,7 +231,7 @@ func collectBridgeMacLinkRecords(
 
 	for _, attachment := range attachmentsSorted {
 		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
-		portKey := bridgePortRefKey(port, false, false)
+		portKey := bridgePortRefKey(port, false, true)
 		endpointID := strings.TrimSpace(attachment.EndpointID)
 		if portKey == "" || endpointID == "" {
 			continue
@@ -159,5 +261,5 @@ func collectBridgeMacLinkRecords(
 		})
 	}
 
-	return records
+	return normalizeBridgeMacLinkRecords(records)
 }

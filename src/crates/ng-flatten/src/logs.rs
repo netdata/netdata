@@ -22,9 +22,10 @@ use crate::common::*;
 
 /// WAL `payload_format` id of the bincode [`FlattenedLogRequest`] frame codec.
 /// Producers stamp it via `wal::Writer::new`; every consumer that decodes log
-/// frames checks it first. The id space is append-only: `0` is reserved,
-/// `2` is the traces raw-OTLP proof payload; a changed logs wire shape takes
-/// the next free id, never reuses this one.
+/// frames checks it first. The id space is append-only: `0` is reserved, `2`
+/// is retired (the removed traces proof scaffold's raw-OTLP payload — never
+/// reuse), `3` is the traces frame codec; a changed logs wire shape takes the
+/// next free id, never reuses this one.
 pub const LOG_FRAME_PAYLOAD_FORMAT: u16 = 1;
 
 /// A flattened request: one schema tree shared by all its records, plus the OTLP
@@ -133,15 +134,6 @@ pub fn flatten_log_into(
         resources.push(LogResourceGroup { resource, scopes });
     }
     resources
-}
-
-/// Inclusive resolved-timestamp acceptance window `[min_ns, max_ns]` for
-/// ingestion. A record whose resolved `time_unix_nano` falls outside is dropped
-/// by [`normalize_log_request`] and counted in [`LogNormalization::rejected`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TimeBounds {
-    pub min_ns: u64,
-    pub max_ns: u64,
 }
 
 /// What one [`normalize_log_request`] walk observed and fixed across a request.
@@ -360,9 +352,9 @@ fn json_number_to_value(n: serde_json::Number) -> Av {
 /// timestamps first (see [`normalize_log_request`] / [`Record`]); a record with
 /// `time_unix_nano == 0` flattens to `ts == 0`.
 ///
-/// Also returns the number of attribute keys sanitized (`'='` → `'_'`, the
-/// key=value delimiter rule) so the caller can log one aggregated warning per
-/// request.
+/// Also returns the number of attribute keys sanitized (`'='` → `'_'` per the
+/// key=value delimiter rule; empty keys degraded to `"_"`) so the caller can
+/// log one aggregated warning per request.
 pub fn flatten_log_request(request: ExportLogsServiceRequest) -> (FlattenedLogRequest, u64) {
     let mut flattener = Flattener::new();
     let resources = flatten_log_into(&mut flattener, request);
@@ -390,8 +382,8 @@ pub struct PreparedLogFrame {
     pub ts_range: Option<(u64, u64)>,
     /// Malformed trace/span ids cleared during normalization (already warned).
     pub bad_ids: MalformedIds,
-    /// Attribute keys sanitized (`'='` → `'_'`) during flattening (already
-    /// warned).
+    /// Attribute keys sanitized during flattening (`'='` → `'_'`, empty
+    /// keys → `"_"`; already warned).
     pub sanitized_keys: u64,
     /// Records dropped as out-of-window by the ingestion [`TimeBounds`]
     /// (0 when no bounds were applied). The caller reports these to the client.
@@ -405,7 +397,7 @@ pub struct PreparedLogFrame {
 /// ingestor so the recipe exists exactly once.
 ///
 /// Logs the aggregated per-request warnings itself (cleared malformed ids,
-/// sanitized `'='` keys) — one owner for the message text too; the counts are
+/// sanitized keys) — one owner for the message text too; the counts are
 /// still returned for callers that want them.
 pub fn prepare_log_frame(
     mut req: ExportLogsServiceRequest,
@@ -443,7 +435,8 @@ pub fn prepare_log_frame(
     if sanitized_keys > 0 {
         tracing::warn!(
             sanitized_keys,
-            "rewrote '=' to '_' in attribute keys at ingest ('=' is the key=value delimiter)",
+            "sanitized attribute keys at ingest ('=' rewritten to '_' — the key=value \
+             delimiter — and empty keys degraded to '_')",
         );
     }
     // Hashes are filled at emit time by the flattener; no second pass.

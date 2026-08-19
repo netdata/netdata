@@ -11,7 +11,9 @@ pub mod runner;
 pub mod sender;
 pub mod sse;
 pub mod synth;
-// PROOF SCAFFOLD (otel traces-proof SOW; revert with the skeleton).
+// Deterministic synthetic-traces generator: regression-test tooling for edge
+// cases (orphans, multi-root, skew, resends); real development traffic comes
+// from the OTel demo (plan decision D6).
 pub mod synth_traces;
 pub mod wikimedia;
 pub mod ws;

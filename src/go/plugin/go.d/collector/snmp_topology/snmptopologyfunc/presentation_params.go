@@ -41,10 +41,11 @@ func mapTypeParamConfig() funcapi.ParamConfig {
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
 			{
-				ID:      topologyoptions.MapTypeLLDPCDPManaged,
-				Name:    "LLDP/CDP/Managed Devices Map",
+				ID:      topologyoptions.MapTypeManagedFabric,
+				Name:    "Managed Fabric Map",
 				Default: true,
 			},
+			{ID: topologyoptions.MapTypeLLDPCDPManaged, Name: "LLDP/CDP/Managed Devices Map"},
 			{ID: topologyoptions.MapTypeHighConfidenceInferred, Name: "High Confidence Inferred Map"},
 			{
 				ID:   topologyoptions.MapTypeAllDevicesLowConfidence,

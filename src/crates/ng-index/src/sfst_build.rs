@@ -40,11 +40,13 @@ fn to_value_kind(kind: ng_flatten::Kind) -> sfst::ValueKind {
     }
 }
 
-/// Convert the global flatten [`ng_flatten::SchemaTree`] into the format crate's
+/// Convert a flatten [`ng_flatten::SchemaTree`] into the format crate's
 /// [`sfst::SchemaTree`] node-by-node (ids are preserved, parents precede
 /// children). Leaf stats are left unset here — the SFST build fills them from
-/// the per-field cardinality/tier.
-fn to_sfst_tree(tree: &ng_flatten::SchemaTree) -> sfst::SchemaTree {
+/// the per-field cardinality/tier. Public as the CANONICAL boundary
+/// conversion: the sfsq traces tail scan derives its field→kind map through
+/// this exact converter, so tail and sealed kinds agree by construction.
+pub fn to_sfst_tree(tree: &ng_flatten::SchemaTree) -> sfst::SchemaTree {
     let nodes = (0..tree.len() as NodeId)
         .map(|id| sfst::SchemaNode {
             kind: to_value_kind(tree.node(id).kind),
@@ -82,6 +84,53 @@ pub struct SfstStats {
 /// hash collision aliasing distinct strings); a verified hit skips the intern-map
 /// insert. Computed once per resource/scope group and reused across its records, so
 /// shared attrs aren't re-probed per record.
+fn intern_one(
+    row_index: &mut RowIndex<'_>,
+    e: &Entry,
+    paths: &[String],
+    kv: &mut String,
+    stats: &mut SfstStats,
+) -> KvSlot {
+    // Render key=value up front so a hash hit can be *verified* against the
+    // interned string. Without this re-check, two distinct strings sharing a
+    // hash (a genuine xxhash64 collision, or an unfilled hash==0) would alias:
+    // `lookup_hash` returns the first string's slot with no string check, and
+    // the interner's collision overflow — populated only inside `intern` — is
+    // never reached, because a fast-path hit skips `intern` entirely.
+    build_kv(&paths[e.node as usize], &e.value, kv);
+    let hit = row_index.lookup_hash(e.hash);
+    match hit {
+        Some(token) if row_index.resolve(token) == kv.as_str() => {
+            stats.hits += 1;
+            token
+        }
+        // Unknown hash, or a hit whose string differs (a real collision):
+        // `intern` compares strings and records the collision correctly.
+        _ => {
+            stats.misses += 1;
+            row_index.intern(Some(e.hash), kv)
+        }
+    }
+}
+
+/// Intern `entries` APPENDING their slots to `out` — the allocation-free form
+/// for hot loops that reuse a scratch buffer (per-event/per-link attrs) or
+/// intern straight into the row's token list.
+fn intern_entries_into(
+    row_index: &mut RowIndex<'_>,
+    entries: &[Entry],
+    paths: &[String],
+    kv: &mut String,
+    stats: &mut SfstStats,
+    out: &mut Vec<KvSlot>,
+) {
+    out.reserve(entries.len());
+    for e in entries {
+        let slot = intern_one(row_index, e, paths, kv, stats);
+        out.push(slot);
+    }
+}
+
 fn intern_entries(
     row_index: &mut RowIndex<'_>,
     entries: &[Entry],
@@ -89,31 +138,9 @@ fn intern_entries(
     kv: &mut String,
     stats: &mut SfstStats,
 ) -> Vec<KvSlot> {
-    entries
-        .iter()
-        .map(|e| {
-            // Render key=value up front so a hash hit can be *verified* against the
-            // interned string. Without this re-check, two distinct strings sharing a
-            // hash (a genuine xxhash64 collision, or an unfilled hash==0) would alias:
-            // `lookup_hash` returns the first string's slot with no string check, and
-            // the interner's collision overflow — populated only inside `intern` — is
-            // never reached, because a fast-path hit skips `intern` entirely.
-            build_kv(&paths[e.node as usize], &e.value, kv);
-            let hit = row_index.lookup_hash(e.hash);
-            match hit {
-                Some(token) if row_index.resolve(token) == kv.as_str() => {
-                    stats.hits += 1;
-                    token
-                }
-                // Unknown hash, or a hit whose string differs (a real collision):
-                // `intern` compares strings and records the collision correctly.
-                _ => {
-                    stats.misses += 1;
-                    row_index.intern(Some(e.hash), kv)
-                }
-            }
-        })
-        .collect()
+    let mut out = Vec::with_capacity(entries.len());
+    intern_entries_into(row_index, entries, paths, kv, stats, &mut out);
+    out
 }
 
 /// Populate `row_index` from every frame `reader` yields: intern each entry
@@ -315,6 +342,27 @@ pub fn build_sfst_range(
     Ok((summary, cursor.into_inner()))
 }
 
+/// The **traces** counterpart of [`build_sfst_range`]: an in-memory SFST over a
+/// frame-aligned `range` of an active flattened-traces WAL — the on-query chunk
+/// build over the durable-unindexed prefix. Same typed tree + span per-row columns
+/// (+ TIDX/TBLM) as [`build_sfst_traces_file`], so the chunks are byte-identical to
+/// a file build over the same frames. The caller cross-checks
+/// `summary.record_count` against the expected count to detect a truncated prefix
+/// (the check `open_range` defers).
+pub fn build_sfst_traces_range(
+    wal_path: &Path,
+    range: wal::FrameRange,
+) -> Result<(sfst::Summary, Vec<u8>), Error> {
+    let mut reader = wal::Reader::open_range(wal_path, range)?;
+    let content_meta = reader.header().content_meta.clone();
+    let arena = Bump::new();
+    let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+    populate_trace_row_index(&mut reader, &mut row_index, &Metrics::new())?;
+    let cursor = std::io::Cursor::new(Vec::new());
+    let (cursor, summary, _metadata) = IndexWriter::write_into(&row_index, cursor, content_meta)?;
+    Ok((summary, cursor.into_inner()))
+}
+
 /// The traces analog of [`populate_row_index`]: decode `FlattenedTraceRequest` frames,
 /// intern each span's entries (resource ++ scope ++ span), feed one row per span keyed
 /// on the span's start `ts`, and accumulate the span per-row columns — `trace_id`,
@@ -333,12 +381,26 @@ fn populate_trace_row_index(
     let mut kv = String::new();
     let mut flattener = ng_flatten::Flattener::new();
 
+    // The producer-side storage keys the rollup captures by (this crate
+    // family DEFINES the storage paths via the flattener; the sfsq
+    // vocabulary mirrors them — a downstream lockstep test keeps both
+    // honest).
+    const ROLLUP_SERVICE_KEY: &str = "resource.attributes.service.name";
+    const ROLLUP_NAME_KEY: &str = "name";
+    const ROLLUP_KIND_RAW_KEY: &str = "_kind";
+    const ROLLUP_STATUS_KEY: &str = "status_code";
+
+    let mut rollup = sfst::TraceRollupRows::new();
     let mut trace_ids = TraceIds::default();
     let mut span_ids = SpanIds::default();
     let mut parent_span_ids = ParentSpanIds::default();
     let mut durations: Vec<i64> = Vec::new();
     let mut flags: Vec<u32> = Vec::new();
     let mut dropped_attrs: Vec<u32> = Vec::new();
+    let mut events = sfst::EventRows::new();
+    let mut links = sfst::LinkRows::new();
+    // Reused per-event/per-link attr slot buffer (see the span loop).
+    let mut attr_scratch: Vec<KvSlot> = Vec::new();
 
     loop {
         let frame = {
@@ -365,11 +427,29 @@ fn populate_trace_row_index(
         let _ = flattener.merge_tree(tree);
         let paths: Vec<String> = (0..tree.len() as NodeId).map(|id| tree.path(id)).collect();
 
+        // Resolve the rollup capture keys to this frame's NodeIds ONCE —
+        // the per-span capture below compares node ids, not path strings.
+        let node_of = |key: &str| -> Option<NodeId> {
+            (0..tree.len() as NodeId).find(|&id| paths[id as usize] == key)
+        };
+        let service_node = node_of(ROLLUP_SERVICE_KEY);
+        let name_node = node_of(ROLLUP_NAME_KEY);
+        let kind_node = node_of(ROLLUP_KIND_RAW_KEY);
+        let status_node = node_of(ROLLUP_STATUS_KEY);
+
         let mut tokens: Vec<KvSlot> = Vec::new();
         let mut records = 0u64;
         for rg in &flattened.resources {
             let resource_tokens =
                 intern_entries(row_index, &rg.resource, &paths, &mut kv, &mut stats);
+            // The rollup's root service ref: the resource group's
+            // `service.name` slot, constant across its spans.
+            let service_slot = service_node.and_then(|n| {
+                rg.resource
+                    .iter()
+                    .position(|e| e.node == n)
+                    .map(|i| resource_tokens[i])
+            });
             tokens.clear();
             tokens.extend_from_slice(&resource_tokens);
 
@@ -381,13 +461,130 @@ fn populate_trace_row_index(
                 for span in &sg.spans {
                     records += 1;
 
-                    let span_tokens =
-                        intern_entries(row_index, &span.entries, &paths, &mut kv, &mut stats);
+                    // Span entries intern straight into the row token list (no
+                    // per-span Vec); the truncate re-establishes the shared
+                    // resource+scope prefix.
                     tokens.truncate(resource_tokens.len() + scope_tokens.len());
-                    tokens.extend_from_slice(&span_tokens);
+                    intern_entries_into(
+                        row_index,
+                        &span.entries,
+                        &paths,
+                        &mut kv,
+                        &mut stats,
+                        &mut tokens,
+                    );
+
+                    // Events/links: their name/attr entries intern like any row
+                    // token (searchable via the tiers) AND register in the
+                    // structure accumulators, which reference the same slots —
+                    // grouping/order/per-item scalars for the EVNB/LNKB chunks.
+                    // `attr_scratch` is reused per item (no per-event/link Vec).
+                    for ev in &span.events {
+                        let name_slot =
+                            intern_one(row_index, &ev.name, &paths, &mut kv, &mut stats);
+                        attr_scratch.clear();
+                        intern_entries_into(
+                            row_index,
+                            &ev.attributes,
+                            &paths,
+                            &mut kv,
+                            &mut stats,
+                            &mut attr_scratch,
+                        );
+                        tokens.push(name_slot);
+                        tokens.extend_from_slice(&attr_scratch);
+                        events.push_event(
+                            ev.time_unix_nano,
+                            ev.dropped_attributes_count,
+                            name_slot,
+                            &attr_scratch,
+                        );
+                    }
+                    for link in &span.links {
+                        attr_scratch.clear();
+                        intern_entries_into(
+                            row_index,
+                            &link.attributes,
+                            &paths,
+                            &mut kv,
+                            &mut stats,
+                            &mut attr_scratch,
+                        );
+                        tokens.extend_from_slice(&attr_scratch);
+                        links.push_link(
+                            sfst::TraceId::from(*link.trace_id.as_bytes()),
+                            sfst::SpanId::from(*link.span_id.as_bytes()),
+                            link.flags,
+                            link.dropped_attributes_count,
+                            &link.trace_state,
+                            &attr_scratch,
+                        );
+                    }
 
                     // ts = start_time, normalized at ingest (always concrete).
                     row_index.row(span.ts, &tokens);
+
+                    // Per-row pushes AFTER row(): the row and every parallel
+                    // per-row structure advance atomically at the bottom of the
+                    // iteration (same discipline as the column Vecs below), so
+                    // no early exit can leave the accumulators misaligned.
+                    events.end_row(span.dropped_events_count);
+                    links.end_row(span.dropped_links_count);
+
+                    // The trace rollup folds this span: name/raw-kind/status
+                    // captured by storage key from the just-interned span
+                    // entries (tokens[base + j] is span.entries[j]'s slot).
+                    // FIRST entry wins per facet — the same value every
+                    // evaluation path reads (span_field / the tail fold /
+                    // canonical materialization all take the first), so
+                    // a crafted multi-valued frame cannot make the
+                    // recorded facets diverge from the evaluated ones.
+                    // Precisely: `name` locks on the first entry, `kind`
+                    // on the first Int-valued entry, `status` on the
+                    // first entry of any type — the flattener emits
+                    // `_kind` only as Int and `status_code` only as Str
+                    // (ng-flatten common.rs), so the per-facet nuances
+                    // are unreachable from the ingest path.
+                    // Honest OTLP spans carry each of these exactly once.
+                    {
+                        let base = resource_tokens.len() + scope_tokens.len();
+                        let mut name_slot = None;
+                        let mut kind = None;
+                        let mut is_error = None;
+                        for (j, e) in span.entries.iter().enumerate() {
+                            if Some(e.node) == name_node {
+                                if name_slot.is_none() {
+                                    name_slot = Some(tokens[base + j]);
+                                }
+                            } else if Some(e.node) == kind_node {
+                                if kind.is_none() {
+                                    if let ng_flatten::Value::Int(k) = &e.value {
+                                        kind = Some(*k as i32);
+                                    }
+                                }
+                            } else if Some(e.node) == status_node && is_error.is_none() {
+                                is_error = Some(matches!(&e.value,
+                                    ng_flatten::Value::Str(s) if s == "ERROR"));
+                            }
+                        }
+                        let kind = kind.unwrap_or(0);
+                        let is_error = is_error.unwrap_or(false);
+                        // An empty/malformed parent id normalized to the
+                        // all-zero UNSET at ingest — the typed check IS the
+                        // OTLP root convention.
+                        let parent = SpanId::from(*span.parent_span_id.as_bytes());
+                        rollup.record_span(
+                            TraceId::from(*span.trace_id.as_bytes()),
+                            SpanId::from(*span.span_id.as_bytes()),
+                            parent.is_unset(),
+                            span.ts,
+                            span.duration,
+                            kind,
+                            is_error,
+                            service_slot,
+                            name_slot,
+                        );
+                    }
 
                     // Per-row span columns, one value per row (parallel to the row
                     // just fed) so they stay aligned for the build-time remap. Ids
@@ -416,6 +613,16 @@ fn populate_trace_row_index(
     row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
     // Spans turn the index on: the builder builds TIDX from the chronological TRCE.
     row_index.build_trace_id_index = true;
+    // ...and the per-file trace-id bloom derived from it (skipped by the
+    // builder when no set trace id exists).
+    row_index.build_trace_id_bloom = true;
+    // Event/link structures only when they carry information (≥1 item or a
+    // nonzero span-level dropped count) — an all-empty accumulator writes no chunk.
+    row_index.events = events.is_meaningful().then_some(events);
+    row_index.links = links.is_meaningful().then_some(links);
+    // The trace rollup, same is-meaningful rule (an empty rollup — an
+    // all-UNSET-trace-id file — writes no chunk).
+    row_index.trace_rollup = rollup.is_meaningful().then_some(rollup);
 
     Ok(stats)
 }

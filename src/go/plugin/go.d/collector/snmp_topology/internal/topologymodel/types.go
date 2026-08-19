@@ -26,23 +26,24 @@ const (
 
 type Match = graph.Match
 type LinkEndpoint = graph.LinkEndpoint
+type ActorHandle = graph.ActorHandle
 
 type Link struct {
-	Layer        string
-	Protocol     string
-	LinkType     string
-	Direction    string
-	State        string
-	SrcActorID   string
-	DstActorID   string
-	Src          LinkEndpoint
-	Dst          LinkEndpoint
-	DiscoveredAt *time.Time
-	LastSeen     *time.Time
-	Display      *graph.LinkDisplay
-	L2           *graph.LinkL2
-	Inference    *graph.LinkInference
-	Detail       LinkDetail
+	Layer          string
+	Protocol       string
+	LinkType       string
+	Direction      string
+	State          string
+	SrcActorHandle ActorHandle
+	DstActorHandle ActorHandle
+	Src            LinkEndpoint
+	Dst            LinkEndpoint
+	DiscoveredAt   *time.Time
+	LastSeen       *time.Time
+	Display        *graph.LinkDisplay
+	L2             *graph.LinkL2
+	Inference      *graph.LinkInference
+	Detail         LinkDetail
 }
 
 type LinkDetail struct {
@@ -103,6 +104,7 @@ type BGPAdjacencyLinkDetail struct {
 }
 
 type Actor struct {
+	ActorHandle ActorHandle
 	ActorID     string
 	ActorType   string
 	SegmentKind string
@@ -157,6 +159,7 @@ type Data struct {
 	Actors        []Actor
 	Links         []Link
 	Stats         Stats
+	actorHandles  graph.ActorHandleAllocator
 }
 
 type ManagementAddress struct {

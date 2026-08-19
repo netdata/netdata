@@ -73,7 +73,16 @@ func sortedCDPRemotes(in []model.CDPRemoteObservation) []model.CDPRemoteObservat
 		if a.DeviceID != b.DeviceID {
 			return a.DeviceID < b.DeviceID
 		}
-		return a.Address < b.Address
+		if a.LocalIfName != b.LocalIfName {
+			return a.LocalIfName < b.LocalIfName
+		}
+		if a.DevicePort != b.DevicePort {
+			return a.DevicePort < b.DevicePort
+		}
+		if a.Address != b.Address {
+			return a.Address < b.Address
+		}
+		return a.RawAddress < b.RawAddress
 	})
 	return out
 }
@@ -231,7 +240,10 @@ func sortedAdjacencies(in map[string]model.Adjacency) []model.Adjacency {
 		if a.TargetID != b.TargetID {
 			return a.TargetID < b.TargetID
 		}
-		return a.TargetPort < b.TargetPort
+		if a.TargetPort != b.TargetPort {
+			return a.TargetPort < b.TargetPort
+		}
+		return adjacencyKey(a) < adjacencyKey(b)
 	})
 	return out
 }
@@ -252,7 +264,10 @@ func sortedAttachments(in map[string]model.Attachment) []model.Attachment {
 		if a.EndpointID != b.EndpointID {
 			return a.EndpointID < b.EndpointID
 		}
-		return a.Method < b.Method
+		if a.Method != b.Method {
+			return a.Method < b.Method
+		}
+		return attachmentKey(a) < attachmentKey(b)
 	})
 	return out
 }

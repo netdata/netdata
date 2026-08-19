@@ -8,20 +8,36 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-func topologyLinkDeltaKey(link topologymodel.Link) string {
-	return strings.Join([]string{
-		strings.ToLower(strings.TrimSpace(link.Protocol)),
-		strings.ToLower(strings.TrimSpace(link.Direction)),
-		strings.TrimSpace(link.SrcActorID),
-		strings.TrimSpace(link.DstActorID),
-		topologymodel.EndpointKey(link.Src, "if_index"),
-		topologymodel.EndpointKey(link.Src, "if_name"),
-		topologymodel.EndpointKey(link.Src, "port_id"),
-		topologymodel.EndpointKey(link.Dst, "if_index"),
-		topologymodel.EndpointKey(link.Dst, "if_name"),
-		topologymodel.EndpointKey(link.Dst, "port_id"),
-		topologyL2BridgeDomain(link),
-	}, "|")
+type deltaActorRef uint64
+
+type topologyLinkDeltaKeyValue struct {
+	protocol     string
+	direction    string
+	srcActor     deltaActorRef
+	dstActor     deltaActorRef
+	srcIfIndex   int
+	srcIfName    string
+	srcPortID    string
+	dstIfIndex   int
+	dstIfName    string
+	dstPortID    string
+	bridgeDomain string
+}
+
+func topologyLinkDeltaKey(link topologymodel.Link, srcActor, dstActor deltaActorRef) topologyLinkDeltaKeyValue {
+	return topologyLinkDeltaKeyValue{
+		protocol:     strings.ToLower(strings.TrimSpace(link.Protocol)),
+		direction:    strings.ToLower(strings.TrimSpace(link.Direction)),
+		srcActor:     srcActor,
+		dstActor:     dstActor,
+		srcIfIndex:   max(link.Src.IfIndex, 0),
+		srcIfName:    topologymodel.EndpointKey(link.Src, "if_name"),
+		srcPortID:    topologymodel.EndpointKey(link.Src, "port_id"),
+		dstIfIndex:   max(link.Dst.IfIndex, 0),
+		dstIfName:    topologymodel.EndpointKey(link.Dst, "if_name"),
+		dstPortID:    topologymodel.EndpointKey(link.Dst, "port_id"),
+		bridgeDomain: topologyL2BridgeDomain(link),
+	}
 }
 
 func MarkProbableDeltaLinks(strictData, probableData *topologymodel.Data) {
@@ -29,13 +45,14 @@ func MarkProbableDeltaLinks(strictData, probableData *topologymodel.Data) {
 		return
 	}
 
-	strictKeys := make(map[string]struct{}, len(strictData.Links))
+	strictActorRefs, probableActorRefs := buildDeltaActorRefs(strictData.Actors, probableData.Actors)
+	strictKeys := make(map[topologyLinkDeltaKeyValue]struct{}, len(strictData.Links))
 	for _, link := range strictData.Links {
-		strictKeys[topologyLinkDeltaKey(link)] = struct{}{}
+		strictKeys[topologyLinkDeltaKey(link, strictActorRefs[link.SrcActorHandle], strictActorRefs[link.DstActorHandle])] = struct{}{}
 	}
 
 	for idx, link := range probableData.Links {
-		key := topologyLinkDeltaKey(link)
+		key := topologyLinkDeltaKey(link, probableActorRefs[link.SrcActorHandle], probableActorRefs[link.DstActorHandle])
 		if _, exists := strictKeys[key]; exists {
 			continue
 		}
@@ -59,23 +76,64 @@ func MarkProbableDeltaLinks(strictData, probableData *topologymodel.Data) {
 	topologymodel.RecomputeLinkStats(probableData)
 }
 
-func topologyLinkActorKey(link topologymodel.Link) string {
-	return strings.Join([]string{
-		link.Protocol,
-		link.Direction,
-		link.SrcActorID,
-		link.DstActorID,
-		topologymodel.EndpointKey(link.Src, "if_index"),
-		topologymodel.EndpointKey(link.Src, "if_name"),
-		topologymodel.EndpointKey(link.Src, "port_id"),
-		topologymodel.EndpointKey(link.Dst, "if_index"),
-		topologymodel.EndpointKey(link.Dst, "if_name"),
-		topologymodel.EndpointKey(link.Dst, "port_id"),
-		link.State,
-		topologyL2BridgeDomain(link),
-		topologymodel.LinkAttachmentModeValue(link),
-		topologymodel.LinkInferenceValue(link),
-	}, "|")
+func buildDeltaActorRefs(strictActors, probableActors []topologymodel.Actor) (map[topologymodel.ActorHandle]deltaActorRef, map[topologymodel.ActorHandle]deltaActorRef) {
+	byActorID := make(map[string]deltaActorRef, len(strictActors)+len(probableActors))
+	strictRefs := make(map[topologymodel.ActorHandle]deltaActorRef, len(strictActors))
+	probableRefs := make(map[topologymodel.ActorHandle]deltaActorRef, len(probableActors))
+	next := deltaActorRef(1)
+	add := func(actors []topologymodel.Actor, refs map[topologymodel.ActorHandle]deltaActorRef) {
+		for _, actor := range actors {
+			actorID := strings.TrimSpace(actor.ActorID)
+			ref, ok := byActorID[actorID]
+			if actorID == "" || !ok {
+				ref = next
+				next++
+				if actorID != "" {
+					byActorID[actorID] = ref
+				}
+			}
+			refs[actor.ActorHandle] = ref
+		}
+	}
+	add(strictActors, strictRefs)
+	add(probableActors, probableRefs)
+	return strictRefs, probableRefs
+}
+
+type topologyLinkActorKeyValue struct {
+	protocol       string
+	direction      string
+	srcActor       topologymodel.ActorHandle
+	dstActor       topologymodel.ActorHandle
+	srcIfIndex     string
+	srcIfName      string
+	srcPortID      string
+	dstIfIndex     string
+	dstIfName      string
+	dstPortID      string
+	state          string
+	bridgeDomain   string
+	attachmentMode string
+	inference      string
+}
+
+func topologyLinkActorKey(link topologymodel.Link) topologyLinkActorKeyValue {
+	return topologyLinkActorKeyValue{
+		protocol:       link.Protocol,
+		direction:      link.Direction,
+		srcActor:       link.SrcActorHandle,
+		dstActor:       link.DstActorHandle,
+		srcIfIndex:     topologymodel.EndpointKey(link.Src, "if_index"),
+		srcIfName:      topologymodel.EndpointKey(link.Src, "if_name"),
+		srcPortID:      topologymodel.EndpointKey(link.Src, "port_id"),
+		dstIfIndex:     topologymodel.EndpointKey(link.Dst, "if_index"),
+		dstIfName:      topologymodel.EndpointKey(link.Dst, "if_name"),
+		dstPortID:      topologymodel.EndpointKey(link.Dst, "port_id"),
+		state:          link.State,
+		bridgeDomain:   topologyL2BridgeDomain(link),
+		attachmentMode: topologymodel.LinkAttachmentModeValue(link),
+		inference:      topologymodel.LinkInferenceValue(link),
+	}
 }
 
 func topologyL2BridgeDomain(link topologymodel.Link) string {

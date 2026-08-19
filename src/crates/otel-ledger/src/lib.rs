@@ -1,16 +1,16 @@
-//! OTel-logs ledger: the logs content binding over the content-agnostic
+//! OTel ledger: the logs + traces content bindings over the content-agnostic
 //! [`file_lifecycle`] substrate. It owns the `Ledger` coordinator (run-loop,
 //! supervisor/writer IPC, shared workers), the logs query handler + engine
-//! adapter (`ledger::rpc`), and the logs seal step (`indexer`, which builds the
-//! SFST via `ng-index`). The reusable machinery (registry, catalog, upload/download,
-//! cache, recovery, the per-signal `Pipeline` shell) lives in `file-lifecycle`.
+//! adapter (`ledger::rpc`), and the shared seal component (`indexer`, spawned
+//! per signal with that signal's `ng-index` builder). The reusable machinery
+//! (registry, catalog, upload/download, cache, recovery, the per-signal
+//! `Pipeline` shell) lives in `file-lifecycle`.
 
 pub mod event;
 pub mod indexer;
 mod ledger;
 #[cfg(test)]
 pub(crate) mod test_helpers;
-pub mod traces_indexer;
 
 pub use ledger::Ledger;
 
@@ -37,7 +37,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     let config = match supervisor.recv().await? {
         LedgerRequest::Configure(config) => {
             tracing::info!("received plugin configuration from supervisor");
-            config
+            *config
         }
         other => {
             anyhow::bail!("expected Configure, got {:?}", other);
@@ -78,9 +78,11 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     if let Err(e) = &result {
         tracing::error!("ledger event loop error: {e:#}");
     }
-    result.context("ledger event loop error")?;
-
+    // Signal shutdown to the cancellation-driven tasks on BOTH exit
+    // paths — an error exit would otherwise leave them to the runtime
+    // teardown, never the graceful drain.
     ledger.cancel.cancel();
+    result.context("ledger event loop error")?;
 
     Ok(())
 }

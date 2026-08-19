@@ -1,5 +1,5 @@
-//! OTel ingestor worker — receives metrics and logs via gRPC and emits Netdata chart data
-//! over ferryboat IPC to the otel-plugin supervisor.
+//! OTel ingestor worker — receives metrics, logs, and traces via gRPC and emits
+//! Netdata chart data over ferryboat IPC to the otel-plugin supervisor.
 
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,7 +25,6 @@ mod metrics_service;
 mod otel;
 mod output;
 mod tenant;
-// PROOF SCAFFOLD (traces-proof SOW; revert with the skeleton).
 mod trace_service;
 
 use chart_config::ChartConfigManager;
@@ -56,7 +55,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     let config = match conn.recv().await? {
         IngestorRequest::Configure(config) => {
             tracing::info!("received plugin configuration from supervisor");
-            config
+            *config
         }
         other => {
             anyhow::bail!("expected Configure, got {:?}", other);
@@ -157,10 +156,10 @@ async fn run_ingestor(
         }
     });
 
-    // Set up logs + (proof-scaffold) traces pipelines. They SHARE one
-    // writer→ledger sender and one global seq allocator: the ledger accepts a
-    // single writer connection (and gap-checks the frame sequence per signal),
-    // and file `seq` must be globally unique across signals.
+    // Set up the logs + traces pipelines. They SHARE one writer→ledger sender
+    // and one global seq allocator: the ledger accepts a single writer
+    // connection (and gap-checks the frame sequence per signal), and file
+    // `seq` must be globally unique across signals.
     let (sender, seq) = create_shared_writer_state(&config, &config.writer_socket_path)?;
     // One process-wide monotonic clock, shared across signals — the WAL writer's
     // contract is that all per-frame `ingestion_ns` come from a single clock so
@@ -182,66 +181,46 @@ async fn run_ingestor(
         identity,
     ));
 
-    // Idle-rotation sweep (P4/I2): a periodic task closes WAL streams that have
-    // passed their duration threshold with no new frames, so quiet streams still
-    // get indexed (and, with remote storage, uploaded). The sweep interval is a
-    // floor on idle-stream latency only; if an operator sets a default rotation
-    // shorter than it, idle files rotate at sweep granularity (active files are
-    // unaffected — they rotate on write). Warn once so that is not a surprise.
-    let default_rotation = logs_service.default_max_file_duration();
-    if default_rotation <= WAL_SWEEP_INTERVAL {
-        tracing::warn!(
-            max_file_duration_secs = default_rotation.as_secs(),
-            sweep_interval_secs = WAL_SWEEP_INTERVAL.as_secs(),
-            "logs WAL max_file_duration is at or below the idle-rotation sweep interval; \
-             idle streams will rotate at sweep granularity (active streams still rotate on write)"
-        );
-    }
-    // A zero future_skew makes the ingestion window's upper bound exactly the
-    // server clock: any record even 1ns ahead is rejected. Ordinary sender/server
-    // clock skew then causes routine rejections. Warn once so that is a choice,
-    // not a surprise.
-    if logs_service.ingest_future_skew().is_zero() {
-        tracing::warn!(
-            "logs ingest future_skew is 0; records timestamped even 1ns ahead of the \
-             server clock will be rejected (ordinary sender/server clock skew will cause rejections)"
-        );
-    }
-    // A zero max_age collapses the ingestion window to [now, now + future_skew]:
-    // every record older than the moment of arrival is rejected — effectively all
-    // real (non-synthesized) history. Ordinary delivery latency then causes
-    // routine rejections. Warn once so that is a choice, not a surprise.
-    if logs_service.ingest_max_age().is_zero() {
-        tracing::warn!(
-            "logs ingest max_age is 0; every record older than the moment of arrival is \
-             rejected (effectively all real history; ordinary delivery latency will cause rejections)"
-        );
-    }
-    let sweep_service = Arc::clone(&logs_service);
-    let sweep_handle = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(WAL_SWEEP_INTERVAL);
-        // A slow tick (many tenants sealing at once on slow storage) must not
-        // burst-fire the backlog; skip missed ticks instead.
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        loop {
-            interval.tick().await;
-            let svc = Arc::clone(&sweep_service);
-            // The sweep does serial `fsync`s; run it off the async worker pool so
-            // it can never stall the runtime.
-            if let Err(e) = tokio::task::spawn_blocking(move || svc.sweep_expired_rotations()).await
-            {
-                tracing::error!(%e, "WAL idle-rotation sweep task failed");
-            }
-        }
-    });
-    let traces_service = create_traces_service(
+    let traces_service = Arc::new(create_traces_service(
         &traces_lifecycle,
         &config.auth,
         sender,
         seq,
         clock,
         identity,
+    ));
+
+    // Startup config warnings, per signal (each signal resolves its own
+    // rotation + ingestion window).
+    warn_signal_config(
+        "logs",
+        logs_service.default_max_file_duration(),
+        logs_service.ingest_future_skew(),
+        logs_service.ingest_max_age(),
     );
+    warn_signal_config(
+        "traces",
+        traces_service.default_max_file_duration(),
+        traces_service.ingest_future_skew(),
+        traces_service.ingest_max_age(),
+    );
+
+    // Idle-rotation sweeps (P4/I2): a periodic task per signal closes WAL
+    // streams that have passed their duration threshold with no new frames, so
+    // quiet streams still get indexed (and, with remote storage, uploaded).
+    // The sweep interval is a floor on idle-stream latency only; if an
+    // operator sets a default rotation shorter than it, idle files rotate at
+    // sweep granularity (active files are unaffected — they rotate on write;
+    // `warn_signal_config` flags that case). Each signal gets its OWN task:
+    // the sweeps do serial fsyncs, so sharing one task would let a slow
+    // traces sweep delay the next logs sweep tick (and vice versa) — the
+    // signals' writer registries are independent, so nothing is shared.
+    let logs_sweep_handle = spawn_sweep("logs", Arc::clone(&logs_service), |s| {
+        s.sweep_expired_rotations()
+    });
+    let traces_sweep_handle = spawn_sweep("traces", Arc::clone(&traces_service), |s| {
+        s.sweep_expired_rotations()
+    });
 
     // Parse gRPC endpoint address
     let addr =
@@ -281,12 +260,12 @@ async fn run_ingestor(
         );
     }
 
-    // Build gRPC router with metrics + logs + (proof-scaffold) traces
+    // Build gRPC router with metrics + logs + traces
     let metrics_svc = MetricsServiceServer::new(metrics_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
     let logs_svc = LogsServiceServer::from_arc(logs_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let traces_svc = TraceServiceServer::new(traces_service)
+    let traces_svc = TraceServiceServer::from_arc(traces_service)
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
     tracing::info!(endpoint = %config.endpoint.path, "gRPC server starting (metrics + logs + traces)");
@@ -347,7 +326,8 @@ async fn run_ingestor(
     }
 
     tick_handle.abort();
-    sweep_handle.abort();
+    logs_sweep_handle.abort();
+    traces_sweep_handle.abort();
     Ok(())
 }
 
@@ -424,10 +404,9 @@ fn create_logs_service(
     )
 }
 
-/// PROOF SCAFFOLD (traces-proof SOW): the skeletal traces ingestion service.
-/// Its WAL dir + rotation come from the derived traces lifecycle
-/// (`{base_dir}/traces/wal` — the same derivation the ledger uses), so the two
-/// processes agree on where traces WAL files live.
+/// The traces ingestion service. Its WAL dir + rotation come from the derived
+/// traces lifecycle (`{base_dir}/traces/wal` — the same derivation the ledger
+/// uses), so the two processes agree on where traces WAL files live.
 fn create_traces_service(
     lifecycle: &LifecycleConfig,
     auth: &AuthConfig,
@@ -438,17 +417,78 @@ fn create_traces_service(
 ) -> NetdataTracesService {
     tracing::info!(
         wal_dir = %lifecycle.wal.dir.display(),
-        "traces ingestion enabled (PROOF SCAFFOLD)"
+        "traces ingestion enabled"
     );
     NetdataTracesService::new(
         sender,
         lifecycle.wal.dir.clone(),
         lifecycle.wal.clone(),
+        lifecycle.ingest.clone(),
         seq,
         clock,
         auth.clone(),
         identity,
     )
+}
+
+/// Spawn one signal's idle-rotation sweep loop: every [`WAL_SWEEP_INTERVAL`],
+/// run the given sweep off the async worker pool (`spawn_blocking` — it does
+/// serial `fsync`s and must never stall the runtime). Missed ticks are
+/// skipped, not burst-fired.
+fn spawn_sweep<S: Send + Sync + 'static>(
+    signal: &'static str,
+    service: Arc<S>,
+    sweep: fn(&S),
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(WAL_SWEEP_INTERVAL);
+        // A slow tick (many tenants sealing at once on slow storage) must not
+        // burst-fire the backlog; skip missed ticks instead.
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let svc = Arc::clone(&service);
+            if let Err(e) = tokio::task::spawn_blocking(move || sweep(&svc)).await {
+                tracing::error!(%e, signal, "WAL idle-rotation sweep task failed");
+            }
+        }
+    })
+}
+
+/// Warn once at startup, per signal, about config values that will surprise:
+/// a rotation duration at or below the sweep interval (idle streams then
+/// rotate at sweep granularity), a zero `future_skew` (any sender/server clock
+/// skew causes routine rejections), and a zero `max_age` (everything older
+/// than the moment of arrival is rejected — effectively all real history).
+fn warn_signal_config(
+    signal: &str,
+    default_rotation: std::time::Duration,
+    future_skew: std::time::Duration,
+    max_age: std::time::Duration,
+) {
+    if default_rotation <= WAL_SWEEP_INTERVAL {
+        tracing::warn!(
+            signal,
+            max_file_duration_secs = default_rotation.as_secs(),
+            sweep_interval_secs = WAL_SWEEP_INTERVAL.as_secs(),
+            "WAL max_file_duration is at or below the idle-rotation sweep interval; \
+             idle streams will rotate at sweep granularity (active streams still rotate on write)"
+        );
+    }
+    if future_skew.is_zero() {
+        tracing::warn!(
+            signal,
+            "ingest future_skew is 0; data timestamped even 1ns ahead of the server \
+             clock will be rejected (ordinary sender/server clock skew will cause rejections)"
+        );
+    }
+    if max_age.is_zero() {
+        tracing::warn!(
+            signal,
+            "ingest max_age is 0; everything older than the moment of arrival is \
+             rejected (effectively all real history; ordinary delivery latency will cause rejections)"
+        );
+    }
 }
 
 /// The highest seq found by scanning one signal's on-disk data files.

@@ -55,7 +55,6 @@ type OSPFNeighbor struct {
 	Netmask          string
 	Subnet           string
 	Prefix           int
-	RemoteActorID    string
 }
 
 type BGPPeer struct {
@@ -77,19 +76,19 @@ type BGPPeer struct {
 }
 
 type OSPFNeighborDetailRow struct {
-	RemoteActorID    string
-	LocalRouterID    string
-	NeighborRouterID string
-	NeighborIP       string
-	State            string
-	LocalIP          string
-	Subnet           string
-	AddresslessIndex string
-	Source           string
+	RemoteActorHandle ActorHandle
+	LocalRouterID     string
+	NeighborRouterID  string
+	NeighborIP        string
+	State             string
+	LocalIP           string
+	Subnet            string
+	AddresslessIndex  string
+	Source            string
 }
 
 type BGPPeerDetailRow struct {
-	RemoteActorID         string
+	RemoteActorHandle     ActorHandle
 	RoutingInstance       string
 	NeighborIP            string
 	RemoteAS              string

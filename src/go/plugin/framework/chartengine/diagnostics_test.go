@@ -202,9 +202,8 @@ groups:
 	assert.Equal(t, PlanLabelPromotionAutomatic, accepted.LabelPromotionMode)
 	assert.Empty(t, accepted.PromotedLabels)
 
-	stats := engine.stats()
-	assert.Zero(t, stats.RouteCacheHits)
-	assert.Zero(t, stats.RouteCacheMisses)
+	assert.Zero(t, engineRuntimeMetricValue(t, engine, routeCacheHitsMetricName))
+	assert.Zero(t, engineRuntimeMetricValue(t, engine, routeCacheMissesMetricName))
 }
 
 func TestPlanRouteDiagnosticsReportLifecycleCapRejection(t *testing.T) {

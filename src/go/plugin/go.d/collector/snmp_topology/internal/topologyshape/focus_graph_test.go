@@ -55,77 +55,78 @@ func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 		},
 		Links: []topologymodel.Link{
 			{
-				Layer:      "2",
-				Protocol:   "lldp",
-				LinkType:   "device",
-				SrcActorID: "device-a",
-				DstActorID: "device-b",
+				Layer:          "2",
+				Protocol:       "lldp",
+				LinkType:       "device",
+				SrcActorHandle: topologyShapeTestActorHandle("device-a"),
+				DstActorHandle: topologyShapeTestActorHandle("device-b"),
 			},
 			{
-				Layer:      "2",
-				Protocol:   "fdb",
-				LinkType:   "segment",
-				SrcActorID: "device-b",
-				DstActorID: "segment-1",
+				Layer:          "2",
+				Protocol:       "fdb",
+				LinkType:       "segment",
+				SrcActorHandle: topologyShapeTestActorHandle("device-b"),
+				DstActorHandle: topologyShapeTestActorHandle("segment-1"),
 			},
 			{
-				Layer:      "2",
-				Protocol:   "fdb",
-				LinkType:   "segment",
-				SrcActorID: "segment-1",
-				DstActorID: "device-c",
+				Layer:          "2",
+				Protocol:       "fdb",
+				LinkType:       "segment",
+				SrcActorHandle: topologyShapeTestActorHandle("segment-1"),
+				DstActorHandle: topologyShapeTestActorHandle("device-c"),
 			},
 		},
 	}
+	handles := assignTopologyShapeTestHandles(t, data)
 
 	graph := buildTopologyFocusGraph(data)
-	require.Contains(t, graph.nonSegmentSet, "device-a")
-	require.Contains(t, graph.nonSegmentSet, "device-b")
-	require.Contains(t, graph.nonSegmentSet, "device-c")
-	require.Contains(t, graph.segmentSet, "segment-1")
-	require.Contains(t, graph.nonSegmentAdj["device-a"], "device-b")
-	require.Contains(t, graph.nonSegmentAdj["device-b"], "device-a")
-	require.Contains(t, graph.nodeSegments["device-b"], "segment-1")
-	require.Contains(t, graph.segmentNeighbors["segment-1"], "device-b")
-	require.Contains(t, graph.segmentNeighbors["segment-1"], "device-c")
+	require.Contains(t, graph.nonSegmentSet, handles["device-a"])
+	require.Contains(t, graph.nonSegmentSet, handles["device-b"])
+	require.Contains(t, graph.nonSegmentSet, handles["device-c"])
+	require.Contains(t, graph.segmentSet, handles["segment-1"])
+	require.Contains(t, graph.nonSegmentAdj[handles["device-a"]], handles["device-b"])
+	require.Contains(t, graph.nonSegmentAdj[handles["device-b"]], handles["device-a"])
+	require.Contains(t, graph.nodeSegments[handles["device-b"]], handles["segment-1"])
+	require.Contains(t, graph.segmentNeighbors[handles["segment-1"]], handles["device-b"])
+	require.Contains(t, graph.segmentNeighbors[handles["segment-1"]], handles["device-c"])
 
-	roots := map[string]struct{}{"device-a": {}}
+	roots := map[topologymodel.ActorHandle]struct{}{handles["device-a"]: {}}
 
 	distanceDepth1 := traverseTopologyFocusDepth(graph, roots, 1)
-	require.Equal(t, map[string]int{
-		"device-a": 0,
-		"device-b": 1,
+	require.Equal(t, map[topologymodel.ActorHandle]int{
+		handles["device-a"]: 0,
+		handles["device-b"]: 1,
 	}, distanceDepth1)
 
 	includedNonSegmentDepth1, includedActorsDepth1 := collectTopologyFocusDepthSets(graph, distanceDepth1, 1)
-	require.Equal(t, map[string]struct{}{
-		"device-a": {},
-		"device-b": {},
+	require.Equal(t, map[topologymodel.ActorHandle]struct{}{
+		handles["device-a"]: {},
+		handles["device-b"]: {},
 	}, includedNonSegmentDepth1)
-	require.Equal(t, map[string]struct{}{
-		"device-a":  {},
-		"device-b":  {},
-		"segment-1": {},
+	require.Equal(t, map[topologymodel.ActorHandle]struct{}{
+		handles["device-a"]:  {},
+		handles["device-b"]:  {},
+		handles["segment-1"]: {},
 	}, includedActorsDepth1)
 
 	distanceDepth2 := traverseTopologyFocusDepth(graph, roots, 2)
-	require.Equal(t, map[string]int{
-		"device-a": 0,
-		"device-b": 1,
-		"device-c": 2,
+	require.Equal(t, map[topologymodel.ActorHandle]int{
+		handles["device-a"]: 0,
+		handles["device-b"]: 1,
+		handles["device-c"]: 2,
 	}, distanceDepth2)
 
 	includedNonSegmentDepth2, includedActorsDepth2 := collectTopologyFocusDepthSets(graph, distanceDepth2, 2)
-	require.Equal(t, map[string]struct{}{
-		"device-a": {},
-		"device-b": {},
-		"device-c": {},
+	require.Equal(t, map[topologymodel.ActorHandle]struct{}{
+		handles["device-a"]: {},
+		handles["device-b"]: {},
+		handles["device-c"]: {},
 	}, includedNonSegmentDepth2)
-	require.Equal(t, map[string]struct{}{
-		"device-a":  {},
-		"device-b":  {},
-		"device-c":  {},
-		"segment-1": {},
+	require.Equal(t, map[topologymodel.ActorHandle]struct{}{
+		handles["device-a"]:  {},
+		handles["device-b"]:  {},
+		handles["device-c"]:  {},
+		handles["segment-1"]: {},
 	}, includedActorsDepth2)
 }
 
@@ -138,21 +139,22 @@ func TestTopologyFocusGraphDoesNotFanOutThroughL3SubnetSegment(t *testing.T) {
 			{ActorID: "subnet-a", ActorType: topologymodel.L3SubnetSegmentActorType, SegmentKind: topologymodel.SegmentKindL3Subnet},
 		},
 		Links: []topologymodel.Link{
-			{SrcActorID: "router-a", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
-			{SrcActorID: "router-b", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
-			{SrcActorID: "router-c", DstActorID: "subnet-a", Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+			{SrcActorHandle: topologyShapeTestActorHandle("router-a"), DstActorHandle: topologyShapeTestActorHandle("subnet-a"), Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+			{SrcActorHandle: topologyShapeTestActorHandle("router-b"), DstActorHandle: topologyShapeTestActorHandle("subnet-a"), Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
+			{SrcActorHandle: topologyShapeTestActorHandle("router-c"), DstActorHandle: topologyShapeTestActorHandle("subnet-a"), Protocol: topologymodel.L3SubnetMembershipLinkType, LinkType: topologymodel.L3SubnetMembershipLinkType},
 		},
 	}
+	handles := assignTopologyShapeTestHandles(t, data)
 
 	graph := buildTopologyFocusGraph(data)
-	distance := traverseTopologyFocusDepth(graph, map[string]struct{}{"router-a": {}}, topologyoptions.DepthAllInternal)
+	distance := traverseTopologyFocusDepth(graph, map[topologymodel.ActorHandle]struct{}{handles["router-a"]: {}}, topologyoptions.DepthAllInternal)
 	_, includedActors := collectTopologyFocusDepthSets(graph, distance, topologyoptions.DepthAllInternal)
 
-	require.Equal(t, map[string]int{"router-a": 0}, distance)
-	require.Contains(t, includedActors, "router-a")
-	require.Contains(t, includedActors, "subnet-a")
-	require.NotContains(t, includedActors, "router-b")
-	require.NotContains(t, includedActors, "router-c")
+	require.Equal(t, map[topologymodel.ActorHandle]int{handles["router-a"]: 0}, distance)
+	require.Contains(t, includedActors, handles["router-a"])
+	require.Contains(t, includedActors, handles["subnet-a"])
+	require.NotContains(t, includedActors, handles["router-b"])
+	require.NotContains(t, includedActors, handles["router-c"])
 }
 
 func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
@@ -163,6 +165,7 @@ func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
 		Detail: topologymodel.ActorDetail{
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
+					DeviceID:            "device-a",
 					ManagementIP:        "10.0.0.2",
 					ManagementAddresses: []string{"10.0.0.3", "not-an-ip"},
 				},
@@ -195,17 +198,43 @@ func TestTopologyActorDetailManagementIPsCanonicalizesBeforeDedup(t *testing.T) 
 				ManagementIP: "::ffff:192.0.2.1",
 				ManagementAddresses: []topologymodel.ManagementAddress{
 					{Address: "192.0.2.1"},
+					{Address: "192.0.2.3", AddressType: "ipv4"},
+					{Address: "c0000263", AddressType: "16"},
+					{Address: "192.0.2.4", AddressType: "2"},
 				},
 			},
 			L2: topologyengine.ProjectionActorDetail{
 				Device: topologyengine.ProjectionDeviceActorDetail{
+					DeviceID:            "device-a",
 					ManagementAddresses: []string{"::", "::ffff:192.0.2.2", "192.0.2.2"},
 				},
 			},
 		},
 	}
 
-	require.Equal(t, []string{"192.0.2.1", "192.0.2.2"}, topologymodel.ActorDetailManagementIPs(actor))
+	require.Equal(t, []string{"192.0.2.2"}, topologymodel.ActorDetailManagementIPs(actor))
+}
+
+func TestTopologyActorDetailManagementIPsUsesOnlySelectedSNMPFallback(t *testing.T) {
+	snmpOnly := topologymodel.Actor{
+		Detail: topologymodel.ActorDetail{
+			SNMP: topologymodel.SNMPActorDetail{
+				ManagementIP: "192.0.2.1",
+				ManagementAddresses: []topologymodel.ManagementAddress{
+					{Address: "192.0.2.2", AddressType: "ipv4"},
+				},
+			},
+		},
+	}
+	require.Equal(t, "192.0.2.1", topologymodel.ActorDetailManagementIP(snmpOnly))
+	require.Equal(t, []string{"192.0.2.1"}, topologymodel.ActorDetailManagementIPs(snmpOnly))
+
+	l2WithoutPrimary := snmpOnly
+	l2WithoutPrimary.Detail.L2.Device.DeviceID = "device-a"
+	require.Empty(t, topologymodel.ActorDetailManagementIP(l2WithoutPrimary))
+	require.Empty(t, topologymodel.ActorDetailManagementIPs(l2WithoutPrimary))
+	require.False(t, topologyActorHasIP(l2WithoutPrimary, "192.0.2.1"))
+	require.False(t, topologyActorHasIP(l2WithoutPrimary, "192.0.2.2"))
 }
 
 func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {
@@ -215,7 +244,7 @@ func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) 
 			{ActorID: "device-b", ActorType: "device"},
 		},
 		Links: []topologymodel.Link{
-			{Protocol: "lldp", Direction: "bidirectional", SrcActorID: "device-a", DstActorID: "device-b"},
+			{Protocol: "lldp", Direction: "bidirectional", SrcActorHandle: topologyShapeTestActorHandle("device-a"), DstActorHandle: topologyShapeTestActorHandle("device-b")},
 		},
 	}
 
@@ -234,7 +263,7 @@ func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) 
 func TestRecordTopologyFocusAllDevicesStatsKeepsAllDepth(t *testing.T) {
 	data := &topologymodel.Data{
 		Links: []topologymodel.Link{
-			{Protocol: "lldp", Direction: "bidirectional", SrcActorID: "device-a", DstActorID: "device-b"},
+			{Protocol: "lldp", Direction: "bidirectional", SrcActorHandle: topologyShapeTestActorHandle("device-a"), DstActorHandle: topologyShapeTestActorHandle("device-b")},
 		},
 	}
 

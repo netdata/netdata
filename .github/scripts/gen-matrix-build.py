@@ -11,7 +11,7 @@ with open('.github/data/distros.yml') as f:
     data = yaml.load(f)
 
 for i, v in enumerate(data['include']):
-    if v['test'].get('skip-local-build', False):
+    if v.get('test', dict()).get('skip-local-build', False):
         continue
 
     e = {

@@ -86,6 +86,8 @@ def synth_traces_cmd(
     start_time_nanos: int | None, seed: int, tenant_id: str | None,
     batch_size: int, connect_timeout_secs: int,
     service_name: str | None = None, service_namespace: str | None = None,
+    spans_per_trace: int = 1, events_per_span: int = 0, links_every: int = 0,
+    orphan_every: int = 0, extra_root_every: int = 0, resend_every: int = 0,
 ) -> list[str]:
     """Argv for the one-shot TRACES synth generator (`--bin synth-traces`).
 
@@ -104,6 +106,12 @@ def synth_traces_cmd(
         "--seed", str(seed),
         "--batch-size", str(batch_size),
         "--connect-timeout-secs", str(connect_timeout_secs),
+        "--spans-per-trace", str(spans_per_trace),
+        "--events-per-span", str(events_per_span),
+        "--links-every", str(links_every),
+        "--orphan-every", str(orphan_every),
+        "--extra-root-every", str(extra_root_every),
+        "--resend-every", str(resend_every),
     ]
     if start_time_nanos is not None:
         cmd += ["--start-time-nanos", str(start_time_nanos)]

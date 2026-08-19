@@ -21,6 +21,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentEmitsEstablishedManagedLink(t *testi
 			bgpPeerForTest("device-a", "default", "198.51.100.1", "198.51.100.2", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 		},
 	}
+	handles := assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyBGPAdjacency(&data, aggregate)
 
@@ -36,7 +37,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentEmitsEstablishedManagedLink(t *testi
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_emitted_links"])
 	require.Equal(t, 1, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_visible_links"])
 	require.Len(t, data.Actors[0].Detail.BGP, 1)
-	require.Equal(t, "router-b", data.Actors[0].Detail.BGP[0].RemoteActorID)
+	require.Equal(t, handles["router-b"], data.Actors[0].Detail.BGP[0].RemoteActorHandle)
 }
 
 func TestSortTopologyBGPPeerRowsUsesRawNeighborFallback(t *testing.T) {
@@ -141,6 +142,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			handles := assignTopologyEnrichTestHandles(t, &tc.data)
 			stats := ApplyBGPAdjacency(&tc.data, tc.aggregate)
 
 			require.Zero(t, stats.EmittedLinks)
@@ -154,10 +156,10 @@ func TestApplyTopologyBGPAdjacencyEnrichmentKeepsSuppressedPeersAsDetailOnly(t *
 				require.Equal(t, tc.wantDetailState, row.State)
 			}
 			if tc.wantRemoteActorID != "" {
-				require.Equal(t, tc.wantRemoteActorID, row.RemoteActorID)
+				require.Equal(t, handles[tc.wantRemoteActorID], row.RemoteActorHandle)
 			}
 			if tc.wantRemoteActorIDAbsent {
-				require.Empty(t, row.RemoteActorID)
+				require.True(t, row.RemoteActorHandle.IsZero())
 			}
 			if tc.wantSuppressedStatsCounter != "" {
 				require.Equal(t, 1, topologyStatsToV1ForTest(t, tc.data.Stats)[tc.wantSuppressedStatsCounter])
@@ -272,6 +274,7 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			assignTopologyEnrichTestHandles(t, &tc.data)
 			stats := ApplyBGPAdjacency(&tc.data, tc.aggregate)
 
 			tc.validate(t, tc.data, stats)
@@ -291,14 +294,15 @@ func TestApplyTopologyBGPAdjacencyEnrichmentCanonicalizesUndirectedLinkEndpoints
 			bgpPeerForTest("device-b", "default", "198.51.100.2", "198.51.100.1", "65002", "65001", "2.2.2.2", "1.1.1.1", "established"),
 		},
 	}
+	handles := assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyBGPAdjacency(&data, aggregate)
 
 	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 1)
 	link := data.Links[0]
-	require.Equal(t, "router-a", link.SrcActorID)
-	require.Equal(t, "router-b", link.DstActorID)
+	require.Equal(t, handles["router-a"], link.SrcActorHandle)
+	require.Equal(t, handles["router-b"], link.DstActorHandle)
 	require.Equal(t, "1.1.1.1", topologyBGPLocalIdentifier(link))
 	require.Equal(t, "2.2.2.2", topologyBGPPeerIdentifier(link))
 	require.Equal(t, "198.51.100.1", topologyBGPLocalIP(link))
@@ -319,15 +323,16 @@ func TestApplyTopologyBGPAdjacencyEnrichmentResolvesPeerIdentifierByRouterID(t *
 			bgpPeerForTest("device-a", "default", "198.51.100.1", "", "65001", "65002", "1.1.1.1", "2.2.2.2", "established"),
 		},
 	}
+	handles := assignTopologyEnrichTestHandles(t, &data)
 
 	stats := ApplyBGPAdjacency(&data, aggregate)
 
 	require.Equal(t, 1, stats.EmittedLinks)
 	require.Len(t, data.Links, 1)
-	require.Equal(t, "router-b", data.Links[0].DstActorID)
+	require.Equal(t, handles["router-b"], data.Links[0].DstActorHandle)
 	require.Equal(t, "2.2.2.2", topologyBGPPeerIdentifier(data.Links[0]))
 	require.Len(t, data.Actors[0].Detail.BGP, 1)
-	require.Equal(t, "router-b", data.Actors[0].Detail.BGP[0].RemoteActorID)
+	require.Equal(t, handles["router-b"], data.Actors[0].Detail.BGP[0].RemoteActorHandle)
 }
 
 func topologyBGPManagedActorForTest(actorID, deviceID string, attrs map[string]any, ips ...string) topologymodel.Actor {

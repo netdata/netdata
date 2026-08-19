@@ -294,7 +294,24 @@ static bool labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         changed = true;
     }
 
-    __atomic_add_fetch(&labels->version, 1, __ATOMIC_RELAXED);
+    // Bump only on a real change. labels->JudyL is keyed by the interned
+    // RRDLABEL pointer, which encodes BOTH key and value, so re-adding an
+    // identical key=value lands on an existing slot and only refreshes the
+    // SRC flags - nothing an observer of the label set can see.
+    //
+    // Consumers read this counter as "the labels changed", never as "the
+    // labels were touched": rrdcalc_update_info_using_rrdset_labels() re-derives
+    // every alert's info/summary text on a bump, check_and_update_chart_labels()
+    // re-persists the chart's labels to SQLite, and pulse_child_chart_labels()
+    // re-applies child labels. Bumping unconditionally made all three re-run
+    // forever on a parent, where rrdset_update_permanent_labels() re-adds the
+    // unchanged _collect_plugin/_collect_module pair on every chart
+    // re-registration.
+    //
+    // rrdlabels_copy() already bumps only inside its own mutation branches
+    // (insert, and the same-key cleanup); this brings the add path in line.
+    if(changed)
+        __atomic_add_fetch(&labels->version, 1, __ATOMIC_RELAXED);
 
 //    judy_mem = JudyAllocThreadPulseGetAndReset();
 //    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);

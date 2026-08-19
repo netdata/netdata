@@ -5,6 +5,7 @@ package topologyenrich
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
@@ -17,10 +18,13 @@ func TestTopologyOSPFNeighborLinkKeyIgnoresUnspecifiedIPs(t *testing.T) {
 	withUnspecifiedIPs := base
 	withUnspecifiedIPs.LocalIP = "::"
 	withUnspecifiedIPs.NeighborIP = "0.0.0.0"
+	handles := graph.NewActorHandleAllocator()
+	routerA := handles.Next()
+	routerB := handles.Next()
 
 	require.Equal(
 		t,
-		topologyOSPFNeighborLinkKeyParts(base, "router-a", "router-b"),
-		topologyOSPFNeighborLinkKeyParts(withUnspecifiedIPs, "router-a", "router-b"),
+		topologyOSPFNeighborLinkKeyParts(base, routerA, routerB),
+		topologyOSPFNeighborLinkKeyParts(withUnspecifiedIPs, routerA, routerB),
 	)
 }

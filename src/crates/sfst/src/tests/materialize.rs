@@ -166,3 +166,83 @@ fn kv_id_paths_agree_for_prefix_field_families() {
         "full-text high-card"
     );
 }
+
+/// Per-tier distinct-value enumeration ([`IndexReader::field_values`]):
+/// every tier returns exactly its stored values, sorted, prefix-stripped
+/// by LENGTH (values containing `=` survive whole), and an absent field
+/// is `UnknownField` — all without touching stream batches (the method
+/// reads only the field's dictionary chunk; the access-pattern proof
+/// lives in the corruption test below).
+#[test]
+fn field_values_per_tier_prefix_stripped_by_length() {
+    let (bytes, expected) = prefix_family_fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    for field in ["a", "a.b", "m", "m.n", "h", "h.i"] {
+        let mut want: Vec<String> = expected
+            .iter()
+            .filter(|(f, _)| f == field)
+            .map(|(_, v)| v.clone())
+            .collect();
+        want.sort();
+        assert_eq!(
+            idx.field_values(field).unwrap(),
+            want,
+            "values of {field}"
+        );
+    }
+    assert!(matches!(
+        idx.field_values("absent"),
+        Err(crate::Error::UnknownField(f)) if f == "absent"
+    ));
+
+    // A value containing '=' round-trips whole (prefix-LENGTH strip; a
+    // split-once would truncate it to "x").
+    let bytes = file_of_rows(&[&["eq=x=y=z"], &["eq=plain"]]);
+    let idx = IndexReader::open(&bytes).unwrap();
+    assert_eq!(
+        idx.field_values("eq").unwrap(),
+        vec!["plain".to_string(), "x=y=z".to_string()]
+    );
+}
+
+/// Access-pattern proof for [`IndexReader::field_values`]: with EVERY
+/// stream-batch chunk payload corrupted (crc32 mismatch on access), value
+/// enumeration across all tiers still returns exact results — it reads
+/// only dictionary chunks — while any row access fails loudly.
+#[test]
+fn field_values_never_touch_stream_batches() {
+    let (bytes, expected) = prefix_family_fixture();
+
+    // Locate each stream-batch payload through the CLEAN file's raw
+    // slices (crc-verified there), then flip a byte in a copy.
+    let mut corrupted = bytes.clone();
+    let n = {
+        let cr = crate::reader::ChunkReader::open(&bytes).unwrap();
+        let n = crate::num_stream_batches(cr.summary().unwrap().record_count);
+        assert!(n > 0, "fixture must have stream batches");
+        let base = bytes.as_ptr() as usize;
+        for i in 0..n {
+            let raw = cr.stream_batch_raw(i).unwrap();
+            let off = raw.as_ptr() as usize - base;
+            corrupted[off] ^= 0xFF;
+        }
+        n
+    };
+
+    let idx = IndexReader::open(&corrupted).unwrap();
+    for i in 0..n {
+        assert!(
+            idx.load_stream_batch(i).is_err(),
+            "batch {i} should be corrupt"
+        );
+    }
+    for field in ["a", "a.b", "m", "m.n", "h", "h.i"] {
+        let mut want: Vec<String> = expected
+            .iter()
+            .filter(|(f, _)| f == field)
+            .map(|(_, v)| v.clone())
+            .collect();
+        want.sort();
+        assert_eq!(idx.field_values(field).unwrap(), want, "values of {field}");
+    }
+}

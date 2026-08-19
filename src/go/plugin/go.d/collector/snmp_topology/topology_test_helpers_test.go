@@ -49,7 +49,8 @@ func testCountTopologyLinksByType(links []topologymodel.Link, linkType string) i
 }
 
 func snapshotTopologyRegistryForTestWithOptions(registry *topologyRegistry, options topologyoptions.QueryOptions) (topologymodel.Data, bool) {
-	return registry.snapshotWithOptions(options)
+	data, ok, err := registry.snapshotWithOptions(options)
+	return data, ok && err == nil
 }
 
 func snapshotTopologyCacheForTest(cache *topologyCache) (topologymodel.Data, bool) {
@@ -63,14 +64,7 @@ func snapshotTopologyCacheForTestWithOptions(cache *topologyCache, options topol
 }
 
 func defaultTopologyQueryOptionsForTest() topologyoptions.QueryOptions {
-	return topologyoptions.QueryOptions{
-		CollapseActorsByIP:     true,
-		EliminateNonIPInferred: true,
-		MapType:                topologyoptions.MapTypeLLDPCDPManaged,
-		InferenceStrategy:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
-		ManagedDeviceFocus:     topologyoptions.ManagedFocusAllDevices,
-		Depth:                  topologyoptions.DepthAllInternal,
-	}
+	return topologyoptions.DefaultQueryOptions()
 }
 
 func containsMgmtAddr(snapshot topologymodel.Data, addrs map[string]struct{}) bool {
