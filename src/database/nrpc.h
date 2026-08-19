@@ -45,6 +45,14 @@
 
 #include "libnetdata/libnetdata.h"
 
+// Memory attribution owned by the component, aggregated by the daemon's
+// pulse charts (daemon/pulse) - the daemon reads these, the component (and
+// any daemon code allocating on the component's behalf) charges them. This
+// is the allowed dependency direction: pulse depends on nrpc, never the
+// reverse (precedent: dictionary_stats_category_other in dictionary.c).
+extern struct dictionary_stats dictionary_stats_category_functions;
+extern size_t nrpc_buffers_functions;
+
 #define NRPC_PRIORITY_DEFAULT 100
 #define NRPC_VERSION_DEFAULT 0
 #define NRPC_TAG_HIDDEN "hidden"
@@ -268,5 +276,7 @@ bool nrpc_call_has_result_cb(nd_uuid_t *call_id, nrpc_result_cb_t cb);
 #include "nrpc-builtin.h"
 #include "nrpc-calls.h"
 #include "nrpc-catalog.h"
+#include "nrpc-serving.h"
+#include "nrpc-transport.h"
 
 #endif // NETDATA_NRPC_H

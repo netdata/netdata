@@ -3,6 +3,7 @@
 #include "commands.h"
 #include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
+#include "daemon/dyncfg/dyncfg.h"
 
 void stream_send_global_functions(RRDHOST *host) {
     if(!stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
@@ -28,10 +29,15 @@ void stream_send_global_functions(RRDHOST *host) {
     // the renderer drains the pending FUNCTION_DEL queue too; it needs our
     // verdict on whether the parent can accept FUNCTION_DEL (absorbed from the
     // old stream_send_function_del gate)
-    stream_sender_send_host_functions(host->host_id, wb,
-                                                stream_has_capability(host->sender, STREAM_CAP_DYNCFG),
+    size_t configs = nrpc_catalog_render_global_functions(host->host_id, wb,
                                                 stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                     rrdhost_can_stream_metadata_to_parent(host));
+
+    // the synthetic "config" line is the streaming side's to append (the
+    // renderer knows nothing about dyncfg) - still under the spinlock,
+    // before the commit, so the wire byte-order is unchanged
+    if(configs && stream_has_capability(host->sender, STREAM_CAP_DYNCFG))
+        dyncfg_add_streaming(wb);
 
     // send it as STREAM_TRAFFIC_TYPE_METADATA, not STREAM_TRAFFIC_TYPE_FUNCTIONS
     // this is just metadata not an interactive function call

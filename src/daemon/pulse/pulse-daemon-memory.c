@@ -104,7 +104,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
             netdata_buffers_statistics.rrdset_done_rda_size +
             netdata_buffers_statistics.buffers_aclk +
             netdata_buffers_statistics.buffers_api +
-            netdata_buffers_statistics.buffers_functions +
+            nrpc_buffers_functions +
             netdata_buffers_statistics.buffers_sqlite +
             netdata_buffers_statistics.buffers_exporters +
             netdata_buffers_statistics.buffers_health +
@@ -268,7 +268,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
         rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_api, (collected_number)netdata_buffers_statistics.buffers_api);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)netdata_buffers_statistics.buffers_functions);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)nrpc_buffers_functions);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_sqlite, (collected_number)netdata_buffers_statistics.buffers_sqlite);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_exporters, (collected_number)netdata_buffers_statistics.buffers_exporters);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);

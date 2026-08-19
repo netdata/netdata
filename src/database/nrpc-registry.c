@@ -4,6 +4,10 @@
 
 #define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
 
+// the component-owned "functions" memory-attribution category, read by the
+// daemon's pulse charts (declared in nrpc.h)
+struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
+
 // ----------------------------------------------------------------------------
 
 // Each host identity owns a function registry (struct nrpc_registry) holding
@@ -805,7 +809,7 @@ bool nrpc_method_unregister(ND_UUID host_id, const char *name, NRPC_SOURCE sourc
     }
 
     // dyncfg config functions are intentionally never streamed to parents
-    // (stream_sender_send_host_functions skips NRPC_METHOD_FLAG_DYNCFG),
+    // (nrpc_catalog_render_global_functions skips NRPC_METHOD_FLAG_DYNCFG),
     // so their removals must not be streamed either. Capture this before releasing.
     bool is_dyncfg = (method->options & NRPC_METHOD_FLAG_DYNCFG);
 

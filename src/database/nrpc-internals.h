@@ -8,7 +8,6 @@
 #include "nrpc.h"
 #include "nrpc-serving-internals.h"
 #include "nrpc-transport.h"
-#include "daemon/pulse/pulse-dictionary.h"
 
 // The per-host function registry: the value of one entry of the
 // component-global registries index (see nrpc_registry_acquire), keyed by the

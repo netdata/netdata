@@ -3,6 +3,7 @@
 #include "commands.h"
 #include "../stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
+#include "daemon/dyncfg/dyncfg.h"
 
 static BUFFER *preferred_sender_buffer(RRDHOST *host) {
     if(__atomic_load_n(&host->stream.snd.commit.receiver_tid, __ATOMIC_RELAXED) == gettid_cached())
@@ -55,10 +56,14 @@ ALWAYS_INLINE RRDSET_STREAM_BUFFER stream_send_metrics_init(RRDSET *st, time_t w
         // clear the flag FIRST, then render: the streaming side's half of the
         // pending-dels ordering protocol (see stream_send_global_functions)
         rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
-        stream_sender_send_host_functions(host->host_id, wb,
-                                                    stream_has_capability(host->sender, STREAM_CAP_DYNCFG),
+        size_t configs = nrpc_catalog_render_global_functions(host->host_id, wb,
                                                     stream_has_capability(host->sender, STREAM_CAP_FUNCTION_DEL) &&
                                                         rrdhost_can_stream_metadata_to_parent(host));
+        // the synthetic "config" line is the streaming side's to append (the
+        // renderer knows nothing about dyncfg) - still under the spinlock,
+        // before the commit, so the wire byte-order is unchanged
+        if(configs && stream_has_capability(host->sender, STREAM_CAP_DYNCFG))
+            dyncfg_add_streaming(wb);
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_METADATA);
         spinlock_unlock(&host->sender->global_functions_spinlock);
     }

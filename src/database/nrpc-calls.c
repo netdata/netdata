@@ -4,6 +4,12 @@
 #include "nrpc-internals.h"
 #include "nrpc-calls.h"
 
+// bytes currently held by call-related BUFFERs (charged atomically by the
+// buffer code via the pointer handed to buffer_create); the daemon's pulse
+// buffers chart reads it, and daemon code allocating buffers on the
+// component's behalf (the streaming function executor) charges it too
+size_t nrpc_buffers_functions = 0;
+
 struct nrpc_call {
     // The held method pair: the outer item pins the registry entry, the inner
     // item pins the method. Self-contained, so the completion paths (async
@@ -339,7 +345,7 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
     // so we create a new one we guarantee will survive until the handler finishes...
 
     bool we_should_free = false;
-    BUFFER *temp_wb  = buffer_create(1024, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
+    BUFFER *temp_wb  = buffer_create(1024, &nrpc_buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = call->result.wb->content_type;
 
     struct nrpc_request req = {

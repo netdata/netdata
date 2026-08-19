@@ -49,7 +49,10 @@ size_t nrpc_catalog_host_foreach(ND_UUID host_id, NRPC_CATALOG_FILTER filter, nr
 
 // The caller owns the changed-flag clear (the streaming side's half of the
 // pending-dels ordering protocol) and must clear it BEFORE calling this.
-void stream_sender_send_host_functions(ND_UUID host_id, BUFFER *wb, bool dyncfg, bool can_function_del);
+// Returns the number of dyncfg-backed entries encountered so the caller can
+// decide the synthetic "config" line (dyncfg is an application on top of
+// this component - the renderer emits no dyncfg output itself).
+size_t nrpc_catalog_render_global_functions(ND_UUID host_id, BUFFER *wb, bool can_function_del);
 
 void nrpc_catalog_host2json(ND_UUID host_id, BUFFER *wb);
 

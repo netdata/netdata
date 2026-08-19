@@ -109,6 +109,11 @@ static void stream_global_function_cb(const struct nrpc_method_view *v, void *da
 // knows nothing about streaming; when the verdict is false the snapshot is
 // DISCARDED, matching the old silent drop and preventing unbounded growth on
 // parents without FUNCDEL support.
+// Returns the count of dyncfg-backed entries seen: the caller appends the
+// synthetic "config" line (dyncfg_add_streaming) AFTER this returns and
+// BEFORE its commit, still under its render+commit lock, when the count is
+// non-zero and its peer has the DYNCFG capability - dyncfg is an application
+// on top of this component, so the verdict and the line are the caller's.
 // Ordering contract with nrpc_method_unregister(): the CALLER clears the
 // changed flag FIRST (that clear is the streaming side's half of the
 // protocol and stays with the host flag, outside this component), then this
@@ -123,7 +128,7 @@ static void stream_global_function_cb(const struct nrpc_method_view *v, void *da
 // global_functions_spinlock across {render + commit}, or a stale rendered
 // buffer could commit its FUNCTION_DEL lines after a fresh re-list (see the
 // lock's comment in stream-sender-internals.h).
-void stream_sender_send_host_functions(ND_UUID host_id, BUFFER *wb, bool dyncfg, bool can_function_del) {
+size_t nrpc_catalog_render_global_functions(ND_UUID host_id, BUFFER *wb, bool can_function_del) {
     // a host identity without a live registry entry (an archived host racing
     // the sender's flag poll) behaves exactly like the old NULL-tolerant
     // dictionary traversal: the caller already cleared the flag, nothing is
@@ -131,7 +136,7 @@ void stream_sender_send_host_functions(ND_UUID host_id, BUFFER *wb, bool dyncfg,
     const DICTIONARY_ITEM *registry_item;
     struct nrpc_registry *registry = nrpc_registry_acquire(host_id, &registry_item);
     if(!registry)
-        return;
+        return 0;
 
     spinlock_lock(&registry->pending_dels.spinlock);
     if(dictionary_entries(registry->pending_dels.dict)) {
@@ -149,10 +154,8 @@ void stream_sender_send_host_functions(ND_UUID host_id, BUFFER *wb, bool dyncfg,
     size_t configs = nrpc_catalog_registry_foreach(registry, NRPC_CATALOG_FILTER_STREAM_GLOBAL,
                                                    stream_global_function_cb, wb);
 
-    if(dyncfg && configs)
-        dyncfg_add_streaming(wb);
-
     nrpc_registry_release(registry_item);
+    return configs;
 }
 
 // ----------------------------------------------------------------------------

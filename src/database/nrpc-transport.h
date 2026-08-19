@@ -40,7 +40,8 @@ struct nrpc_transport {
 
 // created with the base entry ref (owned by the caller) and an open dispatcher counter
 static inline struct nrpc_transport *nrpc_transport_create(void *data) {
-    struct nrpc_transport *t = callocz(1, sizeof(struct nrpc_transport));
+    // explicit cast: this header reaches C++ TUs through the nrpc.h umbrella
+    struct nrpc_transport *t = (struct nrpc_transport *)callocz(1, sizeof(struct nrpc_transport));
     t->data = data;
     t->entry_refcount = 1;          // the base ref, dropped by _owner_release()
     t->dispatcher_refcount = 0;

@@ -2,6 +2,7 @@
 
 #include "rrd.h"
 #include "nrpc-internals.h"
+#include "daemon/dyncfg/dyncfg.h"
 #include "sqlite/sqlite_aclk_node.h"
 #include "aclk/aclk_query_queue.h"
 
@@ -898,7 +899,7 @@ int nrpc_manifest_pacer_unittest(void) {
 // owner's changed callback (which sets RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED).
 // The streaming CALLER clears that flag first (its half of the protocol -
 // these tests play the caller role); the renderer
-// (stream_sender_send_host_functions) then snapshots-and-clears the set,
+// (nrpc_catalog_render_global_functions) then snapshots-and-clears the set,
 // emits the FUNCTION_DEL lines and then the full re-list - one buffer.
 // This pins:
 //
@@ -1130,7 +1131,7 @@ int nrpc_del_unittest(void) {
             // flag FIRST, then render (since the inversion the renderer no
             // longer touches the owner's flag)
             rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
-            stream_sender_send_host_functions(host->host_id, wb, false, true);
+            nrpc_catalog_render_global_functions(host->host_id, wb, true);
             const char *out = buffer_tostring(wb);
 
             const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-del-fn\"");
@@ -1166,7 +1167,7 @@ int nrpc_del_unittest(void) {
         nrpc_method_unregister(host->host_id, "tt-keep-fn", NRPC_SOURCE_DAEMON);
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_host_functions(host->host_id, wb, false, false);
+            nrpc_catalog_render_global_functions(host->host_id, wb, false);
             const char *out = buffer_tostring(wb);
 
             if(strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL)) {
@@ -1205,7 +1206,7 @@ int nrpc_del_unittest(void) {
                 worker_done = __atomic_load_n(&ctx.done, __ATOMIC_ACQUIRE);
 
                 CLEAN_BUFFER *wb = buffer_create(0, NULL);
-                stream_sender_send_host_functions(host->host_id, wb, false, true);
+                nrpc_catalog_render_global_functions(host->host_id, wb, true);
                 const char *out = buffer_tostring(wb);
 
                 for(size_t i = 0; i < FNDEL_RACE_N; i++) {
@@ -1292,7 +1293,7 @@ int nrpc_del_unittest(void) {
 
         {
             CLEAN_BUFFER *wb = buffer_create(0, NULL);
-            stream_sender_send_host_functions(host->host_id, wb, false, true);
+            nrpc_catalog_render_global_functions(host->host_id, wb, true);
             const char *out = buffer_tostring(wb);
 
             const char *del_line = strstr(out, PLUGINSD_KEYWORD_FUNCTION_DEL " GLOBAL \"tt-readd-fn\"");
@@ -1349,9 +1350,11 @@ int nrpc_del_unittest(void) {
 // strings - not by calling the emitter - so any rewrite that changes the
 // bytes fails this test. Covered: the FUNCTION_DEL-before-re-list order and
 // the dyncfg FUNCDEL quirk (dyncfg deletes never emit FUNCTION_DEL), the
-// dyncfg-count => dyncfg_add_streaming() synthetic "config" line (only when
-// the parent supports DYNCFG), RESTRICTED functions DO stream, and DYNCFG
-// functions do not appear in the global list.
+// dyncfg-count RETURN => the caller appends the dyncfg_add_streaming()
+// synthetic "config" line (since the inversion the renderer emits no dyncfg
+// output; these tests play the streaming caller and append it themselves),
+// RESTRICTED functions DO stream, and DYNCFG functions do not appear in the
+// global list.
 //
 // It also covers the OTHER consumers of the iteration API - the JSON
 // renderer and the dictionary exporter - because they share the same
@@ -1500,7 +1503,11 @@ int nrpc_catalog_unittest(void) {
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_host_functions(host->host_id, wb, true /* dyncfg */, true /* can_function_del */);
+        size_t configs = nrpc_catalog_render_global_functions(host->host_id, wb, true /* can_function_del */);
+        // the caller's half since the inversion: a DYNCFG-capable parent gets
+        // the synthetic config line appended after the render, count-gated
+        if(configs)
+            dyncfg_add_streaming(wb);
         const char *out = buffer_tostring(wb);
 
         const char *p_del        = strstr(out, buffer_tostring(exp_del));
@@ -1530,17 +1537,23 @@ int nrpc_catalog_unittest(void) {
             fprintf(stderr, "  OK global emitter: DEL-first order, exact line bytes, quirk, dyncfg count, filters\n");
     }
 
-    // no-dyncfg-capability variant: the synthetic config line must be absent
+    // renderer-never-emits variant: since the inversion the synthetic config
+    // line is the caller's; the renderer must never emit it itself, while
+    // still reporting the dyncfg count a capability-lacking caller ignores
     {
         int before = errors;
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_host_functions(host->host_id, wb, false /* dyncfg */, true);
+        size_t configs = nrpc_catalog_render_global_functions(host->host_id, wb, true);
         if(strstr(buffer_tostring(wb), buffer_tostring(exp_dyncfg))) {
-            fprintf(stderr, "  FAILED global: synthetic config line emitted without DYNCFG capability\n");
+            fprintf(stderr, "  FAILED global: the renderer emitted the synthetic config line itself\n");
+            errors++;
+        }
+        if(!configs) {
+            fprintf(stderr, "  FAILED global: dyncfg count not reported to the caller\n");
             errors++;
         }
         if(errors == before)
-            fprintf(stderr, "  OK global emitter: no synthetic config line without the capability\n");
+            fprintf(stderr, "  OK global emitter: config line is the caller's; count still reported\n");
     }
 
     // --------------------------------------------------------------- JSON renderer
@@ -1652,10 +1665,14 @@ int nrpc_catalog_unittest(void) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
-        stream_sender_send_host_functions(host->host_id, wb, true, true);
+        size_t configs = nrpc_catalog_render_global_functions(host->host_id, wb, true);
 
         if(buffer_strlen(wb)) {
             fprintf(stderr, "  FAILED absent-registry: something was emitted for a host with no registry\n");
+            errors++;
+        }
+        if(configs) {
+            fprintf(stderr, "  FAILED absent-registry: non-zero dyncfg count would make the caller append a config line for a dead host\n");
             errors++;
         }
 

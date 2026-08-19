@@ -76,7 +76,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         tmp->received_ut = now_realtime_usec();
         tmp->sender = s;
         tmp->transaction = string_strdupz(transaction);
-        BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
+        BUFFER *wb = buffer_create(1024, &nrpc_buffers_functions);
 
         struct nrpc_call_spec spec = {
             .host_id = s->host->host_id,
