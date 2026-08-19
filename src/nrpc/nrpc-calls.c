@@ -298,7 +298,23 @@ static bool nrpc_call_is_cancelled(void *data) {
     return __atomic_load_n(&call->cancelled, __ATOMIC_RELAXED);
 }
 
-static inline int nrpc_call_async_nowait(struct nrpc_call *call) {
+// The handler's view of a call. All three execution modes share every field
+// but two, so those two are the only parameters:
+//
+// - where the answer goes and who is told about it: sync passes the caller's
+//   own buffer and result callback straight through; nowait substitutes its
+//   completion hook (which forwards to the caller and then retires the
+//   record); wait substitutes a temporary buffer it can abandon on timeout.
+//
+// - `async`: whether the record outlives the handler's return. Only then may
+//   the handler register cancel/progress hooks, and only then does the
+//   handler learn about cancellation through the record's own flag (which
+//   nrpc_call_cancel() sets from another thread). A sync handler runs inside
+//   the caller's thread, so the caller's own is_cancelled predicate is the
+//   live answer and there is nothing to hook into.
+static struct nrpc_request nrpc_request_for(struct nrpc_call *call, BUFFER *wb,
+                                            nrpc_result_cb_t result_cb, void *result_data,
+                                            bool async) {
     struct nrpc_request req = {
         .call_id = &call->call_id_uuid,
         .function = call->sanitized_cmd,
@@ -306,31 +322,28 @@ static inline int nrpc_call_async_nowait(struct nrpc_call *call) {
         .user_access = call->user_access,
         .source = call->source,
         .stop_monotonic_ut = &call->stop_monotonic_ut,
-        .result = {
-            .wb = call->result.wb,
-            .cb = nrpc_call_nowait_finished,
-            .data = call,
-        },
-        .progress = {
-            .cb = call->progress.cb,
-            .data = call->progress.data,
-        },
-        .is_cancelled = {
-            .cb = nrpc_call_is_cancelled,
-            .data = call,
-        },
-        .register_cancel_hook = {
-            .cb = nrpc_call_register_cancel_hook_cb,
-            .data = call,
-        },
-        .register_progress_hook = {
-            .cb = nrpc_call_register_progress_hook_cb,
-            .data = call,
-        },
+        .result = { .wb = wb, .cb = result_cb, .data = result_data },
+        .progress = { .cb = call->progress.cb, .data = call->progress.data },
+        .is_cancelled = { .cb = call->is_cancelled.cb, .data = call->is_cancelled.data },
     };
-    int code = call->captured.handler(&req, call->captured.handler_data);
 
-    return code;
+    if(async) {
+        req.is_cancelled.cb = nrpc_call_is_cancelled;
+        req.is_cancelled.data = call;
+        req.register_cancel_hook.cb = nrpc_call_register_cancel_hook_cb;
+        req.register_cancel_hook.data = call;
+        req.register_progress_hook.cb = nrpc_call_register_progress_hook_cb;
+        req.register_progress_hook.data = call;
+    }
+
+    return req;
+}
+
+static inline int nrpc_call_async_nowait(struct nrpc_call *call) {
+    struct nrpc_request req = nrpc_request_for(call, call->result.wb,
+                                               nrpc_call_nowait_finished, call, true);
+
+    return call->captured.handler(&req, call->captured.handler_data);
 }
 
 static int nrpc_call_async_wait(struct nrpc_call *call) {
@@ -348,38 +361,9 @@ static int nrpc_call_async_wait(struct nrpc_call *call) {
     BUFFER *temp_wb  = buffer_create(1024, &nrpc_buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = call->result.wb->content_type;
 
-    struct nrpc_request req = {
-        .call_id = &call->call_id_uuid,
-        .function = call->sanitized_cmd,
-        .payload = call->payload,
-        .user_access = call->user_access,
-        .source = call->source,
-        .stop_monotonic_ut = &call->stop_monotonic_ut,
-        .result = {
-            .wb = temp_wb,
-
-            // we overwrite the result callbacks,
-            // so that we can clean up the allocations made
-            .cb = nrpc_call_signal_ready,
-            .data = tmp,
-        },
-        .progress = {
-            .cb = call->progress.cb,
-            .data = call->progress.data,
-        },
-        .is_cancelled = {
-            .cb = nrpc_call_is_cancelled,
-            .data = call,
-        },
-        .register_cancel_hook = {
-            .cb = nrpc_call_register_cancel_hook_cb,
-            .data = call,
-        },
-        .register_progress_hook = {
-            .cb = nrpc_call_register_progress_hook_cb,
-            .data = call,
-        },
-    };
+    // the result callbacks are ours, not the caller's: they signal this thread
+    // and own the cleanup of the temporary buffer and the wait record
+    struct nrpc_request req = nrpc_request_for(call, temp_wb, nrpc_call_signal_ready, tmp, true);
     int code = call->captured.handler(&req, call->captured.handler_data);
 
     // this has to happen after we execute the callback
@@ -487,9 +471,8 @@ static inline int nrpc_call_async(struct nrpc_call *call, bool wait) {
 
 // Internal: authorize and fill a caller-owned held pair (outer registry
 // handle + inner method item). On failure everything acquired is released and
-// out_pair is zeroed. UUID_ZERO answers 500 exactly as the old NULL host did;
-// an identity with no live registry entry answers 404 exactly as the old
-// NULL host->rpc_registry did.
+// out_pair is zeroed. An unset owner answers 500 ("no host given"); an owner
+// with no live registry entry answers 404.
 static int nrpc_method_authorize_pair(NRPC_OWNER owner, BUFFER *result_wb, const char *cmd,
                                       HTTP_ACCESS user_access, bool allow_restricted,
                                       struct nrpc_method_acquired *out_pair) {
@@ -715,38 +698,8 @@ int nrpc_call(const struct nrpc_call_spec *spec) {
     if(call->method->sync) {
         // the caller has to wait
 
-        struct nrpc_request req = {
-            .call_id = &call->call_id_uuid,
-            .function = call->sanitized_cmd,
-            .payload = call->payload,
-            .user_access = call->user_access,
-            .source = call->source,
-            .stop_monotonic_ut = &call->stop_monotonic_ut,
-            .result = {
-                .wb = call->result.wb,
-
-                // we overwrite the result callbacks,
-                // so that we can clean up the allocations made
-                .cb = call->result.cb,
-                .data = call->result.data,
-            },
-            .progress = {
-                .cb = call->progress.cb,
-                .data = call->progress.data,
-            },
-            .is_cancelled = {
-                .cb = call->is_cancelled.cb,
-                .data = call->is_cancelled.data,
-            },
-            .register_cancel_hook = {
-                .cb = NULL,
-                .data = NULL,
-            },
-            .register_progress_hook = {
-                .cb = NULL,
-                .data = NULL,
-            },
-        };
+        struct nrpc_request req = nrpc_request_for(call, call->result.wb,
+                                                   call->result.cb, call->result.data, false);
         code = call->captured.handler(&req, call->captured.handler_data);
 
         nrpc_inflight_calls_del(call->call_id);

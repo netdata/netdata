@@ -107,8 +107,8 @@ static void stream_global_function_cb(const struct nrpc_method_view *v, void *da
 // commit by the caller. `can_function_del` is the streaming caller's verdict
 // (STREAM_CAP_FUNCTION_DEL + metadata readiness) - this renderer deliberately
 // knows nothing about streaming; when the verdict is false the snapshot is
-// DISCARDED, matching the old silent drop and preventing unbounded growth on
-// parents without FUNCDEL support.
+// DISCARDED, which is what prevents unbounded growth on parents without
+// FUNCDEL support.
 // Returns the count of dyncfg-backed entries seen: the caller appends the
 // synthetic "config" line (dyncfg_add_streaming) AFTER this returns and
 // BEFORE its commit, still under its render+commit lock, when the count is
@@ -129,10 +129,8 @@ static void stream_global_function_cb(const struct nrpc_method_view *v, void *da
 // buffer could commit its FUNCTION_DEL lines after a fresh re-list (see the
 // lock's comment in stream-sender-internals.h).
 size_t nrpc_catalog_render_global_functions(NRPC_OWNER owner, BUFFER *wb, bool can_function_del) {
-    // a host without a live registry entry (an archived host racing
-    // the sender's flag poll) behaves exactly like the old NULL-tolerant
-    // dictionary traversal: the caller already cleared the flag, nothing is
-    // emitted here
+    // a host without a live registry entry (an archived host racing the
+    // sender's flag poll) emits nothing: the caller already cleared the flag
     const DICTIONARY_ITEM *registry_item;
     struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry)
@@ -185,7 +183,7 @@ static void host_function2json_cb(const struct nrpc_method_view *v, void *data) 
 
 void nrpc_catalog_host2json(NRPC_OWNER owner, BUFFER *wb) {
     // the "functions" key is OMITTED entirely when the host has no live
-    // registry entry - the historical NULL-registry payload shape
+    // registry entry - it is not emitted as an empty object
     const DICTIONARY_ITEM *registry_item;
     struct nrpc_registry *registry = nrpc_registry_acquire(owner, &registry_item);
     if(!registry) return;

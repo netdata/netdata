@@ -876,8 +876,6 @@ int nrpc_registry_find(struct nrpc_registry *registry, BUFFER *wb, const char *n
                 break;
             }
             else {
-                // the owner's stream-thread details this line used to carry
-                // are host internals the component no longer sees
                 CLEAN_STRING *owner_name = nrpc_registry_owner_name_dup(registry);
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "Method '%s' is not available. "
