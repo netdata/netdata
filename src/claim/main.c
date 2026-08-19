@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <signal.h>
 
 #include "main.h"
@@ -24,6 +25,11 @@ char *aProxy = NULL;
 char *aURL = NULL;
 int insecure = 0;
 
+// The MSI runs us as a deferred, non-impersonated custom action: that lives in session 0, where a
+// window or a message box is invisible to the user and never gets closed, hanging the installation.
+// Default to the safe mode and only enable dialogs once we know no arguments were passed.
+int nd_claim_interactive = 0;
+
 LPWSTR netdata_claim_get_formatted_message(LPWSTR pMessage, ...)
 {
     LPWSTR pBuffer = NULL;
@@ -39,29 +45,53 @@ LPWSTR netdata_claim_get_formatted_message(LPWSTR pMessage, ...)
 }
 
 // Common Functions
-void netdata_claim_error_exit(wchar_t *function)
+void netdata_claim_error_exit(wchar_t *function, int code)
 {
     DWORD error = GetLastError();
-    LPWSTR pMessage = L"The function %1 failed with error %2.";
-    LPWSTR pBuffer = netdata_claim_get_formatted_message(pMessage, function, error);
 
-    if (pBuffer) {
-        MessageBoxW(NULL, pBuffer, L"Error", MB_OK|MB_ICONERROR);
-        LocalFree(pBuffer);
+    if (nd_claim_interactive) {
+        LPWSTR pMessage = L"The function %1 failed with error %2.";
+        LPWSTR pBuffer = netdata_claim_get_formatted_message(pMessage, function, error);
+
+        if (pBuffer) {
+            MessageBoxW(NULL, pBuffer, L"Error", MB_OK|MB_ICONERROR);
+            LocalFree(pBuffer);
+        }
     }
 
-    ExitProcess(error);
+    // Report through a stable exit code instead of the raw Win32 error: the installer logs the
+    // custom action's return value, and Win32 codes overlap the classes callers need to tell apart.
+    ExitProcess((UINT)code);
+}
+
+// Installer fields and command lines routinely carry pasted leading/trailing whitespace. Left in
+// place it ends up inside claim.conf and Netdata Cloud rejects the credentials.
+static void netdata_claim_trim(char *s)
+{
+    if (!s)
+        return;
+
+    char *start = s;
+    while (*start && isspace((unsigned char)*start))
+        start++;
+
+    if (start != s)
+        memmove(s, start, strlen(start) + 1);
+
+    size_t len = strlen(s);
+    while (len && isspace((unsigned char)s[len - 1]))
+        s[--len] = '\0';
 }
 
 /**
  *  Parse Args
  *
- *  Parse arguments identifying necessity to make a window
+ *  Parse the command line given by the installer or by a script.
  *
  * @param argc number of arguments
  * @param argv A pointer for all arguments given
  *
- * @return it return the number of arguments parsed.
+ * @return 1 when a usable configuration was parsed, 0 otherwise.
  */
 int nd_claim_parse_args(int argc, LPWSTR *argv)
 {
@@ -86,10 +116,7 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
             if (argc <= i + 1)
                 continue;
             i++;
-            // Minimum IPV4
-            if(wcslen(argv[i]) >= 8) {
-                proxy = argv[i];
-            }
+            proxy = argv[i];
         }
 
         if(wcscasecmp(L"/F", argv[i]) == 0) {
@@ -114,27 +141,28 @@ int nd_claim_parse_args(int argc, LPWSTR *argv)
             size_t length = wcslen(argv[i]) + 1;
             char *tmp = calloc(sizeof(char), length);
             if (!tmp)
-                ExitProcess(1);
+                ExitProcess(ND_CLAIM_INTERNAL);
 
             netdata_claim_convert_str(tmp, argv[i], length);
-            if (i < argc)
-                insecure = atoi(tmp);
-            else
-                insecure = 1;
+            // An empty value is the installer's "unchecked" state and parses as disabled.
+            insecure = atoi(tmp);
 
             free(tmp);
         }
     }
 
-    if (!token || !room)
+    // A token is the only mandatory field. Rooms are optional here exactly as they are for the
+    // Linux claiming script and for NETDATA_CLAIM_ROOMS: the Agent then lands in the Space's
+    // default room.
+    if (!token)
         return 0;
 
-    return argc;
+    return 1;
 }
 
 static int netdata_claim_prepare_strings()
 {
-    if (!token || !room)
+    if (!token)
         return -1;
 
     size_t length = wcslen(token) + 1;
@@ -143,13 +171,17 @@ static int netdata_claim_prepare_strings()
         return -1;
 
     netdata_claim_convert_str(aToken, token, length);
+    netdata_claim_trim(aToken);
 
-    length = wcslen(room) + 1;
-    aRoom = calloc(sizeof(char), length);
-    if (!aRoom)
-        return -1;
+    if (room) {
+        length = wcslen(room) + 1;
+        aRoom = calloc(sizeof(char), length);
+        if (!aRoom)
+            return -1;
 
-    netdata_claim_convert_str(aRoom, room, length);
+        netdata_claim_convert_str(aRoom, room, length);
+        netdata_claim_trim(aRoom);
+    }
 
     if (proxy) {
         length = wcslen(proxy) + 1;
@@ -158,6 +190,7 @@ static int netdata_claim_prepare_strings()
             return -1;
 
         netdata_claim_convert_str(aProxy, proxy, length);
+        netdata_claim_trim(aProxy);
     }
 
     if (url) {
@@ -167,6 +200,7 @@ static int netdata_claim_prepare_strings()
             return -1;
 
         netdata_claim_convert_str(aURL, url, length);
+        netdata_claim_trim(aURL);
     }
     return 0;
 }
@@ -209,16 +243,23 @@ static void netdata_claim_exit_callback(int signal)
 
 static inline int netdata_claim_prepare_data(char *out, size_t length)
 {
-    char *proxyLabel = (aProxy) ? "proxy = " : "#    proxy = ";
-    char *proxyValue = (aProxy) ? aProxy : "";
+    // Leave unset optional keys commented out. An empty "proxy" would override the "env" default the
+    // Agent applies when the key is absent, and a commented "rooms" documents that the Space's
+    // default room is used instead of looking like a lost value.
+    char *roomsLabel = (aRoom && *aRoom) ? "rooms = " : "#    rooms = ";
+    char *roomsValue = (aRoom && *aRoom) ? aRoom : "";
 
-    char *urlValue = (aURL) ? aURL : "https://app.netdata.cloud";
+    char *proxyLabel = (aProxy && *aProxy) ? "proxy = " : "#    proxy = ";
+    char *proxyValue = (aProxy && *aProxy) ? aProxy : "";
+
+    char *urlValue = (aURL && *aURL) ? aURL : "https://app.netdata.cloud";
     return snprintf(out,
                     length,
-                    "[global]\n    url = %s\n    token = %s\n    rooms = %s\n    %s%s\n    insecure = %s",
+                    "[global]\n    url = %s\n    token = %s\n    %s%s\n    %s%s\n    insecure = %s\n",
                     urlValue,
                     aToken,
-                    aRoom,
+                    roomsLabel,
+                    roomsValue,
                     proxyLabel,
                     proxyValue,
                     (insecure) ? "yes" : "no"
@@ -250,45 +291,45 @@ static int netdata_claim_get_path(char *path)
     return 0;
 }
 
-static void netdata_claim_write_config(char *path)
+static int netdata_claim_write_config(char *path)
 {
-#define NETDATA_MIN_CLOUD_LENGTH 135
-#define NETDATA_MIN_ROOM_LENGTH 36
-    if (strlen(aToken) != NETDATA_MIN_CLOUD_LENGTH || strlen(aRoom) < NETDATA_MIN_ROOM_LENGTH)
-        return;
+    // Only an empty token is rejected. Netdata Cloud owns the token format, so validating its length
+    // here just means a token the installer already accepted disappears without a trace; letting the
+    // Agent attempt the claim and log the rejection is diagnosable.
+    if (!aToken || !*aToken)
+        return ND_CLAIM_BAD_ARGS;
 
     char configPath[WINDOWS_MAX_PATH + 1];
     char data[WINDOWS_MAX_PATH + 1];
     char *filename;
     if (!extPath) {
-        snprintf(configPath, WINDOWS_MAX_PATH - 1, "%s\\etc\\netdata\\claim.conf", path);
+        // Refuse a truncated path instead of creating a file under a shortened name that the Agent
+        // would never read.
+        int pathLength = snprintf(configPath, sizeof(configPath), "%s\\etc\\netdata\\claim.conf", path);
+        if (pathLength < 0 || (size_t)pathLength >= sizeof(configPath))
+            return ND_CLAIM_INTERNAL;
+
         filename = configPath;
     } else {
         filename = path;
     }
 
     int length = netdata_claim_prepare_data(data, WINDOWS_MAX_PATH);
-    if (length < 0 || length >= WINDOWS_MAX_PATH) {
-        MessageBoxW(NULL, L"Cannot write claim.conf.", L"Error", MB_OK|MB_ICONERROR);
-        return;
-    }
+    if (length < 0 || length >= WINDOWS_MAX_PATH)
+        return ND_CLAIM_INTERNAL;
 
     HANDLE hf = CreateFileA(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hf == INVALID_HANDLE_VALUE)
-        netdata_claim_error_exit(L"CreateFileA");
+        netdata_claim_error_exit(L"CreateFileA", ND_CLAIM_WRITE_FAILED);
 
     DWORD written = 0;
-
     BOOL ret = WriteFile(hf, data, (DWORD)length, &written, NULL);
-    if (!ret) {
-        CloseHandle(hf);
-        netdata_claim_error_exit(L"WriteFileA");
-    }
-
-    if ((DWORD)length != written)
-        MessageBoxW(NULL, L"Cannot write claim.conf.", L"Error", MB_OK|MB_ICONERROR);
-
     CloseHandle(hf);
+
+    if (!ret || (DWORD)length != written)
+        return ND_CLAIM_WRITE_FAILED;
+
+    return ND_CLAIM_OK;
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -300,27 +341,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int argc = 0;
     argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!argv)
-        netdata_claim_error_exit(L"CommandLineToArgvW");
+        netdata_claim_error_exit(L"CommandLineToArgvW", ND_CLAIM_INTERNAL);
 
-    if (argc)
-        argc = nd_claim_parse_args(argc, argv);
+    // Any argument means the installer or a script started us. In that mode we must never create a
+    // window and never block on a message box, so bad input is reported through the exit code only.
+    nd_claim_interactive = (argc <= 1);
 
-    // When no data is given, user must to use graphic mode
-    int ret = 0;
-    if (!argc) {
+    int ret;
+    if (nd_claim_interactive) {
         ret = netdata_claim_window_loop(hInstance, nCmdShow);
+    } else if (!nd_claim_parse_args(argc, argv)) {
+        ret = ND_CLAIM_BAD_ARGS;
+    } else if (netdata_claim_prepare_strings()) {
+        // The token is already known to be present, so the only failure left here is an allocation.
+        ret = ND_CLAIM_INTERNAL;
     } else {
-        if (netdata_claim_prepare_strings()) {
-            goto exit_claim;
-        }
-
         char basePath[WINDOWS_MAX_PATH];
-        if (!netdata_claim_get_path(basePath)) {
-            netdata_claim_write_config(basePath);
-        }
+        ret = (netdata_claim_get_path(basePath)) ? ND_CLAIM_INTERNAL : netdata_claim_write_config(basePath);
     }
 
-exit_claim:
     netdata_claim_exit_callback(0);
 
     return ret;

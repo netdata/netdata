@@ -244,9 +244,16 @@
                 <CreateFolder />
             </Component>
 
-            <CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='[USRBINDIR]NetdataClaim.exe /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I [INSECURE] /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no"/>
+            <!-- Every argument stays quoted: an unquoted empty property collapses on the command line and the
+                 next switch is consumed as its value, silently discarding the arguments that follow it.
+                 HideTarget keeps the claim token out of the MSI log, which records this command verbatim. -->
+            <CustomAction Id="ClaimAgent" Directory="USRBINDIR" ExeCommand='&quot;[USRBINDIR]NetdataClaim.exe&quot; /T &quot;[TOKEN]&quot; /R &quot;[ROOMS]&quot; /U &quot;[URL]&quot; /I &quot;[INSECURE]&quot; /P &quot;[PROXY]&quot; /F &quot;[INSTALLFOLDER]etc\netdata\claim.conf&quot;' Execute="deferred" Return="ignore" Impersonate="no" HideTarget="yes"/>
             <InstallExecuteSequence>
-                <Custom Action="ClaimAgent" After="InstallFiles" Condition="TOKEN AND ROOMS" />
+                <!-- Rooms are optional, matching the Linux claiming script and NETDATA_CLAIM_ROOMS. Gating on
+                     TOKEN alone is only safe because NetdataClaim.exe never opens a window once it is given
+                     arguments: this action is deferred and non-impersonated, so a dialog here would be
+                     invisible in session 0 and would hang the installation. -->
+                <Custom Action="ClaimAgent" After="InstallFiles" Condition="TOKEN" />
             </InstallExecuteSequence>
 
             <!-- Add new files (stream.conf and netdata.conf) -->
@@ -451,24 +458,30 @@
                 <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
                 <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
                 <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
-                <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token and the Room IDs where you want to add the Agent." />
+                <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Enter your Space's Claim Token. Room IDs are optional." />
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect to the Cloud" />
 
                 <Control Id="WarningLabel" Type="Text" X="10" Y="60" Width="350" Height="15" Text="Agent already claimed! Click Next." HideCondition="NOT OS_HAS_FILE" />
 
-                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="55" Height="15" Text="Claim Token:" HideCondition="OS_HAS_FILE" />
-                <Control Id="Token" Type="Edit" X="65" Y="100" Width="290" Height="18" Property="TOKEN" Text="{135}" HideCondition="OS_HAS_FILE" />
+                <!-- The label column is 100 wide to fit "Rooms ID(s) (optional):"; the edit column starts after it.
+                     Rows advance by 20 because the edit controls are 18 tall: a smaller pitch overlaps them.
+                     The token field is deliberately not length-capped: a cap silently truncates a pasted token
+                     into a valid-looking but wrong value. -->
+                <Control Id="TokenLabel" Type="Text" X="10" Y="100" Width="100" Height="15" Text="Claim Token:" HideCondition="OS_HAS_FILE" />
+                <Control Id="Token" Type="Edit" X="113" Y="100" Width="242" Height="18" Property="TOKEN" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="RoomsLabel" Type="Text" X="10" Y="115" Width="55" Height="15" Text="Rooms ID(s):" HideCondition="OS_HAS_FILE" />
-                <Control Id="Rooms" Type="Edit" X="65" Y="115" Width="290" Height="18" Property="ROOMS" HideCondition="OS_HAS_FILE" />
+                <Control Id="RoomsLabel" Type="Text" X="10" Y="120" Width="100" Height="15" Text="Rooms ID(s) (optional):" HideCondition="OS_HAS_FILE" />
+                <Control Id="Rooms" Type="Edit" X="113" Y="120" Width="242" Height="18" Property="ROOMS" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="ProxyLabel" Type="Text" X="10" Y="130" Width="55" Height="15" Text="Proxy URL:" HideCondition="OS_HAS_FILE" />
-                <Control Id="Proxy" Type="Edit" X="65" Y="130" Width="290" Height="18" Property="PROXY" HideCondition="OS_HAS_FILE" />
+                <Control Id="ProxyLabel" Type="Text" X="10" Y="140" Width="100" Height="15" Text="Proxy URL:" HideCondition="OS_HAS_FILE" />
+                <Control Id="Proxy" Type="Edit" X="113" Y="140" Width="242" Height="18" Property="PROXY" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="URLLabel" Type="Text" X="10" Y="145" Width="55" Height="15" Text="Cloud URL:" HideCondition="OS_HAS_FILE" />
-                <Control Id="URL" Type="Edit" X="65" Y="145" Width="290" Height="18" Property="URL" HideCondition="OS_HAS_FILE" />
+                <Control Id="URLLabel" Type="Text" X="10" Y="160" Width="100" Height="15" Text="Cloud URL:" HideCondition="OS_HAS_FILE" />
+                <Control Id="URL" Type="Edit" X="113" Y="160" Width="242" Height="18" Property="URL" HideCondition="OS_HAS_FILE" />
 
-                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="160" Width="290" Height="15" Property="INSECURE" CheckBoxValue="0"  Text="Insecure" HideCondition="OS_HAS_FILE" />
+                <!-- CheckBoxValue must be 1: MSI sets the property to this value when checked and clears it when
+                     unchecked, so a value of 0 made checking the box request a secure connection. -->
+                <Control Id="InsecureCheckbox" Type="CheckBox" X="10" Y="180" Width="290" Height="15" Property="INSECURE" CheckBoxValue="1"  Text="Insecure" HideCondition="OS_HAS_FILE" />
 
                 <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
                 <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
