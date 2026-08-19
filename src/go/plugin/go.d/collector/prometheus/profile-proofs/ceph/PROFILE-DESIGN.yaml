@@ -8,12 +8,11 @@ namespace: ceph
 composition:
   supports: {}
 entities:
-  by_allow_any_host_and_ceph_instance_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number:
-    grain: Ceph allow any host and ceph instance and group and ha enabled and model number and nqn and serial number
+  by_allow_any_host_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number:
+    grain: Ceph NVMe-oF subsystem security/group/HA/model/NQN/serial metadata
     identity:
       required:
       - allow_any_host
-      - ceph_instance
       - group
       - ha_enabled
       - model_number
@@ -23,13 +22,12 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_anagrpid_and_bdev_name_and_ceph_instance_and_nqn_and_nsid_and_rados_namespace_name:
-    grain: Ceph anagrpid and bdev name and ceph instance and nqn and nsid and rados namespace name
+  by_anagrpid_and_bdev_name_and_nqn_and_nsid_and_rados_namespace_name:
+    grain: Ceph NVMe-oF namespace metadata identity
     identity:
       required:
       - anagrpid
       - bdev_name
-      - ceph_instance
       - nqn
       - nsid
       - rados_namespace_name
@@ -78,26 +76,15 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_bdev_name_and_block_size_and_ceph_instance_and_namespace_and_pool_name_and_rbd_name:
-    grain: Ceph bdev name and block size and ceph instance and namespace and pool name and rbd name
+  by_bdev_name_and_block_size_and_namespace_and_pool_name_and_rbd_name:
+    grain: Ceph NVMe-oF bdev name, block size, namespace, pool name, and RBD name
     identity:
       required:
       - bdev_name
       - block_size
-      - ceph_instance
       - namespace
       - pool_name
       - rbd_name
-      optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
-  by_bdev_name_and_ceph_instance:
-    grain: Ceph bdev name and ceph instance
-    identity:
-      required:
-      - bdev_name
-      - ceph_instance
       optional: []
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
@@ -441,11 +428,10 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_ceph_instance_and_gw_name_and_host_nqn_and_nqn:
-    grain: Ceph ceph instance and gw name and host nqn and nqn
+  by_gw_name_and_host_nqn_and_nqn:
+    grain: Ceph NVMe-oF gateway name, host NQN, and subsystem NQN
     identity:
       required:
-      - ceph_instance
       - gw_name
       - host_nqn
       - nqn
@@ -453,27 +439,11 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_ceph_instance_and_mode_and_name:
-    grain: Ceph ceph instance and mode and name
+  local_gateway_endpoint:
+    grain: One direct NVMe-oF exporter endpoint selected by the collector job
     identity:
-      required:
-      - ceph_instance
-      - mode
-      - name
+      required: []
       optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
-  by_ceph_instance_and_nqn:
-    grain: Ceph ceph instance and nqn
-    identity:
-      required:
-      - ceph_instance
-      - nqn
-      optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
   by_daemon_name_and_hostname_and_service_name_and_service_type:
     grain: Ceph daemon name and hostname and service name and service type
     identity:
@@ -5950,8 +5920,8 @@ views:
       omit: {}
   nvme_of.block_devices.operations:
     family: Ceph/NVMe-oF/Block Devices
-    question: What is the operations for each bdev name and ceph instance?
-    entity: by_bdev_name_and_ceph_instance
+    question: What is the operations for each bdev name?
+    entity: by_bdev_name
     inputs:
       reads_completed:
         signal: nvmeof_bdev_reads_completed_total
@@ -5980,9 +5950,8 @@ views:
       omit: {}
   nvme_of.block_devices.state:
     family: Ceph/NVMe-oF/Block Devices
-    question: What is the state and metadata for each bdev name and block size and ceph instance and namespace and pool name
-      and rbd name?
-    entity: by_bdev_name_and_block_size_and_ceph_instance_and_namespace_and_pool_name_and_rbd_name
+    question: What is the state and metadata for each bdev name and block size and namespace and pool name and rbd name?
+    entity: by_bdev_name_and_block_size_and_namespace_and_pool_name_and_rbd_name
     inputs:
       value:
         signal: nvmeof_bdev_metadata
@@ -5994,8 +5963,8 @@ views:
       omit: {}
   nvme_of.block_devices.time_accumulation:
     family: Ceph/NVMe-oF/Block Devices
-    question: What is the accumulated time for each bdev name and ceph instance?
-    entity: by_bdev_name_and_ceph_instance
+    question: What is the accumulated time for each bdev name?
+    entity: by_bdev_name
     inputs:
       read_seconds:
         signal: nvmeof_bdev_read_seconds_total
@@ -6024,15 +5993,16 @@ views:
       omit: {}
   nvme_of.gateways.time_accumulation:
     family: Ceph/NVMe-oF/Gateways
-    question: What is the accumulated time for each ceph instance and mode and name?
-    entity: by_ceph_instance_and_mode_and_name
+    question: What is the accumulated busy and idle reactor time for each local gateway reactor thread?
+    entity: by_name
     inputs:
       value:
         signal: nvmeof_reactor_seconds_total
         components:
         - value
     labels:
-      dimensions: {}
+      dimensions:
+        mode: {render: label_value}
       promote: []
       omit: {}
   nvme_of.hosts.connection_state:
@@ -6050,8 +6020,8 @@ views:
       omit: {}
   nvme_of.hosts.keepalive_timeout_state:
     family: Ceph/NVMe-oF/Hosts
-    question: What is the keepalive timeout state for each ceph instance and gw name and host nqn and nqn?
-    entity: by_ceph_instance_and_gw_name_and_host_nqn_and_nqn
+    question: What is the keepalive timeout state for each gw name and host nqn and nqn?
+    entity: by_gw_name_and_host_nqn_and_nqn
     inputs:
       value:
         signal: nvmeof_host_keepalive_timeout
@@ -6094,8 +6064,8 @@ views:
       - nvmeof_display_conventions
   nvme_of.subsystems.listener_state:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the listener addresses for each ceph instance and nqn?
-    entity: by_ceph_instance_and_nqn
+    question: What is the listener addresses for each nqn?
+    entity: by_nqn
     inputs:
       value:
         signal: nvmeof_subsystem_listener_count
@@ -6107,8 +6077,8 @@ views:
       omit: {}
   nvme_of.subsystems.namespace_count:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the namespaces for each ceph instance and nqn?
-    entity: by_ceph_instance_and_nqn
+    question: What is the namespaces for each nqn?
+    entity: by_nqn
     inputs:
       nvmeof_subsystem_namespace_count:
         signal: nvmeof_subsystem_namespace_count
@@ -6118,11 +6088,32 @@ views:
       dimensions: {}
       promote: []
       omit: {}
-  nvme_of.subsystems.namespace_limit:
+  nvme_of.gateways.namespace_count:
+    family: Ceph/NVMe-oF/Gateways
+    question: How many namespaces does this local exporter endpoint serve?
+    entity: local_gateway_endpoint
+    inputs:
+      namespace_count:
+        signal: nvmeof_subsystem_namespace_count
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        nqn: Subsystem identity is intentionally summed to the local gateway endpoint.
+    reduction:
+      reducer: sum
+      lost_comparison: Individual subsystem namespace counts remain available in the Subsystems/Namespaces chart.
+  nvme_of.subsystems.namespace_capacity:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the namespace limit for each nqn?
+    question: How does each subsystem namespace population compare with its configured limit?
     entity: by_nqn
     inputs:
+      count:
+        signal: nvmeof_subsystem_namespace_count
+        components:
+        - value
       limit:
         signal: nvmeof_subsystem_namespace_limit
         components:
@@ -6133,9 +6124,9 @@ views:
       omit: {}
   nvme_of.subsystems.state_metadata:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the state and metadata — metadata for each allow any host and ceph instance and group and ha enabled
-      and model number and nqn and serial number?
-    entity: by_allow_any_host_and_ceph_instance_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number
+    question: What is the state and metadata — metadata for each allow any host and group and ha enabled and model number and nqn
+      and serial number?
+    entity: by_allow_any_host_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number
     inputs:
       metadata:
         signal: nvmeof_subsystem_metadata
@@ -6147,9 +6138,9 @@ views:
       omit: {}
   nvme_of.subsystems.state_namespace_metadata:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the state and metadata — namespace metadata for each anagrpid and bdev name and ceph instance and nqn
-      and nsid and rados namespace name?
-    entity: by_anagrpid_and_bdev_name_and_ceph_instance_and_nqn_and_nsid_and_rados_namespace_name
+    question: What is the state and metadata — namespace metadata for each anagrpid and bdev name and nqn and nsid and rados
+      namespace name?
+    entity: by_anagrpid_and_bdev_name_and_nqn_and_nsid_and_rados_namespace_name
     inputs:
       namespace_metadata:
         signal: nvmeof_subsystem_namespace_metadata

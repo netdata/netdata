@@ -11144,7 +11144,6 @@ template:
         instances:
           by_labels:
           - bdev_name
-          - ceph_instance
           optional_by_labels: []
       - title: Space and Memory
         context: space
@@ -11168,7 +11167,6 @@ template:
           by_labels:
           - bdev_name
           - block_size
-          - ceph_instance
           - namespace
           - pool_name
           - rbd_name
@@ -11185,13 +11183,13 @@ template:
         instances:
           by_labels:
           - bdev_name
-          - ceph_instance
           optional_by_labels: []
     - family: Gateways
       context_namespace: gateways
       metrics:
       - ceph_nvmeof_reactor_seconds_total
       - ceph_nvmeof_rpc_method_seconds
+      - ceph_nvmeof_subsystem_namespace_count
       charts:
       - title: Collection Duration
         context: duration
@@ -11210,13 +11208,19 @@ template:
         label_promotion: []
         dimensions:
         - selector: ceph_nvmeof_reactor_seconds_total
-          name: value
+          name_from_label: mode
         instances:
           by_labels:
-          - ceph_instance
-          - mode
           - name
           optional_by_labels: []
+      - title: Namespace Count
+        context: namespace_count
+        units: namespaces
+        label_promotion: []
+        dimensions:
+        - selector: ceph_nvmeof_subsystem_namespace_count
+          name: namespace_count
+        aggregation: sum
     - family: Hosts
       context_namespace: hosts
       metrics:
@@ -11246,7 +11250,6 @@ template:
           name: value
         instances:
           by_labels:
-          - ceph_instance
           - gw_name
           - host_nqn
           - nqn
@@ -11293,7 +11296,6 @@ template:
           name: value
         instances:
           by_labels:
-          - ceph_instance
           - nqn
           optional_by_labels: []
       - title: Namespaces
@@ -11305,14 +11307,15 @@ template:
           name: nvmeof_subsystem_namespace_count
         instances:
           by_labels:
-          - ceph_instance
           - nqn
           optional_by_labels: []
-      - title: Namespace Limit
-        context: namespace_limit
+      - title: Namespace Capacity
+        context: namespace_capacity
         units: namespaces
         label_promotion: []
         dimensions:
+        - selector: ceph_nvmeof_subsystem_namespace_count
+          name: count
         - selector: ceph_nvmeof_subsystem_namespace_limit
           name: limit
         instances:
@@ -11329,7 +11332,6 @@ template:
         instances:
           by_labels:
           - allow_any_host
-          - ceph_instance
           - group
           - ha_enabled
           - model_number
@@ -11347,7 +11349,6 @@ template:
           by_labels:
           - anagrpid
           - bdev_name
-          - ceph_instance
           - nqn
           - nsid
           - rados_namespace_name

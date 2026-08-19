@@ -26,6 +26,53 @@ sources:
     sha256: 09308346d3d143ff128813f1142f1499142799174da4e0505ddad7144b8d8716
 
 adaptation_contracts:
+  local_nvmeof_window_helper:
+    preserved:
+      - the local one-minute database window used by the source expression
+      - the local exporter identity
+    differences:
+      - the helper is instrumentation and does not notify
+      - no cross-exporter cluster aggregation is performed
+  local_nvmeof_inventory_helper:
+    preserved:
+      - the exporter's namespace inventory population
+      - local subsystem or gateway identity
+    differences:
+      - the helper is instrumentation and does not notify
+      - no cross-exporter cluster aggregation is performed
+  local_nvmeof_percent_persistence:
+    preserved:
+      - reactor busy seconds-per-second source signal
+      - strictly greater than 80 percent threshold
+      - ten-minute observation window
+    differences:
+      - busy seconds-per-second is scaled to a percentage before comparison
+      - Netdata applies the threshold to every available local reactor-rate sample in the window rather than first averaging
+        each one-minute source range, making brief sub-threshold dips stricter
+      - scope is each reactor thread rather than the exporter-wide average
+  local_nvmeof_latency_persistence:
+    preserved:
+      - one-minute service-time rate divided by completed-operation rate
+      - read 10 ms and write 20 ms thresholds
+    differences:
+      - scope is each local block device rather than the exporter-wide average
+      - the current ratio does not nest the source five-minute persistence window; a nested lookup-of-lookup would require shared health framework work
+  current_exporter_acknowledgement_state:
+    preserved:
+      - affected host, subsystem, and local gateway identity
+      - warning severity
+    differences:
+      - Netdata observes the exporter's read-on-collect one-shot 0/1 state rather than synthesizing a 24-hour change count
+      - exporter refresh clears the source latch, so the incident may be visible for only one collection cycle
+  local_nvmeof_inventory_limit:
+    preserved:
+      - subsystem or local gateway namespace population
+      - configured namespace limit or supported maximum
+      - inclusive at-limit comparison
+    differences:
+      - aggregation remains inside one exporter endpoint instead of combining gateways across a cluster
+      - the compound count-versus-limit condition is evaluated from current stored dimensions; the source one-minute
+        persistence window is not represented because a health lookup cannot persist this cross-dimension comparison
   observed_binary_window:
     preserved:
       - source incident and predicate
@@ -2099,6 +2146,332 @@ alerts:
       condition: 'warn: $this == 1'
       recipient: silent
       adaptation: generic_collection_reuse
+
+
+  ceph_nvmeof_read_latency_1m:
+    sow_id: CEPH-082-HELPER-READ-TIME
+    source_alert: NVMeoFHighReadLatency
+    source:
+      expression: 'label_replace((avg by(instance) ((rate(ceph_nvmeof_bdev_read_seconds_total[1m]) / rate(ceph_nvmeof_bdev_reads_completed_total[1m])))),"gateway","$1","instance","(.*):.*") > 0.01'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.block_devices.time_accumulation
+      labels: ''
+      lookup: average -1m unaligned of read_seconds
+      units: seconds
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: local_nvmeof_window_helper
+  ceph_nvmeof_read_operations_1m:
+    sow_id: CEPH-082-HELPER-READ-OPS
+    source_alert: NVMeoFHighReadLatency
+    source:
+      expression: 'label_replace((avg by(instance) ((rate(ceph_nvmeof_bdev_read_seconds_total[1m]) / rate(ceph_nvmeof_bdev_reads_completed_total[1m])))),"gateway","$1","instance","(.*):.*") > 0.01'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.block_devices.operations
+      labels: ''
+      lookup: average -1m unaligned of reads_completed
+      units: operations
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: local_nvmeof_window_helper
+  ceph_nvmeof_write_latency_1m:
+    sow_id: CEPH-083-HELPER-WRITE-TIME
+    source_alert: NVMeoFHighWriteLatency
+    source:
+      expression: 'label_replace((avg by(instance) ((rate(ceph_nvmeof_bdev_write_seconds_total[5m]) / rate(ceph_nvmeof_bdev_writes_completed_total[5m])))),"gateway","$1","instance","(.*):.*") > 0.02'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.block_devices.time_accumulation
+      labels: ''
+      lookup: average -1m unaligned of write_seconds
+      units: seconds
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: local_nvmeof_window_helper
+  ceph_nvmeof_write_operations_1m:
+    sow_id: CEPH-083-HELPER-WRITE-OPS
+    source_alert: NVMeoFHighWriteLatency
+    source:
+      expression: 'label_replace((avg by(instance) ((rate(ceph_nvmeof_bdev_write_seconds_total[5m]) / rate(ceph_nvmeof_bdev_writes_completed_total[5m])))),"gateway","$1","instance","(.*):.*") > 0.02'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.block_devices.operations
+      labels: ''
+      lookup: average -1m unaligned of writes_completed
+      units: operations
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: local_nvmeof_window_helper
+
+  ceph_nvmeof_gateway_namespaces:
+    sow_id: CEPH-094-HELPER-GATEWAY
+    source_alert: NVMeoFTooManyNamespaces
+    source:
+      expression: 'sum by(gateway_host, cluster) (label_replace(ceph_nvmeof_subsystem_namespace_count,"gateway_host","$1","instance","(.*?)(?::.*)?")) >= 4096.00'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.gateways.namespace_count
+      labels: ''
+      lookup: average -1m unaligned of namespace_count
+      units: namespaces
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: local_nvmeof_inventory_helper
+  ceph_nvmeof_subsystem_open_security:
+    sow_id: CEPH-078
+    source_alert: NVMeoFGatewayOpenSecurity
+    source:
+      expression: 'ceph_nvmeof_subsystem_metadata{allow_any_host="yes"}'
+      persistence: 5m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 830, squid: 842, tentacle: 948}
+      definition_sha256:
+        reef: 80177d1f73976b80b2e85b4c709ebeb0b940c0967a39dc0fd4bae5de10c548c3
+        squid: 80177d1f73976b80b2e85b4c709ebeb0b940c0967a39dc0fd4bae5de10c548c3
+        tentacle: eeea254679ec25eb206b92b91d0ba43d801033aada2e282d96acbb8e3f1358e0
+    netdata:
+      disposition: ship
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.subsystems.state_metadata
+      labels: allow_any_host=yes
+      lookup: min -5m unaligned of metadata
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: observed_binary_window
+  ceph_nvmeof_gateway_cpu_10m:
+    sow_id: CEPH-080-HELPER-PERSIST
+    source_alert: NVMeoFHighGatewayCPU
+    source:
+      expression: 'label_replace(avg by(instance) (rate(ceph_nvmeof_reactor_seconds_total{mode="busy"}[1m])),"instance","$1","instance","(.*):.*")'
+      persistence: ''
+      severity: warning
+      releases: []
+      lines: {reef: 0, squid: 0, tentacle: 0}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ""
+    netdata:
+      disposition: internal-helper
+      fidelity: NETDATA-ADAPTED
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.gateways.time_accumulation
+      labels: ''
+      lookup: min -10m unaligned of busy
+      units: status
+      condition: 'warn: $this == 999999999'
+      recipient: silent
+      adaptation: local_nvmeof_window_helper
+  ceph_nvmeof_gateway_cpu:
+    sow_id: CEPH-080
+    source_alert: NVMeoFHighGatewayCPU
+    source:
+      expressions:
+        reef: 'label_replace(avg by(instance) (rate(ceph_nvmeof_reactor_seconds_total{mode="busy"}[1m])),"instance","$1","instance","(.*):.*") > 80.00'
+        squid: 'label_replace(avg by(instance) (rate(ceph_nvmeof_reactor_seconds_total{mode="busy"}[1m])),"instance","$1","instance","(.*):.*") > 80.00'
+        tentacle: 'label_replace(avg by(instance, cluster) (rate(ceph_nvmeof_reactor_seconds_total{mode="busy"}[1m])),"instance","$1","instance","(.*):.*") > 80.00'
+      persistence: 10m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 821, squid: 833, tentacle: 939}
+      definition_sha256:
+        reef: 40fd408fb03395a7185d95a512e68b8464ef91ddee00ecf63b87fc8d5528c48c
+        squid: 40fd408fb03395a7185d95a512e68b8464ef91ddee00ecf63b87fc8d5528c48c
+        tentacle: c677ced0cc130893242aba81a6269ff7ede96bf9015bdac6f5a31dd99733237c
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.gateways.time_accumulation
+      labels: ''
+      lookup: ''
+      calc: '($ceph_nvmeof_gateway_cpu_10m == nan or $ceph_nvmeof_gateway_cpu_10m == inf) ? (nan) : ($ceph_nvmeof_gateway_cpu_10m * 100)'
+      units: '%'
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 80)'
+      recipient: silent
+      adaptation: local_nvmeof_percent_persistence
+  ceph_nvmeof_high_read_latency:
+    sow_id: CEPH-082
+    source_alert: NVMeoFHighReadLatency
+    source:
+      expression: 'label_replace((avg by(instance) ((rate(ceph_nvmeof_bdev_read_seconds_total[1m]) / rate(ceph_nvmeof_bdev_reads_completed_total[1m])))),"gateway","$1","instance","(.*):.*") > 0.01'
+      persistence: 5m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 894, squid: 906, tentacle: 1039}
+      definition_sha256:
+        reef: 0158b445aedd463ec76ed17d514ec4d046cf3fa6c646b352b3c6b70647256f63
+        squid: 0158b445aedd463ec76ed17d514ec4d046cf3fa6c646b352b3c6b70647256f63
+        tentacle: 0158b445aedd463ec76ed17d514ec4d046cf3fa6c646b352b3c6b70647256f63
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.block_devices.time_accumulation
+      labels: ''
+      lookup: ''
+      calc: '($ceph_nvmeof_read_latency_1m == nan or $ceph_nvmeof_read_latency_1m == inf or $ceph_nvmeof_read_operations_1m == nan or $ceph_nvmeof_read_operations_1m == inf or $ceph_nvmeof_read_operations_1m <= 0) ? (nan) : ($ceph_nvmeof_read_latency_1m / $ceph_nvmeof_read_operations_1m)'
+      units: seconds
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0.01)'
+      recipient: silent
+      adaptation: local_nvmeof_latency_persistence
+  ceph_nvmeof_high_write_latency:
+    sow_id: CEPH-083
+    source_alert: NVMeoFHighWriteLatency
+    source:
+      expression: 'label_replace((avg by(instance) ((rate(ceph_nvmeof_bdev_write_seconds_total[5m]) / rate(ceph_nvmeof_bdev_writes_completed_total[5m])))),"gateway","$1","instance","(.*):.*") > 0.02'
+      persistence: 5m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 903, squid: 915, tentacle: 1048}
+      definition_sha256:
+        reef: 753e7942b97773739a79a8384353025e506ffca88c4c08e7e3a701c75fe34666
+        squid: 753e7942b97773739a79a8384353025e506ffca88c4c08e7e3a701c75fe34666
+        tentacle: 753e7942b97773739a79a8384353025e506ffca88c4c08e7e3a701c75fe34666
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.block_devices.time_accumulation
+      labels: ''
+      lookup: ''
+      calc: '($ceph_nvmeof_write_latency_1m == nan or $ceph_nvmeof_write_latency_1m == inf or $ceph_nvmeof_write_operations_1m == nan or $ceph_nvmeof_write_operations_1m == inf or $ceph_nvmeof_write_operations_1m <= 0) ? (nan) : ($ceph_nvmeof_write_latency_1m / $ceph_nvmeof_write_operations_1m)'
+      units: seconds
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0.02)'
+      recipient: silent
+      adaptation: local_nvmeof_latency_persistence
+  ceph_nvmeof_host_keepalive_timeout:
+    sow_id: CEPH-084
+    source_alert: NVMeoFHostKeepAliveTimeout
+    source:
+      expression: 'ceil(changes(ceph_nvmeof_host_keepalive_timeout[24h:]) / 2) > 0'
+      persistence: 1m
+      severity: warning
+      releases: [tentacle]
+      lines: {reef: 0, squid: 0, tentacle: 1057}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: ba085dfb924f3a7307d287840f898dfe88c73c61e947f965be907d6e698e78ae
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.hosts.keepalive_timeout_state
+      labels: ''
+      calc: $value
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
+      recipient: silent
+      adaptation: current_exporter_acknowledgement_state
+  ceph_nvmeof_subsystem_namespace_limit:
+    sow_id: CEPH-092
+    source_alert: NVMeoFSubsystemNamespaceLimit
+    source:
+      expressions:
+        reef: '(count by(nqn) (ceph_nvmeof_subsystem_namespace_metadata)) >= ceph_nvmeof_subsystem_namespace_limit'
+        squid: '(count by(nqn) (ceph_nvmeof_subsystem_namespace_metadata)) >= ceph_nvmeof_subsystem_namespace_limit'
+        tentacle: '(count by(nqn, cluster, instance) (ceph_nvmeof_subsystem_namespace_metadata)) >= on(nqn, instance) group_right(cluster) ceph_nvmeof_subsystem_namespace_limit'
+      persistence: 1m
+      severity: warning
+      releases: [reef, squid, tentacle]
+      lines: {reef: 785, squid: 797, tentacle: 885}
+      definition_sha256:
+        reef: 8bf254c3be042ccadff0c0747d5b6c80a041739c19629719845932dfece83198
+        squid: 8bf254c3be042ccadff0c0747d5b6c80a041739c19629719845932dfece83198
+        tentacle: b4f1f27cb1df316f19e01b5b01fe1d8f25278822e825af0c737b27fbe4c35e3e
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.subsystems.namespace_capacity
+      labels: ''
+      lookup: ''
+      calc: '($count == nan or $count == inf or $limit == nan or $limit == inf or $limit < 0) ? (nan) : ($count >= $limit)'
+      units: status
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
+      recipient: silent
+      adaptation: local_nvmeof_inventory_limit
+  ceph_nvmeof_too_many_namespaces:
+    sow_id: CEPH-094
+    source_alert: NVMeoFTooManyNamespaces
+    source:
+      expression: 'sum by(gateway_host, cluster) (label_replace(ceph_nvmeof_subsystem_namespace_count,"gateway_host","$1","instance","(.*?)(?::.*)?")) >= 4096.00'
+      persistence: 1m
+      severity: warning
+      releases: [tentacle]
+      lines: {reef: 0, squid: 0, tentacle: 966}
+      definition_sha256:
+        reef: ""
+        squid: ""
+        tentacle: 6bd6d0e65cd08d8c27e13668418487a80aa700584658950ef29d96068eaac1fc
+    netdata:
+      disposition: correct
+      fidelity: CORRECTED-INTENT
+      owner: mgr_prometheus
+      context: prometheus.ceph.nvme_of.gateways.namespace_count
+      labels: ''
+      lookup: ''
+      calc: '($ceph_nvmeof_gateway_namespaces == nan or $ceph_nvmeof_gateway_namespaces == inf) ? (nan) : ($ceph_nvmeof_gateway_namespaces)'
+      units: namespaces
+      condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this >= 4096)'
+      recipient: silent
+      adaptation: local_nvmeof_inventory_limit
 
 netdata_extensions:
   ceph_unknown_health_check:
