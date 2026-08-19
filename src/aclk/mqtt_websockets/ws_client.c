@@ -18,6 +18,7 @@ const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
 const char *mqtt_protoid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 #define DEFAULT_RINGBUFFER_SIZE (1024*128)
+#define MAX_MQTT_INPUT_BUFFER_SIZE (16*1024*1024)
 
 ws_client *ws_client_new(size_t buf_size, char **host)
 {
@@ -26,9 +27,15 @@ ws_client *ws_client_new(size_t buf_size, char **host)
 
     ws_client *client = callocz(1, sizeof(ws_client));
     client->host = host;
-    client->buf_read = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
-    client->buf_write = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
-    client->buf_to_mqtt = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
+
+    size_t size = buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE;
+    size_t mqtt_input_size = (size > MAX_MQTT_INPUT_BUFFER_SIZE) ? MAX_MQTT_INPUT_BUFFER_SIZE : size;
+
+    // Fixed: raw WebSocket read staging; dynamic growth is only needed after payload decoding.
+    client->buf_read = rbuf_create(size, size);
+    // Fixed: the send path masks buffered bytes in-place after rbuf_bump_head().
+    client->buf_write = rbuf_create(size, size);
+    client->buf_to_mqtt = rbuf_create(mqtt_input_size, MAX_MQTT_INPUT_BUFFER_SIZE);
 
     return client;
 }
@@ -48,9 +55,26 @@ void ws_client_free_headers(ws_client *client)
     client->hs.hdr_count = 0;
 }
 
+static void ws_client_rx_free_specific_data(ws_client *client)
+{
+    switch (client->rx.opcode) {
+        case WS_OP_CONNECTION_CLOSE:
+            freez(client->rx.specific_data.op_close.reason);
+            client->rx.specific_data.op_close.reason = NULL;
+            break;
+        case WS_OP_PING:
+            freez(client->rx.specific_data.ping_msg);
+            client->rx.specific_data.ping_msg = NULL;
+            break;
+        default:
+            break;
+    }
+}
+
 void ws_client_destroy(ws_client *client)
 {
     ws_client_free_headers(client);
+    ws_client_rx_free_specific_data(client);
     freez(client->hs.nonce_reply);
     freez(client->hs.http_reply_msg);
     rbuf_free(client->buf_read);
@@ -62,6 +86,7 @@ void ws_client_destroy(ws_client *client)
 void ws_client_reset(ws_client *client)
 {
     ws_client_free_headers(client);
+    ws_client_rx_free_specific_data(client);
     freez(client->hs.nonce_reply);
     client->hs.nonce_reply = NULL;
 
@@ -74,8 +99,12 @@ void ws_client_reset(ws_client *client)
 
     client->state = WS_RAW;
     client->hs.hdr_state = WS_HDR_HTTP;
+    // Reconnect can happen mid-frame, so clear partial RX frame state too.
     client->rx.parse_state = WS_FIRST_2BYTES;
+    client->rx.opcode = 0;
     client->rx.remote_closed = false;
+    client->rx.payload_length = 0;
+    client->rx.payload_processed = 0;
 }
 
 #define MAX_HTTP_HDR_COUNT 128
@@ -216,14 +245,14 @@ exit_with_error:
 
 #define HTTP_HDR_LINE_CHECK_LIMIT(x)                                                                                   \
     if ((x) >= MAX_HTTP_LINE_LENGTH) {                                                                                 \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP line received is too long. Maximum is %d", MAX_HTTP_LINE_LENGTH);                                  \
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP line received is too long. Maximum is %zu", (size_t)MAX_HTTP_LINE_LENGTH);                         \
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
 
 int ws_client_parse_handshake_resp(ws_client *client)
 {
     char buf[HTTP_SC_LENGTH];
-    int idx_crlf, idx_sep;
+    size_t idx_crlf, idx_sep;
     char *ptr;
     size_t bytes;
 
@@ -287,13 +316,13 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
-            if (idx_crlf == idx_sep + (int)strlen(HTTP_HDR_SEPARATOR)) {
+            if (idx_crlf == idx_sep + strlen(HTTP_HDR_SEPARATOR)) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP Header value cannot be empty");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
             if (idx_sep > HTTP_HEADER_NAME_MAX_LEN) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP header too long (%d)", idx_sep);
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP header too long (%zu)", idx_sep);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -308,7 +337,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
 
             for (int i = 0; hdr->key[i]; i++)
-                hdr->key[i] = tolower(hdr->key[i]);
+                hdr->key[i] = tolower((uint8_t)hdr->key[i]);
 
             if (ws_client_add_http_header(client, hdr))
                 return WS_CLIENT_PROTOCOL_ERROR;
@@ -510,13 +539,17 @@ int ws_client_process_rx_ws(ws_client *client)
         case WS_PAYLOAD_EXTENDED_16:
             BUF_READ_CHECK_AT_LEAST(2);
             rbuf_pop(client->buf_read, buf, 2);
-            client->rx.payload_length = be16toh(*((uint16_t *)buf));
+            uint16_t payload_length16;
+            memcpy(&payload_length16, buf, sizeof(payload_length16));
+            client->rx.payload_length = be16toh(payload_length16);
             ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_EXTENDED_64:
             BUF_READ_CHECK_AT_LEAST(LONGEST_POSSIBLE_HDR_PART);
             rbuf_pop(client->buf_read, buf, LONGEST_POSSIBLE_HDR_PART);
-            client->rx.payload_length = be64toh(*((uint64_t *)buf));
+            uint64_t payload_length64;
+            memcpy(&payload_length64, buf, sizeof(payload_length64));
+            client->rx.payload_length = be64toh(payload_length64);
             ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_DATA:
@@ -527,8 +560,11 @@ int ws_client_process_rx_ws(ws_client *client)
                     return WS_CLIENT_NEED_MORE_BYTES;
                 char *insert = rbuf_get_linear_insert_range(client->buf_to_mqtt, &size);
                 if (!insert) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket buffer full! Cannot process payload of %"PRIu64" bytes (processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes",
-                           remaining, client->rx.payload_processed, client->rx.payload_length, rbuf_get_capacity(client->buf_to_mqtt));
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "ACLK: inbound WebSocket MQTT buffer full! Cannot process payload of %"PRIu64" bytes "
+                           "(processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes, max capacity: %zu bytes",
+                           remaining, client->rx.payload_processed, client->rx.payload_length,
+                           rbuf_get_capacity(client->buf_to_mqtt), rbuf_get_max_capacity(client->buf_to_mqtt));
                     return WS_CLIENT_BUFFER_FULL;
                 }
                 size = (size > remaining) ? remaining : size;
@@ -543,6 +579,11 @@ int ws_client_process_rx_ws(ws_client *client)
             // a) empty payload
             // b) 2byte reason code
             // c) 2byte reason code followed by message
+            if (client->rx.payload_length > 125) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket CONNECTION_CLOSE payload too big! Received %"PRIu64" bytes, maximum allowed 125 bytes",
+                       client->rx.payload_length);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             if (client->rx.payload_length == 1) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebScoket CONNECTION_CLOSE can't have payload of size 1");
                 return WS_CLIENT_PROTOCOL_ERROR;
@@ -559,7 +600,9 @@ int ws_client_process_rx_ws(ws_client *client)
             BUF_READ_CHECK_AT_LEAST(sizeof(uint16_t));
 
             rbuf_pop(client->buf_read, buf, sizeof(uint16_t));
-            client->rx.specific_data.op_close.ec = be16toh(*((uint16_t *)buf));
+            uint16_t close_code;
+            memcpy(&close_code, buf, sizeof(close_code));
+            client->rx.specific_data.op_close.ec = be16toh(close_code);
             client->rx.payload_processed += sizeof(uint16_t);
 
             client->rx.remote_closed = true;
@@ -571,9 +614,10 @@ int ws_client_process_rx_ws(ws_client *client)
             }
             client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE_MSG;
             break;
-        case WS_PAYLOAD_CONNECTION_CLOSE_MSG:
+        case WS_PAYLOAD_CONNECTION_CLOSE_MSG: {
+            size_t close_reason_length = (size_t)(client->rx.payload_length - sizeof(uint16_t));
             if (!client->rx.specific_data.op_close.reason)
-                client->rx.specific_data.op_close.reason = mallocz(client->rx.payload_length + 1);
+                client->rx.specific_data.op_close.reason = mallocz(close_reason_length + 1);
 
             while (client->rx.payload_processed < client->rx.payload_length) {
                 if (!rbuf_bytes_available(client->buf_read))
@@ -582,7 +626,7 @@ int ws_client_process_rx_ws(ws_client *client)
                                                          &client->rx.specific_data.op_close.reason[client->rx.payload_processed - sizeof(uint16_t)],
                                                          client->rx.payload_length - client->rx.payload_processed);
             }
-            client->rx.specific_data.op_close.reason[client->rx.payload_length] = 0;
+            client->rx.specific_data.op_close.reason[close_reason_length] = 0;
             nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: WebSocket server closed the connection with EC=%d and reason \"%s\"",
                 client->rx.specific_data.op_close.ec,
                 client->rx.specific_data.op_close.reason);
@@ -591,6 +635,7 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.specific_data.op_close.reason = NULL;
             client->rx.parse_state = WS_PACKET_DONE;
             break;
+        }
         case WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD:
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
             nd_log(NDLS_DAEMON, NDLP_WARNING, "ACLK: Skipping Websocket Packet of unsupported/unknown type");
@@ -599,6 +644,11 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.parse_state = WS_PACKET_DONE;
             return WS_CLIENT_PARSING_DONE;
         case WS_PAYLOAD_PING_REQ_PAYLOAD:
+            if (client->rx.payload_length > 125) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket PING payload too big! Received %"PRIu64" bytes, maximum allowed 125 bytes",
+                       client->rx.payload_length);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             if (client->rx.payload_length > rbuf_get_capacity(client->buf_read) / 2) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Ping payload too big! Received %"PRIu64" bytes, maximum allowed %zu bytes (buffer capacity: %zu bytes)",
                        client->rx.payload_length, rbuf_get_capacity(client->buf_read) / 2, rbuf_get_capacity(client->buf_read));
@@ -610,6 +660,7 @@ int ws_client_process_rx_ws(ws_client *client)
             // TODO schedule this instead of sending right away
             // then attempt to send as soon as buffer space clears up
             size = ws_client_send(client, WS_OP_PONG, client->rx.specific_data.ping_msg, client->rx.payload_length);
+            ws_client_rx_free_specific_data(client);
             if (size != client->rx.payload_length) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Unable to send the PONG as one packet back. Closing connection.");
                 return WS_CLIENT_PROTOCOL_ERROR;

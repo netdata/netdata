@@ -14,13 +14,16 @@ static char *get_mgmt_api_key(void) {
         return guid;
 
     // read it from disk
+    struct stat st;
+    int fd = -1;
 #ifdef O_NOFOLLOW
-    int fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if(lstat(api_key_filename, &st) == 0 && S_ISREG(st.st_mode))
+        fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW);
 #else
-    int fd = open(api_key_filename, O_RDONLY | O_CLOEXEC);
+    if(stat(api_key_filename, &st) == 0 && S_ISREG(st.st_mode))
+        fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
 #endif
     if(fd != -1) {
-        struct stat st;
         if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode))
             netdata_log_error("Management API key file '%s' is not a regular file, regenerating.", api_key_filename);
         else {
@@ -50,10 +53,14 @@ static char *get_mgmt_api_key(void) {
 
         // save it
 #ifdef O_NOFOLLOW
-        struct stat st;
         // O_RDWR avoids blocking on FIFOs (O_WRONLY blocks until a reader arrives).
         // O_TRUNC is omitted so truncation only happens after fstat() confirms a regular file.
-        fd = open(api_key_filename, O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW, 0600);
+        if(lstat(api_key_filename, &st) == 0 && !S_ISREG(st.st_mode)) {
+            netdata_log_error("Management API key file '%s' is not a regular file.", api_key_filename);
+            goto temp_key;
+        }
+
+        fd = open(api_key_filename, O_RDWR|O_CREAT|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW, 0600);
         if(fd == -1) {
             netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
             goto temp_key;

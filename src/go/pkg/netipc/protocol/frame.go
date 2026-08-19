@@ -48,6 +48,8 @@ const (
 	MethodIncrement       uint16 = 1
 	MethodCgroupsSnapshot uint16 = 2
 	MethodStringReverse   uint16 = 3
+	MethodCgroupsLookup   uint16 = 4
+	MethodAppsLookup      uint16 = 5
 
 	// Profile bits.
 	ProfileBaseline    uint32 = 0x01
@@ -58,20 +60,18 @@ const (
 	// Defaults.
 	MaxPayloadDefault uint32 = 1024
 
-	// MaxPayloadCap is the hard cap on negotiated request payload sizes
-	// (1 MiB) to prevent excessive memory allocation from a compromised peer.
+	// MaxPayloadCap is the zero-config automatic growth ceiling used only when
+	// callers did not configure larger payload budgets explicitly. It is not a
+	// protocol hard limit; peers may negotiate larger ceilings from
+	// initialization config.
 	MaxPayloadCap uint32 = 1024 * 1024
 
-	// Alignment for batch items and cgroups items.
+	// Alignment for batch items and typed codec items.
 	Alignment = 8
 
 	// Payload sizes.
-	helloSize       = 44
-	helloAckSize    = 48
-	cgroupsReqSize  = 4
-	cgroupsRespHdr  = 24
-	cgroupsDirEntry = 8
-	cgroupsItemHdr  = 32
+	helloSize    = 44
+	helloAckSize = 48
 )
 
 var ne = binary.NativeEndian
@@ -81,17 +81,20 @@ var ne = binary.NativeEndian
 // ---------------------------------------------------------------------------
 
 var (
-	ErrTruncated    = errors.New("buffer too short")
-	ErrBadMagic     = errors.New("magic value mismatch")
-	ErrBadVersion   = errors.New("unsupported version")
-	ErrBadHeaderLen = errors.New("header_len != 32")
-	ErrBadKind      = errors.New("unknown message kind")
-	ErrBadLayout    = errors.New("unknown layout_version")
-	ErrOutOfBounds  = errors.New("offset+length exceeds data")
-	ErrMissingNul   = errors.New("string not NUL-terminated")
-	ErrBadAlignment = errors.New("item not 8-byte aligned")
-	ErrBadItemCount = errors.New("item count inconsistent")
-	ErrOverflow     = errors.New("builder out of space")
+	ErrTruncated     = errors.New("buffer too short")
+	ErrBadMagic      = errors.New("magic value mismatch")
+	ErrBadVersion    = errors.New("unsupported version")
+	ErrBadHeaderLen  = errors.New("header_len != 32")
+	ErrBadKind       = errors.New("unknown message kind")
+	ErrBadLayout     = errors.New("unknown layout_version")
+	ErrOutOfBounds   = errors.New("offset+length exceeds data")
+	ErrMissingNul    = errors.New("string not NUL-terminated")
+	ErrBadAlignment  = errors.New("item not 8-byte aligned")
+	ErrBadItemCount  = errors.New("item count inconsistent")
+	ErrOverflow      = errors.New("builder out of space")
+	ErrHandlerFailed = errors.New("dispatch handler failed")
+	ErrTimeout       = errors.New("synchronous call deadline expired")
+	ErrAborted       = errors.New("synchronous call aborted")
 )
 
 // ---------------------------------------------------------------------------
@@ -265,8 +268,14 @@ func BatchDirEncode(entries []BatchEntry, buf []byte) int {
 // BatchDirDecode decodes itemCount directory entries from buf. Validates
 // alignment and that each entry falls within packedAreaLen.
 func BatchDirDecode(buf []byte, itemCount uint32, packedAreaLen uint32) ([]BatchEntry, error) {
-	count := int(itemCount)
-	dirSize := count * 8
+	count, ok := checkedInt(uint64(itemCount))
+	if !ok {
+		return nil, ErrBadItemCount
+	}
+	dirSize, ok := checkedMulInt(count, 8)
+	if !ok {
+		return nil, ErrBadItemCount
+	}
 	if len(buf) < dirSize {
 		return nil, ErrTruncated
 	}
@@ -277,7 +286,7 @@ func BatchDirDecode(buf []byte, itemCount uint32, packedAreaLen uint32) ([]Batch
 		off := ne.Uint32(buf[base : base+4])
 		length := ne.Uint32(buf[base+4 : base+8])
 
-		if int(off)%Alignment != 0 {
+		if off%uint32(Alignment) != 0 {
 			return nil, ErrBadAlignment
 		}
 		if uint64(off)+uint64(length) > uint64(packedAreaLen) {
@@ -291,16 +300,20 @@ func BatchDirDecode(buf []byte, itemCount uint32, packedAreaLen uint32) ([]Batch
 // BatchDirValidate validates the batch directory without allocating.
 // Checks alignment and that each entry falls within packedAreaLen.
 func BatchDirValidate(buf []byte, itemCount uint32, packedAreaLen uint32) error {
-	count := int(itemCount)
-	dirSize := count * 8
+	dirSize64 := uint64(itemCount) * 8
+	if dirSize64 > maxIntUint64() {
+		return ErrBadItemCount
+	}
+	dirSize := int(dirSize64) // #nosec G115 -- bounded by maxIntValue above.
 	if len(buf) < dirSize {
 		return ErrTruncated
 	}
+	count := int(itemCount)
 	for i := range count {
 		base := i * 8
 		off := ne.Uint32(buf[base : base+4])
 		length := ne.Uint32(buf[base+4 : base+8])
-		if int(off)%Alignment != 0 {
+		if off%uint32(Alignment) != 0 {
 			return ErrBadAlignment
 		}
 		if uint64(off)+uint64(length) > uint64(packedAreaLen) {
@@ -317,30 +330,30 @@ func BatchItemGet(payload []byte, itemCount uint32, index uint32) ([]byte, error
 		return nil, ErrOutOfBounds
 	}
 
-	dirSize := int(itemCount) * 8
-	dirAligned := Align8(dirSize)
-
-	if len(payload) < dirAligned {
+	dirSize64 := uint64(itemCount) * 8
+	if dirSize64 > maxIntUint64() {
+		return nil, ErrBadItemCount
+	}
+	dirSize := int(dirSize64) // #nosec G115 -- bounded by maxIntValue above.
+	if len(payload) < dirSize {
 		return nil, ErrTruncated
 	}
 
-	idx := int(index)
-	base := idx * 8
+	base := int(index) * 8 // #nosec G115 -- index < itemCount and dirSize is bounded above.
 	off := ne.Uint32(payload[base : base+4])
 	length := ne.Uint32(payload[base+4 : base+8])
-
-	packedAreaStart := dirAligned
+	packedAreaStart := dirSize
 	packedAreaLen := len(payload) - packedAreaStart
 
-	if int(off)%Alignment != 0 {
+	if off%uint32(Alignment) != 0 {
 		return nil, ErrBadAlignment
 	}
-	if uint64(off)+uint64(length) > uint64(packedAreaLen) {
+	if !uint32RangeWithinInt(off, length, packedAreaLen) {
 		return nil, ErrOutOfBounds
 	}
 
-	start := packedAreaStart + int(off)
-	end := start + int(length)
+	start := packedAreaStart + int(off) // #nosec G115 -- bounds check above proves this fits len(payload).
+	end := start + int(length)          // #nosec G115 -- bounds check above proves this fits len(payload).
 	return payload[start:end], nil
 }
 
@@ -364,7 +377,19 @@ func (b *BatchBuilder) Reset(buf []byte, maxItems uint32) {
 	b.buf = buf
 	b.itemCount = 0
 	b.maxItems = maxItems
-	b.dirEnd = Align8(int(maxItems) * 8)
+	dirSize, ok := checkedInt(uint64(maxItems) * 8)
+	if !ok {
+		b.dirEnd = maxIntValue()
+		b.dataOffset = 0
+		return
+	}
+	dirEnd, ok := checkedAlign8(dirSize)
+	if !ok {
+		b.dirEnd = maxIntValue()
+		b.dataOffset = 0
+		return
+	}
+	b.dirEnd = dirEnd
 	b.dataOffset = 0
 }
 
@@ -378,19 +403,79 @@ func NewBatchBuilder(buf []byte, maxItems uint32) *BatchBuilder {
 
 // Add appends an item payload. Handles alignment padding.
 func (b *BatchBuilder) Add(item []byte) error {
+	maxInt := maxIntValue()
+	itemLen32, itemLenFitsU32 := checkedU32Int(len(item))
+	// Inline the common case; addSlow preserves the precise error returns for
+	// overflow and unusual bounds.
+	if b.itemCount < b.maxItems &&
+		b.dirEnd >= 0 &&
+		b.dataOffset >= 0 &&
+		b.dataOffset <= maxInt-7 &&
+		itemLenFitsU32 {
+		alignedOff := Align8(b.dataOffset)
+		alignedOff32, alignedOffFitsU32 := checkedU32Int(alignedOff)
+		if alignedOffFitsU32 &&
+			alignedOff <= maxInt-b.dirEnd &&
+			len(item) <= maxInt-alignedOff {
+			absPos := b.dirEnd + alignedOff
+			if len(item) <= maxInt-absPos {
+				itemEnd := absPos + len(item)
+				idx, ok := checkedInt(uint64(b.itemCount) * 8)
+				if ok {
+					if itemEnd <= len(b.buf) && idx <= len(b.buf)-8 {
+						if alignedOff > b.dataOffset {
+							clear(b.buf[b.dirEnd+b.dataOffset : b.dirEnd+alignedOff])
+						}
+						copy(b.buf[absPos:], item)
+						ne.PutUint32(b.buf[idx:idx+4], alignedOff32)
+						ne.PutUint32(b.buf[idx+4:idx+8], itemLen32)
+						b.dataOffset = alignedOff + len(item)
+						b.itemCount++
+						return nil
+					}
+				}
+			}
+		}
+	}
+	return b.addSlow(item)
+}
+
+func (b *BatchBuilder) addSlow(item []byte) error {
 	if b.itemCount >= b.maxItems {
 		return ErrOverflow
 	}
-
+	if b.dirEnd < 0 || b.dataOffset < 0 || b.dataOffset > maxIntValue()-7 {
+		return ErrOverflow
+	}
 	alignedOff := Align8(b.dataOffset)
+	alignedOff32, ok := checkedU32Int(alignedOff)
+	if !ok {
+		return ErrOverflow
+	}
+	itemLen32, ok := checkedU32Int(len(item))
+	if !ok {
+		return ErrOverflow
+	}
+	if alignedOff > maxIntValue()-b.dirEnd {
+		return ErrOverflow
+	}
 	absPos := b.dirEnd + alignedOff
-
-	if absPos+len(item) > len(b.buf) {
+	if len(item) > maxIntValue()-absPos {
+		return ErrOverflow
+	}
+	itemEnd := absPos + len(item)
+	if itemEnd > len(b.buf) {
+		return ErrOverflow
+	}
+	if len(item) > maxIntValue()-alignedOff {
 		return ErrOverflow
 	}
 
 	// Zero alignment padding.
 	if alignedOff > b.dataOffset {
+		if b.dataOffset > maxIntValue()-b.dirEnd {
+			return ErrOverflow
+		}
 		padStart := b.dirEnd + b.dataOffset
 		padEnd := b.dirEnd + alignedOff
 		clear(b.buf[padStart:padEnd])
@@ -399,9 +484,15 @@ func (b *BatchBuilder) Add(item []byte) error {
 	copy(b.buf[absPos:], item)
 
 	// Write directory entry.
-	idx := int(b.itemCount) * 8
-	ne.PutUint32(b.buf[idx:idx+4], uint32(alignedOff))
-	ne.PutUint32(b.buf[idx+4:idx+8], uint32(len(item)))
+	idx, ok := checkedInt(uint64(b.itemCount) * 8)
+	if !ok {
+		return ErrOverflow
+	}
+	if idx > len(b.buf)-8 {
+		return ErrOverflow
+	}
+	ne.PutUint32(b.buf[idx:idx+4], alignedOff32)
+	ne.PutUint32(b.buf[idx+4:idx+8], itemLen32)
 
 	b.dataOffset = alignedOff + len(item)
 	b.itemCount++
@@ -412,14 +503,32 @@ func (b *BatchBuilder) Add(item []byte) error {
 // Compacts if fewer items were added than maxItems.
 func (b *BatchBuilder) Finish() (int, uint32) {
 	count := b.itemCount
-	finalDirAligned := Align8(int(count) * 8)
-
-	if finalDirAligned < b.dirEnd && b.dataOffset > 0 {
-		// Shift packed data left.
-		copy(b.buf[finalDirAligned:], b.buf[b.dirEnd:b.dirEnd+b.dataOffset])
+	dirSize, ok := checkedInt(uint64(count) * 8)
+	if !ok {
+		return 0, count
+	}
+	finalDirAligned, ok := checkedAlign8(dirSize)
+	if !ok {
+		return 0, count
 	}
 
-	total := finalDirAligned + Align8(b.dataOffset)
+	if finalDirAligned < b.dirEnd && b.dataOffset > 0 {
+		dataEnd, ok := checkedAddInt(b.dirEnd, b.dataOffset)
+		if !ok {
+			return 0, count
+		}
+		// Shift packed data left.
+		copy(b.buf[finalDirAligned:], b.buf[b.dirEnd:dataEnd])
+	}
+
+	alignedData, ok := checkedAlign8(b.dataOffset)
+	if !ok {
+		return 0, count
+	}
+	total, ok := checkedAddInt(finalDirAligned, alignedData)
+	if !ok {
+		return 0, count
+	}
 	return total, count
 }
 

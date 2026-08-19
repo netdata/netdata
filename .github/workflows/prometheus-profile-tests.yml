@@ -1,0 +1,113 @@
+---
+name: Prometheus Profile Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/prometheus-profile-tests.yml'
+      - '.agents/skills/project-prometheus-profiles/**'
+      - 'src/go/**'
+  pull_request: null
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: prometheus-profile-tests-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  proof-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check modified files
+        id: check-files
+        uses: actions/github-script@v9
+        with:
+          result-encoding: string
+          retries: 3
+          script: |
+            if (context.eventName !== 'pull_request') {
+              return 'true';
+            }
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100,
+            });
+            if (files.length < context.payload.pull_request.changed_files) {
+              return 'true';
+            }
+            const relevant = (path) =>
+              path === '.github/workflows/prometheus-profile-tests.yml' ||
+              path.startsWith('.agents/skills/project-prometheus-profiles/') ||
+              path.startsWith('src/go/');
+            return files.some((file) =>
+              relevant(file.filename) ||
+              (file.previous_filename && relevant(file.previous_filename))
+            ) ? 'true' : 'false';
+
+      - name: Skip check
+        if: steps.check-files.outputs.result != 'true'
+        run: echo 'No Prometheus profile proof dependencies changed.'
+
+      - name: Checkout
+        if: steps.check-files.outputs.result == 'true'
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Go
+        if: steps.check-files.outputs.result == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Clone latest testdata master
+        if: steps.check-files.outputs.result == 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone --depth=1 --branch master --single-branch --filter=blob:none --sparse \
+            https://github.com/netdata/testdata.git src/go/testdata
+
+          mapfile -t evidence_dirs < <(
+            cd src/go
+            go run ./tools/prometheus-profile-proof evidence-dirs --repo-root ../..
+          )
+          test "${#evidence_dirs[@]}" -gt 0
+          git -C src/go/testdata sparse-checkout set "${evidence_dirs[@]}"
+
+      - name: Verify external evidence integrity
+        if: steps.check-files.outputs.result == 'true'
+        env:
+          NETDATA_PROMETHEUS_TESTDATA_REQUIRED: '1'
+        run: |
+          cd src/go
+          go run ./tools/prometheus-profile-proof verify --repo-root ../..
+          go test -count=1 -run '^TestDefaultCatalog_StockProfileProofBundles$' \
+            ./plugin/go.d/collector/prometheus/promprofiles
+
+      - name: Verify authoring launcher
+        if: steps.check-files.outputs.result == 'true'
+        run: >-
+          python3 -m unittest discover
+          -s .agents/skills/project-prometheus-profiles/scripts
+          -p 'test_*.py'
+
+      - name: Verify Prometheus profile proofs
+        if: steps.check-files.outputs.result == 'true'
+        env:
+          NETDATA_PROMETHEUS_TESTDATA_REQUIRED: '1'
+        run: |
+          cd src/go
+          go test -count=1 \
+            ./internal/promprofile/testutil \
+            ./internal/promprofile/validation \
+            ./tools/prometheus-profile-validation \
+            ./plugin/go.d/collector/prometheus/...

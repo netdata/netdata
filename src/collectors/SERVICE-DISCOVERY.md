@@ -6,7 +6,7 @@ Each SD pipeline is a `discoverer:` (where to look) plus a list of `services:` r
 
 ### Jump To
 
-[How it works](#how-it-works) • [Configuration file structure](#configuration-file-structure) • [Rule evaluation semantics](#rule-evaluation-semantics) • [Template helper reference](#template-helper-reference) • [config_template rendering](#config_template-rendering) • [Supported discoverers](#supported-discoverers) • [Mixing discoverers](#mixing-discoverers) • [Troubleshooting](#troubleshooting)
+[How it works](#how-it-works) • [Configuration file structure](#configuration-file-structure) • [Testing configurations](#testing-configurations) • [Rule evaluation semantics](#rule-evaluation-semantics) • [Template helper reference](#template-helper-reference) • [config_template rendering](#config_template-rendering) • [Supported discoverers](#supported-discoverers) • [Mixing discoverers](#mixing-discoverers) • [Troubleshooting](#troubleshooting)
 
 
 ## How it works
@@ -43,6 +43,16 @@ services:
 - `disabled: yes` keeps the file on disk but turns the pipeline off.
 - Editing a stock file requires restarting the agent. UI-managed pipelines apply live.
 - Where each discoverer's stock conf ships (with the Netdata package, with the Helm chart, or not at all) is documented on its per-discoverer page.
+
+
+## Testing configurations
+
+Testing a UI-managed pipeline builds a complete temporary pipeline but does not publish targets, install jobs, or make the configuration persistent. The response says explicitly when only configuration validation was possible.
+
+Operational guarantees depend on the discoverer. Docker runs one bounded container-list query. Local-listener discovery runs and parses one helper snapshot. HTTP discovery runs one complete production fetch only when `method` is empty/default or exactly `GET`; it uses the configured authentication, headers, TLS, proxy, redirects, and timeout, requires HTTP 200, enforces the 10 MiB response limit, and parses every returned item. Redirect handling can issue at most 10 requests.
+
+The HTTP test discards the parsed targets. It does not evaluate `services:` rules, render or validate collector jobs, publish targets, or install jobs. A non-empty HTTP method other than exact `GET`, plus Kubernetes and SNMP, is intentionally validation-only.
+
 
 
 ## Rule evaluation semantics

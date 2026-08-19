@@ -15,7 +15,7 @@ func newTestFuncLicenses(cache *licenseCache) *funcLicenses {
 	return newFuncLicenses(cache)
 }
 
-func TestLicensesMethodConfig_Parameterless(t *testing.T) {
+func TestLicensesFunctionConfig_Parameterless(t *testing.T) {
 	tests := map[string]struct {
 		method string
 	}{
@@ -26,7 +26,7 @@ func TestLicensesMethodConfig_Parameterless(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg := licensesMethodConfig()
+			cfg := licensesFunctionConfig()
 			assert.Empty(t, cfg.RequiredParams)
 
 			params, err := newTestFuncLicenses(newLicenseCache()).MethodParams(context.Background(), tc.method)

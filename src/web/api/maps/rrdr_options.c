@@ -54,6 +54,7 @@ static struct {
     , {"long-keys"         , 0    , RRDR_OPTION_LONG_JSON_KEYS}
     , {"mcp-info"          , 0    , RRDR_OPTION_MCP_INFO}
     , {"rfc3339"           , 0    , RRDR_OPTION_RFC3339}
+    , {"cardinality-limit-all", 0 , RRDR_OPTION_CARDINALITY_ALL}
     , {NULL                , 0    , 0}
 };
 
@@ -161,6 +162,8 @@ void rrdr_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options) {
 }
 
 void web_client_api_request_data_vX_options_to_string(char *buf, size_t size, RRDR_OPTIONS options) {
+    if(unlikely(!buf || !size)) return;
+
     char *write = buf;
     char *end = &buf[size - 1];
 

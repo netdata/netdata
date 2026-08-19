@@ -21,7 +21,7 @@ topology:
         name: vtp_vlan
     metric_tags:
       - tag: vtp_vlan_index
-        index: 1
+        index: 2
       - tag: vtp_vlan_state
         symbol:
           OID: 1.3.6.1.4.1.9.9.46.1.3.1.1.2

@@ -614,15 +614,6 @@ func (a *Collector) collectOutputQueues(ctx context.Context) error {
 }
 
 func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign func(column, value string, lineEnd bool)) error {
-	var (
-		capture      bool
-		columnsSaved []string
-		rowsSaved    [][]string
-	)
-	if a.dump != nil {
-		capture = true
-	}
-
 	start := time.Now()
 	defer func() {
 		a.recordQueryLatency(queryName, time.Since(start))
@@ -632,14 +623,6 @@ func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign
 		for i, col := range columns {
 			assign(col, values[i], i == len(columns)-1)
 		}
-		if capture {
-			if columnsSaved == nil {
-				columnsSaved = append(columnsSaved, columns...)
-			}
-			rowCopy := make([]string, len(values))
-			copy(rowCopy, values)
-			rowsSaved = append(rowsSaved, rowCopy)
-		}
 		return nil
 	})
 	if err != nil {
@@ -652,23 +635,11 @@ func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign
 		}
 		return err
 	}
-	if capture && columnsSaved != nil {
-		a.dump.recordQuery(query, columnsSaved, rowsSaved)
-	}
 	return nil
 }
 
 // doQueryRow executes a query that returns a single row
 func (a *Collector) doQueryRow(ctx context.Context, queryName, query string, assign func(column, value string)) error {
-	var (
-		capture      bool
-		columnsSaved []string
-		rowsSaved    [][]string
-	)
-	if a.dump != nil {
-		capture = true
-	}
-
 	start := time.Now()
 	defer func() {
 		a.recordQueryLatency(queryName, time.Since(start))
@@ -678,12 +649,6 @@ func (a *Collector) doQueryRow(ctx context.Context, queryName, query string, ass
 		for i, col := range columns {
 			assign(col, values[i])
 		}
-		if capture {
-			columnsSaved = append([]string{}, columns...)
-			rowCopy := make([]string, len(values))
-			copy(rowCopy, values)
-			rowsSaved = append(rowsSaved, rowCopy)
-		}
 		return nil
 	})
 	if err != nil {
@@ -695,9 +660,6 @@ func (a *Collector) doQueryRow(ctx context.Context, queryName, query string, ass
 			a.Errorf("failed to execute query: %s, error: %v", query, err)
 		}
 		return err
-	}
-	if capture && columnsSaved != nil {
-		a.dump.recordQuery(query, columnsSaved, rowsSaved)
 	}
 	return nil
 }

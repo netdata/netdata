@@ -12,6 +12,7 @@ type ActionKind uint8
 const (
 	ActionCreateChart ActionKind = iota + 1
 	ActionCreateDimension
+	ActionUpdateChartLabels
 	ActionUpdateChart
 	ActionRemoveDimension
 	ActionRemoveChart
@@ -45,6 +46,15 @@ type CreateDimensionAction struct {
 }
 
 func (a CreateDimensionAction) Kind() ActionKind { return ActionCreateDimension }
+
+// UpdateChartLabelsAction replaces the non-identity labels of one materialized chart.
+type UpdateChartLabelsAction struct {
+	ChartID string
+	Meta    program.ChartMeta
+	Labels  map[string]string
+}
+
+func (a UpdateChartLabelsAction) Kind() ActionKind { return ActionUpdateChartLabels }
 
 // UpdateDimensionValue carries one resolved value for UPDATE emission.
 type UpdateDimensionValue struct {

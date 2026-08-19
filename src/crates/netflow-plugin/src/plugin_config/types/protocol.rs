@@ -1,4 +1,71 @@
 use super::*;
+use crate::decoder::{
+    DEFAULT_SAMPLING_CACHE_MAX_ENTRIES, DEFAULT_SAMPLING_CACHE_MAX_ENTRIES_PER_STREAM,
+};
+use std::str::FromStr;
+
+const DEFAULT_V9_TEMPLATE_LIFETIME: Duration = Duration::from_secs(90 * 60);
+
+fn default_v9_template_lifetime() -> NullableDuration {
+    NullableDuration(Some(DEFAULT_V9_TEMPLATE_LIFETIME))
+}
+
+fn default_sampling_cache_max_entries() -> usize {
+    DEFAULT_SAMPLING_CACHE_MAX_ENTRIES
+}
+
+fn default_sampling_cache_max_entries_per_stream() -> usize {
+    DEFAULT_SAMPLING_CACHE_MAX_ENTRIES_PER_STREAM
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct NullableDuration(Option<Duration>);
+
+impl NullableDuration {
+    pub(crate) fn get(self) -> Option<Duration> {
+        self.0
+    }
+}
+
+impl FromStr for NullableDuration {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        if value == "null" {
+            return Ok(Self(None));
+        }
+        humantime::parse_duration(value)
+            .map(|duration| Self(Some(duration)))
+            .map_err(|err| err.to_string())
+    }
+}
+
+impl Serialize for NullableDuration {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.0 {
+            Some(duration) => {
+                serializer.serialize_some(&humantime::format_duration(duration).to_string())
+            }
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for NullableDuration {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Option::<String>::deserialize(deserializer)?;
+        match value {
+            Some(value) => Self::from_str(&value).map_err(de::Error::custom),
+            None => Ok(Self(None)),
+        }
+    }
+}
 
 #[derive(Debug, Parser, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,6 +98,34 @@ pub(crate) struct ProtocolConfig {
         default_value_t = TimestampSource::Input
     )]
     pub(crate) timestamp_source: TimestampSource,
+
+    #[arg(long = "netflow-v9-template-lifetime", default_value = "90m")]
+    #[serde(default = "default_v9_template_lifetime")]
+    pub(crate) v9_template_lifetime: NullableDuration,
+
+    #[arg(
+        long = "netflow-sampling-cache-max-entries",
+        default_value_t = DEFAULT_SAMPLING_CACHE_MAX_ENTRIES
+    )]
+    #[serde(default = "default_sampling_cache_max_entries")]
+    pub(crate) sampling_cache_max_entries: usize,
+
+    #[arg(
+        long = "netflow-sampling-cache-max-entries-per-stream",
+        default_value_t = DEFAULT_SAMPLING_CACHE_MAX_ENTRIES_PER_STREAM
+    )]
+    #[serde(default = "default_sampling_cache_max_entries_per_stream")]
+    pub(crate) sampling_cache_max_entries_per_stream: usize,
+}
+
+impl ProtocolConfig {
+    pub(crate) fn effective_sampling_cache_limits(&self) -> (usize, usize) {
+        (
+            self.sampling_cache_max_entries,
+            self.sampling_cache_max_entries_per_stream
+                .min(self.sampling_cache_max_entries),
+        )
+    }
 }
 
 impl Default for ProtocolConfig {
@@ -43,6 +138,9 @@ impl Default for ProtocolConfig {
             sflow: true,
             decapsulation_mode: DecapsulationMode::None,
             timestamp_source: TimestampSource::Input,
+            v9_template_lifetime: default_v9_template_lifetime(),
+            sampling_cache_max_entries: default_sampling_cache_max_entries(),
+            sampling_cache_max_entries_per_stream: default_sampling_cache_max_entries_per_stream(),
         }
     }
 }

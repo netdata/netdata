@@ -134,7 +134,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Time Grouping Method");
-        buffer_json_member_add_string(buffer, "description", "Method to group data points over time. The 'extremes' method returns the maximum value for positive numbers and the minimum value for negative numbers, which is particularly useful for showing the highest peaks in both directions on charts.");
+        buffer_json_member_add_string(buffer, "description", "Method to group data points over time. The 'extremes' method returns the maximum value for positive numbers and the minimum value for negative numbers, which is particularly useful for showing the highest peaks in both directions on charts. The 'latest' method returns the most recent collected value of each time frame, which is useful for reading the current value of a metric.");
         buffer_json_member_add_string(buffer, "default", "average");
         
         // Define enum of possible values
@@ -154,6 +154,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
         buffer_json_add_array_item_string(buffer, "countif");  // requires time_group_options parameter
         buffer_json_add_array_item_string(buffer, "extremes");  // for each time frame, returns max for positive values and min for negative values
+        buffer_json_add_array_item_string(buffer, "latest");  // for each time frame, returns the most recent collected value
         buffer_json_array_close(buffer);
     }
     buffer_json_object_close(buffer); // time_group
@@ -542,7 +543,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                    RRDR_OPTION_ABSOLUTE | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR |
                    RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO |
                    RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS | RRDR_OPTION_LONG_JSON_KEYS |
-                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339,
+                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339 | RRDR_OPTION_CARDINALITY_ALL,
         .time_group_method = time_group,
         .time_group_options = time_group_options,
         .resampling_time = 0,
@@ -632,7 +633,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
             // Add a warning about potentially misleading aggregation
             bool warn_aggregation = false;
             // Only warn if using average without dimension grouping AND multiple dimensions selected
-            int dimensions_count = (int)json_object_array_length(dimensions_obj);
+            size_t dimensions_count = json_object_array_length(dimensions_obj);
             if (dimensions_count > 1 &&
                 group_by[0].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && 
                 !(group_by[0].group_by & RRDR_GROUP_BY_DIMENSION)) {

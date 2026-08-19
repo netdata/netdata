@@ -1,15 +1,75 @@
 use super::super::*;
 use super::IngestService;
+use std::future::poll_fn;
+#[cfg(target_os = "linux")]
+use std::os::fd::AsRawFd;
+use std::task::Poll;
+use tokio::io::ReadBuf;
+
+#[cfg(target_os = "linux")]
+fn udp_socket_inode(socket: &UdpSocket) -> Option<u64> {
+    let target = fs::read_link(format!("/proc/self/fd/{}", socket.as_raw_fd())).ok()?;
+    let target = target.to_str()?;
+    target
+        .strip_prefix("socket:[")?
+        .strip_suffix(']')?
+        .parse()
+        .ok()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn udp_socket_inode(_socket: &UdpSocket) -> Option<u64> {
+    None
+}
+
+async fn recv_from_any_listener(
+    sockets: &[UdpSocket],
+    start_index: usize,
+    buffer: &mut [u8],
+) -> std::io::Result<(usize, usize, std::net::SocketAddr)> {
+    poll_fn(|cx| {
+        for offset in 0..sockets.len() {
+            let socket_index = (start_index + offset) % sockets.len();
+            let mut read_buf = ReadBuf::new(buffer);
+            match sockets[socket_index].poll_recv_from(cx, &mut read_buf) {
+                Poll::Ready(Ok(source)) => {
+                    return Poll::Ready(Ok((socket_index, read_buf.filled().len(), source)));
+                }
+                Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                Poll::Pending => {}
+            }
+        }
+        Poll::Pending
+    })
+    .await
+}
 
 impl IngestService {
-    pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
+    #[allow(dead_code)]
+    pub(crate) async fn run(self, shutdown: CancellationToken) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |_| {}).await
+    }
+
+    pub(crate) async fn run_with_listener_ready_signal(
+        self,
+        shutdown: CancellationToken,
+        listener_ready: CancellationToken,
+    ) -> Result<()> {
+        self.run_with_listener_ready(shutdown, move |_| listener_ready.cancel())
+            .await
+    }
+
+    async fn run_with_listener_ready(
+        mut self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(&[UdpSocket]),
+    ) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
 
-        let listen = self.cfg.listener.listen.clone();
-        let socket = UdpSocket::bind(&listen)
-            .await
-            .with_context(|| format!("failed to bind {}", listen))?;
+        let sockets = self.bind_listeners_and_start_workers().await?;
+        listener_ready(&sockets);
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
+        let mut next_socket_index = 0_usize;
         let mut entries_since_sync = 0_usize;
         let mut sync_tick = tokio::time::interval(self.cfg.listener.sync_interval);
         sync_tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -22,14 +82,18 @@ impl IngestService {
                 _ = sync_tick.tick() => {
                     entries_since_sync = self.handle_sync_tick(entries_since_sync);
                 }
-                recv = socket.recv_from(&mut buffer) => {
-                    let (received, source) = match recv {
+                recv = recv_from_any_listener(&sockets, next_socket_index, &mut buffer) => {
+                    let (socket_index, received, source) = match recv {
                         Ok(result) => result,
                         Err(err) => {
+                            self.metrics
+                                .udp_receive_errors
+                                .fetch_add(1, Ordering::Relaxed);
                             tracing::warn!("udp recv error: {}", err);
                             continue;
                         }
                     };
+                    next_socket_index = (socket_index + 1) % sockets.len();
 
                     entries_since_sync = self.handle_received_packet(
                         source,
@@ -44,13 +108,95 @@ impl IngestService {
         Ok(())
     }
 
+    async fn bind_listeners_and_start_workers(&mut self) -> Result<Vec<UdpSocket>> {
+        let listens = self.cfg.listener.listen.clone();
+        if listens.is_empty() {
+            anyhow::bail!("listener.listen must contain at least one address");
+        }
+
+        let mut sockets = Vec::with_capacity(listens.len());
+        for listen in listens {
+            let socket = UdpSocket::bind(&listen)
+                .await
+                .with_context(|| format!("failed to bind {}", listen))?;
+            self.expand_receive_buffer(&socket, &listen);
+            sockets.push(socket);
+        }
+        self.metrics.replace_udp_listener_socket_inodes(
+            sockets.iter().filter_map(udp_socket_inode).collect(),
+        );
+        self.spawn_tier_commit_workers();
+        Ok(sockets)
+    }
+
     fn handle_sync_tick(&mut self, entries_since_sync: usize) -> usize {
         let now = now_usec();
         self.decoders.refresh_enrichment_state();
-        self.run_tier_maintenance(now);
-        let entries_since_sync = self.sync_if_needed(entries_since_sync);
+        // Tier commits belong to the workers; the tick serves handoff
+        // requests (covers idle networks), prunes with in-flight awareness,
+        // and refreshes the open-tier snapshot — all moved here from the
+        // per-packet path.
+        self.handle_tier_handoffs();
+        self.mirror_tier_commit_telemetry(now);
+        self.prune_unused_tier_flow_indexes();
+        self.refresh_open_tier_state(now);
+        let entries_since_sync = if self.periodic_sync_enabled() {
+            self.sync_if_needed(entries_since_sync)
+        } else {
+            // Periodic fsync is disabled (sync_every_entries = 0): the raw
+            // journal reaches disk via kernel writeback and is fully synced on
+            // rotation and at shutdown. Facet state still persists on the tick
+            // cadence, and the entry counter keeps accumulating so shutdown
+            // performs one final sync.
+            self.persist_facets_if_dirty();
+            entries_since_sync
+        };
         self.persist_decoder_state_if_due(now);
         entries_since_sync
+    }
+
+    fn periodic_sync_enabled(&self) -> bool {
+        self.cfg.listener.sync_every_entries > 0
+    }
+
+    /// Request the largest UDP receive buffer the kernel allows. The
+    /// single-threaded receive loop is periodically stalled by inline disk
+    /// work (journal rotation sync, tier flushes), and the socket buffer is
+    /// what absorbs those stalls; the OS default (typically ~208 KiB, only a
+    /// few tens of datagrams) overflows after a few milliseconds at high flow
+    /// rates. The kernel caps unprivileged requests at net.core.rmem_max.
+    fn expand_receive_buffer(&self, socket: &UdpSocket, listen: &str) {
+        const REQUESTED_RECV_BUFFER_BYTES: usize = 64 * 1024 * 1024;
+        let sock_ref = socket2::SockRef::from(socket);
+        if let Err(err) = sock_ref.set_recv_buffer_size(REQUESTED_RECV_BUFFER_BYTES) {
+            self.metrics
+                .udp_socket_setup_errors
+                .fetch_add(1, Ordering::Relaxed);
+            tracing::warn!(
+                "failed to expand UDP receive buffer for {}: {}",
+                listen,
+                err
+            );
+            return;
+        }
+        match sock_ref.recv_buffer_size() {
+            Ok(actual) => tracing::info!(
+                "UDP receive buffer for {}: {} bytes (requested {}; capped by net.core.rmem_max)",
+                listen,
+                actual,
+                REQUESTED_RECV_BUFFER_BYTES
+            ),
+            Err(err) => {
+                self.metrics
+                    .udp_socket_setup_errors
+                    .fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(
+                    "failed to read back UDP receive buffer for {}: {}",
+                    listen,
+                    err
+                );
+            }
+        }
     }
 
     fn handle_received_packet(
@@ -59,10 +205,6 @@ impl IngestService {
         payload: &[u8],
         mut entries_since_sync: usize,
     ) -> usize {
-        if payload.is_empty() {
-            return entries_since_sync;
-        }
-
         self.metrics
             .udp_packets_received
             .fetch_add(1, Ordering::Relaxed);
@@ -70,22 +212,35 @@ impl IngestService {
             .udp_bytes_received
             .fetch_add(payload.len() as u64, Ordering::Relaxed);
 
+        if payload.is_empty() {
+            self.metrics
+                .udp_empty_packets
+                .fetch_add(1, Ordering::Relaxed);
+            return entries_since_sync;
+        }
+
         let receive_time_usec = now_usec();
-        self.prepare_decoder_state_namespace(source, payload);
-        let batch = self
-            .decoders
-            .decode_udp_payload_at(source, payload, receive_time_usec);
+        let packet_context = self.prepare_decoder_state_namespace(source, payload);
+        let batch = self.decoders.decode_udp_payload_at_with_context(
+            source,
+            payload,
+            receive_time_usec,
+            packet_context.as_ref(),
+        );
         self.metrics
             .update_decoder_scope_snapshot(self.decoders.decoder_scope_snapshot());
         self.metrics.apply_decode_stats(&batch.stats);
-
+        if batch.stats.parser_source_evictions > 0 {
+            self.persist_decoder_state();
+        }
         for flow in batch.flows {
             if self.ingest_decoded_record(receive_time_usec, &flow) {
                 entries_since_sync += 1;
             }
         }
 
-        self.run_tier_maintenance(now_usec());
+        // Per-packet cost of the tier handoff: one relaxed atomic load.
+        self.handle_tier_handoffs();
         self.sync_if_threshold_reached(entries_since_sync)
     }
 
@@ -96,7 +251,7 @@ impl IngestService {
     ) -> bool {
         self.ingest_decoded_record_internal(
             receive_time_usec,
-            flow.source_realtime_usec.unwrap_or(receive_time_usec),
+            flow.source_realtime_usec,
             &flow.record,
             true,
         )
@@ -105,7 +260,7 @@ impl IngestService {
     fn ingest_decoded_record_internal(
         &mut self,
         receive_time_usec: u64,
-        source_realtime_usec: u64,
+        source_realtime_usec: Option<u64>,
         record: &crate::flow::FlowRecord,
         observe_tiers: bool,
     ) -> bool {
@@ -120,6 +275,9 @@ impl IngestService {
                 .facet_runtime
                 .observe_active_record(Path::new(&active_path), record)
         {
+            self.metrics
+                .facet_active_update_errors
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!("facet runtime raw write update failed: {}", err);
         }
 
@@ -132,12 +290,28 @@ impl IngestService {
     fn write_raw_record_internal(
         &mut self,
         receive_time_usec: u64,
-        source_realtime_usec: u64,
+        source_realtime_usec: Option<u64>,
         record: &crate::flow::FlowRecord,
     ) -> std::result::Result<Option<String>, ()> {
-        let timestamps = EntryTimestamps::default()
-            .with_source_realtime_usec(source_realtime_usec)
-            .with_entry_realtime_usec(receive_time_usec);
+        let mut timestamps = EntryTimestamps::default()
+            .with_entry_realtime_usec(receive_time_usec)
+            .with_entry_monotonic_usec(match self.journal_host.monotonic_usec() {
+                Ok(value) => value,
+                Err(err) => {
+                    self.metrics
+                        .journal_write_errors
+                        .fetch_add(1, Ordering::Relaxed);
+                    tracing::warn!("journal monotonic timestamp failed: {}", err);
+                    return Err(());
+                }
+            });
+        // The ENTRY header already stores receive time. Persist source time
+        // only when a selected exporter/flow timestamp differs from it.
+        if let Some(source_realtime_usec) =
+            source_realtime_usec.filter(|&value| value != receive_time_usec)
+        {
+            timestamps = timestamps.with_source_realtime_usec(source_realtime_usec);
+        }
 
         if let Err(err) =
             self.encode_buf
@@ -166,12 +340,108 @@ impl IngestService {
     }
 
     fn finish_shutdown(&mut self, entries_since_sync: usize) {
-        self.run_tier_maintenance(now_usec());
+        if self.tier_worker_handles.is_empty() {
+            // Pre-worker mode (in-process tests, benchmarks, rebuild-only
+            // paths): the inline flush + sync, exactly as before.
+            self.run_tier_maintenance(now_usec());
+            let _ = self.sync_if_needed(entries_since_sync);
+            let _ = self.sync_all_tiers();
+            self.persist_decoder_state();
+            return;
+        }
+
+        // Worker shutdown sequence (order matters; see the SOW): the final
+        // per-tier response runs FIRST, filling every slot's pending under
+        // its mutex BEFORE the shutdown flag is raised. A worker can only
+        // reach its drain after observing the flag, and the flag is stored
+        // after the responses on this same thread — so the drain always
+        // finds the final batch already posted. Signaling first raced the
+        // respond against the drain and could strand the last buckets.
+        let now = now_usec();
+        for index in 0..MATERIALIZED_TIERS.len() {
+            self.respond_tier_handoff(index, now);
+        }
+        self.tier_handoff.begin_shutdown();
         let _ = self.sync_if_needed(entries_since_sync);
-        let _ = self.sync_all_tiers();
+        super::tier_commit::join_workers(std::mem::take(&mut self.tier_worker_handles));
+        self.persist_facets_if_dirty();
         self.persist_decoder_state();
     }
 
+    /// Hand the tier `Log`s to their commit workers. Called once, after the
+    /// rebuild's inline flush; each rebuilt tier is synced first so restart
+    /// history is durable before ownership moves.
+    pub(in crate::ingest) fn spawn_tier_commit_workers(&mut self) {
+        let Some(mut tier_writers) = self.tier_writers.take() else {
+            return;
+        };
+        if let Err(err) = tier_writers.sync_all() {
+            tracing::warn!(
+                "failed to sync rebuilt tier journals before worker handoff: {}",
+                err
+            );
+        }
+        let workers = tier_writers.into_workers(
+            &self.tier_flow_indexes,
+            &self.facet_runtime,
+            &self.metrics,
+            &self.journal_host,
+        );
+        self.tier_worker_handles =
+            super::tier_commit::spawn_tier_workers(&self.tier_handoff, workers);
+    }
+
+    /// The receive path's side of the doorbell protocol: one relaxed load per
+    /// call; on a raised bit, move that tier's closed buckets into the slot
+    /// and recycle the returned containers. Microseconds, at most a few times
+    /// per minute.
+    fn handle_tier_handoffs(&mut self) {
+        if !self.tier_handoff.has_requests() {
+            return;
+        }
+        let now = now_usec();
+        for index in 0..MATERIALIZED_TIERS.len() {
+            if self.tier_handoff.requested(index) {
+                self.respond_tier_handoff(index, now);
+            }
+        }
+    }
+
+    fn respond_tier_handoff(&mut self, index: usize, now_usec: u64) {
+        const HOUR_USEC: u64 = 3_600_000_000;
+        let tier = MATERIALIZED_TIERS[index];
+        let Some(acc) = self.tier_accumulators.get_mut(&tier) else {
+            return;
+        };
+        // An empty take still responds: the worker unblocks on the bumped
+        // generation and simply has nothing to commit this window.
+        let taken = acc.take_closed_buckets(now_usec);
+        // Rows in a bucket share the bucket's hour (receive-time interning),
+        // so the in-flight set is one entry per bucket — no row scan here.
+        let in_flight_hours: std::collections::BTreeSet<u64> = taken
+            .iter()
+            .map(|(start, _)| (start / HOUR_USEC) * HOUR_USEC)
+            .collect();
+        let recycled = self.tier_handoff.respond(index, taken, in_flight_hours);
+        if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
+            for container in recycled {
+                acc.recycle(container);
+            }
+        }
+    }
+
+    /// Mirror each tier slot's commit telemetry into the chart atomics.
+    /// Three short mutex holds per second; the workers touch those mutexes
+    /// at most once per anniversary.
+    fn mirror_tier_commit_telemetry(&self, now_usec: u64) {
+        for (index, tier) in MATERIALIZED_TIERS.iter().enumerate() {
+            let telemetry = self.tier_handoff.commit_telemetry(index);
+            self.metrics
+                .store_tier_commit_telemetry(*tier, now_usec, &telemetry);
+        }
+    }
+
+    /// Pre-worker maintenance (rebuild, in-process tests, benchmarks).
     fn run_tier_maintenance(&mut self, now_usec: u64) {
         if let Err(err) = self.flush_closed_tiers(now_usec) {
             tracing::warn!("tier flush failed: {}", err);
@@ -181,7 +451,8 @@ impl IngestService {
     }
 
     fn sync_if_threshold_reached(&mut self, entries_since_sync: usize) -> usize {
-        if entries_since_sync >= self.cfg.listener.sync_every_entries {
+        let sync_every_entries = self.cfg.listener.sync_every_entries;
+        if sync_every_entries > 0 && entries_since_sync >= sync_every_entries {
             return self.sync_if_needed(entries_since_sync);
         }
 
@@ -206,18 +477,30 @@ impl IngestService {
             tracing::warn!("journal sync failed: {}", err);
         }
 
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
 
         0
     }
 
+    fn persist_facets_if_dirty(&self) {
+        if let Err(err) = self.facet_runtime.persist_if_dirty() {
+            self.metrics
+                .facet_persist_errors
+                .fetch_add(1, Ordering::Relaxed);
+            tracing::warn!("facet runtime persist failed: {}", err);
+        }
+    }
+
+    /// Pre-worker mode only (in-process tests/benchmarks); after the workers
+    /// spawn they own the tier `Log`s and fsync per commit.
     fn sync_all_tiers(&mut self) -> usize {
+        let Some(tier_writers) = self.tier_writers.as_mut() else {
+            return 0;
+        };
         self.metrics
             .tier_journal_syncs
             .fetch_add(1, Ordering::Relaxed);
-        if let Err(err) = self.tier_writers.sync_all() {
+        if let Err(err) = tier_writers.sync_all() {
             self.metrics
                 .journal_sync_errors
                 .fetch_add(1, Ordering::Relaxed);
@@ -227,9 +510,7 @@ impl IngestService {
             tracing::warn!("tier journal sync failed: {}", err);
             return 1;
         }
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
         0
     }
 
@@ -244,6 +525,49 @@ impl IngestService {
     }
 
     #[cfg(test)]
+    pub(crate) fn spawn_tier_commit_workers_for_test(&mut self) {
+        self.spawn_tier_commit_workers();
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn bind_listeners_and_start_workers_for_test(&mut self) -> Result<()> {
+        let _sockets = self.bind_listeners_and_start_workers().await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn run_with_listener_ready_for_test(
+        self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(Vec<(std::net::SocketAddr, Option<usize>)>),
+    ) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |sockets| {
+            listener_ready(
+                sockets
+                    .iter()
+                    .map(|socket| {
+                        (
+                            socket.local_addr().expect("read bound listener address"),
+                            socket2::SockRef::from(socket).recv_buffer_size().ok(),
+                        )
+                    })
+                    .collect(),
+            );
+        })
+        .await
+    }
+
+    #[cfg(test)]
+    pub(crate) fn tier_commit_workers_started_for_test(&self) -> bool {
+        !self.tier_worker_handles.is_empty()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn handle_tier_handoffs_for_test(&mut self) {
+        self.handle_tier_handoffs();
+    }
+
+    #[cfg(test)]
     pub(crate) fn finish_shutdown_for_test(&mut self, entries_since_sync: usize) {
         self.finish_shutdown(entries_since_sync);
     }
@@ -254,7 +578,7 @@ impl IngestService {
         receive_time_usec: u64,
         record: &crate::flow::FlowRecord,
     ) -> bool {
-        self.ingest_decoded_record_internal(receive_time_usec, receive_time_usec, record, true)
+        self.ingest_decoded_record_internal(receive_time_usec, None, record, true)
     }
 
     #[cfg(test)]
@@ -294,6 +618,26 @@ impl IngestService {
         self.handle_sync_tick(entries_since_sync)
     }
 
+    /// Production-shaped batch path for worker-mode benchmarks: ingest the
+    /// records, serve raised doorbells (the per-packet cost), and apply the
+    /// sync threshold — exactly what `handle_received_packet` does, minus
+    /// the decode.
+    #[cfg(test)]
+    pub(crate) fn handle_decoded_batch_with_handoffs_for_test(
+        &mut self,
+        receive_time_usec: u64,
+        records: &[crate::flow::FlowRecord],
+        mut entries_since_sync: usize,
+    ) -> usize {
+        for record in records {
+            if self.ingest_decoded_record_internal(receive_time_usec, None, record, true) {
+                entries_since_sync += 1;
+            }
+        }
+        self.handle_tier_handoffs();
+        self.sync_if_threshold_reached(entries_since_sync)
+    }
+
     #[cfg(test)]
     fn handle_decoded_batch_with_options_for_test(
         &mut self,
@@ -304,12 +648,7 @@ impl IngestService {
         run_tier_maintenance: bool,
     ) -> usize {
         for record in records {
-            if self.ingest_decoded_record_internal(
-                receive_time_usec,
-                receive_time_usec,
-                record,
-                observe_tiers,
-            ) {
+            if self.ingest_decoded_record_internal(receive_time_usec, None, record, observe_tiers) {
                 entries_since_sync += 1;
             }
         }

@@ -254,15 +254,67 @@ void netdata_threads_init_for_external_plugins(size_t stacksize) {
 }
 
 // ----------------------------------------------------------------------------
+// Thread-cleanup callback registry.
+//
+// Registration is startup-only — callers register before any daemon
+// thread is created. libnetdata calls every registered callback at
+// thread-exit time, in registration order. The startup-only invariant
+// lets nd_thread_run_cleanup_callbacks read the count without holding
+// the spinlock; the __ATOMIC_RELEASE/_ACQUIRE pair handles any late
+// edge.
+//
+// Ordering: all registered callbacks run before thread_cache_destroy
+// and worker_unregister (called below). A callback that needs to
+// observe thread_cache state must do so before that destroy.
 
-void rrdset_thread_rda_free(void);
-void sender_thread_buffer_free(void);
-void query_target_free(void);
-void service_exits(void);
-void rrd_collector_finished(void);
+#define ND_THREAD_CLEANUP_MAX 16
+static struct {
+    SPINLOCK spinlock;
+    size_t count;
+    nd_thread_cleanup_fn fns[ND_THREAD_CLEANUP_MAX];
+} nd_thread_cleanup_registry = { .spinlock = SPINLOCK_INITIALIZER };
+
+void nd_thread_register_cleanup(nd_thread_cleanup_fn fn) {
+    if(!fn) return;
+
+    spinlock_lock(&nd_thread_cleanup_registry.spinlock);
+
+    // Idempotent: skip if this fn is already registered. Keeps the
+    // registry small under repeated rrd_init / unittest re-entry.
+    for(size_t i = 0; i < nd_thread_cleanup_registry.count; i++) {
+        if(nd_thread_cleanup_registry.fns[i] == fn) {
+            spinlock_unlock(&nd_thread_cleanup_registry.spinlock);
+            return;
+        }
+    }
+
+    if(nd_thread_cleanup_registry.count >= ND_THREAD_CLEANUP_MAX) {
+        spinlock_unlock(&nd_thread_cleanup_registry.spinlock);
+        fatal("nd_thread_register_cleanup: registry full (max %d)", ND_THREAD_CLEANUP_MAX);
+    }
+    nd_thread_cleanup_registry.fns[nd_thread_cleanup_registry.count] = fn;
+    __atomic_store_n(&nd_thread_cleanup_registry.count,
+                     nd_thread_cleanup_registry.count + 1,
+                     __ATOMIC_RELEASE);
+    spinlock_unlock(&nd_thread_cleanup_registry.spinlock);
+}
+
+static void nd_thread_run_cleanup_callbacks(void) {
+    size_t count = __atomic_load_n(&nd_thread_cleanup_registry.count, __ATOMIC_ACQUIRE);
+    for(size_t i = 0; i < count; i++) {
+        nd_thread_cleanup_fn fn = nd_thread_cleanup_registry.fns[i];
+        if(fn) fn();
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released);
 
 void nd_thread_join_threads()
 {
+    ND_THREAD *retained = NULL;
+
     ND_THREAD *nti;
     do {
         spinlock_lock(&threads_globals.exited.spinlock);
@@ -276,11 +328,33 @@ void nd_thread_join_threads()
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
-        // nd_thread_join() handles NULL and will skip list removal since we already did it
-        // The atomic CAS in nd_thread_join() still protects against direct callers racing with us
-        nd_thread_join(nti);
+        // nd_thread_join_internal() handles NULL and will skip list removal since we already did it
+        // The atomic CAS in nd_thread_join_internal() still protects against direct callers racing with us
+        bool wrapper_released = true;
+        nd_thread_join_internal(nti, &wrapper_released);
+
+        // a failed join keeps the wrapper alive; we already unlinked it from the
+        // exited list, so keep it aside (the loop keeps draining) and restore it
+        // below where a later cleanup pass can find it
+        if(nti && !wrapper_released)
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(retained, nti, prev, next);
 
     } while (nti);
+
+    if(retained) {
+        spinlock_lock(&threads_globals.exited.spinlock);
+        while(retained) {
+            ND_THREAD *t = retained;
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(retained, t, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, t, prev, next);
+            t->list = ND_THREAD_LIST_EXITED;
+
+            // it is discoverable again - release our CAS ownership so a
+            // later join can retry it
+            nd_thread_status_clear(t, NETDATA_THREAD_STATUS_JOINED);
+        }
+        spinlock_unlock(&threads_globals.exited.spinlock);
+    }
 }
 
 static void nd_thread_exit(ND_THREAD *nti) {
@@ -323,15 +397,9 @@ static void nd_thread_exit(ND_THREAD *nti) {
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP) != NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", nti->tid);
 
-    rrd_collector_finished();
-    sender_thread_buffer_free();
-    rrdset_thread_rda_free();
-    query_target_free();
+    nd_thread_run_cleanup_callbacks();
     thread_cache_destroy();
-    service_exits();
     worker_unregister();
-
-    nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 
     spinlock_lock(&threads_globals.running.spinlock);
     if(nti->list == ND_THREAD_LIST_RUNNING) {
@@ -344,6 +412,8 @@ static void nd_thread_exit(ND_THREAD *nti) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
     nti->list = ND_THREAD_LIST_EXITED;
     spinlock_unlock(&threads_globals.exited.spinlock);
+
+    nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 }
 
 static void nd_thread_starting_point(void *ptr) {
@@ -454,7 +524,13 @@ bool nd_thread_signaled_to_cancel(void) {
 // ----------------------------------------------------------------------------
 // nd_thread_join
 
-int nd_thread_join(ND_THREAD *nti) {
+// returns the join result; sets *wrapper_released to false when the ND_THREAD
+// wrapper is intentionally kept alive (failed join with the worker not proven
+// finished), so nd_thread_join_threads() can make it discoverable again after
+// having unlinked it from the exited list
+static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released) {
+    *wrapper_released = true;
+
     if(!nti)
         return ESRCH;
 
@@ -478,10 +554,10 @@ int nd_thread_join(ND_THREAD *nti) {
                "cannot join thread. uv_thread_join() failed with code %d. (tag=%s)",
                ret, nti->tag);
 
-        // On Windows/MSYS2, if the thread exited very quickly, uv_thread_join() can fail with EINVAL (-22)
+        // On Windows/MSYS2, if the thread exited very quickly, uv_thread_join() can fail with UV_EINVAL
         // because the thread handle becomes invalid before the join executes. However, the thread may
         // still be finishing its cleanup. Wait for it to reach FINISHED state before cleaning up.
-        if(ret == -22) { // UV_EINVAL
+        if(ret == UV_EINVAL) {
             nd_log(NDLS_DAEMON, NDLP_INFO,
                    "thread '%s' join returned EINVAL, waiting for thread to finish...", nti->tag);
 
@@ -501,9 +577,15 @@ int nd_thread_join(ND_THREAD *nti) {
         }
     }
 
-    // Always clean up the thread structure - if uv_thread_join() failed,
-    // retrying won't help (thread doesn't exist, not joinable, or logic error)
-    // JOINED flag was already set atomically at the start of this function
+    // Only release the wrapper once the OS join succeeded, or Netdata's thread
+    // exit path has finished and can no longer use the thread-local pointer.
+    if(ret != 0 && !nd_thread_status_check(nti, NETDATA_THREAD_STATUS_FINISHED)) {
+        // JOINED stays set: the wrapper remains CAS-owned by this caller, so
+        // no other joiner can free it while the caller decides how to make it
+        // joinable again (see nd_thread_join() and nd_thread_join_threads())
+        *wrapper_released = false;
+        return ret;
+    }
 
     spinlock_lock(&threads_globals.running.spinlock);
     if(nti->list == ND_THREAD_LIST_RUNNING) {
@@ -520,6 +602,18 @@ int nd_thread_join(ND_THREAD *nti) {
     spinlock_unlock(&threads_globals.exited.spinlock);
 
     freez(nti);
+
+    return ret;
+}
+
+int nd_thread_join(ND_THREAD *nti) {
+    bool wrapper_released;
+    int ret = nd_thread_join_internal(nti, &wrapper_released);
+
+    // release our CAS ownership of the retained wrapper, so the caller
+    // (which still holds the pointer) can retry the join
+    if(nti && !wrapper_released)
+        nd_thread_status_clear(nti, NETDATA_THREAD_STATUS_JOINED);
 
     return ret;
 }

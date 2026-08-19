@@ -84,6 +84,12 @@ static struct json_object *yaml_mapping_to_json(yaml_document_t *document, yaml_
             return NULL;
         }
 
+        if (unlikely(memchr(key_node->data.scalar.value, '\0', key_node->data.scalar.length))) {
+            buffer_strcat(error, "YAML mapping key contains an embedded NUL byte");
+            json_object_put(object);
+            return NULL;
+        }
+
         const char *key = (const char *)key_node->data.scalar.value;
         size_t error_len = buffer_strlen(error);
         struct json_object *value_obj = yaml_node_to_json(document, value_node, error, flags, depth);
@@ -148,19 +154,33 @@ static bool parse_number_with_underscores(const char *str, size_t len, long long
     return false;
 }
 
-static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAGS flags) {
+static inline struct json_object *yaml_scalar_json_or_error(struct json_object *json, BUFFER *error) {
+    if (unlikely(!json))
+        buffer_strcat(error, "Failed to create JSON scalar");
+
+    return json;
+}
+
+static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
     const char *value = (const char *)node->data.scalar.value;
     size_t length = node->data.scalar.length;
 
+    if (unlikely(length >= INT_MAX)) {
+        buffer_sprintf(error, "YAML scalar is too long (max %d bytes)", INT_MAX - 1);
+        return NULL;
+    }
+
+    int json_length = (int)length;
+
     // If YAML2JSON_ALL_VALUES_AS_STRINGS flag is set, always return as string
     if (flags & YAML2JSON_ALL_VALUES_AS_STRINGS) {
-        return json_object_new_string_len(value, (int)length);
+        return yaml_scalar_json_or_error(json_object_new_string_len(value, json_length), error);
     }
 
     // Only plain scalars get implicit type conversion (null/bool/number).
     // Quoted, literal block (|), and folded block (>) scalars are always strings.
     if (node->data.scalar.style != YAML_PLAIN_SCALAR_STYLE) {
-        return json_object_new_string_len(value, (int)length);
+        return yaml_scalar_json_or_error(json_object_new_string_len(value, json_length), error);
     }
 
     // Handle null and tilde (case-insensitive for null)
@@ -174,13 +194,13 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAG
     if ((length == 4 && strcasecmp(value, "true") == 0) ||
         (length == 3 && strcasecmp(value, "yes") == 0) ||
         (length == 2 && strcasecmp(value, "on") == 0)) {
-        return json_object_new_boolean(1);
+        return yaml_scalar_json_or_error(json_object_new_boolean(1), error);
     }
 
     if ((length == 5 && strcasecmp(value, "false") == 0) ||
         (length == 2 && strcasecmp(value, "no") == 0) ||
         (length == 3 && strcasecmp(value, "off") == 0)) {
-        return json_object_new_boolean(0);
+        return yaml_scalar_json_or_error(json_object_new_boolean(0), error);
     }
 
     // Try to parse as number
@@ -208,12 +228,12 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAG
                 if (cleaned_len > 2) {
                     long long int_val = strtoll(cleaned + 2, &endptr, base);
                     if (errno == 0 && *endptr == '\0')
-                        return json_object_new_int64(int_val);
+                        return yaml_scalar_json_or_error(json_object_new_int64(int_val), error);
                 }
             } else {
                 long long int_val = strtoll(value + 2, &endptr, base);
                 if (errno == 0 && endptr == value + length)
-                    return json_object_new_int64(int_val);
+                    return yaml_scalar_json_or_error(json_object_new_int64(int_val), error);
             }
         }
     }
@@ -234,9 +254,9 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAG
         
         if (parse_number_with_underscores(value, length, &int_result, &double_result, &is_double)) {
             if (is_double) {
-                return json_object_new_double(double_result);
+                return yaml_scalar_json_or_error(json_object_new_double(double_result), error);
             } else {
-                return json_object_new_int64(int_result);
+                return yaml_scalar_json_or_error(json_object_new_int64(int_result), error);
             }
         }
     }
@@ -244,18 +264,18 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAG
     // Try integer
     long long int_val = strtoll(value, &endptr, 10);
     if (errno == 0 && endptr == value + length && *value != '\0') {
-        return json_object_new_int64(int_val);
+        return yaml_scalar_json_or_error(json_object_new_int64(int_val), error);
     }
 
     // Try double
     errno = 0;
     double double_val = strtod(value, &endptr);
     if (errno == 0 && endptr == value + length && *value != '\0') {
-        return json_object_new_double(double_val);
+        return yaml_scalar_json_or_error(json_object_new_double(double_val), error);
     }
 
     // Default to string
-    return json_object_new_string_len(value, (int)length);
+    return yaml_scalar_json_or_error(json_object_new_string_len(value, json_length), error);
 }
 
 static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags, int depth) {
@@ -271,7 +291,7 @@ static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_nod
 
     switch (node->type) {
         case YAML_SCALAR_NODE:
-            return yaml_scalar_to_json(node, flags);
+            return yaml_scalar_to_json(node, error, flags);
 
         case YAML_SEQUENCE_NODE:
             return yaml_sequence_to_json(document, node, error, flags, depth + 1);
@@ -459,10 +479,16 @@ static int yaml_add_object_to_document(yaml_document_t *document, struct json_ob
 
     json_object_object_foreach(object, key, value) {
         size_t key_len = strlen(key);
+        if (unlikely(key_len >= INT_MAX)) {
+            buffer_sprintf(error, "JSON object key is too long for YAML generation (max %d bytes)", INT_MAX - 1);
+            return 0;
+        }
+
+        int yaml_key_len = (int)key_len;
         yaml_scalar_style_t key_style = yaml_string_scalar_style(key, key_len);
         int key_node = yaml_document_add_scalar(document, NULL,
                                                (yaml_char_t *)key,
-                                               key_len,
+                                               yaml_key_len,
                                                key_style);
         if (!key_node) {
             buffer_sprintf(error, "Failed to add key '%s' to YAML document", key);
@@ -554,11 +580,17 @@ static int yaml_add_json_to_document(yaml_document_t *document, struct json_obje
         case json_type_string: {
             const char *str = json_object_get_string(json);
             size_t len = json_object_get_string_len(json);
+            if (unlikely(len >= INT_MAX)) {
+                buffer_sprintf(error, "JSON string is too long for YAML generation (max %d bytes)", INT_MAX - 1);
+                return 0;
+            }
+
+            int yaml_len = (int)len;
             yaml_scalar_style_t style = yaml_string_scalar_style(str, len);
 
             return yaml_document_add_scalar(document, NULL,
                                           (yaml_char_t *)str,
-                                          len,
+                                          yaml_len,
                                           style);
         }
 

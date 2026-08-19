@@ -19,6 +19,21 @@ fn cleanup_shm(service: &str, session_id: u64) {
     let _ = std::fs::remove_file(&path);
 }
 
+struct FallocateFaultGuard;
+
+impl FallocateFaultGuard {
+    fn install(errors: &[i32]) -> Self {
+        install_fallocate_faults(errors);
+        Self
+    }
+}
+
+impl Drop for FallocateFaultGuard {
+    fn drop(&mut self) {
+        clear_fallocate_faults();
+    }
+}
+
 fn wait_for_server_ready(rx: &mpsc::Receiver<u64>, service: &str) -> u64 {
     rx.recv_timeout(SERVER_READY_TIMEOUT).unwrap_or_else(|err| {
         panic!("timed out waiting for server readiness for service={service}: {err}")
@@ -172,6 +187,32 @@ fn test_stale_recovery() {
     assert!(second.request_capacity >= 2048);
     second.destroy();
     cleanup_shm(svc, sid);
+}
+
+#[test]
+fn test_stale_recovery_in_group_writable_run_dir() {
+    use std::os::unix::fs::PermissionsExt;
+    // Crash recovery must work regardless of run-dir permissions
+    // (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+    let dir = format!("{TEST_RUN_DIR}_0775");
+    let _ = std::fs::create_dir_all(&dir);
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o775)).expect("chmod 0775");
+
+    let svc = "rs_shm_stale_gw";
+    let sid: u64 = 7060;
+    let path = format!("{dir}/{svc}-{sid:016x}.ipcshm");
+    let _ = std::fs::remove_file(&path);
+
+    let mut first = ShmContext::server_create(&dir, svc, sid, 1024, 1024).expect("first create");
+    let hdr = first.base as *mut RegionHeader;
+    unsafe { (*hdr).owner_pid = 99999 }; // very unlikely alive
+    first.close(); // close without unlink
+
+    // server_create must reclaim the dead-owner region through its EEXIST path
+    let mut second = ShmContext::server_create(&dir, svc, sid, 1024, 1024)
+        .expect("crash recovery must work in a group-writable run dir");
+    second.destroy();
+    let _ = std::fs::remove_file(&path);
 }
 
 #[test]
@@ -497,6 +538,7 @@ fn shm_error_display_all_variants() {
         (ShmError::PathTooLong, "SHM path exceeds limit"),
         (ShmError::Open(2), "open failed: errno 2"),
         (ShmError::Truncate(28), "ftruncate failed: errno 28"),
+        (ShmError::Allocate(28), "SHM allocation failed: errno 28"),
         (ShmError::Mmap(12), "mmap failed: errno 12"),
         (ShmError::BadMagic, "SHM header magic mismatch"),
         (ShmError::BadVersion, "SHM header version mismatch"),
@@ -514,6 +556,86 @@ fn shm_error_display_all_variants() {
     }
     let e: &dyn std::error::Error = &ShmError::PathTooLong;
     let _ = format!("{e}");
+}
+
+#[test]
+fn test_server_create_allocate_enospc_cleans_up_before_mmap() {
+    ensure_run_dir();
+    let svc = "rs_shm_alloc_enospc";
+    let sid = 0xa110_c001;
+    cleanup_shm(svc, sid);
+
+    let fault = FallocateFaultGuard::install(&[libc::ENOSPC]);
+    let err = match ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024) {
+        Ok(_) => panic!("injected ENOSPC must fail SHM creation"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err, ShmError::Allocate(libc::ENOSPC));
+    assert_eq!(syscall_test_counts(), (1, 0), "mmap must not be reached");
+
+    let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("SHM path");
+    assert!(!path.exists(), "failed allocation must unlink its file");
+
+    drop(fault);
+    let mut server = ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024)
+        .expect("cleanup must permit recreation at the same path");
+    server.destroy();
+}
+
+#[test]
+fn test_server_create_retries_fallocate_after_eintr() {
+    ensure_run_dir();
+    let svc = "rs_shm_alloc_eintr";
+    let sid = 0xa110_c002;
+    cleanup_shm(svc, sid);
+
+    let _fault = FallocateFaultGuard::install(&[libc::EINTR]);
+    let mut server = ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 2048)
+        .expect("fallocate must retry EINTR");
+
+    assert_eq!(
+        syscall_test_counts(),
+        (2, 1),
+        "one interrupted allocation retry must precede one mmap"
+    );
+
+    let request = unsafe {
+        std::slice::from_raw_parts(
+            server.base.add(server.request_offset as usize),
+            server.request_capacity as usize,
+        )
+    };
+    let response = unsafe {
+        std::slice::from_raw_parts(
+            server.base.add(server.response_offset as usize),
+            server.response_capacity as usize,
+        )
+    };
+    assert!(request.iter().all(|byte| *byte == 0));
+    assert!(response.iter().all(|byte| *byte == 0));
+
+    server.destroy();
+}
+
+#[test]
+fn test_server_create_does_not_fallback_when_fallocate_is_unsupported() {
+    ensure_run_dir();
+    let svc = "rs_shm_alloc_unsupported";
+    let sid = 0xa110_c003;
+    cleanup_shm(svc, sid);
+
+    let _fault = FallocateFaultGuard::install(&[libc::EOPNOTSUPP]);
+    let err = match ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024) {
+        Ok(_) => panic!("unsupported fallocate must disable SHM creation"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err, ShmError::Allocate(libc::EOPNOTSUPP));
+    assert_eq!(syscall_test_counts(), (1, 0), "mmap must not be reached");
+
+    let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("SHM path");
+    assert!(!path.exists(), "failed allocation must unlink its file");
 }
 
 // -----------------------------------------------------------------------
@@ -1137,30 +1259,15 @@ fn test_check_shm_stale_invalid_cstring_returns_not_exist() {
 }
 
 #[test]
-fn test_stale_open_failure_policies_are_conservative() {
-    assert!(should_unlink_cleanup_open_failure(libc::ENOENT));
-    assert!(!should_unlink_cleanup_open_failure(libc::EACCES));
-    assert!(!should_unlink_cleanup_open_failure(libc::EPERM));
-    assert!(!should_unlink_cleanup_open_failure(libc::EMFILE));
-    assert!(!should_unlink_cleanup_open_failure(libc::ENFILE));
-    assert!(!should_unlink_cleanup_open_failure(libc::ELOOP));
-
-    assert!(matches!(
-        classify_stale_open_failure(libc::ENOENT),
-        StaleResult::NotExist
-    ));
-    assert!(matches!(
-        classify_stale_open_failure(libc::EACCES),
-        StaleResult::Invalid
-    ));
-    assert!(matches!(
-        classify_stale_open_failure(libc::EMFILE),
-        StaleResult::Invalid
-    ));
-    assert!(matches!(
-        classify_stale_open_failure(libc::ELOOP),
-        StaleResult::Invalid
-    ));
+fn test_stale_check_unavailable_only_for_fd_exhaustion() {
+    // Only fd exhaustion keeps an entry alive without a liveness check;
+    // every other open failure marks the entry as junk to reclaim.
+    assert!(stale_check_unavailable(libc::EMFILE));
+    assert!(stale_check_unavailable(libc::ENFILE));
+    assert!(!stale_check_unavailable(libc::ENOENT));
+    assert!(!stale_check_unavailable(libc::EACCES));
+    assert!(!stale_check_unavailable(libc::EPERM));
+    assert!(!stale_check_unavailable(libc::ELOOP));
 }
 
 #[test]
@@ -1235,17 +1342,13 @@ fn test_cleanup_stale_invalid_entries() {
     assert!(!build_shm_path(TEST_RUN_DIR, svc, magic_sid)
         .unwrap()
         .exists());
-    // Under non-root: unreadable file is preserved (EACCES skip).
-    // Under root: chmod 000 has no effect, so the file gets opened,
-    // inspected, and removed normally.
-    if unsafe { libc::geteuid() } != 0 {
-        assert!(
-            unreadable_path.exists(),
-            "unreadable entry should be preserved (EACCES skip)"
-        );
-    }
-    // Clean up
-    unsafe { libc::chmod(unreadable_c.as_ptr(), 0o600) };
+    // An unreadable entry at a matching name is junk: it cannot be a live
+    // endpoint we can verify, so cleanup reclaims it (under root chmod 000
+    // has no effect and the file is opened, inspected, and removed instead).
+    assert!(
+        !unreadable_path.exists(),
+        "unreadable entry should be reclaimed"
+    );
     std::fs::remove_file(&unreadable_path).ok();
 }
 
@@ -1334,15 +1437,13 @@ fn test_check_shm_stale_open_failure_invalid() {
     );
 
     assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
-    // Under non-root: file preserved (EACCES). Under root: chmod 000
-    // has no effect, so the file is opened, inspected, and removed.
-    if unsafe { libc::geteuid() } != 0 {
-        assert!(
-            path.exists(),
-            "unopenable file should be preserved (EACCES skip)"
-        );
-    }
-    unsafe { libc::chmod(c_path.as_ptr(), 0o600) };
+    // An unopenable file at the region path is junk: it cannot be a live
+    // endpoint we can verify, so it is reclaimed (under root chmod 000 has
+    // no effect and the file is opened, inspected, and removed instead).
+    assert!(
+        !path.exists(),
+        "unopenable file at the region path should be reclaimed"
+    );
     std::fs::remove_file(&path).ok();
 }
 
@@ -1396,7 +1497,7 @@ fn test_cleanup_stale_unlinks_dangling_symlink() {
 }
 
 #[test]
-fn test_cleanup_stale_preserves_self_referential_symlink_open_failure() {
+fn test_cleanup_stale_unlinks_self_referential_symlink() {
     ensure_run_dir();
     let svc = "rs_shm_cleanup_self_symlink";
     let sid: u64 = 7061;
@@ -1414,14 +1515,12 @@ fn test_cleanup_stale_preserves_self_referential_symlink_open_failure() {
 
     cleanup_stale(TEST_RUN_DIR, svc);
 
+    // A symlink at an endpoint name (ELOOP on open) cannot be a live
+    // endpoint — it is junk and is reclaimed.
     assert!(
-        std::fs::symlink_metadata(&path)
-            .map(|meta| meta.file_type().is_symlink())
-            .unwrap_or(false),
-        "ambiguous open failures must not delete the entry"
+        std::fs::symlink_metadata(&path).is_err(),
+        "self-referential symlink entry should be removed"
     );
-
-    std::fs::remove_file(&path).expect("remove self symlink");
 }
 
 #[test]

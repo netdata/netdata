@@ -5,7 +5,7 @@ Netdata Cloud is available in two versions:
 | Version                | Description                                                                                                                                                                                                                     |
 |:-----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Cloud Service**      | The fully-managed service hosted at [app.netdata.cloud](https://app.netdata.cloud). [Connect](/src/claim/README.md) your Agents to access comprehensive infrastructure monitoring, real-time dashboards, and advanced features. |
-| **Enterprise On-Prem** | A self-hosted version of Netdata Cloud for businesses requiring complete control over their monitoring infrastructure. Includes all features of our Cloud offering, deployed within your own environment.                       |
+| **Enterprise On-Prem** | A self-hosted version of Netdata Cloud for businesses requiring complete control over their monitoring infrastructure. Includes all features of our Cloud offering, deployed within your own environment. [Learn more](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md). |
 
 Visit our [Pricing](https://www.netdata.cloud/pricing/) page to compare features and options.
 
@@ -15,6 +15,8 @@ Visit our [Pricing](https://www.netdata.cloud/pricing/) page to compare features
 2. Follow the provided setup instructions to install and connect Agents to your Space automatically
 
 ## Installing On-Prem
+
+For the complete On-Prem documentation, see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md).
 
 To learn more about installing Netdata Cloud in your own infrastructure:
 

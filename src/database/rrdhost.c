@@ -35,7 +35,65 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
     return ret;
 }
 
+// Runs `cb` on the host with this machine_guid while holding the rrd read lock, so the host and
+// everything hanging off it stay allocated for the duration of the callback. For callers that hold no
+// reference to the host.
+//
+// The rrd read lock - NOT the host index lock - is what provides the lifetime. The index lock does
+// not: dict_item_del() takes only the index write lock, and for an item a traversal is referencing
+// it merely flags it deleted and returns without waiting (dictionary-item.h). rrdhost_root_index is
+// also DICT_OPTION_VALUE_LINK_DONT_CLONE with no delete callback, so the dictionary never owns the
+// RRDHOST and freez(host) is not serialized by it at all.
+//
+// What makes the rrd read lock sufficient is that every teardown removes the host from
+// rrdhost_root_index under rrd_wrlock() before freeing it
+// (rrdhost_unlink___while_having_rrd_wrlock(), then rrdhost_free_unlinked()). So a lookup performed
+// while holding this read lock either happens before the unlink - and then the read lock blocks the
+// writer from unlinking and freeing until `cb` returns - or after it, and finds nothing. That covers
+// rrdhost_free___consume_metadata_lifetime_writelock() too, which frees with no lock held: by the
+// time it gets there the host is already out of the index, so it can no longer be found here.
+//
+// `may_block` selects how the read lock is taken, and a caller that can run on more than one thread
+// MUST decide it per call rather than once:
+//   true  - wait for the lock. Correct for any thread nobody can be waiting on while holding
+//           rrd_wrlock().
+//   false - take it only if it is free, and skip the callback otherwise. Required on a thread that
+//           an rrd_wrlock() holder may be blocked on: the ACLK sync event loop is one, because a host
+//           teardown calls destroy_aclk_config() under rrd_wrlock() and waits for that loop. Waiting
+//           for the read lock there would close the cycle and wedge the agent.
+// With false, "not applied" is a normal outcome the caller MUST tolerate.
+//
+// Keyed by machine_guid, which is immutable for the host's lifetime and is this index's key, so the
+// lookup is exact. Do NOT key such a callback on node_id: host->node_id and the ACLK config's
+// node_id can disagree (command-nodeid.c assigns host->node_id from the parent without touching the
+// config), so a node_id resolves to the wrong host or to none.
+//
+// `cb` runs with the rrd read lock held: keep it short, and do not take a lock from it that an
+// rrd_wrlock() holder may be waiting behind.
+//
+// Returns whether `cb` ran - false when no host matched, and also when the lock was skipped.
+bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block) {
+
+    if (unlikely(!machine_guid || !*machine_guid || !cb))
+        return false;
+
+    if (may_block)
+        rrd_rdlock();
+    else if (rrd_tryrdlock() != 0)
+        return false;
+
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (host)
+        cb(host, data);
+    rrd_rdunlock();
+
+    return host != NULL;
+}
+
 RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
+    if(unlikely(!hostname))
+        return NULL;
+
     if(strcmp(hostname, "localhost") == 0)
         return localhost;
 
@@ -209,6 +267,51 @@ void rrdhost_tz_free(RRDHOST_TZ *tz) {
     tz->utc_offset = 0;
 }
 
+static inline RRDHOST_IDENTITY rrdhost_identity_acquire_unsafe(RRDHOST *host) {
+    return (RRDHOST_IDENTITY) {
+        .hostname = string_dup(host->hostname),
+        .prog_name = string_dup(host->program_name),
+        .prog_version = string_dup(host->program_version),
+    };
+}
+
+RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host) {
+    spinlock_lock(&host->rrdhost_update_lock);
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire_unsafe(host);
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return identity;
+}
+
+void rrdhost_identity_release(RRDHOST_IDENTITY *identity) {
+    string_freez(identity->hostname);
+    string_freez(identity->prog_name);
+    string_freez(identity->prog_version);
+    identity->hostname = NULL;
+    identity->prog_name = NULL;
+    identity->prog_version = NULL;
+}
+
+RRDHOST_METADATA_IDENTITY rrdhost_metadata_identity_acquire(RRDHOST *host) {
+    spinlock_lock(&host->rrdhost_update_lock);
+    RRDHOST_METADATA_IDENTITY identity = {
+        .common = rrdhost_identity_acquire_unsafe(host),
+        .registry_hostname = string_dup(host->registry_hostname),
+        .os = string_dup(host->os),
+    };
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return identity;
+}
+
+void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity) {
+    rrdhost_identity_release(&identity->common);
+    string_freez(identity->registry_hostname);
+    string_freez(identity->os);
+    identity->registry_hostname = NULL;
+    identity->os = NULL;
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
@@ -358,6 +461,10 @@ RRDHOST *rrdhost_create(
 
     spinlock_init(&host->receiver_lock);
     spinlock_init(&host->rrdhost_update_lock);
+    rw_spinlock_init(&host->metadata_lifetime_lock);
+    rw_spinlock_init(&host->ml_host_rwlock);
+    __atomic_store_n(&host->ml_running, false, __ATOMIC_RELAXED);
+    spinlock_init(&host->aclk.spinlock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);
@@ -540,6 +647,12 @@ static void rrdhost_update(RRDHOST *host
 {
     UNUSED(guid);
 
+    // Streaming children may omit the User-Agent header, leaving prog_name/prog_version NULL.
+    // Match the defaults assigned on the host create path (for example in set_host_properties()/rrdhost_create())
+    // so the strcmp/string_strdupz calls below are safe.
+    if(!prog_name || !*prog_name)       prog_name = "unknown";
+    if(!prog_version || !*prog_version) prog_version = "unknown";
+
     spinlock_lock(&host->rrdhost_update_lock);
 
     host->health.enabled = (mode == RRD_DB_MODE_NONE) ? 0 : health;
@@ -674,16 +787,30 @@ RRDHOST *rrdhost_find_or_create(
         if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
             return host;
 
-        /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
-        nd_log(NDLS_DAEMON, NDLP_INFO,
-               "Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
-               rrdhost_hostname(host),
-               rrd_memory_mode_name(host->rrd_memory_mode),
-               rrd_memory_mode_name(mode));
-
         rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host);
-        host = NULL;
+        host = rrdhost_find_by_guid(guid);
+        if (host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+            if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+                rrd_wrunlock();
+                return host;
+            }
+
+            if (!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)) {
+                rrd_wrunlock();
+                return NULL;
+            }
+
+            /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                   "Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
+                   rrdhost_hostname(host),
+                   rrd_memory_mode_name(host->rrd_memory_mode),
+                   rrd_memory_mode_name(mode));
+
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+            rrdhost_free___while_having_rrd_wrlock(host);
+            host = NULL;
+        }
         rrd_wrunlock();
     }
 
@@ -777,7 +904,12 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     rrdhost_pluginsd_receive_chart_slots_free(host);
 
     rrdcalc_delete_all(host);
-    rrdset_index_destroy(host);
+
+    // flush, not destroy: this runs when the host transitions to archived
+    // (service.c) while queries may still hold acquired charts; the indexes
+    // must stay allocated until rrdhost_free_unlinked() destroys them
+    rrdset_index_flush(host);
+
     rrdcalc_rrdhost_index_destroy(host);
     health_alarm_log_free(host);
 
@@ -787,6 +919,11 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     host->exporting_flags = NULL;
 
     rrd_functions_host_destroy(host);
+
+    // an archived host keeps its aclk config, so it is still reached by the manifest send loop -
+    // tell it the function list is now empty (arming is a single atomic CAS, safe under rrd_wrlock)
+    aclk_arm_node_manifest(host);
+
     rrdvariables_destroy(host->rrdvars);
     host->rrdvars = NULL;
 
@@ -810,6 +947,10 @@ static void rrdhost_unlink___while_having_rrd_wrlock(RRDHOST *host) {
 
 static void rrdhost_free_unlinked(RRDHOST *host) {
     rrdhost_cleanup_data_collection_and_health(host);
+
+    // the host is already unlinked, so no new queries can find it;
+    // now it is safe to destroy the chart indexes the archive path only flushed
+    rrdset_index_destroy(host);
 
     // ------------------------------------------------------------------------
     // free it
@@ -846,11 +987,12 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     rrdhost_free_unlinked(host);
 }
 
-void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host) {
+void rrdhost_free___consume_metadata_lifetime_writelock(RRDHOST *host) {
     if(!host) return;
 
     rrd_wrlock();
     rrdhost_unlink___while_having_rrd_wrlock(host);
+    rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
     rrd_wrunlock();
 
     rrdhost_free_unlinked(host);

@@ -1,0 +1,3349 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: litellm
+match: litellm_*
+app: litellm
+namespace: litellm
+composition:
+  supports:
+    process_runtime:
+      when: all_modes
+    python_gc:
+      when: all_modes
+entities:
+  api_provider_model:
+    grain: api_provider, model
+    identity:
+      required:
+      - api_provider
+      - model
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  api_provider_with_pid:
+    grain: api_provider
+    identity:
+      required:
+      - api_provider
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  callback_name:
+    grain: callback_name
+    identity:
+      required:
+      - callback_name
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  collector_job:
+    grain: collector job service
+    identity:
+      required: []
+      optional: []
+  end_user:
+    grain: end_user
+    identity:
+      required:
+      - end_user
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  function_name_error_class:
+    grain: function_name, error_class
+    identity:
+      required:
+      - function_name
+      - error_class
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  guardrail_name_hook_type:
+    grain: guardrail_name, hook_type
+    identity:
+      required:
+      - guardrail_name
+      - hook_type
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  guardrail_name_hook_type_error_type:
+    grain: guardrail_name, hook_type, error_type
+    identity:
+      required:
+      - guardrail_name
+      - hook_type
+      - error_type
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  guardrail_name_hook_type_status:
+    grain: guardrail_name, hook_type, status
+    identity:
+      required:
+      - guardrail_name
+      - hook_type
+      - status
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  hashed_api_key:
+    grain: hashed_api_key
+    identity:
+      required:
+      - hashed_api_key
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  hashed_api_key_model_with_pid:
+    grain: hashed_api_key, model
+    identity:
+      required:
+      - hashed_api_key
+      - model
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  hashed_api_key_with_pid:
+    grain: hashed_api_key
+    identity:
+      required:
+      - hashed_api_key
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  mcp_server_name_mcp_tool_name:
+    grain: mcp_server_name, mcp_tool_name
+    identity:
+      required:
+      - mcp_server_name
+      - mcp_tool_name
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  model_id:
+    grain: model_id
+    identity:
+      required:
+      - model_id
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  model_id_service_tier:
+    grain: model_id, service_tier
+    identity:
+      required:
+      - model_id
+      - service_tier
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  model_id_status_class:
+    grain: model_id, status_class
+    identity:
+      required:
+      - model_id
+      - status_class
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  model_id_status_class_exception_class:
+    grain: model_id, status_class, exception_class
+    identity:
+      required:
+      - model_id
+      - status_class
+      - exception_class
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  model_id_with_pid:
+    grain: model_id
+    identity:
+      required:
+      - model_id
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  org_id:
+    grain: org_id
+    identity:
+      required:
+      - org_id
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  org_id_with_pid:
+    grain: org_id
+    identity:
+      required:
+      - org_id
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  rate_limit_category_rate_limit_type:
+    grain: rate_limit_category, rate_limit_type
+    identity:
+      required:
+      - rate_limit_category
+      - rate_limit_type
+      optional: []
+  requested_model:
+    grain: requested_model
+    identity:
+      required:
+      - requested_model
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  requested_model_fallback_model:
+    grain: requested_model, fallback_model
+    identity:
+      required:
+      - requested_model
+      - fallback_model
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  result:
+    grain: result
+    identity:
+      required:
+      - result
+      optional: []
+  route_status_class:
+    grain: route, status_class
+    identity:
+      required:
+      - route
+      - status_class
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  service:
+    grain: service
+    identity:
+      required:
+      - service
+      optional: []
+  status_class_exception_class:
+    grain: status_class, exception_class
+    identity:
+      required:
+      - status_class
+      - exception_class
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  team:
+    grain: team
+    identity:
+      required:
+      - team
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  team_with_pid:
+    grain: team
+    identity:
+      required:
+      - team
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  user:
+    grain: user
+    identity:
+      required:
+      - user
+      optional: []
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  user_with_pid:
+    grain: user
+    identity:
+      required:
+      - user
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+  worker_with_pid:
+    grain: collector job
+    identity:
+      required: []
+      optional:
+      - pid
+    high_cardinality_acceptance:
+      operator_value: Preserving this finest useful LiteLLM entity supports direct diagnosis while broader views remain available
+        through Netdata aggregation.
+label_policies: {}
+reduction_policies: {}
+normalizations:
+  generated_registration_epochs:
+    kind: generated_component_exclusion
+    source:
+      namespace_prefix: litellm_
+      terminal_suffix: _created
+      component: scalar
+    outcome: drop_before_writer
+    evidence:
+    - created_registration
+    - component_lifecycle
+    - source_units
+  requested_model_label:
+    kind: label_rename
+    source_label: model_group
+    target_label: requested_model
+    retain_source: false
+  deployment_model_label:
+    kind: label_rename
+    source_label: litellm_model_name
+    target_label: model
+    retain_source: false
+  proxy_status_class:
+    kind: category
+    applies_to:
+      signal: proxy_total_requests_metric_total
+      components:
+      - value
+    source_label: status_code
+    target_label: status_class
+    ranges:
+    - min: 100
+      max: 199
+      value: 1xx
+    - min: 200
+      max: 299
+      value: 2xx
+    - min: 300
+      max: 399
+      value: 3xx
+    - min: 400
+      max: 499
+      value: 4xx
+    - min: 500
+      max: 599
+      value: 5xx
+    missing:
+      set: unclassified
+    malformed:
+      set: unclassified
+    unknown:
+      set: unclassified
+    output:
+      meaning: Bounded HTTP status class.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  proxy_failure_status_class:
+    kind: category
+    applies_to:
+      signal: proxy_failed_requests_metric_total
+      components:
+      - value
+    source_label: exception_status
+    target_label: status_class
+    ranges:
+    - min: 100
+      max: 199
+      value: 1xx
+    - min: 200
+      max: 299
+      value: 2xx
+    - min: 300
+      max: 399
+      value: 3xx
+    - min: 400
+      max: 499
+      value: 4xx
+    - min: 500
+      max: 599
+      value: 5xx
+    missing:
+      set: unclassified
+    malformed:
+      set: unclassified
+    unknown:
+      set: unclassified
+    output:
+      meaning: Bounded HTTP status class.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  deployment_failure_status_class:
+    kind: category
+    applies_to:
+      signal: deployment_failure_responses_total
+      components:
+      - value
+    source_label: exception_status
+    target_label: status_class
+    ranges:
+    - min: 100
+      max: 199
+      value: 1xx
+    - min: 200
+      max: 299
+      value: 2xx
+    - min: 300
+      max: 399
+      value: 3xx
+    - min: 400
+      max: 499
+      value: 4xx
+    - min: 500
+      max: 599
+      value: 5xx
+    missing:
+      set: unclassified
+    malformed:
+      set: unclassified
+    unknown:
+      set: unclassified
+    output:
+      meaning: Bounded HTTP status class.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  deployment_cooldown_status_class:
+    kind: category
+    applies_to:
+      signal: deployment_cooled_down_total
+      components:
+      - value
+    source_label: exception_status
+    target_label: status_class
+    ranges:
+    - min: 100
+      max: 199
+      value: 1xx
+    - min: 200
+      max: 299
+      value: 2xx
+    - min: 300
+      max: 399
+      value: 3xx
+    - min: 400
+      max: 499
+      value: 4xx
+    - min: 500
+      max: 599
+      value: 5xx
+    missing:
+      set: unclassified
+    malformed:
+      set: unclassified
+    unknown:
+      set: unclassified
+    output:
+      meaning: Bounded HTTP status class.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  internal_latency_service:
+    kind: category
+    applies_to:
+      signal: internal_service_latency
+      components:
+      - bucket
+      - count
+      - sum
+    source_label: __name__
+    target_label: service
+    exact:
+      litellm_auth_latency_bucket: auth
+      litellm_auth_latency_count: auth
+      litellm_auth_latency_sum: auth
+      litellm_batch_write_to_db_latency_bucket: batch_write_to_db
+      litellm_batch_write_to_db_latency_count: batch_write_to_db
+      litellm_batch_write_to_db_latency_sum: batch_write_to_db
+      litellm_postgres_latency_bucket: postgres
+      litellm_postgres_latency_count: postgres
+      litellm_postgres_latency_sum: postgres
+      litellm_proxy_pre_call_latency_bucket: proxy_pre_call
+      litellm_proxy_pre_call_latency_count: proxy_pre_call
+      litellm_proxy_pre_call_latency_sum: proxy_pre_call
+      litellm_redis_daily_org_spend_update_queue_latency_bucket: redis_daily_org_spend_update_queue
+      litellm_redis_daily_org_spend_update_queue_latency_count: redis_daily_org_spend_update_queue
+      litellm_redis_daily_org_spend_update_queue_latency_sum: redis_daily_org_spend_update_queue
+      litellm_redis_daily_tag_spend_update_queue_latency_bucket: redis_daily_tag_spend_update_queue
+      litellm_redis_daily_tag_spend_update_queue_latency_count: redis_daily_tag_spend_update_queue
+      litellm_redis_daily_tag_spend_update_queue_latency_sum: redis_daily_tag_spend_update_queue
+      litellm_redis_daily_team_spend_update_queue_latency_bucket: redis_daily_team_spend_update_queue
+      litellm_redis_daily_team_spend_update_queue_latency_count: redis_daily_team_spend_update_queue
+      litellm_redis_daily_team_spend_update_queue_latency_sum: redis_daily_team_spend_update_queue
+      litellm_redis_latency_bucket: redis
+      litellm_redis_latency_count: redis
+      litellm_redis_latency_sum: redis
+      litellm_reset_budget_job_latency_bucket: reset_budget_job
+      litellm_reset_budget_job_latency_count: reset_budget_job
+      litellm_reset_budget_job_latency_sum: reset_budget_job
+      litellm_router_latency_bucket: router
+      litellm_router_latency_count: router
+      litellm_router_latency_sum: router
+      litellm_self_latency_bucket: self
+      litellm_self_latency_count: self
+      litellm_self_latency_sum: self
+    missing:
+      leave_absent: true
+    malformed:
+      leave_absent: true
+    unknown:
+      leave_absent: true
+    output:
+      meaning: Internal LiteLLM service category encoded in the metric name.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  internal_failure_service:
+    kind: category
+    applies_to:
+      signal: internal_service_failures
+      components:
+      - value
+    source_label: __name__
+    target_label: service
+    exact:
+      litellm_auth_failed_requests_total: auth
+      litellm_batch_write_to_db_failed_requests_total: batch_write_to_db
+      litellm_postgres_failed_requests_total: postgres
+      litellm_proxy_pre_call_failed_requests_total: proxy_pre_call
+      litellm_redis_daily_org_spend_update_queue_failed_requests_total: redis_daily_org_spend_update_queue
+      litellm_redis_daily_tag_spend_update_queue_failed_requests_total: redis_daily_tag_spend_update_queue
+      litellm_redis_daily_team_spend_update_queue_failed_requests_total: redis_daily_team_spend_update_queue
+      litellm_redis_failed_requests_total: redis
+      litellm_reset_budget_job_failed_requests_total: reset_budget_job
+      litellm_router_failed_requests_total: router
+      litellm_self_failed_requests_total: self
+    missing:
+      leave_absent: true
+    malformed:
+      leave_absent: true
+    unknown:
+      leave_absent: true
+    output:
+      meaning: Internal LiteLLM service category encoded in the metric name.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  internal_total_service:
+    kind: category
+    applies_to:
+      signal: internal_service_totals
+      components:
+      - value
+    source_label: __name__
+    target_label: service
+    exact:
+      litellm_auth_total_requests_total: auth
+      litellm_batch_write_to_db_total_requests_total: batch_write_to_db
+      litellm_postgres_total_requests_total: postgres
+      litellm_proxy_pre_call_total_requests_total: proxy_pre_call
+      litellm_redis_daily_org_spend_update_queue_total_requests_total: redis_daily_org_spend_update_queue
+      litellm_redis_daily_tag_spend_update_queue_total_requests_total: redis_daily_tag_spend_update_queue
+      litellm_redis_daily_team_spend_update_queue_total_requests_total: redis_daily_team_spend_update_queue
+      litellm_redis_total_requests_total: redis
+      litellm_reset_budget_job_total_requests_total: reset_budget_job
+      litellm_router_total_requests_total: router
+      litellm_self_total_requests_total: self
+    missing:
+      leave_absent: true
+    malformed:
+      leave_absent: true
+    unknown:
+      leave_absent: true
+    output:
+      meaning: Internal LiteLLM service category encoded in the metric name.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  internal_success_outcome:
+    kind: category
+    applies_to:
+      signal: internal_service_latency
+      components:
+      - bucket
+      - count
+      - sum
+    source_label: __name__
+    target_label: outcome
+    exact:
+      litellm_auth_latency_bucket: successful
+      litellm_auth_latency_count: successful
+      litellm_auth_latency_sum: successful
+      litellm_batch_write_to_db_latency_bucket: successful
+      litellm_batch_write_to_db_latency_count: successful
+      litellm_batch_write_to_db_latency_sum: successful
+      litellm_postgres_latency_bucket: successful
+      litellm_postgres_latency_count: successful
+      litellm_postgres_latency_sum: successful
+      litellm_proxy_pre_call_latency_bucket: successful
+      litellm_proxy_pre_call_latency_count: successful
+      litellm_proxy_pre_call_latency_sum: successful
+      litellm_redis_daily_org_spend_update_queue_latency_bucket: successful
+      litellm_redis_daily_org_spend_update_queue_latency_count: successful
+      litellm_redis_daily_org_spend_update_queue_latency_sum: successful
+      litellm_redis_daily_tag_spend_update_queue_latency_bucket: successful
+      litellm_redis_daily_tag_spend_update_queue_latency_count: successful
+      litellm_redis_daily_tag_spend_update_queue_latency_sum: successful
+      litellm_redis_daily_team_spend_update_queue_latency_bucket: successful
+      litellm_redis_daily_team_spend_update_queue_latency_count: successful
+      litellm_redis_daily_team_spend_update_queue_latency_sum: successful
+      litellm_redis_latency_bucket: successful
+      litellm_redis_latency_count: successful
+      litellm_redis_latency_sum: successful
+      litellm_reset_budget_job_latency_bucket: successful
+      litellm_reset_budget_job_latency_count: successful
+      litellm_reset_budget_job_latency_sum: successful
+      litellm_router_latency_bucket: successful
+      litellm_router_latency_count: successful
+      litellm_router_latency_sum: successful
+      litellm_self_latency_bucket: successful
+      litellm_self_latency_count: successful
+      litellm_self_latency_sum: successful
+    missing:
+      leave_absent: true
+    malformed:
+      leave_absent: true
+    unknown:
+      leave_absent: true
+    output:
+      meaning: Internal service request outcome encoded in the metric name.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  internal_failure_outcome:
+    kind: category
+    applies_to:
+      signal: internal_service_failures
+      components:
+      - value
+    source_label: __name__
+    target_label: outcome
+    exact:
+      litellm_auth_failed_requests_total: failed
+      litellm_batch_write_to_db_failed_requests_total: failed
+      litellm_postgres_failed_requests_total: failed
+      litellm_proxy_pre_call_failed_requests_total: failed
+      litellm_redis_daily_org_spend_update_queue_failed_requests_total: failed
+      litellm_redis_daily_tag_spend_update_queue_failed_requests_total: failed
+      litellm_redis_daily_team_spend_update_queue_failed_requests_total: failed
+      litellm_redis_failed_requests_total: failed
+      litellm_reset_budget_job_failed_requests_total: failed
+      litellm_router_failed_requests_total: failed
+      litellm_self_failed_requests_total: failed
+    missing:
+      leave_absent: true
+    malformed:
+      leave_absent: true
+    unknown:
+      leave_absent: true
+    output:
+      meaning: Internal service request outcome encoded in the metric name.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+  internal_latency_measurement:
+    kind: category
+    applies_to:
+      signal: internal_service_latency
+      components:
+      - bucket
+      - count
+      - sum
+    source_label: __name__
+    target_label: measurement
+    exact:
+      litellm_auth_latency_bucket: time
+      litellm_auth_latency_count: time
+      litellm_auth_latency_sum: time
+      litellm_batch_write_to_db_latency_bucket: time
+      litellm_batch_write_to_db_latency_count: time
+      litellm_batch_write_to_db_latency_sum: time
+      litellm_postgres_latency_bucket: time
+      litellm_postgres_latency_count: time
+      litellm_postgres_latency_sum: time
+      litellm_proxy_pre_call_latency_bucket: time
+      litellm_proxy_pre_call_latency_count: time
+      litellm_proxy_pre_call_latency_sum: time
+      litellm_redis_daily_org_spend_update_queue_latency_bucket: time
+      litellm_redis_daily_org_spend_update_queue_latency_count: time
+      litellm_redis_daily_org_spend_update_queue_latency_sum: time
+      litellm_redis_daily_tag_spend_update_queue_latency_bucket: time
+      litellm_redis_daily_tag_spend_update_queue_latency_count: time
+      litellm_redis_daily_tag_spend_update_queue_latency_sum: time
+      litellm_redis_daily_team_spend_update_queue_latency_bucket: time
+      litellm_redis_daily_team_spend_update_queue_latency_count: time
+      litellm_redis_daily_team_spend_update_queue_latency_sum: time
+      litellm_redis_latency_bucket: time
+      litellm_redis_latency_count: time
+      litellm_redis_latency_sum: time
+      litellm_reset_budget_job_latency_bucket: time
+      litellm_reset_budget_job_latency_count: time
+      litellm_reset_budget_job_latency_sum: time
+      litellm_router_latency_bucket: time
+      litellm_router_latency_count: time
+      litellm_router_latency_sum: time
+      litellm_self_latency_bucket: time
+      litellm_self_latency_count: time
+      litellm_self_latency_sum: time
+    missing:
+      leave_absent: true
+    malformed:
+      leave_absent: true
+    unknown:
+      leave_absent: true
+    output:
+      meaning: Internal service measurement category encoded in the metric name.
+      evidence:
+      - source_labels
+    evidence:
+    - normalization_contract
+exclusions:
+  deprecated_failed_requests:
+    source:
+      signal: deprecated_failed_requests
+      components:
+      - value
+    reason: source_superseded
+    replacement: proxy_failed_requests_metric_total
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  deprecated_total_requests:
+    source:
+      signal: deprecated_total_requests
+      components:
+      - value
+    reason: source_superseded
+    replacement: proxy_total_requests_metric_total
+    evidence:
+    - deprecated_sources
+    outcome: drop_before_writer
+  batch_cost_poll_timestamp:
+    source:
+      signal: check_batch_cost_last_run_timestamp
+      components:
+      - value
+    reason: not_chartable
+    lost_question: How long has it been since the batch-cost poll last ran?
+    required_operation: age_from_unix_epoch
+    evidence:
+    - component_lifecycle
+    - source_units
+    outcome: drop_before_writer
+  internal_service_totals:
+    source:
+      signal: internal_service_totals
+      components:
+      - value
+    reason: equivalent_duplicate
+    covering_view: internal_services.request_outcomes
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  guardrail_requests_counter:
+    source:
+      signal: guardrail_requests_total
+      components:
+      - value
+    reason: equivalent_duplicate
+    covering_view: guardrails.invocations
+    evidence:
+    - source_relationships
+    outcome: retain_writable_unrendered
+  check_batch_cost_jobs_polled:
+    source:
+      signal: check_batch_cost_jobs_polled
+      components:
+      - value
+    reason: collection_hazard
+    evidence:
+    - collection_hazards
+    outcome: retain_writable_unrendered
+  managed_file_size_bytes:
+    source:
+      signal: managed_file_size_bytes
+      components:
+      - value
+    reason: collection_hazard
+    evidence:
+    - collection_hazards
+    outcome: retain_writable_unrendered
+  pod_lock_manager_size:
+    source:
+      signal: pod_lock_manager_size
+      components:
+      - value
+    reason: collection_hazard
+    evidence:
+    - collection_hazards
+    outcome: retain_writable_unrendered
+  spend_update_queue_sizes:
+    source:
+      signal: spend_update_queue_sizes
+      components:
+      - value
+    reason: collection_hazard
+    evidence:
+    - collection_hazards
+    outcome: retain_writable_unrendered
+limitations: {}
+views:
+  gateway.client_traffic.request_outcomes:
+    family: LiteLLM/Gateway/Client Traffic
+    question: What does client request outcomes report for each route, status_class?
+    entity: route_status_class
+    inputs:
+      requests:
+        signal: proxy_total_requests_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        status_code: This source label does not define the selected operator entity or a useful chart dimension/label.
+        stream: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.client_traffic.failure_causes:
+    family: LiteLLM/Gateway/Client Traffic
+    question: What does client failure causes report for each status_class, exception_class?
+    entity: status_class_exception_class
+    inputs:
+      failures:
+        signal: proxy_failed_requests_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_status: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        rate_limit_category: This source label does not define the selected operator entity or a useful chart dimension/label.
+        rate_limit_type: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        route: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.client_traffic.rate_limit_attribution:
+    family: LiteLLM/Gateway/Client Traffic
+    question: What does client rate-limit attribution report for each rate_limit_category, rate_limit_type?
+    entity: rate_limit_category_rate_limit_type
+    inputs:
+      failures:
+        signal: proxy_failed_requests_metric_total
+        components:
+        - value
+        where:
+          any:
+          - all:
+            - label: rate_limit_category
+              op: nonblank
+            - label: rate_limit_type
+              op: nonblank
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_class: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_status: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        route: This source label does not define the selected operator entity or a useful chart dimension/label.
+        status_class: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.client_traffic.in_flight_requests:
+    family: LiteLLM/Gateway/Client Traffic
+    question: What does in-flight requests report for each collector job?
+    entity: collector_job
+    inputs:
+      requests:
+        signal: in_flight_requests
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  gateway.admission_queue.queue_time_distribution:
+    family: LiteLLM/Gateway/Admission Queue
+    question: What does request queue-time distribution report for each model_id?
+    entity: model_id
+    inputs:
+      distribution:
+        signal: request_queue_time_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.admission_queue.queued_request_measurements:
+    family: LiteLLM/Gateway/Admission Queue
+    question: What does queued request measurements report for each model_id?
+    entity: model_id
+    inputs:
+      requests:
+        signal: request_queue_time_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.admission_queue.accumulated_queue_time:
+    family: LiteLLM/Gateway/Admission Queue
+    question: What does accumulated request queue time report for each model_id?
+    entity: model_id
+    inputs:
+      time:
+        signal: request_queue_time_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.request_latency.distribution:
+    family: LiteLLM/Gateway/Request Latency
+    question: What does end-to-end request-latency distribution report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      distribution:
+        signal: request_total_latency_metric
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.request_latency.measurements:
+    family: LiteLLM/Gateway/Request Latency
+    question: What does end-to-end request measurements report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      requests:
+        signal: request_total_latency_metric
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.request_latency.accumulated_time:
+    family: LiteLLM/Gateway/Request Latency
+    question: What does accumulated end-to-end request time report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      time:
+        signal: request_total_latency_metric
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.processing_overhead.distribution:
+    family: LiteLLM/Gateway/Processing Overhead
+    question: What does litellm overhead-latency distribution report for each model_id?
+    entity: model_id
+    inputs:
+      distribution:
+        signal: overhead_latency_metric
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.processing_overhead.measurements:
+    family: LiteLLM/Gateway/Processing Overhead
+    question: What does litellm overhead measurements report for each model_id?
+    entity: model_id
+    inputs:
+      requests:
+        signal: overhead_latency_metric
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.processing_overhead.accumulated_time:
+    family: LiteLLM/Gateway/Processing Overhead
+    question: What does accumulated litellm overhead report for each model_id?
+    entity: model_id
+    inputs:
+      time:
+        signal: overhead_latency_metric
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.processing_overhead.guardrail_inclusive_distribution:
+    family: LiteLLM/Gateway/Processing Overhead
+    question: What does guardrail-inclusive overhead distribution report for each model_id?
+    entity: model_id
+    inputs:
+      distribution:
+        signal: overhead_with_guardrails_latency_metric
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.processing_overhead.guardrail_inclusive_measurements:
+    family: LiteLLM/Gateway/Processing Overhead
+    question: What does guardrail-inclusive overhead measurements report for each model_id?
+    entity: model_id
+    inputs:
+      requests:
+        signal: overhead_with_guardrails_latency_metric
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  gateway.processing_overhead.accumulated_guardrail_inclusive_time:
+    family: LiteLLM/Gateway/Processing Overhead
+    question: What does accumulated guardrail-inclusive overhead report for each model_id?
+    entity: model_id
+    inputs:
+      time:
+        signal: overhead_with_guardrails_latency_metric
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.deployment_requests.workload:
+    family: LiteLLM/Routing and Deployments/Deployment Requests
+    question: What does deployment request workload report for each model_id?
+    entity: model_id
+    inputs:
+      requests:
+        signal: deployment_total_requests_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.deployment_requests.outcomes:
+    family: LiteLLM/Routing and Deployments/Deployment Requests
+    question: What does classified deployment outcomes report for each model_id?
+    entity: model_id
+    inputs:
+      successful:
+        signal: deployment_success_responses_total
+        components:
+        - value
+      failed:
+        signal: deployment_failure_responses_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_class: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_status: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        status_class: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.deployment_requests.failure_causes:
+    family: LiteLLM/Routing and Deployments/Deployment Requests
+    question: What does deployment failure causes report for each model_id, status_class, exception_class?
+    entity: model_id_status_class_exception_class
+    inputs:
+      failures:
+        signal: deployment_failure_responses_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_status: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+    display:
+      convention: request_failures
+      reason: The existing operator view expresses the source measurement as failures/s.
+      evidence:
+      - display_conventions
+  routing.deployment_health.cooldowns:
+    family: LiteLLM/Routing and Deployments/Deployment Health
+    question: What does deployment cooldowns report for each model_id, status_class?
+    entity: model_id_status_class
+    inputs:
+      cooldowns:
+        signal: deployment_cooled_down_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_status: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.deployment_health.state:
+    family: LiteLLM/Routing and Deployments/Deployment Health
+    question: What does deployment state report for each model_id?
+    entity: model_id_with_pid
+    inputs:
+      state:
+        signal: deployment_state
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: max
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.deployment_capacity.request_limit:
+    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    question: What does deployment request limit report for each model_id?
+    entity: model_id_with_pid
+    inputs:
+      limit:
+        signal: deployment_rpm_limit
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: max
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+    display:
+      convention: requests_per_minute
+      reason: The existing operator view expresses the source measurement as requests/min.
+      evidence:
+      - display_conventions
+  routing.deployment_capacity.token_limit:
+    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    question: What does deployment token limit report for each model_id?
+    entity: model_id_with_pid
+    inputs:
+      limit:
+        signal: deployment_tpm_limit
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: max
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+    display:
+      convention: tokens_per_minute
+      reason: The existing operator view expresses the source measurement as tokens/min.
+      evidence:
+      - display_conventions
+  routing.deployment_capacity.remaining_requests:
+    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    question: What does provider remaining requests report for each model_id?
+    entity: model_id_with_pid
+    inputs:
+      remaining:
+        signal: remaining_requests_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: min
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.deployment_capacity.remaining_tokens:
+    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    question: What does provider remaining tokens report for each model_id?
+    entity: model_id_with_pid
+    inputs:
+      remaining:
+        signal: remaining_tokens_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: min
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.output_token_latency.distribution:
+    family: LiteLLM/Routing and Deployments/Output-Token Latency
+    question: What does deployment output-token latency distribution report for each model_id?
+    entity: model_id
+    inputs:
+      distribution:
+        signal: deployment_latency_per_output_token
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.output_token_latency.measurements:
+    family: LiteLLM/Routing and Deployments/Output-Token Latency
+    question: What does deployment output-token latency measurements report for each model_id?
+    entity: model_id
+    inputs:
+      requests:
+        signal: deployment_latency_per_output_token
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.output_token_latency.accumulated_time:
+    family: LiteLLM/Routing and Deployments/Output-Token Latency
+    question: What does accumulated deployment output-token latency report for each model_id?
+    entity: model_id
+    inputs:
+      time:
+        signal: deployment_latency_per_output_token
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_base: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  routing.fallbacks.outcomes:
+    family: LiteLLM/Routing and Deployments/Fallbacks
+    question: What does fallback outcomes report for each requested_model, fallback_model?
+    entity: requested_model_fallback_model
+    inputs:
+      successful:
+        signal: deployment_successful_fallbacks_total
+        components:
+        - value
+      failed:
+        signal: deployment_failed_fallbacks_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_class: This source label does not define the selected operator entity or a useful chart dimension/label.
+        exception_status: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  provider_api.latency_distribution:
+    family: LiteLLM/Provider API
+    question: What does provider api latency distribution report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      distribution:
+        signal: llm_api_latency_metric
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  provider_api.latency_measurements:
+    family: LiteLLM/Provider API
+    question: What does provider api latency measurements report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      requests:
+        signal: llm_api_latency_metric
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  provider_api.accumulated_latency:
+    family: LiteLLM/Provider API
+    question: What does accumulated provider api latency report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      time:
+        signal: llm_api_latency_metric
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  provider_api.time_to_first_token_distribution:
+    family: LiteLLM/Provider API
+    question: What does provider time-to-first-token distribution report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      distribution:
+        signal: llm_api_time_to_first_token_metric
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  provider_api.time_to_first_token_measurements:
+    family: LiteLLM/Provider API
+    question: What does provider time-to-first-token measurements report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      requests:
+        signal: llm_api_time_to_first_token_metric
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  provider_api.accumulated_time_to_first_token:
+    family: LiteLLM/Provider API
+    question: What does accumulated provider time-to-first-token report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      time:
+        signal: llm_api_time_to_first_token_metric
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.deployment.request_token_throughput:
+    family: LiteLLM/Usage and Cost/By Deployment
+    question: What does request token throughput report for each model_id?
+    entity: model_id
+    inputs:
+      input:
+        signal: input_tokens_metric_total
+        components:
+        - value
+      output:
+        signal: output_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.deployment.total_token_throughput:
+    family: LiteLLM/Usage and Cost/By Deployment
+    question: What does reported total token throughput report for each model_id?
+    entity: model_id
+    inputs:
+      total:
+        signal: total_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.deployment.spend:
+    family: LiteLLM/Usage and Cost/By Deployment
+    question: What does llm spend report for each model_id, service_tier?
+    entity: model_id_service_tier
+    inputs:
+      spend:
+        signal: spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.deployment.specialized_token_throughput:
+    family: LiteLLM/Usage and Cost/By Deployment
+    question: What does audio and reasoning token throughput report for each model_id?
+    entity: model_id
+    inputs:
+      input_audio:
+        signal: input_audio_tokens_metric_total
+        components:
+        - value
+      output_audio:
+        signal: output_audio_tokens_metric_total
+        components:
+        - value
+      output_reasoning:
+        signal: output_reasoning_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.deployment.generated_images:
+    family: LiteLLM/Usage and Cost/By Deployment
+    question: What does generated images report for each model_id?
+    entity: model_id
+    inputs:
+      images:
+        signal: images_generated_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.deployment.generated_video_duration:
+    family: LiteLLM/Usage and Cost/By Deployment
+    question: What does generated video duration report for each model_id?
+    entity: model_id
+    inputs:
+      duration:
+        signal: video_duration_seconds_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.api_key.request_token_throughput:
+    family: LiteLLM/Usage and Cost/By API Key
+    question: What does request token throughput by api key report for each hashed_api_key?
+    entity: hashed_api_key
+    inputs:
+      input:
+        signal: input_tokens_metric_total
+        components:
+        - value
+      output:
+        signal: output_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit:
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.api_key.total_token_throughput:
+    family: LiteLLM/Usage and Cost/By API Key
+    question: What does reported total token throughput by api key report for each hashed_api_key?
+    entity: hashed_api_key
+    inputs:
+      total:
+        signal: total_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit:
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.api_key.spend:
+    family: LiteLLM/Usage and Cost/By API Key
+    question: What does llm spend by api key report for each hashed_api_key?
+    entity: hashed_api_key
+    inputs:
+      spend:
+        signal: spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit:
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        service_tier: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.team.request_token_throughput:
+    family: LiteLLM/Usage and Cost/By Team
+    question: What does request token throughput by team report for each team?
+    entity: team
+    inputs:
+      input:
+        signal: input_tokens_metric_total
+        components:
+        - value
+      output:
+        signal: output_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - team_alias
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.team.total_token_throughput:
+    family: LiteLLM/Usage and Cost/By Team
+    question: What does reported total token throughput by team report for each team?
+    entity: team
+    inputs:
+      total:
+        signal: total_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - team_alias
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.team.spend:
+    family: LiteLLM/Usage and Cost/By Team
+    question: What does llm spend by team report for each team?
+    entity: team
+    inputs:
+      spend:
+        signal: spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - team_alias
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        service_tier: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.user.request_token_throughput:
+    family: LiteLLM/Usage and Cost/By User
+    question: What does request token throughput by user report for each user?
+    entity: user
+    inputs:
+      input:
+        signal: input_tokens_metric_total
+        components:
+        - value
+      output:
+        signal: output_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.user.total_token_throughput:
+    family: LiteLLM/Usage and Cost/By User
+    question: What does reported total token throughput by user report for each user?
+    entity: user
+    inputs:
+      total:
+        signal: total_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.user.spend:
+    family: LiteLLM/Usage and Cost/By User
+    question: What does llm spend by user report for each user?
+    entity: user
+    inputs:
+      spend:
+        signal: spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        service_tier: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.organization.request_token_throughput:
+    family: LiteLLM/Usage and Cost/By Organization
+    question: What does request token throughput by organization report for each org_id?
+    entity: org_id
+    inputs:
+      input:
+        signal: input_tokens_metric_total
+        components:
+        - value
+      output:
+        signal: output_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - org_alias
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.organization.total_token_throughput:
+    family: LiteLLM/Usage and Cost/By Organization
+    question: What does reported total token throughput by organization report for each org_id?
+    entity: org_id
+    inputs:
+      total:
+        signal: total_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - org_alias
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.organization.spend:
+    family: LiteLLM/Usage and Cost/By Organization
+    question: What does llm spend by organization report for each org_id?
+    entity: org_id
+    inputs:
+      spend:
+        signal: spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - org_alias
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        service_tier: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.end_user.request_token_throughput:
+    family: LiteLLM/Usage and Cost/By End User
+    question: What does request token throughput by end user report for each end_user?
+    entity: end_user
+    inputs:
+      input:
+        signal: input_tokens_metric_total
+        components:
+        - value
+      output:
+        signal: output_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.end_user.total_token_throughput:
+    family: LiteLLM/Usage and Cost/By End User
+    question: What does reported total token throughput by end user report for each end_user?
+    entity: end_user
+    inputs:
+      total:
+        signal: total_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.end_user.spend:
+    family: LiteLLM/Usage and Cost/By End User
+    question: What does llm spend by end user report for each end_user?
+    entity: end_user
+    inputs:
+      spend:
+        signal: spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        service_tier: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.requested_model.request_token_throughput:
+    family: LiteLLM/Usage and Cost/By Requested Model
+    question: What does request token throughput by requested model report for each requested_model?
+    entity: requested_model
+    inputs:
+      input:
+        signal: input_tokens_metric_total
+        components:
+        - value
+      output:
+        signal: output_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.requested_model.total_token_throughput:
+    family: LiteLLM/Usage and Cost/By Requested Model
+    question: What does reported total token throughput by requested model report for each requested_model?
+    entity: requested_model
+    inputs:
+      total:
+        signal: total_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  usage.requested_model.spend:
+    family: LiteLLM/Usage and Cost/By Requested Model
+    question: What does llm spend by requested model report for each requested_model?
+    entity: requested_model
+    inputs:
+      spend:
+        signal: spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        api_provider: This source label does not define the selected operator entity or a useful chart dimension/label.
+        client_ip: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        org_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        service_tier: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_agent: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  caching.outcomes:
+    family: LiteLLM/Caching
+    question: What does cache outcomes report for each model_id?
+    entity: model_id
+    inputs:
+      hits:
+        signal: cache_hits_metric_total
+        components:
+        - value
+      misses:
+        signal: cache_misses_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  caching.cached_token_throughput:
+    family: LiteLLM/Caching
+    question: What does litellm cached token throughput report for each model_id?
+    entity: model_id
+    inputs:
+      cached:
+        signal: cached_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  caching.request_cache_token_throughput:
+    family: LiteLLM/Caching
+    question: What does request input-cache token throughput report for each model_id?
+    entity: model_id
+    inputs:
+      read:
+        signal: input_cached_tokens_metric_total
+        components:
+        - value
+      creation:
+        signal: input_cache_creation_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        requested_model: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  caching.provider_cache_token_throughput:
+    family: LiteLLM/Caching
+    question: What does provider cache token throughput report for each model_id?
+    entity: model_id
+    inputs:
+      read:
+        signal: provider_cache_read_input_tokens_metric_total
+        components:
+        - value
+      creation:
+        signal: provider_cache_creation_input_tokens_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_provider
+      - model
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  governance.api_keys.remaining_budget:
+    family: LiteLLM/Governance/API Keys
+    question: What does api-key remaining budget report for each hashed_api_key?
+    entity: hashed_api_key_with_pid
+    inputs:
+      remaining:
+        signal: remaining_api_key_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit: {}
+  governance.api_keys.budget_limit:
+    family: LiteLLM/Governance/API Keys
+    question: What does api-key budget limit report for each hashed_api_key?
+    entity: hashed_api_key_with_pid
+    inputs:
+      limit:
+        signal: api_key_max_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit: {}
+  governance.api_keys.budget_reset_window:
+    family: LiteLLM/Governance/API Keys
+    question: What does api-key budget reset window report for each hashed_api_key?
+    entity: hashed_api_key_with_pid
+    inputs:
+      remaining:
+        signal: api_key_budget_remaining_hours_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit: {}
+    display:
+      convention: duration_hours
+      reason: The existing operator view expresses the source measurement as hours.
+      evidence:
+      - display_conventions
+  governance.api_keys.model_request_headroom:
+    family: LiteLLM/Governance/API Keys
+    question: What does api-key model request headroom report for each hashed_api_key, model?
+    entity: hashed_api_key_model_with_pid
+    inputs:
+      remaining:
+        signal: remaining_api_key_requests_for_model
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit:
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: min
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  governance.api_keys.model_token_headroom:
+    family: LiteLLM/Governance/API Keys
+    question: What does api-key model token headroom report for each hashed_api_key, model?
+    entity: hashed_api_key_model_with_pid
+    inputs:
+      remaining:
+        signal: remaining_api_key_tokens_for_model
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - api_key_alias
+      omit:
+        metadata_project: This source label does not define the selected operator entity or a useful chart dimension/label.
+        model_id: This source label does not define the selected operator entity or a useful chart dimension/label.
+        tag_prod: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: min
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  governance.organizations.remaining_budget:
+    family: LiteLLM/Governance/Organizations
+    question: What does organization remaining budget report for each org_id?
+    entity: org_id_with_pid
+    inputs:
+      remaining:
+        signal: remaining_org_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - org_alias
+      omit: {}
+  governance.organizations.budget_limit:
+    family: LiteLLM/Governance/Organizations
+    question: What does organization budget limit report for each org_id?
+    entity: org_id_with_pid
+    inputs:
+      limit:
+        signal: org_max_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - org_alias
+      omit: {}
+  governance.organizations.budget_reset_window:
+    family: LiteLLM/Governance/Organizations
+    question: What does organization budget reset window report for each org_id?
+    entity: org_id_with_pid
+    inputs:
+      remaining:
+        signal: org_budget_remaining_hours_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - org_alias
+      omit: {}
+    display:
+      convention: duration_hours
+      reason: The existing operator view expresses the source measurement as hours.
+      evidence:
+      - display_conventions
+  governance.teams.remaining_budget:
+    family: LiteLLM/Governance/Teams
+    question: What does team remaining budget report for each team?
+    entity: team_with_pid
+    inputs:
+      remaining:
+        signal: remaining_team_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - team_alias
+      omit: {}
+  governance.teams.budget_limit:
+    family: LiteLLM/Governance/Teams
+    question: What does team budget limit report for each team?
+    entity: team_with_pid
+    inputs:
+      limit:
+        signal: team_max_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - team_alias
+      omit: {}
+  governance.teams.budget_reset_window:
+    family: LiteLLM/Governance/Teams
+    question: What does team budget reset window report for each team?
+    entity: team_with_pid
+    inputs:
+      remaining:
+        signal: team_budget_remaining_hours_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - team_alias
+      omit: {}
+    display:
+      convention: duration_hours
+      reason: The existing operator view expresses the source measurement as hours.
+      evidence:
+      - display_conventions
+  governance.teams.membership:
+    family: LiteLLM/Governance/Teams
+    question: What does team membership report for each team?
+    entity: team_with_pid
+    inputs:
+      members:
+        signal: team_members_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote:
+      - team_alias
+      omit: {}
+  governance.users.remaining_budget:
+    family: LiteLLM/Governance/Users
+    question: What does user remaining budget report for each user?
+    entity: user_with_pid
+    inputs:
+      remaining:
+        signal: remaining_user_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        user_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: min
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  governance.users.budget_limit:
+    family: LiteLLM/Governance/Users
+    question: What does user budget limit report for each user?
+    entity: user_with_pid
+    inputs:
+      limit:
+        signal: user_max_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        user_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: max
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  governance.users.budget_reset_window:
+    family: LiteLLM/Governance/Users
+    question: What does user budget reset window report for each user?
+    entity: user_with_pid
+    inputs:
+      remaining:
+        signal: user_budget_remaining_hours_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        user_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: min
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+    display:
+      convention: duration_hours
+      reason: The existing operator view expresses the source measurement as hours.
+      evidence:
+      - display_conventions
+  governance.providers.remaining_budget:
+    family: LiteLLM/Governance/Providers
+    question: What does provider remaining budget report for each api_provider?
+    entity: api_provider_with_pid
+    inputs:
+      remaining:
+        signal: provider_remaining_budget_metric
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  guardrails.invocations:
+    family: LiteLLM/Guardrails
+    question: What does guardrail invocations report for each guardrail_name, hook_type, status?
+    entity: guardrail_name_hook_type_status
+    inputs:
+      invocations:
+        signal: guardrail_latency_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        error_type: The invocation view intentionally aggregates the finer guardrail error category.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-error-type invocation comparison remains available in the guardrail error view.
+  guardrails.errors:
+    family: LiteLLM/Guardrails
+    question: What does guardrail errors report for each guardrail_name, hook_type, error_type?
+    entity: guardrail_name_hook_type_error_type
+    inputs:
+      errors:
+        signal: guardrail_errors_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  guardrails.latency_distribution:
+    family: LiteLLM/Guardrails
+    question: What does guardrail latency distribution report for each guardrail_name, hook_type?
+    entity: guardrail_name_hook_type
+    inputs:
+      distribution:
+        signal: guardrail_latency_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        error_type: This source label does not define the selected operator entity or a useful chart dimension/label.
+        status: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  guardrails.accumulated_latency:
+    family: LiteLLM/Guardrails
+    question: What does accumulated guardrail latency report for each guardrail_name, hook_type?
+    entity: guardrail_name_hook_type
+    inputs:
+      time:
+        signal: guardrail_latency_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        error_type: This source label does not define the selected operator entity or a useful chart dimension/label.
+        status: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  mcp.tool_calls:
+    family: LiteLLM/MCP Gateway
+    question: What does mcp tool calls report for each mcp_server_name, mcp_tool_name?
+    entity: mcp_server_name_mcp_tool_name
+    inputs:
+      calls:
+        signal: mcp_tool_calls_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  mcp.tool_call_spend:
+    family: LiteLLM/MCP Gateway
+    question: What does mcp tool-call spend report for each mcp_server_name, mcp_tool_name?
+    entity: mcp_server_name_mcp_tool_name
+    inputs:
+      spend:
+        signal: mcp_tool_call_spend_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        end_user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        hashed_api_key: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team: This source label does not define the selected operator entity or a useful chart dimension/label.
+        team_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  managed.batches_created:
+    family: LiteLLM/Managed Batches and Files
+    question: What does managed batches created report for each api_provider, model?
+    entity: api_provider_model
+    inputs:
+      created:
+        signal: managed_batch_created_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  managed.batches_cost_tracked:
+    family: LiteLLM/Managed Batches and Files
+    question: What does successfully cost-tracked batches report for each api_provider, model?
+    entity: api_provider_model
+    inputs:
+      cost_tracked:
+        signal: check_batch_cost_jobs_processed_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  managed.batch_cost_errors:
+    family: LiteLLM/Managed Batches and Files
+    question: What does batch-cost processing errors report for each collector job?
+    entity: collector_job
+    inputs:
+      errors:
+        signal: check_batch_cost_errors_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        error_type: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  managed.files_created:
+    family: LiteLLM/Managed Batches and Files
+    question: What does managed files created report for each api_provider, model?
+    entity: api_provider_model
+    inputs:
+      created:
+        signal: managed_file_created_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        api_key_alias: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user: This source label does not define the selected operator entity or a useful chart dimension/label.
+        user_email: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  managed.file_deletions:
+    family: LiteLLM/Managed Batches and Files
+    question: What does managed file deletions report for each result?
+    entity: result
+    inputs:
+      deletions:
+        signal: managed_file_deleted_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  managed.batch_duration_distribution:
+    family: LiteLLM/Managed Batches and Files
+    question: What does managed batch duration distribution report for each api_provider, model?
+    entity: api_provider_model
+    inputs:
+      distribution:
+        signal: managed_batch_duration_seconds
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  managed.batches_completed:
+    family: LiteLLM/Managed Batches and Files
+    question: What does completed managed batches report for each api_provider, model?
+    entity: api_provider_model
+    inputs:
+      completed:
+        signal: managed_batch_duration_seconds
+        components:
+        - count
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  managed.accumulated_batch_duration:
+    family: LiteLLM/Managed Batches and Files
+    question: What does accumulated managed batch duration report for each api_provider, model?
+    entity: api_provider_model
+    inputs:
+      time:
+        signal: managed_batch_duration_seconds
+        components:
+        - sum
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  inventory.total_users:
+    family: LiteLLM/Inventory and Callbacks
+    question: What does total users report for each collector job?
+    entity: worker_with_pid
+    inputs:
+      users:
+        signal: total_users
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  inventory.billable_users:
+    family: LiteLLM/Inventory and Callbacks
+    question: What does billable users report for each collector job?
+    entity: worker_with_pid
+    inputs:
+      users:
+        signal: active_users
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  inventory.teams:
+    family: LiteLLM/Inventory and Callbacks
+    question: What does teams report for each collector job?
+    entity: worker_with_pid
+    inputs:
+      teams:
+        signal: teams_count
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  inventory.callback_logging_failures:
+    family: LiteLLM/Inventory and Callbacks
+    question: What does callback logging failures report for each callback_name?
+    entity: callback_name
+    inputs:
+      failures:
+        signal: callback_logging_failures_metric_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  internal_services.request_outcomes:
+    family: LiteLLM/Internal Services
+    question: What does internal service request outcomes report for each service?
+    entity: service
+    inputs:
+      outcome_successful:
+        signal: internal_service_latency
+        components:
+        - count
+      outcome_failed:
+        signal: internal_service_failures
+        components:
+        - value
+    labels:
+      dimensions:
+        outcome:
+          render: label_value
+      promote: []
+      omit:
+        auth: This source label does not define the selected operator entity or a useful chart dimension/label.
+        batch_write_to_db: This source label does not define the selected operator entity or a useful chart dimension/label.
+        error_class: This source label does not define the selected operator entity or a useful chart dimension/label.
+        function_name: This source label does not define the selected operator entity or a useful chart dimension/label.
+        measurement: This source label does not define the selected operator entity or a useful chart dimension/label.
+        postgres: This source label does not define the selected operator entity or a useful chart dimension/label.
+        proxy_pre_call: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis_daily_org_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_tag_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_team_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        reset_budget_job: This source label does not define the selected operator entity or a useful chart dimension/label.
+        router: This source label does not define the selected operator entity or a useful chart dimension/label.
+        self: This source label does not define the selected operator entity or a useful chart dimension/label.
+    reduction:
+      reducer: sum
+      lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
+        from this view.
+  internal_services.failure_causes:
+    family: LiteLLM/Internal Services
+    question: What does internal service failure causes report for each function_name, error_class?
+    entity: function_name_error_class
+    inputs:
+      ? service_auth_batch_write_to_db_postgres_proxy_pre_call_redis_redis_daily_org_spend_update_queue_redis_daily_tag_spend_update_queue_redis_daily_team_spend_update_queue_reset_budget_job_router_self
+      : signal: internal_service_failures
+        components:
+        - value
+    labels:
+      dimensions:
+        service:
+          render: label_value
+      promote: []
+      omit:
+        auth: This source label does not define the selected operator entity or a useful chart dimension/label.
+        batch_write_to_db: This source label does not define the selected operator entity or a useful chart dimension/label.
+        outcome: This source label does not define the selected operator entity or a useful chart dimension/label.
+        postgres: This source label does not define the selected operator entity or a useful chart dimension/label.
+        proxy_pre_call: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis_daily_org_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_tag_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_team_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        reset_budget_job: This source label does not define the selected operator entity or a useful chart dimension/label.
+        router: This source label does not define the selected operator entity or a useful chart dimension/label.
+        self: This source label does not define the selected operator entity or a useful chart dimension/label.
+    display:
+      convention: request_failures
+      reason: The existing operator view expresses the source measurement as failures/s.
+      evidence:
+      - display_conventions
+  internal_services.latency_distribution:
+    family: LiteLLM/Internal Services
+    question: What does internal service latency distribution report for each service?
+    entity: service
+    inputs:
+      distribution:
+        signal: internal_service_latency
+        components:
+        - bucket
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        auth: This source label does not define the selected operator entity or a useful chart dimension/label.
+        batch_write_to_db: This source label does not define the selected operator entity or a useful chart dimension/label.
+        measurement: This source label does not define the selected operator entity or a useful chart dimension/label.
+        outcome: This source label does not define the selected operator entity or a useful chart dimension/label.
+        postgres: This source label does not define the selected operator entity or a useful chart dimension/label.
+        proxy_pre_call: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis_daily_org_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_tag_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_team_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        reset_budget_job: This source label does not define the selected operator entity or a useful chart dimension/label.
+        router: This source label does not define the selected operator entity or a useful chart dimension/label.
+        self: This source label does not define the selected operator entity or a useful chart dimension/label.
+  internal_services.accumulated_latency:
+    family: LiteLLM/Internal Services
+    question: What does accumulated internal service latency report for each service?
+    entity: service
+    inputs:
+      measurement_time:
+        signal: internal_service_latency
+        components:
+        - sum
+    labels:
+      dimensions:
+        measurement:
+          render: label_value
+      promote: []
+      omit:
+        auth: This source label does not define the selected operator entity or a useful chart dimension/label.
+        batch_write_to_db: This source label does not define the selected operator entity or a useful chart dimension/label.
+        outcome: This source label does not define the selected operator entity or a useful chart dimension/label.
+        postgres: This source label does not define the selected operator entity or a useful chart dimension/label.
+        proxy_pre_call: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis: This source label does not define the selected operator entity or a useful chart dimension/label.
+        redis_daily_org_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_tag_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        redis_daily_team_spend_update_queue: This source label does not define the selected operator entity or a useful chart
+          dimension/label.
+        reset_budget_job: This source label does not define the selected operator entity or a useful chart dimension/label.
+        router: This source label does not define the selected operator entity or a useful chart dimension/label.
+        self: This source label does not define the selected operator entity or a useful chart dimension/label.

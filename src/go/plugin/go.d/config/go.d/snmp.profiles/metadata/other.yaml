@@ -1,147 +1,147 @@
 enterprisenumbers:
-  org_to_vendor:
-    Alcatel-Lucent Enterprise (previous was 'Alcatel'): Nokia
-    Alcatel-Lucent TMC (formerly 'Alcatel SOC'): Nokia
-    allied networks GmbH: Allied
-    Allied Data Technologies: Allied
-    Allied Telesis, Inc.: Allied
-    Alteon Networks, Inc.: Alteon
-    American Power Conversion Corp.: APC
-    Arista Networks, Inc. (formerly 'Arastra, Inc.'): Arista
-    Aruba PEC S.p.A.: Aruba
-    Aruba S.r.l.: Aruba
-    Aruba, a Hewlett Packard Enterprise company: Aruba
-    AVAYA: Avaya
-    Avaya Atlanta Lab: Avaya
-    Avaya Communication: Avaya
-    Barracuda Networks AG (previous was 'phion Information Technologies'): Barracuda
-    Barracuda Networks, Inc.: Barracuda
-    barracuda digitale agentur GmbH: Barracuda
-    Blade Network Technologies, Inc.: IBM
-    Brocade Communication Systems, Inc. (formerly 'Foundry Networks, Inc.'): Brocade
-    Brocade Communication Systems, Inc. (formerly 'Rhapsody Networks Inc.'): Brocade
-    Brocade Communications Systems, Inc.: Brocade
-    Brocade Communications Systems, Inc. (formerly 'McDATA Corp.'): Brocade
-    Brocade Communications Systems, Inc. (formerly 'McDATA Corporation'): Brocade
-    Brocade Communications Systems, Inc. (formerly 'McDATA,Inc'): Brocade
-    Brocade Communications Systems, Inc. (formerly 'NuView Inc.'): Brocade
-    CacheFlow Inc.: CacheFlow
-    Check Point Software Technologies Ltd: CheckPoint
-    CIENA Corporation (formerly 'ONI Systems Corp.'): Ciena
-    Ciena (formerly 'Akara Inc.'): Ciena
-    Ciena Corporation: Ciena
-    Ciena Corporation (formerly 'Catena Networks'): Ciena
-    Cisco Flex Platform: Cisco
-    Cisco Sera: Cisco
-    Cisco SolutionsLab: Cisco
-    Cisco Sytems, Inc.: Cisco
-    Cisco Systems: Cisco
-    Cisco Systems Inc: Cisco
-    Cisco Systems India Private Limited: Cisco
-    Cisco Systems, Inc.: Cisco
-    Cisco Systems, Inc. (formerly 'Arch Rock Corporation'): Cisco
-    ciscoSystems: Cisco
-    Citrix Systems Inc.: Citrix
-    Dialogic Corporation: Dialogic
-    D-Link Systems, Inc.: D-Link
-    Dell Inc.: Dell
-    Eaton Energy Automation Solutions (EAS) Division: Eaton
-    EATON Wireless: Eaton
-    Enterasys Networks: Enterasys
-    Enterasys Networks Inc.: Enterasys
-    Ericsson AB: Ericsson
-    Ericsson AB - 4G5G (formerly 'Ellemtel Telecommunication Systems Laboratories'): Ericsson
-    Ericsson AB - Packet Core Networks: Ericsson
-    Ericsson Ahead Communications Systems GmbH: Ericsson
-    Ericsson Communications Ltd.: Ericsson
-    Ericsson Denmark A/S, Telebit Division: Ericsson
-    Ericsson Inc. (formerly 'BelAir Networks'): Ericsson
-    Ericsson Mobile Platforms AB: Ericsson
-    Ericsson Nikola Tesla d.d.: Ericsson
-    Ericsson Research Montreal (LMC): Ericsson
-    Ericsson Wireless LAN Systems: Ericsson
-    ERICSSON FIBER ACCESS: Ericsson
-    Extreme Networks: Extreme
-    Extreme Networks (formerly 'Ipanema Technologies'): Extreme
-    F5 Labs, Inc.: F5
-    F5 Networks Inc: F5
-    Fortinet, Inc.: Fortinet
-    Fortinet. Inc.: Fortinet
-    FUJIFILM Business Innovation Corp.: Fujifilm
-    Fujitsu Limited: Fujitsu
-    Gigamon Systems LLC: Gigamon
-    Hewlett-Packard: HP
-    Hewlett-Packard (Schweiz) GmbH: HP
-    Hewlett-Packard Slovakia: HP
-    Hewlett Packard Enterprise: HPE
-    HUAWEI Technology Co.,Ltd: Huawei
-    Huawei Symantec Technologies Co.,Ltd: Huawei
-    Infinera Corp.: Infinera
-    InfoBlox Inc.: Infoblox
-    Infoblox, WinConnect (formerly 'Ipanto'): Infoblox
-    Juniper Financial Corp.: Juniper
-    Juniper Networks, Inc.: Juniper
-    Juniper Networks/Funk Software: Juniper
-    Juniper Networks/Unisphere: Juniper
-    KONICA MINOLTA HOLDINGS, INC.: Konica
-    KYOCERA Corporation: Kyocera
-    Kyocera Communication Systems Co.Ltd: Kyocera
-    Lexmark International: Lexmark
-    McAFee Associates Inc.: McAfee
-    McAfee (formerly 'Secure Computing Corporation'): McAfee
-    McAfee Inc. (formerly 'Network Associates, Inc.'): McAfee
-    McAfee, Inc.  (formerly 'Securify, Inc.'): McAfee
-    McAfee Inc. (formerly 'Reconnex Corporation'): McAfee
-    McAfee, LLC: McAfee
-    Meraki Networks, Inc.: Meraki
-    Nasuni Corporation: Nasuni
-    NEC Corporation: NEC
-    NEC Eluminant Technologies, Inc.: NEC
-    NEC Platforms, Ltd.: NEC
-    NEC Telenetworx,Ltd: NEC
-    NEC COMPUTERS INTERNATIONAL B.V.: NEC
-    NEC informatec systems,ltd.: NEC
-    NEC Electronics Corporation: NEC
-    NEC Unified Solutions: NEC
-    NEC Enterprise Communication Technologies: NEC
-    NetScout Systems, Inc. (formerly 'Frontier Software Development'): NetScout
-    Network Appliance Corporation: NetApp
-    Nokia (formerly 'Alcatel-Lucent'): Nokia
-    Nokia (formerly 'Novarra, Inc.'): Nokia
-    Nokia Distributed Access: Nokia
-    Nokia Networks (formerly 'Nokia Siemens Networks'): Nokia
-    Nokia Shanghai Bell: Nokia
-    NVIDIA Corporation: NVIDIA
-    PALO ALTO NETWORKS: Palo Alto
-    Palo Alto Research Center, Inc.: Palo Alto
-    Palo Alto Software, Inc.: Palo Alto
-    Ruckus Wireless, Inc.: Ruckus
-    Ruijie Networks Co., Ltd. (formerly 'Start Network Technology Co., Ltd.'): Ruijie
-    SINETICA: Panduit
-    SHARP Corporation: SHARP
-    Sophos Plc: Sophos
-    SVTO Hewlett-Packard: HP
-    Synology Inc.: Synology
-    Tec Corporation: Tec
-    Tejas Networks: Tejas
-    Teracom Telematica Ltda.: Teracom Telematica
-    TP-Link Systems Inc.: TP-Link
-    Ubiquiti Networks, Inc.: Ubiquiti
-    Velocloud Networks, Inc.: VeloCloud
-    Vertiv (formerly 'Emerson Computer Power'): Vertiv
-    Vertiv (formerly 'Emerson Energy Systems'): Vertiv
-    Vertiv Tech Co.,Ltd. (formerly 'Emerson Network Power Co.,Ltd.'): Vertiv
-    Vertiv (formerly 'Geist Manufacturing, Inc'): Vertiv
-    Vertiv Co: Vertiv
-    VMware Inc.: VMware
-    WatchGuard Technologies Inc.: WatchGuard
-    Westermo Teleindustri AB: Westermo
-    Western Digital Corporation: Western Digital
-    Yamaha Corporation: Yamaha
-    Yokogawa-Hewlett-Packard: HP
-    Zebra Technologies Corporation: Zebra
-    Zhongxing Telecom Co.,ltd. (abbr. ZTE): ZTE
-    ZyXEL Communications Corp.: Zyxel
+  pen_to_vendor:
+    "9": Cisco
+    "11": HP
+    "52": Enterasys
+    "119": NEC
+    "141": NetScout
+    "171": D-Link
+    "193": Ericsson
+    "207": Allied
+    "211": Fujitsu
+    "297": Fujifilm
+    "318": APC
+    "476": Vertiv
+    "504": Ericsson
+    "637": Nokia
+    "641": Lexmark
+    "674": Dell
+    "766": Ericsson
+    "789": NetApp
+    "890": Zyxel
+    "1092": HP
+    "1129": Tec
+    "1182": Yamaha
+    "1230": McAfee
+    "1271": Ciena
+    "1347": Kyocera
+    "1411": Juniper
+    "1549": Allied
+    "1573": McAfee
+    "1588": Brocade
+    "1731": Ericsson
+    "1872": Alteon
+    "1916": Extreme
+    "1991": Brocade
+    "2011": Huawei
+    "2385": SHARP
+    "2427": Brocade
+    "2604": Sophos
+    "2620": CheckPoint
+    "2636": Juniper
+    "2957": Ericsson
+    "3028": Dialogic
+    "3097": WatchGuard
+    "3375": F5
+    "3401": McAfee
+    "3417": CacheFlow
+    "3657": Ericsson
+    "3709": Teracom Telematica
+    "3711": Panduit
+    "3729": Nokia
+    "3845": Citrix
+    "3902": ZTE
+    "4086": Ericsson
+    "4369": Brocade
+    "4874": Juniper
+    "4881": Ruijie
+    "5127": Western Digital
+    "5474": Ericsson
+    "5624": Enterasys
+    "5672": Ciena
+    "5703": NVIDIA
+    "5745": Ericsson
+    "5771": Cisco
+    "5842": Cisco
+    "6302": Vertiv
+    "6307": Extreme
+    "6352": Ciena
+    "6486": Nokia
+    "6527": Nokia
+    "6574": Synology
+    "6612": Juniper
+    "6782": Ciena
+    "6876": VMware
+    "6889": Avaya
+    "6905": Brocade
+    "7031": McAfee
+    "7779": Infoblox
+    "8244": Brocade
+    "8255": Tejas
+    "9044": NEC
+    "10642": Zebra
+    "10704": Barracuda
+    "10923": Ericsson
+    "11147": HP
+    "11863": TP-Link
+    "12276": F5
+    "12356": Fortinet
+    "13400": Vertiv
+    "14067": Allied
+    "14399": NEC
+    "14823": Aruba
+    "14870": Avaya
+    "15768": Ericsson
+    "16066": NEC
+    "16177": Westermo
+    "16401": HP
+    "16410": NEC
+    "16853": Barracuda
+    "17202": NEC
+    "17990": NEC
+    "18334": Konica
+    "20349": Aruba
+    "20632": Barracuda
+    "20941": Palo Alto
+    "21239": Vertiv
+    "21296": Infinera
+    "21885": Ericsson
+    "22252": McAfee
+    "25053": Ruckus
+    "25461": Palo Alto
+    "25558": Infoblox
+    "26484": Cisco
+    "26543": IBM
+    "26767": Nokia
+    "26866": Gigamon
+    "28088": NEC
+    "28152": Palo Alto
+    "28458": Nokia
+    "28586": Eaton
+    "29671": Meraki
+    "29714": Kyocera
+    "29741": Aruba
+    "30065": Arista
+    "32229": Nokia
+    "34774": Huawei
+    "41112": Ubiquiti
+    "42040": Nasuni
+    "45091": Cisco
+    "45346": VeloCloud
+    "46606": Cisco
+    "46898": HP
+    "47196": HPE
+    "48079": NEC
+    "48170": Avaya
+    "49150": Vertiv
+    "52474": McAfee
+    "52577": Cisco
+    "53257": Nokia
+    "53683": Cisco
+    "53910": Eaton
+    "58616": Nokia
+    "61234": Cisco
+    "61562": Cisco
 sysobjectids:
   oid_overrides:
     1.3.1.6.1.4.1.2505.3:

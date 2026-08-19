@@ -315,6 +315,7 @@ done:
 static void commit_alert_events(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
+    sqlite3_stmt *res_version = NULL;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_DUMMY, &res))
         return;
@@ -325,7 +326,6 @@ static void commit_alert_events(RRDHOST *host)
     int64_t first_sequence_id = 0;
     int64_t last_sequence_id = 0;
 
-    sqlite3_stmt *res_version = NULL;
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
@@ -349,6 +349,7 @@ static void commit_alert_events(RRDHOST *host)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res_version);
 }
 
 typedef enum {
@@ -402,8 +403,8 @@ void health_alarm_log_populate(
     char *source = (char *) sqlite3_column_text(res, SOURCE);
     alarm_log->command = source ? health_edit_command_from_source(source) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    alarm_log->chart = strdupz((char *) sqlite3_column_text(res, CHART));
-    alarm_log->name = strdupz((char *) sqlite3_column_text(res, NAME));
+    alarm_log->chart = sqlite3_text_strdupz_empty(res, CHART);
+    alarm_log->name = sqlite3_text_strdupz_empty(res, NAME);
 
     alarm_log->when = sqlite3_column_int64(res, WHEN_KEY);
 
@@ -423,12 +424,10 @@ void health_alarm_log_populate(
 
     alarm_log->conf_source = source ? strdupz(source) : strdupz("");
 
-    time_t duration = sqlite3_column_int64(res, DURATION);
-    alarm_log->duration =  (duration > 0) ? duration : 0;
-
+    int64_t duration = sqlite3_column_int64(res, DURATION);
     int64_t non_clear_duration = sqlite3_column_int64(res, NON_CLEAR_DURATION);
-    alarm_log->non_clear_duration = (non_clear_duration <= 0) ? 0 :
-                                    (non_clear_duration > UINT32_MAX) ? UINT32_MAX : (uint32_t)non_clear_duration;
+    alarm_log->duration = nd_duration_to_uint32_saturating(duration);
+    alarm_log->non_clear_duration = nd_duration_to_uint32_saturating(non_clear_duration);
 
     alarm_log->status = rrdcalc_status_to_proto_enum(current_status);
     alarm_log->old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS)sqlite3_column_int64(res, OLD_STATUS));
@@ -706,22 +705,23 @@ void aclk_push_alert_events_for_all_hosts(void)
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (!aclk_host_config || false == aclk_host_config->stream_alerts || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+        if (!aclk_host_config || !aclk_alert_streaming_enabled(aclk_host_config) || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
             (void)process_alert_pending_queue(host);
             commit_alert_events(host);
             continue;
         }
 
-        if (aclk_host_config->send_snapshot) {
+        enum aclk_alert_snapshot_state snapshot_state = aclk_alert_snapshot_state_get(aclk_host_config);
+        if (snapshot_state != ACLK_ALERT_SNAPSHOT_IDLE) {
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            if (aclk_host_config->send_snapshot == 1)
+            if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
                 continue;
             (void)process_alert_pending_queue(host);
             commit_alert_events(host);
             rebuild_host_alert_version_table(host);
             send_alert_snapshot_to_cloud(host);
             aclk_host_config->snapshot_count++;
-            aclk_host_config->send_snapshot = 0;
+            aclk_alert_snapshot_complete(aclk_host_config);
         }
         else
             aclk_push_alert_event(host, &res, &res_version);
@@ -812,13 +812,15 @@ void aclk_send_alert_configuration(char *config_hash)
     if (unlikely(!aclk_host_config))
         return;
 
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
         "ACLK REQ [%s (%s)]: Request to send alert config %s.",
-        aclk_host_config->node_id,
+        node_id,
         aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A",
         config_hash);
 
-    aclk_push_alert_config(aclk_host_config->node_id, config_hash);
+    aclk_push_alert_config(node_id, config_hash);
 }
 
 #define SQL_SELECT_ALERT_CONFIG                                                                                        \
@@ -839,6 +841,9 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
         freez(node_id);
         return;
     }
+
+    char current_node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, current_node_id);
 
     nd_uuid_t hash_uuid;
     if (uuid_parse(config_hash, hash_uuid)) {
@@ -924,7 +929,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
 
     if (likely(p_alarm_config.cfg_hash)) {
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: Sent alert config %s.",
-            aclk_host_config->node_id,
+            current_node_id,
             aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
         alert_hash_mark_sent(&hash_uuid);
@@ -933,7 +938,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
     }
     else
         nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK STA [%s (%s)]: Alert config for %s not found.",
-            aclk_host_config->node_id,
+            current_node_id,
             aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A", config_hash);
 
 done:
@@ -971,13 +976,16 @@ done:
 
 static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_config, uint64_t cloud_version)
 {
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
+
     if (cloud_version == 1) {
         nd_log(
             NDLS_ACCESS,
             NDLP_NOTICE,
             "Cloud requested to skip alert version verification for host \"%s\", node \"%s\"",
             rrdhost_hostname(aclk_host_config->host),
-            aclk_host_config->node_id);
+            node_id);
         return;
     }
 
@@ -988,11 +996,11 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
             NDLP_NOTICE,
             "Scheduling alert snapshot for host \"%s\", node \"%s\" (version: cloud %llu, local %llu)",
             rrdhost_hostname(aclk_host_config->host),
-            aclk_host_config->node_id,
+            node_id,
             (long long unsigned)cloud_version,
             (long long unsigned)local_version);
 
-        aclk_host_config->send_snapshot = 1;
+        aclk_alert_snapshot_request(aclk_host_config);
         rrdhost_flag_set(aclk_host_config->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     }
     else
@@ -1001,7 +1009,7 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
             NDLP_DEBUG,
             "Alert check on \"%s\", node \"%s\" (version: cloud %llu, local %llu)",
             rrdhost_hostname(aclk_host_config->host),
-            aclk_host_config->node_id,
+            node_id,
             (unsigned long long)cloud_version,
             (unsigned long long)local_version);
     aclk_host_config->checkpoint_count++;
@@ -1051,16 +1059,21 @@ done:
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 {
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-
     if (unlikely(!host)) {
-        nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [%s (N/A)]: Node id not found", aclk_host_config->node_id);
+        nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [N/A (N/A)]: Node id not found");
         return;
     }
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (unlikely(!aclk_host_config))
+        return;
 
     CLAIM_ID claim_id = claim_id_get();
     if (unlikely(!claim_id_is_set(claim_id)))
         return;
+
+    char node_id[UUID_STR_LEN];
+    aclk_node_id_copy(aclk_host_config, node_id);
 
     // Check the database for this node to see how many alerts we will need to put in the snapshot
     int cnt = calculate_alert_snapshot_entries(&host->host_id.uuid);
@@ -1082,7 +1095,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG,
         "ACLK REQ [%s (%s)]: Sending %d alerts snapshot, snapshot_uuid %s",
-        aclk_host_config->node_id, rrdhost_hostname(host),
+        node_id, rrdhost_hostname(host),
         cnt, snapshot_uuid);
 
     uint32_t chunks;
@@ -1092,13 +1105,13 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     struct alarm_snapshot alarm_snap;
     struct alarm_log_entry alarm_log;
 
-    alarm_snap.node_id = aclk_host_config->node_id;
+    alarm_snap.node_id = node_id;
     alarm_snap.claim_id = claim_id.str;
     alarm_snap.snapshot_uuid = snapshot_uuid;
     alarm_snap.chunks = chunks;
     alarm_snap.chunk = 1;
 
-    alarm_log.node_id = aclk_host_config->node_id;
+    alarm_log.node_id = node_id;
     alarm_log.claim_id = claim_id.str;
 
     cnt = 0;
@@ -1120,6 +1133,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         if (cnt == ALARM_EVENTS_PER_CHUNK) {
             if (aclk_online_for_alerts())
                 aclk_send_alarm_snapshot(snapshot_proto);
+            else
+                destroy_alarm_snapshot_proto(snapshot_proto);
+            snapshot_proto = NULL;
             cnt = 0;
             if (alarm_snap.chunk < chunks) {
                 alarm_snap.chunk++;
@@ -1130,12 +1146,14 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     }
     if (cnt)
         aclk_send_alarm_snapshot(snapshot_proto);
+    else
+        destroy_alarm_snapshot_proto(snapshot_proto);
 
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
         "ACLK REQ [%s (%s)]: Created snapshot %s with %d alerts (version = %llu)",
-        aclk_host_config->node_id,
+        node_id,
         rrdhost_hostname(host),
         snapshot_uuid,
         total_count,
@@ -1170,7 +1188,9 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
     nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id,
         aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A");
     schedule_alert_snapshot_if_needed(aclk_host_config, cloud_version);
-    aclk_host_config->stream_alerts = true;
+    aclk_alert_streaming_set(aclk_host_config, true);
+    if (aclk_alert_snapshot_state_get(aclk_host_config) != ACLK_ALERT_SNAPSHOT_IDLE)
+        rrdhost_flag_set(aclk_host_config->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
 
 // Do checkpoint alert version check

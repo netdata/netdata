@@ -518,8 +518,8 @@ void mcp_params_validate_time_window(time_t *after, time_t *before, time_t now) 
     if (!now) now = now_realtime_sec();
     
     // Check if both are relative times (within 3 years of zero)
-    bool after_is_relative = (ABS(*after) <= API_RELATIVE_TIME_MAX);
-    bool before_is_relative = (ABS(*before) <= API_RELATIVE_TIME_MAX);
+    bool after_is_relative = rrdr_relative_window_value_is_relative(*after);
+    bool before_is_relative = rrdr_relative_window_value_is_relative(*before);
     
     if (after_is_relative && before_is_relative) {
         // Case 1: Both are relative and positive - assistant didn't read instructions
@@ -575,8 +575,8 @@ bool mcp_params_parse_time_window(
     }
     
     // Check if after is later than before (when both are absolute timestamps)
-    bool after_is_absolute = (ABS(*after) > API_RELATIVE_TIME_MAX);
-    bool before_is_absolute = (ABS(*before) > API_RELATIVE_TIME_MAX);
+    bool after_is_absolute = !rrdr_relative_window_value_is_relative(*after);
+    bool before_is_absolute = !rrdr_relative_window_value_is_relative(*before);
     
     if (after_is_absolute && before_is_absolute && *after >= *before) {
         if (error) {
@@ -610,12 +610,13 @@ time_t mcp_params_parse_time(struct json_object *params, const char *name, time_
 
         // Try to parse as RFC3339 first
         char *endptr = NULL;
-        usec_t timestamp_ut = rfc3339_parse_ut(val_str, &endptr);
+        usec_t timestamp_ut = 0;
+        bool parsed_rfc3339 = rfc3339_parse_ut(val_str, &timestamp_ut, &endptr);
 
         // Check if RFC3339 parsing was successful
         // Note: We check endptr to see if the entire string was consumed
         // We don't check timestamp_ut > 0 because dates before 1970 are valid
-        if (endptr && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
+        if (parsed_rfc3339 && endptr && (*endptr == '\0' || isspace((unsigned char)*endptr))) {
             // Successfully parsed as RFC3339, convert to seconds
             return (time_t)(timestamp_ut / USEC_PER_SEC);
         }

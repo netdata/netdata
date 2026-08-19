@@ -73,12 +73,11 @@ snapshot() {
     # Cursor-paginate threads so PRs with >100 threads are tracked correctly.
     local cursor='' resolved=0 open=0
     while :; do
-        local cursor_args=()
-        [[ -n "${cursor}" ]] && cursor_args+=(-F "after=${cursor}")
+        local gh_args=(-F owner="${owner}" -F name="${name}" -F number="${PR}")
+        [[ -n "${cursor}" ]] && gh_args+=(-F "after=${cursor}")
         # GraphQL string has $owner/$name/$number/$after as placeholders.
         # shellcheck disable=SC2016
-        graphql_out="$(gh api graphql -F owner="${owner}" -F name="${name}" -F number="${PR}" \
-            "${cursor_args[@]}" -f query='
+        graphql_out="$(gh api graphql "${gh_args[@]}" -f query='
             query($owner:String!, $name:String!, $number:Int!, $after:String) {
                 repository(owner:$owner, name:$name) {
                     pullRequest(number:$number) {

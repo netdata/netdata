@@ -6,6 +6,7 @@ modules:
       module_name: k8s_kubeproxy
       monitored_instance:
         name: Kubeproxy
+        description: "Monitor Kubernetes kube-proxy rule synchronization, latency, and HTTP request metrics."
         link: https://kubernetes.io/docs/concepts/overview/components/#kube-proxy
         icon_filename: kubernetes.svg
         categories:

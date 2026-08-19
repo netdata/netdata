@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
@@ -45,12 +47,12 @@ func (c *topologyCache) updateLldpLocManAddr(tags map[string]string) {
 		return
 	}
 
-	addr, addrType := normalizeManagementAddress(addrHex, tags[tagLldpLocMgmtAddrSubtype])
+	addr, addrType := normalizeLLDPManagementAddress(addrHex, tags[tagLldpLocMgmtAddrSubtype])
 	if addr == "" {
 		return
 	}
 
-	mgmt := topologyManagementAddress{
+	mgmt := topologymodel.ManagementAddress{
 		Address:     addr,
 		AddressType: addrType,
 		IfSubtype:   tags[tagLldpLocMgmtAddrIfSubtype],
@@ -111,10 +113,9 @@ func (c *topologyCache) updateLldpRemote(tags map[string]string) {
 		entry.sysCapEnabled = v
 	}
 	if v := tags[tagLldpRemMgmtAddr]; v != "" {
-		entry.managementAddr = v
-		addr, addrType := normalizeManagementAddress(v, tags[tagLldpRemMgmtAddrSubtype])
+		addr, addrType := normalizeLLDPManagementAddress(v, tags[tagLldpRemMgmtAddrSubtype])
 		if addr != "" {
-			entry.managementAddrs = appendManagementAddress(entry.managementAddrs, topologyManagementAddress{
+			entry.managementAddrs = appendManagementAddress(entry.managementAddrs, topologymodel.ManagementAddress{
 				Address:     addr,
 				AddressType: addrType,
 				Source:      "lldp_remote",
@@ -148,12 +149,12 @@ func (c *topologyCache) updateLldpRemManAddr(tags map[string]string) {
 	if strings.TrimSpace(addrHex) == "" {
 		addrHex = reconstructLldpRemMgmtAddrHex(tags)
 	}
-	addr, addrType := normalizeManagementAddress(addrHex, tags[tagLldpRemMgmtAddrSubtype])
+	addr, addrType := normalizeLLDPManagementAddress(addrHex, tags[tagLldpRemMgmtAddrSubtype])
 	if addr == "" {
 		return
 	}
 
-	mgmt := topologyManagementAddress{
+	mgmt := topologymodel.ManagementAddress{
 		Address:     addr,
 		AddressType: addrType,
 		IfSubtype:   tags[tagLldpRemMgmtAddrIfSubtype],

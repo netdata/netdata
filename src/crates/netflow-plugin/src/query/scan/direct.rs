@@ -22,6 +22,47 @@ pub(crate) fn scan_journal_files_forward<F>(
 where
     F: FnMut(&Path, &JournalFile<Mmap>, u64, &[NonZeroU64], &mut Vec<u8>) -> Result<bool>,
 {
+    let mut checkpoint = || Ok(());
+    scan_journal_files_forward_with_checkpoint(
+        file_paths,
+        after_usec,
+        before_usec,
+        execution,
+        pass_index,
+        span_index,
+        prefilter_matches,
+        purpose,
+        &mut checkpoint,
+        |file_path, journal, timestamp_usec, data_offsets, decompress_buf, _checkpoint| {
+            on_entry(
+                file_path,
+                journal,
+                timestamp_usec,
+                data_offsets,
+                decompress_buf,
+            )
+        },
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn scan_journal_files_forward_with_checkpoint<C, F>(
+    file_paths: &[PathBuf],
+    after_usec: Option<u64>,
+    before_usec: Option<u64>,
+    execution: Option<&QueryExecutionPlan>,
+    pass_index: usize,
+    span_index: usize,
+    prefilter_matches: &[Vec<u8>],
+    purpose: &str,
+    checkpoint: &mut C,
+    mut on_entry: F,
+) -> Result<ScanCounts>
+where
+    C: FnMut() -> Result<()>,
+    F: FnMut(&Path, &JournalFile<Mmap>, u64, &[NonZeroU64], &mut Vec<u8>, &mut C) -> Result<bool>,
+{
+    checkpoint()?;
     let mut counts = ScanCounts::default();
     let mut data_offsets = Vec::new();
     let mut decompress_buf = Vec::new();
@@ -41,22 +82,45 @@ where
     files.sort_by(|left, right| left.0.cmp(&right.0));
 
     for (registry_file, file_path) in files {
-        let journal = JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
-            .with_context(|| {
-                format!(
-                    "failed to open journal file {} for {}",
-                    file_path.display(),
-                    purpose
-                )
-            })?;
+        checkpoint()?;
+        // Journal read failures below are treated per journald semantics: a
+        // torn tail (power loss mid-write) makes everything from the tear
+        // onward unrecoverable, but must not fail the whole scan — that would
+        // turn one damaged file into a startup (rebuild) or query outage.
+        // Only caller-side errors (cancellation checkpoints, the on_entry
+        // closure) abort the scan.
+        let journal =
+            match JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE) {
+                Ok(journal) => journal,
+                Err(err) => {
+                    tracing::warn!(
+                        "skipping unreadable journal file {} during {}: {}",
+                        file_path.display(),
+                        purpose,
+                        err
+                    );
+                    continue;
+                }
+            };
 
         let mut reader = JournalReader::default();
         for pair in prefilter_matches {
             reader.add_match(pair);
         }
         let mut cursor = JournalCursor::new();
-        if let Some(filter_expr) = reader.build_filter(&journal)? {
-            cursor.set_filter(filter_expr);
+        match reader.build_filter(&journal) {
+            Ok(Some(filter_expr)) => cursor.set_filter(filter_expr),
+            Ok(None) => {}
+            Err(err) => {
+                // The filter is an optimization over the file's hash tables;
+                // a damaged region there must not hide the readable entries.
+                tracing::warn!(
+                    "scanning {} unfiltered during {}: filter build failed: {}",
+                    file_path.display(),
+                    purpose,
+                    err
+                );
+            }
         }
         drop(reader);
         cursor.set_location(match after_usec {
@@ -65,36 +129,41 @@ where
         });
 
         loop {
-            let has_entry = cursor
-                .step(&journal, JournalDirection::Forward)
-                .with_context(|| {
-                    format!(
-                        "failed to step journal reader for {} during {}",
+            checkpoint()?;
+            let has_entry = match cursor.step(&journal, JournalDirection::Forward) {
+                Ok(has_entry) => has_entry,
+                Err(err) => {
+                    tracing::warn!(
+                        "treating torn or unreadable entry in {} as end of file during {}: {}",
                         file_path.display(),
-                        purpose
-                    )
-                })?;
+                        purpose,
+                        err
+                    );
+                    break;
+                }
+            };
+            checkpoint()?;
             if !has_entry {
                 break;
             }
 
             counts.streamed_entries = counts.streamed_entries.saturating_add(1);
-            let entry_offset = cursor.position().with_context(|| {
-                format!(
-                    "failed to read current entry offset from {} during {}",
-                    file_path.display(),
-                    purpose
-                )
-            })?;
-            let timestamp_usec = {
-                let entry_guard = journal.entry_ref(entry_offset).with_context(|| {
-                    format!(
-                        "failed to read current entry from {} during {}",
+            let read_entry = || -> Result<(NonZeroU64, u64)> {
+                let entry_offset = cursor.position()?;
+                let entry_guard = journal.entry_ref(entry_offset)?;
+                Ok((entry_offset, entry_guard.header.realtime))
+            };
+            let (entry_offset, timestamp_usec) = match read_entry() {
+                Ok(read) => read,
+                Err(err) => {
+                    tracing::warn!(
+                        "treating torn or unreadable entry in {} as end of file during {}: {}",
                         file_path.display(),
-                        purpose
-                    )
-                })?;
-                entry_guard.header.realtime
+                        purpose,
+                        err
+                    );
+                    break;
+                }
             };
             if after_usec.is_some_and(|after_usec| timestamp_usec < after_usec) {
                 continue;
@@ -103,14 +172,15 @@ where
                 return Ok(counts);
             }
             data_offsets.clear();
-            journal
-                .entry_data_object_offsets(entry_offset, &mut data_offsets)
-                .with_context(|| {
-                    format!(
-                        "failed to collect payload offsets from current entry in {}",
-                        file_path.display()
-                    )
-                })?;
+            if let Err(err) = journal.entry_data_object_offsets(entry_offset, &mut data_offsets) {
+                tracing::warn!(
+                    "treating torn or unreadable entry in {} as end of file during {}: {}",
+                    file_path.display(),
+                    purpose,
+                    err
+                );
+                break;
+            }
             if let Some(execution) = execution {
                 execution.checkpoint(
                     pass_index,
@@ -125,6 +195,7 @@ where
                 timestamp_usec,
                 &data_offsets,
                 &mut decompress_buf,
+                checkpoint,
             )? {
                 counts.matched_entries = counts.matched_entries.saturating_add(1);
             }
@@ -163,8 +234,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use journal_core::{JournalFileOptions, JournalWriter};
-    use journal_registry::repository::file::Status;
+    use journal_sdk_core::{JournalFileOptions, JournalWriter};
+    use journal_sdk_registry::repository::file::Status;
     use std::collections::BTreeMap;
     use tempfile::TempDir;
     use uuid::Uuid;
@@ -204,7 +275,7 @@ mod tests {
         path: &Path,
         option_seed: u8,
         entries: &[TestEntry],
-    ) -> Result<(), journal_core::JournalError> {
+    ) -> Result<(), journal_sdk_core::JournalError> {
         let repo_file = RegistryFile::from_path(path).expect("test journal path should parse");
         let head_seqnum = match repo_file.status() {
             Status::Archived { head_seqnum, .. } => *head_seqnum,
@@ -508,6 +579,59 @@ mod tests {
 
         assert!(!seen_any);
         assert_eq!(counts.matched_entries, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn non_matching_exact_filter_checks_cancellation_after_cursor_step() -> TestResult {
+        let dir = TempDir::new()?;
+        let path = archived_journal_path(&dir, 0x21, 1, 1_000_000);
+        write_archived_journal(
+            &path,
+            0x31,
+            &[TestEntry {
+                realtime: 1_000_000,
+                monotonic: 100,
+                fields: &["MESSAGE=only-entry", "FLOW_VERSION=9"],
+            }],
+        )?;
+
+        let prefilter_matches =
+            build_prefilter_matches(&[("FLOW_VERSION".to_string(), "999".to_string())]);
+        let mut checkpoint_calls = 0;
+        let mut checkpoint = || {
+            checkpoint_calls += 1;
+            if checkpoint_calls == 4 {
+                return Err(anyhow::anyhow!("test scan cancelled"));
+            }
+            Ok(())
+        };
+        let mut seen_any = false;
+        let result = scan_journal_files_forward_with_checkpoint(
+            &[path],
+            None,
+            None,
+            None,
+            0,
+            0,
+            &prefilter_matches,
+            "test filtered cursor cancellation",
+            &mut checkpoint,
+            |_file_path, _journal, _timestamp_usec, _data_offsets, _decompress_buf, _checkpoint| {
+                seen_any = true;
+                Ok(true)
+            },
+        );
+
+        let error = match result {
+            Ok(_) => panic!("the post-step checkpoint must cancel the scan"),
+            Err(error) => error,
+        };
+        assert_eq!(error.to_string(), "test scan cancelled");
+        assert!(
+            !seen_any,
+            "the filter must not yield the non-matching entry"
+        );
         Ok(())
     }
 }

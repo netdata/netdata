@@ -77,6 +77,10 @@ extern netdata_rwlock_t rrd_rwlock;
 #define rrd_rdunlock() netdata_rwlock_rdunlock(&rrd_rwlock)
 #define rrd_wrunlock() netdata_rwlock_wrunlock(&rrd_rwlock)
 
+// returns 0 when the read lock was taken. For threads that MUST NOT block on it - a writer can hold
+// rrd_wrlock() while waiting on another thread, so blocking here can close a cycle.
+#define rrd_tryrdlock() netdata_rwlock_tryrdlock(&rrd_rwlock)
+
 // --------------------------------------------------------------------------------------------------------------------
 
 STRING *rrd_string_strdupz(const char *s);

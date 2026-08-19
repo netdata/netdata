@@ -6,6 +6,7 @@ modules:
       module_name: zookeeper
       monitored_instance:
         name: ZooKeeper
+        description: Monitor ZooKeeper request latency, connections, sessions, server state, file descriptors, data size, and network traffic.
         link: https://zookeeper.apache.org/
         categories:
           - data-collection.applications

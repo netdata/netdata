@@ -112,7 +112,7 @@ durable.
 ## Path discipline
 
 This skill follows
-`<repo>/.agents/sow/specs/sensitive-data-discipline.md`:
+`<repo>/.agents/sensitive-data-discipline.md`:
 
 - This repo's files: repo-relative
   (`<repo>/docs/.map/map.yaml`, `<repo>/docs/...`).

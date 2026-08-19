@@ -75,8 +75,11 @@ typedef enum {
     STREAM_HANDSHAKE_SP_NO_DESTINATION                  = -38,
     STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL              = -39, // sent by parent - DO NOT CHANGE
 
+    // receiver-only code, appended here (out of its group) to keep the existing values unchanged
+    STREAM_HANDSHAKE_RCV_DISCONNECT_LOCAL_VNODE_CLAIMED = -40,
+
     // terminator - keep this positive, bigger than all negative values
-    STREAM_HANDSHAKE_NEGATIVE_MAX                       = 40,
+    STREAM_HANDSHAKE_NEGATIVE_MAX                       = 41,
 } STREAM_HANDSHAKE;
 
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE reason);

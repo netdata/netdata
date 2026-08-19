@@ -3,6 +3,7 @@
 package ddsnmp
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -97,7 +98,7 @@ func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
 		},
 		"bgp_projection": {
 			consumer:      ConsumerBGP,
-			bgp:           1,
+			bgp:           3,
 			metadataField: "bgp_vendor",
 			metricTag:     "bgp_model",
 			sysobjectID:   "sysobjectid_bgp_vendor",
@@ -161,7 +162,7 @@ func TestResolvedProfileSetProject_MetricsAndBGP(t *testing.T) {
 	require.Len(t, profiles, 1)
 	def := profiles[0].Definition
 	require.Len(t, def.Metrics, 2)
-	require.Len(t, def.BGP, 1)
+	require.Len(t, def.BGP, 3)
 	require.Len(t, def.VirtualMetrics, 1)
 	require.Empty(t, def.Topology)
 	require.Empty(t, def.Licensing)
@@ -257,6 +258,28 @@ func TestResolvedProfileSetProject_DoesNotShareMutableProjectionState(t *testing
 	assert.NotEqual(t, "mutated", fresh[0].Definition.Metadata["device"].Fields["lldp_loc_sys_name"].Value)
 }
 
+func TestProjectedViewFilterBGPToTopologyPeersDoesNotShareMutableProjectionState(t *testing.T) {
+	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+
+	pruned := resolved.Project(ConsumerTopology, ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
+	full := resolved.Project(ConsumerBGP).Profiles()
+
+	require.Len(t, pruned, 1)
+	require.Len(t, full, 1)
+	require.Len(t, pruned[0].Definition.BGP, 1)
+	require.Len(t, full[0].Definition.BGP, 3)
+
+	assert.Equal(t, ddprofiledefinition.BGPTrafficConfig{}, pruned[0].Definition.BGP[0].Traffic)
+	assert.NotEqual(t, ddprofiledefinition.BGPTrafficConfig{}, full[0].Definition.BGP[0].Traffic)
+	assert.NotEmpty(t, full[0].Definition.BGP[0].MetricTags)
+
+	pruned[0].Definition.BGP[0].Identity.Neighbor.Value = "mutated"
+	fresh := resolved.Project(ConsumerTopology, ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
+	require.Len(t, fresh, 1)
+	require.Len(t, fresh[0].Definition.BGP, 1)
+	assert.Equal(t, "192.0.2.1", fresh[0].Definition.BGP[0].Identity.Neighbor.Value)
+}
+
 func TestProjectedViewFilterByKind(t *testing.T) {
 	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
 
@@ -272,6 +295,219 @@ func TestProjectedViewFilterByKind(t *testing.T) {
 	unfiltered := resolved.Project(ConsumerTopology).Profiles()
 	require.Len(t, unfiltered[0].Definition.Topology, 2)
 	assert.Empty(t, unfiltered[0].Definition.Metrics)
+}
+
+func TestProjectedViewFilterBGPByKind(t *testing.T) {
+	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+
+	view := resolved.Project(ConsumerTopology, ConsumerBGP).FilterBGPByKind(map[ddprofiledefinition.BGPRowKind]bool{
+		ddprofiledefinition.BGPRowKindPeer: true,
+	}).Profiles()
+
+	require.Len(t, view, 1)
+	require.Len(t, view[0].Definition.Topology, 2)
+	require.Len(t, view[0].Definition.BGP, 1)
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, view[0].Definition.BGP[0].Kind)
+	assert.Empty(t, view[0].Definition.Metrics)
+
+	unfiltered := resolved.Project(ConsumerTopology, ConsumerBGP).Profiles()
+	require.Len(t, unfiltered[0].Definition.Topology, 2)
+	require.Len(t, unfiltered[0].Definition.BGP, 3)
+}
+
+func TestProjectedViewFilterBGPToTopologyPeers(t *testing.T) {
+	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+
+	view := resolved.Project(ConsumerTopology, ConsumerBGP).
+		FilterBGPToTopologyPeers().
+		Profiles()
+
+	require.Len(t, view, 1)
+	require.Len(t, view[0].Definition.BGP, 1)
+	row := view[0].Definition.BGP[0]
+
+	assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, row.Kind)
+	assert.Equal(t, "192.0.2.1", row.Identity.Neighbor.Value)
+	assert.Equal(t, "192.0.2.2", row.Descriptors.LocalAddress.Value)
+	assert.Equal(t, "start", row.Admin.Enabled.Value)
+	assert.Equal(t, "established", row.State.Value)
+	assert.Equal(t, "1.3.6.1.2.1.15.3.1.16", row.Connection.EstablishedUptime.Symbol.OID)
+	assert.Equal(t, "1.3.6.1.2.1.15.3.1.24", row.Connection.LastReceivedUpdateAge.Symbol.OID)
+
+	assert.Equal(t, ddprofiledefinition.BGPStateConfig{}, row.Previous)
+	assert.Equal(t, ddprofiledefinition.BGPTrafficConfig{}, row.Traffic)
+	assert.Equal(t, ddprofiledefinition.BGPTransitionsConfig{}, row.Transitions)
+	assert.Equal(t, ddprofiledefinition.BGPTimersConfig{}, row.Timers)
+	assert.Equal(t, ddprofiledefinition.BGPLastErrorConfig{}, row.LastError)
+	assert.Equal(t, ddprofiledefinition.BGPLastNotifyConfig{}, row.LastNotify)
+	assert.Equal(t, ddprofiledefinition.BGPReasonsConfig{}, row.Reasons)
+	assert.Equal(t, ddprofiledefinition.BGPGracefulRestartConfig{}, row.Restart)
+	assert.Equal(t, ddprofiledefinition.BGPRoutesConfig{}, row.Routes)
+	assert.Equal(t, ddprofiledefinition.BGPRouteLimitsConfig{}, row.RouteLimits)
+	assert.Equal(t, ddprofiledefinition.BGPDeviceCountsConfig{}, row.Device)
+	assert.Empty(t, row.StaticTags)
+	assert.Empty(t, row.MetricTags)
+
+	assert.Empty(t, bgpSignalPathsWithPrefix(row, "traffic."))
+	assert.Empty(t, bgpSignalPathsWithPrefix(row, "timers."))
+	assert.Empty(t, bgpSignalPathsWithPrefix(row, "last_error."))
+	assert.Empty(t, bgpSignalPathsWithPrefix(row, "routes."))
+
+	unfiltered := resolved.Project(ConsumerTopology, ConsumerBGP).
+		FilterBGPByKind(map[ddprofiledefinition.BGPRowKind]bool{ddprofiledefinition.BGPRowKindPeer: true}).
+		Profiles()
+	require.Len(t, unfiltered[0].Definition.BGP, 1)
+	assert.NotEqual(t, ddprofiledefinition.BGPTrafficConfig{}, unfiltered[0].Definition.BGP[0].Traffic)
+	assert.NotEmpty(t, unfiltered[0].Definition.BGP[0].MetricTags)
+}
+
+func TestProjectedViewFilterBGPToTopologyPeersKeepsSingleAnchorWithoutTopologySignal(t *testing.T) {
+	resolved := &ResolvedProfileSet{profiles: []*Profile{{
+		SourceFile: "projection.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{
+				{
+					ID:   "peer",
+					Kind: ddprofiledefinition.BGPRowKindPeer,
+					Identity: ddprofiledefinition.BGPIdentityConfig{
+						Neighbor: ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
+						RemoteAS: ddprofiledefinition.BGPValueConfig{Value: "65001"},
+					},
+					Descriptors: ddprofiledefinition.BGPDescriptorsConfig{
+						Description: ddprofiledefinition.BGPValueConfig{Value: "peer without state"},
+					},
+					Transitions: ddprofiledefinition.BGPTransitionsConfig{
+						Established: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4", Name: "hwBgpPeerFsmEstablishedTransitions"}},
+						Down:        ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5", Name: "hwBgpPeerDownCounts"}},
+					},
+					Traffic: ddprofiledefinition.BGPTrafficConfig{
+						Updates: ddprofiledefinition.BGPDirectionalConfig{
+							Received: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.6", Name: "hwBgpPeerInUpdateMsgs"}},
+						},
+					},
+				},
+			},
+		},
+	}}}
+
+	view := resolved.Project(ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
+
+	require.Len(t, view, 1)
+	require.Len(t, view[0].Definition.BGP, 1)
+	row := view[0].Definition.BGP[0]
+	assert.Equal(t, "192.0.2.1", row.Identity.Neighbor.Value)
+	assert.Equal(t, "peer without state", row.Descriptors.Description.Value)
+	assert.Equal(t, ddprofiledefinition.BGPTransitionsConfig{
+		Established: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4", Name: "hwBgpPeerFsmEstablishedTransitions"}},
+		Down:        ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5", Name: "hwBgpPeerDownCounts"}},
+	}, row.Transitions)
+	assert.Equal(t, ddprofiledefinition.BGPTrafficConfig{}, row.Traffic)
+}
+
+func TestProjectedViewFilterBGPToTopologyPeersPrunesAuxiliaryTableReferences(t *testing.T) {
+	resolved := &ResolvedProfileSet{profiles: []*Profile{{
+		SourceFile: "projection.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			BGP: []ddprofiledefinition.BGPConfig{
+				{
+					ID:    "peer",
+					Kind:  ddprofiledefinition.BGPRowKindPeer,
+					Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10", Name: "peerTable"},
+					Identity: ddprofiledefinition.BGPIdentityConfig{
+						Neighbor: ddprofiledefinition.BGPValueConfig{
+							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10.1.1", Name: "peerRemoteAddr"},
+						},
+						RemoteAS: ddprofiledefinition.BGPValueConfig{
+							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10.1.2", Name: "peerRemoteAS"},
+						},
+					},
+					State: ddprofiledefinition.BGPStateConfig{
+						BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10.1.3", Name: "peerState"},
+						},
+					},
+					Traffic: ddprofiledefinition.BGPTrafficConfig{
+						Messages: ddprofiledefinition.BGPDirectionalConfig{
+							Received: ddprofiledefinition.BGPValueConfig{
+								Table:  "peerAuxTable",
+								Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.20.1.1", Name: "peerMessagesReceived"},
+							},
+						},
+					},
+					MetricTags: []ddprofiledefinition.MetricTagConfig{
+						{
+							Tag:   "aux_tag",
+							Table: "peerAuxTable",
+							Symbol: ddprofiledefinition.SymbolConfigCompat{
+								OID:  "1.3.6.1.4.1.99999.20.1.2",
+								Name: "peerAuxTag",
+							},
+						},
+					},
+				},
+			},
+		},
+	}}}
+
+	full := resolved.Project(ConsumerBGP).Profiles()
+	require.Len(t, full, 1)
+	require.Len(t, full[0].Definition.BGP, 1)
+	assert.Contains(t, bgpValueSourceTables(full[0].Definition.BGP[0]), "peerAuxTable")
+	require.NotEmpty(t, full[0].Definition.BGP[0].MetricTags)
+
+	pruned := resolved.Project(ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
+	require.Len(t, pruned, 1)
+	require.Len(t, pruned[0].Definition.BGP, 1)
+	row := pruned[0].Definition.BGP[0]
+	assert.NotContains(t, bgpValueSourceTables(row), "peerAuxTable")
+	assert.Equal(t, ddprofiledefinition.BGPTrafficConfig{}, row.Traffic)
+	assert.Empty(t, row.MetricTags)
+}
+
+func bgpSignalPathsWithPrefix(row ddprofiledefinition.BGPConfig, prefix string) []string {
+	var paths []string
+	ddprofiledefinition.ForEachBGPSignalValue(row, func(path string, _ ddprofiledefinition.BGPValueConfig) {
+		if len(path) >= len(prefix) && path[:len(prefix)] == prefix {
+			paths = append(paths, path)
+		}
+	})
+	return paths
+}
+
+func bgpValueSourceTables(row ddprofiledefinition.BGPConfig) []string {
+	tables := make(map[string]struct{})
+	add := func(value ddprofiledefinition.BGPValueConfig) {
+		if value.Table != "" {
+			tables[value.Table] = struct{}{}
+		}
+	}
+	add(row.Identity.RoutingInstance)
+	add(row.Identity.Neighbor)
+	add(row.Identity.RemoteAS)
+	add(row.Identity.AddressFamily.BGPValueConfig)
+	add(row.Identity.SubsequentAddressFamily.BGPValueConfig)
+	add(row.Descriptors.LocalAddress)
+	add(row.Descriptors.LocalAS)
+	add(row.Descriptors.LocalIdentifier)
+	add(row.Descriptors.PeerIdentifier)
+	add(row.Descriptors.PeerType)
+	add(row.Descriptors.BGPVersion)
+	add(row.Descriptors.Description)
+	ddprofiledefinition.ForEachBGPSignalValue(row, func(_ string, value ddprofiledefinition.BGPValueConfig) {
+		add(value)
+	})
+	for _, tag := range row.MetricTags {
+		if tag.Table != "" {
+			tables[tag.Table] = struct{}{}
+		}
+	}
+
+	out := make([]string, 0, len(tables))
+	for table := range tables {
+		out = append(out, table)
+	}
+	slices.Sort(out)
+	return out
 }
 
 func projectionTestProfile() *Profile {
@@ -389,9 +625,93 @@ func projectionTestProfile() *Profile {
 					ID:   "peer",
 					Kind: ddprofiledefinition.BGPRowKindPeer,
 					Identity: ddprofiledefinition.BGPIdentityConfig{
-						Neighbor: ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
-						RemoteAS: ddprofiledefinition.BGPValueConfig{Value: "65001"},
+						RoutingInstance: ddprofiledefinition.BGPValueConfig{Value: "default"},
+						Neighbor:        ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
+						RemoteAS:        ddprofiledefinition.BGPValueConfig{Value: "65001"},
 					},
+					Descriptors: ddprofiledefinition.BGPDescriptorsConfig{
+						LocalAddress:    ddprofiledefinition.BGPValueConfig{Value: "192.0.2.2"},
+						LocalAS:         ddprofiledefinition.BGPValueConfig{Value: "65000"},
+						LocalIdentifier: ddprofiledefinition.BGPValueConfig{Value: "10.0.0.1"},
+						PeerIdentifier:  ddprofiledefinition.BGPValueConfig{Value: "10.0.0.2"},
+						PeerType:        ddprofiledefinition.BGPValueConfig{Value: "ipv4"},
+						BGPVersion:      ddprofiledefinition.BGPValueConfig{Value: "4"},
+						Description:     ddprofiledefinition.BGPValueConfig{Value: "peer"},
+					},
+					Admin: ddprofiledefinition.BGPAdminConfig{
+						Enabled: ddprofiledefinition.BGPValueConfig{Value: "start"},
+					},
+					State: ddprofiledefinition.BGPStateConfig{
+						BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "established"},
+					},
+					Previous: ddprofiledefinition.BGPStateConfig{
+						BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "idle"},
+					},
+					Connection: ddprofiledefinition.BGPConnectionConfig{
+						EstablishedUptime: ddprofiledefinition.BGPValueConfig{
+							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.16", Name: "bgpPeerFsmEstablishedTime"},
+						},
+						LastReceivedUpdateAge: ddprofiledefinition.BGPValueConfig{
+							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.24", Name: "bgpPeerInUpdateElapsedTime"},
+						},
+					},
+					Traffic: ddprofiledefinition.BGPTrafficConfig{
+						Messages: ddprofiledefinition.BGPDirectionalConfig{
+							Received: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.12", Name: "bgpPeerInTotalMessages"}},
+							Sent:     ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.13", Name: "bgpPeerOutTotalMessages"}},
+						},
+					},
+					Transitions: ddprofiledefinition.BGPTransitionsConfig{
+						Established: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.15", Name: "bgpPeerFsmEstablishedTransitions"}},
+					},
+					Timers: ddprofiledefinition.BGPTimersConfig{
+						Negotiated: ddprofiledefinition.BGPTimerPairConfig{
+							HoldTime: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.18", Name: "bgpPeerHoldTime"}},
+						},
+					},
+					LastError: ddprofiledefinition.BGPLastErrorConfig{
+						Code: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.14", Name: "bgpPeerLastErrorCode"}},
+					},
+					LastNotify: ddprofiledefinition.BGPLastNotifyConfig{
+						Received: ddprofiledefinition.BGPLastNotificationConfig{
+							Reason: ddprofiledefinition.BGPValueConfig{Value: "hold timer expired"},
+						},
+					},
+					Reasons: ddprofiledefinition.BGPReasonsConfig{
+						LastDown: ddprofiledefinition.BGPValueConfig{Value: "manual"},
+					},
+					Restart: ddprofiledefinition.BGPGracefulRestartConfig{
+						State: ddprofiledefinition.BGPValueConfig{Value: "enabled"},
+					},
+					Routes: ddprofiledefinition.BGPRoutesConfig{
+						Total: ddprofiledefinition.BGPRouteCountersConfig{
+							Accepted: ddprofiledefinition.BGPValueConfig{Value: "10"},
+						},
+					},
+					RouteLimits: ddprofiledefinition.BGPRouteLimitsConfig{
+						Limit: ddprofiledefinition.BGPValueConfig{Value: "1000"},
+					},
+					Device: ddprofiledefinition.BGPDeviceCountsConfig{
+						Peers: ddprofiledefinition.BGPValueConfig{Value: "1"},
+					},
+					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{{Tag: "scope", Value: "bgp"}},
+					MetricTags: []ddprofiledefinition.MetricTagConfig{
+						{Tag: "bgp_extra", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: "1.3.6.1.2.1.15.3.1.99", Name: "bgpPeerExtra"}},
+					},
+				},
+				{
+					ID:   "peer-family",
+					Kind: ddprofiledefinition.BGPRowKindPeerFamily,
+					Identity: ddprofiledefinition.BGPIdentityConfig{
+						Neighbor:                ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
+						RemoteAS:                ddprofiledefinition.BGPValueConfig{Value: "65001"},
+						AddressFamily:           ddprofiledefinition.BGPAddressFamilyValueConfig{BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "ipv4"}},
+						SubsequentAddressFamily: ddprofiledefinition.BGPSubsequentAddressFamilyValueConfig{BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "unicast"}},
+					},
+				},
+				{
+					ID:   "device",
+					Kind: ddprofiledefinition.BGPRowKindDevice,
 				},
 			},
 			VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{

@@ -37,6 +37,9 @@
         "icon_filename": {
           "type": "string",
           "description": "Icon filename hosted at https://netdata.cloud/img/."
+        },
+        "description": {
+          "$ref": "./shared.json#/$defs/page_description"
         }
       },
       "required": ["kind", "name", "tagline", "link", "icon_filename"]

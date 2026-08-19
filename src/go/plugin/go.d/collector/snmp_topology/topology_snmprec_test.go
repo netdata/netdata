@@ -11,6 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/require"
 )
@@ -43,33 +46,34 @@ func TestTopologyCache_RealSnmprecFixtures(t *testing.T) {
 				t.Skip("no LLDP/CDP data detected")
 			}
 
-			coll := newTestCollector(ddsnmp.DeviceConnectionInfo{
+			cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
 				Hostname: "192.0.2.10", SysObjectID: "1.3.6.1.4.1.9.1.1", SysName: filepath.Base(path),
 			})
 
 			if len(data.lldpLocalMeta) > 0 {
-				coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.lldpLocalMeta}})
+				cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{DeviceMetadata: data.lldpLocalMeta}})
 			}
 			for _, tags := range data.lldpLocPorts {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocPort, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocPort, Tags: tags})
 			}
 			for _, tags := range data.lldpLocManAddrs {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: tags})
 			}
 			for _, tags := range data.lldpRemotes {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRem, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRem, Tags: tags})
 			}
 			for _, tags := range data.lldpRemManAddrs {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRemManAddr, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindLldpRemManAddr, Tags: tags})
 			}
 			for _, tags := range data.cdpRemotes {
-				coll.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindCdpCache, Tags: tags})
+				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindCdpCache, Tags: tags})
 			}
-			coll.finalizeTopologyCache()
+			cache.finalizeTopologyCache()
 
-			coll.topologyCache.mu.RLock()
-			snapshot, ok := coll.topologyCache.snapshot()
-			coll.topologyCache.mu.RUnlock()
+			options := defaultTopologyQueryOptionsForTest()
+			options.CollapseActorsByIP = false
+			options.EliminateNonIPInferred = false
+			snapshot, ok := snapshotTopologyCacheForTestWithOptions(cache, options)
 
 			require.True(t, ok)
 			require.GreaterOrEqual(t, len(snapshot.Actors), 1)
@@ -430,9 +434,6 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 			entry[tagCdpIfIndex] = ifIndex
 			entry[tagCdpDeviceIndex] = deviceIndex
 			entry[tagCdpAddress] = val
-			if val != "" {
-				data.cdpMgmtAddrs[val] = struct{}{}
-			}
 			continue
 		}
 		if indexes, ok := parseOIDIndexes(oid, "1.3.6.1.4.1.9.9.23.1.2.1.1.10", 2); ok {
@@ -517,9 +518,6 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 			entry[tagCdpIfIndex] = ifIndex
 			entry[tagCdpDeviceIndex] = deviceIndex
 			entry[tagCdpPrimaryMgmtAddr] = val
-			if val != "" {
-				data.cdpMgmtAddrs[val] = struct{}{}
-			}
 			continue
 		}
 		if indexes, ok := parseOIDIndexes(oid, "1.3.6.1.4.1.9.9.23.1.2.1.1.21", 2); ok {
@@ -538,9 +536,6 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 			entry[tagCdpIfIndex] = ifIndex
 			entry[tagCdpDeviceIndex] = deviceIndex
 			entry[tagCdpSecondaryMgmtAddr] = val
-			if val != "" {
-				data.cdpMgmtAddrs[val] = struct{}{}
-			}
 			continue
 		}
 		if indexes, ok := parseOIDIndexes(oid, "1.3.6.1.4.1.9.9.23.1.2.1.1.23", 2); ok {
@@ -570,6 +565,11 @@ func parseSnmprecTopology(t *testing.T, path string) snmprecTopology {
 		if len(parts) == 2 {
 			if name := data.ifNames[parts[0]]; name != "" {
 				entry[tagCdpIfName] = name
+			}
+		}
+		for _, address := range appendCdpManagementAddresses(entry, nil) {
+			if ip, ok := managementAddressIP(address); ok {
+				data.cdpMgmtAddrs[ip.String()] = struct{}{}
 			}
 		}
 	}
@@ -629,7 +629,7 @@ func parseOIDSuffix(oid, prefix string) (string, bool) {
 	return strings.TrimPrefix(oid, prefix+"."), true
 }
 
-func hasProtocolLink(snapshot topologyData, protocol string) bool {
+func hasProtocolLink(snapshot topologymodel.Data, protocol string) bool {
 	for _, link := range snapshot.Links {
 		if link.Protocol == protocol {
 			return true
@@ -638,9 +638,9 @@ func hasProtocolLink(snapshot topologyData, protocol string) bool {
 	return false
 }
 
-func containsSysName(snapshot topologyData, names map[string]struct{}) bool {
+func containsSysName(snapshot topologymodel.Data, names map[string]struct{}) bool {
 	for _, link := range snapshot.Links {
-		sysName, _ := link.Dst.Attributes["sys_name"].(string)
+		sysName := strings.TrimSpace(link.Dst.SysName)
 		if sysName == "" {
 			continue
 		}
@@ -682,7 +682,7 @@ func hasLinkableCDP(data snmprecTopology) bool {
 	return false
 }
 
-func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
+func containsIdentifier(snapshot topologymodel.Data, ids map[string]struct{}) bool {
 	exact := make(map[string]struct{}, len(ids))
 	macs := make(map[string]struct{}, len(ids))
 	ips := make(map[string]struct{}, len(ids))
@@ -693,10 +693,10 @@ func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 			continue
 		}
 		exact[strings.ToLower(id)] = struct{}{}
-		if mac := normalizeMAC(id); mac != "" {
+		if mac := topologyutil.NormalizeMAC(id); mac != "" {
 			macs[mac] = struct{}{}
 		}
-		if ip := normalizeIPAddress(id); ip != "" {
+		if ip := topologyutil.NormalizeIPAddress(id); ip != "" {
 			ips[ip] = struct{}{}
 		}
 		hosts[strings.ToLower(strings.TrimSuffix(id, "."))] = struct{}{}
@@ -709,12 +709,12 @@ func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 		if _, ok := exact[strings.ToLower(value)]; ok {
 			return true
 		}
-		if mac := normalizeMAC(value); mac != "" {
+		if mac := topologyutil.NormalizeMAC(value); mac != "" {
 			if _, ok := macs[mac]; ok {
 				return true
 			}
 		}
-		if ip := normalizeIPAddress(value); ip != "" {
+		if ip := topologyutil.NormalizeIPAddress(value); ip != "" {
 			if _, ok := ips[ip]; ok {
 				return true
 			}
@@ -726,7 +726,7 @@ func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 	}
 
 	for _, link := range snapshot.Links {
-		if sysName, _ := link.Dst.Attributes["sys_name"].(string); sysName != "" {
+		if sysName := strings.TrimSpace(link.Dst.SysName); sysName != "" {
 			if matches(sysName) {
 				return true
 			}

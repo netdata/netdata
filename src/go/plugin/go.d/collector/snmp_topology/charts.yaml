@@ -1,0 +1,44 @@
+version: v1
+groups:
+  - family: Internal
+    metrics:
+      - netdata.go.plugin.collector.snmp_topology.devices_registered
+      - netdata.go.plugin.collector.snmp_topology.devices_cached
+      - netdata.go.plugin.collector.snmp_topology.last_refresh_age_seconds
+      - netdata.go.plugin.collector.snmp_topology.last_refresh_duration_seconds
+      - netdata.go.plugin.collector.snmp_topology.refresh_runs_total
+      - netdata.go.plugin.collector.snmp_topology.refresh_errors_total
+    charts:
+      - id: devices
+        title: SNMP topology internal devices
+        context: netdata.go.plugin.collector.snmp_topology.devices
+        units: devices
+        algorithm: absolute
+        type: line
+        dimensions:
+          - selector: netdata.go.plugin.collector.snmp_topology.devices_registered
+            name: registered
+          - selector: netdata.go.plugin.collector.snmp_topology.devices_cached
+            name: cached
+      - id: last_refresh
+        title: SNMP topology internal last refresh
+        context: netdata.go.plugin.collector.snmp_topology.last_refresh
+        units: seconds
+        algorithm: absolute
+        type: line
+        dimensions:
+          - selector: netdata.go.plugin.collector.snmp_topology.last_refresh_age_seconds
+            name: age
+          - selector: netdata.go.plugin.collector.snmp_topology.last_refresh_duration_seconds
+            name: duration
+      - id: refreshes
+        title: SNMP topology internal refreshes
+        context: netdata.go.plugin.collector.snmp_topology.refreshes
+        units: events/s
+        algorithm: incremental
+        type: line
+        dimensions:
+          - selector: netdata.go.plugin.collector.snmp_topology.refresh_runs_total
+            name: runs
+          - selector: netdata.go.plugin.collector.snmp_topology.refresh_errors_total
+            name: errors

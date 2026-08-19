@@ -60,6 +60,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
         .id = string_strdupz(sd->id),
         .name = string_strdupz(sd->name),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomic
+        .algorithm = (RRD_ALGORITHM)sd->algorithm,
     };
     if(sd->hidden) trm.flags |= RRD_FLAG_HIDDEN;
 
@@ -133,6 +134,12 @@ static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
 static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, void *data) {
     RRDHOST *host = data;
     (void)host;
+
+    // the insert callback replaces the SQLite-owned hub string pointers with
+    // owned copies only when hub.version is set - a versionless row would
+    // keep dangling pointers, so skip it
+    if(unlikely(!ctx_data->version))
+        return;
 
     RRDCONTEXT trc = {
         .id = string_strdupz(ctx_data->id),

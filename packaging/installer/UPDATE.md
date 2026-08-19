@@ -47,7 +47,6 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 
 If you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to make sure it finds the existing installation.
 
-
 If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#update-methods-by-platform) will work for you.
 
 Otherwise, it should either indicate that the installation type is not supported (which probably means you either have a `custom` install or built Netdata manually) or indicate that it would create a new install (which means that you either used a non-standard installation path, or that you don't have Netdata installed).
@@ -160,8 +159,101 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 | Option                          | Description                                                                                                                                                                                                                                                                                      | Default         |
 |---------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
 | `NETDATA_UPDATER_JITTER`        | Sets an upper limit in seconds on the random delay in the updater script when running as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to the Cloud at the same time. Most users shouldn't ever need to change this.                  | 3600 (one hour) |
-| `NETDATA_MAJOR_VERSION_UPDATES` | If set to a value other than 0, then new major versions will be installed without user confirmation. Must be set to a non-zero value for automated updates to install new major versions.                                                                                                        | 0               |
+| `NETDATA_ACCEPT_MAJOR_VERSIONS` | A space-separated list of major versions the updater installs automatically without prompting. An empty value uses the updater's built-in default (currently `1 2`). To stay on a specific major version, set this to that version number (for example, `1`). Applies to all install types managed by the auto-updater, including native packages. | Empty (script defaults to `1 2`) |
 | `NETDATA_NO_SYSTEMD_JOURNAL`    | If set to a value other than 0, skip attempting to install the `netdata-plugin-systemd-journal` package on supported systems on update. The updater will install this optional package by default on supported systems if this option is not set. It only affects systems using native packages. | 0               |
+
+## Managing Automatic Updates
+
+Netdata enables daily auto-updates by default when installed using the kickstart script (unless you pass `--no-updates` during installation). The schedule runs once per day. The installer auto-detects the scheduling method, which may be a cron entry under `/etc/cron.daily` or `/etc/periodic/daily`, the `netdata-updater.timer` systemd unit (`OnCalendar=daily`), or a crontab under `/etc/cron.d`.
+
+### Disable auto-updates
+
+<details>
+<summary><strong>At install time (kickstart)</strong></summary><br/>
+
+Pass `--no-updates` to the kickstart script to skip setting up auto-updates entirely:
+
+```bash
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
+```
+
+To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`:
+
+```bash
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --auto-update-type systemd
+```
+
+<br/>
+</details>
+
+The simplest method on an existing installation is the updater script's built-in command, which removes every supported scheduling method (systemd timer, `/etc/cron.daily`, `/etc/periodic/daily`, and `/etc/cron.d`) in one step:
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+```
+
+This takes effect immediately — the systemd timer is stopped and any cron entries are removed, so no further automatic updates will run.
+
+If you prefer to disable the scheduler manually:
+
+- **systemd:** `sudo systemctl disable --now netdata-updater.timer` (stops and disables the timer unit).
+- **non-systemd (cron):** remove the entry your installer created. Remove whichever exists:
+  ```bash
+  sudo rm -f /etc/cron.daily/netdata-updater /etc/cron.daily/netdata-updater.sh
+  sudo rm -f /etc/periodic/daily/netdata-updater /etc/periodic/daily/netdata-updater.sh
+  sudo rm -f /etc/cron.d/netdata-updater /etc/cron.d/netdata-updater-daily
+  ```
+  Only one of these directories will contain a file; removing a non-existent path is harmless.
+
+:::note
+
+The path `/usr/libexec/netdata/netdata-updater.sh` is for a standard install with the default prefix. If you installed with `--install-prefix`, the script lives under `<your-prefix>/usr/libexec/netdata/netdata-updater.sh`.
+
+:::
+
+:::note
+
+**Native package installations**
+
+`--disable-auto-updates` stops the Netdata-managed update scheduler for all install types, including native packages. However, system-level auto-upgrade tools (such as `unattended-upgrades` on Debian/Ubuntu or `dnf-automatic` on RHEL-based systems) can still update Netdata independently of the Netdata scheduler. To prevent that, also pin the package using your system's package manager:
+
+```bash
+# DEB-based systems
+sudo apt-mark hold netdata
+
+# RPM-based systems (requires dnf-plugins-core)
+sudo dnf versionlock add netdata
+```
+
+:::
+
+### Check auto-update status
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --auto-update-status
+```
+
+This reports which scheduling methods are detected as enabled or disabled on your system.
+
+### Re-enable auto-updates
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
+```
+
+The script auto-detects the appropriate scheduler for your system. To explicitly set the method, pass it as an argument:
+
+```bash
+sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates systemd
+```
+
+Valid methods are `systemd`, `interval`, and `crontab`.
+
+:::warning
+
+`netdata-updater.conf` controls **how** the updater runs, not **whether** it runs — see the [configuration options](#control-runtime-behavior-of-the-updater-script) above. It does not contain an option to disable the auto-update schedule, and setting variables in it will not stop auto-updates. To turn auto-updates off, use the disable command above — not the config file.
+
+:::
 
 ## Quick Reference
 
@@ -176,5 +268,5 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 | **custom**                 | System package manager | Use your system's package manager                                                                          |
 | **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
 | **Manual Git**             | Git + installer        | See [manual installation steps](#update-methods-by-platform)                                               |
-| **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#update-your-netdata-docker-container)                |
+| **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#update-your-netdata-docker-container)         |
 | **Windows**                | MSI installer          | Download and run latest installer                                                                          |

@@ -26,6 +26,10 @@ pub(crate) struct PluginConfig {
     #[serde(default, rename = "enrichment")]
     pub(crate) enrichment: EnrichmentConfig,
 
+    #[arg(skip)]
+    #[serde(default, rename = "charts")]
+    pub(crate) charts: ChartsConfig,
+
     #[arg(hide = true, help = "Collection interval in seconds (ignored)")]
     #[serde(skip)]
     pub(crate) _update_frequency: Option<u32>,
@@ -43,6 +47,7 @@ impl Default for PluginConfig {
             protocols: ProtocolConfig::default(),
             journal: JournalConfig::default(),
             enrichment: EnrichmentConfig::default(),
+            charts: ChartsConfig::default(),
             _update_frequency: None,
             _netdata_env: NetdataEnv::default(),
         }

@@ -1,12 +1,40 @@
 use super::*;
+use crate::local_journal_host::load_local_journal_provider;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
 use etherparse::{NetSlice, SlicedPacket, TransportSlice};
 use pcap_file::pcap::PcapReader;
+use serde::Serialize;
 use std::fs::File;
+use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
+
+pub(super) fn write_unique_json<T: Serialize>(
+    root: &Path,
+    prefix: &str,
+    value: &T,
+) -> Result<PathBuf> {
+    let mut report = tempfile::Builder::new()
+        .prefix(prefix)
+        .suffix(".json")
+        .tempfile_in(root)
+        .with_context(|| format!("create JSON report in {}", root.display()))?;
+    serde_json::to_writer_pretty(report.as_file_mut(), value).context("serialize JSON report")?;
+    report
+        .as_file_mut()
+        .write_all(b"\n")
+        .context("finish JSON report")?;
+    report
+        .as_file_mut()
+        .sync_all()
+        .context("sync JSON report")?;
+    let (_, path) = report
+        .keep()
+        .map_err(|error| anyhow!("persist JSON report: {}", error.error))?;
+    Ok(path)
+}
 
 pub(super) fn new_test_ingest_service(
     decapsulation_mode: ConfigDecapsulationMode,
@@ -68,18 +96,45 @@ pub(super) fn new_disk_benchmark_ingest_service(
     (tmp, service)
 }
 
-pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log) {
+pub(super) fn new_production_benchmark_ingest_service(
+    decapsulation_mode: ConfigDecapsulationMode,
+) -> (TempDir, IngestService) {
+    let tmp = new_disk_benchmark_tempdir("resource-bench-production-");
+    let mut cfg = PluginConfig::default();
+    cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg.protocols.decapsulation_mode = decapsulation_mode;
+
+    for dir in cfg.journal.all_tier_dirs() {
+        std::fs::create_dir_all(&dir)
+            .unwrap_or_else(|e| panic!("create tier directory {}: {e}", dir.display()));
+    }
+
+    let service = IngestService::new(
+        cfg,
+        Arc::new(IngestMetrics::default()),
+        Arc::new(RwLock::new(OpenTierState::default())),
+        Arc::new(RwLock::new(TierFlowIndexStore::default())),
+    )
+    .expect("create production-shaped ingest benchmark service");
+
+    (tmp, service)
+}
+
+pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log, Arc<LocalJournalProvider>) {
     let tmp = new_disk_benchmark_tempdir("resource-bench-raw-");
     let mut cfg = PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+    cfg._netdata_env.lib_dir = Some(tmp.path().join("varlib"));
 
     let raw_dir = cfg.journal.raw_tier_dir();
     std::fs::create_dir_all(&raw_dir)
         .unwrap_or_else(|e| panic!("create raw tier directory {}: {e}", raw_dir.display()));
 
-    let machine_id = load_machine_id().expect("load machine id for raw benchmark log");
+    let journal_host = Arc::new(
+        load_local_journal_provider(&cfg).expect("load local journal host for raw benchmark log"),
+    );
     let origin = Origin {
-        machine_id: Some(machine_id),
+        machine_id: Some(journal_host.machine_id()),
         namespace: None,
         source: Source::System,
     };
@@ -97,13 +152,19 @@ pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log) {
             retention_policy.with_duration_of_journal_files(duration_of_journal_files);
     }
 
+    // Match the production fastest-storage profile so benchmarks measure the
+    // same on-disk format the plugin ships: compact, no compression, no live.
     let log = Log::new(
         &raw_dir,
-        Config::new(origin, rotation_policy, retention_policy),
+        Config::new(origin, rotation_policy, retention_policy)
+            .with_compact(true)
+            .with_compression(Compression::None)
+            .with_boot_id(journal_host.boot_id())
+            .with_live_publish_every_entries(0),
     )
     .unwrap_or_else(|e| panic!("create raw benchmark log in {}: {e}", raw_dir.display()));
 
-    (tmp, log)
+    (tmp, log, journal_host)
 }
 
 pub(super) fn new_test_ingest_service_in_dir(
@@ -153,8 +214,13 @@ fn decode_pcap_flows(path: &Path, service: &mut IngestService) -> Vec<crate::dec
     while let Some(packet) = reader.next_packet() {
         let packet = packet.unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
         if let Some((source, payload)) = extract_udp_payload(packet.data.as_ref()) {
-            service.prepare_decoder_state_namespace(source, payload);
-            let decoded = service.decoders.decode_udp_payload(source, payload);
+            let packet_context = service.prepare_decoder_state_namespace(source, payload);
+            let decoded = service.decoders.decode_udp_payload_at_with_context(
+                source,
+                payload,
+                now_usec(),
+                packet_context.as_ref(),
+            );
             flows.extend(
                 decoded
                     .flows
@@ -224,14 +290,42 @@ pub(super) fn extract_udp_payloads(path: &Path) -> Vec<UdpPayload> {
 }
 
 fn new_disk_benchmark_tempdir(prefix: &str) -> TempDir {
-    let base = std::env::current_dir()
-        .expect("resolve current dir")
-        .join("src/crates/target/netflow-resource-bench");
-    std::fs::create_dir_all(&base)
-        .unwrap_or_else(|e| panic!("create disk benchmark root {}: {e}", base.display()));
-
+    let base = std::env::temp_dir();
     tempfile::Builder::new()
         .prefix(prefix)
         .tempdir_in(&base)
         .unwrap_or_else(|e| panic!("create disk benchmark temp dir {}: {e}", base.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn benchmark_ingest_helpers_make_sync_shape_explicit() {
+        let (_tmp, service) = new_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert_eq!(service.cfg.listener.sync_every_entries, usize::MAX);
+        assert_eq!(
+            service.cfg.listener.sync_interval,
+            Duration::from_secs(60 * 60)
+        );
+
+        let (_tmp, service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert_eq!(service.cfg.listener.sync_every_entries, usize::MAX);
+        assert_eq!(
+            service.cfg.listener.sync_interval,
+            Duration::from_secs(60 * 60)
+        );
+
+        let (_tmp, service) =
+            new_production_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert_eq!(service.cfg.listener.sync_every_entries, 0);
+        assert_eq!(service.cfg.listener.sync_interval, Duration::from_secs(1));
+    }
+
+    #[test]
+    fn disk_benchmark_helpers_use_the_system_temporary_directory() {
+        let (tmp, _service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert!(tmp.path().starts_with(std::env::temp_dir()));
+    }
 }

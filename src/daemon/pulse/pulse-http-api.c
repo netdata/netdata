@@ -31,7 +31,7 @@ void pulse_web_request_completed(uint64_t dt,
                                              uint64_t bytes_sent __maybe_unused,
                                              uint64_t content_size,
                                              uint64_t compressed_content_size) {
-    uint64_t old_web_usec_max = live_stats.web_usec_max;
+    uint64_t old_web_usec_max = __atomic_load_n(&live_stats.web_usec_max, __ATOMIC_RELAXED);
     while(dt > old_web_usec_max)
         __atomic_compare_exchange(&live_stats.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 

@@ -1,0 +1,27 @@
+{
+  "vnode": "cato-account",
+  "update_every": 60,
+  "autodetection_retry": 5,
+  "account_id": "12345",
+  "api_key": "secret",
+  "url": "https://api.catonetworks.com/api/v1/graphql2",
+  "username": "netdata",
+  "password": "secret",
+  "bearer_token_file": "/tmp/cato-token",
+  "proxy_username": "proxy-user",
+  "proxy_password": "proxy-secret",
+  "method": "POST",
+  "headers": {
+    "X-Test": "test"
+  },
+  "body": "{\"query\":\"query\"}",
+  "timeout": 30,
+  "not_follow_redirects": true,
+  "proxy_url": "http://proxy.local:8080",
+  "tls_ca": "/tmp/ca.pem",
+  "tls_cert": "/tmp/cert.pem",
+  "tls_key": "/tmp/key.pem",
+  "tls_skip_verify": true,
+  "force_http2": true,
+  "site_selector": "!lab-* *"
+}

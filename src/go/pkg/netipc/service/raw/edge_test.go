@@ -276,8 +276,7 @@ func TestCacheLookupBeforeRefresh(t *testing.T) {
 		t.Fatal("should not be ready")
 	}
 
-	_, found := cache.Lookup(123, "anything")
-	if found {
+	if cacheHasForTest(cache, 123, "anything") {
 		t.Fatal("should not find items in empty cache")
 	}
 }
@@ -361,8 +360,7 @@ func TestCacheCloseResetsState(t *testing.T) {
 	if cache.Ready() {
 		t.Fatal("should not be ready after close")
 	}
-	_, found := cache.Lookup(1001, "docker-abc123")
-	if found {
+	if cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("should not find items after close")
 	}
 
@@ -419,19 +417,17 @@ func TestCacheLookupHashNameMismatch(t *testing.T) {
 	}
 
 	// Correct hash (1001), wrong name
-	_, found := cache.Lookup(1001, "wrong-name")
-	if found {
+	if cacheHasForTest(cache, 1001, "wrong-name") {
 		t.Fatal("should not find with wrong name")
 	}
 
 	// Wrong hash, correct name
-	_, found = cache.Lookup(9999, "docker-abc123")
-	if found {
+	if cacheHasForTest(cache, 9999, "docker-abc123") {
 		t.Fatal("should not find with wrong hash")
 	}
 
 	// Both correct
-	item, found := cache.Lookup(1001, "docker-abc123")
+	item, found := cacheDupForTest(cache, 1001, "docker-abc123")
 	if !found {
 		t.Fatal("should find with correct hash+name")
 	}

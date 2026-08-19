@@ -8,6 +8,14 @@ You can configure Netdata Agents on the fly using Netdata Cloud. Check the [Dyna
 
 You configure your Netdata Agent using the main configuration file `netdata.conf`. This guide shows you how to locate, edit, and manage this configuration file.
 
+:::note
+
+On a freshly installed system, `netdata.conf` contains only comments and instructions for how to obtain the running configuration. This is normal and expected, a comment-only file means the Agent is running with built-in defaults, and no changes are required unless you want to override those defaults.
+
+Check below for [instructions on editing configuration files](#edit-configuration-files).
+
+:::
+
 ## Locate Your Config Directory
 
 First, you need to find where your configuration files are stored. On most Linux systems, you'll find your **Netdata config directory** at `/etc/netdata/`. This directory contains:
@@ -29,12 +37,26 @@ All of Netdata's documentation **assumes your config directory is at** `/etc/net
 
 :::
 
+### On Windows
+
+On Windows, the **Netdata config directory** is located at `C:\Program Files\Netdata\etc\netdata`. Like on Linux, this directory contains configuration files, a few directories for specific configurations (including `health.d` for your alert overrides), and the `edit-config` helper script.
+
+:::note
+
+`edit-config` requires the bundled MSYS2 shell that ships with Netdata for Windows — see [Editing configuration files](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for how to open it and use `edit-config` there. Because `C:\Program Files\Netdata` is a protected system directory, run the MSYS2 shell with Administrator privileges.
+
+:::
+
+For alert-specific configuration on Windows — where the stock alert templates ship, where to place your overrides, and how to reload without restarting the Agent — see [How to Edit Health Configuration Files](/src/health/REFERENCE.md#how-to-edit-health-configuration-files) in the health configuration reference.
+
 ## Edit Configuration Files
 
 <details>
 <summary><strong>Method 1: Using `edit-config` (Recommended)</strong></summary>
 
 You should use the `edit-config` script for making configuration changes. This script lives inside your config directory and helps you manage and safely edit configuration files.
+
+On Windows, run `edit-config` from the bundled MSYS2 shell — see [On Windows](#on-windows) above.
 
 To edit `netdata.conf`:
 
@@ -75,3 +97,7 @@ This method is useful when you want to:
 - Replicate configuration across multiple agents
 
 </details>
+
+## Apply Your Changes
+
+After saving a configuration file, [restart the Netdata Agent as appropriate for that file and platform](/docs/netdata-agent/start-stop-restart.md).

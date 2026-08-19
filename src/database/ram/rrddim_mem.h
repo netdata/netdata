@@ -27,6 +27,7 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID 
 STORAGE_METRIC_HANDLE *rrddim_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
 STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh);
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh);
+bool rrddim_metric_release_from_rrddim(STORAGE_METRIC_HANDLE *smh, RRDDIM *rd);
 
 bool rrddim_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
 bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);

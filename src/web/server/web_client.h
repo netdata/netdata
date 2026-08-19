@@ -71,6 +71,7 @@ typedef enum __attribute__((packed)) {
     WEB_CLIENT_FLAG_ACCEPT_TEXT             = (1 << 27),
     WEB_CLIENT_FLAG_MCP_PREVIEW_KEY         = (1 << 28), // Authorization header matched MCP preview key
     WEB_CLIENT_FLAG_PATH_IS_MCP             = (1 << 29), // URL path is /mcp[/...] or /sse[/...] — set during URL decoding so it's also available for OPTIONS preflights (which skip the URL dispatcher)
+    WEB_CLIENT_FLAG_SSL_CHECKED             = (1 << 30), // the initial TCP bytes have been classified as TLS or plain HTTP
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)
@@ -119,6 +120,9 @@ typedef enum __attribute__((packed)) {
 #define web_client_set_mcp_preview_key(w) web_client_flag_set(w, WEB_CLIENT_FLAG_MCP_PREVIEW_KEY)
 #define web_client_clear_mcp_preview_key(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_MCP_PREVIEW_KEY)
 
+#define web_client_has_ssl_checked(w) web_client_flag_check(w, WEB_CLIENT_FLAG_SSL_CHECKED)
+#define web_client_set_ssl_checked(w) web_client_flag_set(w, WEB_CLIENT_FLAG_SSL_CHECKED)
+
 #define web_client_check_conn_unix(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_UNIX)
 #define web_client_check_conn_tcp(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_TCP)
 #define web_client_check_conn_cloud(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD)
@@ -163,6 +167,11 @@ struct response {
     z_stream zstream;                                    // zlib stream for sending compressed output to client
     size_t zsent;                                        // the compressed bytes we have sent to the client
     size_t zhave;                                        // the compressed bytes that we have received from zlib
+    size_t zchunk_header_len;                            // bytes in zchunk_header pending before zbuffer
+    size_t zchunk_header_sent;                           // chunk header bytes already sent
+    size_t zchunk_suffix_sent;                           // chunk suffix bytes already sent
+    size_t zchunk_finalize_sent;                         // final chunk marker bytes already sent
+    char zchunk_header[24];                              // hex chunk-size header plus CRLF
     Bytef zbuffer[NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE]; // temporary buffer for storing compressed output
 };
 

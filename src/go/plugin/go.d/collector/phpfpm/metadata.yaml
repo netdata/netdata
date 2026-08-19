@@ -6,6 +6,7 @@ modules:
       module_name: phpfpm
       monitored_instance:
         name: PHP-FPM
+        description: "Monitor PHP-FPM connections, requests, process activity, request duration, CPU, and memory usage."
         link: https://php-fpm.org/
         icon_filename: php.svg
         categories:
@@ -199,13 +200,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                     - name: local
                       url: http://localhost/status?full&json
-                
+
                     - name: remote
                       url: http://203.0.113.10/status?full&json
     troubleshooting:

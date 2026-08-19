@@ -3,7 +3,10 @@
 package raw
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,7 +41,7 @@ func TestCacheFullRoundTrip(t *testing.T) {
 	}
 
 	// Lookup by hash + name
-	item, found := cache.Lookup(1001, "docker-abc123")
+	item, found := cacheDupForTest(cache, 1001, "docker-abc123")
 	if !found {
 		t.Fatal("item should be found")
 	}
@@ -58,7 +61,7 @@ func TestCacheFullRoundTrip(t *testing.T) {
 		t.Fatalf("expected path=/sys/fs/cgroup/docker/abc123, got %q", item.Path)
 	}
 
-	item2, found2 := cache.Lookup(3003, "systemd-user")
+	item2, found2 := cacheDupForTest(cache, 3003, "systemd-user")
 	if !found2 {
 		t.Fatal("item 2 should be found")
 	}
@@ -113,8 +116,7 @@ func TestCacheRefreshFailurePreserves(t *testing.T) {
 	if !cache.Ready() {
 		t.Fatal("should be ready")
 	}
-	_, found := cache.Lookup(1001, "docker-abc123")
-	if !found {
+	if !cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("item should be found after first refresh")
 	}
 
@@ -131,8 +133,7 @@ func TestCacheRefreshFailurePreserves(t *testing.T) {
 	if !cache.Ready() {
 		t.Fatal("should still be ready (old cache preserved)")
 	}
-	_, found = cache.Lookup(1001, "docker-abc123")
-	if !found {
+	if !cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("item should still be found (old cache preserved)")
 	}
 
@@ -145,6 +146,114 @@ func TestCacheRefreshFailurePreserves(t *testing.T) {
 	}
 
 	cache.Close()
+	cleanupAll(svc)
+}
+
+func TestCacheConcurrentReadersRefresh(t *testing.T) {
+	svc := "go_cache_concurrent"
+	ensureRunDir()
+	cleanupAll(svc)
+
+	ts := startTestServer(svc, testSnapshotDispatch())
+	defer ts.stop()
+
+	cache := NewCache(testRunDir, svc, testClientConfig())
+	defer cache.Close()
+
+	if !cache.Refresh() {
+		t.Fatal("initial refresh should succeed")
+	}
+
+	const readerCount = 4
+	const readerIters = 500
+	const writerIters = 100
+
+	var wg sync.WaitGroup
+	failures := make(chan int, readerCount)
+	for range readerCount {
+		wg.Go(func() {
+
+			localFailures := 0
+			for range readerIters {
+				guard := cache.ReadLock()
+				view := guard.Get(1001, "docker-abc123")
+				if view == nil ||
+					view.Hash != 1001 ||
+					view.Path != "/sys/fs/cgroup/docker/abc123" {
+					localFailures++
+					guard.Unlock()
+					continue
+				}
+				copy := guard.Dup(view)
+				if copy.Hash != view.Hash || copy.Name != view.Name {
+					localFailures++
+				}
+				time.Sleep(100 * time.Microsecond)
+				guard.Unlock()
+			}
+			failures <- localFailures
+		})
+	}
+
+	writerFailures := 0
+	for range writerIters {
+		if !cache.Refresh() {
+			writerFailures++
+		}
+	}
+
+	wg.Wait()
+	close(failures)
+
+	readerFailures := 0
+	for count := range failures {
+		readerFailures += count
+	}
+
+	if writerFailures != 0 {
+		t.Fatalf("writer failures = %d", writerFailures)
+	}
+	if readerFailures != 0 {
+		t.Fatalf("reader failures = %d", readerFailures)
+	}
+	if got := cache.Status().RefreshSuccessCount; got != 1+writerIters {
+		t.Fatalf("refresh success count = %d, want %d", got, 1+writerIters)
+	}
+}
+
+func TestCacheRefreshRejectsMalformedSnapshotItem(t *testing.T) {
+	svc := "go_cache_bad_item"
+	ensureRunDir()
+	cleanupAll(svc)
+
+	ts := startTestServer(svc, func(_ []byte, responseBuf []byte) (int, error) {
+		minRequired, ok := protocol.CgroupsBuilderMinBytes(1)
+		if !ok {
+			return 0, protocol.ErrOverflow
+		}
+		builder := protocol.NewCgroupsBuilder(responseBuf, 1, 1, 42)
+		if err := builder.Add(1001, 0, 1, []byte("docker-abc123"), []byte("/sys/fs/cgroup/docker/abc123")); err != nil {
+			return 0, err
+		}
+		n := builder.Finish()
+		responseBuf[minRequired+2] = 1
+		return n, nil
+	})
+	defer ts.stop()
+
+	cache := NewCache(testRunDir, svc, testClientConfig())
+	defer cache.Close()
+
+	if cache.Refresh() {
+		t.Fatal("refresh should fail when snapshot item validation fails")
+	}
+	if cache.Ready() {
+		t.Fatal("cache should not be ready after malformed first refresh")
+	}
+	if got := cache.Status().RefreshFailureCount; got != 1 {
+		t.Fatalf("refresh failure count = %d, want 1", got)
+	}
+
 	cleanupAll(svc)
 }
 
@@ -204,20 +313,17 @@ func TestCacheLookupNotFound(t *testing.T) {
 	}
 
 	// Non-existent hash
-	_, found := cache.Lookup(9999, "nonexistent")
-	if found {
+	if cacheHasForTest(cache, 9999, "nonexistent") {
 		t.Fatal("should not find nonexistent item")
 	}
 
 	// Correct hash, wrong name
-	_, found = cache.Lookup(1001, "wrong-name")
-	if found {
+	if cacheHasForTest(cache, 1001, "wrong-name") {
 		t.Fatal("should not find with wrong name")
 	}
 
 	// Correct name, wrong hash
-	_, found = cache.Lookup(9999, "docker-abc123")
-	if found {
+	if cacheHasForTest(cache, 9999, "docker-abc123") {
 		t.Fatal("should not find with wrong hash")
 	}
 
@@ -238,8 +344,7 @@ func TestCacheEmpty(t *testing.T) {
 	}
 
 	// Lookup on empty cache returns not-found
-	_, found := cache.Lookup(1001, "docker-abc123")
-	if found {
+	if cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("should not find in empty cache")
 	}
 
@@ -258,6 +363,23 @@ func TestCacheEmpty(t *testing.T) {
 	}
 
 	cleanupAll(svc)
+}
+
+func TestCacheOverflowGuards(t *testing.T) {
+	if _, err := cacheBucketCountForItemCount(1<<30 + 1); err != protocol.ErrOverflow {
+		t.Fatalf("oversized bucket count error = %v, want ErrOverflow", err)
+	}
+	if strconv.IntSize < 64 {
+		t.Skip("oversized slice-header guard requires 64-bit int")
+	}
+
+	if _, err := cacheBucketMaskForLen(int(uint64(^uint32(0)) + 2)); !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("unrepresentable bucket count error = %v, want ErrOverflow", err)
+	}
+
+	if got := cacheStatusItemCountForLen(int(uint64(^uint32(0)) + 1)); got != ^uint32(0) {
+		t.Fatalf("overflow status item count = %d, want uint32 max", got)
+	}
 }
 
 func TestCacheLargeDataset(t *testing.T) {
@@ -322,7 +444,7 @@ func TestCacheLargeDataset(t *testing.T) {
 	// Verify all lookups
 	for i := range uint32(N) {
 		name := fmt.Sprintf("cgroup-%d", i)
-		item, found := cache.Lookup(i+1000, name)
+		item, found := cacheDupForTest(cache, i+1000, name)
 		if !found {
 			t.Fatalf("item %d not found", i)
 		}

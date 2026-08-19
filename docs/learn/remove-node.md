@@ -17,11 +17,10 @@ For a complete explanation of node states, state transitions, and when nodes mov
 
 **Stale means this node is a Child that has stopped streaming to its Parent, but the Parent still retains its historical data.**
 
-You can't delete a Stale node because the Parent is alive/connected to the Cloud and has data for the Stale node. The UI disables the "Remove" option to protect this historical data and maintain the parent-child relationship integrity.<br/>
+You can't delete a Stale node because the Parent is alive/connected to the Cloud and has data for the Stale node. The UI disables the "Delete" option to protect this historical data and maintain the parent-child relationship integrity.<br/>
 
 This is why stale nodes show "Delete is disabled" - the system prevents deletion while the parent node still holds queryable metrics data for that child.<br/>
 </details>
-
 
 ## Quick Decision Guide
 
@@ -41,7 +40,7 @@ This is why stale nodes show "Delete is disabled" - the system prevents deletion
 
 :::note
 
-You need **Admin** role in your Space to remove nodes. The CLI method requires a system with Netdata Agent installed.
+Deleting a node from the Space requires the **Admin** role; removing it from a room only requires **Manager** or **Admin**. The CLI method requires a system with Netdata Agent installed.
 
 :::
 
@@ -61,14 +60,15 @@ Stale status does not apply to standalone nodes — stale specifically means a c
 :::
 
 **Steps**:
-1. Stop the Netdata Agent on the node you want to remove
+
+1. Stop the Netdata Agent on the node you want to remove.
 2. In Netdata Cloud, go to **Space Settings > Nodes** (click the ⚙️ cog icon below the spaces list).
 3. Locate the offline node in the list
 4. Select the trash icon to remove it
 
 :::note
 
-The **Remove** option is only available in the **Space Settings** view. It will appear disabled in the "All Nodes" room or other parts of the UI.
+The trash icon here performs the **Delete** action, which removes the node from the Space entirely and requires the **Admin** role. This is different from the **Remove** action shown in room views, which only removes a node from that specific room. Remove is unavailable in the default "All Nodes" room — shown disabled or replaced with a different delete option depending on the view — but works normally in other rooms.
 
 :::
 
@@ -84,8 +84,9 @@ These are nodes that stream metrics through a Parent Agent. When a child node st
 **When to use**: Your child node shows as **Stale** status and UI shows "Delete is disabled".
 
 **Step 1: Get the Node Identifier**
+
 1. In Netdata Cloud, navigate to the stale node
-2. Click the **node information (i)** button 
+2. Click the **node information (i)** button
 3. Click **"View node info in JSON"**
 4. Copy the identifier from the JSON data (node_id, machine_guid, or hostname)
 
@@ -97,9 +98,10 @@ netdatacli remove-stale-node <identifier>
 ```
 
 Replace `<identifier>` with one of:
-- `node_id` - The node's unique identifier
-- `machine_guid` - The machine GUID from the node info
-- `hostname` - The node's hostname
+
+* `node_id` - The node's unique identifier
+* `machine_guid` - The machine GUID from the node info
+* `hostname` - The node's hostname
 
 :::important
 
@@ -113,7 +115,7 @@ If a node is represented by multiple Parent Agents in an HA setup, this command 
 
 :::
 
-**What happens next**: The command marks the node as ephemeral and removes it so it is no longer available for queries, from both the Netdata Agent dashboard and Netdata Cloud. The node is fully removed — it does not transition to Offline status.
+**What happens next**: The node is marked as ephemeral and disconnected. On the **Parent Agent**, the node is removed from queries and disappears from the dashboard immediately. On **Netdata Cloud**, the node transitions to Offline — but because it is ephemeral, Cloud deletes it immediately rather than waiting for the standard Offline cleanup window, so it typically disappears from the Cloud dashboard within 1-2 minutes as Cloud processes the update and the UI refreshes. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md) for details on node states and cleanup timing.
 
 </details>
 
@@ -138,6 +140,7 @@ This command affects all disconnected child nodes on the Parent Agent where it i
 ## Prevention and Best Practices
 
 ### Auto-scaling/Spot Instances
+
 For environments with auto-scaling cloud instances or spot instances that get terminated frequently, consider configuring nodes as ephemeral:
 
 ```ini
@@ -153,19 +156,26 @@ For nodes that are part of streaming configurations, see [Nodes Ephemerality](/d
 :::
 
 ### Prevent Automatic Reconnection
+
 To prevent removed nodes from reappearing:
-* Remove or clear any existing `claim.conf` file 
+
+* [Stop the Netdata Agent](/docs/netdata-agent/start-stop-restart.md) on the node
+* Remove or clear any existing `claim.conf` file
 * Clear related environment variables on the node
 
+To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
+
 ## Troubleshooting
+
+**"Remove option is disabled" (or "node removal is not allowed in this room")**: The room-scoped **Remove** action is unavailable in the default "All Nodes" room by design — some views show it disabled, others replace it with a different delete option — but it works normally in other rooms. This is not the Stale-node "Delete is disabled" case described below. To remove an Offline node from the Space entirely, use **Delete** in Space Settings > Nodes instead. See the note under **Removing Offline Standalone Nodes (UI Method)** above for the Remove vs. Delete distinction.
 
 **"Delete is disabled"**: The node is Stale, not Offline. Use the CLI approach for child nodes.
 
 **"Command not found"**: Ensure you're running `netdatacli` on a system with Netdata Agent installed.
 
-**"Permission denied"**: You need **Admin** role in the Space to remove nodes.
+**"Permission denied"**: Deleting a node from the Space requires the **Admin** role; removing a node from a room requires **Manager** or **Admin**.
 
-**"Node '<name>' (machine guid: <guid>) is our localhost - not changing it"**: The machine GUID you provided belongs to the agent where you are running `netdatacli`—in this procedure, that should be the Parent Agent—not the stale child node you want to remove. This usually happens when you accidentally copy the Parent's own machine GUID instead of the stale child's. Verify you are using the correct machine GUID by checking the stale child's node info in Netdata Cloud — the GUID must belong to the disconnected child, not the Parent Agent you are logged into.
+**"Node '\<name>' (machine guid: \<guid>) is our localhost - not changing it"**: The machine GUID you provided belongs to the agent where you are running `netdatacli`—in this procedure, that should be the Parent Agent—not the stale child node you want to remove. This usually happens when you accidentally copy the Parent's own machine GUID instead of the stale child's. Verify you are using the correct machine GUID by checking the stale child's node info in Netdata Cloud — the GUID must belong to the disconnected child, not the Parent Agent you are logged into.
 
 **Node reappears after removal**: The agent may still be running and configured to reconnect. Stop the agent and clear claim configuration.
 

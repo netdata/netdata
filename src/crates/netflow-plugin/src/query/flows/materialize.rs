@@ -24,7 +24,7 @@ impl FlowQueryService {
         })
     }
 
-    pub(super) fn materialize_projected_compact_aggregate(
+    pub(crate) fn materialize_projected_compact_aggregate(
         &self,
         group_by: &[String],
         fields: &ProjectedFieldTable,

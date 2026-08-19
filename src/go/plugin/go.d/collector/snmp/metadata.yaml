@@ -9,7 +9,7 @@ modules:
         link: ""
         icon_filename: SNMP.png
         categories:
-          - data-collection.networking
+          - network-performance-monitoring.device-metrics
       keywords:
         # Protocol/generic
         - snmp
@@ -476,7 +476,7 @@ modules:
               required: false
             - name: vnode.labels
               group: Virtual node
-              description: Additional key-value pairs to associate with the Virtual Node.
+              description: Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence.
               default_value: ""
               required: false
         examples:
@@ -567,6 +567,22 @@ modules:
                       - cisco-asr
                     options:
                       version: 2
+            - name: Additional node labels
+              description: |
+                Because `create_vnode` defaults to true, each SNMP job automatically creates a Virtual Node for its device — no separate vnode definition file is needed.
+                Use `vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
+              config: |
+                jobs:
+                  - name: core-switch
+                    update_every: 10
+                    hostname: 192.0.2.20
+                    community: public
+                    options:
+                      version: 2
+                    vnode:
+                      labels:
+                        site: dc1
+                        rack: a12
     alerts:
       - name: snmp_license_expiring
         metric: snmp.license.remaining_time
@@ -875,7 +891,7 @@ modules:
           description: |
             Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
 
-            This function reads cached LLDP/CDP data collected by the independent topology refresh loop and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+            This function reads cached LLDP/CDP, bridge, FDB, ARP, and STP data collected by the independent topology refresh loop and returns a netdata.topology.v1 payload with compact actor, link, evidence, and detail tables. No additional SNMP requests are triggered when calling this function.
 
             Use cases:
             - Discover Layer 2 neighbors and link mapping
@@ -896,14 +912,16 @@ modules:
                   name: MAC
             - id: map_type
               name: Map
-              description: Select the topology map mode. Defaults to the managed-device LLDP/CDP view. Other modes progressively include inferred devices and lower-confidence links.
+              description: Select the topology map mode. The default Managed Fabric Map keeps monitored devices, direct LLDP/CDP and managed STP links, and qualified FDB broadcast-domain paths. Logical L3 subnet, OSPF, and BGP relationships remain visible with distinct presentation. Legacy and broader inferred views remain selectable.
               type: select
               required: true
-              default: lldp_cdp_managed
+              default: managed_fabric
               options:
+                - id: managed_fabric
+                  name: Managed Fabric Map
+                  default: true
                 - id: lldp_cdp_managed
                   name: LLDP/CDP/Managed Devices Map
-                  default: true
                 - id: high_confidence_inferred
                   name: High Confidence Inferred Map
                 - id: all_devices_low_confidence
@@ -969,38 +987,62 @@ modules:
                 - id: "10"
                   name: "10"
           returns:
-            description: Agent-wide topology data in a JSON schema suitable for cross-agent aggregation.
+            description: Agent-wide SNMP topology data using the netdata.topology.v1 schema, suitable for cross-agent aggregation.
             columns:
               - name: schema_version
-                type: integer
+                type: string
                 unit: ""
                 description: Topology schema version.
-              - name: agent_id
-                type: string
+              - name: producer
+                type: object
                 unit: ""
-                description: Netdata Agent or vnode identifier that collected the data.
+                description: Producer metadata identifying the SNMP L2 topology source, plugin, and local node when available.
               - name: collected_at
-                type: string
+                type: datetime
                 unit: ""
                 description: Collection timestamp in RFC 3339 format.
-              - name: devices
-                type: array
+              - name: view
+                type: object
                 unit: ""
-                description: List of devices (local and discovered).
+                description: Topology view metadata, including selected mode and focus parameters when present.
+              - name: dictionaries
+                type: object
+                unit: ""
+                description: Compact-table dictionaries used by actors, links, evidence, and detail tables.
+              - name: types
+                type: object
+                unit: ""
+                description: Actor, link, evidence, table, and presentation type registry.
+              - name: presentation
+                type: object
+                unit: ""
+                description: Graph-level presentation metadata.
+              - name: actors
+                type: object
+                unit: ""
+                description: Compact actor table for managed devices, discovered devices, inferred endpoints, and network segments.
               - name: links
-                type: array
+                type: object
                 unit: ""
-                description: List of discovered links (LLDP/CDP).
+                description: Compact link table for LLDP, CDP, bridge, FDB, STP, ARP, SNMP, and inferred L2 relationships.
+              - name: evidence
+                type: object
+                unit: ""
+                description: Relationship evidence tables backing the rendered links.
+              - name: tables
+                type: object
+                unit: ""
+                description: Actor detail, port, path, and label tables used by topology modals.
               - name: stats
                 type: object
                 unit: ""
-                description: Summary stats (device/link counts).
+                description: Summary stats for collected observations, actors, links, and pruning/filtering decisions.
           performance: |
-            Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows
+            Uses cached SNMP data only; calling the function triggers no additional SNMP requests.<br/>• Each request builds and renders a topology snapshot from the current cache<br/>• CPU time, allocations, and payload size scale with cached devices, interfaces, FDB entries, neighbors, segments, and links<br/>• Large or concurrent requests can require materially more processing even though no device walk occurs
           security: |
             Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
           availability: |
-            Available when:<br/>• The collector has completed at least one successful topology refresh cycle<br/>• LLDP/CDP topology data is present in cache from the last successful topology refresh<br/>• Returns HTTP 503 if topology cache is not ready yet
+            Available when:<br/>• At least one topology-enabled SNMP job has a fresh successful snapshot<br/>• That snapshot contains enough device identity to render a managed actor; LLDP/CDP rows are not required<br/>• Returns HTTP 503 if no current renderable topology snapshot is available
 
         - id: licenses
           name: Licenses

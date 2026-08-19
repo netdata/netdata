@@ -6,6 +6,7 @@ modules:
       module_name: hddtemp
       monitored_instance:
         name: HDD temperature
+        description: "Monitor temperatures and sensor status for attached disks by querying the hddtemp daemon."
         link: https://linux.die.net/man/8/hddtemp
         categories:
           - data-collection.storage

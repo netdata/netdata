@@ -30,4 +30,6 @@ bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *
 #define rw_spinlock_tryread_lock(rw_spinlock) rw_spinlock_tryread_lock_with_trace(rw_spinlock, __FUNCTION__)
 #define rw_spinlock_trywrite_lock(rw_spinlock) rw_spinlock_trywrite_lock_with_trace(rw_spinlock, __FUNCTION__)
 
+int rw_spinlock_unittest(void);
+
 #endif //NETDATA_RW_SPINLOCK_H

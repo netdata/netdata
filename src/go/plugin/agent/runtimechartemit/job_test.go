@@ -146,7 +146,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
 	}{
-		"flush failure does not block component state advancement": {
+		"flush failure aborts component state advancement": {
 			run: func(t *testing.T) {
 				reg := newComponentRegistry()
 				store := metrix.NewRuntimeStore()
@@ -170,9 +170,7 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 				job.runOnce(1)
 
 				state := job.components["component"]
-				require.NotNil(t, state)
-				require.False(t, state.prev.IsZero())
-				require.NotEmpty(t, state.knownCharts)
+				require.Nil(t, state)
 
 				var out safeBuffer
 				job.out = &out
@@ -182,8 +180,13 @@ func TestRuntimeMetricsJobTransactionalScenarios(t *testing.T) {
 				require.NotNil(t, state)
 				require.False(t, state.prev.IsZero())
 				require.NotEmpty(t, state.knownCharts)
-				requireInOrder(t, out.String(), "HOST ''", "BEGIN")
-				assert.NotContains(t, out.String(), "CHART 'component_load'")
+				requireInOrder(
+					t,
+					out.String(),
+					"HOST ''",
+					"CHART 'netdata.go.d.internal.component.component_load'",
+					"BEGIN",
+				)
 			},
 		},
 		"effective chart tracking includes dimension only creation": {

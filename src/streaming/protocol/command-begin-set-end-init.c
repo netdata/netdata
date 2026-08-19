@@ -5,7 +5,7 @@
 #include "plugins.d/pluginsd_internals.h"
 
 static BUFFER *preferred_sender_buffer(RRDHOST *host) {
-    if(host->stream.snd.commit.receiver_tid == gettid_cached())
+    if(__atomic_load_n(&host->stream.snd.commit.receiver_tid, __ATOMIC_RELAXED) == gettid_cached())
         return sender_host_buffer(host);
     else
         return sender_thread_buffer(host->sender, HOST_THREAD_BUFFER_INITIAL_SIZE);

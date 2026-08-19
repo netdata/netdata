@@ -16,26 +16,43 @@ func Test_task(t *testing.T) {
 		atomic.AddInt64(&i, 1)
 	}
 
-	task := newTask(job, time.Millisecond*200)
-	defer task.stop()
-	time.Sleep(time.Second)
-	assert.True(t, atomic.LoadInt64(&i) > 0)
+	task := newTask(job, time.Millisecond)
+	defer func() {
+		task.stop()
+		task.wait()
+	}()
+
+	assert.Eventually(t, func() bool {
+		return atomic.LoadInt64(&i) > 0
+	}, time.Second, time.Millisecond)
 }
 
-func Test_task_isStopped(t *testing.T) {
-	task := newTask(func() {}, time.Second)
-	assert.False(t, task.isStopped())
+func Test_task_state(t *testing.T) {
+	tests := map[string]struct {
+		state      func(*task) bool
+		wantBefore bool
+		wantAfter  bool
+	}{
+		"is stopped": {
+			state:      (*task).isStopped,
+			wantBefore: false,
+			wantAfter:  true,
+		},
+		"is running": {
+			state:      (*task).isRunning,
+			wantBefore: true,
+			wantAfter:  false,
+		},
+	}
 
-	task.stop()
-	time.Sleep(time.Millisecond * 500)
-	assert.True(t, task.isStopped())
-}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			task := newTask(func() {}, time.Second)
+			assert.Equal(t, tc.wantBefore, tc.state(task))
 
-func Test_task_isRunning(t *testing.T) {
-	task := newTask(func() {}, time.Second)
-	assert.True(t, task.isRunning())
-
-	task.stop()
-	time.Sleep(time.Millisecond * 500)
-	assert.False(t, task.isRunning())
+			task.stop()
+			task.wait()
+			assert.Equal(t, tc.wantAfter, tc.state(task))
+		})
+	}
 }

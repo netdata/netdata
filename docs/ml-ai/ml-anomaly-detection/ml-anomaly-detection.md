@@ -10,20 +10,20 @@ A dedicated process correlates anomalies across all metrics within each node, ge
 
 ## System Characteristics
 
-| Aspect                    | Implementation                                                                      | Benefit                                                     |
-|---------------------------|-------------------------------------------------------------------------------------|-------------------------------------------------------------|
-| **Algorithm**             | Unsupervised k-means clustering (k=2) via [dlib](https://github.com/davisking/dlib) | No manual training or labeled data required                 |
-| **Model Architecture**    | rolling 18 models per metric, 3-hour staggered training                             | Eliminates 99% of false positives through consensus         |
-| **Processing Location**   | Edge computation on each Netdata agent                                              | No cloud dependency, no data egress                         |
-| **Resource Usage**        | ~18KB RAM per metric, 2-4% of a single CPU for 10k metrics                          | Predictable linear scaling                                  |
-| **Configuration**         | Zero-configuration with automatic adaptation                                        | Works instantly on any metric type                          |
-| **Detection Latency**     | Real-time during data collection                                                    | Anomalies flagged within 1 second                           |
-| **Historical Storage**    | Anomaly bit embedded in metric storage                                              | No additional storage overhead                              |
-| **Query Performance**     | On-the-fly anomaly rate calculation                                                 | No pre-aggregation needed                                   |
-| **Time-series Integrity** | Immutable anomaly history                                                           | No hindsight bias - shows what was detectable THEN          |
-| **Coverage**              | Every metric, every dimension                                                       | No sampling, no blind spots                                 |
-| **Correlation Engine**    | Real-time anomaly correlation across metrics                                        | Powers Anomaly Advisor for root cause analysis              |
-| **Alert Philosophy**      | Primary: investigation aid; also supports Anomaly Rate alerts                       | Reduces alert fatigue while enabling proactive notification |
+| Aspect                  | Implementation                                                                              | Benefit                                              |
+|-------------------------|---------------------------------------------------------------------------------------------|------------------------------------------------------|
+| **Algorithm**           | Unsupervised k-means clustering (k=2) via [dlib](https://github.com/davisking/dlib)        | No manual training or labeled data required          |
+| **Model Architecture**  | Rolling 18 models per metric, 3-hour staggered training                                     | Eliminates 99% of false positives through consensus  |
+| **Processing Location** | Edge computation on each Netdata Agent                                                       | No cloud dependency, no data egress                  |
+| **Resource Usage**      | ~18KB RAM per metric, 2-4% of a single CPU for 10k metrics                                  | Predictable linear scaling                           |
+| **Configuration**       | Zero-configuration with automatic adaptation                                                | Works instantly on any metric type                   |
+| **Detection Latency**   | Real-time during data collection                                                            | Anomalies flagged within 1 second                    |
+| **Historical Storage**  | Anomaly bit embedded in metric storage                                                       | No additional storage overhead                       |
+| **Query Performance**   | On-the-fly anomaly rate calculation                                                         | No pre-aggregation needed                            |
+| **Time-series Integrity** | Immutable anomaly history                                                                 | No hindsight bias — shows what was detectable then   |
+| **Coverage**            | Every metric, every dimension                                                                | No sampling, no blind spots                          |
+| **Correlation Engine**  | Real-time anomaly correlation across metrics                                                 | Powers Anomaly Advisor for root cause analysis       |
+| **Alert Philosophy**    | Primarily an investigation aid; anomaly bits and anomaly rate can also drive health alerts   | Reduces alert fatigue while enabling anomaly-based alerting |
 
 :::note
 Netdata avoids deep learning models to maintain lightweight operation on any Linux system. The entire ML system is designed to run efficiently without specialized hardware or dependencies.
@@ -31,13 +31,13 @@ Netdata avoids deep learning models to maintain lightweight operation on any Lin
 
 ## Types of Anomalies Detected
 
-| Anomaly Type             | Description                                                       | Business Impact                          |
-|--------------------------|-------------------------------------------------------------------|------------------------------------------|
-| **Point Anomalies**      | Unusually high or low values compared to historical data          | Early warning of service degradation     |
-| **Contextual Anomalies** | Sequences of values that deviate from expected patterns           | Identification of unusual usage patterns |
-| **Collective Anomalies** | Multivariate anomalies where a combination of metrics appears off | Detection of complex system issues       |
-| **Concept Drifts**       | Gradual shifts leading to a new baseline                          | Recognition of evolving system behavior  |
-| **Change Points**        | Sudden shifts resulting in a new normal state                     | Identification of system changes         |
+| Anomaly Type             | Description                                                      | Business Impact                           |
+|--------------------------|------------------------------------------------------------------|-------------------------------------------|
+| **Point Anomalies**      | Unusually high or low values compared to historical data         | Early warning of service degradation      |
+| **Contextual Anomalies** | Sequences of values that deviate from expected patterns          | Identification of unusual usage patterns  |
+| **Collective Anomalies** | Multivariate anomalies where a combination of metrics appears off | Detection of complex system issues        |
+| **Concept Drifts**       | Gradual shifts leading to a new baseline                         | Recognition of evolving system behavior   |
+| **Change Points**        | Sudden shifts resulting in a new normal state                    | Identification of system changes          |
 
 ## Technical Deep Dive: How Netdata ML Works
 
@@ -158,15 +158,6 @@ You can see **Node Anomaly Rate (NAR)** and **Dimension Anomaly Rate (DAR)** cal
 
 Netdata tracks the percentage of anomaly bits over time for you. When the **Node Anomaly Rate (NAR)** exceeds a set threshold and remains high for a period, a **node anomaly event** is triggered. These events are recorded in the `new_anomaly_event` dimension on the `anomaly_detection.anomaly_detection` chart.
 
-## Alerting on Anomaly Rates
-
-Netdata supports creating alerts based on ML anomaly rates, so you can be notified when anomaly rates exceed thresholds. There are two patterns:
-
-- **Chart-level anomaly rate alerts**: Use `anomaly-bit` in the `lookup` line to calculate the anomaly rate for a specific chart's dimensions. For example, `lookup: average -5m anomaly-bit of *` computes the rolling 5-minute anomaly rate for a chart.
-- **Node-level anomaly rate alerts**: Use the `anomaly_detection.anomaly_rate` chart to monitor the overall anomaly rate across all ML-enabled dimensions on a node.
-
-You can create Anomaly Rate alerts through the [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md) UI wizard, or write them manually. The [Alert Configuration Reference](/src/health/REFERENCE.md) includes complete working examples for both patterns (Examples 6 and 7).
-
 ## Available Documentation
 
 - **[ML Configuration](/src/ml/ml-configuration.md)** - Configuration and tuning guide
@@ -258,13 +249,67 @@ On a freshly installed agent, ML begins detecting anomalies within 10 minutes. H
 
 **Operational tip**: During the first 48 hours after deployment, expect elevated anomaly rates. This is normal as the system learns your infrastructure's patterns. Use this period to observe ML behavior but avoid making critical decisions based solely on early anomaly detection.
 
-## Getting Started
+## Creating Anomaly-Based Health Alerts
 
-ML is enabled by default in recent Netdata versions. To use anomaly detection:
+You can create health alerts that trigger based on anomaly rates instead of raw metric values by using the `anomaly-bit` option in your alert's `lookup` line. Internally, anomaly bits mark samples as anomalous or normal, and the query/health pipeline exposes this as an anomaly-rate percentage in the 0-100 range. For aggregated or tiered data, returned values can be intermediate percentages rather than only 0 or 100, so averaging over a time window gives you the anomaly rate as a percentage.
 
-1. **View anomaly ribbons** - Purple overlays on all charts show anomaly rates
-2. **Access Anomaly Advisor** - Click the Anomalies tab for guided troubleshooting
-3. **Query historical anomalies** - Use the query engine to analyze past incidents
-4. **Create Anomaly Rate alerts** - Get notified when anomaly rates exceed thresholds
+### Anomaly-rate alert
 
-[Learn more about the Anomaly Advisor →](/docs/ml-ai/anomaly-advisor.md)
+The following template triggers when the anomaly rate on `system.cpu` exceeds the defined thresholds:
+
+```text
+ template: ml_5min_cpu_chart
+       on: system.cpu
+   lookup: average -5m anomaly-bit of *
+     calc: $this
+    units: %
+    every: 30s
+     warn: $this > (($status >= $WARNING)  ? (5) : (20))
+     crit: $this >= (($status == $CRITICAL) ? (20) : (100))
+     info: rolling 5min anomaly rate for system.cpu chart
+```
+
+### Pairing with actual values
+
+An anomaly-rate alert tells you *something is unusual*, but not *what the actual numbers are*. To get the real values alongside the anomaly alert, create a companion alert on the raw metric:
+
+```text
+ alarm: cpu_usage_5min
+    on: system.cpu
+lookup: average -5m of user,system
+ units: %
+ every: 30s
+  warn: $this > 80
+  crit: $this > 95
+  info: average user+system CPU utilization over the last 5 minutes
+```
+
+When the anomaly alert fires, the companion alert can provide the concrete values in a separate alert — for example, "CPU anomaly rate 35%" alongside "CPU utilization 92%".
+
+:::tip
+
+Use `foreach` in a template to generate one alert instance per dimension (e.g., one per CPU state). Note that `foreach` and `of` serve different purposes: `of` selects which dimensions the `lookup` aggregates, while `foreach` creates separate alert instances for each matching dimension in a template. For the full alert syntax, see the [health configuration reference](/src/health/REFERENCE.md).
+
+:::
+
+### Adding context to alert notifications
+
+The `info` and `summary` fields support template variables that add contextual detail to notifications:
+
+| Variable             | Replaced With                     |
+|----------------------|-----------------------------------|
+| `${family}`          | Family instance (for example, `eth0`) |
+| `${label:LABEL_NAME}` | Chart label value                 |
+
+:::important
+
+`$this` is available only in `calc`, `warn`, and `crit` expressions — not in the `info` or `summary` fields.
+
+:::
+
+### Investigating anomaly alerts
+
+When an anomaly alert fires, use Netdata's built-in tools to investigate the root cause:
+
+- **[Alert Troubleshooting](/docs/netdata-ai/troubleshooting/index.md)** — generate a one-click report from any fired alert, assessing its validity, uncovering correlated signals, and proposing a root-cause hypothesis
+- **[Investigations](/docs/netdata-ai/investigations/index.md)** — ask open-ended questions about your infrastructure for deeper analysis beyond a single alert

@@ -242,16 +242,16 @@ func (c *Collector) parseIBMiVersion() {
 					c.versionRelease = release
 				}
 				modStr := remainder[mIdx+1:]
-				modNum := ""
+				var modNum strings.Builder
 				for _, ch := range modStr {
 					if ch >= '0' && ch <= '9' {
-						modNum += string(ch)
+						modNum.WriteString(string(ch))
 					} else {
 						break
 					}
 				}
-				if modNum != "" {
-					if mod, err := strconv.Atoi(modNum); err == nil {
+				if modNum.String() != "" {
+					if mod, err := strconv.Atoi(modNum.String()); err == nil {
 						c.versionMod = mod
 					}
 				}

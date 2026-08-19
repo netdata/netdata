@@ -7,11 +7,11 @@
 // memory management
 
 EVAL_NODE *eval_node_alloc(int count) {
-    static int id = 1;
+    static int id = 0;
 
     EVAL_NODE *op = callocz(1, sizeof(EVAL_NODE) + (sizeof(EVAL_VALUE) * count));
 
-    op->id = id++;
+    op->id = __atomic_add_fetch(&id, 1, __ATOMIC_RELAXED);
     op->operator = EVAL_OPERATOR_NOP;
     op->precedence = 0;  // Will be set based on the operator
     op->count = count;
@@ -365,6 +365,7 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
         const char *src = string2str(expression->source);
         size_t slot = 0;
         while(matches) {
+            size_t matches_before = matches;
             size_t matched = 0;
 
             matched = str_replace_cpy(dst[slot], max_buf_size, src, find1, find1_len, replace, replace_len);
@@ -382,6 +383,9 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
                     matches -= MIN(matches, matched);
                 }
             }
+
+            if(matches == matches_before)
+                return;
         }
 
         // Update the expression source with the new string.

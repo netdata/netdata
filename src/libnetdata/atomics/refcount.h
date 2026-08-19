@@ -76,9 +76,8 @@ static REFCOUNT refcount_release_with_trace(REFCOUNT *refcount, const char *func
         if(!REFCOUNT_VALID(expected))
             fatal("REFCOUNT %d is invalid (detected at %s(), called from %s())", expected, __FUNCTION__, func);
 
-//        // the following is a valid case when using refcount_acquire_for_deletion_and_wait_with_trace()
-//        if(expected <= 0)
-//            fatal("REFCOUNT cannot release a refcount of %d (detected at %s(), called from %s())", expected, __FUNCTION__, func);
+        if(unlikely(expected == 0 || expected == REFCOUNT_DELETED))
+            fatal("REFCOUNT cannot release a refcount of %d (detected at %s(), called from %s())", expected, __FUNCTION__, func);
 
         desired = expected - 1;
     } while(!__atomic_compare_exchange_n(refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
@@ -110,6 +109,9 @@ static REFCOUNT refcount_release_and_acquire_for_deletion_advanced_with_trace(RE
         if (!REFCOUNT_VALID(expected))
             fatal("REFCOUNT %d is invalid (detected at %s(), called from %s())", expected, __FUNCTION__, func);
 
+        if (unlikely(expected == 0 || expected == REFCOUNT_DELETED))
+            fatal("REFCOUNT cannot release a refcount of %d (detected at %s(), called from %s())", expected, __FUNCTION__, func);
+
         if (expected == 1) {
             // we can get it for deletion
             desired = REFCOUNT_DELETED;
@@ -130,7 +132,7 @@ static bool refcount_release_and_acquire_for_deletion_with_trace(REFCOUNT *refco
     return refcount_release_and_acquire_for_deletion_advanced_with_trace(refcount, func) == REFCOUNT_DELETED;
 }
 
-// this sleeps for 1 nanosecond (posix systems), or Sleep(0) on Windows
+// this sleeps for 1 nanosecond (POSIX systems), or 1 millisecond on Windows
 void tinysleep(void);
 
 ALWAYS_INLINE

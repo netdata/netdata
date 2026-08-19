@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(crate) fn apply_v9_special_mappings(fields: &mut FlowFields, field: V9Field, value: &str) {
     match field {
         V9Field::IpProtocolVersion => {
@@ -31,8 +32,7 @@ pub(crate) fn apply_v9_special_mappings(fields: &mut FlowFields, field: V9Field,
                 .entry("ICMPV6_TYPE")
                 .or_insert_with(|| value.to_string());
         }
-        V9Field::ImpIpv6CodeValue => {
-            // netflow_parser names v9 field 179 "ImpIpv6CodeValue".
+        V9Field::IcmpIpv6CodeValue => {
             fields
                 .entry("ICMPV6_CODE")
                 .or_insert_with(|| value.to_string());

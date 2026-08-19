@@ -56,6 +56,27 @@ type CollectorV2 interface {
 	ChartTemplateYAML() string
 }
 
+// CollectorV2Runner is an optional long-running V2 collector hook.
+//
+// Run is called only after the runtime job starts. It is not called during
+// config validation or autodetection. Implementations should block until ctx is
+// canceled, and must return promptly after ctx.Done(). Returning before
+// cancellation is treated as an unexpected runner stop and is logged by the job
+// runtime.
+type CollectorV2Runner interface {
+	Run(context.Context) error
+}
+
+// FunctionAvailability lets a running collector instance decide which
+// job-backed Functions it can currently serve.
+//
+// Implementations must be cheap and non-blocking. When a collector does not
+// implement this interface, every running job is available for every
+// job-backed Function it declares or shares.
+type FunctionAvailability interface {
+	FunctionAvailable(functionID string) bool
+}
+
 // CollectorV2EnginePolicy allows a V2 collector to provide chartengine policy
 // (series selector + autogen behavior).
 type CollectorV2EnginePolicy interface {

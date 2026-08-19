@@ -110,17 +110,18 @@
 
 #define DOUBLE_LINKED_LIST_APPEND_LIST_UNSAFE(head, head2, prev, next)                         \
     do {                                                                                       \
-        if (head2) {                                                                           \
+        __typeof(head2) _head2 = (head2);                                                      \
+        if (_head2 && _head2 != (head)) {                                                       \
             if (head) {                                                                        \
-                __typeof(head2) _head2_last_item = (head2)->prev;                              \
-                                                                                               \
-                (head2)->prev = (head)->prev;                                                  \
-                (head)->prev->next = (head2);                                                  \
-                                                                                               \
+                __typeof(_head2) _head2_last_item = _head2->prev;                              \
+                                                                                                \
+                _head2->prev = (head)->prev;                                                   \
+                (head)->prev->next = _head2;                                                   \
+                                                                                                \
                 (head)->prev = _head2_last_item;                                               \
             }                                                                                  \
             else                                                                               \
-                (head) = (head2);                                                              \
+                (head) = _head2;                                                               \
         }                                                                                      \
     } while (0)
 

@@ -6,6 +6,7 @@ modules:
       module_name: proxysql
       monitored_instance:
         name: ProxySQL
+        description: "Monitor ProxySQL client and backend connections, traffic, queries, latency, prepared statements, and cache use."
         link: https://www.proxysql.com/
         icon_filename: proxysql.png
         categories:
@@ -119,7 +120,7 @@ modules:
                 jobs:
                   - name: local
                     dsn: stats:stats@tcp(127.0.0.1:6032)/
-                
+
                   - name: remote
                     dsn: stats:stats@tcp(203.0.113.0:6032)/
     troubleshooting:

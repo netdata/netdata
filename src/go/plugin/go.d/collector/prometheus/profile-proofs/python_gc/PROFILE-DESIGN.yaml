@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: python_gc
+match: 'python_gc_*'
+namespace: process_runtime
+composition:
+  supports: {}
+entities:
+  generation:
+    grain: Python garbage-collector generation
+    identity:
+      required: [generation]
+      optional: []
+label_policies: {}
+reduction_policies: {}
+normalizations: {}
+exclusions: {}
+limitations: {}
+views:
+  python_gc.collected_objects:
+    family: Process Runtime/Python GC
+    question: At what rate does each generation collect objects?
+    entity: generation
+    inputs:
+      collected:
+        signal: objects_collected
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  python_gc.uncollectable_objects:
+    family: Process Runtime/Python GC
+    question: At what rate does each generation find uncollectable objects?
+    entity: generation
+    inputs:
+      uncollectable:
+        signal: objects_uncollectable
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}
+  python_gc.collections:
+    family: Process Runtime/Python GC
+    question: At what rate does each generation run garbage collection?
+    entity: generation
+    inputs:
+      collections:
+        signal: collections
+        components: [value]
+    labels: {dimensions: {}, promote: [], omit: {}}

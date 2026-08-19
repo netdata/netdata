@@ -1,7 +1,18 @@
 use super::*;
 
-pub(super) const DEFAULT_NETDATA_CACHE_DIR: &str = "/var/cache/netdata";
-pub(super) const DEFAULT_NETDATA_STOCK_DATA_DIR: &str = "/usr/share/netdata";
+pub(super) const DEFAULT_NETDATA_CACHE_DIR: &str = match option_env!("NETDATA_BUILD_CACHE_DIR") {
+    Some(value) => value,
+    None => "/var/cache/netdata",
+};
+pub(super) const DEFAULT_NETDATA_LIB_DIR: &str = match option_env!("NETDATA_BUILD_LIB_DIR") {
+    Some(value) => value,
+    None => "/var/lib/netdata",
+};
+pub(super) const DEFAULT_NETDATA_STOCK_DATA_DIR: &str =
+    match option_env!("NETDATA_BUILD_STOCK_DATA_DIR") {
+        Some(value) => value,
+        None => "/usr/share/netdata",
+    };
 pub(super) const TOPOLOGY_IP_INTEL_DIR: &str = "topology-ip-intel";
 pub(super) const TOPOLOGY_IP_ASN_MMDB: &str = "topology-ip-asn.mmdb";
 pub(super) const TOPOLOGY_IP_GEO_MMDB: &str = "topology-ip-geo.mmdb";
@@ -26,6 +37,10 @@ pub(super) fn parse_bytesize(value: &str) -> Result<ByteSize, String> {
 
 pub(super) fn default_true() -> bool {
     true
+}
+
+pub(super) fn default_netflow_listen() -> Vec<String> {
+    vec!["0.0.0.0:2055".to_string(), "0.0.0.0:6343".to_string()]
 }
 
 pub(super) fn default_dynamic_bmp_listen() -> String {
@@ -84,12 +99,12 @@ pub(super) fn default_plugin_enabled() -> bool {
     true
 }
 
-pub(super) fn default_retention_size_of_journal_files() -> ByteSize {
-    ByteSize::gb(10)
+pub(super) fn default_memory_diagnostics_interval() -> Duration {
+    Duration::from_secs(10)
 }
 
-pub(super) fn default_retention_duration_of_journal_files() -> Duration {
-    Duration::from_secs(7 * 24 * 60 * 60)
+pub(super) fn default_retention_size_of_journal_files() -> ByteSize {
+    ByteSize::gb(10)
 }
 
 pub(super) fn default_retention_size_of_journal_files_opt() -> Option<ByteSize> {
@@ -97,7 +112,7 @@ pub(super) fn default_retention_size_of_journal_files_opt() -> Option<ByteSize> 
 }
 
 pub(super) fn default_retention_duration_of_journal_files_opt() -> Option<Duration> {
-    Some(default_retention_duration_of_journal_files())
+    None
 }
 
 pub(super) fn default_rotation_duration_of_journal_file() -> Duration {

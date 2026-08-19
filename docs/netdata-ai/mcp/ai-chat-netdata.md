@@ -1,6 +1,6 @@
 # AI Chat with Netdata
 
-Chat with your infrastructure using natural language through two distinct integration architectures.
+Chat with your infrastructure using natural language through two distinct integration architectures. The LLM powering the conversation can be a cloud service — such as OpenAI, Anthropic, or DeepSeek — or a self-hosted provider like Ollama running on your own infrastructure.
 
 ## Integration Architecture
 
@@ -8,7 +8,7 @@ Chat with your infrastructure using natural language through two distinct integr
 
 ```mermaid
 flowchart TB
-    LLM("LLM Provider<br/>OpenAI, Anthropic, etc.")
+    LLM("LLM Provider<br/>OpenAI, Anthropic, Ollama, etc.")
     
     subgraph infra["Your Infrastructure"]
         direction TB
@@ -65,7 +65,7 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    LLM("LLM Provider<br/>OpenAI, Anthropic, etc.")
+    LLM("LLM Provider<br/>OpenAI, Anthropic, Ollama, etc.")
     CloudMCP("Netdata Cloud MCP<br/>app.netdata.cloud/api/v1/mcp")
 
     subgraph infra["Your Infrastructure"]

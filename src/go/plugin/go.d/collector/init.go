@@ -3,6 +3,12 @@
 package collector
 
 import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
+	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
+
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/activemq"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/adaptecraid"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ap"
@@ -14,9 +20,11 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/boinc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cassandra"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ceph"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/chrony"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/clickhouse"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cockroachdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/consul"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/coredns"
@@ -80,6 +88,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/openvpn"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/openvpn_status_log"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/oracledb"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/panos"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pgbouncer"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/phpdaemon"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/phpfpm"
@@ -104,10 +113,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rspamd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/samba"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sensors"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smartctl"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/spigotmc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/squid"
@@ -137,3 +143,21 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/zfspool"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/zookeeper"
 )
+
+func init() {
+	// These collectors share SNMP state; wire them together here instead of
+	// exposing package-global registries from the individual collector packages.
+	deviceStore := ddsnmp.NewDeviceStore()
+	trapEnrichment := snmptopology.NewTrapEnrichmentHandle()
+	reverseDNS := reversedns.New(reversedns.Config{
+		LookupTimeout: reversedns.DefaultLookupTimeout,
+		PositiveTTL:   reversedns.DefaultPositiveTTL,
+		NegativeTTL:   reversedns.DefaultNegativeTTL,
+		MaxEntries:    reversedns.DefaultMaxEntries,
+		MaxConcurrent: reversedns.DefaultMaxConcurrent,
+	})
+
+	snmp.Register(deviceStore)
+	snmptopology.Register(deviceStore, trapEnrichment, reverseDNS)
+	snmptraps.Register(deviceStore, trapEnrichment, reverseDNS)
+}

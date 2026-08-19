@@ -4,8 +4,10 @@ package chartengine
 
 import (
 	"sort"
+	"sync"
 	"testing"
 
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +23,52 @@ func (m mapLabelView) Get(key string) (string, bool) {
 	return value, ok
 }
 
+func TestCompilePreservesLabelPromotionModes(t *testing.T) {
+	tests := map[string]struct {
+		promotion []string
+		wantMode  program.PromotionMode
+		wantKeys  []string
+	}{
+		"omitted uses automatic intersection": {
+			wantMode: program.PromotionModeAutoIntersection,
+		},
+		"explicit empty promotes no non-identity labels": {
+			promotion: []string{},
+			wantMode:  program.PromotionModeExplicitIntersection,
+		},
+		"explicit allowlist uses explicit intersection": {
+			promotion: []string{"owner", "owner", "region"},
+			wantMode:  program.PromotionModeExplicitIntersection,
+			wantKeys:  []string{"owner", "region"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := &charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{{
+					Family:  "Service",
+					Metrics: []string{"service_value"},
+					Charts: []charttpl.Chart{{
+						Title:         "Value",
+						Context:       "value",
+						Units:         "value",
+						LabelPromoted: tc.promotion,
+						Dimensions:    []charttpl.Dimension{{Selector: "service_value", Name: "value"}},
+					}},
+				}},
+			}
+			compiled, err := Compile(spec, 1)
+			require.NoError(t, err)
+			charts := compiled.Charts()
+			require.Len(t, charts, 1)
+			assert.Equal(t, tc.wantMode, charts[0].Labels.Mode)
+			assert.Equal(t, tc.wantKeys, charts[0].Labels.PromoteKeys)
+		})
+	}
+}
+
 func (m mapLabelView) Range(fn func(key, value string) bool) {
 	keys := make([]string, 0, len(m))
 	for key := range m {
@@ -32,6 +80,17 @@ func (m mapLabelView) Range(fn func(key, value string) bool) {
 			return
 		}
 	}
+}
+
+func TestChartTemplateIDAtUsesCompilerIdentity(t *testing.T) {
+	id, ok := ChartTemplateIDAt([]int{1, 2}, 3)
+	require.True(t, ok)
+	assert.Equal(t, "g1.2.c3", id)
+
+	_, ok = ChartTemplateIDAt(nil, 0)
+	assert.False(t, ok)
+	_, ok = ChartTemplateIDAt([]int{0}, -1)
+	assert.False(t, ok)
 }
 
 func TestCompileScenarios(t *testing.T) {
@@ -51,9 +110,10 @@ func TestCompileScenarios(t *testing.T) {
 						Metrics: []string{"svc_requests_total"},
 						Charts: []charttpl.Chart{
 							{
-								Title:   "Requests",
-								Context: "requests",
-								Units:   "requests/s",
+								Title:       "Requests",
+								Context:     "requests",
+								Units:       "requests/s",
+								Aggregation: charttpl.AggregationMin,
 								Dimensions: []charttpl.Dimension{
 									{
 										Selector: "svc_requests_total",
@@ -65,6 +125,10 @@ func TestCompileScenarios(t *testing.T) {
 											Divisor:    1000,
 										},
 									},
+									{
+										Selector: "svc_requests_total",
+										Name:     "inherited",
+									},
 								},
 							},
 						},
@@ -75,11 +139,13 @@ func TestCompileScenarios(t *testing.T) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
-				require.Len(t, charts[0].Dimensions, 1)
+				require.Len(t, charts[0].Dimensions, 2)
 				assert.True(t, charts[0].Dimensions[0].Hidden)
 				assert.True(t, charts[0].Dimensions[0].Float)
 				assert.Equal(t, -8, charts[0].Dimensions[0].Multiplier)
 				assert.Equal(t, 1000, charts[0].Dimensions[0].Divisor)
+				assert.Equal(t, program.AggregationMin, charts[0].Dimensions[0].Aggregation)
+				assert.Equal(t, program.AggregationMin, charts[0].Dimensions[1].Aggregation)
 			},
 		},
 		"applies default lifecycle when omitted": {
@@ -110,6 +176,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, 5, charts[0].Lifecycle.ExpireAfterCycles)
 				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.MaxDims)
 				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.ExpireAfterCycles)
+				assert.Equal(t, program.AggregationSum, charts[0].Dimensions[0].Aggregation)
 			},
 		},
 		"defaults chart priority when omitted": {
@@ -267,7 +334,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, 9, charts[0].Lifecycle.ExpireAfterCycles)
 			},
 		},
-		"compiles nested groups with inherited metric visibility and inferred algorithm": {
+		"compiles nested groups with inherited metric visibility and deferred algorithm": {
 			rev: 42,
 			spec: charttpl.Spec{
 				Version:          charttpl.VersionV1,
@@ -308,7 +375,7 @@ func TestCompileScenarios(t *testing.T) {
 				require.Len(t, charts, 1)
 				assert.Equal(t, "Database/Throughput", charts[0].Meta.Family)
 				assert.Equal(t, "mysql.database.queries_total", charts[0].Meta.Context)
-				assert.Equal(t, program.AlgorithmIncremental, charts[0].Meta.Algorithm)
+				assert.Equal(t, program.AlgorithmAuto, charts[0].Meta.Algorithm)
 				assert.Equal(t, program.ChartTypeLine, charts[0].Meta.Type)
 				assert.True(t, charts[0].Identity.Static)
 
@@ -357,7 +424,41 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, "", charts[0].Dimensions[0].NameFromLabel)
 				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
 				assert.True(t, charts[0].Dimensions[0].Dynamic)
-				assert.Equal(t, program.AlgorithmIncremental, charts[0].Meta.Algorithm)
+				assert.Equal(t, program.AlgorithmAuto, charts[0].Meta.Algorithm)
+			},
+		},
+		"compile required and optional instance labels": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Workers",
+						Metrics: []string{"worker_cpu_seconds"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Worker CPU",
+								Context: "worker_cpu",
+								Units:   "seconds",
+								Instances: &charttpl.Instances{
+									ByLabels:         []string{"deployment"},
+									OptionalByLabels: []string{"pid"},
+								},
+								Dimensions: []charttpl.Dimension{
+									{Selector: "worker_cpu_seconds", Name: "cpu"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.False(t, charts[0].Identity.Static)
+				require.Len(t, charts[0].Identity.InstanceByLabels, 1)
+				assert.Equal(t, "deployment", charts[0].Identity.InstanceByLabels[0].Key)
+				assert.Equal(t, []string{"pid"}, charts[0].Identity.OptionalByLabels)
 			},
 		},
 		"infer stateset dimension naming from runtime series metadata": {
@@ -390,7 +491,7 @@ func TestCompileScenarios(t *testing.T) {
 				require.Len(t, charts[0].Dimensions, 1)
 				assert.Equal(t, "", charts[0].Dimensions[0].NameFromLabel)
 				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
-				assert.Equal(t, program.AlgorithmAbsolute, charts[0].Meta.Algorithm)
+				assert.Equal(t, program.AlgorithmAuto, charts[0].Meta.Algorithm)
 			},
 		},
 		"fails runtime inference for omitted naming on non-inferable selector": {
@@ -461,7 +562,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, []string{"state"}, charts[0].Labels.Exclusions.DimensionKeyLabels)
 			},
 		},
-		"fails on mixed inferred metric kinds without explicit algorithm": {
+		"defers algorithm for selectors with different metric name conventions": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
 				Groups: []charttpl.Group{
@@ -485,8 +586,12 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
-			errLike: "algorithm inference is ambiguous",
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, program.AlgorithmAuto, charts[0].Meta.Algorithm)
+			},
 		},
 		"treats braces as literal characters in chart id": {
 			spec: charttpl.Spec{
@@ -611,4 +716,59 @@ func TestCompileScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCompileDoesNotMutateOrRaceOnSharedSpec(t *testing.T) {
+	newSpec := func() charttpl.Spec {
+		return charttpl.Spec{
+			Version: charttpl.VersionV1,
+			Engine: &charttpl.Engine{
+				Autogen: &charttpl.EngineAutogen{
+					Enabled: true,
+					Rules: []charttpl.EngineAutogenRule{{
+						Scope: "metric_*",
+						Selector: metrixselector.Expr{
+							Deny: []string{"zeta_*", "alpha_*", "alpha_*"},
+						},
+					}},
+				},
+			},
+			Groups: []charttpl.Group{
+				{
+					Family:  "Test",
+					Metrics: []string{"metric"},
+					Charts: []charttpl.Chart{
+						{
+							Title:      "Test",
+							Context:    "test",
+							Units:      "units",
+							Dimensions: []charttpl.Dimension{{Selector: "metric", Name: "metric"}},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	spec := newSpec()
+	want := newSpec()
+
+	const workers = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, workers)
+	for i := range workers {
+		wg.Add(1)
+		go func(revision uint64) {
+			defer wg.Done()
+			_, err := Compile(&spec, revision)
+			errs <- err
+		}(uint64(i + 1))
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	assert.Equal(t, want, spec)
 }

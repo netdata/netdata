@@ -1,6 +1,5 @@
 use crate::flow::{FlowFields, FlowRecord};
 use crate::flow_index::FlowId as IndexedFlowId;
-use std::mem::size_of;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,6 +73,7 @@ pub(crate) struct TierFlowRef {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub(crate) struct OpenTierRow {
     pub(crate) timestamp_usec: u64,
     pub(crate) flow_ref: TierFlowRef,
@@ -83,16 +83,34 @@ pub(crate) struct OpenTierRow {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct OpenTierState {
     pub(crate) generation: u64,
-    pub(crate) minute_1: Vec<OpenTierRow>,
-    pub(crate) minute_5: Vec<OpenTierRow>,
-    pub(crate) hour_1: Vec<OpenTierRow>,
+    pub(crate) minute_1_rows: u64,
+    pub(crate) minute_5_rows: u64,
+    pub(crate) hour_1_rows: u64,
+    pub(crate) accumulator_heap_bytes: usize,
 }
 
 impl OpenTierState {
-    pub(crate) fn estimated_heap_bytes(&self) -> usize {
-        self.minute_1.capacity() * size_of::<OpenTierRow>()
-            + self.minute_5.capacity() * size_of::<OpenTierRow>()
-            + self.hour_1.capacity() * size_of::<OpenTierRow>()
+    pub(crate) fn replace_snapshot(
+        &mut self,
+        generation: u64,
+        minute_1_rows: u64,
+        minute_5_rows: u64,
+        hour_1_rows: u64,
+        accumulator_heap_bytes: usize,
+    ) {
+        self.generation = generation;
+        self.minute_1_rows = minute_1_rows;
+        self.minute_5_rows = minute_5_rows;
+        self.hour_1_rows = hour_1_rows;
+        self.accumulator_heap_bytes = accumulator_heap_bytes;
+    }
+
+    pub(crate) fn counts(&self) -> (u64, u64, u64) {
+        (self.minute_1_rows, self.minute_5_rows, self.hour_1_rows)
+    }
+
+    pub(crate) const fn estimated_heap_bytes(&self) -> usize {
+        self.accumulator_heap_bytes
     }
 }
 

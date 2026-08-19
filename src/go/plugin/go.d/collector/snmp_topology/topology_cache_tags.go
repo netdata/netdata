@@ -2,6 +2,8 @@
 
 package snmptopology
 
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 const (
 	tagLldpLocChassisID        = "lldp_loc_chassis_id"
 	tagLldpLocChassisIDSubtype = "lldp_loc_chassis_id_subtype"
@@ -120,6 +122,12 @@ const (
 	tagArpType     = "arp_type"
 	tagArpState    = "arp_state"
 	tagArpAddrType = "arp_addr_type"
+
+	tagOSPFRouterID                 = topologymodel.LabelOSPFRouterID
+	tagOSPFNeighborIP               = "ospf_neighbor_ip"
+	tagOSPFNeighborAddresslessIndex = "ospf_neighbor_addressless_index"
+	tagOSPFNeighborRouterID         = "ospf_neighbor_router_id"
+	tagOSPFNeighborState            = "ospf_neighbor_state"
 
 	// Internal collector tags used when ingesting additional VLAN-context snapshots.
 	tagTopologyContextVLANID   = "_topology_context_vlan_id"

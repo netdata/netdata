@@ -6,6 +6,7 @@ modules:
       module_name: phpdaemon
       monitored_instance:
         name: phpDaemon
+        description: "Monitor phpDaemon worker states, active and idle worker counts, and uptime."
         link: https://github.com/kakserpom/phpdaemon
         icon_filename: php.svg
         categories:
@@ -42,18 +43,18 @@ modules:
           - title: Enable phpDaemon's HTTP server
             description: |
               Statistics expected to be in JSON format.
-              
+
               <details>
               <summary>phpDaemon configuration</summary>
-              
+
               Instruction from [@METAJIJI](https://github.com/METAJIJI).
-              
+
               To enable `phpd` statistics on http, you must enable the http server and write an application.
               Application is important, because standalone application [ServerStatus.php](https://github.com/kakserpom/phpdaemon/blob/master/PHPDaemon/Applications/ServerStatus.php) provides statistics in html format and unusable for `netdata`.
-              
+
               ```php
               // /opt/phpdaemon/conf/phpd.conf
-              
+
               path /opt/phpdaemon/conf/AppResolver.php;
               Pool:HTTPServer {
                   privileged;
@@ -61,12 +62,12 @@ modules:
                   port 8509;
               }
               ```
-              
+
               ```php
               // /opt/phpdaemon/conf/AppResolver.php
-              
+
               <?php
-              
+
               class MyAppResolver extends \PHPDaemon\Core\AppResolver {
                   public function getRequestRoute($req, $upstream) {
                       if (preg_match('~^/(ServerStatus|FullStatus)/~', $req->attrs->server['DOCUMENT_URI'], $m)) {
@@ -74,44 +75,44 @@ modules:
                       }
                   }
               }
-              
+
               return new MyAppResolver;
               ```
-              
+
               ```php
               /opt/phpdaemon/conf/PHPDaemon/Applications/FullStatus.php
-              
+
               <?php
               namespace PHPDaemon\Applications;
-              
+
               class FullStatus extends \PHPDaemon\Core\AppInstance {
                   public function beginRequest($req, $upstream) {
                       return new FullStatusRequest($this, $upstream, $req);
                   }
               }
               ```
-              
+
               ```php
               // /opt/phpdaemon/conf/PHPDaemon/Applications/FullStatusRequest.php
-              
+
               <?php
               namespace PHPDaemon\Applications;
-              
+
               use PHPDaemon\Core\Daemon;
               use PHPDaemon\HTTPRequest\Generic;
-              
+
               class FullStatusRequest extends Generic {
                   public function run() {
                       $stime = microtime(true);
                       $this->header('Content-Type: application/javascript; charset=utf-8');
-              
+
                       $stat = Daemon::getStateOfWorkers();
                       $stat['uptime'] = time() - Daemon::$startTime;
                       echo json_encode($stat);
                   }
               }
               ```
-              
+
               </details>
       configuration:
         file:
@@ -258,13 +259,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8509/FullStatus
-                
+
                   - name: remote
                     url: http://192.0.2.1:8509/FullStatus
     troubleshooting:

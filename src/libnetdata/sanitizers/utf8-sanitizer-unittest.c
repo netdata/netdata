@@ -1036,6 +1036,47 @@ static void test_empty_and_special(void) {
         run_sanitize_test(&t);
     }
 
+    // NULL default is equivalent to empty fallback
+    {
+        sanitize_test_t t = {
+            .name = "null_input_with_null_default",
+            .input = NULL,
+            .dst_size = 32, .char_map = identity_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
+    {
+        sanitize_test_t t = {
+            .name = "empty_input_with_null_default",
+            .input = (unsigned char *)"",
+            .dst_size = 32, .char_map = identity_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
+    {
+        sanitize_test_t t = {
+            .name = "control_chars_with_null_default",
+            .input = (unsigned char *)"\t\n\r\v",
+            .dst_size = 32, .char_map = test_rrd_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
+    {
+        sanitize_test_t t = {
+            .name = "all_underscores_with_null_default",
+            .input = (unsigned char *)"___",
+            .dst_size = 32, .char_map = identity_char_map, .utf = true, .empty = NULL,
+            .expected_output = "", .expected_len = 0, .expected_mblen = 0
+        };
+        run_sanitize_test(&t);
+    }
+
     // Single character
     {
         sanitize_test_t t = {
@@ -1462,6 +1503,20 @@ static void test_regression_fixed_bugs(void) {
             .expected_output = "c2", .expected_len = 2, .expected_mblen = 1
         };
         run_sanitize_test(&t);
+    }
+
+    // REGRESSION: In-place hex expansion must not overwrite unread source bytes.
+    {
+        const unsigned char input[] = "\xC2" "AB";
+        unsigned char separate[sizeof(input)];
+        unsigned char in_place[] = "\xC2" "AB";
+
+        size_t separate_len = text_sanitize(separate, input, sizeof(separate), identity_char_map, true, "", NULL);
+        size_t in_place_len = text_sanitize(in_place, in_place, sizeof(in_place), identity_char_map, true, "", NULL);
+
+        TEST_ASSERT("regression_in_place_hex_alias",
+            in_place_len == separate_len && strcmp((char *)in_place, (char *)separate) == 0,
+            "In-place result '%s' does not match separate result '%s'", in_place, separate);
     }
 
     // Test truncated sequence that would overflow if not properly bounded

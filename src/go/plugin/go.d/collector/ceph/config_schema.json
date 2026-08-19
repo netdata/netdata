@@ -6,84 +6,136 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, measured in seconds.",
+        "description": "Periodic metric collection interval in seconds. This does not control the standalone ceph-exporter 5-second default refresh on Reef 18 and later or the ceph-mgr Prometheus 15-second default cache refresh.",
         "type": "integer",
         "minimum": 1,
         "default": 10
       },
       "autodetection_retry": {
         "title": "Detection retry",
-        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "description": "Recheck interval in seconds. Zero disables retries.",
         "type": "integer",
         "minimum": 0,
         "default": 60
       },
+      "function_only": {
+        "title": "Function-only mode",
+        "description": "Run only on-demand Functions, without creating charts or making periodic metric requests.",
+        "type": "boolean",
+        "default": false
+      },
       "url": {
-        "title": "URL",
-        "description": "The URL of the [Ceph Manager API](https://docs.ceph.com/en/reef/mgr/ceph_api/).",
+        "title": "Dashboard URL",
+        "description": "Base URL of the Ceph Dashboard API. Standby-to-active MGR redirects are resolved securely.",
         "type": "string",
-        "default": "https://127.0.0.1:8443",
-        "format": "uri"
+        "format": "uri",
+        "pattern": "^https?://",
+        "default": "https://127.0.0.1:8443"
       },
       "timeout": {
-        "title": "Timeout",
-        "description": "The timeout in seconds for the HTTP request.",
+        "title": "HTTP timeout",
+        "description": "Deadline in seconds for one logical Dashboard operation, including discovery, authentication, retries, and response decoding.",
         "type": "number",
         "minimum": 0.5,
         "default": 2
       },
       "not_follow_redirects": {
-        "title": "Not follow redirects",
-        "description": "If set, the client will not follow HTTP redirects automatically.",
-        "type": "boolean"
+        "title": "Reject redirects",
+        "description": "Reject every Dashboard redirect instead of using Ceph active-MGR discovery.",
+        "type": "boolean",
+        "default": false
+      },
+      "allowed_redirect_origins": {
+        "title": "Trusted active-MGR origins",
+        "description": "Exact scheme and host origins that may receive Dashboard login credentials or bearer tokens after credentialless active-MGR discovery. The configured URL origin is always trusted implicitly.",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://[^/]+/?$"
+        },
+        "uniqueItems": true,
+        "default": []
       },
       "vnode": {
         "title": "Vnode",
-        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "description": "Associate this once-per-cluster job with a configured Virtual Node. Functions remain attached to the physical Agent job.",
         "type": "string"
       },
       "username": {
-        "title": "Username",
-        "description": "The username for basic authentication.",
+        "title": "Dashboard username",
+        "description": "Username sent in the Ceph Dashboard JSON login request. This is not HTTP Basic authentication.",
         "type": "string",
+        "minLength": 1,
         "sensitive": true
       },
       "password": {
-        "title": "Password",
-        "description": "The password for basic authentication.",
+        "title": "Dashboard password",
+        "description": "Password sent only in the Ceph Dashboard JSON login request.",
         "type": "string",
+        "minLength": 1,
         "sensitive": true
       },
       "bearer_token_file": {
-        "title": "Bearer Token File",
-        "description": "Path to a file containing a bearer token for HTTP authentication.",
-        "type": "string"
+        "title": "Bearer token file",
+        "description": "Path to an externally managed Dashboard bearer token. Takes priority over username/password. The file owner must replace the token before it expires; the collector rereads the file for every request, so replacements take effect without a restart.",
+        "type": "string",
+        "minLength": 1
+      },
+      "osd_selector": {
+        "title": "OSD selector",
+        "description": "Simple-pattern selector matched against osd.<id> or OSD UUID before the cap.",
+        "type": "string",
+        "minLength": 1,
+        "default": "*"
+      },
+      "max_osds": {
+        "title": "Maximum OSDs",
+        "description": "Maximum selected OSDs with individual charts. If the selected set exceeds this operator policy, no per-OSD metrics are collected.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 100
+      },
+      "pool_selector": {
+        "title": "Pool selector",
+        "description": "Simple-pattern selector matched against pool names before the cap.",
+        "type": "string",
+        "minLength": 1,
+        "default": "*"
+      },
+      "max_pools": {
+        "title": "Maximum pools",
+        "description": "Maximum selected pools with individual charts. If the selected set exceeds this operator policy, no per-pool metrics are collected.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 100
       },
       "force_http2": {
-        "title": "Force HTTP2",
-        "description": "If set, forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c).",
-        "type": "boolean"
+        "title": "Force HTTP/2",
+        "description": "Force HTTP/2, including h2c over plain TCP.",
+        "type": "boolean",
+        "default": false
       },
       "proxy_url": {
         "title": "Proxy URL",
-        "description": "The URL of the proxy server.",
+        "description": "HTTP proxy URL.",
         "type": "string"
       },
       "proxy_username": {
         "title": "Proxy username",
-        "description": "The username for proxy authentication.",
+        "description": "Username for proxy authentication.",
         "type": "string",
         "sensitive": true
       },
       "proxy_password": {
         "title": "Proxy password",
-        "description": "The password for proxy authentication.",
+        "description": "Password for proxy authentication.",
         "type": "string",
         "sensitive": true
       },
       "headers": {
         "title": "Headers",
-        "description": "Additional HTTP headers to include in the request.",
+        "description": "Additional HTTP headers. Authorization, Cookie, and Host are managed by the collector and rejected here.",
         "type": [
           "object",
           "null"
@@ -94,76 +146,73 @@
       },
       "tls_skip_verify": {
         "title": "Skip TLS verification",
-        "description": "If set, TLS certificate verification will be skipped.",
+        "description": "Skip TLS certificate and hostname verification. This is insecure and defaults on only for compatibility with self-signed Ceph Dashboard deployments.",
         "type": "boolean",
         "default": true
       },
       "tls_ca": {
         "title": "TLS CA",
-        "description": "The path to the CA certificate file for TLS verification.",
+        "description": "Absolute path to a CA bundle.",
         "type": "string",
         "pattern": "^$|^/"
       },
       "tls_cert": {
         "title": "TLS certificate",
-        "description": "The path to the client certificate file for TLS authentication.",
+        "description": "Absolute path to a client certificate.",
         "type": "string",
         "pattern": "^$|^/"
       },
       "tls_key": {
         "title": "TLS key",
-        "description": "The path to the client key file for TLS authentication.",
+        "description": "Absolute path to a client private key.",
         "type": "string",
         "pattern": "^$|^/"
-      },
-      "body": {
-        "title": "Body",
-        "type": "string"
-      },
-      "method": {
-        "title": "Method",
-        "type": "string"
       }
     },
     "required": [
-      "url",
-      "username",
-      "password"
+      "url"
+    ],
+    "anyOf": [
+      {
+        "required": [
+          "bearer_token_file"
+        ]
+      },
+      {
+        "required": [
+          "username",
+          "password"
+        ]
+      }
     ]
   },
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
     },
-    "body": {
-      "ui:widget": "hidden"
-    },
-    "method": {
-      "ui:widget": "hidden"
-    },
     "bearer_token_file": {
-      "ui:help": "The token is sent in the Authorization header as `Bearer <token>`. **Takes priority over basic authentication**.",
+      "ui:help": "The token is sent only after credentialless active-MGR discovery and takes priority over Dashboard JSON login. Its external owner must replace it before expiry; the file is reread for every request.",
       "ui:widget": "hidden"
     },
     "force_http2": {
       "ui:widget": "hidden"
     },
     "autodetection_retry": {
-      "ui:help": "This option determines how frequently (in seconds) Netdata will retry data collection jobs that failed initially, with the value of 60 meaning it retries to start data collection jobs every 60 seconds, while setting it to 0 disables this retry mechanism entirely."
+      "ui:help": "How often Netdata retries a job that failed its initial Dashboard/API check. Zero disables retries."
     },
     "vnode": {
-      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+      "ui:placeholder": "Create a Virtual Node first, then reference its name here."
     },
     "timeout": {
-      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+      "ui:help": "Accepts decimals, for example 2.5 seconds."
     },
     "username": {
       "ui:widget": "password"
     },
-    "proxy_username": {
+    "password": {
       "ui:widget": "password"
     },
-    "password": {
+    "proxy_username": {
       "ui:widget": "password"
     },
     "proxy_password": {
@@ -177,17 +226,30 @@
           "fields": [
             "update_every",
             "autodetection_retry",
+            "function_only",
             "url",
             "timeout",
             "not_follow_redirects",
-            "vnode"
+            "allowed_redirect_origins",
+            "vnode",
+            "force_http2"
+          ]
+        },
+        {
+          "title": "Metrics",
+          "fields": [
+            "osd_selector",
+            "max_osds",
+            "pool_selector",
+            "max_pools"
           ]
         },
         {
           "title": "Auth",
           "fields": [
             "username",
-            "password"
+            "password",
+            "bearer_token_file"
           ]
         },
         {

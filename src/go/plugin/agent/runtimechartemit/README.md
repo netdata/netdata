@@ -24,6 +24,12 @@ This package is the runtime/internal metrics bridge between component-owned
 - `Service.Start(pluginName, out)` starts runtime metrics job and cadence ticker.
 - `Service.Stop()` stops ticker and runtime job.
 - Components should register on start and unregister on stop to avoid stale runtime charts.
+- `UnregisterComponent` permits an in-progress tick to finish and emits
+  obsolete/remove actions on a later tick.
+- `QuarantineComponent` removes a component without obsolete output and
+  returns only after no component output can reach the wire.
+- `FinalizeComponent` synchronously emits the current Store state, removes the
+  component without obsolete output, and provides the same output barrier.
 
 ## Producers vs components
 

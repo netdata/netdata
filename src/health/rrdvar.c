@@ -269,13 +269,20 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
 
         RRDCALC *rc;
         dfe_start_read(st->rrdhost->rrdcalc_root_index, rc) {
+            RRDSET *alert_st = rrdcalc_rrdset_read_lock(rc);
+            if(unlikely(!alert_st))
+                continue;
+
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
             tmp = (struct scored) {
                 .existing = false,
-                .chart = string_dup(rc->rrdset->id),
-                .context = string_dup(rc->rrdset->context),
-                .value = rc->value,
-                .score = rrdlabels_common_count(rc->rrdset->rrdlabels, st->rrdlabels),
+                .chart = string_dup(alert_st->id),
+                .context = string_dup(alert_st->context),
+                .value = snapshot.value,
+                .score = rrdlabels_common_count(alert_st->rrdlabels, st->rrdlabels),
             };
+            rrdcalc_rrdset_read_unlock(alert_st);
             z = dictionary_set(dict, string2str(rc->config.name), &tmp, sizeof(tmp));
 
             if(z->existing) {

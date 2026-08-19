@@ -3,6 +3,7 @@
 #include "common.h"
 
 void cgroups_main(void *ptr);
+void cgroups_init(void);
 void proc_main(void *ptr);
 void diskspace_main(void *ptr);
 void tc_main(void *ptr);
@@ -42,7 +43,7 @@ static const struct netdata_static_thread static_threads_linux[] = {
         .config_name = "cgroups",
         .enabled = 1,
         .thread = NULL,
-        .init_routine = NULL,
+        .init_routine = cgroups_init,
         .start_routine = cgroups_main
     },
     {

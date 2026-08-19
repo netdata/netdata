@@ -26,8 +26,9 @@ static inline ND_PROFILE prefer_profile(ND_PROFILE setting, ND_PROFILE preferred
 
 ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
     static ND_PROFILE profile = ND_PROFILE_NONE;
-    if(!recheck && profile != ND_PROFILE_NONE)
-        return profile;
+    ND_PROFILE cached_profile = __atomic_load_n(&profile, __ATOMIC_ACQUIRE);
+    if(!recheck && cached_profile != ND_PROFILE_NONE)
+        return cached_profile;
 
     // required for detecting the profile
     stream_conf_load();
@@ -88,8 +89,8 @@ ND_PROFILE nd_profile_detect_and_configure(bool recheck) {
                buffer_tostring(wb));
     }
 
-    profile = pt;
-    return profile;
+    __atomic_store_n(&profile, pt, __ATOMIC_RELEASE);
+    return pt;
 }
 
 struct nd_profile_t nd_profile = { 0 };

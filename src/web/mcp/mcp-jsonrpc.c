@@ -6,6 +6,31 @@
 
 static const size_t MCP_JSONRPC_RESPONSE_MAX_BYTES = 16 * 1024 * 1024;
 
+struct json_object *mcp_jsonrpc_parse_request(const char *request, size_t length, enum json_tokener_error *error)
+{
+    struct json_tokener *tokener = json_tokener_new();
+    if (!tokener) {
+        *error = json_tokener_error_parse_unexpected;
+        return NULL;
+    }
+
+    struct json_object *root = json_tokener_parse_ex(tokener, request, -1);
+    *error = json_tokener_get_error(tokener);
+
+    if (!root && *error == json_tokener_success) {
+        json_tokener_reset(tokener);
+        json_tokener_set_flags(tokener, JSON_TOKENER_STRICT);
+        root = json_tokener_parse_ex(tokener, request, -1);
+        *error = json_tokener_get_error(tokener);
+
+        if (*error == json_tokener_success && json_tokener_get_parse_end(tokener) != length)
+            *error = json_tokener_error_parse_unexpected;
+    }
+
+    json_tokener_free(tokener);
+    return root;
+}
+
 static void buffer_append_json_id(BUFFER *out, struct json_object *id_obj) {
     if (!id_obj) {
         buffer_strcat(out, "null");
@@ -87,7 +112,7 @@ BUFFER *mcp_jsonrpc_process_single_request(MCP_CLIENT *mcpc, struct json_object 
     if (had_error)
         *had_error = false;
 
-    if (!mcpc || !request)
+    if (!mcpc)
         return NULL;
 
     struct json_object *id_obj = NULL;

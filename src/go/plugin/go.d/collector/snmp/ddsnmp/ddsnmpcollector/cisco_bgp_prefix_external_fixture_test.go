@@ -66,6 +66,45 @@ func TestCollector_Collect_CiscoBgpPeer2Prefixes_FromLibreNMSFixtures(t *testing
 	}
 }
 
+func TestCollector_Collect_CiscoBgpPeer2PrefixRows_OmitsInvalidOptionalLocalAddress(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	prefixIndex := "1.4.198.19.220.34.1.128"
+	peerIndex := "1.4.198.19.220.34"
+
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", []gosnmp.SnmpPDU{
+		createCounter32PDU("1.3.6.1.4.1.9.9.187.1.2.8.1.1."+prefixIndex, 12),
+	})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", []gosnmp.SnmpPDU{
+		createPDU("1.3.6.1.4.1.9.9.187.1.2.5.1.6."+peerIndex, gosnmp.OctetString, []byte("00 00 7F C3 ")),
+		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.5.1.11."+peerIndex, 65001),
+	})
+
+	profile := matchedProfileByFile(t, "1.3.6.1.4.1.9.1.923", "cisco-asr.yaml")
+	filterProfileForTypedBGPByID(t, profile, "cisco-bgp-peer-family")
+
+	collector := New(Config{
+		SnmpClient:  mockHandler,
+		Profiles:    []*ddsnmp.Profile{profile},
+		Log:         logger.New(),
+		SysObjectID: "1.3.6.1.4.1.9.1.923",
+	})
+
+	results, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Len(t, results[0].BGPRows, 1)
+
+	row := results[0].BGPRows[0]
+	assert.Equal(t, "198.19.220.34", row.Identity.Neighbor)
+	assert.Equal(t, "65001", row.Identity.RemoteAS)
+	assert.Equal(t, "ipv4", string(row.Identity.AddressFamily))
+	assert.Equal(t, "vpn", string(row.Identity.SubsequentAddressFamily))
+	assert.Empty(t, row.Descriptors.LocalAddress)
+	assert.EqualValues(t, 12, row.Routes.Current.Accepted.Value)
+}
+
 func collectCiscoPeer2PrefixRowsFromFixture(t *testing.T, sysObjectID, profileFile, fixturePath string) []ddsnmp.BGPRow {
 	t.Helper()
 

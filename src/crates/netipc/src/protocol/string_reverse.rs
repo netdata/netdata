@@ -44,7 +44,7 @@ pub fn string_reverse_decode(buf: &[u8]) -> Result<StringReverseView<'_>, NipcEr
         return Err(NipcError::Truncated);
     }
     let str_offset = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as usize;
-    if str_offset < STRING_REVERSE_HDR_SIZE {
+    if str_offset != STRING_REVERSE_HDR_SIZE {
         return Err(NipcError::BadLayout);
     }
     let str_length = u32::from_ne_bytes(buf[4..8].try_into().unwrap()) as usize;
@@ -142,6 +142,19 @@ mod tests {
         assert!(matches!(
             string_reverse_decode(&buf),
             Err(NipcError::MissingNul)
+        ));
+    }
+
+    #[test]
+    fn decode_bad_offset() {
+        let mut buf = [0u8; 16];
+        buf[0..4].copy_from_slice(&9u32.to_ne_bytes());
+        buf[4..8].copy_from_slice(&1u32.to_ne_bytes());
+        buf[9] = b'x';
+        buf[10] = 0;
+        assert!(matches!(
+            string_reverse_decode(&buf),
+            Err(NipcError::BadLayout)
         ));
     }
 

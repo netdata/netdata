@@ -138,7 +138,7 @@ already documented in the per-domain guides above or in
 ## Path discipline
 
 This skill follows
-`<repo>/.agents/sow/specs/sensitive-data-discipline.md`:
+`<repo>/.agents/sensitive-data-discipline.md`:
 
 - Repo files: repo-relative (`<repo>/src/...`).
 - Sibling Netdata-org repos: `${NETDATA_REPOS_DIR}/<repo>/...`.

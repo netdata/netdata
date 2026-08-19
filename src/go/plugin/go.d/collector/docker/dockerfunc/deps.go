@@ -5,15 +5,13 @@ package dockerfunc
 import (
 	"context"
 
-	"github.com/docker/docker/api/types"
-	typesContainer "github.com/docker/docker/api/types/container"
-	typesImage "github.com/docker/docker/api/types/image"
+	docker "github.com/moby/moby/client"
 )
 
 // DockerClient defines the minimal Docker API surface needed by function handlers.
 type DockerClient interface {
-	ContainerList(context.Context, typesContainer.ListOptions) ([]types.Container, error)
-	ImageList(context.Context, typesImage.ListOptions) ([]typesImage.Summary, error)
+	ContainerList(context.Context, docker.ContainerListOptions) (docker.ContainerListResult, error)
+	ImageList(context.Context, docker.ImageListOptions) (docker.ImageListResult, error)
 }
 
 // Deps provides runtime dependencies needed by Docker function handlers.

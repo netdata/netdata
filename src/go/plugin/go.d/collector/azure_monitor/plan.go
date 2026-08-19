@@ -9,7 +9,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
-	"gopkg.in/yaml.v3"
 )
 
 func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[string]ProfileEntryConfig, catalog azureprofiles.Catalog, workloadResourceTagKey string) (*collectorRuntime, error) {
@@ -121,7 +120,7 @@ func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEn
 		return out.Metrics[i].ID < out.Metrics[j].ID
 	})
 
-	out.Template = resolved.Config.Template
+	out.Template = resolved.Config.Template.Clone()
 	out.Template.Metrics = profileMetricsList(out)
 	return out, nil
 }
@@ -137,15 +136,7 @@ func buildChartTemplate(runtime *collectorRuntime) (string, error) {
 		spec.Groups = append(spec.Groups, p.Template)
 	}
 
-	if err := spec.Validate(); err != nil {
-		return "", err
-	}
-
-	raw, err := yaml.Marshal(spec)
-	if err != nil {
-		return "", err
-	}
-	return string(raw), nil
+	return spec.MarshalTemplate()
 }
 
 func profileMetricsList(p *profileRuntime) []string {

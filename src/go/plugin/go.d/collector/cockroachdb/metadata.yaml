@@ -6,6 +6,7 @@ modules:
       module_name: cockroachdb
       monitored_instance:
         name: CockroachDB
+        description: "Monitor CockroachDB CPU, memory, storage, network, cluster, SQL, and transaction performance metrics."
         link: https://www.cockroachlabs.com/
         icon_filename: cockroachdb.svg
         categories:
@@ -243,7 +244,7 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8080/_status/vars
-                
+
                   - name: remote
                     url: http://203.0.113.10:8080/_status/vars
     troubleshooting:

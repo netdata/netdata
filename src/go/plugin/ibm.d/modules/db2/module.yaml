@@ -1,5 +1,6 @@
 name: db2
 display_name: IBM DB2
+page_description: Monitor IBM DB2 connections, locking, buffer pool efficiency, tablespace capacity, and workload performance through system catalog views.
 description: |
   Monitors IBM DB2 databases using system catalog views and MON_GET_* table
   functions to expose connections, locking, buffer pool efficiency, tablespace

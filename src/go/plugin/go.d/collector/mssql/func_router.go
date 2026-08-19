@@ -51,11 +51,11 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func mssqlMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
-		deadlockInfoMethodConfig(),
-		errorInfoMethodConfig(),
+func mssqlMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
+		deadlockInfoFunctionConfig(),
+		errorInfoFunctionConfig(),
 	}
 }
 

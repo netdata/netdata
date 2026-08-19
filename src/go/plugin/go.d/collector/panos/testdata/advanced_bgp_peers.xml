@@ -1,0 +1,28 @@
+<response status="success">
+  <result>
+    <logical-router>
+      <entry name="lr-a">
+        <entry peer-address="203.0.113.1" peer-group="core">
+          <local-address>203.0.113.254</local-address>
+          <remote-as>65100</remote-as>
+          <bgp-state>OpenConfirm</bgp-state>
+          <uptime>1 days 02:03:04</uptime>
+          <msg-total-in>200</msg-total-in>
+          <msg-total-out>220</msg-total-out>
+          <msg-update-in>20</msg-update-in>
+          <msg-update-out>22</msg-update-out>
+          <status-flap-counts>4</status-flap-counts>
+          <established-counts>5</established-counts>
+          <prefix-counter>
+            <entry name="ipv4-unicast">
+              <incoming-total>100</incoming-total>
+              <incoming-accepted>90</incoming-accepted>
+              <incoming-rejected>10</incoming-rejected>
+              <outgoing-advertised>11</outgoing-advertised>
+            </entry>
+          </prefix-counter>
+        </entry>
+      </entry>
+    </logical-router>
+  </result>
+</response>

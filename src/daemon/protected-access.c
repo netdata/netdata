@@ -104,8 +104,8 @@ void signal_protected_access_check(int sig, siginfo_t *si, void *context __maybe
             frame->fault_address = fault_addr;
             frame->signal_code = signal_code(sig, si->si_code);
 
-            // Update the depth to unwind all nested frames up to this one
-            state->depth = i;
+            // Unwind nested frames while keeping this frame for diagnostics and cleanup.
+            state->depth = i + 1;
 
             // Jump back to the sigsetjmp point in PROTECTED_ACCESS_START
             // The '1' becomes the non-zero return value of sigsetjmp.

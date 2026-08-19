@@ -17,6 +17,15 @@ Today only `flows:netflow` is registered (covers NetFlow v5/v9,
 IPFIX, sFlow). The agent must run the netflow-plugin Rust crate
 for the Function to be available.
 
+The direct endpoint has the same CIDR behavior as Cloud: the six
+IP address facets accept exact IPv4/IPv6 addresses or canonical
+CIDRs, and autocomplete terms containing `/` generate canonical
+CIDR candidates from loose input such as `10/8`. Only candidates
+containing an address in that field's retention-wide vocabulary are
+returned. One trailing dot before `/` is tolerated after one through
+three IPv4 octets, so `10./` is equivalent to `10/`. Suggestions are
+not recalculated for the current time window or other active filters.
+
 ---
 
 ## Endpoint (agent v3)

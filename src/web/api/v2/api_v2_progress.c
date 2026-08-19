@@ -19,7 +19,7 @@ int api_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *ur
         if(!strcmp(name, "transaction")) transaction = value;
     }
 
-    nd_uuid_t tr;
+    nd_uuid_t tr = {0};
     uuid_parse_flexi(transaction, tr);
 
     rrd_function_call_progresser(&tr);

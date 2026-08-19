@@ -54,6 +54,107 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 		input []byte
 		want  MetricFamilies
 	}{
+		"summary _sum/_count before # TYPE fold into one summary": {
+			input: []byte(`my_summary_sum{label1="value1"} 10
+my_summary_count{label1="value1"} 2
+# TYPE my_summary summary
+my_summary{label1="value1",quantile="0.5"} 0.5
+`),
+			want: MetricFamilies{
+				"my_summary": {
+					name: "my_summary",
+					typ:  model.MetricTypeSummary,
+					metrics: []Metric{
+						{
+							labels: labels.Labels{{Name: "label1", Value: "value1"}},
+							summary: &Summary{
+								sum:       10,
+								count:     2,
+								hasSum:    true,
+								hasCount:  true,
+								quantiles: []Quantile{{quantile: 0.5, value: 0.5}},
+							},
+						},
+					},
+				},
+			},
+		},
+		"histogram _sum/_count before _bucket (no # TYPE) fold into one histogram": {
+			input: []byte(`my_hist_sum{label1="value1"} 5
+my_hist_count{label1="value1"} 3
+my_hist_bucket{label1="value1",le="0.1"} 1
+my_hist_bucket{label1="value1",le="+Inf"} 3
+`),
+			want: MetricFamilies{
+				"my_hist": {
+					name: "my_hist",
+					typ:  model.MetricTypeHistogram,
+					metrics: []Metric{
+						{
+							labels: labels.Labels{{Name: "label1", Value: "value1"}},
+							histogram: &Histogram{
+								sum:   5,
+								count: 3,
+								buckets: []Bucket{
+									{upperBound: 0.1, cumulativeCount: 1},
+									{upperBound: math.Inf(1), cumulativeCount: 3},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"metric name found by lookup, not first label": {
+			input: []byte(`
+# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization
+# TYPE DCGM_FI_DEV_GPU_UTIL gauge
+DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
+`),
+			want: MetricFamilies{
+				"DCGM_FI_DEV_GPU_UTIL": {
+					name: "DCGM_FI_DEV_GPU_UTIL",
+					help: "GPU utilization",
+					typ:  model.MetricTypeGauge,
+					metrics: []Metric{
+						{
+							labels: labels.Labels{{Name: "UUID", Value: "GPU-aaa"}, {Name: "gpu", Value: "0"}},
+							gauge:  &Gauge{value: 80},
+						},
+					},
+				},
+			},
+		},
+		"valid _bucket (has le) folds into the histogram family": {
+			input: []byte("# TYPE h histogram\nh_bucket{le=\"1\",label=\"x\"} 1\n"),
+			want: MetricFamilies{
+				"h": {
+					name: "h",
+					typ:  model.MetricTypeHistogram,
+					metrics: []Metric{
+						{
+							labels:    labels.Labels{{Name: "label", Value: "x"}},
+							histogram: &Histogram{buckets: []Bucket{{upperBound: 1, cumulativeCount: 1}}},
+						},
+					},
+				},
+			},
+		},
+		"_bucket without le is a plain metric, not a histogram bucket": {
+			input: []byte("# TYPE h histogram\nh_bucket{label=\"x\"} 1\n"),
+			want: MetricFamilies{
+				"h_bucket": {
+					name: "h_bucket",
+					typ:  model.MetricTypeUnknown,
+					metrics: []Metric{
+						{
+							labels:  labels.Labels{{Name: "label", Value: "x"}},
+							untyped: &Untyped{value: 1},
+						},
+					},
+				},
+			},
+		},
 		"Gauge with multiline HELP": {
 			input: dataMultilineHelp,
 			want: MetricFamilies{
@@ -181,8 +282,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -193,8 +296,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -205,8 +310,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -217,8 +324,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -235,8 +344,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -247,8 +358,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -259,8 +372,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -271,8 +386,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -506,8 +623,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -518,8 +637,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -530,8 +651,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -542,8 +665,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -560,8 +685,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -572,8 +699,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -584,8 +713,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -596,8 +727,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -823,8 +956,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -835,8 +970,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -847,8 +984,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -859,8 +998,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -877,8 +1018,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -889,8 +1032,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -901,8 +1046,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -913,8 +1060,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1128,8 +1277,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1140,8 +1291,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1152,8 +1305,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1164,8 +1319,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   283201.29,
-								count: 31,
+								sum:      283201.29,
+								count:    31,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 4931.921},
 									{quantile: 0.9, value: 4932.921},
@@ -1182,8 +1339,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1194,8 +1353,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value2"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1206,8 +1367,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value3"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1218,8 +1381,10 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value4"}},
 							summary: &Summary{
-								sum:   383201.29,
-								count: 41,
+								sum:      383201.29,
+								count:    41,
+								hasSum:   true,
+								hasCount: true,
 								quantiles: []Quantile{
 									{quantile: 0.5, value: 5931.921},
 									{quantile: 0.9, value: 5932.921},
@@ -1359,6 +1524,58 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 	}
 }
 
+func TestPromTextParser_summaryComponentPresenceResets(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{
+			name: "both components present",
+			input: `# TYPE request_size summary
+request_size_sum 0
+request_size_count 0
+`,
+			want: true,
+		},
+		{
+			name: "count absent after both were present",
+			input: `# TYPE request_size summary
+request_size_sum 0
+`,
+		},
+		{
+			name: "both components present again",
+			input: `# TYPE request_size summary
+request_size_sum 0
+request_size_count 0
+`,
+			want: true,
+		},
+		{
+			name: "sum absent after both were present",
+			input: `# TYPE request_size summary
+request_size_count 0
+`,
+		},
+	}
+
+	var p promTextParser
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mfs, err := p.parseToMetricFamilies([]byte(test.input))
+			require.NoError(t, err)
+
+			mf := mfs.GetSummary("request_size")
+			require.NotNil(t, mf)
+			require.Len(t, mf.Metrics(), 1)
+			summary := mf.Metrics()[0].Summary()
+			require.NotNil(t, summary)
+			assert.Equal(t, test.want, summary.HasCountAndSum())
+		})
+	}
+}
+
 func TestPromTextParser_parseToMetricFamiliesWithSelector(t *testing.T) {
 	sr, err := selector.Parse(`test_gauge_metric_1{label1="value2"}`)
 	require.NoError(t, err)
@@ -1393,6 +1610,17 @@ func TestPromTextParser_parseToSeries(t *testing.T) {
 		input []byte
 		want  Series
 	}{
+		"label order matches textparse (__name__ not forced first)": {
+			input: []byte("m{UUID=\"x\",gpu=\"0\"} 5\n"),
+			want: Series{SeriesSample{
+				Labels: labels.Labels{
+					{Name: "UUID", Value: "x"},
+					{Name: "__name__", Value: "m"},
+					{Name: "gpu", Value: "0"},
+				},
+				Value: 5,
+			}},
+		},
 		"All types": {
 			input: []byte(`
 # HELP test_gauge_metric_1 Test Gauge Metric 1
@@ -1665,31 +1893,6 @@ test_gauge_metric_2{label1="value2"} 1
 	assert.Equal(t, want, series)
 }
 
-func TestPromTextParser_parseToMetricFamilies_metricNameNotFirstLabel(t *testing.T) {
-	var p promTextParser
-
-	txt := []byte(`
-# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization
-# TYPE DCGM_FI_DEV_GPU_UTIL gauge
-DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
-`)
-
-	mfs, err := p.parseToMetricFamilies(txt)
-	require.NoError(t, err)
-
-	require.Contains(t, mfs, "DCGM_FI_DEV_GPU_UTIL")
-	require.NotContains(t, mfs, "GPU-aaa")
-
-	mf := mfs["DCGM_FI_DEV_GPU_UTIL"]
-	require.Len(t, mf.metrics, 1)
-	assert.Equal(t, model.MetricTypeGauge, mf.typ)
-	assert.Equal(t, 80.0, mf.metrics[0].gauge.value)
-	assert.EqualValues(t, labels.Labels{
-		{Name: "UUID", Value: "GPU-aaa"},
-		{Name: "gpu", Value: "0"},
-	}, mf.metrics[0].labels)
-}
-
 func TestPromTextParser_parseToMetricFamilies_failsOnInvalidSeriesValue(t *testing.T) {
 	var p promTextParser
 
@@ -1727,4 +1930,189 @@ func joinData(data ...[]byte) []byte {
 		_ = buf.WriteByte('\n')
 	}
 	return buf.Bytes()
+}
+
+func TestPromTextParser_parseSamples(t *testing.T) {
+	type wantSample struct {
+		name       string
+		labels     string
+		value      float64
+		kind       SampleKind
+		familyType model.MetricType
+	}
+
+	tests := map[string]struct {
+		input    []byte
+		wantHelp []string
+		want     []wantSample
+	}{
+		"deferred _sum emits after a later unrelated metric (cross-metric reorder)": {
+			input: []byte("a_sum 1\nb 2\n# TYPE a summary\na{quantile=\"0.5\"} 3\n"),
+			want: []wantSample{
+				{"b", `{}`, 2, SampleKindScalar, model.MetricTypeUnknown},
+				{"a_sum", `{}`, 1, SampleKindSummarySum, model.MetricTypeSummary},
+				{"a", `{quantile="0.5"}`, 3, SampleKindSummaryQuantile, model.MetricTypeSummary},
+			},
+		},
+		"all metric types are classified in exposition order": {
+			input: []byte(`# HELP test_gauge A gauge metric.
+# TYPE test_gauge gauge
+test_gauge{label="a"} 1
+# TYPE test_counter_total counter
+test_counter_total 5
+# TYPE test_hist histogram
+test_hist_bucket{le="0.1"} 1
+test_hist_bucket{le="+Inf"} 2
+test_hist_sum 3
+test_hist_count 2
+# TYPE test_summary summary
+test_summary{quantile="0.5"} 0.2
+test_summary_sum 1
+test_summary_count 10
+`),
+			wantHelp: []string{"test_gauge=A gauge metric."},
+			want: []wantSample{
+				{"test_gauge", `{label="a"}`, 1, SampleKindScalar, model.MetricTypeGauge},
+				{"test_counter_total", `{}`, 5, SampleKindScalar, model.MetricTypeCounter},
+				{"test_hist_bucket", `{le="0.1"}`, 1, SampleKindHistogramBucket, model.MetricTypeHistogram},
+				{"test_hist_bucket", `{le="+Inf"}`, 2, SampleKindHistogramBucket, model.MetricTypeHistogram},
+				{"test_hist_sum", `{}`, 3, SampleKindHistogramSum, model.MetricTypeHistogram},
+				{"test_hist_count", `{}`, 2, SampleKindHistogramCount, model.MetricTypeHistogram},
+				{"test_summary", `{quantile="0.5"}`, 0.2, SampleKindSummaryQuantile, model.MetricTypeSummary},
+				{"test_summary_sum", `{}`, 1, SampleKindSummarySum, model.MetricTypeSummary},
+				{"test_summary_count", `{}`, 10, SampleKindSummaryCount, model.MetricTypeSummary},
+			},
+		},
+		"__name__ is delivered via Name and excluded from Labels": {
+			input: []byte("# TYPE m gauge\nm{a=\"1\",b=\"2\"} 7\n"),
+			want: []wantSample{
+				{"m", `{a="1", b="2"}`, 7, SampleKindScalar, model.MetricTypeGauge},
+			},
+		},
+		"deferred sum/count before # TYPE are buffered and back-resolved": {
+			input: []byte(`my_summary_sum 10
+my_summary_count 2
+# TYPE my_summary summary
+my_summary{quantile="0.5"} 0.5
+`),
+			want: []wantSample{
+				{"my_summary_sum", `{}`, 10, SampleKindSummarySum, model.MetricTypeSummary},
+				{"my_summary_count", `{}`, 2, SampleKindSummaryCount, model.MetricTypeSummary},
+				{"my_summary", `{quantile="0.5"}`, 0.5, SampleKindSummaryQuantile, model.MetricTypeSummary},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var p promTextParser
+
+			for i := range 10 {
+				t.Run(fmt.Sprintf("parse num %d", i+1), func(t *testing.T) {
+					var got []wantSample
+					var help []string
+
+					err := p.driver.parseSamples(test.input, true,
+						func(name, h string) { help = append(help, name+"="+h) },
+						func(s Sample) error {
+							assert.Falsef(t, s.Labels.Has(labels.MetricName),
+								"sample %q must not carry __name__ in Labels", s.Name)
+							got = append(got, wantSample{s.Name, s.Labels.String(), s.Value, s.Kind, s.FamilyType})
+							return nil
+						},
+					)
+					require.NoError(t, err)
+					assert.Equal(t, test.want, got)
+					for _, h := range test.wantHelp {
+						assert.Contains(t, help, h)
+					}
+				})
+			}
+		})
+	}
+}
+
+// The stream supports Prometheus-style relabeling on __name__/le/quantile.
+// ownLabels=true isolates each sample's labels, so a transform can rename via
+// Name and mutate Labels in place without affecting later samples.
+func TestPromTextParser_parseSamples_relabelStyle(t *testing.T) {
+	data := []byte(`# TYPE req_seconds histogram
+req_seconds_bucket{le="0.1",path="/a"} 1
+req_seconds_bucket{le="+Inf",path="/a"} 3
+# TYPE rpc summary
+rpc{quantile="0.99",path="/a"} 0.5
+`)
+
+	type out struct {
+		name     string
+		le       string
+		quantile string
+		labels   string
+	}
+
+	var p promTextParser
+	var got []out
+	err := p.driver.parseSamples(data, true, nil, func(s Sample) error {
+		o := out{
+			name:     s.Name + ":relabeled", // __name__ is mutable via Name
+			le:       s.Labels.Get(bucketLabel),
+			quantile: s.Labels.Get(quantileLabel),
+		}
+		// Drop the "path" target label in place (this sample owns its labels).
+		kept := s.Labels[:0]
+		for _, l := range s.Labels {
+			if l.Name == "path" {
+				continue
+			}
+			kept = append(kept, l)
+		}
+		o.labels = labels.Labels(kept).String()
+		got = append(got, o)
+		return nil
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []out{
+		{name: "req_seconds_bucket:relabeled", le: "0.1", quantile: "", labels: `{le="0.1"}`},
+		{name: "req_seconds_bucket:relabeled", le: "+Inf", quantile: "", labels: `{le="+Inf"}`},
+		{name: "rpc:relabeled", le: "", quantile: "0.99", labels: `{quantile="0.99"}`},
+	}, got)
+}
+
+// A relabel step's mutations — a renamed Name and changed Labels — are what Assemble
+// folds: it must assemble the MUTATED sample, not the original. Mutating Labels in
+// place also exercises the ownLabels=true sample stream from parseToSamples.
+func TestAssemble_reflectsMutatedSamples(t *testing.T) {
+	input := []byte("# TYPE old_name gauge\nold_name{keep=\"yes\",drop=\"me\"} 42\n")
+
+	var p promTextParser
+	batch, err := p.parseToSamples(input)
+	require.NoError(t, err)
+
+	// Rename the metric and drop the "drop" label in place (each sample owns its labels).
+	for i := range batch.Samples {
+		batch.Samples[i].Name = "new_name"
+		kept := batch.Samples[i].Labels[:0]
+		for _, l := range batch.Samples[i].Labels {
+			if l.Name == "drop" {
+				continue
+			}
+			kept = append(kept, l)
+		}
+		batch.Samples[i].Labels = kept
+	}
+
+	want := MetricFamilies{
+		"new_name": {
+			name: "new_name",
+			typ:  model.MetricTypeGauge,
+			metrics: []Metric{
+				{labels: labels.Labels{{Name: "keep", Value: "yes"}}, gauge: &Gauge{value: 42}},
+			},
+		},
+	}
+
+	mfs, err := Assemble(batch)
+	require.NoError(t, err)
+	assert.Equal(t, want, mfs)
 }

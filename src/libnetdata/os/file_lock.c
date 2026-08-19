@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "os.h"
 #include "file_lock.h"
+#include "../memory/nd-mallocz.h"
+
+#include <errno.h>
+#include <stdbool.h>
 
 #if defined(OS_LINUX) || defined(OS_FREEBSD) || defined(OS_MACOS)
 #include <sys/file.h>
@@ -12,7 +17,7 @@
 #include <windows.h>
 #endif
 
-FILE_LOCK file_lock_get(const char *filename) {
+static FILE_LOCK file_lock_get_internal(const char *filename, bool wait) {
     if(!filename || !*filename)
         return FILE_LOCK_INVALID;
 
@@ -22,25 +27,24 @@ FILE_LOCK file_lock_get(const char *filename) {
     if(fd == -1)
         return FILE_LOCK_INVALID;
 
-    // LOCK_NB makes flock() non-blocking
-    if(flock(fd, LOCK_EX | LOCK_NB) == -1) {
+    int rc;
+    do {
+        rc = flock(fd, LOCK_EX | (wait ? 0 : LOCK_NB));
+    } while(wait && rc == -1 && errno == EINTR);
+
+    if(rc == -1) {
+        int saved_errno = errno;
         close(fd);
+        errno = saved_errno;
         return FILE_LOCK_INVALID;
     }
 
     return (FILE_LOCK){ .fd = fd };
 
 #elif defined(OS_WINDOWS)
-    // Convert MSYS2/Cygwin path directly to Windows wide-char path
-    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, NULL, 0);
-    if(wpath_size < 0)
+    wchar_t *wpath = os_translate_msys_to_windows_pathW(filename);
+    if(!wpath)
         return FILE_LOCK_INVALID;
-
-    wchar_t *wpath = mallocz(wpath_size);
-    if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, wpath, wpath_size) != 0) {
-        freez(wpath);
-        return FILE_LOCK_INVALID;
-    }
 
     // Open existing file or create new one
     HANDLE hFile = CreateFileW(
@@ -76,9 +80,13 @@ FILE_LOCK file_lock_get(const char *filename) {
 
     // Try to lock the entire file
     OVERLAPPED overlapped = {0};
+    DWORD flags = LOCKFILE_EXCLUSIVE_LOCK;
+    if(!wait)
+        flags |= LOCKFILE_FAIL_IMMEDIATELY;
+
     if(!LockFileEx(
             hFile,
-            LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+            flags,
             0,
             MAXDWORD,
             MAXDWORD,
@@ -92,6 +100,14 @@ FILE_LOCK file_lock_get(const char *filename) {
 #else
 #error "Unsupported operating system"
 #endif
+}
+
+FILE_LOCK file_lock_get(const char *filename) {
+    return file_lock_get_internal(filename, false);
+}
+
+FILE_LOCK file_lock_get_wait(const char *filename) {
+    return file_lock_get_internal(filename, true);
 }
 
 void file_lock_release(FILE_LOCK lock) {

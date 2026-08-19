@@ -22,6 +22,14 @@
 // and are supposed not to be needed outside of ACLK
 extern usec_t aclk_session_newarch;
 
+static inline usec_t aclk_session_load(void) {
+    return __atomic_load_n(&aclk_session_newarch, __ATOMIC_RELAXED);
+}
+
+static inline void aclk_session_store(usec_t session) {
+    __atomic_store_n(&aclk_session_newarch, session, __ATOMIC_RELAXED);
+}
+
 extern int chart_batch_id;
 
 typedef enum {
@@ -90,10 +98,12 @@ enum aclk_topics {
     ACLK_TOPICID_ALARM_SNAPSHOT        = 17,
     ACLK_TOPICID_NODE_COLLECTORS       = 18,
     ACLK_TOPICID_CTXS_SNAPSHOT         = 19,
-    ACLK_TOPICID_CTXS_UPDATED          = 20
+    ACLK_TOPICID_CTXS_UPDATED          = 20,
+    ACLK_TOPICID_NODE_MANIFEST         = 21
 };
 
 const char *aclk_get_topic(enum aclk_topics topic);
+bool aclk_topic_available(enum aclk_topics topic);
 int aclk_generate_topic_cache(json_object *json);
 void free_topic_cache(void);
 const char *aclk_topic_cache_iterate(size_t *iter);
@@ -115,5 +125,18 @@ int aclk_proxy_negotiation_connect(int sockfd, enum mqtt_wss_proxy_type proxy_ty
                                    const char *target_host, int target_port, int timeout_ms);
 void aclk_sensitive_memzero(void *ptr, size_t len);
 void aclk_sensitive_free(char **ptr);
+
+// True once at least budget_ut has elapsed since start_ut. Inclusive: the budget is spent when
+// exactly that much has passed. Single predicate for every monotonic deadline in ACLK - the
+// request budget in https_client.c and the I/O watchdog in mqtt_wss_client.c both use it, so
+// there is one boundary convention rather than one per call site. A backward clock reading
+// counts as no elapsed time.
+static inline bool aclk_usec_budget_spent(usec_t start_ut, usec_t budget_ut, usec_t now_ut) {
+    return clocks_usec_delta_or_zero(now_ut, start_ut) >= budget_ut;
+}
+
+// Monotonic budget left out of timeout_ms, or 0 once spent. Expiry is inclusive, and the result
+// is >= 1 while time remains so callers never poll() with a 0 timeout.
+int aclk_timeout_remaining_ms(usec_t start_ut, int timeout_ms);
 
 #endif /* ACLK_UTIL_H */

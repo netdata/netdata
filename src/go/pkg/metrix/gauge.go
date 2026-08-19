@@ -95,6 +95,13 @@ func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, scope HostScope, 
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.gauges[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedGauge{
 			key:          key,
@@ -132,9 +139,16 @@ func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, scope HostScope, 
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.gauges[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		baseline := SampleValue(0)
-		if existing := c.snapshot.Load().series[key]; existing != nil {
+		if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 			baseline = existing.value
 		}
 		entry = &stagedGauge{

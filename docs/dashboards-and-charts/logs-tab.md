@@ -7,8 +7,15 @@ The Logs tab provides a structured, searchable view of logs collected from acros
 The Logs tab displays log entries from the following sources:
 
 - **systemd-journal** — reads logs from `systemd` journald on Linux Nodes. See the [Systemd Journal Plugin Reference](/src/collectors/systemd-journal.plugin/README.md) for details on journal sources, fields, and query performance.
-- **otel-logs** — displays logs received via OpenTelemetry (OTLP) log ingestion. See the [OpenTelemetry Signal Viewer plugin](/src/crates/netdata-log-viewer/otel-signal-viewer-plugin/README.md) for setup and configuration.
+- **otel-logs** — displays logs ingested via OpenTelemetry (OTLP/gRPC) by the [OpenTelemetry plugin](/src/crates/otel-plugin/README.md), which indexes them for fast querying in this tab.
 - **Windows Event Logs** — reads Windows event logs on Windows Nodes. See the [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) for supported event channels and configuration.
+- **macOS Unified Logs** — reads native macOS unified logs through Apple's OSLog framework. See the [macOS Logs Plugin Reference](/src/collectors/macos-logs.plugin/README.md) for supported fields and query behavior.
+
+:::note
+
+On Linux systems without systemd (such as Alpine Linux), the systemd-journal source is unavailable. You can still send logs to Netdata by using `systemd-cat-native --url` to forward to a remote `systemd-journal-remote`, or by using OTLP log ingestion. See [Working with Logs](/docs/category-overview-pages/working-with-logs.md) for details.
+
+:::
 
 You can also display custom application logs, such as web server access logs, under the systemd-journal source by piping them into `systemd` journald using [log2journal](/src/collectors/log2journal/README.md) and [systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md). For example, use the built-in `nginx-combined` log2journal configuration to pipe nginx access logs.
 

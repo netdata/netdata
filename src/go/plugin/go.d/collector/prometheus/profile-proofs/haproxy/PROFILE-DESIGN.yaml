@@ -1,0 +1,2882 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: haproxy
+match: haproxy_*
+app: haproxy
+namespace: haproxy
+composition:
+  supports: {}
+entities:
+  process:
+    grain: HAProxy worker process
+    identity:
+      required: []
+      optional: []
+  frontend:
+    grain: HAProxy frontend
+    identity:
+      required:
+      - proxy
+      optional: []
+  listener:
+    grain: HAProxy listener
+    identity:
+      required:
+      - proxy
+      - listener
+      optional: []
+  backend:
+    grain: HAProxy backend
+    identity:
+      required:
+      - proxy
+      optional: []
+  server:
+    grain: HAProxy server
+    identity:
+      required:
+      - proxy
+      - server
+      optional: []
+  resolver:
+    grain: HAProxy nameserver
+    identity:
+      required:
+      - resolver
+      - nameserver
+      optional: []
+  sticktable:
+    grain: HAProxy stick table
+    identity:
+      required:
+      - name
+      - type
+      optional: []
+label_policies: {}
+reduction_policies: {}
+normalizations: {}
+exclusions:
+  process_start_epoch:
+    source:
+      signal: process_start_time_seconds
+      components:
+      - value
+    reason: not_chartable
+    lost_question: How long has the HAProxy worker process been running?
+    required_operation: age_from_unix_epoch
+    evidence:
+    - process_lifecycle
+    - process_unit
+    outcome: retain_writable_unrendered
+  process_node_metadata:
+    source:
+      signal: process_node
+      components:
+      - value
+    reason: metadata_only
+    evidence:
+    - process_lifecycle
+    - process_unit
+    - process_labels
+    outcome: retain_writable_unrendered
+  process_description_metadata:
+    source:
+      signal: process_description
+      components:
+      - value
+    reason: metadata_only
+    evidence:
+    - process_lifecycle
+    - process_unit
+    - process_labels
+    outcome: retain_writable_unrendered
+  deprecated_backend_aggregate_status:
+    source:
+      signal: backend_agg_server_check_status
+      components:
+      - value
+    reason: equivalent_duplicate
+    covering_view: backend_agg_server_status
+    evidence:
+    - aggregate_status_replacement
+    outcome: retain_writable_unrendered
+limitations: {}
+views:
+  process_recv_logs_total:
+    family: HAProxy/Process/Activity
+    question: What per-second rate does HAProxy report for received logs?
+    entity: process
+    inputs:
+      value:
+        signal: process_recv_logs_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_relative_process_id:
+    family: HAProxy/Process/Activity
+    question: What value does HAProxy currently report for relative process id?
+    entity: process
+    inputs:
+      value:
+        signal: process_relative_process_id
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_requests_total:
+    family: HAProxy/Process/Activity
+    question: What per-second rate does HAProxy report for requests?
+    entity: process
+    inputs:
+      value:
+        signal: process_requests_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_nbthread:
+    family: HAProxy/Process/Activity
+    question: What value does HAProxy currently report for threads?
+    entity: process
+    inputs:
+      value:
+        signal: process_nbthread
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_nbproc:
+    family: HAProxy/Process/Activity
+    question: What value does HAProxy currently report for worker processes?
+    entity: process
+    inputs:
+      value:
+        signal: process_nbproc
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_zlib_memory:
+    family: HAProxy/Process/Compression
+    question: What value does HAProxy currently report for zlib memory?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_zlib_memory
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_limit_http_comp:
+    family: HAProxy/Process/Compression
+    question: What value does HAProxy currently report for http compression limit?
+    entity: process
+    inputs:
+      value:
+        signal: process_limit_http_comp
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_zlib_memory:
+    family: HAProxy/Process/Compression
+    question: What value does HAProxy currently report for max zlib memory?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_zlib_memory
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_connections_total:
+    family: HAProxy/Process/Connections
+    question: What per-second rate does HAProxy report for connections?
+    entity: process
+    inputs:
+      value:
+        signal: process_connections_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_connection_rate:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for connection rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_connection_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_connections:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for connections?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_connections
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_hard_max_connections:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for hard max connections?
+    entity: process
+    inputs:
+      value:
+        signal: process_hard_max_connections
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_limit_connection_rate:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for limit connection rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_limit_connection_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_connection_rate:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for max connection rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_connection_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_connections:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for max connections?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_connections
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_fds:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for max fds?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_fds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_pipes:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for max pipes?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_pipes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_sockets:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for max sockets?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_sockets
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_pipes:
+    family: HAProxy/Process/Connections
+    question: What value does HAProxy currently report for pipes?
+    entity: process
+    inputs:
+      used:
+        signal: process_pipes_used_total
+        components:
+        - value
+      free:
+        signal: process_pipes_free_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_dropped_logs_total:
+    family: HAProxy/Process/Errors
+    question: What per-second rate does HAProxy report for dropped logs?
+    entity: process
+    inputs:
+      value:
+        signal: process_dropped_logs_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_failed_resolutions:
+    family: HAProxy/Process/Errors
+    question: What per-second rate does HAProxy report for failed resolutions?
+    entity: process
+    inputs:
+      value:
+        signal: process_failed_resolutions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_total_warnings:
+    family: HAProxy/Process/Errors
+    question: What per-second rate does HAProxy report for warnings?
+    entity: process
+    inputs:
+      value:
+        signal: process_total_warnings
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_active_peers:
+    family: HAProxy/Process/Health
+    question: What value does HAProxy currently report for active peers?
+    entity: process
+    inputs:
+      value:
+        signal: process_active_peers
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_memory_bytes:
+    family: HAProxy/Process/Memory
+    question: What value does HAProxy currently report for max memory bytes?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_memory_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_pool_allocated_bytes:
+    family: HAProxy/Process/Memory
+    question: What value does HAProxy currently report for pool allocated bytes?
+    entity: process
+    inputs:
+      value:
+        signal: process_pool_allocated_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_pool_failures_total:
+    family: HAProxy/Process/Memory
+    question: What per-second rate does HAProxy report for pool failures?
+    entity: process
+    inputs:
+      value:
+        signal: process_pool_failures_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_pool_used_bytes:
+    family: HAProxy/Process/Memory
+    question: What value does HAProxy currently report for pool used bytes?
+    entity: process
+    inputs:
+      value:
+        signal: process_pool_used_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_run_queue:
+    family: HAProxy/Process/Queue
+    question: What value does HAProxy currently report for run queue?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_run_queue
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_backend_ssl_key_rate:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for backend ssl key rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_backend_ssl_key_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_frontend_ssl_key_rate:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for frontend ssl key rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_frontend_ssl_key_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_ssl_connections:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for ssl connections?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_ssl_connections
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_ssl_rate:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for ssl rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_ssl_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_frontend_ssl_reuse:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for frontend ssl reuse?
+    entity: process
+    inputs:
+      value:
+        signal: process_frontend_ssl_reuse
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+    display:
+      convention: percentage
+      reason: HAProxy exports this ratio on the operator-facing zero-to-one-hundred percentage scale.
+      evidence:
+      - percentage_display
+  process_limit_ssl_rate:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for limit ssl rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_limit_ssl_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_backend_ssl_key_rate:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for max backend ssl key rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_backend_ssl_key_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_frontend_ssl_key_rate:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for max frontend ssl key rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_frontend_ssl_key_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_ssl_connections:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for max ssl connections?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_ssl_connections
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_ssl_rate:
+    family: HAProxy/Process/SSL
+    question: What value does HAProxy currently report for max ssl rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_ssl_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_ssl_cache_lookups_total:
+    family: HAProxy/Process/SSL
+    question: What per-second rate does HAProxy report for ssl cache lookups?
+    entity: process
+    inputs:
+      value:
+        signal: process_ssl_cache_lookups_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_ssl_cache_misses_total:
+    family: HAProxy/Process/SSL
+    question: What per-second rate does HAProxy report for ssl cache misses?
+    entity: process
+    inputs:
+      value:
+        signal: process_ssl_cache_misses_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_ssl_connections_total:
+    family: HAProxy/Process/SSL
+    question: What per-second rate does HAProxy report for ssl connections?
+    entity: process
+    inputs:
+      value:
+        signal: process_ssl_connections_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_connected_peers:
+    family: HAProxy/Process/Scheduler
+    question: What value does HAProxy currently report for connected peers?
+    entity: process
+    inputs:
+      value:
+        signal: process_connected_peers
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_tasks:
+    family: HAProxy/Process/Scheduler
+    question: What value does HAProxy currently report for tasks?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_tasks
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_jobs:
+    family: HAProxy/Process/Scheduler
+    question: What value does HAProxy currently report for jobs?
+    entity: process
+    inputs:
+      value:
+        signal: process_jobs
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_listeners:
+    family: HAProxy/Process/Scheduler
+    question: What value does HAProxy currently report for listeners?
+    entity: process
+    inputs:
+      value:
+        signal: process_listeners
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_unstoppable_jobs:
+    family: HAProxy/Process/Scheduler
+    question: What value does HAProxy currently report for unstoppable jobs?
+    entity: process
+    inputs:
+      value:
+        signal: process_unstoppable_jobs
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_current_session_rate:
+    family: HAProxy/Process/Sessions
+    question: What value does HAProxy currently report for session rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_current_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_limit_session_rate:
+    family: HAProxy/Process/Sessions
+    question: What value does HAProxy currently report for limit session rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_limit_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_max_session_rate:
+    family: HAProxy/Process/Sessions
+    question: What value does HAProxy currently report for max session rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_max_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_busy_polling_enabled:
+    family: HAProxy/Process/Status
+    question: What value does HAProxy currently report for busy polling enabled?
+    entity: process
+    inputs:
+      value:
+        signal: process_busy_polling_enabled
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_stopping:
+    family: HAProxy/Process/Status
+    question: What value does HAProxy currently report for stopping?
+    entity: process
+    inputs:
+      value:
+        signal: process_stopping
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_idle_time_percent:
+    family: HAProxy/Process/Timing
+    question: What value does HAProxy currently report for idle time percent?
+    entity: process
+    inputs:
+      value:
+        signal: process_idle_time_percent
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+    display:
+      convention: percentage
+      reason: HAProxy exports this ratio on the operator-facing zero-to-one-hundred percentage scale.
+      evidence:
+      - percentage_display
+  process_uptime_seconds:
+    family: HAProxy/Process/Timing
+    question: What value does HAProxy currently report for uptime seconds?
+    entity: process
+    inputs:
+      value:
+        signal: process_uptime_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_bytes_out_total:
+    family: HAProxy/Process/Traffic
+    question: What per-second rate does HAProxy report for bytes out?
+    entity: process
+    inputs:
+      value:
+        signal: process_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_bytes_out_rate:
+    family: HAProxy/Process/Traffic
+    question: What value does HAProxy currently report for bytes out rate?
+    entity: process
+    inputs:
+      value:
+        signal: process_bytes_out_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_http_comp_bytes_in_total:
+    family: HAProxy/Process/Traffic
+    question: What value does HAProxy currently report for http compression bytes in?
+    entity: process
+    inputs:
+      value:
+        signal: process_http_comp_bytes_in_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_http_comp_bytes_out_total:
+    family: HAProxy/Process/Traffic
+    question: What value does HAProxy currently report for http compression bytes out?
+    entity: process
+    inputs:
+      value:
+        signal: process_http_comp_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  process_spliced_bytes_out_total:
+    family: HAProxy/Process/Traffic
+    question: What per-second rate does HAProxy report for spliced bytes out?
+    entity: process
+    inputs:
+      value:
+        signal: process_spliced_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_comp_responses_total:
+    family: HAProxy/Frontends/Compression
+    question: What per-second rate does HAProxy report for http compression responses?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_comp_responses_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_connections_total:
+    family: HAProxy/Frontends/Connections
+    question: What per-second rate does HAProxy report for connections?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_connections_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_connections_rate_max:
+    family: HAProxy/Frontends/Connections
+    question: What value does HAProxy currently report for connections rate max?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_connections_rate_max
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_denied_connections_total:
+    family: HAProxy/Frontends/Connections
+    question: What per-second rate does HAProxy report for denied connections?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_denied_connections_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_errors:
+    family: HAProxy/Frontends/Errors
+    question: What per-second rate does HAProxy report for errors?
+    entity: frontend
+    inputs:
+      request:
+        signal: frontend_request_errors_total
+        components:
+        - value
+      header_rewriting:
+        signal: frontend_failed_header_rewriting_total
+        components:
+        - value
+      internal:
+        signal: frontend_internal_errors_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_requests_denied_total:
+    family: HAProxy/Frontends/Errors
+    question: What per-second rate does HAProxy report for requests denied?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_requests_denied_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_responses_denied_total:
+    family: HAProxy/Frontends/Errors
+    question: What per-second rate does HAProxy report for responses denied?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_responses_denied_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_cache_hits_total:
+    family: HAProxy/Frontends/HTTP
+    question: What per-second rate does HAProxy report for http cache hits?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_cache_hits_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_cache_lookups_total:
+    family: HAProxy/Frontends/HTTP
+    question: What per-second rate does HAProxy report for http cache lookups?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_cache_lookups_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_requests_total:
+    family: HAProxy/Frontends/HTTP
+    question: What per-second rate does HAProxy report for http requests?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_requests_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_requests_rate_max:
+    family: HAProxy/Frontends/HTTP
+    question: What value does HAProxy currently report for http requests rate max?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_requests_rate_max
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_responses_total:
+    family: HAProxy/Frontends/HTTP
+    question: What per-second rate does HAProxy report for http responses?
+    entity: frontend
+    inputs:
+      code:
+        signal: frontend_http_responses_total
+        components:
+        - value
+    labels:
+      dimensions:
+        code:
+          render: label_value
+      promote: []
+      omit: {}
+  frontend_intercepted_requests_total:
+    family: HAProxy/Frontends/HTTP
+    question: What per-second rate does HAProxy report for intercepted requests?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_intercepted_requests_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_current_session_rate:
+    family: HAProxy/Frontends/Sessions
+    question: What value does HAProxy currently report for session rate?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_current_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_current_sessions:
+    family: HAProxy/Frontends/Sessions
+    question: What value does HAProxy currently report for sessions?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_current_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_denied_sessions_total:
+    family: HAProxy/Frontends/Sessions
+    question: What per-second rate does HAProxy report for denied sessions?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_denied_sessions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_limit_session_rate:
+    family: HAProxy/Frontends/Sessions
+    question: What value does HAProxy currently report for limit session rate?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_limit_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_limit_sessions:
+    family: HAProxy/Frontends/Sessions
+    question: What value does HAProxy currently report for limit sessions?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_limit_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_max_session_rate:
+    family: HAProxy/Frontends/Sessions
+    question: What value does HAProxy currently report for max session rate?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_max_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_max_sessions:
+    family: HAProxy/Frontends/Sessions
+    question: What value does HAProxy currently report for max sessions?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_max_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_sessions_total:
+    family: HAProxy/Frontends/Sessions
+    question: What per-second rate does HAProxy report for sessions?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_sessions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_status:
+    family: HAProxy/Frontends/Status
+    question: What values does HAProxy report across the source-defined status states?
+    entity: frontend
+    inputs:
+      state:
+        signal: frontend_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  frontend_http_comp_bytes_bypassed_total:
+    family: HAProxy/Frontends/Traffic
+    question: What per-second rate does HAProxy report for http compression bytes bypassed?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_comp_bytes_bypassed_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_comp_bytes_in_total:
+    family: HAProxy/Frontends/Traffic
+    question: What per-second rate does HAProxy report for http compression bytes in?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_comp_bytes_in_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_http_comp_bytes_out_total:
+    family: HAProxy/Frontends/Traffic
+    question: What per-second rate does HAProxy report for http compression bytes out?
+    entity: frontend
+    inputs:
+      value:
+        signal: frontend_http_comp_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  frontend_traffic:
+    family: HAProxy/Frontends/Traffic
+    question: What per-second rate does HAProxy report for traffic?
+    entity: frontend
+    inputs:
+      in:
+        signal: frontend_bytes_in_total
+        components:
+        - value
+      out:
+        signal: frontend_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_connections_total:
+    family: HAProxy/Listeners/Connections
+    question: What per-second rate does HAProxy report for connections?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_connections_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_denied_connections_total:
+    family: HAProxy/Listeners/Connections
+    question: What per-second rate does HAProxy report for denied connections?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_denied_connections_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_errors:
+    family: HAProxy/Listeners/Errors
+    question: What per-second rate does HAProxy report for errors?
+    entity: listener
+    inputs:
+      request:
+        signal: listener_request_errors_total
+        components:
+        - value
+      header_rewriting:
+        signal: listener_failed_header_rewriting_total
+        components:
+        - value
+      internal:
+        signal: listener_internal_errors_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_requests_denied_total:
+    family: HAProxy/Listeners/Errors
+    question: What per-second rate does HAProxy report for requests denied?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_requests_denied_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_responses_denied_total:
+    family: HAProxy/Listeners/Errors
+    question: What per-second rate does HAProxy report for responses denied?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_responses_denied_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_current_sessions:
+    family: HAProxy/Listeners/Sessions
+    question: What value does HAProxy currently report for sessions?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_current_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_denied_sessions_total:
+    family: HAProxy/Listeners/Sessions
+    question: What per-second rate does HAProxy report for denied sessions?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_denied_sessions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_limit_sessions:
+    family: HAProxy/Listeners/Sessions
+    question: What value does HAProxy currently report for limit sessions?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_limit_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_max_sessions:
+    family: HAProxy/Listeners/Sessions
+    question: What value does HAProxy currently report for max sessions?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_max_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_sessions_total:
+    family: HAProxy/Listeners/Sessions
+    question: What per-second rate does HAProxy report for sessions?
+    entity: listener
+    inputs:
+      value:
+        signal: listener_sessions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  listener_status:
+    family: HAProxy/Listeners/Status
+    question: What values does HAProxy report across the source-defined status states?
+    entity: listener
+    inputs:
+      state:
+        signal: listener_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  listener_traffic:
+    family: HAProxy/Listeners/Traffic
+    question: What per-second rate does HAProxy report for traffic?
+    entity: listener
+    inputs:
+      in:
+        signal: listener_bytes_in_total
+        components:
+        - value
+      out:
+        signal: listener_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_comp_responses_total:
+    family: HAProxy/Backends/Compression
+    question: What per-second rate does HAProxy report for http compression responses?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_http_comp_responses_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_connection_attempts_total:
+    family: HAProxy/Backends/Connections
+    question: What per-second rate does HAProxy report for connection attempts?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_connection_attempts_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_connection_reuses_total:
+    family: HAProxy/Backends/Connections
+    question: What per-second rate does HAProxy report for connection reuses?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_connection_reuses_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_aborts:
+    family: HAProxy/Backends/Errors
+    question: What per-second rate does HAProxy report for aborts?
+    entity: backend
+    inputs:
+      client:
+        signal: backend_client_aborts_total
+        components:
+        - value
+      server:
+        signal: backend_server_aborts_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_errors:
+    family: HAProxy/Backends/Errors
+    question: What per-second rate does HAProxy report for errors?
+    entity: backend
+    inputs:
+      response:
+        signal: backend_response_errors_total
+        components:
+        - value
+      connection:
+        signal: backend_connection_errors_total
+        components:
+        - value
+      header_rewriting:
+        signal: backend_failed_header_rewriting_total
+        components:
+        - value
+      internal:
+        signal: backend_internal_errors_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_requests_denied_total:
+    family: HAProxy/Backends/Errors
+    question: What per-second rate does HAProxy report for requests denied?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_requests_denied_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_responses_denied_total:
+    family: HAProxy/Backends/Errors
+    question: What per-second rate does HAProxy report for responses denied?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_responses_denied_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_warnings:
+    family: HAProxy/Backends/Errors
+    question: What per-second rate does HAProxy report for warnings?
+    entity: backend
+    inputs:
+      retry:
+        signal: backend_retry_warnings_total
+        components:
+        - value
+      redispatch:
+        signal: backend_redispatch_warnings_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_cache_hits_total:
+    family: HAProxy/Backends/HTTP
+    question: What per-second rate does HAProxy report for http cache hits?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_http_cache_hits_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_cache_lookups_total:
+    family: HAProxy/Backends/HTTP
+    question: What per-second rate does HAProxy report for http cache lookups?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_http_cache_lookups_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_requests_total:
+    family: HAProxy/Backends/HTTP
+    question: What per-second rate does HAProxy report for http requests?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_http_requests_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_responses_total:
+    family: HAProxy/Backends/HTTP
+    question: What per-second rate does HAProxy report for http responses?
+    entity: backend
+    inputs:
+      code:
+        signal: backend_http_responses_total
+        components:
+        - value
+    labels:
+      dimensions:
+        code:
+          render: label_value
+      promote: []
+      omit: {}
+  backend_servers:
+    family: HAProxy/Backends/Health
+    question: What value does HAProxy currently report for available servers?
+    entity: backend
+    inputs:
+      active:
+        signal: backend_active_servers
+        components:
+        - value
+      backup:
+        signal: backend_backup_servers
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_check_last_change_seconds:
+    family: HAProxy/Backends/Health
+    question: What value does HAProxy currently report for check last change seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_check_last_change_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_downtime_seconds_total:
+    family: HAProxy/Backends/Health
+    question: What per-second rate does HAProxy report for downtime seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_downtime_seconds_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_check_up_down_total:
+    family: HAProxy/Backends/Health
+    question: What per-second rate does HAProxy report for failed check state transitions?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_check_up_down_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_loadbalanced_total:
+    family: HAProxy/Backends/Health
+    question: What per-second rate does HAProxy report for load-balanced requests?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_loadbalanced_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_uweight:
+    family: HAProxy/Backends/Health
+    question: What value does HAProxy currently report for user weight?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_uweight
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_weight:
+    family: HAProxy/Backends/Health
+    question: What value does HAProxy currently report for weight?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_weight
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_current_queue:
+    family: HAProxy/Backends/Queue
+    question: What value does HAProxy currently report for queue?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_current_queue
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_max_queue:
+    family: HAProxy/Backends/Queue
+    question: What value does HAProxy currently report for max queue?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_max_queue
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_max_queue_time_seconds:
+    family: HAProxy/Backends/Queue
+    question: What value does HAProxy currently report for max queue time seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_max_queue_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_queue_time_average_seconds:
+    family: HAProxy/Backends/Queue
+    question: What value does HAProxy currently report for queue time average seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_queue_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_current_session_rate:
+    family: HAProxy/Backends/Sessions
+    question: What value does HAProxy currently report for session rate?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_current_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_current_sessions:
+    family: HAProxy/Backends/Sessions
+    question: What value does HAProxy currently report for sessions?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_current_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_last_session_seconds:
+    family: HAProxy/Backends/Sessions
+    question: What value does HAProxy currently report for last session seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_last_session_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_limit_sessions:
+    family: HAProxy/Backends/Sessions
+    question: What value does HAProxy currently report for limit sessions?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_limit_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_max_session_rate:
+    family: HAProxy/Backends/Sessions
+    question: What value does HAProxy currently report for max session rate?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_max_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_max_sessions:
+    family: HAProxy/Backends/Sessions
+    question: What value does HAProxy currently report for max sessions?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_max_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_sessions_total:
+    family: HAProxy/Backends/Sessions
+    question: What per-second rate does HAProxy report for sessions?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_sessions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_agg_check_status:
+    family: HAProxy/Backends/Status
+    question: What values does HAProxy report across the source-defined aggregated check status states?
+    entity: backend
+    inputs:
+      state:
+        signal: backend_agg_check_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  backend_agg_server_status:
+    family: HAProxy/Backends/Status
+    question: What values does HAProxy report across the source-defined aggregated server status states?
+    entity: backend
+    inputs:
+      state:
+        signal: backend_agg_server_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  backend_status:
+    family: HAProxy/Backends/Status
+    question: What values does HAProxy report across the source-defined status states?
+    entity: backend
+    inputs:
+      state:
+        signal: backend_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  backend_total_time_average_seconds:
+    family: HAProxy/Backends/Timing
+    question: What value does HAProxy currently report for average total time?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_total_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_connect_time_average_seconds:
+    family: HAProxy/Backends/Timing
+    question: What value does HAProxy currently report for connect time average seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_connect_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_max_connect_time_seconds:
+    family: HAProxy/Backends/Timing
+    question: What value does HAProxy currently report for max connect time seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_max_connect_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_max_response_time_seconds:
+    family: HAProxy/Backends/Timing
+    question: What value does HAProxy currently report for max response time seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_max_response_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_max_total_time_seconds:
+    family: HAProxy/Backends/Timing
+    question: What value does HAProxy currently report for maximum total time?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_max_total_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_response_time_average_seconds:
+    family: HAProxy/Backends/Timing
+    question: What value does HAProxy currently report for response time average seconds?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_response_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_comp_bytes_bypassed_total:
+    family: HAProxy/Backends/Traffic
+    question: What per-second rate does HAProxy report for http compression bytes bypassed?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_http_comp_bytes_bypassed_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_comp_bytes_in_total:
+    family: HAProxy/Backends/Traffic
+    question: What per-second rate does HAProxy report for http compression bytes in?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_http_comp_bytes_in_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_http_comp_bytes_out_total:
+    family: HAProxy/Backends/Traffic
+    question: What per-second rate does HAProxy report for http compression bytes out?
+    entity: backend
+    inputs:
+      value:
+        signal: backend_http_comp_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  backend_traffic:
+    family: HAProxy/Backends/Traffic
+    question: What per-second rate does HAProxy report for traffic?
+    entity: backend
+    inputs:
+      in:
+        signal: backend_bytes_in_total
+        components:
+        - value
+      out:
+        signal: backend_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_connection_attempts_total:
+    family: HAProxy/Servers/Connections
+    question: What per-second rate does HAProxy report for connection attempts?
+    entity: server
+    inputs:
+      value:
+        signal: server_connection_attempts_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_connection_reuses_total:
+    family: HAProxy/Servers/Connections
+    question: What per-second rate does HAProxy report for connection reuses?
+    entity: server
+    inputs:
+      value:
+        signal: server_connection_reuses_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_idle_connections_current:
+    family: HAProxy/Servers/Connections
+    question: What value does HAProxy currently report for idle connections?
+    entity: server
+    inputs:
+      value:
+        signal: server_idle_connections_current
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_used_connections_current:
+    family: HAProxy/Servers/Connections
+    question: What value does HAProxy currently report for used connections?
+    entity: server
+    inputs:
+      value:
+        signal: server_used_connections_current
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_idle_connections_limit:
+    family: HAProxy/Servers/Connections
+    question: What value does HAProxy currently report for idle connection limit?
+    entity: server
+    inputs:
+      value:
+        signal: server_idle_connections_limit
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_idle_connection_safety:
+    family: HAProxy/Servers/Connections
+    question: What value does HAProxy currently report for idle connection safety?
+    entity: server
+    inputs:
+      safe:
+        signal: server_safe_idle_connections_current
+        components:
+        - value
+      unsafe:
+        signal: server_unsafe_idle_connections_current
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_need_connections_current:
+    family: HAProxy/Servers/Connections
+    question: What value does HAProxy currently report for needed connections?
+    entity: server
+    inputs:
+      value:
+        signal: server_need_connections_current
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_aborts:
+    family: HAProxy/Servers/Errors
+    question: What per-second rate does HAProxy report for aborts?
+    entity: server
+    inputs:
+      client:
+        signal: server_client_aborts_total
+        components:
+        - value
+      server:
+        signal: server_server_aborts_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_check_failures_total:
+    family: HAProxy/Servers/Errors
+    question: What per-second rate does HAProxy report for check failures?
+    entity: server
+    inputs:
+      value:
+        signal: server_check_failures_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_errors:
+    family: HAProxy/Servers/Errors
+    question: What per-second rate does HAProxy report for errors?
+    entity: server
+    inputs:
+      response:
+        signal: server_response_errors_total
+        components:
+        - value
+      connection:
+        signal: server_connection_errors_total
+        components:
+        - value
+      header_rewriting:
+        signal: server_failed_header_rewriting_total
+        components:
+        - value
+      internal:
+        signal: server_internal_errors_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_responses_denied_total:
+    family: HAProxy/Servers/Errors
+    question: What per-second rate does HAProxy report for responses denied?
+    entity: server
+    inputs:
+      value:
+        signal: server_responses_denied_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_warnings:
+    family: HAProxy/Servers/Errors
+    question: What per-second rate does HAProxy report for warnings?
+    entity: server
+    inputs:
+      retry:
+        signal: server_retry_warnings_total
+        components:
+        - value
+      redispatch:
+        signal: server_redispatch_warnings_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_http_requests_total:
+    family: HAProxy/Servers/HTTP
+    question: What per-second rate does HAProxy report for http requests?
+    entity: server
+    inputs:
+      value:
+        signal: server_http_requests_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_http_responses_total:
+    family: HAProxy/Servers/HTTP
+    question: What per-second rate does HAProxy report for http responses?
+    entity: server
+    inputs:
+      code:
+        signal: server_http_responses_total
+        components:
+        - value
+    labels:
+      dimensions:
+        code:
+          render: label_value
+      promote: []
+      omit: {}
+  server_agent_code:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for agent code?
+    entity: server
+    inputs:
+      value:
+        signal: server_agent_code
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_agent_duration_seconds:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for agent duration seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_agent_duration_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_check_code:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for check code?
+    entity: server
+    inputs:
+      value:
+        signal: server_check_code
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_check_duration_seconds:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for check duration seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_check_duration_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_check_last_change_seconds:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for check last change seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_check_last_change_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_current_throttle:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for throttle?
+    entity: server
+    inputs:
+      value:
+        signal: server_current_throttle
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+    display:
+      convention: percentage
+      reason: HAProxy exports this ratio on the operator-facing zero-to-one-hundred percentage scale.
+      evidence:
+      - percentage_display
+  server_downtime_seconds_total:
+    family: HAProxy/Servers/Health
+    question: What per-second rate does HAProxy report for downtime seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_downtime_seconds_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_check_up_down_total:
+    family: HAProxy/Servers/Health
+    question: What per-second rate does HAProxy report for failed check state transitions?
+    entity: server
+    inputs:
+      value:
+        signal: server_check_up_down_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_loadbalanced_total:
+    family: HAProxy/Servers/Health
+    question: What per-second rate does HAProxy report for load-balanced requests?
+    entity: server
+    inputs:
+      value:
+        signal: server_loadbalanced_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_role:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for server role?
+    entity: server
+    inputs:
+      active:
+        signal: server_active
+        components:
+        - value
+      backup:
+        signal: server_backup
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_uweight:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for user weight?
+    entity: server
+    inputs:
+      value:
+        signal: server_uweight
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_weight:
+    family: HAProxy/Servers/Health
+    question: What value does HAProxy currently report for weight?
+    entity: server
+    inputs:
+      value:
+        signal: server_weight
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_current_queue:
+    family: HAProxy/Servers/Queue
+    question: What value does HAProxy currently report for queue?
+    entity: server
+    inputs:
+      value:
+        signal: server_current_queue
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_max_queue:
+    family: HAProxy/Servers/Queue
+    question: What value does HAProxy currently report for max queue?
+    entity: server
+    inputs:
+      value:
+        signal: server_max_queue
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_max_queue_time_seconds:
+    family: HAProxy/Servers/Queue
+    question: What value does HAProxy currently report for max queue time seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_max_queue_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_queue_limit:
+    family: HAProxy/Servers/Queue
+    question: What value does HAProxy currently report for queue limit?
+    entity: server
+    inputs:
+      value:
+        signal: server_queue_limit
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_queue_time_average_seconds:
+    family: HAProxy/Servers/Queue
+    question: What value does HAProxy currently report for queue time average seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_queue_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_current_session_rate:
+    family: HAProxy/Servers/Sessions
+    question: What value does HAProxy currently report for session rate?
+    entity: server
+    inputs:
+      value:
+        signal: server_current_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_current_sessions:
+    family: HAProxy/Servers/Sessions
+    question: What value does HAProxy currently report for sessions?
+    entity: server
+    inputs:
+      value:
+        signal: server_current_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_last_session_seconds:
+    family: HAProxy/Servers/Sessions
+    question: What value does HAProxy currently report for last session seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_last_session_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_limit_sessions:
+    family: HAProxy/Servers/Sessions
+    question: What value does HAProxy currently report for limit sessions?
+    entity: server
+    inputs:
+      value:
+        signal: server_limit_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_max_session_rate:
+    family: HAProxy/Servers/Sessions
+    question: What value does HAProxy currently report for max session rate?
+    entity: server
+    inputs:
+      value:
+        signal: server_max_session_rate
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_max_sessions:
+    family: HAProxy/Servers/Sessions
+    question: What value does HAProxy currently report for max sessions?
+    entity: server
+    inputs:
+      value:
+        signal: server_max_sessions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_sessions_total:
+    family: HAProxy/Servers/Sessions
+    question: What per-second rate does HAProxy report for sessions?
+    entity: server
+    inputs:
+      value:
+        signal: server_sessions_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_agent_status:
+    family: HAProxy/Servers/Status
+    question: What values does HAProxy report across the source-defined agent status states?
+    entity: server
+    inputs:
+      state:
+        signal: server_agent_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  server_check_status:
+    family: HAProxy/Servers/Status
+    question: What values does HAProxy report across the source-defined check status states?
+    entity: server
+    inputs:
+      state:
+        signal: server_check_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  server_status:
+    family: HAProxy/Servers/Status
+    question: What values does HAProxy report across the source-defined status states?
+    entity: server
+    inputs:
+      state:
+        signal: server_status
+        components:
+        - value
+    labels:
+      dimensions:
+        state:
+          render: label_value
+      promote: []
+      omit: {}
+  server_total_time_average_seconds:
+    family: HAProxy/Servers/Timing
+    question: What value does HAProxy currently report for average total time?
+    entity: server
+    inputs:
+      value:
+        signal: server_total_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_connect_time_average_seconds:
+    family: HAProxy/Servers/Timing
+    question: What value does HAProxy currently report for connect time average seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_connect_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_max_connect_time_seconds:
+    family: HAProxy/Servers/Timing
+    question: What value does HAProxy currently report for max connect time seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_max_connect_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_max_response_time_seconds:
+    family: HAProxy/Servers/Timing
+    question: What value does HAProxy currently report for max response time seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_max_response_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_max_total_time_seconds:
+    family: HAProxy/Servers/Timing
+    question: What value does HAProxy currently report for maximum total time?
+    entity: server
+    inputs:
+      value:
+        signal: server_max_total_time_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_response_time_average_seconds:
+    family: HAProxy/Servers/Timing
+    question: What value does HAProxy currently report for response time average seconds?
+    entity: server
+    inputs:
+      value:
+        signal: server_response_time_average_seconds
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  server_traffic:
+    family: HAProxy/Servers/Traffic
+    question: What per-second rate does HAProxy report for traffic?
+    entity: server
+    inputs:
+      in:
+        signal: server_bytes_in_total
+        components:
+        - value
+      out:
+        signal: server_bytes_out_total
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_any_err:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for any errors?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_any_err
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_cname:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for cname?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_cname
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_cname_error:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for cname error?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_cname_error
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_invalid:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for invalid?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_invalid
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_nx:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for nx?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_nx
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_other:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for other?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_other
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_outdated:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for outdated?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_outdated
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_refused:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for refused?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_refused
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_send_error:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for send error?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_send_error
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_sent:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for sent?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_sent
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_timeout:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for timeout?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_timeout
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_too_big:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for too big?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_too_big
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_truncated:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for truncated?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_truncated
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_update:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for update?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_update
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  resolver_valid:
+    family: HAProxy/Resolvers/DNS
+    question: What per-second rate does HAProxy report for valid?
+    entity: resolver
+    inputs:
+      value:
+        signal: resolver_valid
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  sticktable_size:
+    family: HAProxy/Stick Tables/Entries
+    question: What value does HAProxy currently report for size?
+    entity: sticktable
+    inputs:
+      value:
+        signal: sticktable_size
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  sticktable_used:
+    family: HAProxy/Stick Tables/Entries
+    question: What value does HAProxy currently report for used?
+    entity: sticktable
+    inputs:
+      value:
+        signal: sticktable_used
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}

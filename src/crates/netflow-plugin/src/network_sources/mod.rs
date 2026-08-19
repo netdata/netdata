@@ -7,6 +7,8 @@ mod tests;
 mod transform;
 mod types;
 
+#[cfg(test)]
+pub(crate) use runtime::{IPV4_INDEX_MIN_FAMILY_RECORDS, IPV6_INDEX_MIN_FAMILY_RECORDS};
 pub(crate) use runtime::{NetworkSourceRecord, NetworkSourcesRuntime};
 pub(crate) use service::run_network_sources_refresher;
 pub(crate) use transform::compile_jaq_filter;

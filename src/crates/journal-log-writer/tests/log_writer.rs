@@ -767,3 +767,67 @@ fn test_lifecycle_observer_reports_missing_retention_deletions() {
         "files removed from chain/accounting must still be reported for retention follow-up"
     );
 }
+
+#[test]
+fn relative_journal_dir_is_rejected_before_any_io() {
+    // A relative journal directory must fail fast at construction with a clear,
+    // actionable error that names the offending value, and must create no
+    // directory (validation happens before any filesystem mutation).
+    let root = "relative-journal-dir-rejected";
+    let dir = format!("{root}/otel/v1");
+
+    // Clean any leftover from a prior run. A real removal error (e.g. permission
+    // denied) must surface rather than mask a spurious assertion below; only a
+    // missing directory is the expected, ignorable case.
+    match fs::remove_dir_all(root) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => panic!("failed to clean up leftover {root}: {e}"),
+    }
+
+    match Log::new(Path::new(&dir), test_config()) {
+        Ok(_) => panic!("expected Log::new to reject a relative journal directory"),
+        Err(e) => {
+            let msg = e.to_string();
+            assert!(
+                msg.contains("absolute"),
+                "error should mention the absolute-path requirement, got: {msg}"
+            );
+            assert!(
+                msg.contains(&dir),
+                "error should name the offending value, got: {msg}"
+            );
+        }
+    }
+
+    assert!(
+        !Path::new(root).exists(),
+        "rejection must happen before any I/O; no directory may be created"
+    );
+}
+
+#[test]
+fn absolute_journal_dir_is_accepted() {
+    let tmp = TempDir::new().expect("create temp dir");
+    assert!(tmp.path().is_absolute());
+    match Log::new(tmp.path(), test_config()) {
+        Ok(_) => {}
+        Err(e) => panic!("absolute journal directory must be accepted, got: {e}"),
+    }
+}
+
+#[test]
+fn nonexistent_absolute_journal_dir_is_created_and_accepted() {
+    // Common production case: the configured absolute directory does not yet
+    // exist on first run and must be created.
+    let tmp = TempDir::new().expect("create temp dir");
+    let fresh = tmp.path().join("not-yet-created/otel/v1");
+    assert!(!fresh.exists());
+
+    match Log::new(&fresh, test_config()) {
+        Ok(_) => {}
+        Err(e) => panic!("non-existent absolute journal directory must be accepted, got: {e}"),
+    }
+
+    assert!(fresh.is_dir(), "journal directory should have been created");
+}

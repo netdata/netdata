@@ -224,11 +224,11 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
 
             if(cmd == DYNCFG_CMD_REMOVE) {
                 bool delete = (df->current.status == DYNCFG_STATUS_ORPHAN);
-                dictionary_acquired_item_release(dyncfg_globals.nodes, item);
-                item = NULL;
 
                 if(delete) {
                     if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->edit_access)) {
+                        dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+                        item = NULL;
                         code = dyncfg_default_response(
                             rfe->result.wb, HTTP_RESP_FORBIDDEN,
                             "dyncfg: you don't have enough edit permissions to execute this command");
@@ -236,6 +236,9 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
                     }
 
                     dictionary_del(dyncfg_globals.nodes, id);
+                    dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+                    item = NULL;
+                    dictionary_garbage_collect(dyncfg_globals.nodes);
                     dyncfg_file_delete(id);
                     code = dyncfg_default_response(rfe->result.wb, 200, "");
                     goto cleanup;

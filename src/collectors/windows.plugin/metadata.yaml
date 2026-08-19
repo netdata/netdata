@@ -22,7 +22,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors processors statistics on host.
+          Monitor processor performance statistics on Windows hosts through Perflib.
         method_description: |
           It queries Processor object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -561,6 +561,7 @@ modules:
       module_name: PerflibNetwork
       monitored_instance:
         name: Network Subsystem
+        description: "Monitor Windows network interface traffic, errors, drops, queue length, and offload activity through Perflib."
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
           - data-collection.networking
@@ -914,7 +915,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            This collector is disabled by default. When enabled, it automatically detects all available SMB share instances and metrics.
+            This collector is enabled by default and automatically detects all available SMB share instances and metrics. On systems where the 'SMB Server Shares' object is not available, no SMB metrics are collected.
         limits:
           description: ""
         performance_impact:
@@ -965,18 +966,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: open
-            - name: smb.server_shares_tree_connect_count
-              description: Count of user connections to the SMB share.
-              unit: "connections"
-              chart_type: line
-              dimensions:
-                - name: connections
-            - name: smb.server_shares_received_bytes
-              description: Received bytes on the SMB share.
-              unit: "bytes/s"
-              chart_type: line
-              dimensions:
-                - name: received
             - name: smb.server_shares_write_requests
               description: Write requests on the SMB share.
               unit: "requests/s"
@@ -995,12 +984,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: metadata
-            - name: smb.server_shares_sent_bytes
-              description: Sent bytes on the SMB share.
-              unit: "bytes/s"
-              chart_type: line
-              dimensions:
-                - name: sent
             - name: smb.server_shares_files_opened
               description: Files opened on the SMB share.
               unit: "files/s"
@@ -1137,7 +1120,14 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Install the Netdata Driver (netdata_driver.sys)
+            description: |
+              CPU temperature monitoring on Windows requires the Netdata kernel driver (`netdata_driver.sys`) to be installed on the host. The driver is an optional component and is not installed by default.
+
+              When you install Netdata with the Windows MSI installer, select the **Netdata Driver: Hardware Metrics Collection** option on the feature selection screen. If Netdata is already installed without the driver, the installer's Change/Modify option does not expose this checkbox again; uninstall Netdata first, then reinstall it and select the option during setup.
+
+              Editing `netdata.conf` alone is not enough. Without the driver, the `GetHardwareInfo` module cannot read the CPU `msr` register, so the `cpu.temperature` chart is never created and CPU temperature will not appear on the dashboard. The collector records an error in the Netdata log, but no temperature chart is produced.
       configuration:
         file:
           name: "netdata.conf"
@@ -1435,7 +1425,7 @@ modules:
         - name: Sensor
           description: "These metrics refer to Sensors."
           labels:
-            - name: name
+            - name: label
               description: Sensor friendly name.
             - name: manufacturer
               description: The sensor manufacturer.
@@ -1448,6 +1438,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.temperature.histogram
+              description: Distribution of all temperature sensors in fixed bands
+              unit: "sensors"
+              chart_type: heatmap
+              dimensions:
+                - name: "40"
+                - name: "50"
+                - name: "60"
+                - name: "70"
+                - name: "80"
+                - name: "85"
+                - name: "90"
+                - name: "95"
+                - name: "100"
+                - name: "+Inf"
             - name: system.hw.sensor.power.input
               description: Sensor Power
               unit: "W"
@@ -1898,6 +1903,7 @@ modules:
       module_name: PerflibHyperV
       monitored_instance:
         name: Hyper-V
+        description: Monitor Hyper-V virtual machine health, compute, memory, storage, network, and virtual switch performance on Windows hosts.
         link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
         categories:
           - data-collection.containers-and-vms
@@ -1913,10 +1919,12 @@ modules:
         - hyperv
         - virtualization
         - vm
+        - azure-local
+        - azure-stack-hci
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors website requests and logins.
+          This collector monitors Hyper-V virtualization metrics including virtual machine health status, root partition virtualization layer statistics (TLB flushes, address spaces, attached devices, GPA space), per-VM CPU usage, memory allocation and pressure, storage device I/O and errors, network interface traffic and packets, and virtual switch traffic, packets, and dropped packets.
         method_description: |
           It queries the 'HyperV' object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2282,7 +2290,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors application built with .NET
+          Monitor runtime and performance statistics for applications built with .NET Framework through Perflib.
         method_description: |
           It queries different NET Framework objects per process from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2534,6 +2542,7 @@ modules:
         categories:
           - data-collection.applications
         icon_filename: "windows.svg"
+        description: 'Monitor Active Directory operations, replication, LDAP activity, binds, queues, database work, cleanup, security descriptors, and SAM metrics.'
       related_resources:
         integrations:
           list: []
@@ -3761,6 +3770,7 @@ modules:
       module_name: PerflibExchange
       monitored_instance:
         name: MS Exchange
+        description: "Monitor Microsoft Exchange performance counters for mail flow, databases, clients, and server health through Perflib."
         link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
         categories:
           - data-collection.applications
@@ -4110,6 +4120,7 @@ modules:
       module_name: PerflibASP
       monitored_instance:
         name: ASP.NET
+        description: "Monitor ASP.NET application requests, errors, sessions, queues, and runtime performance through Perflib."
         link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
         categories:
           - data-collection.web-servers-and-proxies

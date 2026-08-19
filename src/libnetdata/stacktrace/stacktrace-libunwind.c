@@ -22,11 +22,8 @@ void stacktrace_flush(void) {
 }
 
 bool stacktrace_capture_is_async_signal_safe(void) {
-#if defined(STATIC_BUILD)
+    // libunwind's default program-header iterator uses dl_iterate_phdr(), which is not async-signal-safe.
     return false;
-#else
-    return true;
-#endif
 }
 
 bool stacktrace_available(void) {
@@ -35,8 +32,6 @@ bool stacktrace_available(void) {
 
 NEVER_INLINE
 void stacktrace_capture(BUFFER *wb) {
-    // this function is async-signal-safe, if the buffer has enough space to hold the stack trace
-
     root_cause_function[0] = '\0';
 
     unw_cursor_t cursor;
@@ -163,17 +158,16 @@ void impl_stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
         // Try to resolve symbol name
         unw_cursor_t cursor;
         unw_context_t context;
-        char sym[256] = "<unknown>";
+        Dl_info info;
         unw_word_t offset = 0;
         
         // We don't have the context anymore, so do the best we can
         // Try to resolve the address to a symbol name
-        if (dladdr(st->frames[i], (Dl_info *)sym) == 0) {
+        if (dladdr(st->frames[i], &info) == 0) {
             buffer_strcat(wb, "<unknown>");
         } else {
-            Dl_info *info = (Dl_info *)sym;
-            if (info->dli_sname)
-                buffer_strcat(wb, info->dli_sname);
+            if (info.dli_sname)
+                buffer_strcat(wb, info.dli_sname);
             else
                 buffer_strcat(wb, "<unknown>");
         }

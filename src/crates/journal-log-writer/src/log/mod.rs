@@ -23,6 +23,18 @@ const STACK_ENTRY_REF_LIMIT: usize = 128;
 const SOURCE_REALTIME_PREFIX: &[u8] = b"_SOURCE_REALTIME_TIMESTAMP=";
 
 fn create_chain(path: &Path) -> Result<OwnedChain> {
+    // The journal directory must be absolute: downstream file-path parsing
+    // (`repository::File::from_path`) only accepts absolute paths, so a relative
+    // value would otherwise fail later at first write with a cause-less error.
+    // Checked first, before any I/O, so the rejection is FS-free and the error
+    // names the offending value regardless of machine-id availability.
+    if !path.is_absolute() {
+        return Err(WriterError::InvalidPath(format!(
+            "journal directory must be an absolute path, got: {}",
+            path.display()
+        )));
+    }
+
     let machine_id = load_machine_id()
         .map_err(|e| WriterError::MachineId(format!("failed to load machine ID: {}", e)))?;
 

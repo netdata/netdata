@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/require"
 
@@ -89,33 +91,34 @@ func TestTopologyIntegrationWithSnmpsimV3(t *testing.T) {
 	}
 }
 
-func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnectionInfo) topologyData {
+func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnectionInfo) topologymodel.Data {
 	t.Helper()
 
+	deviceStore := ddsnmp.NewDeviceStore()
 	deviceKey := "integration:" + dev.SNMPVersion + ":" + dev.SysName
-	ddsnmp.DeviceRegistry.Register(deviceKey, dev)
-	defer ddsnmp.DeviceRegistry.Unregister(deviceKey)
+	deviceStore.Register(deviceKey, dev)
 
-	coll := New()
-	coll.Config = Config{UpdateEvery: 1}
+	coll := New(deviceStore, NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	coll.Config = Config{UpdateEvery: 3600}
 	require.NoError(t, coll.Init(context.Background()))
 	defer coll.Cleanup(context.Background())
 
 	require.NoError(t, coll.Check(context.Background()))
-	_ = coll.Collect(context.Background())
+	coll.refreshTopology(context.Background())
 
-	var snapshot topologyData
+	var snapshot topologymodel.Data
 	cacheKey := dev.Hostname + ":" + strconv.Itoa(dev.Port)
 	require.Eventuallyf(t, func() bool {
 		cache := coll.deviceCaches[cacheKey]
 		if cache == nil {
 			return false
 		}
-		cache.mu.RLock()
-		defer cache.mu.RUnlock()
 
 		var ok bool
-		snapshot, ok = cache.snapshot()
+		options := defaultTopologyQueryOptionsForTest()
+		options.CollapseActorsByIP = false
+		options.EliminateNonIPInferred = false
+		snapshot, ok = snapshotTopologyCacheForTestWithOptions(cache, options)
 		return ok
 	}, 5*time.Second, 100*time.Millisecond, "topology snapshot did not become available for %q", dev.SysName)
 
@@ -158,7 +161,7 @@ func integrationV3DeviceInfo(host string, port int, contextName, user, level, au
 	}
 }
 
-func assertExpectedTopologySnapshot(t *testing.T, subject string, expectation topologyIntegrationExpectation, snapshot topologyData) {
+func assertExpectedTopologySnapshot(t *testing.T, subject string, expectation topologyIntegrationExpectation, snapshot topologymodel.Data) {
 	t.Helper()
 
 	require.Greaterf(t, len(snapshot.Links), 0, "expected topology links for %q", subject)

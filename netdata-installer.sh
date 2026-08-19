@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Next unused error code: I0012
+# Next unused error code: I0016
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
@@ -217,14 +217,14 @@ USAGE: ${PROGRAM} [options]
   --enable-plugin-systemd-journal Enable the systemd journal plugin. Default: enable it when libsystemd is available.
   --disable-plugin-systemd-journal Explicitly disable the systemd journal plugin.
   --internal-systemd-journal Enable the internal journal file reader instead of using libsystemd
-  --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled
+  --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled, except on macOS where it is enabled when a suitable Rust toolchain is found
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
-  --enable-plugin-otel-signal-viewer Enable the OTel signal viewer plugin. Default: disabled
-  --disable-plugin-otel-signal-viewer Explicitly disable the OTel signal viewer plugin.
   --enable-plugin-netflow    Enable the NetFlow/IPFIX/sFlow flow analysis plugin. Default: disabled.
   --disable-plugin-netflow   Explicitly disable the NetFlow/IPFIX/sFlow flow analysis plugin.
   --enable-plugin-ibm        Enable the IBM ecosystem monitoring plugin. Default: disabled
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
+  --enable-plugin-scripts    Enable the scripts.d plugin. Default: Enabled when possible.
+  --disable-plugin-scripts   Explicitly disable the scripts.d plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
   --disable-exporting-kinesis Explicitly disable AWS Kinesis exporting connector.
@@ -268,16 +268,17 @@ ENABLE_GO=1
 ENABLE_PYTHON=1
 ENABLE_CHARTS=1
 ENABLE_NETFLOW=0
-ENABLE_OTEL=0
-ENABLE_OTEL_SIGNAL_VIEWER=0
+ENABLE_OTEL=""
 ENABLE_IBM=0
-ENABLE_SCRIPTS=0
+ENABLE_SCRIPTS=1
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 REMOVE_BUILD=1
 
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
+# The parser keeps legacy no-op flags for command-line compatibility.
+# shellcheck disable=SC2034
 while [ -n "${1}" ]; do
   case "${1}" in
     "--zlib-is-really-here") LIBS_ARE_HERE=1 ;;
@@ -315,8 +316,6 @@ while [ -n "${1}" ]; do
     "--internal-systemd-journal") USE_RUST_JOURNAL_FILE=1 ;;
     "--enable-plugin-otel") ENABLE_OTEL=1 ;;
     "--disable-plugin-otel") ENABLE_OTEL=0 ;;
-    "--enable-plugin-otel-signal-viewer") ENABLE_OTEL_SIGNAL_VIEWER=1 ;;
-    "--disable-plugin-otel-signal-viewer") ENABLE_OTEL_SIGNAL_VIEWER=0 ;;
     "--enable-plugin-ibm") ENABLE_IBM=1 ;;
     "--disable-plugin-ibm") ENABLE_IBM=0 ;;
     "--enable-plugin-scripts") ENABLE_SCRIPTS=1 ;;
@@ -550,6 +549,7 @@ cmake_install() {
     fi
 }
 
+# shellcheck disable=SC2329
 build_error() {
   netdata_banner
   trap - EXIT
@@ -576,6 +576,7 @@ fi
 
 if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   progress "Checking for a usable Go toolchain and attempting to install one to /usr/local/go if needed."
+  # shellcheck source=/dev/null
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then
@@ -598,6 +599,75 @@ if [ "${ENABLE_IBM}" -eq 1 ]; then
       warning "IBM plugin requires a C compiler (gcc or clang) for CGO. Disabling IBM plugin."
       ENABLE_IBM=0
     fi
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# The otel-plugin needs a Rust toolchain covering the workspace MSRV. On macOS
+# it is enabled automatically when one is present (the dependency script,
+# packaging/installer/install-required-packages.sh, provisions one via rustup
+# or Homebrew), and an explicit --enable-plugin-otel without a usable
+# toolchain fails fast. Toolchain provisioning cannot happen here: on macOS
+# this script runs as root, where Homebrew refuses to operate. These checks
+# are macOS-only by design — on every other platform the plugin stays opt-in
+# and toolchain resolution is left to CMake/Corrosion, exactly as before.
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  required_rust_version() {
+    grep '^rust-version' "${NETDATA_SOURCE_DIR}/src/crates/Cargo.toml" 2>/dev/null | head -n 1 | sed -e 's/.*"\([0-9.]*\)".*/\1/'
+  }
+
+  # Succeeds when version ${2} >= version ${1}; components compared
+  # numerically, missing components count as 0. Twin of the check in
+  # packaging/installer/install-required-packages.sh (which is also used
+  # standalone and cannot source this file).
+  version_covers() {
+    _vc_i=1
+    while [ "${_vc_i}" -le 3 ]; do
+      _vc_r="$(echo "${1}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
+      _vc_a="$(echo "${2}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
+      [ "${_vc_a:-0}" -gt "${_vc_r:-0}" ] && return 0
+      [ "${_vc_a:-0}" -lt "${_vc_r:-0}" ] && return 1
+      _vc_i=$((_vc_i + 1))
+    done
+    return 0
+  }
+
+  rust_covers_required_version() {
+    # Sourcing /etc/profile above ran path_helper, which may have reset PATH
+    # and hidden the toolchain; probe the locations Corrosion's FindRust
+    # considers, plus Homebrew's Apple Silicon prefix. Validate the rustc
+    # that ships next to the selected cargo, so a mixed installation cannot
+    # pass the check with a different compiler.
+    cargo_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v cargo 2>/dev/null)"
+    [ -n "${cargo_cmd}" ] || return 1
+    rustc_cmd="${cargo_cmd%/*}/rustc"
+    [ -x "${rustc_cmd}" ] || return 1
+    rust_version_min="$(required_rust_version)"
+    if [ -n "${rust_version_min}" ]; then
+      rust_version_have="$("${rustc_cmd}" --version 2>/dev/null | cut -d ' ' -f 2)"
+      [ -z "${rust_version_have}" ] && return 1
+      version_covers "${rust_version_min}" "${rust_version_have}" || return 1
+    fi
+    # Make the approved toolchain visible to CMake/Corrosion as well.
+    export PATH="${cargo_cmd%/*}:${PATH}"
+  }
+
+  if [ -z "${ENABLE_OTEL}" ]; then
+    ENABLE_OTEL=0
+    if rust_covers_required_version; then
+      progress "Found Rust toolchain (${rustc_cmd}), the otel-plugin will be built."
+      ENABLE_OTEL=1
+    else
+      warning "Building without the otel-plugin: no Rust toolchain covering version $(required_rust_version) found. Run packaging/installer/install-required-packages.sh (or install Rust via rustup or 'brew install rust') and re-run the installer to enable it."
+    fi
+  elif [ "${ENABLE_OTEL}" -eq 1 ] && ! rust_covers_required_version; then
+    fatal "The otel-plugin was explicitly enabled, but no Rust toolchain covering version $(required_rust_version) was found. Install one (via rustup or 'brew install rust') and re-run the installer." I0015
+  fi
+else
+  # otel-plugin remains opt-in on non-macOS platforms; empty means default-off.
+  if [ -z "${ENABLE_OTEL}" ]; then
+    ENABLE_OTEL=0
   fi
 fi
 
@@ -901,19 +971,9 @@ if [ "$(id -u)" -eq 0 ]; then
     fi
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-    capabilities=0
-    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
-      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"; then
-        capabilities=1
-      fi
-    fi
-
-    if [ $capabilities -eq 0 ]; then
-      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-    fi
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/macos-logs.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/macos-logs.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/macos-logs.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin" ]; then
@@ -971,6 +1031,11 @@ if [ "$(id -u)" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf-go.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf-go.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf-go.plugin"
+  fi
+
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
@@ -979,6 +1044,11 @@ if [ "$(id -u)" -eq 0 ]; then
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/local-listeners" ]; then
@@ -1001,7 +1071,7 @@ if [ "$(id -u)" -eq 0 ]; then
     capabilities=0
     if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-      if run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
+      if run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
         capabilities=1
       fi
     fi
@@ -1010,6 +1080,11 @@ if [ "$(id -u)" -eq 0 ]; then
       # fix go.d.plugin to be setuid to root
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
     fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin" ]; then

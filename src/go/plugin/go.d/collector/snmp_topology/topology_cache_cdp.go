@@ -32,8 +32,8 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 	if v := tags[tagCdpDeviceID]; v != "" {
 		entry.deviceID = v
 	}
-	if v := tags[tagCdpAddressType]; v != "" {
-		entry.addressType = v
+	if v := tags[tagCdpAddress]; v != "" {
+		entry.rawAddress = v
 	}
 	if v := tags[tagCdpDevicePort]; v != "" {
 		entry.devicePort = v
@@ -46,9 +46,6 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 	}
 	if v := tags[tagCdpCaps]; v != "" {
 		entry.capabilities = v
-	}
-	if v := tags[tagCdpAddress]; v != "" {
-		entry.address = v
 	}
 	if v := tags[tagCdpVTPDomain]; v != "" {
 		entry.vtpMgmtDomain = v
@@ -71,18 +68,6 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 	if v := tags[tagCdpSysObjectID]; v != "" {
 		entry.sysObjectID = v
 	}
-	if v := tags[tagCdpPrimaryMgmtAddrType]; v != "" {
-		entry.primaryMgmtAddrType = v
-	}
-	if v := tags[tagCdpPrimaryMgmtAddr]; v != "" {
-		entry.primaryMgmtAddr = v
-	}
-	if v := tags[tagCdpSecondaryMgmtAddrType]; v != "" {
-		entry.secondaryMgmtAddrType = v
-	}
-	if v := tags[tagCdpSecondaryMgmtAddr]; v != "" {
-		entry.secondaryMgmtAddr = v
-	}
 	if v := tags[tagCdpPhysicalLocation]; v != "" {
 		entry.physicalLocation = v
 	}
@@ -90,5 +75,5 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 		entry.lastChange = v
 	}
 
-	entry.managementAddrs = appendCdpManagementAddresses(entry, entry.managementAddrs)
+	entry.managementAddrs = appendCdpManagementAddresses(tags, entry.managementAddrs)
 }

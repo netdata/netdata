@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReader_New(t *testing.T) {
@@ -114,6 +115,18 @@ func TestReader_Run(t *testing.T) {
 			test.createSim(tmp).run(t)
 		})
 	}
+}
+
+func TestReader_StockSNMPTrapsConfigHasNoJobs(t *testing.T) {
+	reader := NewReader(
+		confgroup.Registry{"snmp_traps": {}},
+		[]string{"../../../go.d/config/go.d/snmp_traps.conf"},
+	)
+
+	groups := reader.groups()
+
+	require.Len(t, groups, 1)
+	assert.Empty(t, groups[0].Configs)
 }
 
 func TestConfigSourceType(t *testing.T) {

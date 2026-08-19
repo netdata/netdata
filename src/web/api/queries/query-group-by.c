@@ -211,7 +211,7 @@ void rrd2rrdr_set_timestamps(RRDR *r) {
     internal_fatal(qt->window.points != r->n, "QUERY: mismatch to the number of points in qt and r");
 
     r->view.group = qt->window.group;
-    r->view.update_every = (int) query_view_update_every(qt);
+    r->view.update_every = query_view_update_every(qt);
     r->view.before = qt->window.before;
     r->view.after = qt->window.after;
 
@@ -229,12 +229,13 @@ void rrd2rrdr_set_timestamps(RRDR *r) {
     time_t query_granularity = (time_t)(r->view.update_every / r->view.group);
 
     size_t rrdr_line = 0;
-    time_t first_point_end_time = after_wanted + view_update_every - query_granularity;
+    time_t first_point_end_time = after_wanted + (view_update_every - query_granularity);
     time_t now_end_time = first_point_end_time;
 
     while (rrdr_line < points_wanted) {
         r->t[rrdr_line++] = now_end_time;
-        now_end_time += view_update_every;
+        if(rrdr_line < points_wanted)
+            now_end_time += view_update_every;
     }
 
     internal_fatal(r->t[0] != first_point_end_time, "QUERY: wrong first timestamp in the query");

@@ -162,7 +162,7 @@ func TestHostScopeFlattenPreservesScopeScenarios(t *testing.T) {
 				mustValue(t, scopedReader, "svc.latency_count", Labels{"route": "/api"}, 3)
 				mustValue(t, scopedReader, "svc.latency_sum", Labels{"route": "/api"}, 6)
 				mustValue(t, scopedReader, "svc.latency_bucket", Labels{"route": "/api", HistogramBucketLabel: "1"}, 1)
-				mustValue(t, scopedReader, "svc.latency_bucket", Labels{"route": "/api", HistogramBucketLabel: "5"}, 3)
+				mustValue(t, scopedReader, "svc.latency_bucket", Labels{"route": "/api", HistogramBucketLabel: "5"}, 2)
 			},
 		},
 		"composite instruments": {

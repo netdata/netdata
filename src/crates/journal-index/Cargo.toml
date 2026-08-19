@@ -24,7 +24,7 @@ static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-journal-core = { path = "../journal-core" }
+journal-core = { workspace = true }
 journal-common = { workspace = true }
 journal-registry = { workspace = true }
 

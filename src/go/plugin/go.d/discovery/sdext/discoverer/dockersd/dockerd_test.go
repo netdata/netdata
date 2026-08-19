@@ -3,14 +3,15 @@
 package dockersd
 
 import (
+	"net/netip"
 	"testing"
 	"time"
 
-	typesContainer "github.com/docker/docker/api/types/container"
+	typesContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 
-	typesNetwork "github.com/docker/docker/api/types/network"
+	typesNetwork "github.com/moby/moby/api/types/network"
 )
 
 func TestDiscoverer_Discover(t *testing.T) {
@@ -132,9 +133,9 @@ func prepareNginxContainer(name string) typesContainer.Summary {
 		Image:   "nginx-image",
 		ImageID: "nginx-image-id",
 		Command: "nginx-command",
-		Ports: []typesContainer.Port{
+		Ports: []typesContainer.PortSummary{
 			{
-				IP:          "0.0.0.0",
+				IP:          netip.MustParseAddr("0.0.0.0"),
 				PrivatePort: 80,
 				PublicPort:  8080,
 				Type:        "tcp",
@@ -149,7 +150,7 @@ func prepareNginxContainer(name string) typesContainer.Summary {
 		},
 		NetworkSettings: &typesContainer.NetworkSettingsSummary{
 			Networks: map[string]*typesNetwork.EndpointSettings{
-				"bridge": {IPAddress: "192.0.2.0"},
+				"bridge": {IPAddress: netip.MustParseAddr("192.0.2.0")},
 			},
 		},
 	}

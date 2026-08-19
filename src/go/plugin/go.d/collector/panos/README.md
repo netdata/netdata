@@ -1,0 +1,1 @@
+integrations/palo_alto_networks_pan-os.md

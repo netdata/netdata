@@ -3,11 +3,13 @@
 package jobruntime
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 )
 
@@ -48,6 +50,15 @@ func (c *stopController) requestStop() {
 	c.stopOnce.Do(func() { close(c.stopCh) })
 }
 
+func (c *stopController) stopRequested() bool {
+	select {
+	case <-c.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *stopController) stopAndWait() {
 	c.requestStop()
 	if !c.started.Load() {
@@ -62,6 +73,35 @@ func retryAutoDetection(autoDetectEvery, autoDetectTries int) bool {
 
 func disableAutoDetection(autoDetectEvery *int) {
 	*autoDetectEvery = 0
+}
+
+func isRetryableError(err error) bool {
+	return dyncfg.IsRetryableError(err)
+}
+
+func sanitizeLifecycleError(sanitize func(error) error, err error) (sanitized error) {
+	if err == nil || sanitize == nil {
+		return err
+	}
+	defer func() {
+		if recover() != nil {
+			sanitized = errors.New("jobruntime: lifecycle error sanitizer panicked")
+		}
+	}()
+	sanitized = sanitize(err)
+	if sanitized == nil {
+		return errors.New("jobruntime: lifecycle error sanitizer discarded a failure")
+	}
+	return sanitized
+}
+
+func lifecycleLogMessageSanitizer(sanitize func(error) error) func(string) string {
+	if sanitize == nil {
+		return nil
+	}
+	return func(message string) string {
+		return sanitizeLifecycleError(sanitize, errors.New(message)).Error()
+	}
 }
 
 func consumeAutoDetectTry(autoDetectTries *int) {

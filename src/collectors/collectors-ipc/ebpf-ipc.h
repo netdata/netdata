@@ -82,19 +82,6 @@ typedef struct ebpf_publish_process {
     uint32_t task_err;
 } ebpf_publish_process_t;
 
-typedef struct ebpf_socket_publish_apps {
-    // Data read
-    uint64_t bytes_sent;             // Bytes sent
-    uint64_t bytes_received;         // Bytes received
-    uint64_t call_tcp_sent;          // Number of times tcp_sendmsg was called
-    uint64_t call_tcp_received;      // Number of times tcp_cleanup_rbuf was called
-    uint64_t retransmit;             // Number of times tcp_retransmit was called
-    uint64_t call_udp_sent;          // Number of times udp_sendmsg was called
-    uint64_t call_udp_received;      // Number of times udp_recvmsg was called
-    uint64_t call_close;             // Number of times tcp_close was called
-    uint64_t call_tcp_v4_connection; // Number of times tcp_v4_connect was called
-    uint64_t call_tcp_v6_connection; // Number of times tcp_v6_connect was called
-} ebpf_socket_publish_apps_t;
 
 typedef struct netdata_socket {
     char name[TASK_COMM_LEN];
@@ -125,38 +112,6 @@ typedef struct netdata_socket {
         uint64_t udp_bytes_received;
     } udp;
 } netdata_socket_t;
-
-typedef struct netdata_cachestat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_pid_t;
-
-typedef struct netdata_cachestat {
-    uint32_t add_to_page_cache_lru;
-    uint32_t mark_page_accessed;
-    uint32_t account_page_dirtied;
-    uint32_t mark_buffer_dirty;
-} netdata_cachestat_t;
-
-typedef struct netdata_publish_cachestat {
-    uint64_t ct;
-
-    long long ratio;
-    long long dirty;
-    long long hit;
-    long long miss;
-
-    netdata_cachestat_t current;
-    netdata_cachestat_t prev;
-} netdata_publish_cachestat_t;
 
 typedef struct netdata_publish_dcstat_pid {
     uint64_t cache_access;
@@ -321,8 +276,6 @@ typedef struct netdata_ebpf_pid_stats {
     uint32_t pid;
 
     ebpf_publish_process_t process;
-    ebpf_socket_publish_apps_t socket;
-    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t directory_cache;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;

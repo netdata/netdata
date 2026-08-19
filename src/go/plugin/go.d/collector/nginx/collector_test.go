@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -68,6 +70,66 @@ func TestCollector_CheckNG(t *testing.T) {
 	collr.URL = "http://127.0.0.1:38001/us"
 	require.NoError(t, collr.Init(context.Background()))
 	assert.Error(t, collr.Check(context.Background()))
+}
+
+func TestCollector_LifecycleContextCancelsHTTPRequest(t *testing.T) {
+	tests := map[string]func(context.Context, *Collector) error{
+		"check": func(ctx context.Context, collector *Collector) error {
+			return collector.Check(ctx)
+		},
+		"collect": func(ctx context.Context, collector *Collector) error {
+			collector.Collect(ctx)
+			return nil
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			entered := make(chan struct{})
+			requestCanceled := make(chan struct{})
+			releaseServer := make(chan struct{})
+			ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+				close(entered)
+				select {
+				case <-req.Context().Done():
+					close(requestCanceled)
+				case <-releaseServer:
+				}
+			}))
+			defer ts.Close()
+
+			collector := New()
+			collector.URL = ts.URL
+			collector.Timeout = confopt.Duration(time.Minute)
+			require.NoError(t, collector.Init(context.Background()))
+
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan error, 1)
+			go func() {
+				done <- run(ctx, collector)
+			}()
+			select {
+			case <-entered:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "HTTP request was not received")
+			}
+			cancel()
+			select {
+			case <-requestCanceled:
+				close(releaseServer)
+			case <-time.After(time.Second):
+				close(releaseServer)
+				require.FailNow(t, "test failed", "HTTP request ignored lifecycle cancellation")
+			}
+			select {
+			case err := <-done:
+				if name == "check" {
+					require.ErrorIs(t, err, context.Canceled)
+				}
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "collector ignored lifecycle cancellation")
+			}
+		})
+	}
 }
 
 func TestCollector_Charts(t *testing.T) {

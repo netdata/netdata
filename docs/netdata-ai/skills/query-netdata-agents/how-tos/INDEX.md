@@ -35,10 +35,9 @@ defeats the no-token-leak guarantee.
 
 ## Index
 
-(Populate as how-tos are authored. Stubs below correspond to the
-seed verification questions in `../verify/questions.md`; replace
-each `(stub -- not yet authored)` with a real link as soon as a
-how-to is written.)
+(Populate as how-tos are authored. Stubs below mirror the canonical
+skill-verification harness questions for `verify/questions.md`; replace each
+`(stub -- not yet authored)` with a real link as soon as a how-to is written.)
 
 ### Identity / hardware / OS
 
@@ -79,13 +78,17 @@ how-to is written.)
 ### Topology / flows
 
 - `topology-summary-direct.md` (stub -- not yet authored)
+- [group-network-topology-by-kubernetes-pod-direct.md](./group-network-topology-by-kubernetes-pod-direct.md) -- summarize `topology:network-connections` process actors by Kubernetes pod and namespace through a direct Agent call.
+- [find-containers-for-topology-port-direct.md](./find-containers-for-topology-port-direct.md) -- find containers or pods exposing a specific TCP port from the direct Agent topology Function payload.
 - `flows-top-talkers-direct.md` (stub -- not yet authored)
 - [validate-direct-local-flow-function.md](./validate-direct-local-flow-function.md) -- prove a local Cloud-connected `flows:netflow` Function works through a Cloud-minted direct-agent bearer.
+- [audit-stored-flow-timestamps-direct.md](./audit-stored-flow-timestamps-direct.md) -- audit retained raw-flow timestamp and duration coverage with aggregate-only output, distinguishing exporter timing from receive-time fallback.
 
 ### Metrics
 
 - `current-cpu-direct.md` (stub -- not yet authored)
 - `peak-memory-last-hour-direct.md` (stub -- not yet authored)
+- [export-cpu-io-memory-three-days-direct.md](./export-cpu-io-memory-three-days-direct.md) -- export CPU, disk I/O, and memory in one-minute buckets for the 72 hours ending at 14:00 through a direct Agent call.
 
 ## Cross-skill how-tos
 

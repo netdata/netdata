@@ -27,10 +27,22 @@ You can create multiple Spaces, but we recommend using a single Space for most u
 
 ### Set Up Team Access
 
-1. Click "Invite Users" in the Space's sidebar
-2. Set appropriate access levels:
-    - Rooms
-    - User roles
+You control what each team member can do in a Space by assigning them a **role**. The **Admin** role has full control over the Space, including users, nodes, rooms, and billing. To make someone an Admin, you must already be an Admin yourself — only current Admins can assign the Admin role to others. For the full list of roles and what each one permits, see the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+
+#### Invite a new user and make them an Admin
+
+1. In the Space's sidebar, click **Invite Users**.
+2. Enter the invitee's email address.
+3. Select **Admin** as the role for the invitation.
+4. Send the invitation. The invitee becomes an Admin when they accept and join the Space.
+
+#### Change an existing member's role to Admin
+
+1. Click **Space Settings** (⚙️) on the left sidebar below the spaces list.
+2. Open the **User Management** tab.
+3. Find the member and change their role to **Admin**.
+
+Role changes take effect immediately — the member gains the new permissions right away, with no reload or restart needed.
 
 :::tip
 
@@ -73,3 +85,49 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 
 1. Click the ⚙️ next to the Room name
 2. Manage room access, node grouping, dashboard settings, and monitoring configurations
+
+### Leaving a Room
+
+Any user with Room access — **Admin**, **Manager**, **Troubleshooter**, or **Observer** — can leave a Room. **Billing** users do not have Room access and cannot leave a Room.
+
+Leaving a Room removes your access to that Room's nodes, dashboards, metrics, and functions. It does not delete the Room or affect other members.
+
+Rejoining a Room depends on your role:
+
+- **Admins** and **Managers** can rejoin any Room at any time on their own.
+- **Troubleshooters** and **Observers** cannot rejoin on their own and must be re-added to the Room by an Admin or Manager.
+
+For the full permission breakdown, see the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+
+### Delete a Room
+
+Only **Admins** and **Managers** can delete a Room. See the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions matrix.
+
+:::warning
+
+Deleting a Room is permanent and cannot be undone. The Room and its dashboards are removed.
+
+:::
+
+The nodes in a deleted Room are not deleted — they remain available in the "All nodes" Room and any other Rooms they belong to within the Space.
+
+**Steps to delete a Room:**
+
+1. Click the ⚙️ next to the Room name to open the Room's settings.
+2. Click **Delete Room**.
+
+### Delete a Space
+
+Only users with the **Admin** role can delete a Space. See the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for full permission details.
+
+:::warning
+
+Deleting a Space is permanent and cannot be undone. You cannot delete the only Space on your account — each account must have at least one Space.
+
+:::
+
+**Steps to delete a Space:**
+
+1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list.
+2. Select the **Info** tab.
+3. Click **Delete Space**.

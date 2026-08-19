@@ -12,13 +12,22 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 const (
 	shortName = "http"
 	fullName  = "sd:http"
+
+	publicErrRequest = "the configured HTTP discovery request could not be created"
+	publicErrTimeout = "the configured HTTP endpoint did not respond before the timeout"
+	publicErrQuery   = "cannot query the configured HTTP endpoint"
+	publicErrData    = "the configured HTTP endpoint did not return usable discovery data"
+	publicErrFile    = "the configured HTTP credential or TLS file could not be read safely"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
@@ -28,6 +37,9 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 
 	client, err := web.NewHTTPClient(cfg.clientConfig())
 	if err != nil {
+		if errors.Is(err, tlscfg.ErrTLSFile) || errors.Is(err, safefile.ErrFile) {
+			return nil, dyncfg.NewPublicError(publicErrFile, err)
+		}
 		return nil, err
 	}
 
@@ -60,6 +72,42 @@ type Discoverer struct {
 
 func (d *Discoverer) String() string {
 	return fullName
+}
+
+func (d *Discoverer) Test(ctx context.Context) error {
+	if d == nil || ctx == nil {
+		return errors.New("invalid HTTP discovery test")
+	}
+	if d.request.Method != "" && d.request.Method != http.MethodGet {
+		return dyncfg.ErrTestUnsupported
+	}
+
+	defer d.client.CloseIdleConnections()
+
+	_, err := d.fetchTargetGroup(ctx)
+	if err == nil {
+		return nil
+	}
+
+	switch {
+	case errors.Is(err, safefile.ErrFile), errors.Is(err, tlscfg.ErrTLSFile):
+		return dyncfg.NewPublicError(publicErrFile, err)
+	case errors.Is(err, context.DeadlineExceeded):
+		return dyncfg.NewPublicError(publicErrTimeout, err)
+	}
+
+	var fetchErr *fetchError
+	if errors.As(err, &fetchErr) {
+		switch fetchErr.phase {
+		case fetchPhaseRequest:
+			return dyncfg.NewPublicError(publicErrRequest, err)
+		case fetchPhaseQuery:
+			return dyncfg.NewPublicError(publicErrQuery, err)
+		case fetchPhaseResponse:
+			return dyncfg.NewPublicError(publicErrData, err)
+		}
+	}
+	return dyncfg.NewPublicError(publicErrQuery, err)
 }
 
 func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
@@ -101,42 +149,70 @@ func (d *Discoverer) discover(ctx context.Context, in chan<- []model.TargetGroup
 func (d *Discoverer) fetchTargetGroup(ctx context.Context) (model.TargetGroup, error) {
 	req, err := web.NewHTTPRequest(d.request)
 	if err != nil {
-		return nil, fmt.Errorf("create HTTP request: %w", err)
+		return nil, newFetchError(fetchPhaseRequest, fmt.Errorf("create HTTP request: %w", err))
 	}
 	req = req.WithContext(ctx)
 	safeURL := sanitizedURL(req.URL.String())
 
 	resp, err := d.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request to %q failed: %w", safeURL, err)
+		return nil, newFetchError(fetchPhaseQuery, fmt.Errorf("HTTP request to %q failed: %w", safeURL, err))
 	}
 	if resp.Body != nil {
 		defer func() { _ = resp.Body.Close() }()
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s %q returned HTTP status code: %d", req.Method, safeURL, resp.StatusCode)
+		return nil, newFetchError(
+			fetchPhaseQuery,
+			fmt.Errorf("%s %q returned HTTP status code: %d", req.Method, safeURL, resp.StatusCode),
+		)
 	}
 
 	bs, err := readResponseBody(resp.Body, responseBodyLimit)
 	if err != nil {
-		return nil, fmt.Errorf("read response from %q: %w", safeURL, err)
+		return nil, newFetchError(fetchPhaseResponse, fmt.Errorf("read response from %q: %w", safeURL, err))
 	}
 
 	items, err := d.parser.parse(bs, resp.Header.Get("Content-Type"))
 	if err != nil {
-		return nil, fmt.Errorf("parse response from %q: %w", safeURL, err)
+		return nil, newFetchError(fetchPhaseResponse, fmt.Errorf("parse response from %q: %w", safeURL, err))
 	}
 
 	targets, err := targetsFromItems(d.source, items)
 	if err != nil {
-		return nil, err
+		return nil, newFetchError(fetchPhaseResponse, err)
 	}
 
 	return &targetGroup{
 		source:  d.source,
 		targets: targets,
 	}, nil
+}
+
+type fetchPhase uint8
+
+const (
+	fetchPhaseRequest fetchPhase = iota + 1
+	fetchPhaseQuery
+	fetchPhaseResponse
+)
+
+type fetchError struct {
+	phase fetchPhase
+	err   error
+}
+
+func newFetchError(phase fetchPhase, err error) error {
+	return &fetchError{phase: phase, err: err}
+}
+
+func (e *fetchError) Error() string {
+	return e.err.Error()
+}
+
+func (e *fetchError) Unwrap() error {
+	return e.err
 }
 
 func readResponseBody(r io.Reader, maxBytes int64) ([]byte, error) {

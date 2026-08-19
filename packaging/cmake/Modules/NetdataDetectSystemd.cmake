@@ -24,6 +24,7 @@ macro(detect_systemd)
     check_symbol_exists(SD_JOURNAL_OS_ROOT "systemd/sd-journal.h" HAVE_SD_JOURNAL_OS_ROOT)
     check_symbol_exists(sd_journal_open_files_fd "systemd/sd-journal.h" HAVE_SD_JOURNAL_OPEN_FILES_FD)
     check_symbol_exists(sd_journal_restart_fields "systemd/sd-journal.h" HAVE_SD_JOURNAL_RESTART_FIELDS)
+    check_symbol_exists(sd_journal_enumerate_available_unique "systemd/sd-journal.h" HAVE_SD_JOURNAL_ENUMERATE_AVAILABLE_UNIQUE)
     check_symbol_exists(sd_journal_get_seqnum "systemd/sd-journal.h" HAVE_SD_JOURNAL_GET_SEQNUM)
 
     check_symbol_exists(sd_bus_default_system "systemd/sd-bus.h" HAVE_SD_BUS_DEFAULT_SYSTEM)

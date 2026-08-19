@@ -1,0 +1,1506 @@
+# LiteLLM profile derived from the pinned upstream metric registrations and update paths.
+# Charts follow the gateway -> routing -> provider -> accounting -> internal-services causal path.
+# Entity identities use source-defined stable keys; reducers explicitly remove worker and request metadata.
+# Generated Python-client timestamps and deprecated aliases are excluded before chart routing.
+match: 'litellm_*'
+app: litellm
+autogen:
+  selector:
+    deny:
+      - litellm_managed_file_size_bytes
+      - litellm_check_batch_cost_jobs_polled
+      - litellm_pod_lock_manager_size
+      - litellm_in_memory_daily_spend_update_queue_size
+      - litellm_in_memory_spend_update_queue_size
+      - litellm_redis_daily_agent_spend_update_queue_size
+      - litellm_redis_daily_end_user_spend_update_queue_size
+      - litellm_redis_daily_spend_update_queue_size
+      - litellm_redis_spend_update_queue_size
+      - litellm_guardrail_requests_total
+      - litellm_auth_total_requests_total
+      - litellm_batch_write_to_db_total_requests_total
+      - litellm_postgres_total_requests_total
+      - litellm_proxy_pre_call_total_requests_total
+      - litellm_redis_total_requests_total
+      - litellm_redis_daily_org_spend_update_queue_total_requests_total
+      - litellm_redis_daily_tag_spend_update_queue_total_requests_total
+      - litellm_redis_daily_team_spend_update_queue_total_requests_total
+      - litellm_reset_budget_job_total_requests_total
+      - litellm_router_total_requests_total
+      - litellm_self_total_requests_total
+relabeling:
+  - match: litellm_*_created
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'litellm_.+_created'
+        action: drop
+  - match: >-
+      litellm_requests_metric_total
+      litellm_llm_api_failed_requests_metric_total
+    metric_relabel_configs:
+      - action: drop
+  - match: litellm_check_batch_cost_last_run_timestamp
+    metric_relabel_configs:
+      - action: drop
+  - match: litellm_proxy_total_requests_metric_total
+    metric_relabel_configs:
+      - target_label: status_class
+        replacement: unclassified
+      - source_labels: [status_code]
+        regex: '([1-5])[0-9]{2}'
+        target_label: status_class
+        replacement: '${1}xx'
+  - match: >-
+      litellm_proxy_failed_requests_metric_total
+      litellm_deployment_failure_responses_total
+      litellm_deployment_cooled_down_total
+    metric_relabel_configs:
+      - target_label: status_class
+        replacement: unclassified
+      - source_labels: [exception_status]
+        regex: '([1-5])[0-9]{2}'
+        target_label: status_class
+        replacement: '${1}xx'
+  - match: >-
+      litellm_overhead_latency_metric_bucket
+      litellm_overhead_latency_metric_count
+      litellm_overhead_latency_metric_sum
+      litellm_overhead_with_guardrails_latency_metric_bucket
+      litellm_overhead_with_guardrails_latency_metric_count
+      litellm_overhead_with_guardrails_latency_metric_sum
+      litellm_remaining_requests_metric
+      litellm_remaining_tokens_metric
+    metric_relabel_configs:
+      - regex: model_group
+        action: labelmap
+        replacement: requested_model
+      - regex: model_group
+        action: labeldrop
+  - match: >-
+      litellm_deployment_cooled_down_total
+      litellm_deployment_failure_responses_total
+      litellm_deployment_latency_per_output_token_bucket
+      litellm_deployment_latency_per_output_token_count
+      litellm_deployment_latency_per_output_token_sum
+      litellm_deployment_rpm_limit
+      litellm_deployment_state
+      litellm_deployment_success_responses_total
+      litellm_deployment_total_requests_total
+      litellm_deployment_tpm_limit
+      litellm_overhead_latency_metric_bucket
+      litellm_overhead_latency_metric_count
+      litellm_overhead_latency_metric_sum
+      litellm_overhead_with_guardrails_latency_metric_bucket
+      litellm_overhead_with_guardrails_latency_metric_count
+      litellm_overhead_with_guardrails_latency_metric_sum
+      litellm_remaining_requests_metric
+      litellm_remaining_tokens_metric
+    metric_relabel_configs:
+      - regex: litellm_model_name
+        action: labelmap
+        replacement: model
+      - regex: litellm_model_name
+        action: labeldrop
+  - match: >-
+      litellm_auth_failed_requests_total
+      litellm_auth_latency_bucket
+      litellm_auth_latency_count
+      litellm_auth_latency_sum
+      litellm_auth_total_requests_total
+      litellm_batch_write_to_db_failed_requests_total
+      litellm_batch_write_to_db_latency_bucket
+      litellm_batch_write_to_db_latency_count
+      litellm_batch_write_to_db_latency_sum
+      litellm_batch_write_to_db_total_requests_total
+      litellm_postgres_failed_requests_total
+      litellm_postgres_latency_bucket
+      litellm_postgres_latency_count
+      litellm_postgres_latency_sum
+      litellm_postgres_total_requests_total
+      litellm_proxy_pre_call_failed_requests_total
+      litellm_proxy_pre_call_latency_bucket
+      litellm_proxy_pre_call_latency_count
+      litellm_proxy_pre_call_latency_sum
+      litellm_proxy_pre_call_total_requests_total
+      litellm_redis_failed_requests_total
+      litellm_redis_latency_bucket
+      litellm_redis_latency_count
+      litellm_redis_latency_sum
+      litellm_redis_total_requests_total
+      litellm_redis_daily_org_spend_update_queue_failed_requests_total
+      litellm_redis_daily_org_spend_update_queue_latency_bucket
+      litellm_redis_daily_org_spend_update_queue_latency_count
+      litellm_redis_daily_org_spend_update_queue_latency_sum
+      litellm_redis_daily_org_spend_update_queue_total_requests_total
+      litellm_redis_daily_tag_spend_update_queue_failed_requests_total
+      litellm_redis_daily_tag_spend_update_queue_latency_bucket
+      litellm_redis_daily_tag_spend_update_queue_latency_count
+      litellm_redis_daily_tag_spend_update_queue_latency_sum
+      litellm_redis_daily_tag_spend_update_queue_total_requests_total
+      litellm_redis_daily_team_spend_update_queue_failed_requests_total
+      litellm_redis_daily_team_spend_update_queue_latency_bucket
+      litellm_redis_daily_team_spend_update_queue_latency_count
+      litellm_redis_daily_team_spend_update_queue_latency_sum
+      litellm_redis_daily_team_spend_update_queue_total_requests_total
+      litellm_reset_budget_job_failed_requests_total
+      litellm_reset_budget_job_latency_bucket
+      litellm_reset_budget_job_latency_count
+      litellm_reset_budget_job_latency_sum
+      litellm_reset_budget_job_total_requests_total
+      litellm_router_failed_requests_total
+      litellm_router_latency_bucket
+      litellm_router_latency_count
+      litellm_router_latency_sum
+      litellm_router_total_requests_total
+      litellm_self_failed_requests_total
+      litellm_self_latency_bucket
+      litellm_self_latency_count
+      litellm_self_latency_sum
+      litellm_self_total_requests_total
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'litellm_(auth|batch_write_to_db|postgres|proxy_pre_call|redis|redis_daily_org_spend_update_queue|redis_daily_tag_spend_update_queue|redis_daily_team_spend_update_queue|reset_budget_job|router|self)_(failed_requests_total|latency_bucket|latency_count|latency_sum|total_requests_total)'
+        target_label: service
+        replacement: '${1}'
+      - source_labels: [__name__]
+        regex: 'litellm_(auth|batch_write_to_db|postgres|proxy_pre_call|redis|redis_daily_org_spend_update_queue|redis_daily_tag_spend_update_queue|redis_daily_team_spend_update_queue|reset_budget_job|router|self)_latency_(bucket|count|sum)'
+        target_label: outcome
+        replacement: successful
+      - source_labels: [__name__]
+        regex: 'litellm_(auth|batch_write_to_db|postgres|proxy_pre_call|redis|redis_daily_org_spend_update_queue|redis_daily_tag_spend_update_queue|redis_daily_team_spend_update_queue|reset_budget_job|router|self)_failed_requests_total'
+        target_label: outcome
+        replacement: failed
+      - source_labels: [__name__]
+        regex: 'litellm_(auth|batch_write_to_db|postgres|proxy_pre_call|redis|redis_daily_org_spend_update_queue|redis_daily_tag_spend_update_queue|redis_daily_team_spend_update_queue|reset_budget_job|router|self)_latency_(bucket|count|sum)'
+        target_label: measurement
+        replacement: time
+template:
+  family: LiteLLM
+  context_namespace: litellm
+  groups:
+    - family: Gateway
+      context_namespace: gateway
+      groups:
+        - family: Client Traffic
+          context_namespace: client_traffic
+          metrics:
+            - litellm_proxy_total_requests_metric_total
+            - litellm_proxy_failed_requests_metric_total
+            - litellm_in_flight_requests
+          charts:
+            - title: Client Request Outcomes
+              context: request_outcomes
+              units: requests/s
+              aggregation: sum
+              label_promotion: []
+              instances:
+                by_labels: [route, status_class]
+              dimensions:
+                - selector: litellm_proxy_total_requests_metric_total
+                  name: requests
+
+            - title: Client Failure Causes
+              context: failure_causes
+              units: failures/s
+              aggregation: sum
+              label_promotion: []
+              instances:
+                by_labels: [status_class, exception_class]
+              dimensions:
+                - selector: litellm_proxy_failed_requests_metric_total
+                  name: failures
+
+            - title: Client Rate-Limit Attribution
+              context: rate_limit_attribution
+              units: failures/s
+              aggregation: sum
+              label_promotion: []
+              instances:
+                by_labels: [rate_limit_category, rate_limit_type]
+              dimensions:
+                - selector: 'litellm_proxy_failed_requests_metric_total{rate_limit_category=~".+",rate_limit_type=~".+"}'
+                  name: failures
+
+            - title: In-Flight Requests
+              context: in_flight_requests
+              units: requests
+              dimensions:
+                - selector: litellm_in_flight_requests
+                  name: requests
+
+        - family: Admission Queue
+          context_namespace: admission_queue
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id]
+          metrics:
+            - litellm_request_queue_time_seconds_bucket
+            - litellm_request_queue_time_seconds_count
+            - litellm_request_queue_time_seconds_sum
+          charts:
+            - title: Request Queue-Time Distribution
+              context: queue_time_distribution
+              units: observations/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_request_queue_time_seconds_bucket
+
+            - title: Queued Request Measurements
+              context: queued_request_measurements
+              units: requests/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_request_queue_time_seconds_count
+                  name: requests
+
+            - title: Accumulated Request Queue Time
+              context: accumulated_queue_time
+              units: seconds/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_request_queue_time_seconds_sum
+                  name: time
+
+        - family: Request Latency
+          context_namespace: request_latency
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id, service_tier]
+          metrics:
+            - litellm_request_total_latency_metric_bucket
+            - litellm_request_total_latency_metric_count
+            - litellm_request_total_latency_metric_sum
+          charts:
+            - title: End-to-End Request-Latency Distribution
+              context: distribution
+              units: observations/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_request_total_latency_metric_bucket
+
+            - title: End-to-End Request Measurements
+              context: measurements
+              units: requests/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_request_total_latency_metric_count
+                  name: requests
+
+            - title: Accumulated End-to-End Request Time
+              context: accumulated_time
+              units: seconds/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_request_total_latency_metric_sum
+                  name: time
+
+        - family: Processing Overhead
+          context_namespace: processing_overhead
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id]
+          metrics:
+            - litellm_overhead_latency_metric_bucket
+            - litellm_overhead_latency_metric_count
+            - litellm_overhead_latency_metric_sum
+            - litellm_overhead_with_guardrails_latency_metric_bucket
+            - litellm_overhead_with_guardrails_latency_metric_count
+            - litellm_overhead_with_guardrails_latency_metric_sum
+          charts:
+            - title: LiteLLM Overhead-Latency Distribution
+              context: distribution
+              units: observations/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_overhead_latency_metric_bucket
+
+            - title: LiteLLM Overhead Measurements
+              context: measurements
+              units: requests/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_overhead_latency_metric_count
+                  name: requests
+
+            - title: Accumulated LiteLLM Overhead
+              context: accumulated_time
+              units: seconds/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_overhead_latency_metric_sum
+                  name: time
+
+            - title: Guardrail-Inclusive Overhead Distribution
+              context: guardrail_inclusive_distribution
+              units: observations/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_overhead_with_guardrails_latency_metric_bucket
+
+            - title: Guardrail-Inclusive Overhead Measurements
+              context: guardrail_inclusive_measurements
+              units: requests/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_overhead_with_guardrails_latency_metric_count
+                  name: requests
+
+            - title: Accumulated Guardrail-Inclusive Overhead
+              context: accumulated_guardrail_inclusive_time
+              units: seconds/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_overhead_with_guardrails_latency_metric_sum
+                  name: time
+
+    - family: Routing and Deployments
+      context_namespace: routing
+      groups:
+        - family: Deployment Requests
+          context_namespace: deployment_requests
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id]
+          metrics:
+            - litellm_deployment_total_requests_total
+            - litellm_deployment_success_responses_total
+            - litellm_deployment_failure_responses_total
+          charts:
+            - title: Deployment Request Workload
+              context: workload
+              units: requests/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_deployment_total_requests_total
+                  name: requests
+
+            - title: Classified Deployment Outcomes
+              context: outcomes
+              units: requests/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_deployment_success_responses_total
+                  name: successful
+                - selector: litellm_deployment_failure_responses_total
+                  name: failed
+
+            - title: Deployment Failure Causes
+              context: failure_causes
+              units: failures/s
+              aggregation: sum
+              label_promotion: []
+              instances:
+                by_labels: [model_id, status_class, exception_class]
+              dimensions:
+                - selector: litellm_deployment_failure_responses_total
+                  name: failures
+
+        - family: Deployment Health
+          context_namespace: deployment_health
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id]
+          metrics:
+            - litellm_deployment_cooled_down_total
+            - litellm_deployment_state
+          charts:
+            - title: Deployment Cooldowns
+              context: cooldowns
+              units: events/s
+              aggregation: sum
+              label_promotion: []
+              instances:
+                by_labels: [model_id, status_class]
+              dimensions:
+                - selector: litellm_deployment_cooled_down_total
+                  name: cooldowns
+
+            - title: Deployment State
+              context: state
+              units: '{status}'
+              aggregation: max
+              instances:
+                by_labels: [model_id]
+                optional_by_labels: [pid]
+              dimensions:
+                - selector: litellm_deployment_state
+                  name: state
+
+        - family: Deployment Capacity
+          context_namespace: deployment_capacity
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id]
+              optional_by_labels: [pid]
+          metrics:
+            - litellm_deployment_rpm_limit
+            - litellm_deployment_tpm_limit
+            - litellm_remaining_requests_metric
+            - litellm_remaining_tokens_metric
+          charts:
+            - title: Deployment Request Limit
+              context: request_limit
+              units: requests/min
+              aggregation: max
+              dimensions:
+                - selector: litellm_deployment_rpm_limit
+                  name: limit
+
+            - title: Deployment Token Limit
+              context: token_limit
+              units: tokens/min
+              aggregation: max
+              dimensions:
+                - selector: litellm_deployment_tpm_limit
+                  name: limit
+
+            - title: Provider Remaining Requests
+              context: remaining_requests
+              units: requests
+              aggregation: min
+              label_promotion: [model, api_provider]
+              dimensions:
+                - selector: litellm_remaining_requests_metric
+                  name: remaining
+
+            - title: Provider Remaining Tokens
+              context: remaining_tokens
+              units: tokens
+              aggregation: min
+              label_promotion: [model, api_provider]
+              dimensions:
+                - selector: litellm_remaining_tokens_metric
+                  name: remaining
+
+        - family: Output-Token Latency
+          context_namespace: output_token_latency
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id]
+          metrics:
+            - litellm_deployment_latency_per_output_token_bucket
+            - litellm_deployment_latency_per_output_token_count
+            - litellm_deployment_latency_per_output_token_sum
+          charts:
+            - title: Deployment Output-Token Latency Distribution
+              context: distribution
+              units: observations/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_deployment_latency_per_output_token_bucket
+
+            - title: Deployment Output-Token Latency Measurements
+              context: measurements
+              units: requests/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_deployment_latency_per_output_token_count
+                  name: requests
+
+            - title: Accumulated Deployment Output-Token Latency
+              context: accumulated_time
+              units: seconds/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_deployment_latency_per_output_token_sum
+                  name: time
+
+        - family: Fallbacks
+          context_namespace: fallbacks
+          metrics:
+            - litellm_deployment_successful_fallbacks_total
+            - litellm_deployment_failed_fallbacks_total
+          charts:
+            - title: Fallback Outcomes
+              context: outcomes
+              units: fallbacks/s
+              aggregation: sum
+              label_promotion: []
+              instances:
+                by_labels: [requested_model, fallback_model]
+              dimensions:
+                - selector: litellm_deployment_successful_fallbacks_total
+                  name: successful
+                - selector: litellm_deployment_failed_fallbacks_total
+                  name: failed
+
+    - family: Provider API
+      context_namespace: provider_api
+      chart_defaults:
+        label_promotion: [model, api_provider]
+        instances:
+          by_labels: [model_id, service_tier]
+      metrics:
+        - litellm_llm_api_latency_metric_bucket
+        - litellm_llm_api_latency_metric_count
+        - litellm_llm_api_latency_metric_sum
+        - litellm_llm_api_time_to_first_token_metric_bucket
+        - litellm_llm_api_time_to_first_token_metric_count
+        - litellm_llm_api_time_to_first_token_metric_sum
+      charts:
+        - title: Provider API Latency Distribution
+          context: latency_distribution
+          units: observations/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_llm_api_latency_metric_bucket
+
+        - title: Provider API Latency Measurements
+          context: latency_measurements
+          units: requests/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_llm_api_latency_metric_count
+              name: requests
+
+        - title: Accumulated Provider API Latency
+          context: accumulated_latency
+          units: seconds/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_llm_api_latency_metric_sum
+              name: time
+
+        - title: Provider Time-to-First-Token Distribution
+          context: time_to_first_token_distribution
+          units: observations/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_llm_api_time_to_first_token_metric_bucket
+
+        - title: Provider Time-to-First-Token Measurements
+          context: time_to_first_token_measurements
+          units: requests/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_llm_api_time_to_first_token_metric_count
+              name: requests
+
+        - title: Accumulated Provider Time-to-First-Token
+          context: accumulated_time_to_first_token
+          units: seconds/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_llm_api_time_to_first_token_metric_sum
+              name: time
+
+    - family: Usage and Cost
+      context_namespace: usage
+      groups:
+        - family: By Deployment
+          context_namespace: deployment
+          chart_defaults:
+            label_promotion: [model, api_provider]
+            instances:
+              by_labels: [model_id]
+          metrics:
+            - litellm_input_tokens_metric_total
+            - litellm_output_tokens_metric_total
+            - litellm_total_tokens_metric_total
+            - litellm_spend_metric_total
+            - litellm_input_audio_tokens_metric_total
+            - litellm_output_audio_tokens_metric_total
+            - litellm_output_reasoning_tokens_metric_total
+            - litellm_images_generated_metric_total
+            - litellm_video_duration_seconds_metric_total
+          charts:
+            - title: Request Token Throughput
+              context: request_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_tokens_metric_total
+                  name: input
+                - selector: litellm_output_tokens_metric_total
+                  name: output
+
+            - title: Reported Total Token Throughput
+              context: total_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_total_tokens_metric_total
+                  name: total
+
+            - title: LLM Spend
+              context: spend
+              units: USD/s
+              aggregation: sum
+              instances:
+                by_labels: [model_id, service_tier]
+              dimensions:
+                - selector: litellm_spend_metric_total
+                  name: spend
+
+            - title: Audio and Reasoning Token Throughput
+              context: specialized_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_audio_tokens_metric_total
+                  name: input_audio
+                - selector: litellm_output_audio_tokens_metric_total
+                  name: output_audio
+                - selector: litellm_output_reasoning_tokens_metric_total
+                  name: output_reasoning
+
+            - title: Generated Images
+              context: generated_images
+              units: images/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_images_generated_metric_total
+                  name: images
+
+            - title: Generated Video Duration
+              context: generated_video_duration
+              units: seconds/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_video_duration_seconds_metric_total
+                  name: duration
+
+        - family: By API Key
+          context_namespace: api_key
+          chart_defaults:
+            label_promotion: [api_key_alias]
+            instances:
+              by_labels: [hashed_api_key]
+          metrics:
+            - litellm_input_tokens_metric_total
+            - litellm_output_tokens_metric_total
+            - litellm_total_tokens_metric_total
+            - litellm_spend_metric_total
+          charts:
+            - title: Request Token Throughput by API Key
+              context: request_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_tokens_metric_total
+                  name: input
+                - selector: litellm_output_tokens_metric_total
+                  name: output
+            - title: Reported Total Token Throughput by API Key
+              context: total_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_total_tokens_metric_total
+                  name: total
+            - title: LLM Spend by API Key
+              context: spend
+              units: USD/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_spend_metric_total
+                  name: spend
+
+        - family: By Team
+          context_namespace: team
+          chart_defaults:
+            label_promotion: [team_alias]
+            instances:
+              by_labels: [team]
+          metrics:
+            - litellm_input_tokens_metric_total
+            - litellm_output_tokens_metric_total
+            - litellm_total_tokens_metric_total
+            - litellm_spend_metric_total
+          charts:
+            - title: Request Token Throughput by Team
+              context: request_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_tokens_metric_total
+                  name: input
+                - selector: litellm_output_tokens_metric_total
+                  name: output
+            - title: Reported Total Token Throughput by Team
+              context: total_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_total_tokens_metric_total
+                  name: total
+            - title: LLM Spend by Team
+              context: spend
+              units: USD/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_spend_metric_total
+                  name: spend
+
+        - family: By User
+          context_namespace: user
+          chart_defaults:
+            label_promotion: []
+            instances:
+              by_labels: [user]
+          metrics:
+            - litellm_input_tokens_metric_total
+            - litellm_output_tokens_metric_total
+            - litellm_total_tokens_metric_total
+            - litellm_spend_metric_total
+          charts:
+            - title: Request Token Throughput by User
+              context: request_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_tokens_metric_total
+                  name: input
+                - selector: litellm_output_tokens_metric_total
+                  name: output
+            - title: Reported Total Token Throughput by User
+              context: total_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_total_tokens_metric_total
+                  name: total
+            - title: LLM Spend by User
+              context: spend
+              units: USD/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_spend_metric_total
+                  name: spend
+
+        - family: By Organization
+          context_namespace: organization
+          chart_defaults:
+            label_promotion: [org_alias]
+            instances:
+              by_labels: [org_id]
+          metrics:
+            - litellm_input_tokens_metric_total
+            - litellm_output_tokens_metric_total
+            - litellm_total_tokens_metric_total
+            - litellm_spend_metric_total
+          charts:
+            - title: Request Token Throughput by Organization
+              context: request_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_tokens_metric_total
+                  name: input
+                - selector: litellm_output_tokens_metric_total
+                  name: output
+            - title: Reported Total Token Throughput by Organization
+              context: total_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_total_tokens_metric_total
+                  name: total
+            - title: LLM Spend by Organization
+              context: spend
+              units: USD/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_spend_metric_total
+                  name: spend
+
+        - family: By End User
+          context_namespace: end_user
+          chart_defaults:
+            label_promotion: []
+            instances:
+              by_labels: [end_user]
+          metrics:
+            - litellm_input_tokens_metric_total
+            - litellm_output_tokens_metric_total
+            - litellm_total_tokens_metric_total
+            - litellm_spend_metric_total
+          charts:
+            - title: Request Token Throughput by End User
+              context: request_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_tokens_metric_total
+                  name: input
+                - selector: litellm_output_tokens_metric_total
+                  name: output
+            - title: Reported Total Token Throughput by End User
+              context: total_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_total_tokens_metric_total
+                  name: total
+            - title: LLM Spend by End User
+              context: spend
+              units: USD/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_spend_metric_total
+                  name: spend
+
+        - family: By Requested Model
+          context_namespace: requested_model
+          chart_defaults:
+            label_promotion: []
+            instances:
+              by_labels: [requested_model]
+          metrics:
+            - litellm_input_tokens_metric_total
+            - litellm_output_tokens_metric_total
+            - litellm_total_tokens_metric_total
+            - litellm_spend_metric_total
+          charts:
+            - title: Request Token Throughput by Requested Model
+              context: request_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_input_tokens_metric_total
+                  name: input
+                - selector: litellm_output_tokens_metric_total
+                  name: output
+            - title: Reported Total Token Throughput by Requested Model
+              context: total_token_throughput
+              units: tokens/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_total_tokens_metric_total
+                  name: total
+            - title: LLM Spend by Requested Model
+              context: spend
+              units: USD/s
+              aggregation: sum
+              dimensions:
+                - selector: litellm_spend_metric_total
+                  name: spend
+
+    - family: Caching
+      context_namespace: caching
+      chart_defaults:
+        label_promotion: [model, api_provider]
+        instances:
+          by_labels: [model_id]
+      metrics:
+        - litellm_cache_hits_metric_total
+        - litellm_cache_misses_metric_total
+        - litellm_cached_tokens_metric_total
+        - litellm_input_cached_tokens_metric_total
+        - litellm_input_cache_creation_tokens_metric_total
+        - litellm_provider_cache_read_input_tokens_metric_total
+        - litellm_provider_cache_creation_input_tokens_metric_total
+      charts:
+        - title: Cache Outcomes
+          context: outcomes
+          units: events/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_cache_hits_metric_total
+              name: hits
+            - selector: litellm_cache_misses_metric_total
+              name: misses
+
+        - title: LiteLLM Cached Token Throughput
+          context: cached_token_throughput
+          units: tokens/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_cached_tokens_metric_total
+              name: cached
+
+        - title: Request Input-Cache Token Throughput
+          context: request_cache_token_throughput
+          units: tokens/s
+          aggregation: sum
+          label_promotion: [model, api_provider]
+          dimensions:
+            - selector: litellm_input_cached_tokens_metric_total
+              name: read
+            - selector: litellm_input_cache_creation_tokens_metric_total
+              name: creation
+
+        - title: Provider Cache Token Throughput
+          context: provider_cache_token_throughput
+          units: tokens/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_provider_cache_read_input_tokens_metric_total
+              name: read
+            - selector: litellm_provider_cache_creation_input_tokens_metric_total
+              name: creation
+
+    - family: Governance
+      context_namespace: governance
+      groups:
+        - family: API Keys
+          context_namespace: api_keys
+          chart_defaults:
+            label_promotion: [api_key_alias]
+            instances:
+              by_labels: [hashed_api_key]
+              optional_by_labels: [pid]
+          metrics:
+            - litellm_remaining_api_key_budget_metric
+            - litellm_api_key_max_budget_metric
+            - litellm_api_key_budget_remaining_hours_metric
+            - litellm_remaining_api_key_requests_for_model
+            - litellm_remaining_api_key_tokens_for_model
+          charts:
+            - title: API-Key Remaining Budget
+              context: remaining_budget
+              units: USD
+              dimensions:
+                - selector: litellm_remaining_api_key_budget_metric
+                  name: remaining
+            - title: API-Key Budget Limit
+              context: budget_limit
+              units: USD
+              dimensions:
+                - selector: litellm_api_key_max_budget_metric
+                  name: limit
+            - title: API-Key Budget Reset Window
+              context: budget_reset_window
+              units: hours
+              dimensions:
+                - selector: litellm_api_key_budget_remaining_hours_metric
+                  name: remaining
+            - title: API-Key Model Request Headroom
+              context: model_request_headroom
+              units: requests
+              aggregation: min
+              instances:
+                by_labels: [hashed_api_key, model]
+                optional_by_labels: [pid]
+              dimensions:
+                - selector: litellm_remaining_api_key_requests_for_model
+                  name: remaining
+            - title: API-Key Model Token Headroom
+              context: model_token_headroom
+              units: tokens
+              aggregation: min
+              instances:
+                by_labels: [hashed_api_key, model]
+                optional_by_labels: [pid]
+              dimensions:
+                - selector: litellm_remaining_api_key_tokens_for_model
+                  name: remaining
+
+        - family: Organizations
+          context_namespace: organizations
+          chart_defaults:
+            label_promotion: [org_alias]
+            instances:
+              by_labels: [org_id]
+              optional_by_labels: [pid]
+          metrics:
+            - litellm_remaining_org_budget_metric
+            - litellm_org_max_budget_metric
+            - litellm_org_budget_remaining_hours_metric
+          charts:
+            - title: Organization Remaining Budget
+              context: remaining_budget
+              units: USD
+              dimensions:
+                - selector: litellm_remaining_org_budget_metric
+                  name: remaining
+            - title: Organization Budget Limit
+              context: budget_limit
+              units: USD
+              dimensions:
+                - selector: litellm_org_max_budget_metric
+                  name: limit
+            - title: Organization Budget Reset Window
+              context: budget_reset_window
+              units: hours
+              dimensions:
+                - selector: litellm_org_budget_remaining_hours_metric
+                  name: remaining
+
+        - family: Teams
+          context_namespace: teams
+          chart_defaults:
+            label_promotion: [team_alias]
+            instances:
+              by_labels: [team]
+              optional_by_labels: [pid]
+          metrics:
+            - litellm_remaining_team_budget_metric
+            - litellm_team_max_budget_metric
+            - litellm_team_budget_remaining_hours_metric
+            - litellm_team_members_metric
+          charts:
+            - title: Team Remaining Budget
+              context: remaining_budget
+              units: USD
+              dimensions:
+                - selector: litellm_remaining_team_budget_metric
+                  name: remaining
+            - title: Team Budget Limit
+              context: budget_limit
+              units: USD
+              dimensions:
+                - selector: litellm_team_max_budget_metric
+                  name: limit
+            - title: Team Budget Reset Window
+              context: budget_reset_window
+              units: hours
+              dimensions:
+                - selector: litellm_team_budget_remaining_hours_metric
+                  name: remaining
+            - title: Team Membership
+              context: membership
+              units: members
+              dimensions:
+                - selector: litellm_team_members_metric
+                  name: members
+
+        - family: Users
+          context_namespace: users
+          chart_defaults:
+            label_promotion: []
+            instances:
+              by_labels: [user]
+              optional_by_labels: [pid]
+          metrics:
+            - litellm_remaining_user_budget_metric
+            - litellm_user_max_budget_metric
+            - litellm_user_budget_remaining_hours_metric
+          charts:
+            - title: User Remaining Budget
+              context: remaining_budget
+              units: USD
+              aggregation: min
+              dimensions:
+                - selector: litellm_remaining_user_budget_metric
+                  name: remaining
+            - title: User Budget Limit
+              context: budget_limit
+              units: USD
+              aggregation: max
+              dimensions:
+                - selector: litellm_user_max_budget_metric
+                  name: limit
+            - title: User Budget Reset Window
+              context: budget_reset_window
+              units: hours
+              aggregation: min
+              dimensions:
+                - selector: litellm_user_budget_remaining_hours_metric
+                  name: remaining
+
+        - family: Providers
+          context_namespace: providers
+          metrics:
+            - litellm_provider_remaining_budget_metric
+          charts:
+            - title: Provider Remaining Budget
+              context: remaining_budget
+              units: USD
+              label_promotion: []
+              instances:
+                by_labels: [api_provider]
+                optional_by_labels: [pid]
+              dimensions:
+                - selector: litellm_provider_remaining_budget_metric
+                  name: remaining
+
+    - family: Guardrails
+      context_namespace: guardrails
+      metrics:
+        - litellm_guardrail_errors_total
+        - litellm_guardrail_latency_seconds_bucket
+        - litellm_guardrail_latency_seconds_count
+        - litellm_guardrail_latency_seconds_sum
+      charts:
+        - title: Guardrail Invocations
+          context: invocations
+          units: invocations/s
+          aggregation: sum
+          label_promotion: []
+          instances:
+            by_labels: [guardrail_name, hook_type, status]
+          dimensions:
+            - selector: litellm_guardrail_latency_seconds_count
+              name: invocations
+
+        - title: Guardrail Errors
+          context: errors
+          units: errors/s
+          label_promotion: []
+          instances:
+            by_labels: [guardrail_name, hook_type, error_type]
+          dimensions:
+            - selector: litellm_guardrail_errors_total
+              name: errors
+
+        - title: Guardrail Latency Distribution
+          context: latency_distribution
+          units: observations/s
+          aggregation: sum
+          label_promotion: []
+          instances:
+            by_labels: [guardrail_name, hook_type]
+          dimensions:
+            - selector: litellm_guardrail_latency_seconds_bucket
+
+        - title: Accumulated Guardrail Latency
+          context: accumulated_latency
+          units: seconds/s
+          aggregation: sum
+          label_promotion: []
+          instances:
+            by_labels: [guardrail_name, hook_type]
+          dimensions:
+            - selector: litellm_guardrail_latency_seconds_sum
+              name: time
+
+    - family: MCP Gateway
+      context_namespace: mcp
+      chart_defaults:
+        label_promotion: []
+        instances:
+          by_labels: [mcp_server_name, mcp_tool_name]
+      metrics:
+        - litellm_mcp_tool_calls_total
+        - litellm_mcp_tool_call_spend_metric_total
+      charts:
+        - title: MCP Tool Calls
+          context: tool_calls
+          units: calls/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_mcp_tool_calls_total
+              name: calls
+        - title: MCP Tool-Call Spend
+          context: tool_call_spend
+          units: USD/s
+          aggregation: sum
+          dimensions:
+            - selector: litellm_mcp_tool_call_spend_metric_total
+              name: spend
+
+    - family: Managed Batches and Files
+      context_namespace: managed
+      metrics:
+        - litellm_managed_batch_created_total
+        - litellm_check_batch_cost_jobs_processed_total
+        - litellm_check_batch_cost_errors_total
+        - litellm_managed_file_created_total
+        - litellm_managed_file_deleted_total
+        - litellm_managed_batch_duration_seconds_bucket
+        - litellm_managed_batch_duration_seconds_count
+        - litellm_managed_batch_duration_seconds_sum
+      charts:
+        - title: Managed Batches Created
+          context: batches_created
+          units: batches/s
+          aggregation: sum
+          label_promotion: []
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: litellm_managed_batch_created_total
+              name: created
+
+        - title: Successfully Cost-Tracked Batches
+          context: batches_cost_tracked
+          units: batches/s
+          label_promotion: []
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: litellm_check_batch_cost_jobs_processed_total
+              name: cost_tracked
+
+        - title: Batch-Cost Processing Errors
+          context: batch_cost_errors
+          units: errors/s
+          aggregation: sum
+          label_promotion: []
+          dimensions:
+            - selector: litellm_check_batch_cost_errors_total
+              name: errors
+
+        - title: Managed Files Created
+          context: files_created
+          units: files/s
+          aggregation: sum
+          label_promotion: []
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: litellm_managed_file_created_total
+              name: created
+
+        - title: Managed File Deletions
+          context: file_deletions
+          units: files/s
+          label_promotion: []
+          instances:
+            by_labels: [result]
+          dimensions:
+            - selector: litellm_managed_file_deleted_total
+              name: deletions
+
+        - title: Managed Batch Duration Distribution
+          context: batch_duration_distribution
+          units: observations/s
+          label_promotion: []
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: litellm_managed_batch_duration_seconds_bucket
+
+        - title: Completed Managed Batches
+          context: batches_completed
+          units: batches/s
+          label_promotion: []
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: litellm_managed_batch_duration_seconds_count
+              name: completed
+
+        - title: Accumulated Managed Batch Duration
+          context: accumulated_batch_duration
+          units: seconds/s
+          label_promotion: []
+          instances:
+            by_labels: [api_provider, model]
+          dimensions:
+            - selector: litellm_managed_batch_duration_seconds_sum
+              name: time
+
+    - family: Inventory and Callbacks
+      context_namespace: inventory
+      metrics:
+        - litellm_total_users
+        - litellm_active_users
+        - litellm_teams_count
+        - litellm_callback_logging_failures_metric_total
+      charts:
+        - title: Total Users
+          context: total_users
+          units: users
+          label_promotion: []
+          instances:
+            optional_by_labels: [pid]
+          dimensions:
+            - selector: litellm_total_users
+              name: users
+
+        - title: Billable Users
+          context: billable_users
+          units: users
+          label_promotion: []
+          instances:
+            optional_by_labels: [pid]
+          dimensions:
+            - selector: litellm_active_users
+              name: users
+
+        - title: Teams
+          context: teams
+          units: teams
+          label_promotion: []
+          instances:
+            optional_by_labels: [pid]
+          dimensions:
+            - selector: litellm_teams_count
+              name: teams
+
+        - title: Callback Logging Failures
+          context: callback_logging_failures
+          units: failures/s
+          label_promotion: []
+          instances:
+            by_labels: [callback_name]
+          dimensions:
+            - selector: litellm_callback_logging_failures_metric_total
+              name: failures
+
+    - family: Internal Services
+      context_namespace: internal_services
+      chart_defaults:
+        label_promotion: []
+      metrics:
+        - litellm_auth_failed_requests_total
+        - litellm_auth_latency_bucket
+        - litellm_auth_latency_count
+        - litellm_auth_latency_sum
+        - litellm_batch_write_to_db_failed_requests_total
+        - litellm_batch_write_to_db_latency_bucket
+        - litellm_batch_write_to_db_latency_count
+        - litellm_batch_write_to_db_latency_sum
+        - litellm_postgres_failed_requests_total
+        - litellm_postgres_latency_bucket
+        - litellm_postgres_latency_count
+        - litellm_postgres_latency_sum
+        - litellm_proxy_pre_call_failed_requests_total
+        - litellm_proxy_pre_call_latency_bucket
+        - litellm_proxy_pre_call_latency_count
+        - litellm_proxy_pre_call_latency_sum
+        - litellm_redis_failed_requests_total
+        - litellm_redis_latency_bucket
+        - litellm_redis_latency_count
+        - litellm_redis_latency_sum
+        - litellm_redis_daily_org_spend_update_queue_failed_requests_total
+        - litellm_redis_daily_org_spend_update_queue_latency_bucket
+        - litellm_redis_daily_org_spend_update_queue_latency_count
+        - litellm_redis_daily_org_spend_update_queue_latency_sum
+        - litellm_redis_daily_tag_spend_update_queue_failed_requests_total
+        - litellm_redis_daily_tag_spend_update_queue_latency_bucket
+        - litellm_redis_daily_tag_spend_update_queue_latency_count
+        - litellm_redis_daily_tag_spend_update_queue_latency_sum
+        - litellm_redis_daily_team_spend_update_queue_failed_requests_total
+        - litellm_redis_daily_team_spend_update_queue_latency_bucket
+        - litellm_redis_daily_team_spend_update_queue_latency_count
+        - litellm_redis_daily_team_spend_update_queue_latency_sum
+        - litellm_reset_budget_job_failed_requests_total
+        - litellm_reset_budget_job_latency_bucket
+        - litellm_reset_budget_job_latency_count
+        - litellm_reset_budget_job_latency_sum
+        - litellm_router_failed_requests_total
+        - litellm_router_latency_bucket
+        - litellm_router_latency_count
+        - litellm_router_latency_sum
+        - litellm_self_failed_requests_total
+        - litellm_self_latency_bucket
+        - litellm_self_latency_count
+        - litellm_self_latency_sum
+      charts:
+        - title: Internal Service Request Outcomes
+          context: request_outcomes
+          units: requests/s
+          aggregation: sum
+          instances:
+            by_labels: [service]
+          dimensions:
+            - selector: litellm_auth_latency_count
+              name_from_label: outcome
+            - selector: litellm_batch_write_to_db_latency_count
+              name_from_label: outcome
+            - selector: litellm_postgres_latency_count
+              name_from_label: outcome
+            - selector: litellm_proxy_pre_call_latency_count
+              name_from_label: outcome
+            - selector: litellm_redis_latency_count
+              name_from_label: outcome
+            - selector: litellm_redis_daily_org_spend_update_queue_latency_count
+              name_from_label: outcome
+            - selector: litellm_redis_daily_tag_spend_update_queue_latency_count
+              name_from_label: outcome
+            - selector: litellm_redis_daily_team_spend_update_queue_latency_count
+              name_from_label: outcome
+            - selector: litellm_reset_budget_job_latency_count
+              name_from_label: outcome
+            - selector: litellm_router_latency_count
+              name_from_label: outcome
+            - selector: litellm_self_latency_count
+              name_from_label: outcome
+            - selector: litellm_auth_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_batch_write_to_db_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_postgres_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_proxy_pre_call_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_redis_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_redis_daily_org_spend_update_queue_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_redis_daily_tag_spend_update_queue_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_redis_daily_team_spend_update_queue_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_reset_budget_job_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_router_failed_requests_total
+              name_from_label: outcome
+            - selector: litellm_self_failed_requests_total
+              name_from_label: outcome
+
+        - title: Internal Service Failure Causes
+          context: failure_causes
+          units: failures/s
+          instances:
+            by_labels: [function_name, error_class]
+          dimensions:
+            - selector: litellm_auth_failed_requests_total
+              name_from_label: service
+            - selector: litellm_batch_write_to_db_failed_requests_total
+              name_from_label: service
+            - selector: litellm_postgres_failed_requests_total
+              name_from_label: service
+            - selector: litellm_proxy_pre_call_failed_requests_total
+              name_from_label: service
+            - selector: litellm_redis_failed_requests_total
+              name_from_label: service
+            - selector: litellm_redis_daily_org_spend_update_queue_failed_requests_total
+              name_from_label: service
+            - selector: litellm_redis_daily_tag_spend_update_queue_failed_requests_total
+              name_from_label: service
+            - selector: litellm_redis_daily_team_spend_update_queue_failed_requests_total
+              name_from_label: service
+            - selector: litellm_reset_budget_job_failed_requests_total
+              name_from_label: service
+            - selector: litellm_router_failed_requests_total
+              name_from_label: service
+            - selector: litellm_self_failed_requests_total
+              name_from_label: service
+
+        - title: Internal Service Latency Distribution
+          context: latency_distribution
+          units: observations/s
+          instances:
+            by_labels: [service]
+          dimensions:
+            - selector: litellm_auth_latency_bucket
+            - selector: litellm_batch_write_to_db_latency_bucket
+            - selector: litellm_postgres_latency_bucket
+            - selector: litellm_proxy_pre_call_latency_bucket
+            - selector: litellm_redis_latency_bucket
+            - selector: litellm_redis_daily_org_spend_update_queue_latency_bucket
+            - selector: litellm_redis_daily_tag_spend_update_queue_latency_bucket
+            - selector: litellm_redis_daily_team_spend_update_queue_latency_bucket
+            - selector: litellm_reset_budget_job_latency_bucket
+            - selector: litellm_router_latency_bucket
+            - selector: litellm_self_latency_bucket
+
+        - title: Accumulated Internal Service Latency
+          context: accumulated_latency
+          units: seconds/s
+          instances:
+            by_labels: [service]
+          dimensions:
+            - selector: litellm_auth_latency_sum
+              name_from_label: measurement
+            - selector: litellm_batch_write_to_db_latency_sum
+              name_from_label: measurement
+            - selector: litellm_postgres_latency_sum
+              name_from_label: measurement
+            - selector: litellm_proxy_pre_call_latency_sum
+              name_from_label: measurement
+            - selector: litellm_redis_latency_sum
+              name_from_label: measurement
+            - selector: litellm_redis_daily_org_spend_update_queue_latency_sum
+              name_from_label: measurement
+            - selector: litellm_redis_daily_tag_spend_update_queue_latency_sum
+              name_from_label: measurement
+            - selector: litellm_redis_daily_team_spend_update_queue_latency_sum
+              name_from_label: measurement
+            - selector: litellm_reset_budget_job_latency_sum
+              name_from_label: measurement
+            - selector: litellm_router_latency_sum
+              name_from_label: measurement
+            - selector: litellm_self_latency_sum
+              name_from_label: measurement

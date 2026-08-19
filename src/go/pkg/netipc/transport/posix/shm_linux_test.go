@@ -276,6 +276,30 @@ func TestShmStaleRecovery(t *testing.T) {
 	second.ShmDestroy()
 }
 
+func TestShmStaleRecoveryInGroupWritableRunDir(t *testing.T) {
+	// Crash recovery must work regardless of run-dir permissions
+	// (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+	runDir := t.TempDir()
+	if err := os.Chmod(runDir, 0o775); err != nil {
+		t.Fatalf("chmod run dir: %v", err)
+	}
+	svc := uniqueShmService(t, "go_shm_stale_gw")
+
+	first, err := ShmServerCreate(runDir, svc, 3, 1024, 1024)
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	binary.NativeEndian.PutUint32(first.data[8:12], 99999) // very unlikely alive
+	first.ShmClose()                                       // close without unlink
+
+	// ServerCreate must reclaim the dead-owner region through its EEXIST path
+	second, err := ShmServerCreate(runDir, svc, 3, 1024, 1024)
+	if err != nil {
+		t.Fatalf("crash recovery must work in a group-writable run dir: %v", err)
+	}
+	second.ShmDestroy()
+}
+
 func TestShmClientAttachPartialHeaderNotReady(t *testing.T) {
 	ensureShmRunDir(t)
 	svc := uniqueShmService(t, "go_shm_partial")

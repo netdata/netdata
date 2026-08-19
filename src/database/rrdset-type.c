@@ -3,6 +3,9 @@
 #include "rrdset-type.h"
 
 RRDSET_TYPE rrdset_type_id(const char *name) {
+    if(unlikely(!name))
+        return RRDSET_TYPE_LINE;
+
     if(unlikely(strcmp(name, RRDSET_TYPE_AREA_NAME) == 0))
         return RRDSET_TYPE_AREA;
 

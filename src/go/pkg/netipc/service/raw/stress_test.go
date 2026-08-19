@@ -368,8 +368,8 @@ func TestStressConcurrentCacheClients(t *testing.T) {
 						r.failures++
 						continue
 					}
-					// Verify a lookup
-					item, found := cache.Lookup(1001, "docker-abc123")
+					// Verify a guarded lookup.
+					item, found := cacheDupForTest(cache, 1001, "docker-abc123")
 					if !found || item.Hash != 1001 ||
 						item.Path != "/sys/fs/cgroup/docker/abc123" {
 						r.failures++

@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,46 @@ const (
 	maxKBToBytes        = int64(1<<63-1) / 1024
 	maxKBToCentiPercent = int64(1<<63-1) / 10000
 )
+
+const (
+	logKeySQLAgentJobsQueryFailed = "mssql:sql-agent-jobs-query-failed"
+)
+
+const (
+	sqlAgentJobRunStatusFailed    = 0
+	sqlAgentJobRunStatusSucceeded = 1
+	sqlAgentJobRunStatusCanceled  = 3
+)
+
+const (
+	jobLastExecutionStatusUnknown  = "unknown"
+	jobLastExecutionStatusOK       = "ok"
+	jobLastExecutionStatusWarning  = "warning"
+	jobLastExecutionStatusError    = "error"
+	jobLastExecutionStatusCanceled = "canceled"
+)
+
+var jobLastExecutionStatusNames = []string{
+	jobLastExecutionStatusUnknown,
+	jobLastExecutionStatusOK,
+	jobLastExecutionStatusWarning,
+	jobLastExecutionStatusError,
+	jobLastExecutionStatusCanceled,
+}
+
+type sqlAgentJob struct {
+	id      string
+	name    string
+	chartID string
+	enabled bool
+}
+
+type sqlAgentJobLastExecution struct {
+	runStatus       int64
+	durationSeconds int64
+	ageSeconds      sql.NullInt64
+	hasFailedStep   bool
+}
 
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.db == nil {
@@ -61,9 +102,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectWaitStats(mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectJobStatus(mx); err != nil {
-		return nil, err
-	}
+	c.collectJobStatus(mx)
 	if err := c.collectReplicationStatus(mx); err != nil {
 		return nil, err
 	}
@@ -659,41 +698,263 @@ func (c *Collector) collectWaitStats(mx map[string]int64) error {
 	return rows.Err()
 }
 
-func (c *Collector) collectJobStatus(mx map[string]int64) error {
+func (c *Collector) collectJobStatus(mx map[string]int64) {
+	jobs, complete, err := c.querySQLAgentJobs()
+	if err != nil {
+		c.Limit(logKeySQLAgentJobsQueryFailed, 1, 0).
+			Warningf("SQL Server Agent jobs query failed; job metrics will be unavailable: %v", err)
+		return
+	}
+
+	assignJobChartIDs(jobs, c.seenJobs)
+	c.updateJobCharts(jobs, complete)
+
+	for _, job := range jobs {
+		px := fmt.Sprintf("job_%s_", job.chartID)
+		mx[px+"enabled"] = boolToInt64(job.enabled)
+		mx[px+"disabled"] = boolToInt64(!job.enabled)
+	}
+
+	if lastExecutions, ok := c.querySQLAgentJobLastExecutions(); ok {
+		for _, job := range jobs {
+			if lastExec, ok := lastExecutions[job.id]; ok {
+				collectJobLastExecution(mx, job, &lastExec)
+			} else {
+				collectJobLastExecution(mx, job, nil)
+			}
+		}
+	}
+
+	if currentExecutions, ok := c.querySQLAgentJobCurrentExecutions(); ok {
+		for _, job := range jobs {
+			mx[fmt.Sprintf("job_%s_current_execution_time", job.chartID)] = currentExecutions[job.id]
+		}
+	}
+}
+
+func (c *Collector) querySQLAgentJobs() ([]sqlAgentJob, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	rows, err := c.db.QueryContext(ctx, queryJobs)
 	if err != nil {
-		return fmt.Errorf("jobs query failed: %v", err)
+		return nil, false, err
 	}
 	defer rows.Close()
 
+	var jobs []sqlAgentJob
+	var scanFailed bool
 	for rows.Next() {
-		var jobName string
+		var jobID, jobName string
 		var enabled int64
-		if err := rows.Scan(&jobName, &enabled); err != nil {
+		if err := rows.Scan(&jobID, &jobName, &enabled); err != nil {
+			c.Debugf("jobs row scan failed: %v", err)
+			scanFailed = true
 			continue
 		}
 
+		jobID = strings.TrimSpace(jobID)
 		jobName = strings.TrimSpace(jobName)
-
-		if !c.seenJobs[jobName] {
-			c.seenJobs[jobName] = true
-			c.addJobCharts(jobName)
+		if jobID == "" || jobName == "" {
+			continue
 		}
 
-		jobID := cleanJobName(jobName)
-		if enabled == 1 {
-			mx[fmt.Sprintf("job_%s_enabled", jobID)] = 1
-			mx[fmt.Sprintf("job_%s_disabled", jobID)] = 0
-		} else {
-			mx[fmt.Sprintf("job_%s_enabled", jobID)] = 0
-			mx[fmt.Sprintf("job_%s_disabled", jobID)] = 1
+		jobs = append(jobs, sqlAgentJob{
+			id:      strings.ToLower(jobID),
+			name:    jobName,
+			enabled: enabled == 1,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+
+	return jobs, !scanFailed, nil
+}
+
+func assignJobChartIDs(jobs []sqlAgentJob, previous map[string]string) {
+	sort.SliceStable(jobs, func(i, j int) bool {
+		if jobs[i].name != jobs[j].name {
+			return jobs[i].name < jobs[j].name
+		}
+		return jobs[i].id < jobs[j].id
+	})
+
+	used := make(map[string]bool, len(jobs))
+	for i := range jobs {
+		if chartID := previous[jobs[i].id]; chartID != "" && !used[chartID] {
+			jobs[i].chartID = chartID
+			used[chartID] = true
 		}
 	}
 
-	return rows.Err()
+	for i := range jobs {
+		if jobs[i].chartID != "" {
+			continue
+		}
+
+		base := cleanJobName(jobs[i].name)
+		chartID := base
+		for n := 0; used[chartID]; n++ {
+			chartID = fmt.Sprintf("%s_%s", base, cleanJobID(jobs[i].id))
+			if n > 0 {
+				chartID = fmt.Sprintf("%s_%d", chartID, n)
+			}
+		}
+		jobs[i].chartID = chartID
+		used[chartID] = true
+	}
+}
+
+func (c *Collector) updateJobCharts(jobs []sqlAgentJob, removeMissing bool) {
+	seen := make(map[string]bool, len(jobs))
+	currentChartIDs := make(map[string]bool, len(jobs))
+	for _, job := range jobs {
+		currentChartIDs[job.chartID] = true
+	}
+
+	for _, job := range jobs {
+		seen[job.id] = true
+
+		if chartID, ok := c.seenJobs[job.id]; ok {
+			if chartID != job.chartID {
+				if !currentChartIDs[chartID] {
+					c.removeJobCharts(chartID)
+				}
+				c.addJobCharts(job)
+			} else {
+				c.updateJobChartsLabels(job)
+			}
+		} else {
+			c.addJobCharts(job)
+		}
+		c.seenJobs[job.id] = job.chartID
+	}
+
+	if !removeMissing {
+		return
+	}
+	for jobID, chartID := range c.seenJobs {
+		if seen[jobID] {
+			continue
+		}
+		c.removeJobCharts(chartID)
+		delete(c.seenJobs, jobID)
+	}
+}
+
+func (c *Collector) querySQLAgentJobLastExecutions() (map[string]sqlAgentJobLastExecution, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	rows, err := c.db.QueryContext(ctx, queryJobLastExecutions)
+	if err != nil {
+		c.Debugf("job last executions query failed: %v", err)
+		return nil, false
+	}
+	defer rows.Close()
+
+	executions := make(map[string]sqlAgentJobLastExecution)
+	for rows.Next() {
+		var jobID string
+		var runStatus, durationSeconds int64
+		var ageSeconds sql.NullInt64
+		var hasFailedStep int64
+		if err := rows.Scan(&jobID, &runStatus, &durationSeconds, &ageSeconds, &hasFailedStep); err != nil {
+			c.Debugf("job last executions row scan failed: %v", err)
+			continue
+		}
+
+		jobID = strings.ToLower(strings.TrimSpace(jobID))
+		if jobID == "" {
+			continue
+		}
+		executions[jobID] = sqlAgentJobLastExecution{
+			runStatus:       runStatus,
+			durationSeconds: durationSeconds,
+			ageSeconds:      ageSeconds,
+			hasFailedStep:   hasFailedStep != 0,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		c.Debugf("job last executions rows failed: %v", err)
+		return nil, false
+	}
+
+	return executions, true
+}
+
+func collectJobLastExecution(mx map[string]int64, job sqlAgentJob, exec *sqlAgentJobLastExecution) {
+	status := jobLastExecutionStatusUnknown
+	if exec != nil {
+		switch exec.runStatus {
+		case sqlAgentJobRunStatusFailed:
+			status = jobLastExecutionStatusError
+		case sqlAgentJobRunStatusSucceeded:
+			if exec.hasFailedStep {
+				status = jobLastExecutionStatusWarning
+			} else {
+				status = jobLastExecutionStatusOK
+			}
+		case sqlAgentJobRunStatusCanceled:
+			status = jobLastExecutionStatusCanceled
+		}
+	}
+
+	px := fmt.Sprintf("job_%s_last_execution_status_", job.chartID)
+	for _, name := range jobLastExecutionStatusNames {
+		mx[px+name] = boolToInt64(name == status)
+	}
+
+	if exec == nil {
+		return
+	}
+
+	mx[fmt.Sprintf("job_%s_last_execution_duration", job.chartID)] = exec.durationSeconds
+	if exec.ageSeconds.Valid {
+		mx[fmt.Sprintf("job_%s_last_execution_age", job.chartID)] = exec.ageSeconds.Int64
+	}
+}
+
+func (c *Collector) querySQLAgentJobCurrentExecutions() (map[string]int64, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	rows, err := c.db.QueryContext(ctx, queryJobCurrentExecutions)
+	if err != nil {
+		c.Debugf("job current executions query failed: %v", err)
+		return nil, false
+	}
+	defer rows.Close()
+
+	executions := make(map[string]int64)
+	for rows.Next() {
+		var jobID string
+		var seconds int64
+		if err := rows.Scan(&jobID, &seconds); err != nil {
+			c.Debugf("job current executions row scan failed: %v", err)
+			continue
+		}
+
+		jobID = strings.ToLower(strings.TrimSpace(jobID))
+		if jobID == "" {
+			continue
+		}
+		executions[jobID] = seconds
+	}
+	if err := rows.Err(); err != nil {
+		c.Debugf("job current executions rows failed: %v", err)
+		return nil, false
+	}
+
+	return executions, true
+}
+
+func boolToInt64(v bool) int64 {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func (c *Collector) collectSQLErrors(mx map[string]int64) error {

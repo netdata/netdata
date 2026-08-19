@@ -62,6 +62,22 @@ func defaultClientConfig() ClientConfig {
 	}
 }
 
+func TestListenerSetPayloadLimits(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+
+	listener := startListener(t, runDir, service, defaultServerConfig())
+	defer listener.Close()
+
+	listener.SetPayloadLimits(2048, 8192)
+	if listener.config.MaxRequestPayloadBytes != 2048 {
+		t.Fatalf("request payload limit = %d, want 2048", listener.config.MaxRequestPayloadBytes)
+	}
+	if listener.config.MaxResponsePayloadBytes != 8192 {
+		t.Fatalf("response payload limit = %d, want 8192", listener.config.MaxResponsePayloadBytes)
+	}
+}
+
 // serverResult holds the result of an Accept call.
 type serverResult struct {
 	session *Session
@@ -467,7 +483,7 @@ func TestChunking(t *testing.T) {
 	}
 
 	// Client receives
-	rHdr, rPayload, err = client.Receive(recvBuf)
+	_, rPayload, err = client.Receive(recvBuf)
 	if err != nil {
 		t.Fatalf("client Receive (chunked): %v", err)
 	}
@@ -635,6 +651,28 @@ func TestStaleRecovery(t *testing.T) {
 	}
 }
 
+func TestStaleRecoveryInGroupWritableRunDir(t *testing.T) {
+	// Crash recovery must work regardless of run-dir permissions
+	// (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+	runDir := t.TempDir()
+	if err := os.Chmod(runDir, 0o775); err != nil {
+		t.Fatalf("chmod run dir: %v", err)
+	}
+	service := uniqueService(t)
+	sockPath := filepath.Join(runDir, service+".sock")
+
+	// A foreign regular file squatting on the socket path
+	if err := os.WriteFile(sockPath, []byte("accidentally copied file"), 0o644); err != nil {
+		t.Fatalf("cannot create foreign file: %v", err)
+	}
+
+	listener, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("Listen must reclaim the endpoint in a group-writable run dir: %v", err)
+	}
+	listener.Close()
+}
+
 // ---------------------------------------------------------------------------
 //  Test: Disconnect detection
 // ---------------------------------------------------------------------------
@@ -745,7 +783,7 @@ func TestDirectionalLimitNegotiation(t *testing.T) {
 	defer os.Remove(filepath.Join(runDir, service+".sock"))
 
 	sCfg := defaultServerConfig()
-	sCfg.MaxRequestPayloadBytes = 2048
+	sCfg.MaxRequestPayloadBytes = 4096
 	sCfg.MaxRequestBatchItems = 8
 	sCfg.MaxResponsePayloadBytes = 8192
 	sCfg.MaxResponseBatchItems = 32

@@ -264,8 +264,8 @@ modules:
 
                 :::info
 
-                - Returned resource `type` values should match the Azure resource types expected by the active profiles. 
-                - Resources with unsupported or non-matching types are ignored and do not activate profiles. 
+                - Returned resource `type` values should match the Azure resource types expected by the active profiles.
+                - Resources with unsupported or non-matching types are ignored and do not activate profiles.
                 - For the stock catalog, see [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default).
 
                 :::
@@ -629,6 +629,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_managed_instance
       monitored_instance:
         name: Azure SQL Managed Instance
+        description: Monitor CPU, storage, and input and output performance for Azure SQL Managed Instance resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-sql/managed-instance/
         icon_filename: azure.svg
         categories:
@@ -733,6 +734,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_database
       monitored_instance:
         name: Azure SQL Database
+        description: Monitor operational and performance metrics for Azure SQL Database resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-sql/database/
         icon_filename: azure.svg
         categories:
@@ -1017,6 +1019,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-postgres_flexible
       monitored_instance:
         name: Azure PostgreSQL Flexible Server
+        description: Monitor compute, storage, connections, database activity, replication, and availability for Azure PostgreSQL Flexible Server.
         link: https://learn.microsoft.com/azure/postgresql/flexible-server/
         icon_filename: azure.svg
         categories:
@@ -1443,6 +1446,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-cosmos_db
       monitored_instance:
         name: Azure Cosmos DB Account
+        description: Monitor operational and performance metrics for Azure Cosmos DB accounts through Azure Monitor.
         link: https://learn.microsoft.com/azure/cosmos-db/
         icon_filename: azure.svg
         categories:
@@ -1675,6 +1679,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-logic_apps
       monitored_instance:
         name: Azure Logic Apps Workflow
+        description: Monitor operational and performance metrics for Azure Logic Apps workflows through Azure Monitor.
         link: https://learn.microsoft.com/azure/logic-apps/
         icon_filename: azure.svg
         categories:
@@ -1887,6 +1892,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-virtual_machines
       monitored_instance:
         name: Azure Virtual Machine
+        description: Monitor compute, memory, disk, network, throttling, and availability metrics for Azure Virtual Machine resources.
         link: https://learn.microsoft.com/azure/virtual-machines/
         icon_filename: azure.svg
         categories:
@@ -2289,6 +2295,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-aks
       monitored_instance:
         name: Azure Kubernetes Service Cluster
+        description: Monitor control plane, node, pod, and autoscaler health for Azure Kubernetes Service clusters through Azure Monitor.
         link: https://learn.microsoft.com/azure/aks/
         icon_filename: azure.svg
         categories:
@@ -2550,6 +2557,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-storage_accounts
       monitored_instance:
         name: Azure Storage Account
+        description: Monitor transactions, latency, throughput, availability, and storage capacity for Azure Storage Account resources.
         link: https://learn.microsoft.com/azure/storage/common/storage-account-overview
         icon_filename: azure.svg
         categories:
@@ -2671,6 +2679,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-load_balancers
       monitored_instance:
         name: Azure Load Balancer
+        description: Monitor availability, throughput, connections, and source network address translation ports for Azure Load Balancer resources.
         link: https://learn.microsoft.com/azure/load-balancer/
         icon_filename: azure.svg
         categories:
@@ -2795,6 +2804,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-app_service
       monitored_instance:
         name: Azure App Service
+        description: Monitor operational and performance metrics for Azure App Service resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/app-service/
         icon_filename: azure.svg
         categories:
@@ -3065,6 +3075,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-azure_functions
       monitored_instance:
         name: Azure Functions
+        description: Monitor operational and performance metrics for Azure Functions resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/azure-functions/
         icon_filename: azure.svg
         categories:
@@ -3299,6 +3310,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-redis_cache
       monitored_instance:
         name: Azure Cache for Redis
+        description: Monitor performance, latency, memory, connections, keys, throughput, and replication for Azure Cache for Redis resources.
         link: https://learn.microsoft.com/azure/azure-cache-for-redis/
         icon_filename: azure.svg
         categories:
@@ -3613,6 +3625,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-event_hubs
       monitored_instance:
         name: Azure Event Hubs Namespace
+        description: Monitor operational and performance metrics for Azure Event Hubs namespaces through Azure Monitor.
         link: https://learn.microsoft.com/azure/event-hubs/
         icon_filename: azure.svg
         categories:
@@ -3802,6 +3815,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-service_bus
       monitored_instance:
         name: Azure Service Bus Namespace
+        description: Monitor operational and performance metrics for Azure Service Bus namespaces through Azure Monitor.
         link: https://learn.microsoft.com/azure/service-bus-messaging/
         icon_filename: azure.svg
         categories:
@@ -4019,6 +4033,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-application_gateway
       monitored_instance:
         name: Azure Application Gateway
+        description: Monitor traffic, responses, backend health, latency, connections, capacity, and firewall activity for Azure Application Gateway.
         link: https://learn.microsoft.com/azure/application-gateway/
         icon_filename: azure.svg
         categories:
@@ -4245,6 +4260,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-key_vault
       monitored_instance:
         name: Azure Key Vault
+        description: Monitor operational and performance metrics for Azure Key Vault resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/key-vault/
         icon_filename: azure.svg
         categories:
@@ -4341,6 +4357,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-api_management
       monitored_instance:
         name: Azure API Management
+        description: Monitor requests, latency, compute, capacity, events, WebSockets, and network connectivity for Azure API Management resources.
         link: https://learn.microsoft.com/azure/api-management/
         icon_filename: azure.svg
         categories:
@@ -4514,6 +4531,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-front_door
       monitored_instance:
         name: Azure Front Door
+        description: Monitor operational and performance metrics for Azure Front Door resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/frontdoor/
         icon_filename: azure.svg
         categories:
@@ -4685,6 +4703,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-vmss
       monitored_instance:
         name: Azure Virtual Machine Scale Set
+        description: Monitor compute, memory, disk, network, throttling, and availability metrics across Azure Virtual Machine Scale Sets.
         link: https://learn.microsoft.com/azure/virtual-machine-scale-sets/
         icon_filename: azure.svg
         categories:
@@ -5098,6 +5117,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-sql_elastic_pool
       monitored_instance:
         name: Azure SQL Elastic Pool
+        description: Monitor compute, memory, storage, input and output, sessions, and billing metrics for Azure SQL Elastic Pool resources.
         link: https://learn.microsoft.com/azure/azure-sql/database/elastic-pool-overview
         icon_filename: azure.svg
         categories:
@@ -5324,6 +5344,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-mysql_flexible
       monitored_instance:
         name: Azure MySQL Flexible Server
+        description: Monitor compute, memory, storage, connections, queries, replication, network, and health for Azure MySQL Flexible Server.
         link: https://learn.microsoft.com/azure/mysql/flexible-server/
         icon_filename: azure.svg
         categories:
@@ -5683,6 +5704,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_apps
       monitored_instance:
         name: Azure Container Apps
+        description: Monitor compute, memory, requests, network, replicas, Java runtime, and resiliency metrics for Azure Container Apps.
         link: https://learn.microsoft.com/azure/container-apps/
         icon_filename: azure.svg
         categories:
@@ -5935,6 +5957,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-firewall
       monitored_instance:
         name: Azure Firewall
+        description: Monitor operational and performance metrics for Azure Firewall resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/firewall/
         icon_filename: azure.svg
         categories:
@@ -6051,6 +6074,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-cognitive_services
       monitored_instance:
         name: Azure Cognitive Services
+        description: Monitor calls, errors, latency, tokens, availability, content safety, and model activity for Azure Cognitive Services.
         link: https://learn.microsoft.com/azure/ai-services/
         icon_filename: azure.svg
         categories:
@@ -6688,6 +6712,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-vpn_gateway
       monitored_instance:
         name: Azure VPN Gateway
+        description: Monitor operational and performance metrics for Azure VPN Gateway resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/vpn-gateway/
         icon_filename: azure.svg
         categories:
@@ -7052,6 +7077,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-event_grid
       monitored_instance:
         name: Azure Event Grid Topic
+        description: Monitor operational and performance metrics for Azure Event Grid topics through Azure Monitor.
         link: https://learn.microsoft.com/azure/event-grid/
         icon_filename: azure.svg
         categories:
@@ -7177,6 +7203,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-iot_hub
       monitored_instance:
         name: Azure IoT Hub
+        description: Monitor operational and performance metrics for Azure IoT Hub resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/iot-hub/
         icon_filename: azure.svg
         categories:
@@ -7572,6 +7599,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-data_factory
       monitored_instance:
         name: Azure Data Factory
+        description: Monitor operational and performance metrics for Azure Data Factory resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/data-factory/
         icon_filename: azure.svg
         categories:
@@ -8074,6 +8102,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-nat_gateway
       monitored_instance:
         name: Azure NAT Gateway
+        description: Monitor operational and performance metrics for Azure NAT Gateway resources through Azure Monitor.
         link: https://learn.microsoft.com/azure/nat-gateway/
         icon_filename: azure.svg
         categories:
@@ -8184,6 +8213,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_instances
       monitored_instance:
         name: Azure Container Instances
+        description: Monitor CPU, memory, and network traffic for Azure Container Instances through Azure Monitor.
         link: https://learn.microsoft.com/azure/container-instances/
         icon_filename: azure.svg
         categories:
@@ -8279,6 +8309,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-container_registry
       monitored_instance:
         name: Azure Container Registry
+        description: Monitor image pull and push operations, storage use, and task execution for Azure Container Registry resources.
         link: https://learn.microsoft.com/azure/container-registry/
         icon_filename: azure.svg
         categories:
@@ -8378,6 +8409,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-application_insights
       monitored_instance:
         name: Azure Application Insights
+        description: Monitor availability, requests, dependencies, exceptions, browser timing, process health, and traces for Azure Application Insights.
         link: https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview
         icon_filename: azure.svg
         categories:
@@ -8633,6 +8665,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-express_route_circuit
       monitored_instance:
         name: Azure ExpressRoute Circuit
+        description: Monitor throughput, availability, bandwidth utilization, dropped traffic, and routes for Azure ExpressRoute Circuit resources.
         link: https://learn.microsoft.com/azure/expressroute/
         icon_filename: azure.svg
         categories:
@@ -8763,6 +8796,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-machine_learning
       monitored_instance:
         name: Azure Machine Learning Workspace
+        description: Monitor compute, GPU, cluster, run, model, quota, storage, network, and agent activity for Azure Machine Learning workspaces.
         link: https://learn.microsoft.com/azure/machine-learning/
         icon_filename: azure.svg
         categories:
@@ -9103,6 +9137,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-data_explorer
       monitored_instance:
         name: Azure Data Explorer Cluster
+        description: Monitor ingestion, queries, streaming, cache, compute, exports, views, events, and cluster health for Azure Data Explorer.
         link: https://learn.microsoft.com/azure/data-explorer/
         icon_filename: azure.svg
         categories:
@@ -9526,6 +9561,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-stream_analytics
       monitored_instance:
         name: Azure Stream Analytics Job
+        description: Monitor event flow, processing errors, timing, resource utilization, inputs, and functions for Azure Stream Analytics jobs.
         link: https://learn.microsoft.com/azure/stream-analytics/
         icon_filename: azure.svg
         categories:
@@ -9694,6 +9730,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-synapse
       monitored_instance:
         name: Azure Synapse Analytics Workspace
+        description: Monitor pipeline runs, SQL pool activity, streaming events, input throughput, and link processing for Azure Synapse Analytics workspaces.
         link: https://learn.microsoft.com/azure/synapse-analytics/
         icon_filename: azure.svg
         categories:
@@ -9901,6 +9938,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-log_analytics
       monitored_instance:
         name: Azure Log Analytics Workspace
+        description: Monitor ingestion, queries, exports, and legacy agent system health for Azure Log Analytics workspaces.
         link: https://learn.microsoft.com/azure/azure-monitor/logs/
         icon_filename: azure.svg
         categories:
@@ -10275,6 +10313,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-express_route_gateway
       monitored_instance:
         name: Azure ExpressRoute Gateway
+        description: Monitor throughput, CPU, active flows, route changes, and virtual network scale for Azure ExpressRoute Gateway resources.
         link: https://learn.microsoft.com/azure/expressroute/expressroute-about-virtual-network-gateways
         icon_filename: azure.svg
         categories:

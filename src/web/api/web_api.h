@@ -35,6 +35,8 @@ struct web_api_command {
 
 struct web_client;
 
+void web_api_command_hashes_init(struct web_api_command *api_commands, SPINLOCK *spinlock, bool *initialized);
+
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands);
 
 static inline void fix_google_param(char *s) {

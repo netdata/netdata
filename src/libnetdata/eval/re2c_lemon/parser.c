@@ -137,14 +137,22 @@ typedef union {
 #define ParseARG_PARAM ,result
 #define ParseARG_FETCH EVAL_NODE **result=yypParser->result;
 #define ParseARG_STORE yypParser->result=result;
+#undef YYREALLOC
 #define YYREALLOC realloc
+#undef YYFREE
 #define YYFREE free
+#undef YYDYNSTACK
 #define YYDYNSTACK 0
+#undef YYSIZELIMIT
+#define ParseCTX(P) 0
 #define ParseCTX_SDECL
 #define ParseCTX_PDECL
 #define ParseCTX_PARAM
 #define ParseCTX_FETCH
 #define ParseCTX_STORE
+#undef YYERRORSYMBOL
+#undef YYERRSYMDT
+#undef YYFALLBACK
 #define YYNSTATE             37
 #define YYNRULE              22
 #define YYNRULE_WITH_ACTION  22
@@ -157,7 +165,7 @@ typedef union {
 #define YY_NO_ACTION         71
 #define YY_MIN_REDUCE        72
 #define YY_MAX_REDUCE        93
-#define YY_MIN_DSTRCTR       24
+#define YY_MIN_DSTRCTR       0
 #define YY_MAX_DSTRCTR       24
 /************* End control #defines *******************************************/
 #define YY_NLOOKAHEAD ((int)(sizeof(yy_lookahead)/sizeof(yy_lookahead[0])))
@@ -581,15 +589,45 @@ static void yy_destructor(
     ** inside the C code.
     */
 /********* Begin destructor definitions ***************************************/
+      /* TERMINAL Destructor */
+    case 1: /* NUMBER */
+    case 2: /* VARIABLE */
+    case 3: /* LPAREN */
+    case 4: /* RPAREN */
+    case 5: /* PLUS */
+    case 6: /* UPLUS */
+    case 7: /* MINUS */
+    case 8: /* UMINUS */
+    case 9: /* NOT */
+    case 10: /* FUNCTION_ABS */
+    case 11: /* MULTIPLY */
+    case 12: /* DIVIDE */
+    case 13: /* MODULO */
+    case 14: /* AND */
+    case 15: /* OR */
+    case 16: /* EQ */
+    case 17: /* NE */
+    case 18: /* LT */
+    case 19: /* LE */
+    case 20: /* GT */
+    case 21: /* GE */
+    case 22: /* QMARK */
+    case 23: /* COLON */
+{
+#line 8 "parser.y"
+freez((yypminor->yy0).strval);
+#line 620 "parser.c"
+}
+      break;
     case 24: /* expr */
 {
-#line 34 "parser.y"
+#line 35 "parser.y"
 
     if ((yypminor->yy48)) {
         eval_node_free((yypminor->yy48));
     }
 
-#line 592 "parser.c"
+#line 631 "parser.c"
 }
       break;
 /********* End destructor definitions *****************************************/
@@ -980,85 +1018,98 @@ static YYACTIONTYPE yy_reduce(
 /********** Begin reduce actions **********************************************/
         YYMINORTYPE yylhsminor;
       case 0: /* program ::= expr */
-#line 41 "parser.y"
+#line 42 "parser.y"
 {
     *result = yymsp[0].minor.yy48;
 }
-#line 987 "parser.c"
+#line 1026 "parser.c"
         break;
       case 1: /* expr ::= NUMBER */
-#line 46 "parser.y"
+#line 47 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(1);
     yylhsminor.yy48->operator = EVAL_OPERATOR_NOP;
     eval_node_set_value_to_constant(yylhsminor.yy48, 0, yymsp[0].minor.yy0.dval);
 }
-#line 996 "parser.c"
+#line 1035 "parser.c"
   yymsp[0].minor.yy48 = yylhsminor.yy48;
         break;
       case 2: /* expr ::= VARIABLE */
-#line 52 "parser.y"
+#line 53 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(1);
     yylhsminor.yy48->operator = EVAL_OPERATOR_NOP;
     eval_node_set_value_to_variable(yylhsminor.yy48, 0, yymsp[0].minor.yy0.strval);
     freez(yymsp[0].minor.yy0.strval); // Free the strdup'd string
 }
-#line 1007 "parser.c"
+#line 1046 "parser.c"
   yymsp[0].minor.yy48 = yylhsminor.yy48;
         break;
       case 3: /* expr ::= LPAREN expr RPAREN */
-#line 60 "parser.y"
+{  yy_destructor(yypParser,3,&yymsp[-2].minor);
+#line 61 "parser.y"
 {
     yymsp[-2].minor.yy48 = eval_node_alloc(1);
     yymsp[-2].minor.yy48->operator = EVAL_OPERATOR_EXPRESSION_OPEN;
     yymsp[-2].minor.yy48->precedence = eval_precedence(EVAL_OPERATOR_EXPRESSION_OPEN);
     eval_node_set_value_to_node(yymsp[-2].minor.yy48, 0, yymsp[-1].minor.yy48);
 }
-#line 1018 "parser.c"
+#line 1058 "parser.c"
+  yy_destructor(yypParser,4,&yymsp[0].minor);
+}
         break;
       case 4: /* expr ::= PLUS expr */
-#line 68 "parser.y"
+{  yy_destructor(yypParser,5,&yymsp[-1].minor);
+#line 69 "parser.y"
 {
     yymsp[-1].minor.yy48 = eval_node_alloc(1);
     yymsp[-1].minor.yy48->operator = EVAL_OPERATOR_SIGN_PLUS;
     yymsp[-1].minor.yy48->precedence = eval_precedence(EVAL_OPERATOR_SIGN_PLUS);
     eval_node_set_value_to_node(yymsp[-1].minor.yy48, 0, yymsp[0].minor.yy48);
 }
-#line 1028 "parser.c"
+#line 1071 "parser.c"
+}
         break;
       case 5: /* expr ::= MINUS expr */
-#line 75 "parser.y"
+{  yy_destructor(yypParser,7,&yymsp[-1].minor);
+#line 76 "parser.y"
 {
     yymsp[-1].minor.yy48 = eval_node_alloc(1);
     yymsp[-1].minor.yy48->operator = EVAL_OPERATOR_SIGN_MINUS;
     yymsp[-1].minor.yy48->precedence = eval_precedence(EVAL_OPERATOR_SIGN_MINUS);
     eval_node_set_value_to_node(yymsp[-1].minor.yy48, 0, yymsp[0].minor.yy48);
 }
-#line 1038 "parser.c"
+#line 1083 "parser.c"
+}
         break;
       case 6: /* expr ::= NOT expr */
-#line 82 "parser.y"
+{  yy_destructor(yypParser,9,&yymsp[-1].minor);
+#line 83 "parser.y"
 {
     yymsp[-1].minor.yy48 = eval_node_alloc(1);
     yymsp[-1].minor.yy48->operator = EVAL_OPERATOR_NOT;
     yymsp[-1].minor.yy48->precedence = eval_precedence(EVAL_OPERATOR_NOT);
     eval_node_set_value_to_node(yymsp[-1].minor.yy48, 0, yymsp[0].minor.yy48);
 }
-#line 1048 "parser.c"
+#line 1095 "parser.c"
+}
         break;
       case 7: /* expr ::= FUNCTION_ABS LPAREN expr RPAREN */
-#line 90 "parser.y"
+{  yy_destructor(yypParser,10,&yymsp[-3].minor);
+#line 91 "parser.y"
 {
     yymsp[-3].minor.yy48 = eval_node_alloc(1);
     yymsp[-3].minor.yy48->operator = EVAL_OPERATOR_ABS;
     yymsp[-3].minor.yy48->precedence = eval_precedence(EVAL_OPERATOR_ABS);
     eval_node_set_value_to_node(yymsp[-3].minor.yy48, 0, yymsp[-1].minor.yy48);
 }
-#line 1058 "parser.c"
+#line 1107 "parser.c"
+  yy_destructor(yypParser,3,&yymsp[-2].minor);
+  yy_destructor(yypParser,4,&yymsp[0].minor);
+}
         break;
       case 8: /* expr ::= expr PLUS expr */
-#line 98 "parser.y"
+#line 99 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_PLUS;
@@ -1066,11 +1117,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1069 "parser.c"
+#line 1121 "parser.c"
+  yy_destructor(yypParser,5,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 9: /* expr ::= expr MINUS expr */
-#line 106 "parser.y"
+#line 107 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_MINUS;
@@ -1078,11 +1130,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1081 "parser.c"
+#line 1134 "parser.c"
+  yy_destructor(yypParser,7,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 10: /* expr ::= expr MULTIPLY expr */
-#line 114 "parser.y"
+#line 115 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_MULTIPLY;
@@ -1090,11 +1143,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1093 "parser.c"
+#line 1147 "parser.c"
+  yy_destructor(yypParser,11,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 11: /* expr ::= expr DIVIDE expr */
-#line 122 "parser.y"
+#line 123 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_DIVIDE;
@@ -1102,11 +1156,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1105 "parser.c"
+#line 1160 "parser.c"
+  yy_destructor(yypParser,12,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 12: /* expr ::= expr MODULO expr */
-#line 130 "parser.y"
+#line 131 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_MODULO;
@@ -1114,11 +1169,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1117 "parser.c"
+#line 1173 "parser.c"
+  yy_destructor(yypParser,13,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 13: /* expr ::= expr AND expr */
-#line 138 "parser.y"
+#line 139 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_AND;
@@ -1126,11 +1182,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1129 "parser.c"
+#line 1186 "parser.c"
+  yy_destructor(yypParser,14,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 14: /* expr ::= expr OR expr */
-#line 146 "parser.y"
+#line 147 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_OR;
@@ -1138,11 +1195,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1141 "parser.c"
+#line 1199 "parser.c"
+  yy_destructor(yypParser,15,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 15: /* expr ::= expr EQ expr */
-#line 154 "parser.y"
+#line 155 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_EQUAL;
@@ -1150,11 +1208,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1153 "parser.c"
+#line 1212 "parser.c"
+  yy_destructor(yypParser,16,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 16: /* expr ::= expr NE expr */
-#line 162 "parser.y"
+#line 163 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_NOT_EQUAL;
@@ -1162,11 +1221,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1165 "parser.c"
+#line 1225 "parser.c"
+  yy_destructor(yypParser,17,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 17: /* expr ::= expr LT expr */
-#line 170 "parser.y"
+#line 171 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_LESS;
@@ -1174,11 +1234,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1177 "parser.c"
+#line 1238 "parser.c"
+  yy_destructor(yypParser,18,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 18: /* expr ::= expr LE expr */
-#line 178 "parser.y"
+#line 179 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_LESS_THAN_OR_EQUAL;
@@ -1186,11 +1247,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1189 "parser.c"
+#line 1251 "parser.c"
+  yy_destructor(yypParser,19,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 19: /* expr ::= expr GT expr */
-#line 186 "parser.y"
+#line 187 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_GREATER;
@@ -1198,11 +1260,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1201 "parser.c"
+#line 1264 "parser.c"
+  yy_destructor(yypParser,20,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 20: /* expr ::= expr GE expr */
-#line 194 "parser.y"
+#line 195 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(2);
     yylhsminor.yy48->operator = EVAL_OPERATOR_GREATER_THAN_OR_EQUAL;
@@ -1210,11 +1273,12 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 0, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[0].minor.yy48);
 }
-#line 1213 "parser.c"
+#line 1277 "parser.c"
+  yy_destructor(yypParser,21,&yymsp[-1].minor);
   yymsp[-2].minor.yy48 = yylhsminor.yy48;
         break;
       case 21: /* expr ::= expr QMARK expr COLON expr */
-#line 205 "parser.y"
+#line 206 "parser.y"
 {
     yylhsminor.yy48 = eval_node_alloc(3);
     yylhsminor.yy48->operator = EVAL_OPERATOR_IF_THEN_ELSE;
@@ -1223,7 +1287,9 @@ static YYACTIONTYPE yy_reduce(
     eval_node_set_value_to_node(yylhsminor.yy48, 1, yymsp[-2].minor.yy48);
     eval_node_set_value_to_node(yylhsminor.yy48, 2, yymsp[0].minor.yy48);
 }
-#line 1226 "parser.c"
+#line 1291 "parser.c"
+  yy_destructor(yypParser,22,&yymsp[-3].minor);
+  yy_destructor(yypParser,23,&yymsp[-1].minor);
   yymsp[-4].minor.yy48 = yylhsminor.yy48;
         break;
       default:
@@ -1268,14 +1334,14 @@ static void yy_parse_failed(
   /* Here code is inserted which will be executed whenever the
   ** parser fails */
 /************ Begin %parse_failure code ***************************************/
-#line 24 "parser.y"
+#line 25 "parser.y"
 
     // Failed to parse the expression
     if (*result) {
         eval_node_free(*result);
         *result = NULL;
     }
-#line 1278 "parser.c"
+#line 1345 "parser.c"
 /************ End %parse_failure code *****************************************/
   ParseARG_STORE /* Suppress warning about unused %extra_argument variable */
   ParseCTX_STORE
@@ -1294,13 +1360,13 @@ static void yy_syntax_error(
   ParseCTX_FETCH
 #define TOKEN yyminor
 /************ Begin %syntax_error code ****************************************/
-#line 13 "parser.y"
+#line 14 "parser.y"
 
     // Create a NOP node with count=0 as an error marker
     EVAL_NODE *error_node = eval_node_alloc(0);
     error_node->operator = EVAL_OPERATOR_NOP;
     *result = error_node;
-#line 1303 "parser.c"
+#line 1370 "parser.c"
 /************ End %syntax_error code ******************************************/
   ParseARG_STORE /* Suppress warning about unused %extra_argument variable */
   ParseCTX_STORE
@@ -1326,10 +1392,10 @@ static void yy_accept(
   /* Here code is inserted which will be executed whenever the
   ** parser accepts */
 /*********** Begin %parse_accept code *****************************************/
-#line 20 "parser.y"
+#line 21 "parser.y"
 
     // Successfully parsed the expression
-#line 1332 "parser.c"
+#line 1399 "parser.c"
 /*********** End %parse_accept code *******************************************/
   ParseARG_STORE /* Suppress warning about unused %extra_argument variable */
   ParseCTX_STORE

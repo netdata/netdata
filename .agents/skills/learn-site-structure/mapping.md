@@ -224,7 +224,7 @@ rewrites these links to the correct Learn URLs during processing.
 **Correct:**
 
 ```markdown
-See [Configuration](/docs/network-flows/configuration.md) for details.
+See [Configuration](/docs/npm/network-flows/configuration.md) for details.
 ```
 
 **Wrong (will NOT resolve on Learn or GitHub):**

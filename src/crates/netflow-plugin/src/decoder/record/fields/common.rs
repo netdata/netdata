@@ -9,6 +9,7 @@ pub(crate) fn normalize_direction_value(value: &str) -> &str {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn apply_icmp_port_fallback(fields: &mut FlowFields) {
     let protocol = fields
         .get("PROTOCOL")
@@ -45,6 +46,7 @@ pub(crate) fn apply_icmp_port_fallback(fields: &mut FlowFields) {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn set_if_missing_or_empty(fields: &mut FlowFields, key: &'static str, value: &str) {
     let current = fields.get(key).map(String::as_str).unwrap_or_default();
     if current.is_empty() {
@@ -97,20 +99,7 @@ pub(crate) fn append_mpls_label_value(fields: &mut FlowFields, label: u64) {
     }
 }
 
-pub(crate) fn parse_ip_value(raw_value: &[u8]) -> Option<String> {
-    match raw_value.len() {
-        4 => {
-            Some(Ipv4Addr::new(raw_value[0], raw_value[1], raw_value[2], raw_value[3]).to_string())
-        }
-        16 => {
-            let mut octets = [0_u8; 16];
-            octets.copy_from_slice(raw_value);
-            Some(Ipv6Addr::from(octets).to_string())
-        }
-        _ => None,
-    }
-}
-
+#[cfg(test)]
 pub(crate) fn infer_etype_from_endpoints(fields: &FlowFields) -> Option<&'static str> {
     let src_addr = fields
         .get("SRC_ADDR")

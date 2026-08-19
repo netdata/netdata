@@ -1,5 +1,6 @@
 use super::*;
 
+mod charts;
 mod enrichment;
 mod journal;
 mod listener;
@@ -7,6 +8,7 @@ mod plugin;
 mod protocol;
 mod routing;
 
+pub(crate) use charts::*;
 pub(crate) use enrichment::*;
 pub(crate) use journal::*;
 pub(crate) use listener::*;

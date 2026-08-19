@@ -13,7 +13,9 @@ import (
 	"time"
 )
 
-func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (string, error) {
+const defaultCommandTimeout = 10 * time.Second
+
+func resolveCmd(ctx context.Context, cmdLine, original string, timeout time.Duration) (string, error) {
 	parts := strings.Fields(cmdLine)
 	if len(parts) == 0 {
 		return "", fmt.Errorf("resolving secret '%s': empty command", original)
@@ -25,21 +27,32 @@ func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (st
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	timeout := r.cmdTimeout
 	if timeout <= 0 {
-		timeout = 10 * time.Second
+		timeout = defaultCommandTimeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	configureCommandProcessTree(cmd)
 	cmd.Stderr = io.Discard
-	out, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': command stdout: %w", original, err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
+	}
+	out, readErr := readBoundedSecret(stdout, MaximumAtomicResolvedBytes)
+	if readErr != nil && cmd.Cancel != nil {
+		_ = cmd.Cancel()
+	}
+	waitErr := cmd.Wait()
+	if readErr != nil || waitErr != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return "", fmt.Errorf("resolving secret '%s': command timed out after %s", original, timeout)
 		}
-		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
+		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, errors.Join(readErr, waitErr))
 	}
 
 	value := strings.TrimSpace(string(out))

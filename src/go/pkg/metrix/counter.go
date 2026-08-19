@@ -90,6 +90,13 @@ func (c *storeCore) recordCounterObserveTotal(desc *instrumentDescriptor, scope 
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.counters[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedCounter{
 			key:          key,
@@ -131,9 +138,16 @@ func (c *storeCore) recordCounterAdd(desc *instrumentDescriptor, scope HostScope
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.counters[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		baseline := SampleValue(0)
-		if existing := c.snapshot.Load().series[key]; existing != nil && existing.desc != nil && existing.desc.kind == kindCounter {
+		if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 			baseline = existing.counterCurrent
 		}
 		entry = &stagedCounter{

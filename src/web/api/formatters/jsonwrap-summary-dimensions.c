@@ -175,7 +175,7 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
     }
 
     if(v2) {
-        size_t cardinality_limit = qt->request.cardinality_limit;
+        size_t cardinality_limit = query_target_summary_cardinality_limit(qt);
         size_t dict_entries = dictionary_entries(dict);
 
         // Use the enhanced walkthrough with cardinality limiting

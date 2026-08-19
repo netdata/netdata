@@ -1,5 +1,7 @@
 mod accumulator;
 mod store;
 
-pub(crate) use accumulator::TierAccumulator;
-pub(crate) use store::{TierFlowIndexMemoryBreakdown, TierFlowIndexStore};
+pub(crate) use accumulator::{MetricBucket, TierAccumulator};
+pub(crate) use store::{
+    TierFlowIndexCardinality, TierFlowIndexMemoryBreakdown, TierFlowIndexStore,
+};

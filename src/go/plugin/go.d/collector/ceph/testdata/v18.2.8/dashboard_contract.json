@@ -1,0 +1,234 @@
+{
+  "crush_rules": [
+    {
+      "rule_id": 1,
+      "rule_name": "ssd-rule",
+      "steps": [
+        {
+          "item_name": "default~ssd",
+          "op": "take"
+        },
+        {
+          "op": "chooseleaf_firstn",
+          "type": "host"
+        },
+        {
+          "op": "emit"
+        }
+      ]
+    }
+  ],
+  "daemons": [
+    {
+      "container_image_name": "quay.io/ceph/ceph:synthetic",
+      "daemon_id": "a",
+      "daemon_name": "mon.a",
+      "daemon_type": "mon",
+      "hostname": "ceph-node-a",
+      "is_active": true,
+      "last_refresh": "2026-01-01T00:00:00Z",
+      "service_name": "mon",
+      "status_desc": "running",
+      "version": "ceph version synthetic"
+    }
+  ],
+  "health_minimal": {
+    "client_perf": {
+      "read_bytes_sec": 10.25,
+      "read_op_per_sec": 1.5,
+      "recovering_bytes_per_sec": 3.75,
+      "write_bytes_sec": 20.5,
+      "write_op_per_sec": 2.5
+    },
+    "df": {
+      "stats": {
+        "total_avail_bytes": 750000,
+        "total_bytes": 1000000,
+        "total_used_raw_bytes": 250000
+      }
+    },
+    "health": {
+      "status": "HEALTH_WARN",
+      "checks": [
+        {
+          "type": "OSD_SCRUB_ERRORS",
+          "detail": [
+            {
+              "message": "Synthetic PG has a scrub error"
+            }
+          ],
+          "muted": false,
+          "severity": "HEALTH_WARN",
+          "summary": {
+            "count": 1,
+            "message": "Synthetic scrub errors"
+          }
+        },
+        {
+          "type": "SLOW_OPS",
+          "detail": [
+            {
+              "message": "Synthetic OSD operation is slow"
+            }
+          ],
+          "muted": false,
+          "severity": "HEALTH_WARN",
+          "summary": {
+            "count": 1,
+            "message": "Synthetic slow operations"
+          }
+        }
+      ]
+    },
+    "hosts": 2,
+    "iscsi_daemons": {
+      "down": 0,
+      "up": 0
+    },
+    "mgr_map": {
+      "active_name": "mgr.a",
+      "standbys": [
+        {
+          "gid": 2
+        }
+      ]
+    },
+    "mon_status": {
+      "monmap": {
+        "mons": [
+          {
+            "rank": 0
+          },
+          {
+            "rank": 1
+          },
+          {
+            "rank": 2
+          }
+        ]
+      }
+    },
+    "osd_map": {
+      "osds": [
+        {
+          "in": 1,
+          "up": 1
+        },
+        {
+          "in": 1,
+          "up": 0
+        }
+      ]
+    },
+    "pg_info": {
+      "object_stats": {
+        "num_object_copies": 30,
+        "num_objects": 10,
+        "num_objects_degraded": 1,
+        "num_objects_misplaced": 2,
+        "num_objects_unfound": 0
+      },
+      "pgs_per_osd": 16.5,
+      "statuses": {
+        "active+clean": 31,
+        "active+degraded": 1
+      }
+    },
+    "pools": [
+      {
+        "pool_name": "pool-a"
+      }
+    ],
+    "rgw": 1,
+    "scrub_status": "inactive"
+  },
+  "osds": [
+    {
+      "host": {
+        "name": "ceph-node-a"
+      },
+      "id": 0,
+      "in": 1,
+      "osd": 0,
+      "osd_stats": {
+        "perf_stat": {
+          "apply_latency_ms": 2.5,
+          "commit_latency_ms": 1.25
+        },
+        "statfs": {
+          "available": 750000,
+          "total": 1000000
+        }
+      },
+      "stats": {
+        "op_in_bytes": 2048.5,
+        "op_out_bytes": 1024.25,
+        "op_r": 1.5,
+        "op_w": 2.5
+      },
+      "tree": {
+        "device_class": "ssd",
+        "name": "osd.0",
+        "type": "osd"
+      },
+      "up": 1,
+      "uuid": "00000000-0000-4000-8000-000000000001"
+    }
+  ],
+  "pools_policy": [
+    {
+      "application_metadata": [
+        "rgw"
+      ],
+      "crush_rule": "ssd-rule",
+      "erasure_code_profile": "",
+      "flags_names": [
+        "hashpspool"
+      ],
+      "min_size": 2,
+      "pg_autoscale_mode": "on",
+      "pg_num": 32,
+      "pg_placement_num": 32,
+      "pool_name": "pool-a",
+      "quota_max_bytes": 1000000,
+      "quota_max_objects": 10000,
+      "size": 3,
+      "type": "replicated"
+    }
+  ],
+  "pools_stats": [
+    {
+      "pool_name": "pool-a",
+      "stats": {
+        "avail_raw": {
+          "latest": 900
+        },
+        "bytes_used": {
+          "latest": 100
+        },
+        "objects": {
+          "latest": 10
+        },
+        "percent_used": {
+          "latest": 0.1
+        },
+        "rd": {
+          "latest": 5
+        },
+        "rd_bytes": {
+          "latest": 500
+        },
+        "stored": {
+          "latest": 100
+        },
+        "wr": {
+          "latest": 7
+        },
+        "wr_bytes": {
+          "latest": 700
+        }
+      }
+    }
+  ],
+  "release": "18.2.8"
+}

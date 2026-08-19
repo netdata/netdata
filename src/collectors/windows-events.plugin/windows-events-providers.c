@@ -114,11 +114,19 @@ static bool provider_property_get(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content
         }
     }
 
+    if (!bufferUsed)
+        goto cleanup;
+
     wevt_variant_resize(content, bufferUsed);
     if (!EvtGetPublisherMetadataProperty(h->hMetadata, property_id, 0, content->size, content->data, &bufferUsed)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetPublisherMetadataProperty() failed after resize");
         goto cleanup;
     }
+
+    content->used = bufferUsed;
+    wevt_variant_count_from_used(content);
+    if(!content->data || !content->count)
+        goto cleanup;
 
     return true;
 
@@ -130,10 +138,11 @@ static bool provider_string_property_exists(PROVIDER_META_HANDLE *h, WEVT_VARIAN
     if(!provider_property_get(h, content, property_id))
         return false;
 
-    if(content->data->Type != EvtVarTypeString)
+    LPCWSTR value = wevt_field_get_string(content->data);
+    if(!value)
         return false;
 
-    if(!content->data->StringVal[0])
+    if(!value[0])
         return false;
 
     return true;
@@ -155,7 +164,7 @@ static void provider_detect_platform(PROVIDER_META_HANDLE *h, WEVT_VARIANT *cont
 }
 
 WEVT_PROVIDER_PLATFORM provider_get_platform(PROVIDER_META_HANDLE *p) {
-    return p->provider->platform;
+    return (p && p->provider) ? p->provider->platform : WEVT_PLATFORM_UNKNOWN;
 }
 
 PROVIDER_META_HANDLE *provider_get(ND_UUID uuid, LPCWSTR providerName) {
@@ -250,7 +259,15 @@ EVT_HANDLE provider_handle(PROVIDER_META_HANDLE *h) {
 }
 
 PROVIDER_META_HANDLE *provider_dup(PROVIDER_META_HANDLE *h) {
-    if(h) h->locks++;
+    if(!h)
+        return NULL;
+
+    spinlock_lock(&pbc.spinlock);
+    fatal_assert(h->owner == gettid_cached());
+    fatal_assert(h->locks > 0);
+    h->locks++;
+    spinlock_unlock(&pbc.spinlock);
+
     return h;
 }
 
@@ -299,13 +316,14 @@ void providers_release_unused_handles(void) {
 
 void provider_release(PROVIDER_META_HANDLE *h) {
     if(!h) return;
+
     pid_t me = gettid_cached();
+    spinlock_lock(&pbc.spinlock);
     fatal_assert(h->owner == me);
     fatal_assert(h->locks > 0);
     if(--h->locks == 0) {
         PROVIDER *p = h->provider;
 
-        spinlock_lock(&pbc.spinlock);
         h->owner = 0;
 
         if(++p->available_handles > MAX_OPEN_HANDLES_PER_PROVIDER) {
@@ -318,8 +336,9 @@ void provider_release(PROVIDER_META_HANDLE *h) {
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(p->handles, h, prev, next);
         }
 
-        spinlock_unlock(&pbc.spinlock);
     }
+
+    spinlock_unlock(&pbc.spinlock);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -335,6 +354,9 @@ static bool wevt_get_property_from_array(WEVT_VARIANT *property, EVT_HANDLE hand
             return false;
         }
 
+        if (!used)
+            return false;
+
         wevt_variant_resize(property, used);
         if (!EvtGetObjectArrayProperty(handle, PropertyId, dwIndex, 0, property->size, property->data, &used)) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetObjectArrayProperty() failed");
@@ -343,6 +365,10 @@ static bool wevt_get_property_from_array(WEVT_VARIANT *property, EVT_HANDLE hand
     }
 
     property->used = used;
+    wevt_variant_count_from_used(property);
+    if(!property->data || !property->count)
+        return false;
+
     return true;
 }
 
@@ -426,7 +452,10 @@ static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, W
         goto cleanup;
 
     // Get the number of items (e.g., levels, tasks, or opcodes)
-    hArray = content->data->EvtHandleVal;
+    hArray = wevt_field_get_evt_handle(content->data);
+    if(!hArray)
+        goto cleanup;
+
     if (!EvtGetObjectArraySize(hArray, &itemCount)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtGetObjectArraySize() failed");
         goto cleanup;
@@ -440,71 +469,90 @@ static void provider_load_list(PROVIDER_META_HANDLE *h, WEVT_VARIANT *content, W
 
     // Allocate memory for the list items
     l->array = callocz(itemCount, sizeof(struct provider_data));
-    l->total = itemCount;
+    l->total = 0;
 
     uint64_t min = UINT64_MAX, max = 0, mask = 0;
 
     // Iterate over the list and populate the entries
     for (DWORD i = 0; i < itemCount; ++i) {
-        struct provider_data *d = &l->array[i];
+        struct provider_data tmp = { 0 };
 
         // Get the value (e.g., opcode, task, or level)
+        bool has_value = false;
         if (wevt_get_property_from_array(property, hArray, i, value_id)) {
             switch(value_bits) {
-                case 64:
-                    d->value = wevt_field_get_uint64(property->data);
+                case 64: {
+                    has_value = wevt_field_get_uint64_checked(property->data, &tmp.value);
                     break;
+                }
 
-                case 32:
-                    d->value = wevt_field_get_uint32(property->data);
+                case 32: {
+                    uint32_t value = 0;
+                    has_value = wevt_field_get_uint32_checked(property->data, &value);
+                    tmp.value = value;
                     break;
+                }
             }
 
-            if(d->value < min)
-                min = d->value;
+            if(tmp.value < min)
+                min = tmp.value;
 
-            if(d->value > max)
-                max = d->value;
+            if(tmp.value > max)
+                max = tmp.value;
 
-            mask |= d->value;
+            mask |= tmp.value;
 
-            if(!is_valid(d->value, false))
+            if(!is_valid(tmp.value, false))
                 l->exceeds_data_type = true;
         }
 
+        if(!has_value)
+            continue;
+
         // Get the message ID
         if (wevt_get_property_from_array(property, hArray, i, message_id)) {
-            uint32_t messageID = wevt_field_get_uint32(property->data);
+            uint32_t messageID = 0;
 
-            if (messageID != (uint32_t)-1) {
+            if (wevt_field_get_uint32_checked(property->data, &messageID) && messageID != (uint32_t)-1) {
                 if (EvtFormatMessage_utf16(dst, hMetadata, NULL, messageID, EvtFormatMessageId)) {
                     size_t len;
-                    d->name = utf16_to_utf8_strdupz(dst->data, &len);
-                    d->len = len;
+                    tmp.name = utf16_to_utf8_strdupz(dst->data, &len);
+                    tmp.len = len;
                 }
             }
         }
 
         // Get the name if the message is missing
-        if (!d->name && wevt_get_property_from_array(property, hArray, i, name_id)) {
-            fatal_assert(property->data->Type == EvtVarTypeString);
+        if (!tmp.name && wevt_get_property_from_array(property, hArray, i, name_id)) {
+            LPCWSTR name = wevt_field_get_string(property->data);
+            if(!name)
+                continue;
+
             size_t len;
-            d->name = utf16_to_utf8_strdupz(property->data->StringVal, &len);
-            d->len = len;
+            tmp.name = utf16_to_utf8_strdupz(name, &len);
+            tmp.len = len;
         }
 
         // Calculate the hash for the name
-        if (d->name)
-            d->hash = XXH3_64bits(d->name, d->len);
+        if (tmp.name)
+            tmp.hash = XXH3_64bits(tmp.name, tmp.len);
+
+        l->array[l->total++] = tmp;
+    }
+
+    if(!l->total) {
+        freez(l->array);
+        l->array = NULL;
+        min = max = mask = 0;
     }
 
     l->min = min;
     l->max = max;
     l->mask = mask;
 
-    if(itemCount > 1 && compare_func != NULL) {
+    if(l->total > 1 && compare_func != NULL) {
         // Sort the array based on the value (ascending for all except keywords, descending for keywords)
-        qsort(l->array, itemCount, sizeof(struct provider_data), compare_func);
+        qsort(l->array, l->total, sizeof(struct provider_data), compare_func);
     }
 
 cleanup:

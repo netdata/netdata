@@ -33,6 +33,9 @@ inline void arl_callback_ssize_t(const char *name, uint32_t hash, const char *va
 
 // create a new ARL
 ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks) {
+    if(unlikely(!rechecks))
+        fatal("ARL: rechecks cannot be zero");
+
     ARL_BASE *base = callocz(1, sizeof(ARL_BASE));
 
     base->name = strdupz(name);
@@ -295,7 +298,7 @@ int arl_check(ARL_BASE *base, const char *keyword, const char *value) {
 #endif
 
     // it should be the first entry (pointed by base->next_keyword)
-    if(likely(!strcmp(keyword, e->name))) {
+    if(likely(e && !strcmp(keyword, e->name))) {
         // it is
 
 #ifdef NETDATA_INTERNAL_CHECKS

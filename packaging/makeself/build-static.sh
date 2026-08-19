@@ -62,6 +62,20 @@ if [ "${BUILDARCH}" != "$(uname -m)" ] && [ -z "${SKIP_EMULATION}" ]; then
 fi
 
 DOCKER_IMAGE_NAME="netdata/static-builder:v1"
+stock_env=()
+
+if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR:-}" ]; then
+    if [ ! -d "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
+        echo "Could not find the topology IP intelligence stock directory: ${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
+        exit 1
+    fi
+
+    stock_host_dir="$(cd -- "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" && pwd -P)"
+    stock_env=(
+        -v "${stock_host_dir}:/topology-ip-intel-stock:ro"
+        -e "NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/topology-ip-intel-stock"
+    )
+fi
 
 if ${docker} inspect "${DOCKER_IMAGE_NAME}" > /dev/null 2>&1; then
     if ${docker} image inspect "${DOCKER_IMAGE_NAME}" | grep -q 'Variant'; then
@@ -85,6 +99,7 @@ if [ -t 1 ]; then
     --platform "${platform}" ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${DEBUG_BUILD_INFRA:+-e DEBUG_BUILD_INFRA=1} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    "${stock_env[@]}" \
     -e TUNING_FLAGS="${TUNING_FLAGS}" ${GOARCH:+-e GOARCH="${GOARCH}"} \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
     ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \
@@ -94,6 +109,7 @@ else
     -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" \
     ${EXTRA_INSTALL_FLAGS:+-e EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}"} \
     ${QEMU_CPU:+-e QEMU_CPU="${QEMU_CPU}"} \
+    "${stock_env[@]}" \
     -e TUNING_FLAGS="${TUNING_FLAGS}" ${GOARCH:+-e GOARCH="${GOARCH}"} \
     ${GOAMD64:+-e GOAMD64="${GOAMD64}"} ${GOARM:+-e GOARM="${GOARM}"} \
     ${GOARM64:+-e GOARM64="${GOARM64}"} ${GOPPC64:+-e GOPPC64="${GOPPC64}"} \

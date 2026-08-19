@@ -146,14 +146,19 @@ void evt_variant_to_buffer(BUFFER *b, EVT_VARIANT *ev, const char *separator);
 
 static inline void wevt_variant_cleanup(WEVT_VARIANT *v) {
     freez(v->data);
+    v->data = NULL;
+    v->size = 0;
+    v->used = 0;
+    v->count = 0;
 }
 
 static inline void wevt_variant_resize(WEVT_VARIANT *v, size_t required_size) {
-    if(required_size < v->size)
+    if(required_size <= v->size)
         return;
 
+    size_t old_size = v->size;
     wevt_variant_cleanup(v);
-    v->size = txt_compute_new_size(v->size, required_size);
+    v->size = txt_compute_new_size(old_size, required_size);
     v->data = mallocz(v->size);
 }
 
@@ -161,74 +166,132 @@ static inline void wevt_variant_count_from_used(WEVT_VARIANT *v) {
     v->count = v->used / sizeof(*v->data);
 }
 
-static inline uint8_t wevt_field_get_uint8(EVT_VARIANT *ev) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
-        return 0;
+static inline EVT_VARIANT_TYPE wevt_field_type(EVT_VARIANT *ev) {
+    return ev ? (EVT_VARIANT_TYPE)(ev->Type & EVT_VARIANT_TYPE_MASK) : EvtVarTypeNull;
+}
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeByte);
-    return ev->ByteVal;
+static inline bool wevt_field_is_array(EVT_VARIANT *ev) {
+    return ev && (ev->Type & EVT_VARIANT_TYPE_ARRAY);
+}
+
+static inline bool wevt_field_get_uint8_checked(EVT_VARIANT *ev, uint8_t *dst) {
+    if(dst) *dst = 0;
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeByte)
+        return false;
+
+    if(dst) *dst = ev->ByteVal;
+    return true;
+}
+
+static inline uint8_t wevt_field_get_uint8(EVT_VARIANT *ev) {
+    uint8_t value = 0;
+    wevt_field_get_uint8_checked(ev, &value);
+    return value;
+}
+
+static inline bool wevt_field_get_bool_checked(EVT_VARIANT *ev, bool *dst) {
+    if(dst) *dst = false;
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeBoolean)
+        return false;
+
+    if(dst) *dst = ev->BooleanVal;
+    return true;
+}
+
+static inline bool wevt_field_get_uint16_checked(EVT_VARIANT *ev, uint16_t *dst) {
+    if(dst) *dst = 0;
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeUInt16)
+        return false;
+
+    if(dst) *dst = ev->UInt16Val;
+    return true;
 }
 
 static inline uint16_t wevt_field_get_uint16(EVT_VARIANT *ev) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
-        return 0;
+    uint16_t value = 0;
+    wevt_field_get_uint16_checked(ev, &value);
+    return value;
+}
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt16);
-    return ev->UInt16Val;
+static inline bool wevt_field_get_uint32_checked(EVT_VARIANT *ev, uint32_t *dst) {
+    if(dst) *dst = 0;
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeUInt32)
+        return false;
+
+    if(dst) *dst = ev->UInt32Val;
+    return true;
 }
 
 static inline uint32_t wevt_field_get_uint32(EVT_VARIANT *ev) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
-        return 0;
+    uint32_t value = 0;
+    wevt_field_get_uint32_checked(ev, &value);
+    return value;
+}
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt32);
-    return ev->UInt32Val;
+static inline bool wevt_field_get_uint64_checked(EVT_VARIANT *ev, uint64_t *dst) {
+    if(dst) *dst = 0;
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeUInt64)
+        return false;
+
+    if(dst) *dst = ev->UInt64Val;
+    return true;
 }
 
 static inline uint64_t wevt_field_get_uint64(EVT_VARIANT *ev) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
-        return 0;
+    uint64_t value = 0;
+    wevt_field_get_uint64_checked(ev, &value);
+    return value;
+}
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeUInt64);
-    return ev->UInt64Val;
+static inline bool wevt_field_get_uint64_hex_checked(EVT_VARIANT *ev, uint64_t *dst) {
+    if(dst) *dst = 0;
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeHexInt64)
+        return false;
+
+    if(dst) *dst = ev->UInt64Val;
+    return true;
 }
 
 static inline uint64_t wevt_field_get_uint64_hex(EVT_VARIANT *ev) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
-        return 0;
+    uint64_t value = 0;
+    wevt_field_get_uint64_hex_checked(ev, &value);
+    return value;
+}
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeHexInt64);
-    return ev->UInt64Val;
+static inline LPCWSTR wevt_field_get_string(EVT_VARIANT *ev) {
+    return !wevt_field_is_array(ev) && wevt_field_type(ev) == EvtVarTypeString ? ev->StringVal : NULL;
+}
+
+static inline EVT_HANDLE wevt_field_get_evt_handle(EVT_VARIANT *ev) {
+    return !wevt_field_is_array(ev) && wevt_field_type(ev) == EvtVarTypeEvtHandle ? ev->EvtHandleVal : NULL;
 }
 
 static inline bool wevt_field_get_string_utf8(EVT_VARIANT *ev, TXT_UTF8 *dst) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
+    LPCWSTR src = wevt_field_get_string(ev);
+    if(!src) {
         txt_utf8_empty(dst);
         return false;
     }
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeString);
-    return wchar_to_txt_utf8(dst, ev->StringVal, -1);
+    return wchar_to_txt_utf8(dst, src, -1);
 }
 
 bool cached_sid_to_account_domain_sidstr(PSID sid, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str);
 static inline bool wevt_field_get_sid(EVT_VARIANT *ev, TXT_UTF8 *dst_account, TXT_UTF8 *dst_domain, TXT_UTF8 *dst_sid_str) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeSid || !ev->SidVal) {
         txt_utf8_empty(dst_account);
         txt_utf8_empty(dst_domain);
         txt_utf8_empty(dst_sid_str);
         return false;
     }
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeSid);
     return cached_sid_to_account_domain_sidstr(ev->SidVal, dst_account, dst_domain, dst_sid_str);
 }
 
 static inline uint64_t wevt_field_get_filetime_to_ns(EVT_VARIANT *ev) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull)
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeFileTime)
         return 0;
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeFileTime);
     return os_windows_ulonglong_to_unix_epoch_ns(ev->FileTimeVal);
 }
 
@@ -244,12 +307,11 @@ static inline bool wevt_GUID_to_ND_UUID(ND_UUID *nd_uuid, const GUID *guid) {
 }
 
 static inline bool wevt_get_uuid_by_type(EVT_VARIANT *ev, ND_UUID *dst) {
-    if((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeNull) {
+    if(wevt_field_is_array(ev) || wevt_field_type(ev) != EvtVarTypeGuid) {
         wevt_GUID_to_ND_UUID(dst, NULL);
         return false;
     }
 
-    fatal_assert((ev->Type & EVT_VARIANT_TYPE_MASK) == EvtVarTypeGuid);
     return wevt_GUID_to_ND_UUID(dst, ev->GuidVal);
 }
 

@@ -26,7 +26,11 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(localhost);
+        buffer_json_member_add_string(wb, "hostname", string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
+    }
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
@@ -71,6 +75,7 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
         dfe_start_read(rrdhost_root_index, host) {
             RRDHOST_STATUS s;
             rrdhost_status(host, now, &s, RRDHOST_STATUS_ALL);
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
             buffer_json_add_array_item_array(wb);
 
             if(s.db.metrics > max_db_metrics)
@@ -96,7 +101,7 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             }
 
             // Node
-            buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host));
+            buffer_json_add_array_item_string(wb, string2str(identity.hostname));
 
             // rowOptions
             buffer_json_add_array_item_object(wb);
@@ -136,11 +141,15 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             buffer_json_add_array_item_string(wb, rrdhost_option_check(s.host, RRDHOST_OPTION_EPHEMERAL_HOST) ? "ephemeral" : "permanent");
 
             // AgentName and AgentVersion
-            buffer_json_add_array_item_string(wb, rrdhost_program_name(host));
-            buffer_json_add_array_item_string(wb, rrdhost_program_version(host));
+            buffer_json_add_array_item_string(wb, string2str(identity.prog_name));
+            buffer_json_add_array_item_string(wb, string2str(identity.prog_version));
 
             // System Info
-            rrdhost_system_info_to_streaming_function_array(wb, s.host->system_info);
+            spinlock_lock(&s.host->rrdhost_update_lock);
+            struct rrdhost_system_info *system_info = rrdhost_system_info_dup(s.host->system_info);
+            spinlock_unlock(&s.host->rrdhost_update_lock);
+            rrdhost_system_info_to_streaming_function_array(wb, system_info);
+            rrdhost_system_info_free(system_info);
 
             // retention
             buffer_json_add_array_item_uint64(wb, s.db.first_time_s * MSEC_PER_SEC); // dbFrom
@@ -169,9 +178,9 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             // collection
 
             // InConnections
-            buffer_json_add_array_item_uint64(wb, s.host->stream.rcv.status.connections);
-            if(s.host->stream.rcv.status.connections > max_in_connections)
-                max_in_connections = s.host->stream.rcv.status.connections;
+            buffer_json_add_array_item_uint64(wb, s.ingest.id);
+            if(s.ingest.id > max_in_connections)
+                max_in_connections = s.ingest.id;
 
             if(s.ingest.since) {
                 uint64_t in_since = s.ingest.since * MSEC_PER_SEC;
@@ -219,9 +228,9 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             // streaming
 
             // OutConnections
-            buffer_json_add_array_item_uint64(wb, s.host->stream.snd.status.connections);
-            if(s.host->stream.snd.status.connections > max_out_connections)
-                max_out_connections = s.host->stream.snd.status.connections;
+            buffer_json_add_array_item_uint64(wb, s.stream.id);
+            if(s.stream.id > max_out_connections)
+                max_out_connections = s.stream.id;
 
             if(s.stream.since) {
                 uint64_t out_since = s.stream.since * MSEC_PER_SEC;
@@ -309,7 +318,18 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
                 buffer_json_add_array_item_string(wb, NULL); // MlSilenced
             }
 
+            // MachineGUID + NodeID — hidden columns, to join streaming rows to the node inventory
+            buffer_json_add_array_item_string(wb, host->machine_guid); // MachineGUID
+            if(!UUIDiszero(host->node_id)) {
+                char node_id_str[UUID_STR_LEN];
+                uuid_unparse_lower(host->node_id.uuid, node_id_str);
+                buffer_json_add_array_item_string(wb, node_id_str); // NodeID
+            }
+            else
+                buffer_json_add_array_item_string(wb, NULL); // NodeID
+
             // close
+            rrdhost_identity_release(&identity);
             buffer_json_array_close(wb);
         }
         dfe_done(host);
@@ -878,6 +898,19 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
                                     (double)max_ml_silenced,
                                     RRDF_FIELD_SORT_DESCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
+        // MachineGUID + NodeID — hidden, used to join streaming rows to the node inventory
+        buffer_rrdf_table_add_field(wb, field_id++, "MachineGUID", "Machine GUID",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "NodeID", "Cloud Node ID",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
     }
     buffer_json_object_close(wb); // columns

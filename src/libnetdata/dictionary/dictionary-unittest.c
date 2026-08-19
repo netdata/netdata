@@ -242,6 +242,80 @@ static size_t dictionary_unittest_foreach_delete_this(DICTIONARY *dict, char **n
     return entries - count;
 }
 
+static size_t dictionary_unittest_reject_unrepresentable_lengths(void) {
+    size_t errors = 0;
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    int value = 1;
+    if(dictionary_set_advanced(dict, "key-too-long", (ssize_t)KEY_LEN_MAX + 1, &value, sizeof(value), NULL)) {
+        fprintf(stderr, ">>> %s() accepted an unrepresentable key length\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 0) {
+        fprintf(stderr, ">>> %s() added an item with an unrepresentable key length\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    DICTIONARY *master = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *view = dictionary_create_view(master);
+    DICT_ITEM_CONST DICTIONARY_ITEM *master_item = dictionary_set_and_acquire_item(master, "master", &value, sizeof(value));
+    if(!master_item) {
+        fprintf(stderr, ">>> %s() failed to add the master item\n", __FUNCTION__);
+        errors++;
+    }
+    else {
+        if(dictionary_view_set_advanced(view, "view-key-too-long", (ssize_t)KEY_LEN_MAX + 1, master_item)) {
+            fprintf(stderr, ">>> %s() accepted an unrepresentable view key length\n", __FUNCTION__);
+            errors++;
+        }
+        if(dictionary_entries(view) != 0) {
+            fprintf(stderr, ">>> %s() added a view item with an unrepresentable key length\n", __FUNCTION__);
+            errors++;
+        }
+        dictionary_acquired_item_release(master, master_item);
+    }
+    dictionary_destroy(view);
+    dictionary_destroy(master);
+
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    if(dictionary_set(dict, "value-too-large", NULL, (size_t)VALUE_LEN_MAX + 1)) {
+        fprintf(stderr, ">>> %s() accepted an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 0) {
+        fprintf(stderr, ">>> %s() added an item with an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    int original = 1234;
+    int *stored = dictionary_set(dict, "existing", &original, sizeof(original));
+    if(!stored || *stored != original) {
+        fprintf(stderr, ">>> %s() failed to add the baseline item\n", __FUNCTION__);
+        errors++;
+    }
+
+    if(dictionary_set(dict, "existing", NULL, (size_t)VALUE_LEN_MAX + 1)) {
+        fprintf(stderr, ">>> %s() reset an item with an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+
+    stored = dictionary_get(dict, "existing");
+    if(!stored || *stored != original) {
+        fprintf(stderr, ">>> %s() changed the baseline item after rejected reset\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 1) {
+        fprintf(stderr, ">>> %s() changed dictionary entries after rejected reset\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    return errors;
+}
+
 static size_t dictionary_unittest_destroy(DICTIONARY *dict, char **names, char **values, size_t entries) {
     (void)names;
     (void)values;
@@ -452,6 +526,41 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     }
     else
         fprintf(stderr, "OK\n");
+
+    return errors;
+}
+
+static size_t dictionary_unittest_last_release_before_delete_mark(void) {
+    size_t errors = 0;
+    const char *name = "pending-delete-race";
+
+    fprintf(stderr, "\nTesting last-release/delete-mark race accounting:\n");
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
+    dictionary_set(dict, name, "VALUE", 6);
+    DICTIONARY_ITEM *item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, name);
+
+    errors += unittest_check_dictionary("pre-race", dict, 1, 1, 0, 1, 0);
+
+    dictionary_index_lock_wrlock(dict);
+    if(hashtable_delete_unsafe(dict, item_get_name(item), item_get_name_len(item), item) == 0) {
+        fprintf(stderr, "failed to remove race item from index\n");
+        errors++;
+    }
+    else
+        pointer_del(dict, item);
+    dictionary_index_wrlock_unlock(dict);
+
+    dict_item_shared_set_deleted(dict, item);
+    item_release(dict, item);
+    dict_item_set_deleted(dict, item);
+
+    errors += unittest_check_dictionary("post-race", dict, 0, 0, 1, 0, 1);
+
+    dictionary_garbage_collect(dict);
+    errors += unittest_check_dictionary("post-gc", dict, 0, 0, 0, 0, 0);
+
+    dictionary_destroy(dict);
 
     return errors;
 }
@@ -1819,6 +1928,8 @@ int dictionary_unittest(size_t entries) {
     // check reference counters
     {
         fprintf(stderr, "\nTesting reference counters:\n");
+        errors += dictionary_unittest_last_release_before_delete_mark();
+
         dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
         errors += unittest_check_dictionary("", dict, 0, 0, 0, 0, 0);
 
@@ -1891,6 +2002,9 @@ int dictionary_unittest(size_t entries) {
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
+
+    fprintf(stderr, "\nTesting dictionary packed length bounds\n");
+    errors += dictionary_unittest_reject_unrepresentable_lengths();
 
     errors += dictionary_unittest_views();
     errors += dictionary_unittest_threads();

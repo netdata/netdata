@@ -278,7 +278,9 @@ prepare_cmake_options() {
   # Keep forwarding the install prefix even when it is empty.
   # This installer uses an empty prefix for /usr/... destinations instead of
   # CMake's /usr/local default.
+  # shellcheck disable=SC2034
   NETDATA_CMAKE_INSTALL_PREFIX_OPTION="-DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX-}"
+  # shellcheck disable=SC2034
   NETDATA_WINDOWS_PATH_PREFIX_OPTION=
 
   #
@@ -288,6 +290,7 @@ prepare_cmake_options() {
   # callers can pass them as separately quoted arguments.
 
   if [ -n "${NETDATA_WINDOWS_PATH_PREFIX:-}" ]; then
+    # shellcheck disable=SC2034
     NETDATA_WINDOWS_PATH_PREFIX_OPTION="-DNETDATA_WINDOWS_PATH_PREFIX=${NETDATA_WINDOWS_PATH_PREFIX}"
   fi
 
@@ -381,12 +384,16 @@ prepare_cmake_options() {
 
   IS_LINUX=0
   [ "$(uname -s)" = "Linux" ] && IS_LINUX=1
+  IS_LINUX_OR_FREEBSD="${IS_LINUX}"
+  [ "$(uname -s)" = "FreeBSD" ] && IS_LINUX_OR_FREEBSD=1
+  IS_LINUX_OR_FREEBSD_OR_DARWIN="${IS_LINUX_OR_FREEBSD}"
+  [ "$(uname -s)" = "Darwin" ] && IS_LINUX_OR_FREEBSD_OR_DARWIN=1
   enable_feature PLUGIN_DEBUGFS "${IS_LINUX}"
   enable_feature PLUGIN_PERF "${IS_LINUX}"
   enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
   enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
   enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
-  enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX}"
+  enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX_OR_FREEBSD_OR_DARWIN}"
   enable_feature PLUGIN_EBPF "${ENABLE_EBPF:-0}"
 
   enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
@@ -395,7 +402,6 @@ prepare_cmake_options() {
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
   enable_feature PLUGIN_NETFLOW "${ENABLE_NETFLOW:-0}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
-  enable_feature PLUGIN_OTEL_SIGNAL_VIEWER "${ENABLE_OTEL_SIGNAL_VIEWER:-0}"
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
   enable_feature PLUGIN_SCRIPTS "${ENABLE_SCRIPTS:-0}"
 
@@ -623,11 +629,38 @@ get_os_key() {
 }
 
 get_group(){
+  group="${1:-}"
+
+  [ -z "${group}" ] && return 1
+
   if command -v getent > /dev/null 2>&1; then
-    getent group "${1:-""}"
-  else
-    grep "^${1}:" /etc/group
+    getent group "${group}" && return 0
   fi
+
+  if command -v dscl > /dev/null 2>&1; then
+    if group_record="$(dscl . read /Groups/"${group}" 2>/dev/null)"; then
+      gid="$(printf "%s\n" "${group_record}" | awk '/^PrimaryGroupID:/{print $2; exit}')"
+      members="$(printf "%s\n" "${group_record}" | awk '
+        /^GroupMembership:/ {
+          for (i = 2; i <= NF; i++) {
+            members = members ? members "," $i : $i
+          }
+        }
+        END {
+          print members
+        }
+      ')"
+      case "${gid}" in
+        ''|*[!0-9]*) ;;
+        *)
+          printf "%s:*:%s:%s\n" "${group}" "${gid}" "${members}"
+          return 0
+          ;;
+      esac
+    fi
+  fi
+
+  awk -F ':' -v group="${group}" '$1 == group { print; found = 1 } END { exit !found }' /etc/group
 }
 
 issystemd() {
@@ -774,6 +807,26 @@ install_netdata_tmpfiles() {
   fi
 }
 
+install_netdata_snmp_trap_log_dir() {
+  if [ "${UID}" -ne 0 ]; then
+    return 0
+  fi
+
+  if ! run mkdir -p "${NETDATA_LOG_DIR}/traps"; then
+    warning "Failed to create ${NETDATA_LOG_DIR}/traps. SNMP trap jobs using direct journals will fail until it is created manually."
+    return 0
+  fi
+  if ! run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_LOG_DIR}/traps"; then
+    warning "Failed to set ownership on ${NETDATA_LOG_DIR}/traps. SNMP trap jobs using direct journals will fail until it is fixed manually."
+    return 0
+  fi
+  if ! run chmod 0755 "${NETDATA_LOG_DIR}/traps"; then
+    warning "Failed to set permissions on ${NETDATA_LOG_DIR}/traps. SNMP trap jobs using direct journals will fail until it is fixed manually."
+  fi
+
+  return 0
+}
+
 install_netdata_dirs() {
   _DIRS_INSTALLED=0
   if install_netdata_tmpfiles && command -v systemd-tmpfiles >/dev/null 2>&1 ; then
@@ -803,6 +856,8 @@ install_netdata_dirs() {
     run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
     run chmod 770 "${NETDATA_CLAIMING_DIR}"
   fi
+
+  install_netdata_snmp_trap_log_dir
 }
 
 # -----------------------------------------------------------------------------

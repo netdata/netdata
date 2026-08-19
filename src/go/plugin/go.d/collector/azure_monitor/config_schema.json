@@ -731,7 +731,7 @@
     "ui:options": {
       "tabs": [
         {
-          "title": "Base",
+          "title": "Collection",
           "fields": [
             "subscription_ids",
             "cloud",
@@ -742,7 +742,7 @@
           ]
         },
         {
-          "title": "Auth",
+          "title": "Authentication",
           "fields": [
             "auth"
           ]

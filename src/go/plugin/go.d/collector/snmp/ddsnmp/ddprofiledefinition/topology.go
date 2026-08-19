@@ -25,6 +25,7 @@ const (
 	KindVtpVlan              TopologyKind = "vtp_vlan"
 	KindArpEntry             TopologyKind = "arp_entry"
 	KindArpLegacyEntry       TopologyKind = "arp_legacy_entry"
+	KindOSPFNeighbor         TopologyKind = "ospf_neighbor"
 )
 
 var validTopologyKinds = map[TopologyKind]struct{}{
@@ -46,6 +47,7 @@ var validTopologyKinds = map[TopologyKind]struct{}{
 	KindVtpVlan:              {},
 	KindArpEntry:             {},
 	KindArpLegacyEntry:       {},
+	KindOSPFNeighbor:         {},
 }
 
 func IsValidTopologyKind(kind TopologyKind) bool {

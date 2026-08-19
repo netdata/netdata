@@ -201,9 +201,9 @@ async fn run_memory_stress_profile(total_flows: usize) -> anyhow::Result<MemoryS
     let (minute_1_rows, minute_5_rows, hour_1_rows) = {
         let guard = open_tiers.read().expect("open tiers read lock");
         (
-            guard.minute_1.len(),
-            guard.minute_5.len(),
-            guard.hour_1.len(),
+            guard.minute_1_rows as usize,
+            guard.minute_5_rows as usize,
+            guard.hour_1_rows as usize,
         )
     };
 
@@ -238,7 +238,7 @@ fn start_ingest_fixture() -> anyhow::Result<(
     let tmp = tempfile::tempdir()?;
     let mut cfg = plugin_config::PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
-    cfg.listener.listen = "127.0.0.1:0".to_string();
+    cfg.listener.listen = vec!["127.0.0.1:0".to_string()];
     cfg.listener.sync_interval = Duration::from_millis(50);
     cfg.listener.sync_every_entries = 256;
     let small_tier = plugin_config::JournalTierRetentionConfig {

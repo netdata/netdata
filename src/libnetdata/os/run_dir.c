@@ -4,6 +4,7 @@
 #include "libnetdata/libnetdata.h"
 
 static char *cached_run_dir = NULL;
+static bool cached_run_dir_available = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 static inline bool is_dir_accessible(const char *dir, bool rw) {
@@ -22,10 +23,16 @@ static inline bool is_dir_accessible(const char *dir, bool rw) {
 }
 
 static inline bool netdata_dir_in_parent(const char *parent, char *out_path, size_t out_path_len, bool rw) {
+    int ret = snprintf(out_path, out_path_len, "%s/netdata", parent);
+    if (ret < 0 || (size_t)ret >= out_path_len)
+        return false;
+
+    if (is_dir_accessible(out_path, rw))
+        return true;
+
     if (!is_dir_accessible(parent, rw))
         return false;
 
-    snprintfz(out_path, out_path_len, "%s/netdata", parent);
     if (mkdir(out_path, 0755) == -1 && errno != EEXIST)
         return false;
 
@@ -35,13 +42,10 @@ static inline bool netdata_dir_in_parent(const char *parent, char *out_path, siz
 static char *detect_run_dir(bool rw) {
     char path[FILENAME_MAX + 1];
 
-    if(!rw) {
-        // First check for environment variable
-        const char *env_dir = getenv("NETDATA_RUN_DIR");
-        if (env_dir && *env_dir) {
-            if (is_dir_accessible(env_dir, rw))
-                return strdupz(env_dir);
-        }
+    const char *env_dir = getenv("NETDATA_RUN_DIR");
+    if (env_dir && *env_dir) {
+        if (is_dir_accessible(env_dir, rw))
+            return strdupz(env_dir);
     }
 
 #if defined(OS_LINUX)
@@ -113,17 +117,23 @@ success:
 
 const char *os_run_dir(bool rw) {
     // Fast path - return cached directory if available
-    if(cached_run_dir)
+    if(__atomic_load_n(&cached_run_dir_available, __ATOMIC_ACQUIRE))
         return cached_run_dir;
 
     spinlock_lock(&spinlock);
 
     // Check again under lock in case another thread set it
-    if(!cached_run_dir)
-        cached_run_dir = detect_run_dir(rw);
+    char *run_dir = cached_run_dir;
+    if(!run_dir) {
+        run_dir = detect_run_dir(rw);
+        cached_run_dir = run_dir;
+
+        if(run_dir)
+            __atomic_store_n(&cached_run_dir_available, true, __ATOMIC_RELEASE);
+    }
 
     spinlock_unlock(&spinlock);
 
     errno_clear();
-    return cached_run_dir;
+    return run_dir;
 }

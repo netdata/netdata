@@ -3,13 +3,27 @@ use super::*;
 #[derive(Debug, Parser, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListenerConfig {
-    #[arg(long = "netflow-listen", default_value = "0.0.0.0:2055")]
-    pub(crate) listen: String,
+    #[arg(
+        long = "netflow-listen",
+        value_name = "ADDR",
+        default_values_t = default_netflow_listen(),
+        value_delimiter = ',',
+        value_parser = parse_listener_endpoint,
+    )]
+    #[serde(default = "default_netflow_listen")]
+    #[serde(deserialize_with = "deserialize_listen")]
+    pub(crate) listen: Vec<String>,
 
     #[arg(long = "netflow-max-packet-size", default_value_t = 9216)]
     pub(crate) max_packet_size: usize,
 
-    #[arg(long = "netflow-sync-every-entries", default_value_t = 1024)]
+    /// Fsync the active raw journal after this many entries. 0 (default)
+    /// disables periodic fsync: entries reach disk via kernel writeback, and
+    /// every journal file is still fully synced when it is rotated/archived
+    /// and once at shutdown. Values > 0 also fsync at least once per
+    /// `sync_interval`; at high flow rates this stalls the receive path and
+    /// can cause UDP drops.
+    #[arg(long = "netflow-sync-every-entries", default_value_t = 0)]
     pub(crate) sync_every_entries: usize,
 
     #[arg(
@@ -24,10 +38,40 @@ pub(crate) struct ListenerConfig {
 impl Default for ListenerConfig {
     fn default() -> Self {
         Self {
-            listen: "0.0.0.0:2055".to_string(),
+            listen: default_netflow_listen(),
             max_packet_size: 9216,
-            sync_every_entries: 1024,
+            sync_every_entries: 0,
             sync_interval: Duration::from_secs(1),
         }
     }
+}
+
+fn deserialize_listen<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum ListenValue {
+        Scalar(String),
+        List(Vec<String>),
+    }
+
+    match ListenValue::deserialize(deserializer)? {
+        ListenValue::Scalar(value) => parse_listener_endpoint(&value)
+            .map(|value| vec![value])
+            .map_err(serde::de::Error::custom),
+        ListenValue::List(values) => values
+            .into_iter()
+            .map(|value| parse_listener_endpoint(&value).map_err(serde::de::Error::custom))
+            .collect(),
+    }
+}
+
+fn parse_listener_endpoint(value: &str) -> std::result::Result<String, String> {
+    let endpoint = value.trim();
+    if endpoint.is_empty() {
+        return Err("listener address must not be empty".to_string());
+    }
+    Ok(endpoint.to_string())
 }

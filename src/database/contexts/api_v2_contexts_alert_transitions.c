@@ -114,6 +114,31 @@ struct facet_entry {
     uint32_t count;
 };
 
+struct alert_transition_host_snapshot {
+    RRDHOST_IDENTITY identity;
+    ND_UUID node_id;
+    bool found;
+};
+
+static struct alert_transition_host_snapshot alert_transition_host_snapshot_acquire(const char *machine_guid) {
+    struct alert_transition_host_snapshot snapshot = { 0 };
+
+    rrd_rdlock();
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if(host) {
+        snapshot.identity = rrdhost_identity_acquire(host);
+        snapshot.node_id = host->node_id;
+        snapshot.found = true;
+    }
+    rrd_rdunlock();
+
+    return snapshot;
+}
+
+static void alert_transition_host_snapshot_release(struct alert_transition_host_snapshot *snapshot) {
+    rrdhost_identity_release(&snapshot->identity);
+}
+
 static struct sql_alert_transition_fixed_size *contexts_v2_alert_transition_dup(struct sql_alert_transition_data *t, const char *machine_guid, struct sql_alert_transition_fixed_size *dst) {
     struct sql_alert_transition_fixed_size *n = dst ? dst : mallocz(sizeof(*n));
 
@@ -343,11 +368,13 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
                         {
                             buffer_json_member_add_string(wb, "id", x_dfe.name);
                             if (i == ATF_NODE) {
-                                RRDHOST *host = rrdhost_find_by_guid(x_dfe.name);
-                                if (host)
-                                    buffer_json_member_add_string(wb, "name", rrdhost_hostname(host));
+                                struct alert_transition_host_snapshot snapshot =
+                                    alert_transition_host_snapshot_acquire(x_dfe.name);
+                                if (snapshot.found)
+                                    buffer_json_member_add_string(wb, "name", string2str(snapshot.identity.hostname));
                                 else
                                     buffer_json_member_add_string(wb, "name", x_dfe.name);
+                                alert_transition_host_snapshot_release(&snapshot);
                             } else
                                 buffer_json_member_add_string(wb, "name", x_dfe.name);
                             buffer_json_member_add_uint64(wb, "count", x->count);
@@ -367,7 +394,8 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
     for(struct sql_alert_transition_fixed_size *t = data.base; t ; t = t->next) {
         buffer_json_add_array_item_object(wb);
         {
-            RRDHOST *host = rrdhost_find_by_guid(t->machine_guid);
+            struct alert_transition_host_snapshot snapshot =
+                alert_transition_host_snapshot_acquire(t->machine_guid);
 
             buffer_json_member_add_uint64(wb, JSKEY(alert_global_id), t->global_id);
             buffer_json_member_add_string(wb, "alert", *t->alert_name ? t->alert_name : NULL);
@@ -376,15 +404,16 @@ void contexts_v2_alert_transitions_to_json(BUFFER *wb, struct rrdcontext_to_json
                 buffer_json_member_add_uuid(wb, "transition_id", t->transition_id);
                 buffer_json_member_add_string(wb, "machine_guid", t->machine_guid);
 
-                if(host && !UUIDiszero(host->node_id))
-                    buffer_json_member_add_uuid(wb, "node_id", host->node_id.uuid);
+                if(snapshot.found && !UUIDiszero(snapshot.node_id))
+                    buffer_json_member_add_uuid(wb, "node_id", snapshot.node_id.uuid);
             }
 
             buffer_json_member_add_uuid(wb, "config_hash_id", t->config_hash_id);
 
-            if(host) {
-                buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+            if(snapshot.found) {
+                buffer_json_member_add_string(wb, "hostname", string2str(snapshot.identity.hostname));
             }
+            alert_transition_host_snapshot_release(&snapshot);
 
             if(!(ctl->options & CONTEXTS_OPTION_MCP)) {
                 buffer_json_member_add_string(wb, "instance", *t->chart ? t->chart : NULL);

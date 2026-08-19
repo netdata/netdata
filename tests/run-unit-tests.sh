@@ -25,6 +25,23 @@ c_unit_tests() {
   "$HOME"/netdata/usr/sbin/netdata -W unittest
 }
 
+spawn_server_unit_tests() {
+  echo "Running spawn-server unit tests"
+
+  local run_dir
+  run_dir="$(mktemp -d "${TMPDIR:-/tmp}/netdata-spawn-tester.XXXXXX")" || return 1
+
+  NETDATA_RUN_DIR="${run_dir}" \
+  ASAN_OPTIONS=detect_leaks=0 \
+  "${NETDATA_BUILD_DIR:-./build}/spawn-tester" test
+  local ret=$?
+
+  rm -rf -- "${run_dir}"
+  return "${ret}"
+}
+
 install_netdata || exit 1
 
 c_unit_tests || exit 1
+
+spawn_server_unit_tests || exit 1

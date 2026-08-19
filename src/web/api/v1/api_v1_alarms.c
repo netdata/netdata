@@ -54,7 +54,7 @@ int api_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
 
         char* p = value;
         if(!strcmp(name, "status")) {
-            while ((*p = toupper(*p))) p++;
+            while ((*p = (char)toupper((uint8_t)*p))) p++;
             if (!strcmp("CRITICAL", value)) status = RRDCALC_STATUS_CRITICAL;
             else if (!strcmp("WARNING", value)) status = RRDCALC_STATUS_WARNING;
             else if (!strcmp("UNINITIALIZED", value)) status = RRDCALC_STATUS_UNINITIALIZED;
@@ -105,6 +105,7 @@ int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
     int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
     char *variable = NULL;
+    RRDSET_ACQUIRED *rsa = NULL;
 
     buffer_flush(w->response.data);
 
@@ -128,8 +129,10 @@ int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
         goto cleanup;
     }
 
-    RRDSET *st = rrdset_find(host, chart, false);
-    if(!st) st = rrdset_find_byname(host, chart);
+    rsa = rrdset_find_and_acquire(host, chart, false);
+    if(!rsa) rsa = rrdset_find_byname_and_acquire(host, chart);
+
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
@@ -138,12 +141,13 @@ int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     w->response.data->content_type = CT_APPLICATION_JSON;
-    st->last_accessed_time_s = now_realtime_sec();
+    rrdset_touch_last_accessed_time_s(st);
     alert_variable_lookup_trace(host, st, variable, w->response.data);
 
-    return HTTP_RESP_OK;
+    ret = HTTP_RESP_OK;
 
 cleanup:
+    rrdset_acquired_release(rsa);
     return ret;
 }
 

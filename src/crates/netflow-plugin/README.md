@@ -7,6 +7,35 @@ Rust NetFlow/IPFIX/sFlow ingestion and query plugin.
 It stores flow entries in journal tiers under the Netdata cache directory and exposes
 `flows:netflow`.
 
+## Offline Function test mode
+
+Fixture harnesses can execute the Function query path directly against an existing
+NetFlow backend directory:
+
+```sh
+netflow-plugin --test flows:netflow --dir <flows-dir> [--timeout <seconds>] [--no-persist] < payload.json
+```
+
+Requirements:
+
+- `<flows-dir>` is the NetFlow backend root containing the `raw`, `1m`, `5m`, and `1h` tier directories.
+- stdin is the JSON Function request body (non-empty, maximum 16 MiB).
+- `--request` is not supported and fails with usage output.
+- `--timeout <seconds>` controls the offline Function execution timeout. It
+  defaults to `30`; use `--timeout 0` to map to a very large finite timeout for
+  long-running fixture comparisons.
+- stdout contains only the raw JSON Function response.
+- errors are written to stderr and return non-zero.
+
+Use `--no-persist` for shared fixture datasets. It prevents the test run from writing
+facet state or sidecar files under `<flows-dir>` while keeping facet data in memory for
+the Function response. Without `--no-persist`, the plugin may refresh facet state under
+the backend directory, matching normal runtime behavior.
+
+Function output includes volatile fields such as collection timestamps and runtime
+statistics. Test harnesses should normalize those fields before comparing fixture
+outputs.
+
 ## Configuration
 
 When running under Netdata, config is loaded from `netflow.yaml` in:
@@ -205,7 +234,9 @@ Example:
 enabled: true
 
 listener:
-  listen: "0.0.0.0:2055"
+  listen:
+    - "0.0.0.0:2055"
+    - "0.0.0.0:6343"
 
 protocols:
   v5: true
@@ -254,8 +285,42 @@ Journal rotation size is not user-configured. The plugin derives it per tier:
   uses a fixed internal rotation size of `100MB`
 - the internal time-based rotation cadence remains `1h`
 
-The plugin also exposes internal memory charts to help diagnose resident growth
-in production:
+The plugin exposes lightweight production health charts by default:
+
+- `netflow.open_tiers`
+  - currently open rollup rows by tier
+- `netflow.decoder_scopes`
+  - NetFlow v9 parser scopes
+  - IPFIX parser scopes
+  - legacy parser scopes
+  - persisted decoder namespaces
+  - hydrated namespace-source mappings
+- `netflow.facet_values`
+  - total published facet values
+  - exposed facet values
+- `netflow.facet_fields`
+  - populated facet fields
+  - autocomplete-backed facet fields
+- `netflow.tier_index_entries`
+  - indexed hours
+  - indexed rollup flows
+
+Absolute byte-level memory diagnostics are disabled by default because they read
+process memory maps and estimate in-memory structures. Enable them only when
+debugging memory growth:
+
+```yaml
+charts:
+  memory_diagnostics:
+    enabled: true
+    interval: 10s
+```
+
+These charts refresh on the configured interval. With the default `10s`
+interval, short-lived memory spikes may be missed or appear stale between
+samples.
+
+When enabled, the plugin also exposes:
 
 - `netflow.memory_resident_bytes`
   - `rss`, `hwm`
@@ -286,12 +351,6 @@ in production:
   - tier field dictionaries
   - tier lookup tables
   - tier schema/index metadata
-- `netflow.decoder_scopes`
-  - NetFlow v9 parser scopes
-  - IPFIX parser scopes
-  - legacy parser scopes
-  - persisted decoder namespaces
-  - hydrated namespace-source mappings
 
 These charts are intended for debugging memory explosions under high-cardinality
 traffic, not for billing or hard enforcement decisions.
@@ -303,9 +362,15 @@ traffic, not for billing or hard enforcement decisions.
 - `minute_5` (aliases: `5m`, `minute-5`, `minute5`)
 - `hour_1` (aliases: `1h`, `hour-1`, `hour1`)
 
-If a tier is omitted, it uses the built-in tier default (`10GB / 7d`). There
-are no top-level journal retention knobs; set retention on each tier you want
-to tune.
+If a tier is omitted, it uses the built-in tier default (`10GB` with no
+time-based age limit). There are no top-level journal retention knobs; set
+retention on each tier you want to tune.
+
+`size_of_journal_files` budgets journal data plus finalized
+per-journal facet sidecars. The active journal counts but is protected from
+deletion, so usage can temporarily exceed the budget until rotation. Shared
+`facet-state.bin`, temporary sidecars, and unrelated files are outside the
+per-tier budget.
 
 To make a tier time-only, set `size_of_journal_files: null`.
 To make a tier size-only, set `duration_of_journal_files: null`.
@@ -321,7 +386,9 @@ The plugin ships two complementary benchmarks:
   paced post-decode resource envelope at a configurable rate, controlled via
   env vars: `NETFLOW_RESOURCE_BENCH_PROTOCOL`, `NETFLOW_RESOURCE_BENCH_PROFILE`,
   `NETFLOW_RESOURCE_BENCH_LAYER`, `NETFLOW_RESOURCE_BENCH_FLOWS_PER_SEC`,
-  `NETFLOW_RESOURCE_BENCH_WARMUP_SECS`, `NETFLOW_RESOURCE_BENCH_MEASURE_SECS`
+  `NETFLOW_RESOURCE_BENCH_WARMUP_SECS`, `NETFLOW_RESOURCE_BENCH_MEASURE_SECS`,
+  `NETFLOW_RESOURCE_BENCH_SYNC_EVERY_ENTRIES`,
+  `NETFLOW_RESOURCE_BENCH_SYNC_INTERVAL_MILLIS`
 
 The resource-envelope benchmark scope:
 
@@ -334,11 +401,24 @@ The resource-envelope benchmark scope:
   no static networks); cardinality fields are pre-populated by the harness
 - reports achieved flows/s, CPU% of one core, peak/final RSS, real disk read
   and write bytes/s from `/proc/self/io`
+- `NETFLOW_RESOURCE_BENCH_LAYER=production-shaped` keeps production listener
+  sync defaults, runs tier commits on worker threads, includes low-rate cases,
+  and reports fixed overhead buckets for sync ticks, chart sampling, raw/tier
+  syncs, tier flushes, and decoder-state persistence
 
 `cpu_percent_of_one_core` is the sum of user+system ticks across all threads
 of the test process during the measurement window, divided by wall time, as a
 percent of one core. 100% means one core's worth of CPU was consumed; values
 above 100% are normal for multi-threaded saturation.
+
+> **Note (2026-06):** the recorded tables below predate the migration of the
+> journal backend to `systemd-journal-sdk` (compact file format, no
+> compression, periodic fsync disabled by default). Spot re-runs after the
+> migration show roughly 20-40% higher throughput at every point (e.g.
+> high-cardinality post-decode saturation moved from ~37k to ~43-46k flows/s,
+> low-cardinality full ingest from ~85-95k to ~110-120k flows/s) and about
+> half the physical disk write per flow (~400 bytes/flow). Re-run the
+> commands above for current numbers on your host.
 
 Reference measurements:
 
@@ -429,14 +509,16 @@ Single-threaded peak throughput at native fixture cardinality:
 - The post-decode ingest hot path is currently single-threaded. CPU pins at
   ~98-99% of one core at saturation; it does not scale further with more cores.
 - Low-cardinality saturation is above 60 000 flows/s for NetFlow v9 and IPFIX,
-  and around 70 000 flows/s for sFlow on this host. The matrix above does not
-  reach those ceilings on purpose; extrapolate from the CPU% column.
+  and around 70 000 flows/s for sFlow on this host (above 100 000 flows/s
+  post-decode after the systemd-journal-sdk migration). The matrix above does
+  not reach those ceilings on purpose; extrapolate from the CPU% column.
 - High-cardinality saturation is around 30 000 flows/s post-decode for all
-  three protocols. Above the knee, achieved rate stays at the plateau while
-  offered rate grows.
+  three protocols (~43-46 000 flows/s after the migration). Above the knee,
+  achieved rate stays at the plateau while offered rate grows.
 - Adding decode (~10 µs/flow) on top of post-decode ingest brings the practical
   full-path ceiling to roughly 22-25 000 flows/s at high cardinality on this
-  host, with the four-tier pipeline running and no enrichment. UDP socket
+  host (~40 000 flows/s after the migration), with the four-tier pipeline
+  running and no enrichment. UDP socket
   receive is not measured; at these flow rates packet rate (1-5k pps) is well
   below typical socket limits.
 - Disk reads stay near zero because the benchmark isolates the ingest path

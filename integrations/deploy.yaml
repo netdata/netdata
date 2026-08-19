@@ -586,7 +586,7 @@
     | `/i`         | Specifies the path to the MSI installer file.                                                    |
     | `INSECURE=1` | Forces insecure connections, bypassing hostname verification (use only if absolutely necessary). |
     | `TOKEN=`     | Sets the Claim Token for your Netdata Cloud Space.                                               |
-    | `ROOMS=`     | Comma-separated list of Room IDs where you want your node to appear.                             |
+    | `ROOMS=`     | (Optional) Comma-separated list of Room IDs. Omit it to add the node under All nodes.            |
     | `PROXY=`     | Sets the proxy server address if your network requires one.                                      |
   related_resources: {}
   platform_info:

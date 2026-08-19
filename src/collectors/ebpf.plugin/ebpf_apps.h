@@ -12,7 +12,7 @@
 #define NETDATA_APPS_FILE_GROUP "file_access"
 #define NETDATA_APPS_FILE_FDS "fds"
 #define NETDATA_APPS_PROCESS_GROUP "process"
-#define NETDATA_APPS_NET_GROUP "net"
+
 #define NETDATA_APPS_IPC_SHM_GROUP "ipc shm"
 
 #include "ebpf_process.h"
@@ -20,20 +20,15 @@
 #include "ebpf_disk.h"
 #include "ebpf_fd.h"
 #include "ebpf_filesystem.h"
-#include "ebpf_functions.h"
 #include "ebpf_hardirq.h"
-#include "ebpf_cachestat.h"
 #include "ebpf_mdflush.h"
 #include "ebpf_mount.h"
 #include "ebpf_oomkill.h"
 #include "ebpf_shm.h"
-#include "ebpf_socket.h"
 #include "ebpf_softirq.h"
 #include "ebpf_sync.h"
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
-
-#include "ebpf_socket_ipc.h"
 
 #define EBPF_MAX_COMPARE_NAME 95
 #define EBPF_MAX_NAME 100
@@ -42,8 +37,6 @@
 
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
-    EBPF_MODULE_SOCKET_IDX,
-    EBPF_MODULE_CACHESTAT_IDX,
     EBPF_MODULE_SYNC_IDX,
     EBPF_MODULE_DCSTAT_IDX,
     EBPF_MODULE_SWAP_IDX,
@@ -85,14 +78,12 @@ struct ebpf_target {
     char clean_name[EBPF_MAX_NAME + 1]; // sanitized name used in chart id (need to replace at least dots)
 
     // Changes made to simplify integration between apps and eBPF.
-    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
     ebpf_process_stat_t process;
-    ebpf_socket_publish_apps_t socket;
 
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
@@ -145,9 +136,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     netdata_publish_shm_t *shm;
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
-    netdata_publish_cachestat_t *cachestat;
     ebpf_publish_process_t *process;
-    ebpf_socket_publish_apps_t *socket;
 
 } ebpf_pid_data_t;
 
@@ -220,13 +209,11 @@ typedef struct ebpf_pid_stat {
     int sortlist; // higher numbers = top on the process tree
 
     // each process gets a unique number
-    netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dc;
     netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
     netdata_publish_swap_t swap;
-    ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
 
     int not_updated;
@@ -237,8 +224,6 @@ typedef struct ebpf_pid_stat {
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
-
-    netdata_publish_cachestat_t cache;
 
     char *stat_filename;
     char *status_filename;

@@ -248,16 +248,16 @@ For Netdata, scalability is inherent to the architecture, not an add-on. Designe
 - **Consistent performance**: Query response times remain the same whether you have 10 or 10,000 nodes.
 - **Resource predictability**: Resource usage scales linearly with infrastructure size.
 - **High availability**: Streaming and replication provide high-availability to Netdata deployments.
-- **Clustering**: Netdata Parents can be clustered to replicate all their data localy, or cross region for disaster recovery.
+- **Clustering**: Netdata Parents can be clustered to replicate all their data locally, or cross region for disaster recovery.
 - **Fail-over**: Netdata Cloud dynamically routes queries to Netdata Parents and Agents based on their availability.
 
 ### Open Ecosystem
 
 Netdata thrives as part of a vibrant open-source community with 1.5 million downloads per day. The platform integrates seamlessly with existing tools and standards:
 
-- **Metrics collection**: Ingests metrics via all open standards (OpenTelemetry in final release stage)
+- **Metrics collection**: Ingests metrics through open standards, including OpenTelemetry OTLP/gRPC
 - **Metrics export**: Exports metrics to all open standards and commonly used time-series databases (Prometheus, Graphite, InfluxDB, OpenTSDB, and more)
-- **Logs**: Uses battle tested systemd journal files for storing logs, providing maximum interoperability
+- **Logs**: Explores systemd journal sources and indexed OpenTelemetry logs through the same Logs interface
 - **Alert routing**: Delivers notifications to PagerDuty, Slack, email, webhooks, and 20+ platforms
 - **AI integration**: Supports AI assistants via Model Context Protocol (MCP) — available via Netdata Cloud (infrastructure-wide) and on every Agent/Parent (local access)
 - **Visualization**: Works with Grafana through native datasource plugin
@@ -313,7 +313,8 @@ Based on extensive real-world deployments and independent academic validation, N
 
 - Parent resources include both ingestion and query workload
 - Storage rates are for all tiers combined; actual disk usage depends on retention configuration
-- The recommended topology is having a cluster of Netdata Parents every 500 monitored nodes (2M metrics/s)
+- The recommended topology is having a cluster of Netdata Parents every 500 monitored nodes (2M metrics/s) — see [Parent Sizing Guidelines](/docs/scalability.md#parent-sizing-guidelines) for the full breakdown
+- For default-settings sizing guidance per Agent (CPU, RAM, disk, and bandwidth), see [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md)
 
 :::
 
@@ -327,7 +328,7 @@ For more information, see [Netdata's impact on resources](/docs/netdata-agent/si
 
 ## Practical Implications
 
-Please also see [Netdata Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation-corrected.md) and [Netdata's Security and Privacy Design](/docs/security-and-privacy-design/README.md).
+Please also see [Netdata Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) and [Netdata's Security and Privacy Design](/docs/security-and-privacy-design/README.md).
 
 ### For Small Teams
 

@@ -7,7 +7,7 @@ The docgen tool automatically generates metadata.yaml, config_schema.json, and R
 The tool extracts information from:
 1. **contexts.yaml** - Metric definitions, contexts, dimensions, families
 2. **config.go** - Configuration structure with field types and tags
-3. **module.yaml** - Module-specific metadata (name, description, categories, etc.)
+3. **module.yaml** - Module-specific metadata (name, overview and page descriptions, categories, etc.)
 
 And generates:
 1. **metadata.yaml** - Complete Netdata marketplace metadata
@@ -105,6 +105,7 @@ Module-specific metadata:
 ```yaml
 name: mymodule
 display_name: My Application Monitor
+page_description: "Monitor My Application health: connections, latency, and resource utilization."
 description: |
   Monitors My Application metrics including performance,
   connections, and resource utilization.
@@ -127,6 +128,7 @@ If this file doesn't exist, the tool creates reasonable defaults.
 
 Complete Netdata marketplace metadata including:
 - Module information and categorization
+- The integration-page description from `module.yaml` `page_description`
 - Metric scopes with proper labels and dimensions
 - Configuration options with descriptions
 - Setup and troubleshooting sections
@@ -223,7 +225,9 @@ The tool handles various Go types:
 ### 1. Keep module.yaml Updated
 
 Always maintain module.yaml with:
-- Accurate description
+
+- Accurate overview `description`
+- A unique, single-line `page_description` of 50-160 characters for generated page metadata
 - Proper categorization
 - Useful keywords for search
 
@@ -240,10 +244,14 @@ The tool can extract examples from field comments or provide defaults.
 Add `go generate` to your development workflow:
 
 ```bash
-# After modifying contexts.yaml or config.go
+# After modifying contexts.yaml, config.go, or module.yaml
 go generate
-git add metadata.yaml config_schema.json README.md
+git add config_schema.json
 ```
+
+Commit `config_schema.json` when runtime configuration changes. Inspect
+`metadata.yaml` and `README.md` locally, but leave them for the post-merge
+generated-artifact PR.
 
 ### 5. Review Generated Docs
 

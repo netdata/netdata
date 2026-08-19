@@ -1,4 +1,6 @@
-use super::{field_display_name, field_value_name, icmp_virtual_value};
+use super::{
+    field_display_name, field_value_name, icmp_virtual_value, icmp_virtual_value_from_parts,
+};
 
 #[test]
 fn forwarding_status_uses_exact_labels_only() {
@@ -53,6 +55,15 @@ fn icmp_virtual_values_use_exact_labels_then_numeric_pairs() {
         icmp_virtual_value("ICMPV4", Some("6"), Some("8"), Some("0")),
         None
     );
+    assert_eq!(
+        icmp_virtual_value_from_parts(1, 8, 0).as_deref(),
+        Some("Echo Request")
+    );
+    assert_eq!(
+        icmp_virtual_value_from_parts(58, 160, 1).as_deref(),
+        Some("160/1")
+    );
+    assert_eq!(icmp_virtual_value_from_parts(6, 8, 0), None);
 }
 
 #[test]

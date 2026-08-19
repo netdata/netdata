@@ -30,7 +30,7 @@ typedef enum __attribute__ ((__packed__)) {
 } JOURNALFILE_V2_ACCESS_HINT;
 
 struct rrdengine_journalfile {
-    SPINLOCK data_spinlock;
+    SPINLOCK_TRACKED data_spinlock;  // tracked: journalfile_v2_data_acquire 3600s deadlocks need holder identity
     struct {
         void *data;                    // MMAPed file of journal v2
         uint32_t size;                 // Total file size mapped

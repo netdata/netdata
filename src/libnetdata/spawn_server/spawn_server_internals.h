@@ -8,6 +8,10 @@
 #include "spawn_library.h"
 #include "log-forwarder.h"
 
+// grace period spawn_server_exec_kill() waits after SIGTERM before escalating to SIGKILL,
+// used when the caller passes a non-positive timeout_ms (i.e. no explicit grace)
+#define SPAWN_KILL_DEFAULT_GRACE_MS 2000
+
 #if defined(OS_WINDOWS)
 #define SPAWN_SERVER_VERSION_WINDOWS 1
 // #define SPAWN_SERVER_VERSION_UV 1
@@ -84,6 +88,7 @@ struct spawn_instance {
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)
     HANDLE process_handle;
     DWORD dwProcessId;
+    LOG_FORWARDER_TOKEN stderr_log_token;
 #endif
 };
 

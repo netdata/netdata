@@ -293,7 +293,7 @@ int get_numa_node_count(void)
             if (strncmp(de->d_name, "node", 4) != 0)
                 continue;
 
-            if (!isdigit(de->d_name[4]))
+            if (!isdigit((uint8_t)de->d_name[4]))
                 continue;
 
             numa_node_count++;

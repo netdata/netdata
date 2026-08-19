@@ -2,7 +2,10 @@
 
 package ticker
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type (
 	// Ticker holds a channel that delivers ticks of a clock at intervals.
@@ -10,6 +13,7 @@ type (
 	Ticker struct {
 		C        <-chan int
 		done     chan struct{}
+		stopOnce sync.Once
 		loops    int
 		interval time.Duration
 	}
@@ -21,7 +25,7 @@ type (
 func New(interval time.Duration) *Ticker {
 	ticker := &Ticker{
 		interval: interval,
-		done:     make(chan struct{}, 1),
+		done:     make(chan struct{}),
 	}
 	ticker.start()
 	return ticker
@@ -31,16 +35,24 @@ func (t *Ticker) start() {
 	ch := make(chan int)
 	t.C = ch
 	go func() {
-	LOOP:
 		for {
 			now := time.Now()
 			nextRun := now.Truncate(t.interval).Add(t.interval)
 
-			time.Sleep(nextRun.Sub(now))
+			// The wait must be interruptible: Stop releases this goroutine
+			// promptly, not after the current interval elapses.
+			timer := time.NewTimer(nextRun.Sub(now))
+			select {
+			case <-t.done:
+				timer.Stop()
+				close(ch)
+				return
+			case <-timer.C:
+			}
 			select {
 			case <-t.done:
 				close(ch)
-				break LOOP
+				return
 			case ch <- t.loops:
 				t.loops++
 			}
@@ -48,8 +60,10 @@ func (t *Ticker) start() {
 	}()
 }
 
-// Stop turns off a Ticker. After Stop, no more ticks will be sent.
-// Stop does not close the channel, to prevent a read from the channel succeeding incorrectly.
+// Stop turns off a Ticker and promptly releases its goroutine. After Stop,
+// no more ticks are sent and the channel is closed once the goroutine
+// observes the stop; do not read C after Stop. Stop is idempotent: repeated
+// calls are safe and never block.
 func (t *Ticker) Stop() {
-	t.done <- struct{}{}
+	t.stopOnce.Do(func() { close(t.done) })
 }

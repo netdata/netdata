@@ -4,6 +4,7 @@
 #include "aclk/aclk_capas.h"
 #include "database/rrd-metadata.h"
 #include "database/rrd-retention.h"
+#include "web/api/http_auth.h"
 
 void build_info_to_json_object(BUFFER *b);
 
@@ -72,7 +73,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_member_add_object(wb, "api");
         {
             buffer_json_member_add_uint64(wb, "version", aclk_get_http_api_version());
-            buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
+            buffer_json_member_add_boolean(wb, "bearer_protection", netdata_bearer_protection_is_enabled());
         }
         buffer_json_object_close(wb); // api
 

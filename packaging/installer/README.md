@@ -60,6 +60,18 @@ You can also install Netdata directly without connecting to Netdata Cloud. Choos
 **GCP** - Deploy on Google Cloud Platform
 [→ Install on GCP](/packaging/installer/methods/gcp.md)
 
+## Verify Your Installation
+
+If the installation completed but nothing appears in your dashboard, work through this checklist:
+
+1. **Confirm the Agent service is running.** [Check the service status](/docs/netdata-agent/start-stop-restart.md#check-status) for your platform and confirm the Agent is reachable at `http://NODE:19999`.
+
+2. **Open the right dashboard for your setup.** For connected nodes, check [Netdata Cloud](https://app.netdata.cloud/). For a node that is not connected to Netdata Cloud, or for local-only access, open the local Agent dashboard at `http://NODE:19999`.
+
+3. **If the node is missing from Netdata Cloud, verify it was connected.** Connecting links the Agent to your Netdata Cloud Space. See [Connect Agent to Cloud](/src/claim/README.md#connect-agent-to-cloud) for the steps. If the Agent was already connected but the node still does not appear, see [Troubleshooting](/src/claim/README.md#troubleshooting) to check the Cloud connection status.
+
+4. **Allow inbound TCP port 19999 for local dashboard access from another machine.** The host firewall on the node must permit connections to the Agent's port. If the local dashboard does not load from a remote browser, confirm port 19999 is open on the node.
+
 ## What can I monitor with Netdata?
 
 Netdata can monitor virtually any system, application, or service. Discover what you can monitor and explore our extensive integrations catalog.

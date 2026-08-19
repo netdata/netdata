@@ -106,9 +106,9 @@ pub(crate) fn build_facets_from_accumulator(
         });
 
         let total_values = rows.len();
-        let truncated = total_values > FACET_VALUE_LIMIT;
+        let truncated = total_values > FACET_STATIC_VALUE_LIMIT;
         if truncated {
-            rows.truncate(FACET_VALUE_LIMIT);
+            rows.truncate(FACET_STATIC_VALUE_LIMIT);
         }
 
         let values = rows
@@ -139,7 +139,7 @@ pub(crate) fn build_facets_from_accumulator(
     }
 
     json!({
-        "value_limit": FACET_VALUE_LIMIT,
+        "value_limit": FACET_STATIC_VALUE_LIMIT,
         "accumulator_value_limit": facet_max_values_per_field,
         "overflowed_fields": overflowed_fields,
         "overflowed_records": overflowed_records,

@@ -26,7 +26,7 @@ filter language.
 ## Use the wrapper
 
 ```bash
-source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
 
 agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" '{}'
@@ -37,14 +37,15 @@ never reaches stdout.
 
 ## Per-node response fields
 
-Verified live -- response is a JSON array, each entry an object:
+Verified live -- the response is a JSON object with a `nodes` array. Each entry
+in `.nodes[]` is an object:
 
 | Field | Description |
 |---|---|
 | `nd` | **Node UUID.** This is the value to pass anywhere the API expects a node id (e.g. `/api/v2/nodes/{nd}/function?...`) |
 | `mg` | Machine GUID (stable per OS install) |
 | `nm` | Hostname |
-| `state` | `reachable` (live) / `stale` (disconnected) / `offline` |
+| `state` | `reachable` (live), `stale` (historical data remains), or `unreachable` |
 | `v` | Agent version (e.g. `v2.10.3-nightly`) |
 | `labels` | Object: all `_*` chart-labels keyed by name (architecture, kernel, OS, CPU count, RAM, container/k8s/cloud-provider info) |
 | `hw` | `{cpus, memory, disk_space, architecture}` summary |
@@ -61,19 +62,19 @@ Verified live -- response is a JSON array, each entry an object:
 ```bash
 # Hostname -> node UUID lookup.
 agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" '{}' \
-  | jq -r --arg HOST "costa-desktop" '.[] | select(.nm==$HOST) | .nd'
+  | jq -r --arg HOST "example-host" '.nodes[] | select(.nm==$HOST) | .nd'
 
 # All "reachable" nodes' (UUID, hostname, version) tuples.
 agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" '{}' \
-  | jq -r '.[] | select(.state=="reachable") | "\(.nd)\t\(.nm)\t\(.v)"'
+  | jq -r '.nodes[] | select(.state=="reachable") | "\(.nd)\t\(.nm)\t\(.v)"'
 
 # Nodes whose label `_is_parent` is true.
 agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" '{}' \
-  | jq -r '.[] | select(.labels._is_parent=="true") | .nm'
+  | jq -r '.nodes[] | select(.labels._is_parent=="true") | .nm'
 
 # Aggregate by cloud provider.
 agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" '{}' \
-  | jq -r '[.[] | .labels._cloud_provider_type // "unknown"] | group_by(.) | map({(.[0]): length}) | add'
+  | jq -r '[.nodes[] | .labels._cloud_provider_type // "unknown"] | group_by(.) | map({(.[0]): length}) | add'
 ```
 
 ## Hardware / OS facts

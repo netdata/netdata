@@ -1,13 +1,22 @@
-use super::super::model::{FlowMetrics, OpenTierRow, TierFlowRef, TierKind};
-use super::super::rollup::bucket_start_usec;
+#[cfg(test)]
+use super::super::model::OpenTierRow;
+use super::super::model::{FlowMetrics, TierFlowRef, TierKind};
+use super::super::rollup::{HOUR_BUCKET_USEC, bucket_start_usec};
+use crate::memory_estimation::{btree_container_overhead_bytes, hash_map_allocation_bytes};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::mem::size_of;
 
-type MetricBucket = HashMap<TierFlowRef, FlowMetrics>;
+pub(crate) type MetricBucket = HashMap<TierFlowRef, FlowMetrics>;
 
 #[derive(Debug)]
 pub(crate) struct TierAccumulator {
     bucket_usec: u64,
     buckets: BTreeMap<u64, MetricBucket>,
+    /// Recycled empty containers, capacity retained. Refilled via `recycle`
+    /// when a committed bucket's container comes back, consumed when a new
+    /// bucket opens — keeps the rollup hot path allocation-free in steady
+    /// state (the process runs with a single glibc malloc arena).
+    free: Vec<MetricBucket>,
 }
 
 impl TierAccumulator {
@@ -18,7 +27,12 @@ impl TierAccumulator {
         Self {
             bucket_usec: duration.as_micros() as u64,
             buckets: BTreeMap::new(),
+            free: Vec::new(),
         }
+    }
+
+    pub(crate) fn bucket_usec(&self) -> u64 {
+        self.bucket_usec
     }
 
     pub(crate) fn observe_flow(
@@ -32,13 +46,64 @@ impl TierAccumulator {
         }
 
         let bucket_start = bucket_start_usec(timestamp_usec, self.bucket_usec);
-        let bucket = self.buckets.entry(bucket_start).or_default();
+        let free = &mut self.free;
+        let bucket = self
+            .buckets
+            .entry(bucket_start)
+            .or_insert_with(|| free.pop().unwrap_or_default());
         bucket
             .entry(flow_ref)
             .and_modify(|existing| existing.add(metrics))
             .or_insert(metrics);
     }
 
+    /// Remove and return every closed bucket (same closing rule as
+    /// `flush_closed_rows`: `start + bucket <= now`) as whole containers, in
+    /// bucket order, without expanding rows on the caller's thread. Empty
+    /// containers are recycled directly. This is the main-thread side of the
+    /// tier commit handoff.
+    pub(crate) fn take_closed_buckets(&mut self, now_usec: u64) -> Vec<(u64, MetricBucket)> {
+        let mut closable = Vec::new();
+        for start in self.buckets.keys().copied() {
+            if start.saturating_add(self.bucket_usec) <= now_usec {
+                closable.push(start);
+            }
+        }
+
+        let mut taken = Vec::with_capacity(closable.len());
+        for start in closable {
+            if let Some(bucket) = self.buckets.remove(&start) {
+                if bucket.is_empty() {
+                    self.free.push(bucket);
+                } else {
+                    taken.push((start, bucket));
+                }
+            }
+        }
+        taken
+    }
+
+    /// Return a committed bucket's container for reuse. Clearing retains the
+    /// allocation (`Copy` entry types), so the next opened bucket starts at
+    /// the previous high-water capacity without touching the allocator.
+    pub(crate) fn recycle(&mut self, mut container: MetricBucket) {
+        container.clear();
+        self.free.push(container);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn free_pool_len(&self) -> usize {
+        self.free.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn bucket_capacity(&self, bucket_start: u64) -> Option<usize> {
+        self.buckets.get(&bucket_start).map(HashMap::capacity)
+    }
+
+    /// Legacy row-expanding flush, kept as the reference implementation for
+    /// the `take_closed_buckets` equivalence tests.
+    #[cfg(test)]
     pub(crate) fn flush_closed_rows(&mut self, now_usec: u64) -> Vec<OpenTierRow> {
         let mut closable = Vec::new();
         for start in self.buckets.keys().copied() {
@@ -64,8 +129,9 @@ impl TierAccumulator {
         rows
     }
 
-    pub(crate) fn snapshot_open_rows(&self, now_usec: u64) -> Vec<OpenTierRow> {
-        let mut rows = Vec::new();
+    #[cfg(test)]
+    pub(crate) fn snapshot_open_rows_into(&self, now_usec: u64, rows: &mut Vec<OpenTierRow>) {
+        rows.clear();
         for (start, entries) in &self.buckets {
             let end = start.saturating_add(self.bucket_usec);
             if end <= now_usec {
@@ -80,16 +146,59 @@ impl TierAccumulator {
                 });
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn snapshot_open_rows(&self, now_usec: u64) -> Vec<OpenTierRow> {
+        let mut rows = Vec::new();
+        self.snapshot_open_rows_into(now_usec, &mut rows);
         rows
     }
 
-    pub(crate) fn active_hours(&self) -> BTreeSet<u64> {
-        let mut hours = BTreeSet::new();
-        for entries in self.buckets.values() {
-            for flow_ref in entries.keys() {
-                hours.insert(flow_ref.hour_start_usec);
-            }
-        }
-        hours
+    pub(crate) fn open_row_count(&self, now_usec: u64) -> u64 {
+        self.buckets
+            .iter()
+            .filter(|(start, _)| start.saturating_add(self.bucket_usec) > now_usec)
+            .map(|(_, entries)| entries.len() as u64)
+            .sum()
     }
+
+    pub(crate) fn estimated_heap_bytes(&self) -> usize {
+        let active_bucket_storage = self
+            .buckets
+            .len()
+            .saturating_mul(size_of::<(u64, MetricBucket)>())
+            .saturating_add(btree_container_overhead_bytes(self.buckets.len()));
+        let active_entry_storage = self
+            .buckets
+            .values()
+            .map(metric_bucket_allocation_bytes)
+            .fold(0, usize::saturating_add);
+        let recycled_bucket_storage = self
+            .free
+            .capacity()
+            .saturating_mul(size_of::<MetricBucket>());
+        let recycled_entry_storage = self
+            .free
+            .iter()
+            .map(metric_bucket_allocation_bytes)
+            .fold(0, usize::saturating_add);
+
+        active_bucket_storage
+            .saturating_add(active_entry_storage)
+            .saturating_add(recycled_bucket_storage)
+            .saturating_add(recycled_entry_storage)
+    }
+
+    pub(crate) fn extend_active_hours(&self, hours: &mut BTreeSet<u64>) {
+        for bucket_start_usec in self.buckets.keys().copied() {
+            // Every materialized bucket duration divides an hour, so all rows
+            // in a bucket reference this same hourly flow index.
+            hours.insert(bucket_start_usec / HOUR_BUCKET_USEC * HOUR_BUCKET_USEC);
+        }
+    }
+}
+
+fn metric_bucket_allocation_bytes(bucket: &MetricBucket) -> usize {
+    hash_map_allocation_bytes(bucket.capacity(), size_of::<(TierFlowRef, FlowMetrics)>())
 }

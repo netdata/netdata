@@ -222,8 +222,7 @@ void SIGNAL_CODE_2str_h(SIGNAL_CODE code, char *buf, size_t size) {
     // now we have to concatenate the two strings
     // with a slash in between
 
-    strncpyz(buf, signo_str, size - 1);
-    size_t len = strlen(buf);
+    size_t len = strcatz(buf, 0, signo_str, size);
 
     if(size - 1 > len)
         buf[len++] = '/';

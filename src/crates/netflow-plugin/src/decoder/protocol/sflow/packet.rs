@@ -6,6 +6,8 @@ pub(crate) fn extract_sflow_flows(
     decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
+    emit_rows: bool,
+    stats: &mut DecodeStats,
 ) -> Vec<DecodedFlow> {
     let exporter_ip_override = sflow_agent_ip_addr(&datagram.agent_address);
     let source_realtime_usec = timestamp_source.select(input_realtime_usec, None, None);
@@ -15,6 +17,10 @@ pub(crate) fn extract_sflow_flows(
     for sample in datagram.samples {
         match sample.sample_data {
             SampleData::FlowSample(sample_data) => {
+                stats.sflow_flow_samples += 1;
+                if !emit_rows {
+                    continue;
+                }
                 let mut in_if = if sample_data.input.is_single() {
                     Some(sample_data.input.value())
                 } else {
@@ -51,9 +57,15 @@ pub(crate) fn extract_sflow_flows(
                     need_decap,
                 ) {
                     flows.push(flow);
+                } else {
+                    stats.decapsulation_failed_records += 1;
                 }
             }
             SampleData::FlowSampleExpanded(sample_data) => {
+                stats.sflow_flow_samples += 1;
+                if !emit_rows {
+                    continue;
+                }
                 let mut in_if = if sample_data.input.format == SFLOW_INTERFACE_FORMAT_INDEX {
                     Some(sample_data.input.value)
                 } else {
@@ -91,9 +103,25 @@ pub(crate) fn extract_sflow_flows(
                     need_decap,
                 ) {
                     flows.push(flow);
+                } else {
+                    stats.decapsulation_failed_records += 1;
                 }
             }
-            _ => {}
+            SampleData::CountersSample(_) | SampleData::CountersSampleExpanded(_) => {
+                stats.sflow_counter_samples += 1;
+            }
+            SampleData::DiscardedPacket(_) => {
+                stats.sflow_discarded_samples += 1;
+            }
+            SampleData::RtMetric { .. } => {
+                stats.sflow_rt_metric_samples += 1;
+            }
+            SampleData::RtFlow { .. } => {
+                stats.sflow_rt_flow_samples += 1;
+            }
+            SampleData::Unknown { .. } => {
+                stats.sflow_unknown_samples += 1;
+            }
         }
     }
 

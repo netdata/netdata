@@ -1,6 +1,6 @@
 # Netdata Functions: Developer Guide
 
-> **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md).
+> **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md). For topology Functions, use the dedicated [Topology Function Schema](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md).
 
 ## Overview
 
@@ -17,10 +17,11 @@ This guide teaches you how to create Netdata functions that provide interactive 
 - [Part 1: Simple Table Functions](#part-1-simple-table-functions) - Basic monitoring data
 - [Part 2: Log Explorer Functions](#part-2-log-explorer-functions) - Historical data with search
 - [Part 3: Complete Options Reference](#part-3-complete-options-reference) - Every option explained
+- [Topology Functions](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md) - Graph payloads, evidence rows, aggregation policy, and telemetry overlays
 
 ---
 
-# Part 1: Simple Table Functions
+## Part 1: Simple Table Functions
 
 Simple table functions display current system state - processes, connections, services, etc. They're perfect for "top-like" views and system monitoring.
 
@@ -316,7 +317,7 @@ mysql    45%  1 process    (45% CPU, 1 process counted)
 
 ---
 
-# Part 2: Log Explorer Functions
+## Part 2: Log Explorer Functions
 
 Log explorer functions (`has_history: true`) provide advanced log analysis with full-text search, faceted filtering, time navigation, and histograms. Perfect for systemd journals, event logs, and audit trails.
 
@@ -568,7 +569,7 @@ When `has_history: true`:
 
 ---
 
-# Part 3: Complete Options Reference
+## Part 3: Complete Options Reference
 
 This section documents every field type, option, and behavior for quick reference while developing.
 

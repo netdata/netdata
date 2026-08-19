@@ -5,6 +5,8 @@
 
 #if defined(OS_WINDOWS)
 
+#include <stdbool.h>
+
 char *netdata_win_local_interface();
 char *netdata_win_local_ip();
 

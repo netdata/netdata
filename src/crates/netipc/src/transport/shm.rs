@@ -6,6 +6,7 @@
 //!
 //! Wire-compatible with the C implementation in netipc_shm.c.
 
+use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
 
@@ -43,8 +44,10 @@ pub enum ShmError {
     PathTooLong,
     /// open/shm_open failed.
     Open(i32),
-    /// ftruncate failed.
+    /// Legacy compatibility; SHM creation no longer uses ftruncate.
     Truncate(i32),
+    /// Backing storage allocation failed.
+    Allocate(i32),
     /// mmap failed.
     Mmap(i32),
     /// Header magic mismatch.
@@ -75,6 +78,7 @@ impl std::fmt::Display for ShmError {
             ShmError::PathTooLong => write!(f, "SHM path exceeds limit"),
             ShmError::Open(e) => write!(f, "open failed: errno {e}"),
             ShmError::Truncate(e) => write!(f, "ftruncate failed: errno {e}"),
+            ShmError::Allocate(e) => write!(f, "SHM allocation failed: errno {e}"),
             ShmError::Mmap(e) => write!(f, "mmap failed: errno {e}"),
             ShmError::BadMagic => write!(f, "SHM header magic mismatch"),
             ShmError::BadVersion => write!(f, "SHM header version mismatch"),
@@ -268,25 +272,15 @@ impl ShmContext {
             return Err(ShmError::Open(errno()));
         }
 
-        if unsafe { libc::ftruncate(fd, region_size as libc::off_t) } < 0 {
-            let e = errno();
+        if let Err(e) = allocate_region(fd, region_size) {
             unsafe {
                 libc::close(fd);
                 libc::unlink(c_path.as_ptr());
             }
-            return Err(ShmError::Truncate(e));
+            return Err(ShmError::Allocate(e));
         }
 
-        let base = unsafe {
-            libc::mmap(
-                ptr::null_mut(),
-                region_size,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_SHARED,
-                fd,
-                0,
-            )
-        };
+        let base = unsafe { map_region(fd, region_size) };
         if base == libc::MAP_FAILED {
             let e = errno();
             unsafe {
@@ -760,11 +754,11 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         // Open read-only to inspect the header
         let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
         if fd < 0 {
-            // The entry vanished after readdir() (for example, a dangling symlink
-            // target disappeared) — remove the stale directory entry. Any other
-            // open failure is ambiguous, so leave the entry alone.
-            if should_unlink_cleanup_open_failure(errno()) {
-                unsafe { libc::unlink(c_path.as_ptr()) };
+            // Entries that cannot be opened are junk (vanished, unreadable,
+            // dangling symlink) — remove them. Keep the entry only when fd
+            // exhaustion prevented the liveness check from running at all.
+            if !stale_check_unavailable(errno()) {
+                let _ = unlink_stale_path(&c_path);
             }
             continue;
         }
@@ -773,8 +767,8 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         if unsafe { libc::fstat(fd, &mut st) } != 0 || (st.st_size as usize) < HEADER_LEN as usize {
             unsafe {
                 libc::close(fd);
-                libc::unlink(c_path.as_ptr());
             }
+            let _ = unlink_stale_path(&c_path);
             continue;
         }
 
@@ -791,7 +785,7 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         unsafe { libc::close(fd) };
 
         if map == libc::MAP_FAILED {
-            unsafe { libc::unlink(c_path.as_ptr()) };
+            let _ = unlink_stale_path(&c_path);
             continue;
         }
 
@@ -800,18 +794,18 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         if magic != REGION_MAGIC {
             unsafe {
                 libc::munmap(map, HEADER_LEN as usize);
-                libc::unlink(c_path.as_ptr());
             }
+            let _ = unlink_stale_path(&c_path);
             continue;
         }
 
         let owner = unsafe { (*hdr).owner_pid };
-        let gen = unsafe { (*hdr).owner_generation };
+        let generation = unsafe { (*hdr).owner_generation };
         unsafe { libc::munmap(map, HEADER_LEN as usize) };
 
         // If owner is dead (or generation is zero / legacy), unlink
-        if !pid_alive(owner) || gen == 0 {
-            unsafe { libc::unlink(c_path.as_ptr()) };
+        if !pid_alive(owner) || generation == 0 {
+            let _ = unlink_stale_path(&c_path);
         }
     }
 }
@@ -867,6 +861,111 @@ fn path_to_cstring(path: &Path) -> Result<std::ffi::CString, ShmError> {
 
 fn errno() -> i32 {
     unsafe { *libc::__errno_location() }
+}
+
+/// Reserve all backing storage before exposing the region through mmap.
+///
+/// Linux may interrupt fallocate before it changes the file, so retry EINTR.
+/// Every other error is returned to the caller; SHM has no unsafe sparse-file
+/// fallback.
+fn allocate_region(fd: i32, region_size: usize) -> Result<(), i32> {
+    loop {
+        #[cfg(test)]
+        record_fallocate_call();
+
+        #[cfg(test)]
+        let result = match take_fallocate_fault() {
+            Some(error) => {
+                unsafe { *libc::__errno_location() = error };
+                -1
+            }
+            None => unsafe { libc::fallocate(fd, 0, 0, region_size as libc::off_t) },
+        };
+
+        #[cfg(not(test))]
+        let result = unsafe { libc::fallocate(fd, 0, 0, region_size as libc::off_t) };
+
+        if result == 0 {
+            return Ok(());
+        }
+
+        let error = errno();
+        if error != libc::EINTR {
+            return Err(error);
+        }
+    }
+}
+
+unsafe fn map_region(fd: i32, region_size: usize) -> *mut libc::c_void {
+    #[cfg(test)]
+    record_mmap_call();
+
+    unsafe {
+        libc::mmap(
+            ptr::null_mut(),
+            region_size,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_SHARED,
+            fd,
+            0,
+        )
+    }
+}
+
+#[cfg(test)]
+#[derive(Default)]
+struct ShmSyscallTestState {
+    fallocate_faults: std::collections::VecDeque<i32>,
+    fallocate_calls: usize,
+    mmap_calls: usize,
+}
+
+#[cfg(test)]
+thread_local! {
+    static SHM_SYSCALL_TEST_STATE: std::cell::RefCell<ShmSyscallTestState> =
+        std::cell::RefCell::new(ShmSyscallTestState::default());
+}
+
+#[cfg(test)]
+fn install_fallocate_faults(errors: &[i32]) {
+    SHM_SYSCALL_TEST_STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        assert!(
+            state.fallocate_faults.is_empty(),
+            "fallocate fault sequence already installed"
+        );
+        state.fallocate_faults.extend(errors.iter().copied());
+        state.fallocate_calls = 0;
+        state.mmap_calls = 0;
+    });
+}
+
+#[cfg(test)]
+fn clear_fallocate_faults() {
+    SHM_SYSCALL_TEST_STATE.with(|state| *state.borrow_mut() = ShmSyscallTestState::default());
+}
+
+#[cfg(test)]
+fn take_fallocate_fault() -> Option<i32> {
+    SHM_SYSCALL_TEST_STATE.with(|state| state.borrow_mut().fallocate_faults.pop_front())
+}
+
+#[cfg(test)]
+fn record_fallocate_call() {
+    SHM_SYSCALL_TEST_STATE.with(|state| state.borrow_mut().fallocate_calls += 1);
+}
+
+#[cfg(test)]
+fn record_mmap_call() {
+    SHM_SYSCALL_TEST_STATE.with(|state| state.borrow_mut().mmap_calls += 1);
+}
+
+#[cfg(test)]
+fn syscall_test_counts() -> (usize, usize) {
+    SHM_SYSCALL_TEST_STATE.with(|state| {
+        let state = state.borrow();
+        (state.fallocate_calls, state.mmap_calls)
+    })
 }
 
 fn pid_alive(pid: i32) -> bool {
@@ -966,16 +1065,19 @@ enum StaleResult {
     Invalid,
 }
 
-fn should_unlink_cleanup_open_failure(err: i32) -> bool {
-    err == libc::ENOENT
+/// Open failures that mean the liveness check itself could not run (fd
+/// exhaustion). Deleting on these could remove a live endpoint, so the
+/// entry is kept and reported as in-use.
+fn stale_check_unavailable(err: i32) -> bool {
+    err == libc::EMFILE || err == libc::ENFILE
 }
 
-fn classify_stale_open_failure(err: i32) -> StaleResult {
-    if err == libc::ENOENT {
-        StaleResult::NotExist
-    } else {
-        StaleResult::Invalid
+fn unlink_stale_path(c_path: &CString) -> bool {
+    if unsafe { libc::unlink(c_path.as_ptr()) } == 0 || errno() == libc::ENOENT {
+        return true;
     }
+    // A directory squatting on the region path is junk too.
+    errno() == libc::EISDIR && unsafe { libc::rmdir(c_path.as_ptr()) } == 0
 }
 
 #[allow(dead_code)]
@@ -991,13 +1093,22 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     }
 
     if (st.st_size as usize) < HEADER_LEN as usize {
-        unsafe { libc::unlink(c_path.as_ptr()) };
+        if !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
+        }
         return StaleResult::Invalid;
     }
 
     let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
     if fd < 0 {
-        return classify_stale_open_failure(errno());
+        let e = errno();
+        if e == libc::ENOENT {
+            return StaleResult::NotExist;
+        }
+        if stale_check_unavailable(e) || !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
+        }
+        return StaleResult::Invalid;
     }
 
     let map = unsafe {
@@ -1013,7 +1124,9 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     unsafe { libc::close(fd) };
 
     if map == libc::MAP_FAILED {
-        unsafe { libc::unlink(c_path.as_ptr()) };
+        if !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
+        }
         return StaleResult::Invalid;
     }
 
@@ -1022,21 +1135,25 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     if magic != REGION_MAGIC {
         unsafe {
             libc::munmap(map, HEADER_LEN as usize);
-            libc::unlink(c_path.as_ptr());
+        }
+        if !unlink_stale_path(&c_path) {
+            return StaleResult::LiveServer;
         }
         return StaleResult::Invalid;
     }
 
     let owner = unsafe { (*hdr).owner_pid };
-    let gen = unsafe { (*hdr).owner_generation };
+    let generation = unsafe { (*hdr).owner_generation };
     unsafe { libc::munmap(map, HEADER_LEN as usize) };
 
-    if pid_alive(owner) && gen != 0 {
+    if pid_alive(owner) && generation != 0 {
         return StaleResult::LiveServer;
     }
 
     // Dead owner or zero generation (PID reuse / legacy) — stale
-    unsafe { libc::unlink(c_path.as_ptr()) };
+    if !unlink_stale_path(&c_path) {
+        return StaleResult::LiveServer;
+    }
     StaleResult::Recovered
 }
 

@@ -3,7 +3,7 @@
 #ifndef NETDATA_STACKTRACE_H
 #define NETDATA_STACKTRACE_H 1
 
-#include "libnetdata/common.h"
+#include "libnetdata/libnetdata-base.h"
 
 #define STACK_TRACE_INFO_PREFIX "info: "
 
@@ -30,6 +30,7 @@ bool stacktrace_available(void);
 
 // Capture a stacktrace to a buffer
 struct web_buffer;
+typedef struct web_buffer BUFFER;
 void stacktrace_capture(BUFFER *wb);
 
 // Return a string describing the backend used for capturing stacktraces

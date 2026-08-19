@@ -130,7 +130,7 @@ done:
 }
 
 // Dimension list
-#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context " \
+#define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END, c.type||'.'||c.id, c.context, d.algorithm " \
     "FROM dimension d, chart c WHERE c.host_id = @host_id AND d.chart_id = c.chart_id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
 void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
@@ -162,6 +162,7 @@ void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_
         dimension_data.hidden = sqlite3_column_int(res, 3);
         dimension_data.chart_id = (char *) sqlite3_column_text(res, 4);
         dimension_data.context = (char *) sqlite3_column_text(res, 5);
+        dimension_data.algorithm = sqlite3_column_int(res, 6);
         dict_cb(&dimension_data, data);
     }
 
@@ -367,13 +368,21 @@ int ctx_unittest(void)
     nd_uuid_t host_uuid;
     uuid_generate(host_uuid);
 
+    sqlite3 *saved_db_context_meta = db_context_meta;
+    bool owns_sqlite_lifecycle = !saved_db_context_meta;
+
     if (sqlite_library_init())
         return 1;
 
     int rc = sql_init_context_database(1);
 
-    if (rc != SQLITE_OK)
+    if (rc != SQLITE_OK) {
+        sql_close_database(db_context_meta, "CONTEXT");
+        db_context_meta = saved_db_context_meta;
+        if (owns_sqlite_lifecycle)
+            sqlite_library_shutdown();
         return 1;
+    }
 
     // Store a context
     VERSIONED_CONTEXT_DATA context_data;
@@ -445,7 +454,9 @@ int ctx_unittest(void)
     netdata_log_info("List context end after delete");
 
     sql_close_database(db_context_meta, "CONTEXT");
-    sqlite_library_shutdown();
+    db_context_meta = saved_db_context_meta;
+    if (owns_sqlite_lifecycle)
+        sqlite_library_shutdown();
 
     return 0;
 }

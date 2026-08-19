@@ -168,8 +168,9 @@ int help(int exitcode) {
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
 #ifdef OS_WINDOWS
-            "  -W perflibdump [key]\n"
-            "                           Dump the Windows Performance Counters Registry in JSON.\n\n"
+            "  -W perflibdump [key] [-perflibfile FILENAME]\n"
+            "                           Dump the Windows Performance Counters Registry in JSON.\n"
+            "                           Prints to stdout, or to FILENAME when -perflibfile is given.\n\n"
 #endif
     );
 
@@ -210,15 +211,28 @@ int help(int exitcode) {
     } while(0)
 
 int buffer_unittest(void);
+int ringbuffer_unittest(void);
+int log_stack_unittest(void);
+int clocks_unittest(void);
+int ws_client_unittest(void);
+int mqtt_ng_unittest(void);
+int aclk_timeout_unittest(void);
+int https_client_timeout_unittest(void);
+int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
+int websocket_compression_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
+int rrdfunctions_verify_access_unittest(void);
+int rrdfunctions_manifest_unittest(void);
+int rrdfunctions_manifest_pacer_unittest(void);
+int mcp_execute_function_access_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int statistical_unittest(void);
@@ -226,14 +240,20 @@ int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
+int stream_path_json_unittest(void);
 int query_plan_unittest(void);
+int api_v1_allmetrics_json_unittest(void);
+int exporting_json_connector_unittest(void);
+int exporting_graphite_unittest(void);
+int exporting_opentsdb_http_unittest(void);
+int exporting_opentsdb_telnet_unittest(void);
 #ifdef ENABLE_ML
 int ml_unittest(void);
 #endif
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
-int windows_perflib_dump(const char *key);
+int windows_perflib_dump(const char *key, const char *filename);
 #endif
 
 int unittest_prepare_rrd(const char **user) {
@@ -253,6 +273,26 @@ int unittest_prepare_rrd(const char **user) {
     return 0;
 }
 
+// Standalone `-W <name>` unittest driver: bring up sqlite + RRD, run one test,
+// tear everything down, and return the test's exit code.
+static int unittest_run_with_rrd(int (*test_fn)(void)) {
+    unittest_running = true;
+
+    if(sqlite_library_init())
+        return 1;
+    rrdlabels_aral_init(false);
+
+    const char *user = NULL;
+    int rc = unittest_prepare_rrd(&user);
+    if(!rc)
+        rc = test_fn();
+
+    sqlite_close_databases();
+    sqlite_library_shutdown();
+    rrdlabels_aral_destroy(false);
+    return rc;
+}
+
 static void fatal_status_file_save(void) {
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
     exit(1);
@@ -263,6 +303,13 @@ int netdata_main(int argc, char **argv) {
     string_init();
     analytics_init();
     nd_log_initialize_mutexes();
+
+    // Register the daemon's per-thread cleanup callback. Each subsystem
+    // should own the registration of its own cleanups; this one lives in
+    // the daemon because service_exits is a daemon-layer concern. The
+    // rest are currently registered together in rrd_init() and should be
+    // moved to their respective subsystems in a follow-up.
+    nd_thread_register_cleanup(service_exits);
 
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
@@ -386,6 +433,8 @@ int netdata_main(int argc, char **argv) {
                         if(strcmp(optarg, "jsonctest") == 0) {
                             unittest_running = true;
                             if (json_c_parser_unittest()) return 1;
+                            if (stream_path_json_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nJSON-C PARSER TESTS PASSED\n\n");
                             return 0;
                         }
@@ -423,10 +472,30 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_init(false);
 
                             if (pluginsd_parser_unittest()) return 1;
+                            if (websocket_compression_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+                            if (api_v1_allmetrics_json_unittest()) return 1;
+                            if (exporting_json_connector_unittest()) return 1;
+                            if (exporting_graphite_unittest()) return 1;
+                            if (exporting_opentsdb_http_unittest()) return 1;
+                            if (exporting_opentsdb_telnet_unittest()) return 1;
+                            if (ringbuffer_unittest()) return 1;
+                            if (log_stack_unittest()) return 1;
+                            if (clocks_unittest()) return 1;
+                            if (ws_client_unittest()) return 1;
+                            if (mqtt_ng_unittest()) return 1;
+                            // summed, not short-circuited: this is the path CI runs, so one
+                            // failing suite must not hide the other two
+                            if (aclk_timeout_unittest() + https_client_timeout_unittest() +
+                                mqtt_wss_client_timeout_unittest()) return 1;
+#ifdef OS_WINDOWS
+                            if (unit_test_windows_virt_normalize()) return 1;
+                            if (unit_test_windows_virt_resolution()) return 1;
+                            if (unit_test_windows_container()) return 1;
+#endif
 
                             // No call to load the config file on this code-path
                             if (unittest_prepare_rrd(&user)) return 1;
@@ -444,7 +513,12 @@ int netdata_main(int argc, char **argv) {
                             if (ctx_unittest()) return 1;
                             if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
+                            if (os_socket_egress_interface_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            if (rrdfunctions_verify_access_unittest()) return 1;
+                            if (rrdfunctions_manifest_unittest()) return 1;
+                            if (rrdfunctions_manifest_pacer_unittest()) return 1;
+                            if (mcp_execute_function_access_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
                             if (statistical_unittest()) return 1;
@@ -452,8 +526,15 @@ int netdata_main(int argc, char **argv) {
                             if (health_config_unittest()) return 1;
                             if (yaml_unittest()) return 1;
                             if (json_c_parser_unittest()) return 1;
+                            if (stream_path_json_unittest())
+                                return 1;
                             if (unittest_waiting_queue()) return 1;
+                            if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if (mrg_unittest()) return 1;
+#endif
+                            if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
 #endif
@@ -461,6 +542,7 @@ int netdata_main(int argc, char **argv) {
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
+                            sqlite_close_databases();
                             sqlite_library_shutdown();
                             rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
@@ -506,6 +588,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return rwlocks_stress_test();
                         }
+                        else if(strcmp(optarg, "rwspinlocktest") == 0) {
+                            unittest_running = true;
+                            return rw_spinlock_unittest();
+                        }
                         else if(strcmp(optarg, "prd-array-stress") == 0) {
                             unittest_running = true;
                             return prd_array_stress_test();
@@ -521,9 +607,37 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_destroy(true);
                             return rc;
                         }
+                        else if(strcmp(optarg, "rrdhostlabelstest") == 0) {
+                            unittest_running = true;
+                            rrdlabels_aral_init(true);
+                            int rc = rrdhost_labels_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
+                        }
                         else if(strcmp(optarg, "buffertest") == 0) {
                             unittest_running = true;
                             return buffer_unittest();
+                        }
+                        else if(strcmp(optarg, "ringbuffertest") == 0) {
+                            unittest_running = true;
+                            return ringbuffer_unittest();
+                        }
+                        else if(strcmp(optarg, "wsclienttest") == 0) {
+                            unittest_running = true;
+                            return ws_client_unittest();
+                        }
+                        else if(strcmp(optarg, "mqttngtest") == 0) {
+                            unittest_running = true;
+                            return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclktimeouttest") == 0) {
+                            unittest_running = true;
+                            // run all three and report the total, so one failure does not
+                            // hide the others
+                            int errors = aclk_timeout_unittest();
+                            errors += https_client_timeout_unittest();
+                            errors += mqtt_wss_client_timeout_unittest();
+                            return errors ? 1 : 0;
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;
@@ -541,7 +655,22 @@ int netdata_main(int argc, char **argv) {
 #endif
 #ifdef OS_WINDOWS
                         else if(strcmp(optarg, "perflibdump") == 0) {
-                            return windows_perflib_dump(optind + 1 > argc ? NULL : argv[optind]);
+                            // -W perflibdump [key] [-perflibfile FILENAME]
+                            // without -perflibfile the dump goes to stdout
+                            const char *key = NULL;
+                            const char *filename = NULL;
+                            for(int a = optind; a < argc; a++) {
+                                if(strcmp(argv[a], "-perflibfile") == 0) {
+                                    if(a + 1 >= argc) {
+                                        fprintf(stderr, "Option -perflibfile requires a filename argument.\n");
+                                        return 1;
+                                    }
+                                    filename = argv[++a];
+                                }
+                                else
+                                    key = argv[a];
+                            }
+                            return windows_perflib_dump(key, filename);
                         }
                         else if(strcmp(optarg, "perflibnamestest") == 0) {
                             unittest_running = true;
@@ -585,6 +714,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return pluginsd_parser_unittest();
                         }
+                        else if(strcmp(optarg, "websockettest") == 0) {
+                            unittest_running = true;
+                            return websocket_compression_unittest();
+                        }
                         else if(strcmp(optarg, "stream_compressions_test") == 0) {
                             unittest_running = true;
                             return unittest_stream_compressions();
@@ -605,21 +738,16 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return health_config_unittest();
                         }
-                        else if(strcmp(optarg, "dyncfgtest") == 0) {
-                            unittest_running = true;
-                            if(sqlite_library_init())
-                                return 1;
-                            rrdlabels_aral_init(false);
-
-                            int rc = unittest_prepare_rrd(&user);
-                            if (!rc)
-                                rc = dyncfg_unittest();
-
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
-                            rrdlabels_aral_destroy(false);
-                            return rc;
-                        }
+                        else if(strcmp(optarg, "dyncfgtest") == 0)
+                            return unittest_run_with_rrd(dyncfg_unittest);
+                        else if(strcmp(optarg, "functionsaccesstest") == 0)
+                            return unittest_run_with_rrd(rrdfunctions_verify_access_unittest);
+                        else if(strcmp(optarg, "functionsmanifesttest") == 0)
+                            return unittest_run_with_rrd(rrdfunctions_manifest_unittest);
+                        else if(strcmp(optarg, "functionsmanifestpacertest") == 0)
+                            return unittest_run_with_rrd(rrdfunctions_manifest_pacer_unittest);
+                        else if(strcmp(optarg, "mcpfunctionaccesstest") == 0)
+                            return unittest_run_with_rrd(mcp_execute_function_access_unittest);
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);

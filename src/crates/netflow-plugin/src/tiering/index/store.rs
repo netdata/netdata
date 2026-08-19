@@ -47,6 +47,12 @@ impl TierFlowIndexMemoryBreakdown {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct TierFlowIndexCardinality {
+    pub(crate) hours: u64,
+    pub(crate) flows: u64,
+}
+
 impl TierFlowIndexStore {
     pub(crate) fn generation(&self) -> u64 {
         self.generation
@@ -187,6 +193,17 @@ impl TierFlowIndexStore {
 
     pub(crate) fn estimated_heap_bytes(&self) -> usize {
         self.estimated_memory_breakdown().total()
+    }
+
+    pub(crate) fn cardinality(&self) -> TierFlowIndexCardinality {
+        TierFlowIndexCardinality {
+            hours: self.indexes.len() as u64,
+            flows: self
+                .indexes
+                .values()
+                .map(|index| index.flow_count() as u64)
+                .sum(),
+        }
     }
 
     pub(crate) fn estimated_memory_breakdown(&self) -> TierFlowIndexMemoryBreakdown {

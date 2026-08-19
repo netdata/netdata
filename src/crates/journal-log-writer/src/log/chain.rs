@@ -151,7 +151,8 @@ impl OwnedChain {
         let Some(file) = create_chain_file(&self.path, seqnum_id, head_seqnum, head_realtime)
         else {
             return Err(WriterError::FileCreation(format!(
-                "failed to create journal file in {}",
+                "failed to create journal file in {}: the generated file path \
+                 could not be parsed as a journal repository file",
                 self.path.display()
             )));
         };

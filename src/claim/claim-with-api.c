@@ -24,7 +24,7 @@ static bool check_and_generate_certificates() {
     CLEAN_CHAR_P *private_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "private.pem");
     CLEAN_CHAR_P *public_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "public.pem");
 
-    // Check if private key exists
+    // Check if the public key exists; it is the completion marker for the pair.
     fp = fopen(public_key_file, "r");
     if (fp) {
         fclose(fp);
@@ -66,17 +66,29 @@ static bool check_and_generate_certificates() {
         EVP_PKEY_free(pkey);
         return false;
     }
-    fclose(fp);
+    if (fclose(fp) != 0) {
+        claim_agent_failure_reason_set("Cannot write private key file: %s", private_key_file);
+        EVP_PKEY_free(pkey);
+        return false;
+    }
 
     // Save public key
     fp = fopen(public_key_file, "wb");
     if (!fp || !PEM_write_PUBKEY(fp, pkey)) {
         claim_agent_failure_reason_set("Cannot write public key file: %s", public_key_file);
-        if (fp) fclose(fp);
+        if (fp) {
+            fclose(fp);
+            unlink(public_key_file);
+        }
         EVP_PKEY_free(pkey);
         return false;
     }
-    fclose(fp);
+    if (fclose(fp) != 0) {
+        claim_agent_failure_reason_set("Cannot write public key file: %s", public_key_file);
+        unlink(public_key_file);
+        EVP_PKEY_free(pkey);
+        return false;
+    }
 
     EVP_PKEY_free(pkey);
     return true;
@@ -467,6 +479,24 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
     return done;
 }
 
+static bool claim_extra_opts_has_token(const char *opts, const char *token, size_t token_len) {
+    while(opts && *opts) {
+        while(isspace((uint8_t)*opts))
+            opts++;
+
+        const char *end = opts;
+        while(*end && !isspace((uint8_t)*end))
+            end++;
+
+        if((size_t)(end - opts) == token_len && memcmp(opts, token, token_len) == 0)
+            return true;
+
+        opts = end;
+    }
+
+    return false;
+}
+
 bool claim_agent_from_environment(void) {
     const char *url = getenv("NETDATA_CLAIM_URL");
     if(!url || !*url) {
@@ -488,7 +518,7 @@ bool claim_agent_from_environment(void) {
 
     bool insecure = CONFIG_BOOLEAN_NO;
     const char *from_env = getenv("NETDATA_EXTRA_CLAIM_OPTS");
-    if(from_env && *from_env && strstr(from_env, "-insecure") == 0)
+    if(claim_extra_opts_has_token(from_env, "-insecure", sizeof("-insecure") - 1))
         insecure = CONFIG_BOOLEAN_YES;
 
     return claim_agent(url, token, rooms, proxy, insecure);

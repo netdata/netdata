@@ -8,8 +8,9 @@
 
 void stream_compressor_init_brotli(struct compressor_state *state) {
     if (!state->initialized) {
-        state->initialized = true;
         state->stream = BrotliEncoderCreateInstance(NULL, NULL, NULL);
+        if (!state->stream)
+            return;
 
         if (state->level < BROTLI_MIN_QUALITY) {
             state->level = BROTLI_MIN_QUALITY;
@@ -17,7 +18,14 @@ void stream_compressor_init_brotli(struct compressor_state *state) {
             state->level = BROTLI_MAX_QUALITY;
         }
 
-        BrotliEncoderSetParameter(state->stream, BROTLI_PARAM_QUALITY, state->level);
+        if (!BrotliEncoderSetParameter(state->stream, BROTLI_PARAM_QUALITY, state->level)) {
+            netdata_log_error("STREAM_COMPRESS: BrotliEncoderSetParameter() failed to set quality to %d", state->level);
+            BrotliEncoderDestroyInstance(state->stream);
+            state->stream = NULL;
+            return;
+        }
+
+        state->initialized = true;
     }
 }
 
@@ -76,10 +84,12 @@ size_t stream_compress_brotli(struct compressor_state *state, const char *data, 
 
 void stream_decompressor_init_brotli(struct decompressor_state *state) {
     if (!state->initialized) {
-        state->initialized = true;
         state->stream = BrotliDecoderCreateInstance(NULL, NULL, NULL);
+        if (!state->stream)
+            return;
 
-        simple_ring_buffer_make_room(&state->output, COMPRESSION_MAX_CHUNK);
+        simple_ring_buffer_set_capacity(&state->output, COMPRESSION_MAX_CHUNK + 1);
+        state->initialized = true;
     }
 }
 
@@ -116,9 +126,9 @@ size_t stream_decompress_brotli(struct decompressor_state *state, const char *co
 
     size_t decompressed_size = state->output.size - available_out;
     if(available_out == 0) {
-        netdata_log_error("STREAM_DECOMPRESS: BrotliDecoderDecompressStream() needs a bigger output buffer than the one we provided "
-                          "(output buffer %zu bytes, compressed payload %zu bytes)",
-                          state->output.size, compressed_size);
+        netdata_log_error("STREAM_DECOMPRESS: BrotliDecoderDecompressStream() produced at least %zu bytes, exceeding "
+                          "the max supported size of %zu bytes (compressed payload %zu bytes)",
+                          state->output.size, (size_t)COMPRESSION_MAX_CHUNK, compressed_size);
         return 0;
     }
 

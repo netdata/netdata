@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/aclk/v1/lib.pb.h"
+#include "aclk/v1/lib.pb.h"
 
 #include "capability.h"
 

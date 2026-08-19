@@ -8,6 +8,7 @@ icons:
   - hardware
   - k8s
   - mysql
+  - mssql
   - netdata
   - none
   - otel

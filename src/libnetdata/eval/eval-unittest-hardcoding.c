@@ -69,6 +69,16 @@ int eval_hardcode_unittest(void) {
             66.0,
             EVAL_ERROR_OK
         },
+        // Raw source contains more $test prefixes than parsed test variables
+        {
+            "Prefix variable no-progress guard",
+            "$test_var + $test_var + $test",
+            "test",
+            123456789.0,
+            "$test_var + $test_var + $test",
+            0.0,
+            EVAL_ERROR_UNKNOWN_VARIABLE
+        },
         // Hardcoding negative value
         {
             "Negative value",

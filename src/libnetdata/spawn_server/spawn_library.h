@@ -3,7 +3,7 @@
 #ifndef NETDATA_SPAWN_LIBRARY_H
 #define NETDATA_SPAWN_LIBRARY_H
 
-#include "../libnetdata.h"
+#include "../exit/exit_initiated.h"
 
 BUFFER *argv_to_cmdline_buffer(const char **argv);
 

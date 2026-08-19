@@ -1,10 +1,15 @@
-# SOW-NNNN - <Title>
+# SOW-YYYYMMDD-<slug> - <Title>
 
 ## Status
 
-Status: open | in-progress | paused | completed | closed
+Status: planning | ready | in-progress | paused | completed
 
-`completed` is the successful terminal status. `done` is a directory name, not a status value. Do not use `Status: done` or `Status: complete`.
+`planning` means analysis or decisions are incomplete. `ready` means the
+Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
+before non-trivial work") applies, the user has approved the goal and plan.
+`completed` means work is validated and durable memory transferred. SOW files
+are local-only working memory under `.agents/sow/q/` (gitignored) and are never
+committed.
 
 Sub-state: <short current truth>
 
@@ -17,6 +22,8 @@ Sub-state: <short current truth>
 ### User Request
 
 <Concise quote or faithful summary. Do not lose constraints.>
+
+Regresses (optional): PR #NNNNN
 
 ### Assistant Understanding
 
@@ -61,12 +68,19 @@ Problem / root-cause model:
 
 Evidence reviewed:
 
-- <Specs, code, docs, tests, logs, traces, prior SOWs, issues, external references.>
-- <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste `/opt/baddisk/monitoring/repos/...` absolute paths.>
+- <Specs, code, docs, tests, logs, traces, prior PRs/issues, external references.>
+- <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste machine-specific absolute mirror paths (the mirror lives at `${NETDATA_REPOS_DIR}`).>
 
 Affected contracts and surfaces:
 
 - <APIs, schemas, files, commands, UI, docs, specs, skills, tests, integrations, operators, users.>
+
+Clean-end-state target:
+
+- <The structure the codebase should have once the approved scope is fully delivered.>
+- Removed as redundant (i): <code/config/docs/tests this change makes redundant.>
+- Excluded coupled items (ii): <coupled items NOT part of this clean end state, each with reason + scope source.>
+- Reference search (when a path/contract is replaced): <command(s) run + result; every surviving reference mapped to (i)/(ii), or the target is incomplete.>
 
 Existing patterns to reuse:
 
@@ -96,11 +110,11 @@ Artifact impact plan:
 - Specs: <expected update or reason likely unaffected>
 - End-user/operator docs: <expected update or reason likely unaffected>
 - End-user/operator skills: <expected update or reason likely unaffected>
-- SOW lifecycle: <split/merge/status/follow-up/regression handling>
+- SOW lifecycle: <local-only working file under .agents/sow/q/ (never committed); durable-knowledge targets (skills/docs/code/tests); regression = new linked SOW; follow-up issues>
 
 Open-source reference evidence:
 
-- <If local mirrored repositories under `/opt/baddisk/monitoring/repos/` were checked, list each as `owner/repo @ commit` plus repository-relative paths. If none were checked, record why external OSS references were not relevant.>
+- <If local mirrored repositories under `${NETDATA_REPOS_DIR}` were checked, list each as `owner/repo @ commit` plus repository-relative paths. If none were checked, record why external OSS references were not relevant.>
 
 Open decisions:
 
@@ -119,7 +133,19 @@ Open decisions:
 
 ### YYYY-MM-DD
 
-- <files touched, decisions, deviations, reviewers>
+- <Material state transitions, files touched, decisions, deviations, validation,
+  and reviewers. Keep this a current-state handoff: consolidate superseded rounds
+  and do not reproduce the conversation or every review nit.>
+
+## Workflow Friction & Rule Gaps
+
+Running capture of anything that suggests a rule or workflow change: a rule that
+was missing, ambiguous, or slowed the work; a practice worth codifying; a review
+pattern that helped. Jot entries as they happen — do not reconstruct them from
+memory at close. Every entry is triaged before completion (see the Artifact
+Maintenance Gate).
+
+- <observation + which artifact it may touch (AGENTS.md / project skill / spec / SOW template)>
 
 ## Validation
 
@@ -147,14 +173,15 @@ Sensitive data gate:
 
 - <Confirm durable artifacts contain no raw secrets, credentials, bearer tokens, SNMP communities, community member names, customer names, personal data, non-private customer-identifying IPs, private endpoints, or proprietary incident details; note redactions used.>
 
-Artifact maintenance gate:
+## Artifact Maintenance Gate
 
 - AGENTS.md: <updated path or evidence-backed reason no update was needed>
 - Runtime project skills: <updated .agents/skills/project-*/ path or evidence-backed reason no update was needed>
 - Specs: <updated .agents/sow/specs/ path or evidence-backed reason no update was needed>
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>
-- SOW lifecycle: <status/directory checked; if successful close, `Status: completed` and move to `.agents/sow/done/` are committed together with the work in one commit unless user explicitly requested a different split; split/merge/follow-up/regression handling recorded>
+- SOW lifecycle: <durable knowledge transferred to skills/docs/code/tests; follow-ups moved to GitHub issues or rejected; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never committed; regression-as-new-SOW handling recorded>
+- Workflow friction triaged: <each `Workflow Friction & Rule Gaps` entry resolved to a rule update (file + change), an evidence-backed rejection, or a tracked follow-up; "no workflow friction arose" if the section is empty>
 
 Specs update:
 
@@ -178,7 +205,7 @@ Lessons:
 
 Follow-up mapping:
 
-- <implemented/rejected/tracked>
+- <implemented/rejected/GitHub issue link>
 
 ## Outcome
 
@@ -188,12 +215,6 @@ Pending.
 
 Pending.
 
-## Followup
+## Follow-up Issues
 
 None yet.
-
-## Regression Log
-
-None yet.
-
-Append regression entries here only after this SOW was completed or closed and later testing or use found broken behavior. Use a dated `## Regression - YYYY-MM-DD` heading at the end of the file. Never prepend regression content above the original SOW narrative.

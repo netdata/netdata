@@ -41,6 +41,10 @@ impl FlowQueryService {
 
     pub(crate) fn prepare_query(&self, request: &FlowsRequest) -> Result<QuerySetup> {
         let sort_by = request.normalized_sort_by();
+        let selections = CompiledSelections::compile(&request.selections)
+            .map_err(anyhow::Error::msg)
+            .context("invalid NetFlow selections")?;
+        let prefilter_matches = build_prefilter_matches(selections.prefilter_pairs());
         let (requested_after, requested_before) = resolve_time_bounds(request);
         let effective_group_by = resolve_effective_group_by(request);
         let force_raw_tier =
@@ -161,6 +165,8 @@ impl FlowQueryService {
             sort_by,
             timeseries_layout,
             effective_group_by,
+            selections,
+            prefilter_matches,
             limit,
             spans,
             stats,

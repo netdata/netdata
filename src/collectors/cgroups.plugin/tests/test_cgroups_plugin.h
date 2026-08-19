@@ -7,10 +7,4 @@
 
 #include "../sys_fs_cgroup.h"
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <stdint.h>
-#include <cmocka.h>
-
 #endif /* TEST_CGROUPS_PLUGIN_H */

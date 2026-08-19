@@ -1,0 +1,1 @@
+%systemd_post netdata.service

@@ -10,6 +10,11 @@ pub(crate) fn xxhash64(data: &[u8]) -> u64 {
     hasher.finish()
 }
 
+pub(crate) fn decoder_state_schema_version(data: &[u8]) -> Option<u32> {
+    (data.len() >= 8 && &data[..4] == DECODER_STATE_MAGIC)
+        .then(|| u32::from_le_bytes(data[4..8].try_into().unwrap()))
+}
+
 pub(crate) fn encode_persisted_namespace_file(
     file: &PersistedDecoderNamespaceFile,
 ) -> Result<Vec<u8>, String> {

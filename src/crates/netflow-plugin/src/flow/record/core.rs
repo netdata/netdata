@@ -60,7 +60,7 @@ impl std::fmt::Display for FlowDirection {
 }
 
 /// Flat, typed representation of a canonical flow record.
-/// All 89 canonical fields stored with native types. Only enrichment-derived
+/// All 91 canonical fields stored with native types. Only enrichment-derived
 /// text fields remain as String (36 fields, most empty by default).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct FlowRecord {

@@ -1,0 +1,178 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Palo Alto Networks PAN-OS collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "url": {
+        "title": "URL",
+        "description": "The base URL of the PAN-OS firewall management interface.",
+        "type": "string",
+        "default": "https://127.0.0.1",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "PAN-OS XML API request timeout, measured in seconds.",
+        "type": "number",
+        "minimum": 1,
+        "default": 3
+      },
+      "api_key": {
+        "title": "API key",
+        "description": "PAN-OS XML API key. Takes priority over username/password key generation.",
+        "type": "string",
+        "sensitive": true
+      },
+      "username": {
+        "title": "Username",
+        "description": "PAN-OS administrator username used to generate an API key.",
+        "type": "string",
+        "sensitive": true
+      },
+      "password": {
+        "title": "Password",
+        "description": "PAN-OS administrator password used to generate an API key.",
+        "type": "string",
+        "sensitive": true
+      },
+      "vsys": {
+        "title": "VSYS",
+        "description": "Optional PAN-OS virtual system scope for operational commands.",
+        "type": "string"
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string"
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean",
+        "default": false
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for TLS authentication.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "The URL of the proxy server.",
+        "type": "string"
+      },
+      "headers": {
+        "title": "Headers",
+        "description": "Additional HTTP headers to include in PAN-OS XML API requests.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "dependencies": {
+      "tls_cert": [
+        "tls_key"
+      ],
+      "tls_key": [
+        "tls_cert"
+      ]
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "url",
+            "timeout",
+            "vsys",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "api_key",
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "Proxy",
+          "fields": [
+            "proxy_url"
+          ]
+        },
+        {
+          "title": "Headers",
+          "fields": [
+            "headers"
+          ]
+        }
+      ]
+    },
+    "api_key": {
+      "ui:widget": "password"
+    },
+    "username": {
+      "ui:widget": "password"
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    }
+  }
+}

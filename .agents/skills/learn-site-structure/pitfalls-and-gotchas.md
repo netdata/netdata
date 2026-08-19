@@ -306,12 +306,17 @@ loads.
 
 ## Custom anchor IDs
 
-`ingest.py:531-560` extracts header anchors via a slugger.
-Custom anchors via `<a id="..."> </a>` may not match the
-slugger and trigger anchor-mismatch warnings during link
-resolution (step 12 of the pipeline). Use `## Heading` text
-that produces the desired slug instead of injecting custom
-anchors.
+`ingest.py:531-560` extracts header anchors via a slugger that
+keys ONLY off the slugified heading **text**. Custom anchors —
+both `<a id="..."> </a>` HTML anchors AND the Docusaurus
+`## Heading {#custom-id}` heading-ID syntax — are NOT honored
+by it, so a cross-file link to `#custom-id` is reported as a
+broken header link (a hard failure under `--fail-links-netdata`,
+the `check-markdown.yml` CI gate) even though Docusaurus would
+render it. Use `## Heading` text that slugifies to the anchor
+you want instead of injecting a custom ID. (Same-page `#anchor`
+links are not validated by this checker, but cross-file
+`/docs/.../page.md#anchor` links are.)
 
 ## OpenAPI / Swagger
 

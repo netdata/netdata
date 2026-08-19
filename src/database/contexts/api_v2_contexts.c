@@ -210,7 +210,7 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
     
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, (ri->flags & RRD_FLAG_COLLECTED) ? ctl->now : ri->last_time_s, 0))
+        if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, rrd_flag_is_collected(ri) ? ctl->now : ri->last_time_s, 0))
             continue;
 
         // Check instance name match only if instances option is enabled
@@ -227,7 +227,7 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
         if(ctl->options & CONTEXTS_OPTION_DIMENSIONS) {
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
-                if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, (rm->flags & RRD_FLAG_COLLECTED) ? ctl->now : rm->last_time_s, 0))
+                if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, rrd_flag_is_collected(rm) ? ctl->now : rm->last_time_s, 0))
                     continue;
 
                 if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
@@ -267,7 +267,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
-    if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rc->first_time_s, (rc->flags & RRD_FLAG_COLLECTED) ? ctl->now : rc->last_time_s, 0))
+    if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rc->first_time_s, rrd_flag_is_collected(rc) ? ctl->now : rc->last_time_s, 0))
         return 0; // continue to next context
 
     struct fts_search_results search_results = {0};
@@ -294,7 +294,7 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
             .priority = rc->priority,
             .first_time_s = rc->first_time_s,
             .last_time_s = rc->last_time_s,
-            .flags = rc->flags,
+            .flags = rrd_flags_get(rc),
             .nodes = 1,
             .instances = dictionary_entries(rc->rrdinstances),
             .instances_dict = NULL,
@@ -313,13 +313,13 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     return 1;
 }
 
-void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, size_t ni __maybe_unused) {
+void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, const RRDHOST_IDENTITY *identity, size_t ni __maybe_unused) {
     buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
 
     if(!UUIDiszero(host->node_id))
         buffer_json_member_add_uuid(wb, "node_id", host->node_id.uuid);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    buffer_json_member_add_string(wb, "hostname", string2str(identity->hostname));
 
     buffer_json_member_add_string(wb, "relationship",
                                   host == localhost ? "localhost" :
@@ -475,12 +475,14 @@ static inline void rrdhost_health_to_json_v2(BUFFER *wb, const char *key, RRDHOS
 }
 
 static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdcontext_to_json_v2_data *ctl, size_t node_id) {
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+
     buffer_json_add_array_item_object(wb); // this node
 
     if(ctl->options & CONTEXTS_OPTION_MCP)
-        buffer_json_node_add_v2_mcp(wb, host, node_id);
+        buffer_json_node_add_v2_mcp(wb, host, &identity, node_id);
     else
-        buffer_json_node_add_v2(wb, host, node_id, 0,
+        buffer_json_node_add_v2(wb, host, &identity, node_id, 0,
                             (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));
 
     if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)) {
@@ -488,10 +490,14 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
         rrdhost_status(host, ctl->now, &s, RRDHOST_STATUS_ALL);
 
         if (ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH)) {
-            buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
+            buffer_json_member_add_string(wb, "v", string2str(identity.prog_version));
 
             host_labels2json(host, wb, "labels");
-            rrdhost_system_info_to_json_v2(wb, host->system_info);
+            spinlock_lock(&host->rrdhost_update_lock);
+            struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+            spinlock_unlock(&host->rrdhost_update_lock);
+            rrdhost_system_info_to_json_v2(wb, system_info);
+            rrdhost_system_info_free(system_info);
 
             // created      - the node is created but never connected to cloud
             // unreachable  - not currently connected
@@ -561,6 +567,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
         }
     }
     buffer_json_object_close(wb); // this node
+    rrdhost_identity_release(&identity);
 }
 
 static bool rrdhost_alert_status_snapshot_read(RRDHOST *host, struct health_alert_status_counts *snapshot) {
@@ -972,7 +979,7 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
     // Collect instances, dimensions, and labels if requested
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, (ri->flags & RRD_FLAG_COLLECTED) ? ctl->now : ri->last_time_s, (time_t)ri->update_every_s))
+        if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, rrd_flag_is_collected(ri) ? ctl->now : ri->last_time_s, (time_t)ri->update_every_s))
             continue;
 
         // Add instance name to instances dictionary
@@ -984,7 +991,7 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
         if(t->dimensions_dict) {
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
-                if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, (rm->flags & RRD_FLAG_COLLECTED) ? ctl->now : rm->last_time_s, (time_t)ri->update_every_s))
+                if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, rrd_flag_is_collected(rm) ? ctl->now : rm->last_time_s, (time_t)ri->update_every_s))
                     continue;
 
                 dictionary_set(t->dimensions_dict, string2str(rm->name), NULL, 0);
@@ -1302,7 +1309,6 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .alerts.alert_name_pattern = string_to_simple_pattern(req->alerts.alert),
             .window = {
                     .enabled = false,
-                    .relative = false,
                     .after = req->after,
                     .before = req->before,
             },
@@ -1349,8 +1355,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     if(req->after || req->before) {
-        ctl.window.relative = rrdr_relative_window_to_absolute_query(
-            &ctl.window.after, &ctl.window.before, &ctl.now, false);
+        rrdr_relative_window_to_absolute_query(&ctl.window.after, &ctl.window.before, &ctl.now, false);
 
         ctl.window.enabled = !(mode & CONTEXTS_V2_ALERT_TRANSITIONS);
     }

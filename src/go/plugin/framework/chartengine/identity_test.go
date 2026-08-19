@@ -3,8 +3,10 @@
 package chartengine
 
 import (
+	"sort"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,6 +88,90 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			},
 			labels: map[string]string{
 				"device": "eth0",
+			},
+			wantOK: false,
+		},
+		"optional instance label absent keeps base chart": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"service": "api",
+			},
+			wantID: "worker_cpu",
+			wantOK: true,
+		},
+		"optional instance label blank keeps base chart": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"pid": "  ",
+			},
+			wantID: "worker_cpu",
+			wantOK: true,
+		},
+		"optional instance label present appends suffix": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"pid": "1234",
+			},
+			wantID: "worker_cpu_pid_1234",
+			wantOK: true,
+		},
+		"partially present optional worker keeps key in suffix": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"worker", "pid"},
+			},
+			labels: map[string]string{
+				"worker": "blue",
+			},
+			wantID: "worker_cpu_worker_blue",
+			wantOK: true,
+		},
+		"partially present optional pid keeps key in suffix": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"worker", "pid"},
+			},
+			labels: map[string]string{
+				"pid": "blue",
+			},
+			wantID: "worker_cpu_pid_blue",
+			wantOK: true,
+		},
+		"required values precede optional values": {
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{Raw: "worker_cpu"},
+				InstanceByLabels: []program.InstanceLabelSelector{
+					{Key: "deployment"},
+				},
+				OptionalByLabels: []string{"worker", "pid"},
+			},
+			labels: map[string]string{
+				"deployment": "api",
+				"worker":     "blue",
+				"pid":        "1234",
+			},
+			wantID: "worker_cpu_api_worker_blue_pid_1234",
+			wantOK: true,
+		},
+		"optional value does not satisfy a missing required label": {
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{Raw: "worker_cpu"},
+				InstanceByLabels: []program.InstanceLabelSelector{
+					{Key: "deployment"},
+				},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{
+				"pid": "1234",
 			},
 			wantOK: false,
 		},
@@ -207,6 +293,58 @@ func TestRenderChartInstanceIDExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, ok)
 			assert.Equal(t, tc.wantID, got)
+		})
+	}
+}
+
+var benchmarkRenderedChartInstanceID string
+
+func BenchmarkRenderChartInstanceID(b *testing.B) {
+	tests := map[string]struct {
+		identity program.ChartIdentity
+		labels   map[string]string
+	}{
+		"required_present": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				InstanceByLabels: []program.InstanceLabelSelector{{Key: "pid"}},
+			},
+			labels: map[string]string{"pid": "1234"},
+		},
+		"optional_present": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{"pid": "1234"},
+		},
+		"optional_absent": {
+			identity: program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "worker_cpu"},
+				OptionalByLabels: []string{"pid"},
+			},
+			labels: map[string]string{"service": "api"},
+		},
+	}
+
+	for name, tc := range tests {
+		b.Run(name, func(b *testing.B) {
+			labels := make([]metrix.Label, 0, len(tc.labels))
+			for key, value := range tc.labels {
+				labels = append(labels, metrix.Label{Key: key, Value: value})
+			}
+			sort.Slice(labels, func(i, j int) bool { return labels[i].Key < labels[j].Key })
+			view := labelSliceView{items: labels}
+			plan := compileInstanceLabelPlan(tc.identity)
+
+			b.ReportAllocs()
+			for range b.N {
+				got, ok, err := renderChartInstanceIDFromViewWithPlan(tc.identity, plan, view)
+				if err != nil || !ok {
+					b.Fatalf("render chart identity: ok=%v err=%v", ok, err)
+				}
+				benchmarkRenderedChartInstanceID = got
+			}
 		})
 	}
 }

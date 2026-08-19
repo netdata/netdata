@@ -39,8 +39,8 @@ func bgpPeerColumnSet(cols []bgpPeerColumn) funcapi.ColumnSet[bgpPeerColumn] {
 
 var _ funcapi.MethodHandler = (*funcBGPPeers)(nil)
 
-func bgpPeersMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func bgpPeersFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:          bgpPeersMethodID,
 		Name:        "BGP Peers",
 		UpdateEvery: 10,
@@ -63,7 +63,7 @@ func (f *funcBGPPeers) MethodParams(_ context.Context, method string) ([]funcapi
 	if method != bgpPeersMethodID {
 		return nil, nil
 	}
-	return bgpPeersMethodConfig().RequiredParams, nil
+	return bgpPeersFunctionConfig().RequiredParams, nil
 }
 
 func (f *funcBGPPeers) Cleanup(_ context.Context) {}

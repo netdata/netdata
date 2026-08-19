@@ -125,7 +125,9 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
         size_t health_log_memory = aral_used_bytes_from_stats(health_alarm_entry_aral_stats());
 
         rrddim_set_by_pointer(st_memory, rd_db_dbengine, (collected_number)pulse_dbengine_total_memory);
-        rrddim_set_by_pointer(st_memory, rd_db_rrd, (collected_number)pulse_rrd_memory_size);
+        rrddim_set_by_pointer(
+            st_memory, rd_db_rrd,
+            (collected_number)__atomic_load_n(&pulse_rrd_memory_size, __ATOMIC_RELAXED));
         rrddim_set_by_pointer(st_memory, rd_db_sqlite3, (collected_number)sqlite3_memory_used_highwater);
 
 #ifdef DICT_WITH_STATS

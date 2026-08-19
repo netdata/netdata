@@ -12,18 +12,18 @@ Limitations: Works best for sudden changes and patterns not seen in the last 54 
 
 ## System Characteristics
 
-| Aspect | Implementation | Operational Benefit |
-|--------|----------------|-------------------|
-| **Data Source** | Per-metric anomaly detection using k-means (k=2) with 18-model consensus | Comprehensive coverage, no blind spots |
-| **Correlation Engine** | Pre-computed Node Anomaly Rate (NAR) charts updated in real-time | Instant blast radius visualization |
-| **Query Engine** | Specialized scoring engine evaluating thousands of metrics simultaneously | Returns ranked list, not time-series data |
-| **Ranking Algorithm** | Anomaly severity scoring across selected time window | Root cause typically in top 30-50 results |
-| **Infrastructure View** | Dual charts: % anomalous and absolute count per node | Distinguishes small node spikes from large node issues |
-| **Time to Insight** | Highlight timeframe → ranked results in seconds |Minutes to root cause vs hours of hypothesis testing |
-| **Expertise Required** | No system-specific knowledge needed to identify anomalies | Minimal expertise to interpret results |
-| **Dependency Discovery** | Correlated anomalies reveal component relationships | Exposes hidden infrastructure dependencies |
-| **Best Use Cases** | Sudden changes, cascading failures, multi-node incidents | Excellent for "what just happened?" scenarios |
-| **Limitations** | Cannot detect stopped services, gradual degradation | Not a replacement for all monitoring |
+| Aspect                  | Implementation                                                                 | Operational Benefit                                |
+|-------------------------|---------------------------------------------------------------------------------|----------------------------------------------------|
+| **Data Source**         | Per-metric anomaly detection using k-means (k=2) with 18-model consensus        | Comprehensive coverage, no blind spots             |
+| **Correlation Engine**  | Pre-computed Node Anomaly Rate (NAR) charts updated in real-time                | Instant blast radius visualization                 |
+| **Query Engine**        | Specialized scoring engine evaluating thousands of metrics simultaneously        | Returns ranked list, not time-series data          |
+| **Ranking Algorithm**   | Anomaly severity scoring across selected time window                            | Root cause typically in top 30-50 results          |
+| **Infrastructure View** | Dual charts: % anomalous and absolute count per node                            | Distinguishes small node spikes from large issues  |
+| **Time to Insight**     | Highlight timeframe → ranked results in seconds                                 | Minutes to root cause vs hours of hypothesis testing |
+| **Expertise Required**  | No system-specific knowledge needed to identify anomalies                       | Minimal expertise to interpret results             |
+| **Dependency Discovery**| Correlated anomalies reveal component relationships                             | Exposes hidden infrastructure dependencies         |
+| **Best Use Cases**      | Sudden changes, cascading failures, multi-node incidents                        | Excellent for "what just happened?" scenarios      |
+| **Limitations**         | Cannot detect stopped services, gradual degradation                             | Not a replacement for all monitoring               |
 
 :::warning Limitations
 

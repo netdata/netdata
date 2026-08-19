@@ -42,6 +42,7 @@ var validMetadataResources = map[string]map[string]bool{
 		"bridge_base_address":         true,
 		"stp_designated_root":         true,
 		"vtp_version":                 true,
+		"ospf_router_id":              true,
 	},
 	"interface": {
 		"name":         true,

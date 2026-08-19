@@ -50,7 +50,7 @@ Local, unsupervised ML runs on every agent, learning normal behavior and scoring
 
 ### 7) MCP (Model Context Protocol)
 
-Connect AI clients to Netdata’s MCP server to bring live observability into natural‑language workflows and optional automation. Options include [MCP](/docs/netdata-ai/mcp/README.md), [Chat with Netdata](/docs/netdata-ai/mcp/ai-chat-netdata.md), and [MCP Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md) like Claude Desktop, Cursor, VS Code, JetBrains IDEs, Claude Code, Gemini CLI, and the Netdata Web Client.
+Connect AI clients to Netdata’s MCP server to bring live observability into natural‑language workflows and optional automation. Options include [MCP](/docs/netdata-ai/mcp/README.md), [Chat with Netdata](/docs/netdata-ai/mcp/ai-chat-netdata.md), and [Supported AI Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md) like Claude Desktop, Cursor, VS Code, JetBrains IDEs, Claude Code, Gemini CLI, and the Netdata Web Client. Netdata Cloud can also act as an MCP client that connects to your own tools — see [MCP Connections](/docs/netdata-ai/mcp/mcp-connections.md).
 
 ## Usage and credits
 

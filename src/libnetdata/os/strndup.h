@@ -5,7 +5,11 @@
 
 #include "config.h"
 
-#ifndef HAVE_STRNDUP
+#include <stddef.h>
+
+#if !defined(HAVE_STRNDUP) && !(defined(NETDATA_TRACE_ALLOCATIONS) && defined(HAVE_DLSYM) && defined(ENABLE_DLSYM))
+char *os_strndup(const char *s, size_t n);
+#undef strndup
 #define strndup(s, n) os_strndup(s, n)
 #endif
 

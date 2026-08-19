@@ -303,6 +303,61 @@ cleanup:
     return failed;
 }
 
+static int test_yaml_mapping_keys(void) {
+    int failed = 0;
+    BUFFER *error = buffer_create(0, NULL);
+
+    const char *embedded_nul =
+        "valid:\n"
+        "  - retained\n"
+        "  - nested:\n"
+        "      \"bad\\0key\":\n"
+        "        child: ignored\n";
+    struct json_object *json = yaml_parse_string(embedded_nul, error, YAML2JSON_ALL_VALUES_AS_STRINGS);
+    if (json || !strstr(buffer_tostring(error), "embedded NUL")) {
+        fprintf(stderr, "FAILED: test_yaml_mapping_keys: embedded NUL key was not rejected: %s\n",
+                buffer_tostring(error));
+        failed++;
+    }
+    if (json)
+        json_object_put(json);
+
+    buffer_flush(error);
+    const char *valid_keys =
+        "anchor: &key alias-key\n"
+        "*key: alias-value\n"
+        "\"\": empty-value\n"
+        "\"a\\x01b\": control-value\n"
+        "duplicate: first\n"
+        "duplicate: second\n";
+    json = yaml_parse_string(valid_keys, error, YAML2JSON_DEFAULT);
+    const char control_key[] = {'a', '\x01', 'b', '\0'};
+    struct json_object *value = NULL;
+    if (!json ||
+        json_object_object_length(json) != 5 ||
+        !json_object_object_get_ex(json, "alias-key", &value) ||
+        !json_object_is_type(value, json_type_string) ||
+        strcmp(json_object_get_string(value), "alias-value") != 0 ||
+        !json_object_object_get_ex(json, "", &value) ||
+        !json_object_is_type(value, json_type_string) ||
+        strcmp(json_object_get_string(value), "empty-value") != 0 ||
+        !json_object_object_get_ex(json, control_key, &value) ||
+        !json_object_is_type(value, json_type_string) ||
+        strcmp(json_object_get_string(value), "control-value") != 0 ||
+        !json_object_object_get_ex(json, "duplicate", &value) ||
+        !json_object_is_type(value, json_type_string) ||
+        strcmp(json_object_get_string(value), "second") != 0) {
+        fprintf(stderr, "FAILED: test_yaml_mapping_keys: representable key behavior changed: %s\n",
+                buffer_tostring(error));
+        failed++;
+    }
+    if (json)
+        json_object_put(json);
+
+    buffer_free(error);
+    return failed;
+}
+
 static int test_yaml_generation(void) {
     int failed = 0;
     
@@ -647,6 +702,7 @@ int yaml_unittest(void) {
         {"test_yaml_parse_strings", test_yaml_parse_strings},
         {"test_yaml_parse_arrays", test_yaml_parse_arrays},
         {"test_yaml_parse_objects", test_yaml_parse_objects},
+        {"test_yaml_mapping_keys", test_yaml_mapping_keys},
         {"test_yaml_generation", test_yaml_generation},
         {"test_yaml_parse_errors", test_yaml_parse_errors},
         {"test_yaml_file_operations", test_yaml_file_operations},

@@ -13,8 +13,8 @@ doctest = false
 workspace = true
 
 [dependencies]
-netdata-plugin-error = { path = "../error" }
-netdata-plugin-types = { path = "../types" }
+netdata-plugin-error = { workspace = true }
+netdata-plugin-types = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

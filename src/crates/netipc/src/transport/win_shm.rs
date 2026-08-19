@@ -26,7 +26,7 @@ mod ffi {
     pub const WAIT_OBJECT_0: DWORD = 0x00000000;
     pub const WAIT_TIMEOUT: DWORD = 0x00000102;
 
-    extern "system" {
+    unsafe extern "system" {
         pub fn CreateFileMappingW(
             hFile: HANDLE,
             lpFileMappingAttributes: *const core::ffi::c_void,
@@ -274,22 +274,22 @@ unsafe fn create_file_mapping(
 ) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::CreateFileMapping) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::CreateFileMappingW(h_file, attrs, protect, size_high, size_low, name)
+    unsafe { ffi::CreateFileMappingW(h_file, attrs, protect, size_high, size_low, name) }
 }
 
 #[cfg(windows)]
 unsafe fn open_file_mapping(access: u32, inherit: i32, name: *const u16) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::OpenFileMapping) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::OpenFileMappingW(access, inherit, name)
+    unsafe { ffi::OpenFileMappingW(access, inherit, name) }
 }
 
 #[cfg(windows)]
@@ -302,11 +302,11 @@ unsafe fn map_view_of_file(
 ) -> *mut core::ffi::c_void {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::MapViewOfFile) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return std::ptr::null_mut();
     }
 
-    ffi::MapViewOfFile(mapping, access, offset_high, offset_low, bytes)
+    unsafe { ffi::MapViewOfFile(mapping, access, offset_high, offset_low, bytes) }
 }
 
 #[cfg(windows)]
@@ -318,22 +318,22 @@ unsafe fn create_event(
 ) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::CreateEvent) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::CreateEventW(attrs, manual_reset, initial_state, name)
+    unsafe { ffi::CreateEventW(attrs, manual_reset, initial_state, name) }
 }
 
 #[cfg(windows)]
 unsafe fn open_event(access: u32, inherit: i32, name: *const u16) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::OpenEvent) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::OpenEventW(access, inherit, name)
+    unsafe { ffi::OpenEventW(access, inherit, name) }
 }
 
 // ---------------------------------------------------------------------------
@@ -588,17 +588,20 @@ impl WinShmContext {
         let spin = read_u32(base, OFF_SPIN_TRIES);
 
         // Validate header fields from shared memory
+        let req_end = req_off.checked_add(req_cap);
+        let resp_end = resp_off.checked_add(resp_cap);
         if req_off == 0
             || req_cap == 0
             || resp_off == 0
             || resp_cap == 0
-            || req_off % 64 != 0
-            || req_cap % 64 != 0
-            || resp_off % 64 != 0
-            || resp_cap % 64 != 0
-            || req_off
-                .checked_add(req_cap)
-                .map_or(true, |end| resp_off < end)
+            || req_off < HEADER_LEN
+            || resp_off < HEADER_LEN
+            || req_off % CACHELINE_SIZE != 0
+            || req_cap % CACHELINE_SIZE != 0
+            || resp_off % CACHELINE_SIZE != 0
+            || resp_cap % CACHELINE_SIZE != 0
+            || req_end.map_or(true, |end| resp_off < end)
+            || resp_end.is_none()
         {
             unsafe {
                 ffi::UnmapViewOfFile(base as *const _);
@@ -607,7 +610,7 @@ impl WinShmContext {
             return Err(WinShmError::BadHeader);
         }
 
-        let region_size = (resp_off as usize) + (resp_cap as usize);
+        let region_size = resp_end.unwrap() as usize;
 
         // Read current sequence numbers via interlocked
         let cur_req_seq = interlocked_read_i64(base, OFF_REQ_SEQ);
@@ -784,18 +787,10 @@ impl WinShmContext {
         let mut observed = false;
         let mut mlen: i32 = 0;
         for _ in 0..self.spin_tries {
-            let cur = interlocked_read_i64(self.base, seq_off);
-            if cur >= expected_seq {
-                mlen = interlocked_read_i32(self.base, len_off);
-                if mlen > 0 && (mlen as usize) <= max_copy {
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            self.base.add(area_off as usize),
-                            buf.as_mut_ptr(),
-                            mlen as usize,
-                        );
-                    }
-                }
+            if let Some(observed_len) =
+                self.copy_observed_message(buf, seq_off, len_off, expected_seq, area_off, max_copy)?
+            {
+                mlen = observed_len;
                 observed = true;
                 break;
             }
@@ -817,8 +812,15 @@ impl WinShmContext {
                     interlocked_exchange_i32(self.base, self_waiting_off, 1);
                     std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
 
-                    let cur = interlocked_read_i64(self.base, seq_off);
-                    if cur >= expected_seq {
+                    if let Some(observed_len) = self.copy_observed_message(
+                        buf,
+                        seq_off,
+                        len_off,
+                        expected_seq,
+                        area_off,
+                        max_copy,
+                    )? {
+                        mlen = observed_len;
                         interlocked_exchange_i32(self.base, self_waiting_off, 0);
                         break; // data available
                     }
@@ -839,15 +841,29 @@ impl WinShmContext {
                     interlocked_exchange_i32(self.base, self_waiting_off, 0);
 
                     // Check sequence — data may have arrived
-                    let cur = interlocked_read_i64(self.base, seq_off);
-                    if cur >= expected_seq {
+                    if let Some(observed_len) = self.copy_observed_message(
+                        buf,
+                        seq_off,
+                        len_off,
+                        expected_seq,
+                        area_off,
+                        max_copy,
+                    )? {
+                        mlen = observed_len;
                         break; // data available
                     }
 
                     // No data — check peer close
                     if interlocked_read_i32(self.base, peer_closed_off) != 0 {
-                        let cur = interlocked_read_i64(self.base, seq_off);
-                        if cur >= expected_seq {
+                        if let Some(observed_len) = self.copy_observed_message(
+                            buf,
+                            seq_off,
+                            len_off,
+                            expected_seq,
+                            area_off,
+                            max_copy,
+                        )? {
+                            mlen = observed_len;
                             break;
                         }
                         self.advance_seq(expected_seq);
@@ -861,34 +877,20 @@ impl WinShmContext {
 
                     // Spurious wake — retry with remaining deadline
                 }
-
-                // Copy after waking
-                mlen = interlocked_read_i32(self.base, len_off);
-                if mlen > 0 && (mlen as usize) <= max_copy {
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            self.base.add(area_off as usize),
-                            buf.as_mut_ptr(),
-                            mlen as usize,
-                        );
-                    }
-                }
             } else {
                 // BUSYWAIT
                 let start = unsafe { ffi::GetTickCount() };
+                let mut polls = 0;
                 loop {
-                    let cur = interlocked_read_i64(self.base, seq_off);
-                    if cur >= expected_seq {
-                        mlen = interlocked_read_i32(self.base, len_off);
-                        if mlen > 0 && (mlen as usize) <= max_copy {
-                            unsafe {
-                                std::ptr::copy_nonoverlapping(
-                                    self.base.add(area_off as usize),
-                                    buf.as_mut_ptr(),
-                                    mlen as usize,
-                                );
-                            }
-                        }
+                    if let Some(observed_len) = self.copy_observed_message(
+                        buf,
+                        seq_off,
+                        len_off,
+                        expected_seq,
+                        area_off,
+                        max_copy,
+                    )? {
+                        mlen = observed_len;
                         break;
                     }
 
@@ -900,25 +902,22 @@ impl WinShmContext {
                     }
 
                     if interlocked_read_i32(self.base, peer_closed_off) != 0 {
-                        let cur = interlocked_read_i64(self.base, seq_off);
-                        if cur >= expected_seq {
-                            mlen = interlocked_read_i32(self.base, len_off);
-                            if mlen > 0 && (mlen as usize) <= max_copy {
-                                unsafe {
-                                    std::ptr::copy_nonoverlapping(
-                                        self.base.add(area_off as usize),
-                                        buf.as_mut_ptr(),
-                                        mlen as usize,
-                                    );
-                                }
-                            }
+                        if let Some(observed_len) = self.copy_observed_message(
+                            buf,
+                            seq_off,
+                            len_off,
+                            expected_seq,
+                            area_off,
+                            max_copy,
+                        )? {
+                            mlen = observed_len;
                             break;
                         }
                         self.advance_seq(expected_seq);
                         return Err(WinShmError::Disconnected);
                     }
 
-                    cpu_relax();
+                    busywait_relax(&mut polls);
                 }
             }
         }
@@ -935,6 +934,100 @@ impl WinShmContext {
         }
 
         Ok(mlen as usize)
+    }
+
+    /// Try the spin-only receive path without entering kernel wait/deadline work.
+    pub(crate) fn receive_ready(&mut self, buf: &mut [u8]) -> Result<Option<usize>, WinShmError> {
+        if self.base.is_null() {
+            return Err(WinShmError::BadParam("null context".into()));
+        }
+        if buf.is_empty() {
+            return Err(WinShmError::BadParam("empty buffer".into()));
+        }
+
+        let (area_off, area_cap, len_off, seq_off, expected_seq) = match self.role {
+            WinShmRole::Server => (
+                self.request_offset,
+                self.request_capacity,
+                OFF_REQ_LEN,
+                OFF_REQ_SEQ,
+                self.local_req_seq + 1,
+            ),
+            WinShmRole::Client => (
+                self.response_offset,
+                self.response_capacity,
+                OFF_RESP_LEN,
+                OFF_RESP_SEQ,
+                self.local_resp_seq + 1,
+            ),
+        };
+
+        let max_copy = std::cmp::min(buf.len(), area_cap as usize);
+
+        for _ in 0..self.spin_tries {
+            let Some(mlen) = self.copy_observed_message(
+                buf,
+                seq_off,
+                len_off,
+                expected_seq,
+                area_off,
+                max_copy,
+            )?
+            else {
+                cpu_relax();
+                continue;
+            };
+
+            // Match receive(): consume the observed sequence before reporting
+            // malformed or oversized messages.
+            self.advance_seq(expected_seq);
+            if mlen == 0 {
+                return Err(WinShmError::BadHeader);
+            }
+            if (mlen as usize) > max_copy {
+                return Err(WinShmError::MsgTooLarge);
+            }
+            return Ok(Some(mlen as usize));
+        }
+
+        Ok(None)
+    }
+
+    fn copy_observed_message(
+        &self,
+        buf: &mut [u8],
+        seq_off: usize,
+        len_off: usize,
+        expected_seq: i64,
+        area_off: u32,
+        max_copy: usize,
+    ) -> Result<Option<i32>, WinShmError> {
+        let seq_before = interlocked_read_i64(self.base, seq_off);
+        if seq_before < expected_seq {
+            return Ok(None);
+        }
+
+        let mlen = interlocked_read_i32(self.base, len_off);
+        if mlen < 0 {
+            return Err(WinShmError::BadHeader);
+        }
+        if mlen > 0 && (mlen as usize) <= max_copy {
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    self.base.add(area_off as usize),
+                    buf.as_mut_ptr(),
+                    mlen as usize,
+                );
+            }
+        }
+
+        let len_after = interlocked_read_i32(self.base, len_off);
+        let seq_after = interlocked_read_i64(self.base, seq_off);
+        if seq_before != seq_after || mlen != len_after {
+            return Err(WinShmError::BadHeader);
+        }
+
+        Ok(Some(mlen))
     }
 
     fn advance_seq(&mut self, expected_seq: i64) {
@@ -1143,6 +1236,17 @@ fn cpu_relax() {
     #[cfg(not(any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))]
     {
         std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[cfg(windows)]
+#[inline]
+fn busywait_relax(polls: &mut u32) {
+    *polls = polls.wrapping_add(1);
+    if (*polls & BUSYWAIT_POLL_MASK) == 0 {
+        std::thread::yield_now();
+    } else {
+        cpu_relax();
     }
 }
 
@@ -1560,6 +1664,89 @@ mod tests {
 
         let mut buf = [0u8; 128];
         assert_eq!(server.receive(&mut buf, 10), Err(WinShmError::Timeout));
+
+        client.close();
+        server.destroy();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_receive_ready_hit_and_miss_windows() {
+        let run_dir = test_run_dir();
+        let service = unique_service("rs_win_shm_receive_ready");
+        let auth_token: u64 = 0x8915;
+        let session_id: u64 = 23;
+
+        let mut server = WinShmContext::server_create(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+            4096,
+            4096,
+        )
+        .expect("server_create");
+        let mut client = WinShmContext::client_attach(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+        )
+        .expect("client_attach");
+
+        let mut buf = [0u8; 128];
+        assert_eq!(server.receive_ready(&mut buf), Ok(None));
+
+        client.send(b"ready").expect("client send");
+        assert_eq!(server.receive_ready(&mut buf), Ok(Some(5)));
+        assert_eq!(&buf[..5], b"ready");
+        assert_eq!(server.receive_ready(&mut buf), Ok(None));
+
+        client.close();
+        server.destroy();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_receive_ready_rejects_bad_and_oversized_lengths_windows() {
+        let run_dir = test_run_dir();
+        let service = unique_service("rs_win_shm_receive_ready_bad");
+        let auth_token: u64 = 0x8916;
+        let session_id: u64 = 24;
+
+        let mut server = WinShmContext::server_create(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+            128,
+            128,
+        )
+        .expect("server_create");
+        let mut client = WinShmContext::client_attach(
+            &run_dir,
+            &service,
+            auth_token,
+            session_id,
+            PROFILE_HYBRID,
+        )
+        .expect("client_attach");
+
+        let mut buf = [0u8; 16];
+
+        interlocked_exchange_i32(server.base, OFF_REQ_LEN, 0);
+        interlocked_increment_i64(server.base, OFF_REQ_SEQ);
+        assert_eq!(server.receive_ready(&mut buf), Err(WinShmError::BadHeader));
+
+        interlocked_exchange_i32(server.base, OFF_REQ_LEN, 64);
+        interlocked_increment_i64(server.base, OFF_REQ_SEQ);
+        assert_eq!(
+            server.receive_ready(&mut buf),
+            Err(WinShmError::MsgTooLarge)
+        );
 
         client.close();
         server.destroy();

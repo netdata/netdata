@@ -52,9 +52,11 @@ pub(crate) struct JournalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct JournalTierRetentionConfig {
-    /// Hard size cap. Unset (`null`) disables the size limit; the tier
-    /// is then bounded only by `duration_of_journal_files`. Defaults to
-    /// the tier-default size if the field is omitted.
+    /// Retained journal and per-journal facet-sidecar budget. The active journal
+    /// is protected and may temporarily exceed it. Unset (`null`) disables the
+    /// size limit; the tier is then bounded only by
+    /// `duration_of_journal_files`. Defaults to the tier-default size if the
+    /// field is omitted.
     #[serde(
         default = "default_retention_size_of_journal_files_opt",
         deserialize_with = "deserialize_opt_bytesize",
@@ -63,8 +65,8 @@ pub(crate) struct JournalTierRetentionConfig {
     pub(crate) size_of_journal_files: Option<ByteSize>,
 
     /// Maximum age. Unset (`null`) disables the duration limit; the
-    /// tier is then bounded only by `size_of_journal_files`. Defaults
-    /// to the tier-default duration if the field is omitted.
+    /// tier is then bounded only by `size_of_journal_files`. Omitted
+    /// values use the built-in size-only default.
     #[serde(
         default = "default_retention_duration_of_journal_files_opt",
         deserialize_with = "deserialize_opt_duration",
@@ -75,10 +77,10 @@ pub(crate) struct JournalTierRetentionConfig {
 
 impl JournalTierRetentionConfig {
     pub(crate) fn for_tier(_tier: TierKind) -> Self {
-        // Tier-uniform defaults today (10GB, 7d). The shape is per-tier
-        // so each tier can be tuned independently in user config; the
-        // built-in defaults happen to be uniform across tiers but
-        // nothing in the schema enforces that.
+        // Tier-uniform defaults today (10GB, no age cap). The shape is
+        // per-tier so each tier can be tuned independently in user
+        // config; the built-in defaults happen to be uniform across
+        // tiers but nothing in the schema enforces that.
         Self {
             size_of_journal_files: default_retention_size_of_journal_files_opt(),
             duration_of_journal_files: default_retention_duration_of_journal_files_opt(),

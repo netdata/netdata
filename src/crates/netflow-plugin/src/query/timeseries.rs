@@ -30,20 +30,27 @@ pub(crate) fn metrics_chart_from_top_groups(
     before: u32,
     bucket_seconds: u32,
     sort_by: SortBy,
+    group_by: &[String],
     top_rows: &[AggregatedFlow],
     series_buckets: &[Vec<u64>],
 ) -> Value {
     let rate_units = timeseries_units(sort_by);
-    let ids: Vec<String> = top_rows
+    let ordered_labels: Vec<Map<String, Value>> = top_rows
         .iter()
-        .map(|row| serde_json::to_string(&row.labels).unwrap_or_default())
+        .map(|row| ordered_group_labels(&row.labels, group_by))
         .collect();
-    let names: Vec<String> = top_rows
+    let ids: Vec<String> = ordered_labels
         .iter()
-        .map(|row| {
-            row.labels
+        .map(|labels| serde_json::to_string(labels).unwrap_or_default())
+        .collect();
+    let names: Vec<String> = ordered_labels
+        .iter()
+        .map(|labels| {
+            labels
                 .iter()
-                .map(|(key, value)| presentation::format_group_name(key, value))
+                .map(|(key, value)| {
+                    presentation::format_group_name(key, value.as_str().unwrap_or_default())
+                })
                 .collect::<Vec<_>>()
                 .join(", ")
         })

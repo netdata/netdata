@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -22,21 +23,29 @@ func loadTopologyVLANContextProfiles(dev ddsnmp.DeviceConnectionInfo) ([]*ddsnmp
 	}).Project(ddsnmp.ConsumerTopology).FilterByKind(vlanScopableKinds).Profiles(), nil
 }
 
-func collectTopologyVLANContext(c *Collector, dev ddsnmp.DeviceConnectionInfo, vlanID string, profiles []*ddsnmp.Profile) ([]*ddsnmp.ProfileMetrics, error) {
+func collectTopologyVLANContext(ctx context.Context, c *Collector, dev ddsnmp.DeviceConnectionInfo, vlanID string, profiles []*ddsnmp.Profile) ([]*ddsnmp.ProfileMetrics, error) {
 	if strings.TrimSpace(vlanID) == "" {
 		return nil, fmt.Errorf("empty vlan id")
 	}
 	if _, err := strconv.Atoi(vlanID); err != nil {
 		return nil, fmt.Errorf("invalid vlan id '%s': %w", vlanID, err)
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
-	snmpClient, err := initTopologyVLANClient(c, dev, vlanID)
+	snmpClient, stopContextClose, err := initTopologyVLANClient(ctx, c, dev, vlanID)
 	if err != nil {
 		return nil, err
 	}
+	defer stopContextClose()
 	defer func() {
 		_ = snmpClient.Close()
 	}()
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	vlanCollector := c.newDdSnmpColl(ddsnmpcollector.Config{
 		SnmpClient:      snmpClient,
@@ -46,13 +55,24 @@ func collectTopologyVLANContext(c *Collector, dev ddsnmp.DeviceConnectionInfo, v
 		DisableBulkWalk: dev.DisableBulkWalk,
 	})
 
-	return vlanCollector.Collect()
-}
-
-func initTopologyVLANClient(c *Collector, dev ddsnmp.DeviceConnectionInfo, vlanID string) (gosnmp.Handler, error) {
-	client, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
+	pms, err := vlanCollector.Collect()
 	if err != nil {
 		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return pms, nil
+}
+
+func initTopologyVLANClient(ctx context.Context, c *Collector, dev ddsnmp.DeviceConnectionInfo, vlanID string) (gosnmp.Handler, func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, func() {}, err
+	}
+
+	client, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
+	if err != nil {
+		return nil, func() {}, err
 	}
 
 	switch client.Version() {
@@ -71,8 +91,9 @@ func initTopologyVLANClient(c *Collector, dev ddsnmp.DeviceConnectionInfo, vlanI
 	}
 
 	if err := client.Connect(); err != nil {
-		return nil, err
+		return nil, func() {}, err
 	}
 
-	return client, nil
+	stopContextClose := closeSNMPClientOnContextCancel(ctx, client)
+	return client, stopContextClose, nil
 }

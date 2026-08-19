@@ -20,6 +20,21 @@ impl PluginConfig {
         Ok(cfg)
     }
 
+    pub(crate) fn for_test_backend_dir(backend_dir: &Path) -> Result<Self> {
+        let mut cfg = Self::default();
+        cfg.journal.journal_dir = backend_dir
+            .to_str()
+            .with_context(|| {
+                format!(
+                    "netflow test backend directory {} is not valid UTF-8",
+                    backend_dir.display()
+                )
+            })?
+            .to_string();
+        cfg.validate()?;
+        Ok(cfg)
+    }
+
     pub(super) fn auto_detect_geoip_databases(&mut self) {
         let intel_dirs = [
             self.inferred_cache_dir().join(TOPOLOGY_IP_INTEL_DIR),
@@ -83,6 +98,23 @@ impl PluginConfig {
             .stock_data_dir
             .clone()
             .unwrap_or_else(|| PathBuf::from(DEFAULT_NETDATA_STOCK_DATA_DIR))
+    }
+
+    pub(crate) fn journal_host_state_dir(&self) -> PathBuf {
+        self._netdata_env
+            .lib_dir
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(DEFAULT_NETDATA_LIB_DIR))
+            .join("systemd-journal-sdk")
+    }
+
+    pub(crate) fn journal_host_filesystem_prefix(&self) -> Option<&Path> {
+        self._netdata_env
+            .host_prefix
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .map(Path::new)
     }
 
     fn load_from_netdata_config(netdata_env: &NetdataEnv) -> Result<Self> {

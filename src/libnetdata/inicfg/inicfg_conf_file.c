@@ -238,8 +238,7 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
             if(sect && section_string && overwrite_used && section_string == sect->name) {
                 SECTION_LOCK(sect);
 
-                while(sect->values)
-                    inicfg_option_remove_and_delete(sect, sect->values, true);
+                inicfg_option_remove_and_delete_all(sect, true);
 
                 SECTION_UNLOCK(sect);
             }

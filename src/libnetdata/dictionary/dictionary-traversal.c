@@ -179,15 +179,11 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callba
     // written in such a way, that the callback can delete the active element
 
     int ret = 0;
-    DICTIONARY_ITEM *item = dict->items.list, *item_next;
+    DICTIONARY_ITEM *item = dict->items.list;
+    while(item && !item_check_and_acquire(dict, item))
+        item = item->next;
+
     while(item) {
-
-        // skip the deleted items
-        if(unlikely(!item_check_and_acquire(dict, item))) {
-            item = item->next;
-            continue;
-        }
-
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             ll_recursive_unlock(dict, rw);
 
@@ -196,19 +192,20 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callba
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             ll_recursive_lock(dict, rw);
 
-        // since we have a reference counter, this item cannot be deleted
-        // until we release the reference counter, so the pointers are there
-        item_next = item->next;
-
-        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
-        // item_release(dict, item);
-
         if(unlikely(r < 0)) {
+            dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
             ret = r;
             break;
         }
 
         ret += r;
+
+        DICTIONARY_ITEM *item_next = item->next;
+        while(item_next && !item_check_and_acquire(dict, item_next))
+            item_next = item_next->next;
+
+        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
+        // item_release(dict, item);
 
         item = item_next;
     }

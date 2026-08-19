@@ -10,7 +10,9 @@ mod flow;
 #[allow(dead_code)]
 mod flow_index;
 mod ingest;
+mod local_journal_host;
 mod memory_allocator;
+mod memory_estimation;
 #[cfg(test)]
 mod memory_tests;
 mod network_sources;
@@ -22,6 +24,7 @@ mod rollup;
 mod routing;
 #[cfg(test)]
 mod startup_memory_tests;
+mod test_cli;
 mod tiering;
 
 pub(crate) use api::NetflowFlowsHandler;
@@ -41,16 +44,40 @@ const MAX_RUNTIME_WORKER_THREADS: usize = 4;
 const MIN_RUNTIME_BLOCKING_THREADS: usize = 8;
 
 fn main() {
-    if let Err(err) = journal_core::install_sigbus_handler() {
+    if let Err(err) = journal_sdk_core::install_sigbus_handler() {
         eprintln!("failed to install SIGBUS handler: {}", err);
         std::process::exit(1);
+    }
+
+    match test_cli::TestCommand::parse_from_env_args() {
+        Ok(Some(command)) => {
+            let worker_threads = runtime_worker_threads();
+            let max_blocking_threads = runtime_blocking_threads(worker_threads);
+            let runtime = match build_tokio_runtime(worker_threads, max_blocking_threads) {
+                Ok(runtime) => runtime,
+                Err(err) => {
+                    eprintln!("failed to build tokio runtime: {}", err);
+                    std::process::exit(1);
+                }
+            };
+            if let Err(err) = runtime.block_on(test_cli::run(command)) {
+                eprintln!("{err:#}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        Ok(None) => {}
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(2);
+        }
     }
 
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     let glibc_arena_max = memory_allocator::limit_glibc_arenas_for_process();
 
     println!("TRUST_DURATIONS 1");
-    rt::init_tracing();
+    rt::init_tracing_with_identifier("netflow-plugin");
 
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     match glibc_arena_max {
@@ -79,12 +106,7 @@ fn main() {
         "configured netflow tokio runtime"
     );
 
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(worker_threads)
-        .max_blocking_threads(max_blocking_threads)
-        .build()
-    {
+    let runtime = match build_tokio_runtime(worker_threads, max_blocking_threads) {
         Ok(runtime) => runtime,
         Err(err) => {
             eprintln!("failed to build tokio runtime: {}", err);
@@ -133,11 +155,6 @@ async fn async_main() -> i32 {
             }
         };
     let query_service = Arc::new(query_service);
-    if let Err(err) = query_service.initialize_facets().await {
-        tracing::error!("failed to initialize facet runtime: {err:#}");
-        return 1;
-    }
-
     let ingest_service = match ingest::IngestService::new_with_facet_runtime(
         config.clone(),
         Arc::clone(&metrics),
@@ -151,6 +168,10 @@ async fn async_main() -> i32 {
             return 1;
         }
     };
+    if let Err(err) = query_service.initialize_facets_before_ingest().await {
+        tracing::error!("failed to initialize facet runtime: {err:#}");
+        return 1;
+    }
     let routing_runtime = ingest_service.routing_runtime();
     let network_sources_runtime = ingest_service.network_sources_runtime();
 
@@ -167,35 +188,106 @@ async fn async_main() -> i32 {
         &config.enrichment.geoip.asn_database,
         &config.enrichment.geoip.geo_database,
     );
-    let _charts_task = charts::NetflowCharts::new(&mut runtime).spawn_sampler(
+    let _charts_task = charts::NetflowCharts::new(&mut runtime, &config.charts).spawn_sampler(
         Arc::clone(&metrics),
         Arc::clone(&open_tiers),
         Arc::clone(&tier_flow_indexes),
         Arc::clone(&facet_runtime),
         resident_mapping_paths,
+        config.charts.clone(),
         shutdown.clone(),
     );
 
+    let listener_ready = CancellationToken::new();
+    let direction_migration_pending = facet_runtime.direction_migration_pending();
     let query_service_for_events = Arc::clone(&query_service);
-    tokio::spawn(async move {
+    let notify_listener_ready = listener_ready.clone();
+    let notify_shutdown = shutdown.clone();
+    let notify_task = tokio::spawn(async move {
         let mut notify_rx = notify_rx;
-        while let Some(event) = notify_rx.recv().await {
+        if direction_migration_pending
+            && !wait_for_listener_ready(&notify_listener_ready, &notify_shutdown).await
+        {
+            return;
+        }
+        loop {
+            let event = tokio::select! {
+                biased;
+                _ = notify_shutdown.cancelled() => break,
+                event = notify_rx.recv() => event,
+            };
+            let Some(event) = event else {
+                break;
+            };
             let mut reconcile_required = query_service_for_events.process_notify_event(event);
             while let Ok(event) = notify_rx.try_recv() {
                 reconcile_required |= query_service_for_events.process_notify_event(event);
             }
 
-            if reconcile_required
-                && let Err(err) = query_service_for_events.initialize_facets().await
-            {
-                tracing::warn!("netflow facet reconcile after file notification failed: {err:#}");
+            if reconcile_required {
+                match query_service_for_events
+                    .initialize_facets_cancellable(notify_shutdown.clone())
+                    .await
+                {
+                    Ok(true) => {}
+                    Ok(false) => break,
+                    Err(err) => {
+                        tracing::warn!(
+                            "netflow facet reconcile after file notification failed: {err:#}"
+                        );
+                    }
+                }
             }
         }
         tracing::info!("netflow journal notify event task terminated");
     });
 
     let ingest_shutdown = shutdown.clone();
-    let ingest_task = tokio::spawn(async move { ingest_service.run(ingest_shutdown).await });
+    let ingest_listener_ready = listener_ready.clone();
+    let ingest_task = tokio::spawn(async move {
+        ingest_service
+            .run_with_listener_ready_signal(ingest_shutdown, ingest_listener_ready)
+            .await
+    });
+    let direction_migration_task = if direction_migration_pending {
+        let migration_query_service = Arc::clone(&query_service);
+        let migration_listener_ready = listener_ready;
+        let migration_shutdown = shutdown.clone();
+        Some(tokio::spawn(async move {
+            if !wait_for_listener_ready(&migration_listener_ready, &migration_shutdown).await {
+                return;
+            }
+            tracing::info!("starting background netflow DIRECTION facet migration");
+            loop {
+                match migration_query_service
+                    .migrate_direction_facets(migration_shutdown.clone())
+                    .await
+                {
+                    Ok(true) => {
+                        tracing::info!("completed background netflow DIRECTION facet migration");
+                        return;
+                    }
+                    Ok(false) if migration_shutdown.is_cancelled() => return,
+                    Ok(false) => {
+                        tracing::warn!(
+                            "retained journals changed during DIRECTION facet migration; retrying"
+                        );
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            "background netflow DIRECTION facet migration failed; retrying: {err:#}"
+                        );
+                    }
+                }
+                tokio::select! {
+                    _ = migration_shutdown.cancelled() => return,
+                    _ = tokio::time::sleep(Duration::from_secs(30)) => {}
+                }
+            }
+        }))
+    } else {
+        None
+    };
     let mut bmp_task = None;
     if config.enrichment.routing_dynamic.bmp.enabled {
         if let Some(runtime_state) = routing_runtime.clone() {
@@ -325,6 +417,24 @@ async fn async_main() -> i32 {
             Err(_) => {}
         }
     }
+    if let Some(task) = direction_migration_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("DIRECTION migration task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+    match notify_task.await {
+        Ok(()) => {}
+        Err(err) if !err.is_cancelled() => {
+            tracing::error!("journal notify event task join error: {err}");
+            exit_code = 1;
+        }
+        Err(_) => {}
+    }
     if let Some(task) = bmp_task {
         match task.await {
             Ok(()) => {}
@@ -359,6 +469,17 @@ async fn async_main() -> i32 {
     exit_code
 }
 
+async fn wait_for_listener_ready(
+    listener_ready: &CancellationToken,
+    shutdown: &CancellationToken,
+) -> bool {
+    tokio::select! {
+        biased;
+        _ = shutdown.cancelled() => false,
+        _ = listener_ready.cancelled() => true,
+    }
+}
+
 fn runtime_worker_threads() -> usize {
     std::thread::available_parallelism()
         .map(|value| value.get())
@@ -368,6 +489,17 @@ fn runtime_worker_threads() -> usize {
 
 fn runtime_blocking_threads(worker_threads: usize) -> usize {
     MIN_RUNTIME_BLOCKING_THREADS.max(worker_threads)
+}
+
+fn build_tokio_runtime(
+    worker_threads: usize,
+    max_blocking_threads: usize,
+) -> std::io::Result<tokio::runtime::Runtime> {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(worker_threads)
+        .max_blocking_threads(max_blocking_threads)
+        .build()
 }
 
 #[cfg(test)]

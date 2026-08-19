@@ -69,7 +69,9 @@ func (c *Collector) completeDueCheck(now time.Time, res checkRunResult) {
 }
 
 func (c *Collector) emitMetrics(execMetrics executionMetrics) {
-	sm := c.store.Write().SnapshotMeter("nagios")
+	// Empty meter prefix: the namespace comes from charts.yaml context_namespace (nagios),
+	// which also prefixes autogen perfdata contexts. A "nagios" meter prefix would double it.
+	sm := c.store.Write().SnapshotMeter("")
 
 	jobName := c.job.config.Name
 	if jobName == "" {

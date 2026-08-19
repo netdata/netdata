@@ -50,7 +50,7 @@ ALWAYS_INLINE void rrdcontext_removed_rrddim(RRDDIM *rd) {
 }
 
 ALWAYS_INLINE void rrdcontext_updated_rrddim_algorithm(RRDDIM *rd) {
-    rrdmetric_updated_rrddim_flags(rd);
+    rrdmetric_updated_rrddim_algorithm(rd);
 }
 
 ALWAYS_INLINE void rrdcontext_updated_rrddim_multiplier(RRDDIM *rd) {
@@ -324,7 +324,7 @@ static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, c
         return;
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "RRDCONTEXT: checkpoint for claim id '%s', node id '%s', "
                "while node '%s' has an active context streaming.",
                claim_id, node_id, rrdhost_hostname(host));

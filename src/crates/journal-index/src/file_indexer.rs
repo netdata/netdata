@@ -473,6 +473,19 @@ impl FileIndexer {
         // silently flow into the index.
         let field_data_iterator = journal_file.field_data_objects(marker_field)?;
 
+        // Phase 1: collect the inlined cursor of every ND_REMAPPING=1 data
+        // object.
+        //
+        // Each iterator item is a `ValueGuard<DataObject>` that holds the
+        // journal file's window-manager borrow for as long as it is alive.
+        // `InlinedCursor` is a small `Copy` value, so we copy it out and let
+        // the data-object guard drop at the end of each iteration. We must
+        // NOT call `collect_offsets()` here: when a data object is referenced
+        // by more than one entry it walks the entry-array chain, which
+        // re-borrows the window manager. Doing that while a data-object guard
+        // is still live fails with `ValueGuardInUse`. This mirrors the
+        // two-phase approach in `collect_source_field_info`.
+        let mut remapping_cursors = Vec::new();
         for data_object in field_data_iterator {
             let data_object = data_object?;
 
@@ -485,6 +498,12 @@ impl FileIndexer {
                 continue;
             };
 
+            remapping_cursors.push(inlined_cursor);
+        }
+
+        // Phase 2: walk each cursor's entry-array chain. No data-object guard
+        // is held at this point, so re-borrowing the window manager is safe.
+        for inlined_cursor in remapping_cursors {
             self.entry_offsets.clear();
             inlined_cursor.collect_offsets(journal_file, &mut self.entry_offsets)?;
 

@@ -25,7 +25,11 @@ static void update_cygpath_env(void) {
     char win_path[MAX_PATH];
 
     // Convert Cygwin root path to Windows path
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+    errno_clear();
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path)) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot convert Cygwin/MSYS2 base path to Windows path: %s", strerror(errno));
+        return;
+    }
 
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
 
@@ -58,12 +62,17 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
 }
 
 static BUFFER *argv_to_windows(const char **argv) {
-    BUFFER *wb = buffer_create(0, NULL);
-
     // argv[0] is the path
-    size_t b_size = strlen(argv[0]) * 2 + FILENAME_MAX;
+    ssize_t converted_size = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], NULL, 0);
+    if(converted_size <= 0)
+        return NULL;
+
+    size_t b_size = (size_t)converted_size;
     CLEAN_CHAR_P *b = mallocz(b_size);
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size);
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size) != 0)
+        return NULL;
+
+    BUFFER *wb = buffer_create(0, NULL);
 
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
@@ -130,6 +139,24 @@ int set_fd_blocking(int fd) {
     return 0;
 }
 
+static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE *si) {
+    if(si->stderr_fd == -1)
+        return;
+
+    if(si->stderr_log_token != LOG_FORWARDER_TOKEN_NONE) {
+        // a valid token means the forwarder adopted the fd and closes it on
+        // every path (worker delete, or thread-exit cleanup); a false return
+        // means it is already closed or about to be - raw-closing the number
+        // here could close an unrelated, recycled descriptor
+        log_forwarder_del_and_close_token(server->log_forwarder, si->stderr_log_token);
+        si->stderr_log_token = LOG_FORWARDER_TOKEN_NONE;
+    }
+    else
+        close(si->stderr_fd);
+
+    si->stderr_fd = -1;
+}
+
 //static void print_environment_block(char *env_block) {
 //    if (env_block == NULL) {
 //        fprintf(stderr, "Environment block is NULL\n");
@@ -161,6 +188,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     instance->request_id = __atomic_add_fetch(&server->request_id, 1, __ATOMIC_RELAXED);
 
     CLEAN_BUFFER *wb = argv_to_windows(argv);
+    if(!wb) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot convert command path for request No %zu, command: %s",
+               instance->request_id, argv[0]);
+        goto cleanup;
+    }
+
     char *command = (char *)buffer_tostring(wb);
 
     if (pipe(pipe_stdin) == -1) {
@@ -250,6 +284,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
                instance->request_id, command);
+        if(env_block)
+            FreeEnvironmentStrings(env_block);
         goto cleanup;
     }
 
@@ -280,9 +316,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     instance->stderr_fd = pipe_stderr[PIPE_READ];
 
     // Add stderr_fd to the log forwarder
-    log_forwarder_add_fd(server->log_forwarder, instance->stderr_fd);
-    log_forwarder_annotate_fd_name(server->log_forwarder, instance->stderr_fd, command);
-    log_forwarder_annotate_fd_pid(server->log_forwarder, instance->stderr_fd, spawn_server_instance_pid(instance));
+    instance->stderr_log_token = log_forwarder_add_fd(server->log_forwarder, instance->stderr_fd);
+    log_forwarder_annotate_token_name(server->log_forwarder, instance->stderr_log_token, command);
+    log_forwarder_annotate_token_pid(server->log_forwarder, instance->stderr_log_token, spawn_server_instance_pid(instance));
 
     errno_clear();
     nd_log(NDLS_COLLECTORS, NDLP_INFO,
@@ -421,14 +457,40 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     errno_clear();
     TerminateChildProcesses(si);
 
-    if(si->stderr_fd != -1) {
-        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
-            close(si->stderr_fd);
-
-        si->stderr_fd = -1;
-    }
+    spawn_server_release_stderr_fd(server, si);
 
     return spawn_server_exec_wait(server, si);
+}
+
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
+    if(!si) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+
+    // a negative timeout would become a huge DWORD (~INFINITE) to WaitForSingleObject; clamp to poll-once
+    if(timeout_ms < 0) timeout_ms = 0;
+
+    DWORD wait_rc = WaitForSingleObject(si->process_handle, (DWORD)timeout_ms);
+    if(wait_rc == WAIT_TIMEOUT)
+        // the process is still running; the caller decides whether to keep waiting or kill it
+        return SPAWN_TIMEDWAIT_RUNNING;
+
+    if(wait_rc == WAIT_FAILED) {
+        // the handle is unusable, so we cannot confirm the process exited. We must NOT resolve as
+        // EXITED and free the instance (it may still be alive), and we must NOT report RUNNING
+        // either (a caller looping on RUNNING with a 0/"wait forever" timeout would spin forever).
+        // Report ERROR: the caller keeps the instance and reclaims it by killing it.
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: WaitForSingleObject() failed (err %lu) for request No %zu, pid %d (winpid %u)",
+               (unsigned long)GetLastError(), si->request_id, (int)si->child_pid, si->dwProcessId);
+        return SPAWN_TIMEDWAIT_ERROR;
+    }
+
+    // WAIT_OBJECT_0: the process exited; the blocking wait returns immediately now.
+    int st = spawn_server_exec_wait(server, si);
+    if(status) *status = st;
+    return SPAWN_TIMEDWAIT_EXITED;
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {
@@ -452,12 +514,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     if(err)
         LocalFree(err);
 
-    if(si->stderr_fd != -1) {
-        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
-            close(si->stderr_fd);
-
-        si->stderr_fd = -1;
-    }
+    spawn_server_release_stderr_fd(server, si);
 
     freez(si);
     return map_status_code_to_signal(exit_code);

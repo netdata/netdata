@@ -22,7 +22,7 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
     char *machine_guid = NULL;
     char *claim_id = NULL;
     char *node_id = NULL;
-    bool protection = netdata_is_protected_by_bearer;
+    bool protection = netdata_bearer_protection_is_enabled();
 
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -58,12 +58,12 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    netdata_is_protected_by_bearer = protection;
+    netdata_bearer_protection_set_enabled(protection);
 
     BUFFER *wb = w->response.data;
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-    buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
+    buffer_json_member_add_boolean(wb, "bearer_protection", netdata_bearer_protection_is_enabled());
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
@@ -83,7 +83,7 @@ int bearer_get_token_json_response(BUFFER *wb, RRDHOST *host, const char *claim_
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_int64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "mg", host->machine_guid);
-    buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
+    buffer_json_member_add_boolean(wb, "bearer_protection", netdata_bearer_protection_is_enabled());
     buffer_json_member_add_uuid(wb, "token", uuid);
     buffer_json_member_add_time_t(wb, "expiration", expires_s);
     buffer_json_finalize(wb);

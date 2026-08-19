@@ -14,10 +14,10 @@
 // this has to be in-sync with the same at stream-thread.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION 24
 
-// this controls the max response size of a function
-#define PLUGINSD_MAX_DEFERRED_SIZE (100 * 1024 * 1024)
-
 #define PLUGINSD_MIN_RRDSET_POINTERS_CACHE 1024
+// Slots are cache indexes. Larger values are treated as uncached input to avoid sparse cache allocations.
+#define PLUGINSD_CHART_SLOT_MAX 1000000
+#define PLUGINSD_DIMENSION_SLOT_MAX 65535
 
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
@@ -60,6 +60,7 @@ typedef struct parser_user_object {
     size_t clabel_count;
     size_t data_collections_count;
     int enabled;
+    bool retry;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     void *rpt;
@@ -99,6 +100,7 @@ typedef struct parser_user_object {
 
     struct {
         Pvoid_t JudyL;
+        time_t last_host_stale_check;
     } vnodes;
 
 } PARSER_USER_OBJECT;

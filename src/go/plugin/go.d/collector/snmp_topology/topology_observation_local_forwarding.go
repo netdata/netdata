@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
 func (c *topologyCache) appendObservedFDBEntries(observation *topologyengine.L2Observation) {
@@ -26,22 +28,21 @@ func (c *topologyCache) appendObservedFDBEntries(observation *topologyengine.L2O
 		if entry == nil || strings.TrimSpace(entry.mac) == "" {
 			continue
 		}
-		ifIndex := parseIndex(c.bridgePortToIf[strings.TrimSpace(entry.bridgePort)])
-		vlanID := strings.TrimSpace(entry.vlanID)
-		if vlanID == "" && strings.TrimSpace(entry.fdbID) != "" {
-			fdbID := strings.TrimSpace(entry.fdbID)
-			vlanID = strings.TrimSpace(c.fdbIDToVlanID[fdbID])
-			if vlanID == "" {
-				vlanID = fdbID
-			}
+		ifIndex := topologyutil.ParseIndex(c.bridgePortToIf[strings.TrimSpace(entry.bridgePort)])
+		fdbDomainID := ""
+		if fdbID := strings.TrimSpace(entry.fdbID); fdbID != "" {
+			fdbDomainID = "fdb:" + strings.ToLower(fdbID)
+		} else if vlanID := strings.TrimSpace(entry.vlanID); vlanID != "" {
+			fdbDomainID = "vlan:" + strings.ToLower(vlanID)
 		}
 		observation.FDBEntries = append(observation.FDBEntries, topologyengine.FDBObservation{
-			MAC:        strings.TrimSpace(entry.mac),
-			BridgePort: strings.TrimSpace(entry.bridgePort),
-			IfIndex:    ifIndex,
-			Status:     strings.TrimSpace(entry.status),
-			VLANID:     vlanID,
-			VLANName:   strings.TrimSpace(entry.vlanName),
+			MAC:         strings.TrimSpace(entry.mac),
+			BridgePort:  strings.TrimSpace(entry.bridgePort),
+			IfIndex:     ifIndex,
+			Status:      strings.TrimSpace(entry.status),
+			FDBDomainID: fdbDomainID,
+			VLANID:      strings.TrimSpace(entry.vlanID),
+			VLANName:    strings.TrimSpace(entry.vlanName),
 		})
 	}
 }
@@ -66,7 +67,7 @@ func (c *topologyCache) appendObservedSTPPorts(observation *topologyengine.L2Obs
 		if port == "" {
 			continue
 		}
-		ifIndex := parseIndex(c.bridgePortToIf[port])
+		ifIndex := topologyutil.ParseIndex(c.bridgePortToIf[port])
 		ifName := ""
 		if ifIndex > 0 {
 			ifName = strings.TrimSpace(c.ifNamesByIndex[strconv.Itoa(ifIndex)])
@@ -104,7 +105,7 @@ func (c *topologyCache) appendObservedARPNDEntries(observation *topologyengine.L
 			continue
 		}
 		mac := strings.TrimSpace(entry.mac)
-		if normalizeMAC(mac) == "" {
+		if topologyutil.NormalizeMAC(mac) == "" {
 			continue // incomplete ARP entry — no MAC means we can't place it on the L2 topology
 		}
 		ifName := strings.TrimSpace(entry.ifName)
@@ -113,7 +114,7 @@ func (c *topologyCache) appendObservedARPNDEntries(observation *topologyengine.L
 		}
 		observation.ARPNDEntries = append(observation.ARPNDEntries, topologyengine.ARPNDObservation{
 			Protocol: "arp",
-			IfIndex:  parseIndex(entry.ifIndex),
+			IfIndex:  topologyutil.ParseIndex(entry.ifIndex),
 			IfName:   ifName,
 			IP:       strings.TrimSpace(entry.ip),
 			MAC:      strings.TrimSpace(entry.mac),

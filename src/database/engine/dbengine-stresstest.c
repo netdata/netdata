@@ -45,8 +45,7 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
 
     rd->collector.counter++;
 
-    collected_number v = (value >= 0) ? value : -value;
-    if(unlikely(v > rd->collector.collected.i.collected_value_max)) rrddim_set_collected_max_int(rd, v);
+    rrddim_update_collected_max_from_int(rd, value);
 }
 
 struct dbengine_chart_thread {

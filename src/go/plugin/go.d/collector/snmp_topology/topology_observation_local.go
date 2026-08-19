@@ -5,17 +5,17 @@ package snmptopology
 import (
 	"strings"
 
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyengine.L2Observation {
-	localManagementIP := normalizeIPAddress(local.ManagementIP)
-	if localManagementIP == "" {
-		localManagementIP = pickManagementIP(local.ManagementAddresses)
-	}
+func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
+	localManagementIP := normalizeEligibleManagementIP(local.ManagementIP)
 
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
-	if baseBridgeAddress != "" && normalizeMAC(local.ChassisID) == "" {
+	if baseBridgeAddress != "" && topologyutil.NormalizeMAC(local.ChassisID) == "" {
 		local.ChassisID = baseBridgeAddress
 		local.ChassisIDType = "macAddress"
 	}
@@ -24,9 +24,11 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 		DeviceID:          ensureTopologyObservationDeviceID(local, baseBridgeAddress),
 		Hostname:          strings.TrimSpace(local.SysName),
 		ManagementIP:      localManagementIP,
+		ManagementAliases: engineManagementAliases(local.ManagementAddresses),
 		SysObjectID:       strings.TrimSpace(local.SysObjectID),
 		ChassisID:         strings.TrimSpace(local.ChassisID),
 		BaseBridgeAddress: baseBridgeAddress,
+		Labels:            cloneTopologyLabels(local.Labels),
 	}
 	if observation.BaseBridgeAddress == "" {
 		observation.BaseBridgeAddress = stpBridgeAddressToMAC(observation.ChassisID)
@@ -41,4 +43,18 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 	c.appendObservedCDPRemotes(&observation)
 
 	return observation
+}
+
+func engineManagementAliases(addresses []topologymodel.ManagementAddress) []string {
+	aliases := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		addr, ok := topologymodel.ParseManagementAddressIP(address)
+		if !ok {
+			continue
+		}
+		if ip := normalizeEligibleManagementIP(addr.String()); ip != "" {
+			aliases = append(aliases, ip)
+		}
+	}
+	return topologyutil.DeduplicateSortedStrings(aliases)
 }

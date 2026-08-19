@@ -5,13 +5,12 @@
 bool is_system_ieee754_double(void) {
 //    static bool logged = false;
 
+    if(sizeof(NETDATA_DOUBLE) != sizeof(uint64_t))
+        return false;
+
     struct {
         NETDATA_DOUBLE original;
-
-        union {
-            uint64_t i;
-            NETDATA_DOUBLE d;
-        };
+        uint64_t i;
     } tests[] = {
             { .original = 1.25,                 .i = 0x3FF4000000000000 },
             { .original = 1.0,                  .i = 0x3FF0000000000000 },
@@ -48,12 +47,16 @@ bool is_system_ieee754_double(void) {
     size_t errors = 0;
     size_t elements = sizeof(tests) / sizeof(tests[0]);
     for(size_t i = 0; i < elements ; i++) {
-        uint64_t *ptr = (uint64_t *)&tests[i].original;
+        uint64_t representation;
+        NETDATA_DOUBLE expected;
 
-        if(*ptr != tests[i].i && (tests[i].original == tests[i].d || (isnan(tests[i].original) && isnan(tests[i].d)))) {
+        memcpy(&representation, &tests[i].original, sizeof(representation));
+        memcpy(&expected, &tests[i].i, sizeof(tests[i].i));
+
+        if(representation != tests[i].i && (tests[i].original == expected || (isnan(tests[i].original) && isnan(expected)))) {
 //            if(!logged)
 //                netdata_log_info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %016llX, but it was expected as %016llX",
-//                     i+1, tests[i].original, (long long unsigned int)*ptr, (long long unsigned int)tests[i].i);
+//                     i+1, tests[i].original, (long long unsigned int)representation, (long long unsigned int)tests[i].i);
             errors++;
         }
     }

@@ -118,6 +118,7 @@ struct simple_connector_data {
 
     BUFFER *header;
     BUFFER *buffer;
+    BUFFER *response;
     size_t buffered_metrics;
     size_t buffered_bytes;
 
@@ -205,6 +206,7 @@ struct instance {
     int skip_chart;
 
     BUFFER *labels_buffer;
+    BUFFER *metric_prefix_buffer;
 
     time_t after;
     time_t before;

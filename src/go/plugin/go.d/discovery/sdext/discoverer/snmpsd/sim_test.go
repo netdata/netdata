@@ -41,6 +41,7 @@ func (sim *discoverySim) run(t *testing.T) {
 	}
 
 	seen := make(map[string]model.TargetGroup)
+	var seenMu sync.Mutex
 	ctx, cancel := context.WithCancel(context.Background())
 	in := make(chan []model.TargetGroup)
 	var wg sync.WaitGroup
@@ -55,9 +56,11 @@ func (sim *discoverySim) run(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case tggs := <-in:
+				seenMu.Lock()
 				for _, tgg := range tggs {
 					seen[tgg.Source()] = tgg
 				}
+				seenMu.Unlock()
 			}
 		}
 	})
@@ -74,7 +77,12 @@ func (sim *discoverySim) run(t *testing.T) {
 		require.Fail(t, "discovery failed to start")
 	}
 
-	time.Sleep(time.Second * 2)
+	wantLen := calcTargets(sim.wantGroups)
+	require.Eventually(t, func() bool {
+		seenMu.Lock()
+		defer seenMu.Unlock()
+		return calcSeenTargets(seen) >= wantLen
+	}, time.Second*5, time.Millisecond*10)
 
 	cancel()
 
@@ -85,19 +93,29 @@ func (sim *discoverySim) run(t *testing.T) {
 	}
 
 	var tggs []model.TargetGroup
+	seenMu.Lock()
 	for _, tgg := range seen {
 		tggs = append(tggs, tgg)
 	}
+	seenMu.Unlock()
 
 	sortTargetGroups(tggs)
 	sortTargetGroups(sim.wantGroups)
 
-	wantLen, gotLen := calcTargets(sim.wantGroups), calcTargets(tggs)
+	gotLen := calcTargets(tggs)
 	assert.Equalf(t, wantLen, gotLen, "different len (want %d got %d)", wantLen, gotLen)
 	assert.Equal(t, sim.wantGroups, tggs)
 }
 
 func calcTargets(tggs []model.TargetGroup) int {
+	var n int
+	for _, tgg := range tggs {
+		n += len(tgg.Targets())
+	}
+	return n
+}
+
+func calcSeenTargets(tggs map[string]model.TargetGroup) int {
 	var n int
 	for _, tgg := range tggs {
 		n += len(tgg.Targets())

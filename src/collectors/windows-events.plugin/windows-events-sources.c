@@ -372,20 +372,28 @@ void wevt_sources_to_json_array(BUFFER *wb) {
 }
 
 static bool ndEvtGetChannelConfigProperty(EVT_HANDLE hChannelConfig, WEVT_VARIANT *pr, EVT_CHANNEL_CONFIG_PROPERTY_ID id) {
+    pr->used = 0;
+    pr->count = 0;
+
     if (!EvtGetChannelConfigProperty(hChannelConfig, id, 0, pr->size, pr->data, &pr->used)) {
         DWORD status = GetLastError();
-        if (ERROR_INSUFFICIENT_BUFFER == status) {
-            wevt_variant_resize(pr, pr->used);
-            if(!EvtGetChannelConfigProperty(hChannelConfig, id, 0, pr->size, pr->data, &pr->used)) {
-                pr->used = 0;
-                pr->count = 0;
-                return false;
-            }
+        if (ERROR_INSUFFICIENT_BUFFER != status || !pr->used)
+            return false;
+
+        wevt_variant_resize(pr, pr->used);
+        pr->used = 0;
+        if(!EvtGetChannelConfigProperty(hChannelConfig, id, 0, pr->size, pr->data, &pr->used)) {
+            pr->used = 0;
+            pr->count = 0;
+            return false;
         }
     }
 
+    if(!pr->data || !pr->used)
+        return false;
+
     wevt_variant_count_from_used(pr);
-    return true;
+    return pr->count > 0;
 }
 
 WEVT_SOURCE_TYPE categorize_channel(const wchar_t *channel_path, const char **provider, WEVT_VARIANT *property) {
@@ -397,10 +405,10 @@ WEVT_SOURCE_TYPE categorize_channel(const wchar_t *channel_path, const char **pr
     if (!hChannelConfig)
         goto cleanup;
 
-    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigType) &
-       property->count &&
-       property->data[0].Type == EvtVarTypeUInt32) {
-        switch (property->data[0].UInt32Val) {
+    uint32_t channel_type;
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigType) &&
+       wevt_field_get_uint32_checked(property->data, &channel_type)) {
+        switch (channel_type) {
             case EvtChannelTypeAdmin:
                 result |= WEVTS_ADMIN;
                 break;
@@ -422,26 +430,27 @@ WEVT_SOURCE_TYPE categorize_channel(const wchar_t *channel_path, const char **pr
         }
     }
 
+    bool classic;
     if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigClassicEventlog) &&
-       property->count &&
-       property->data[0].Type == EvtVarTypeBoolean &&
-       property->data[0].BooleanVal)
+       wevt_field_get_bool_checked(property->data, &classic) && classic)
         result |= WEVTS_CLASSIC;
 
-    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigOwningPublisher) &&
-       property->count &&
-       property->data[0].Type == EvtVarTypeString) {
-        *provider = provider2utf8(property->data[0].StringVal);
-        if(wcscasecmp(property->data[0].StringVal, L"Microsoft-Windows-EventCollector") == 0)
+    LPCWSTR owning_publisher = NULL;
+    if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigOwningPublisher))
+        owning_publisher = wevt_field_get_string(property->data);
+
+    if(owning_publisher) {
+        *provider = provider2utf8(owning_publisher);
+        if(wcscasecmp(owning_publisher, L"Microsoft-Windows-EventCollector") == 0)
             result |= WEVTS_FORWARDED;
     }
     else
         *provider = NULL;
 
+    bool enabled;
     if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelConfigEnabled) &&
-       property->count &&
-       property->data[0].Type == EvtVarTypeBoolean) {
-        if(property->data[0].BooleanVal)
+       wevt_field_get_bool_checked(property->data, &enabled)) {
+        if(enabled)
             result |= WEVTS_ENABLED;
         else
             result |= WEVTS_DISABLED;
@@ -450,19 +459,15 @@ WEVT_SOURCE_TYPE categorize_channel(const wchar_t *channel_path, const char **pr
     bool got_retention = false;
     bool retained = false;
     if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelLoggingConfigRetention) &&
-       property->count &&
-       property->data[0].Type == EvtVarTypeBoolean) {
+       wevt_field_get_bool_checked(property->data, &retained)) {
         got_retention = true;
-        retained = property->data[0].BooleanVal;
     }
 
     bool got_auto_backup = false;
     bool auto_backup = false;
     if(ndEvtGetChannelConfigProperty(hChannelConfig, property, EvtChannelLoggingConfigAutoBackup) &&
-       property->count &&
-       property->data[0].Type == EvtVarTypeBoolean) {
+       wevt_field_get_bool_checked(property->data, &auto_backup)) {
         got_auto_backup = true;
-        auto_backup = property->data[0].BooleanVal;
     }
 
     if(got_retention && got_auto_backup) {
@@ -491,11 +496,14 @@ void wevt_sources_scan(void) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     LPWSTR channel = NULL;
     EVT_HANDLE hChannelEnum = NULL;
+    WEVT_LOG *log = NULL;
+    WEVT_VARIANT property = { 0 };
+    bool locked = false;
 
     if(spinlock_trylock(&spinlock)) {
+        locked = true;
         const usec_t started_ut = now_monotonic_usec();
 
-        WEVT_VARIANT property = { 0 };
         DWORD dwChannelBufferSize = 0;
         DWORD dwChannelBufferUsed = 0;
         DWORD status = ERROR_SUCCESS;
@@ -508,7 +516,7 @@ void wevt_sources_scan(void) {
             goto cleanup;
         }
 
-        WEVT_LOG *log = wevt_openlog6(WEVT_QUERY_RETENTION);
+        log = wevt_openlog6(WEVT_QUERY_RETENTION);
         if(!log) goto cleanup;
 
         while (true) {
@@ -625,6 +633,7 @@ void wevt_sources_scan(void) {
 //        }
 //
         wevt_closelog6(log);
+        log = NULL;
 
         LOGS_QUERY_SOURCE *src;
         dfe_start_write(wevt_sources, src)
@@ -642,11 +651,17 @@ void wevt_sources_scan(void) {
         dictionary_garbage_collect(wevt_sources);
 
         spinlock_unlock(&spinlock);
-
-        wevt_variant_cleanup(&property);
+        locked = false;
     }
 
 cleanup:
+    if(log)
+        wevt_closelog6(log);
+
+    if(locked)
+        spinlock_unlock(&spinlock);
+
+    wevt_variant_cleanup(&property);
     freez(channel);
     EvtClose(hChannelEnum);
 }

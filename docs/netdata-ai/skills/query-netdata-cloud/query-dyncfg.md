@@ -246,8 +246,13 @@ curl -sS -X POST \
   -d "$PAYLOAD"
 ```
 
-A successful response (200/202) means the configuration would
-work; the test does NOT make the change persistent.
+A successful response means the resource accepted its supported test, not
+necessarily that the configuration will work in production. Inspect the
+response message: some resources provide only validation, while others run a
+resource-specific operational check. For service discovery, an empty successful
+message means every configured discoverer completed its operational test; an
+explicit validation-only message means no operational check was available. The
+test does NOT make the change persistent.
 
 ### Example 6: enable / disable a configuration
 
@@ -330,5 +335,5 @@ etc.). Treat raw responses as production-sensitive:
 - Direct working output to `<repo>/.local/audits/...` (gitignored).
 - Never paste raw `get` / `userconfig` payloads into committed
   files.
-- See `<repo>/.agents/sow/specs/sensitive-data-discipline.md` for
+- See `<repo>/.agents/sensitive-data-discipline.md` for
   the full rule.

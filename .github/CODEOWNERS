@@ -38,6 +38,9 @@ src/web/ @thiagoftsm @vkalintiris
 *.mdx @Ancairon @kanelatechnical
 Dockerfile* @netdata/agent-sre
 
+# Ownership by directory (overwrites ownership by filetype; must come after *.md/*.mdx)
+.agents/ @ilyam8 @ktsaou
+
 # Ownership of specific files
 .gitignore @netdata/agent-sre @vkalintiris
 .codacy.yml @netdata/agent-sre

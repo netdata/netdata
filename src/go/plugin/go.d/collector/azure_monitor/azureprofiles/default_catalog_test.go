@@ -3,7 +3,6 @@
 package azureprofiles
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +35,7 @@ func TestLoadFromDefaultDirs_LoadsAllStockProfiles(t *testing.T) {
 	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
 
-	assert.Len(t, catalog.byBaseName, want)
+	assert.Equal(t, want, catalog.Len())
 }
 
 func TestLoadFromDefaultDirs_StockProfilesUseSelectorShorthand(t *testing.T) {
@@ -75,95 +74,6 @@ func TestLoadFromDefaultDirs_StockProfilesUseSelectorShorthand(t *testing.T) {
 	}
 }
 
-func TestDefaultCatalog_CachesSuccessfulLoads(t *testing.T) {
-	calls := 0
-	restore := stubDefaultCatalog(t, func() bool { return true }, func() (Catalog, error) {
-		calls++
-		return testCatalog("sql_database"), nil
-	})
-	defer restore()
-
-	first, err := DefaultCatalog()
-	require.NoError(t, err)
-
-	second, err := DefaultCatalog()
-	require.NoError(t, err)
-
-	assert.Equal(t, 1, calls)
-	assert.Equal(t, []string{"sql_database"}, first.defaultProfileBaseNames())
-	assert.Equal(t, []string{"sql_database"}, second.defaultProfileBaseNames())
-}
-
-func TestDefaultCatalog_RetriesAfterFailure(t *testing.T) {
-	calls := 0
-	restore := stubDefaultCatalog(t, func() bool { return true }, func() (Catalog, error) {
-		calls++
-		if calls == 1 {
-			return Catalog{}, errors.New("boom")
-		}
-		return testCatalog("postgres_flexible"), nil
-	})
-	defer restore()
-
-	_, err := DefaultCatalog()
-	require.Error(t, err)
-
-	catalog, err := DefaultCatalog()
-	require.NoError(t, err)
-
-	assert.Equal(t, 2, calls)
-	assert.Equal(t, []string{"postgres_flexible"}, catalog.defaultProfileBaseNames())
-}
-
-func TestDefaultCatalog_DoesNotCacheWhenDisabled(t *testing.T) {
-	calls := 0
-	restore := stubDefaultCatalog(t, func() bool { return false }, func() (Catalog, error) {
-		calls++
-		return testCatalog("storage_accounts"), nil
-	})
-	defer restore()
-
-	_, err := DefaultCatalog()
-	require.NoError(t, err)
-	_, err = DefaultCatalog()
-	require.NoError(t, err)
-
-	assert.Equal(t, 2, calls)
-}
-
-func stubDefaultCatalog(t *testing.T, cacheEnabled func() bool, loader func() (Catalog, error)) func() {
-	t.Helper()
-
-	defaultCatalogMu.Lock()
-	prevCatalog := defaultCatalog
-	prevLoaded := defaultCatalogLoaded
-	prevLoader := defaultCatalogLoader
-	prevEnabled := defaultCatalogCacheEnabled
-
-	defaultCatalog = Catalog{}
-	defaultCatalogLoaded = false
-	defaultCatalogLoader = loader
-	defaultCatalogCacheEnabled = cacheEnabled
-	defaultCatalogMu.Unlock()
-
-	return func() {
-		defaultCatalogMu.Lock()
-		defaultCatalog = prevCatalog
-		defaultCatalogLoaded = prevLoaded
-		defaultCatalogLoader = prevLoader
-		defaultCatalogCacheEnabled = prevEnabled
-		defaultCatalogMu.Unlock()
-	}
-}
-
-func testCatalog(id string) Catalog {
-	profile := Profile{DisplayName: id}
-	return Catalog{
-		byBaseName: map[string]Profile{
-			normalizeKey(id): profile,
-		},
-		stockProfileBaseNames: map[string]struct{}{
-			normalizeKey(id): {},
-		},
-	}
-}
+// Catalog caching (load-once, retry-after-failure, disabled-under-test) is now
+// provided and tested by pkg/profilecatalog (Cached); it is not re-tested per
+// collector.

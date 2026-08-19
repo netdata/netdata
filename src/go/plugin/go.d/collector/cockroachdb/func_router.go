@@ -116,10 +116,10 @@ func (r *funcRouter) topQueriesLimit() int {
 	return r.collector.topQueriesLimit()
 }
 
-func cockroachMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
-		runningQueriesMethodConfig(),
+func cockroachMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
+		runningQueriesFunctionConfig(),
 	}
 }
 

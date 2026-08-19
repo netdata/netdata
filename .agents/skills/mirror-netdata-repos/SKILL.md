@@ -109,8 +109,8 @@ output, end-of-run summary). Run it on demand.
 4. Required tools: `git` and `jq`. Install via your package
    manager.
 5. For Phase 2 (auto-discovery): install `gh` (the GitHub CLI)
-   and run `gh auth login`. SSH clone access to the Netdata GitHub
-   organization must work for clones.
+   and run `gh auth login`. SSH clone access to GitHub for the
+   `netdata` organization must work for clones.
 
 ### First sync
 
@@ -227,7 +227,7 @@ Soft warnings (Phase 2 skipped, Phase 1 still runs):
 ## Path discipline
 
 This skill follows
-`<repo>/.agents/sow/specs/sensitive-data-discipline.md`:
+`<repo>/.agents/sensitive-data-discipline.md`:
 
 - All references to the mirror directory go through
   `${NETDATA_REPOS_DIR}` (the env key from `.env`).

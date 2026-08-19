@@ -121,17 +121,41 @@ modules:
                 ```yaml
                 url_patterns:
                   - name: name1
-                    pattern: pattern1
+                    match: pattern1
                   - name: name2
-                    pattern: pattern2
+                    match: pattern2
                 ```
+
+                Examples:
+
+                ```yaml
+                url_patterns:
+                  - name: api
+                    match: '* /api/*'
+                  - name: api_versioned
+                    match: '~ ^/api/v[0-9]+/.*'
+                  - name: health_endpoint
+                    match: '= /health'
+                  - name: not_static_css
+                    match: '!* *.css'
+                ```
+
+                Pattern values use the [matcher library](/src/go/pkg/matcher/README.md#supported-format) syntax:
+
+                - `=` — string (exact match)
+                - `*` — glob patterns
+                - `~` — regular expressions
+                - `!` — negates either short syntax (`!* ...`) or long syntax (`!simple_patterns:...`)
+                - `simple_patterns` — simple patterns (long syntax only)
+
+                Patterns are matched against the full original request URI (`$request_uri`).
             - name: url_patterns.name
               description: Used as a dimension name.
               default_value: ""
               required: true
               group: Customization
-            - name: url_patterns.pattern
-              description: Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
+            - name: url_patterns.match
+              description: Used to match against full original request URI. Match syntax in [matcher](/src/go/pkg/matcher/README.md#supported-format).
               default_value: ""
               required: true
               group: Customization

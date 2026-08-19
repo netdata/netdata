@@ -2,7 +2,9 @@ use super::decode::decode_remote_records;
 use super::fetch::{build_client, fetch_source_once, parse_source_method};
 use super::transform::{compile_transform, run_transform};
 use super::*;
+use std::hint::black_box;
 use std::net::IpAddr;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
@@ -297,6 +299,477 @@ fn decode_remote_records_non_object_row_is_rejected() {
 }
 
 #[test]
+fn network_sources_runtime_matches_only_containing_prefixes() {
+    let runtime = NetworkSourcesRuntime::default();
+    runtime.replace_records(vec![
+        network_source_record("10.0.0.0/8", "root", "", ""),
+        network_source_record("10.1.0.0/16", "match", "", ""),
+        network_source_record("10.2.0.0/16", "sibling", "", ""),
+    ]);
+
+    let matches = runtime.matching_attributes_ascending("10.1.1.1".parse().expect("address"));
+    let names = matches
+        .iter()
+        .map(|(_, attrs)| attrs.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(names, vec!["root", "match"]);
+}
+
+#[test]
+fn network_sources_runtime_indexed_matches_only_containing_prefixes() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![
+        network_source_record("10.0.0.0/8", "root", "", ""),
+        network_source_record("10.1.0.0/16", "match", "", ""),
+        network_source_record("10.2.0.0/16", "sibling", "", ""),
+    ];
+    add_ipv4_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("10.1.1.1".parse().expect("address"));
+    let names = matches
+        .iter()
+        .map(|(_, attrs)| attrs.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(names, vec!["root", "match"]);
+}
+
+#[test]
+fn network_sources_runtime_indexed_lookup_preserves_match_semantics() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![
+        network_source_record("10.0.0.0/8", "root", "", ""),
+        network_source_record("10.1.0.0/16", "match-first", "", ""),
+        network_source_record("10.1.0.0/16", "match-second", "", ""),
+        network_source_record("10.2.0.0/16", "sibling", "", ""),
+    ];
+    add_ipv4_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("10.1.1.1".parse().expect("address"));
+    let names = matches
+        .iter()
+        .map(|(_, attrs)| attrs.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(names, vec!["root", "match-first", "match-second"]);
+}
+
+#[test]
+fn network_sources_runtime_indexed_ipv6_lookup_preserves_match_semantics() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![
+        network_source_record("2001:db8::/32", "root", "", ""),
+        network_source_record("2001:db8:1::/48", "match-first", "", ""),
+        network_source_record("2001:db8:1::/48", "match-second", "", ""),
+        network_source_record("2001:db8:2::/48", "sibling", "", ""),
+    ];
+    add_ipv6_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("2001:db8:1::42".parse().expect("address"));
+    let names = matches
+        .iter()
+        .map(|(_, attrs)| attrs.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(names, vec!["root", "match-first", "match-second"]);
+}
+
+#[test]
+fn network_sources_runtime_preserves_same_prefix_publish_order() {
+    let runtime = NetworkSourcesRuntime::default();
+    runtime.replace_records(vec![
+        network_source_record("198.51.100.0/24", "first", "", "tenant-a"),
+        network_source_record("198.51.100.0/24", "second", "edge", ""),
+    ]);
+
+    let matches = runtime.matching_attributes_ascending("198.51.100.42".parse().expect("address"));
+    let values = matches
+        .iter()
+        .map(|(prefix_len, attrs)| (*prefix_len, attrs.name.as_str(), attrs.role.as_str()))
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(values, vec![(24, "first", ""), (24, "second", "edge")]);
+}
+
+#[test]
+fn network_sources_runtime_indexed_preserves_same_prefix_publish_order() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![
+        network_source_record("198.51.100.0/24", "first", "", "tenant-a"),
+        network_source_record("198.51.100.0/24", "second", "edge", ""),
+    ];
+    add_ipv4_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("198.51.100.42".parse().expect("address"));
+    let values = matches
+        .iter()
+        .map(|(prefix_len, attrs)| (*prefix_len, attrs.name.as_str(), attrs.role.as_str()))
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(values, vec![(24, "first", ""), (24, "second", "edge")]);
+}
+
+#[test]
+fn network_sources_runtime_keeps_noncanonical_prefix_behavior() {
+    let runtime = NetworkSourcesRuntime::default();
+    runtime.replace_records(vec![network_source_record(
+        "10.1.1.1/8",
+        "noncanonical-root",
+        "",
+        "",
+    )]);
+
+    let matches = runtime.matching_attributes_ascending("10.2.2.2".parse().expect("address"));
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].0, 8);
+    assert_eq!(matches[0].1.name, "noncanonical-root");
+}
+
+#[test]
+fn network_sources_runtime_indexed_keeps_noncanonical_prefix_behavior() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![network_source_record(
+        "10.1.1.1/8",
+        "noncanonical-root",
+        "",
+        "",
+    )];
+    add_ipv4_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("10.2.2.2".parse().expect("address"));
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].0, 8);
+    assert_eq!(matches[0].1.name, "noncanonical-root");
+}
+
+#[test]
+fn network_sources_runtime_indexed_ipv6_keeps_noncanonical_prefix_behavior() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![network_source_record(
+        "2001:db8:1::42/32",
+        "noncanonical-root",
+        "",
+        "",
+    )];
+    add_ipv6_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("2001:db8:2::1".parse().expect("address"));
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].0, 32);
+    assert_eq!(matches[0].1.name, "noncanonical-root");
+}
+
+#[test]
+fn network_sources_runtime_indexed_matches_default_route() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![network_source_record("0.0.0.0/0", "default", "", "")];
+    add_ipv4_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("198.51.100.42".parse().expect("address"));
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].0, 0);
+    assert_eq!(matches[0].1.name, "default");
+}
+
+#[test]
+fn network_sources_runtime_indexed_ipv6_matches_default_route() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![network_source_record("::/0", "default", "", "")];
+    add_ipv6_indexed_lookup_fillers(&mut records);
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("2001:db8:1::42".parse().expect("address"));
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].0, 0);
+    assert_eq!(matches[0].1.name, "default");
+}
+
+#[test]
+fn network_sources_runtime_mixed_family_small_lookup_preserves_match_semantics() {
+    let runtime = NetworkSourcesRuntime::default();
+    runtime.replace_records(vec![
+        network_source_record("2001:db8::/32", "v6-root", "", ""),
+        network_source_record("198.51.0.0/16", "v4-root", "", ""),
+        network_source_record("2001:db8:1::/48", "v6-match", "", ""),
+        network_source_record("198.51.100.0/24", "v4-match", "", ""),
+    ]);
+
+    let ipv4_matches =
+        runtime.matching_attributes_ascending("198.51.100.42".parse().expect("address"));
+    let ipv6_matches =
+        runtime.matching_attributes_ascending("2001:db8:1::42".parse().expect("address"));
+    let ipv4_names = ipv4_matches
+        .iter()
+        .map(|(_, attrs)| attrs.name.as_str())
+        .collect::<Vec<_>>();
+    let ipv6_names = ipv6_matches
+        .iter()
+        .map(|(_, attrs)| attrs.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&ipv4_matches);
+    assert_prefix_lengths_ascending(&ipv6_matches);
+    assert_eq!(ipv4_names, vec!["v4-root", "v4-match"]);
+    assert_eq!(ipv6_names, vec!["v6-root", "v6-match"]);
+}
+
+#[test]
+fn network_sources_runtime_mixed_family_large_linear_lookup_preserves_match_semantics() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut records = vec![
+        network_source_record("198.51.0.0/16", "v4-root", "", ""),
+        network_source_record("198.51.100.0/24", "v4-match", "", ""),
+    ];
+    for index in 0..IPV4_INDEX_MIN_FAMILY_RECORDS {
+        records.push(network_source_record(
+            &format!("2001:db8:{:x}::/48", 0x1000 + index),
+            "v6-filler",
+            "",
+            "",
+        ));
+    }
+    runtime.replace_records(records);
+
+    let matches = runtime.matching_attributes_ascending("198.51.100.42".parse().expect("address"));
+    let names = matches
+        .iter()
+        .map(|(_, attrs)| attrs.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_prefix_lengths_ascending(&matches);
+    assert_eq!(names, vec!["v4-root", "v4-match"]);
+}
+
+#[test]
+fn network_sources_runtime_replaces_records_without_stale_index_matches() {
+    let runtime = NetworkSourcesRuntime::default();
+    let mut first = vec![network_source_record("10.0.0.0/8", "old", "", "")];
+    add_ipv4_indexed_lookup_fillers(&mut first);
+    runtime.replace_records(first);
+
+    let mut second = vec![network_source_record("192.0.2.0/24", "new", "", "")];
+    add_ipv4_indexed_lookup_fillers(&mut second);
+    runtime.replace_records(second);
+
+    let stale_matches = runtime.matching_attributes_ascending("10.1.1.1".parse().expect("address"));
+    let current_matches =
+        runtime.matching_attributes_ascending("192.0.2.10".parse().expect("address"));
+
+    assert!(stale_matches.is_empty());
+    assert_prefix_lengths_ascending(&current_matches);
+    assert_eq!(current_matches.len(), 1);
+    assert_eq!(current_matches[0].1.name, "new");
+}
+
+#[test]
+#[ignore = "manual network-source runtime lookup benchmark"]
+fn bench_network_sources_runtime_lookup_matrix() {
+    let cases = [
+        ("ipv4", 32, "198.51.100.42"),
+        ("ipv4", 33, "198.51.100.42"),
+        ("ipv4", 34, "198.51.100.42"),
+        ("ipv4", 128, "198.51.100.42"),
+        ("ipv4", 129, "198.51.100.42"),
+        ("ipv4", 500, "198.51.100.42"),
+        ("ipv4", 2_000, "198.51.100.42"),
+        ("ipv4", 10_000, "198.51.100.42"),
+        ("ipv6", 128, "2001:db8:1::42"),
+        ("ipv6", 129, "2001:db8:1::42"),
+        ("ipv6", 130, "2001:db8:1::42"),
+        ("ipv6", 500, "2001:db8:1::42"),
+        ("ipv6", 2_000, "2001:db8:1::42"),
+        ("ipv6", 10_000, "2001:db8:1::42"),
+    ];
+
+    eprintln!();
+    eprintln!("=== Network Source Runtime Lookup Matrix ===");
+    eprintln!("family records rounds runtime_ns linear_ns speedup");
+    for (family, record_count, address) in cases {
+        let address = address.parse().expect("address");
+        let records = match family {
+            "ipv4" => benchmark_records_ipv4(record_count),
+            "ipv6" => benchmark_records_ipv6(record_count),
+            _ => unreachable!("benchmark family"),
+        };
+        let runtime = NetworkSourcesRuntime::default();
+        runtime.replace_records(records.clone());
+        let rounds = benchmark_lookup_rounds(record_count);
+
+        let runtime_elapsed =
+            time_lookup_rounds(rounds, || runtime.matching_attributes_ascending(address));
+        let linear_elapsed =
+            time_lookup_rounds(rounds, || benchmark_linear_matches(&records, address));
+
+        let runtime_ns = elapsed_nanos_per_round(runtime_elapsed, rounds);
+        let linear_ns = elapsed_nanos_per_round(linear_elapsed, rounds);
+        let speedup = linear_ns / runtime_ns.max(f64::EPSILON);
+        eprintln!("{family} {record_count} {rounds} {runtime_ns:.1} {linear_ns:.1} {speedup:.2}x");
+    }
+
+    eprintln!();
+    eprintln!("case ipv4_records ipv6_records rounds runtime_ns linear_ns speedup");
+    for (label, ipv4_count, ipv6_count, address) in [
+        ("mixed-ipv4-linear", 128, 128, "198.51.100.42"),
+        ("mixed-ipv6-linear", 128, 128, "2001:db8:1::42"),
+        ("mixed-ipv4-indexed", 500, 500, "198.51.100.42"),
+        ("mixed-ipv6-indexed", 500, 2_000, "2001:db8:1::42"),
+    ] {
+        let address = address.parse().expect("address");
+        let records = benchmark_records_mixed(ipv4_count, ipv6_count);
+        let runtime = NetworkSourcesRuntime::default();
+        runtime.replace_records(records.clone());
+        let rounds = benchmark_lookup_rounds(ipv4_count + ipv6_count);
+
+        let runtime_elapsed =
+            time_lookup_rounds(rounds, || runtime.matching_attributes_ascending(address));
+        let linear_elapsed =
+            time_lookup_rounds(rounds, || benchmark_linear_matches(&records, address));
+
+        let runtime_ns = elapsed_nanos_per_round(runtime_elapsed, rounds);
+        let linear_ns = elapsed_nanos_per_round(linear_elapsed, rounds);
+        let speedup = linear_ns / runtime_ns.max(f64::EPSILON);
+        eprintln!(
+            "{label} {ipv4_count} {ipv6_count} {rounds} {runtime_ns:.1} {linear_ns:.1} {speedup:.2}x"
+        );
+    }
+}
+
+fn add_ipv4_indexed_lookup_fillers(records: &mut Vec<NetworkSourceRecord>) {
+    for index in 0..(IPV4_INDEX_MIN_FAMILY_RECORDS * 2) {
+        records.push(network_source_record(
+            &format!("172.{}.{}.0/24", 16 + index / 256, index % 256),
+            "filler",
+            "",
+            "",
+        ));
+    }
+}
+
+fn add_ipv6_indexed_lookup_fillers(records: &mut Vec<NetworkSourceRecord>) {
+    for index in 0..(IPV6_INDEX_MIN_FAMILY_RECORDS * 2) {
+        records.push(network_source_record(
+            &format!("2001:db8:{:x}::/48", 0x1000 + index),
+            "filler",
+            "",
+            "",
+        ));
+    }
+}
+
+fn benchmark_records_ipv4(record_count: usize) -> Vec<NetworkSourceRecord> {
+    let mut records = vec![
+        network_source_record("198.51.0.0/16", "root", "", ""),
+        network_source_record("198.51.100.0/24", "match", "", ""),
+        network_source_record("198.51.200.0/24", "sibling", "", ""),
+    ];
+    while records.len() < record_count {
+        let index = records.len();
+        let octet2 = (index / 256) % 256;
+        let octet3 = index % 256;
+        records.push(network_source_record(
+            &format!("10.{octet2}.{octet3}.0/24"),
+            "filler",
+            "",
+            "",
+        ));
+    }
+    records
+}
+
+fn benchmark_records_ipv6(record_count: usize) -> Vec<NetworkSourceRecord> {
+    let mut records = vec![
+        network_source_record("2001:db8::/32", "root", "", ""),
+        network_source_record("2001:db8:1::/48", "match", "", ""),
+        network_source_record("2001:db8:2::/48", "sibling", "", ""),
+    ];
+    while records.len() < record_count {
+        let index = records.len();
+        records.push(network_source_record(
+            &format!("2001:db8:{:x}::/48", 0x1000 + index),
+            "filler",
+            "",
+            "",
+        ));
+    }
+    records
+}
+
+fn benchmark_records_mixed(ipv4_count: usize, ipv6_count: usize) -> Vec<NetworkSourceRecord> {
+    let mut records = benchmark_records_ipv4(ipv4_count);
+    records.extend(benchmark_records_ipv6(ipv6_count));
+    records
+}
+
+fn benchmark_lookup_rounds(record_count: usize) -> usize {
+    if let Ok(value) = std::env::var("NETFLOW_NETWORK_SOURCE_BENCH_ROUNDS") {
+        return value.parse().expect("valid benchmark rounds");
+    }
+    (1_000_000 / record_count.max(1)).clamp(100, 20_000)
+}
+
+fn time_lookup_rounds<F>(rounds: usize, mut lookup: F) -> Duration
+where
+    F: FnMut() -> Vec<(u8, crate::enrichment::NetworkAttributes)>,
+{
+    let mut checksum = 0_usize;
+    let started = Instant::now();
+    for _ in 0..rounds {
+        checksum = checksum.wrapping_add(black_box(lookup()).len());
+    }
+    black_box(checksum);
+    started.elapsed()
+}
+
+fn elapsed_nanos_per_round(elapsed: Duration, rounds: usize) -> f64 {
+    elapsed.as_nanos() as f64 / rounds.max(1) as f64
+}
+
+fn benchmark_linear_matches(
+    records: &[NetworkSourceRecord],
+    address: IpAddr,
+) -> Vec<(u8, crate::enrichment::NetworkAttributes)> {
+    let mut matches = Vec::new();
+    for record in records {
+        if record.prefix.contains(&address) {
+            matches.push((record.prefix.prefix_len(), record.attrs.clone()));
+        }
+    }
+    matches.sort_by_key(|(prefix_len, _)| *prefix_len);
+    matches
+}
+
+fn assert_prefix_lengths_ascending(matches: &[(u8, crate::enrichment::NetworkAttributes)]) {
+    assert!(
+        matches.windows(2).all(|items| items[0].0 <= items[1].0),
+        "network-source matches must be ascending by prefix length"
+    );
+}
+
+#[test]
 fn build_client_accepts_default_tls_config() {
     let tls = RemoteNetworkSourceTlsConfig::default();
     build_client(true, &tls).expect("default client should initialize");
@@ -436,6 +909,23 @@ async fn network_sources_refresher_publishes_first_successful_fetch_to_runtime()
     task.await
         .expect("join refresher")
         .expect("refresher should stop cleanly");
+}
+
+fn network_source_record(
+    prefix: &str,
+    name: &str,
+    role: &str,
+    tenant: &str,
+) -> NetworkSourceRecord {
+    NetworkSourceRecord {
+        prefix: prefix.parse().expect("parse network-source prefix"),
+        attrs: crate::enrichment::NetworkAttributes {
+            name: name.to_string(),
+            role: role.to_string(),
+            tenant: tenant.to_string(),
+            ..Default::default()
+        },
+    }
 }
 
 async fn serve_json_once(status: &'static str, body: &'static str) -> (String, JoinHandle<String>) {

@@ -433,20 +433,20 @@ static inline struct free_space check_free_space___aral_lock_needed(ARAL *ar, AR
     f.max_page_elements = aral_max_allocation_size(ar) / ar->config.element_size;
     for(f.p = *aral_pages_head_free(ar, marked); f.p ; f.lp = f.p, f.p = f.p->aral_lock.next) {
         f.pages++;
-        internal_fatal(!f.p->aral_lock.free_elements, "page is in the free list, but does not have any elements free");
-        internal_fatal(f.p->marked != marked, "page is in the wrong mark list");
+        internal_fatal(!f.p->page_lock.free_elements, "page is in the free list, but does not have any elements free");
+        internal_fatal(f.p->aral_lock.marked != marked, "page is in the wrong mark list");
 
-        if(f.p != my_page && f.max_free_elements_on_a_page < f.p->aral_lock.free_elements)
-            f.max_free_elements_on_a_page = f.p->aral_lock.free_elements;
+        if(f.p != my_page && f.max_free_elements_on_a_page < f.p->page_lock.free_elements)
+            f.max_free_elements_on_a_page = f.p->page_lock.free_elements;
 
-        f.free_elements += f.p->aral_lock.free_elements;
+        f.free_elements += f.p->page_lock.free_elements;
         f.pages_with_free_elements++;
     }
 
     for(f.p = *aral_pages_head_full(ar, marked); f.p ; f.lp = f.p, f.p = f.p->aral_lock.next) {
         f.pages++;
-        internal_fatal(f.p->aral_lock.free_elements, "found page with free items in a full page");
-        internal_fatal(f.p->marked != marked, "page is in the wrong mark list");
+        internal_fatal(f.p->page_lock.free_elements, "found page with free items in a full page");
+        internal_fatal(f.p->aral_lock.marked != marked, "page is in the wrong mark list");
     }
 
     return f;
@@ -700,10 +700,10 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 
     if(ar->config.mmap.enabled) {
         page = callocz(1, sizeof(ARAL_PAGE));
-        ar->aral_lock.file_number++;
+        size_t file_number = __atomic_add_fetch(&ar->aral_lock.file_number, 1, __ATOMIC_RELAXED);
 
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, ar->aral_lock.file_number);
+        snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, file_number);
         page->filename = strdupz(filename);
         page->mapped = true;
 
@@ -801,8 +801,8 @@ static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOC
 
         nd_munmap(page->data, page->size);
 
-        if (unlikely(unlink(page->filename) == 1))
-            netdata_log_error("Cannot delete file '%s'", page->filename);
+        if (unlikely(unlink(page->filename) == -1))
+            netdata_log_error("ARAL: '%s' cannot delete file '%s'", ar->config.name, page->filename);
 
         freez((void *)page->filename);
         freez(page);
@@ -885,18 +885,13 @@ static ALWAYS_INLINE ARAL_PAGE *aral_get_first_page_with_a_free_slot(ARAL *ar, b
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.allocators, 1, __ATOMIC_RELAXED);
 
-#ifdef NETDATA_ARAL_INTERNAL_CHECKS
-    // bool added = false;
-    struct free_space f1, f2;
-#endif
-
     ARAL_PAGE *page = NULL;
 
 retry_acquisition:
 
     while(!(page = aral_acquire_first_page(ar, marked))) {
 #ifdef NETDATA_ARAL_INTERNAL_CHECKS
-        f1 = check_free_space___aral_lock_needed(ar, NULL, marked);
+        (void)check_free_space___aral_lock_needed(ar, NULL, marked);
 #endif
 
         bool can_add = false;
@@ -926,10 +921,6 @@ retry_acquisition:
             page->aral_lock.head_ptr = head_ptr_free;
             aral_unlock(ar);
 
-            //#ifdef NETDATA_ARAL_INTERNAL_CHECKS
-            //            added = true;
-            //#endif
-
             aral_adders_lock(ar, marked);
             ar->ops[idx].adders.allocating_elements -= aral_elements_in_page_size(ar, page_allocation_size);
             aral_adders_unlock(ar, marked);
@@ -948,13 +939,6 @@ retry_acquisition:
     // we have a page
     // it is acquired
     // and aral is NOT locked
-
-    //#ifdef NETDATA_ARAL_INTERNAL_CHECKS
-    //    if(added) {
-    //        f2 = check_free_space___aral_lock_needed(ar, page, marked);
-    //        internal_fatal(f2.failed, "hey!");
-    //    }
-    //#endif
 
     internal_fatal(!page,
                    "ARAL: '%s' failed to find a page with a free element",
@@ -1076,19 +1060,25 @@ static inline void aral_add_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *pa
     // use the slot id of the item to be freed to determine the partition number
     size_t start = (((uint8_t *)ptr - page->data) / ar->config.element_size) % ARAL_PAGE_INCOMING_PARTITIONS;
 
-    while (true) {
-        for (size_t partition = start; partition < ARAL_PAGE_INCOMING_PARTITIONS; partition++) {
-            if (aral_page_incoming_trylock(ar, page, partition)) {
-                fr->next = page->incoming[partition].list;
-                page->incoming[partition].list = fr;
-                __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELEASE);
-                aral_page_incoming_unlock(ar, page, partition);
-                return;
-            }
+    size_t partition = start;
+    bool locked = false;
+    for(size_t offset = 0; offset < ARAL_PAGE_INCOMING_PARTITIONS; offset++) {
+        partition = (start + offset) % ARAL_PAGE_INCOMING_PARTITIONS;
+        if(aral_page_incoming_trylock(ar, page, partition)) {
+            locked = true;
+            break;
         }
-
-        start = 0;
     }
+
+    if(!locked) {
+        partition = start;
+        aral_page_incoming_lock(ar, page, partition);
+    }
+
+    fr->next = page->incoming[partition].list;
+    page->incoming[partition].list = fr;
+    __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELEASE);
+    aral_page_incoming_unlock(ar, page, partition);
 }
 
 ALWAYS_INLINE void *aral_callocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {

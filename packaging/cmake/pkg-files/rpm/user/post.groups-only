@@ -1,0 +1,5 @@
+for item in docker ceph I2C video; do
+  if getent group $item > /dev/null 2>&1; then
+    usermod -a -G ${item} netdata
+  fi
+done

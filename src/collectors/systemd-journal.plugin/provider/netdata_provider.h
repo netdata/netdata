@@ -64,6 +64,7 @@ void nsd_journal_restart_fields(NsdJournal *j);
 
 int nsd_journal_query_unique(NsdJournal *j, const char *field);
 void nsd_journal_restart_unique(NsdJournal *j);
+int nsd_journal_enumerate_available_unique(NsdJournal *j, const void **data, size_t *l);
 #endif /* HAVE_SD_JOURNAL_RESTART_FIELDS */
 
 int nsd_journal_add_match(NsdJournal *j, const void *data, uintptr_t size);

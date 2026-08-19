@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<response status="success">
+  <result>
+    <licenses>
+      <entry>
+        <feature>Threat Prevention</feature>
+        <description>Threat prevention updates</description>
+        <issued>May 01, 2026</issued>
+        <expires>June 01, 2026</expires>
+        <expired>no</expired>
+      </entry>
+      <entry>
+        <feature>Premium Support</feature>
+        <description>Support entitlement</description>
+        <issued>January 01, 2025</issued>
+        <expires>April 01, 2026</expires>
+        <expired>yes</expired>
+      </entry>
+      <entry>
+        <feature>GlobalProtect Portal</feature>
+        <description>Portal entitlement</description>
+        <issued>January 01, 2020</issued>
+        <expires>Never</expires>
+        <expired>no</expired>
+      </entry>
+    </licenses>
+  </result>
+</response>

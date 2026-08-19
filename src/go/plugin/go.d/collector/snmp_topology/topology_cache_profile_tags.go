@@ -2,7 +2,11 @@
 
 package snmptopology
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+)
 
 func (c *topologyCache) applyLLDPLocalDeviceProfileTags(tags map[string]string) {
 	if c == nil || len(tags) == 0 {
@@ -60,8 +64,19 @@ func (c *topologyCache) applyVTPProfileTags(tags map[string]string) {
 	}
 }
 
+func (c *topologyCache) applyOSPFProfileTags(tags map[string]string) {
+	if c == nil || len(tags) == 0 {
+		return
+	}
+	if v := topologyutil.NormalizeTopologyRouterID(tags[tagOSPFRouterID]); v != "" {
+		c.localDevice.OSPFRouterID = v
+		c.localDevice.Labels = ensureLabels(c.localDevice.Labels)
+		c.localDevice.Labels[tagOSPFRouterID] = v
+	}
+}
+
 func (c *topologyCache) applyAuthoritativeBridgeIdentity(mac string) {
-	mac = normalizeMAC(mac)
+	mac = topologyutil.NormalizeMAC(mac)
 	if mac == "" || mac == "00:00:00:00:00:00" {
 		return
 	}
@@ -74,7 +89,7 @@ func (c *topologyCache) updateLocalBridgeIdentityFromTags(tags map[string]string
 	if c == nil || len(tags) == 0 {
 		return
 	}
-	if v := stpBridgeAddressToMAC(firstNonEmpty(tags[tagBridgeBaseAddress], tags[tagLegacyStpBaseBridgeAddr])); v != "" {
+	if v := stpBridgeAddressToMAC(topologyutil.FirstNonEmptyString(tags[tagBridgeBaseAddress], tags[tagLegacyStpBaseBridgeAddr])); v != "" {
 		c.applyAuthoritativeBridgeIdentity(v)
 	}
 }

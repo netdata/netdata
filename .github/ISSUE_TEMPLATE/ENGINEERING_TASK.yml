@@ -1,0 +1,94 @@
+name: "Netdata Agent: Engineering task"
+description: "Track refactors, technical debt, and engineering follow-ups for the Netdata Agent"
+title: "[Task]: "
+labels: ["needs triage"]
+type: "task"
+body:
+  - type: markdown
+    attributes:
+      value: "### Thank you for contributing to our project!"
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for internal engineering work, refactors, technical debt,
+        and follow-ups discovered during development. Please include concrete
+        evidence such as file paths, line references, pull requests, issue links,
+        review comments, or failing checks.
+
+        For user-facing features, use the Feature request template. For defects,
+        use the Bug report template.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / root cause
+      description: |
+        What is wrong or risky about the current state, and why? Include concrete evidence where possible.
+    validations:
+      required: true
+  - type: textarea
+    id: clean-end-state
+    attributes:
+      label: Clean end state
+      description: |
+        What should the codebase, workflow, or project structure look like once this task is complete?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: |
+        List observable, checkable conditions for this task to be considered done.
+      value: |
+        -
+        -
+        -
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: |
+        Select the closest category if one applies.
+      options:
+        - "refactor"
+        - "technical debt"
+        - "test debt"
+        - "docs debt"
+        - "build / CI"
+        - "follow-up from prior work"
+    validations:
+      required: false
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope boundaries
+      description: |
+        What is in scope, and what is explicitly out of scope?
+    validations:
+      required: false
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: |
+        Which tests, scans, documentation checks, or other verification should prove the task is complete?
+    validations:
+      required: false
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks / compatibility
+      description: |
+        Note any behavior, API/schema, documentation, packaging, migration, or user-impact risks.
+    validations:
+      required: false
+  - type: textarea
+    id: related-context
+    attributes:
+      label: Related context
+      description: |
+        Link related issues, pull requests, SOWs, review comments, CI findings, or discussions.
+    validations:
+      required: false

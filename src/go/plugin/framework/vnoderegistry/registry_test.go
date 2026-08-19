@@ -37,33 +37,25 @@ func TestRegistryScenarios(t *testing.T) {
 
 				got, err := reg.Register("job-a", first)
 				require.NoError(t, err)
-				assert.True(t, got.NeedDefine)
-				assert.True(t, got.OwnerAdded)
-				assert.False(t, got.MetadataUpdated)
+				assert.False(t, got.MetadataConflict)
 				assert.Equal(t, first, got.Info)
 
 				got, err = reg.Register("job-b", same)
 				require.NoError(t, err)
-				assert.False(t, got.NeedDefine)
-				assert.True(t, got.OwnerAdded)
-				assert.False(t, got.MetadataUpdated)
+				assert.False(t, got.MetadataConflict)
 				assert.Equal(t, first, got.Info)
 
 				got, err = reg.Register("job-c", conflict)
 				require.NoError(t, err)
-				assert.True(t, got.NeedDefine)
-				assert.True(t, got.OwnerAdded)
-				assert.True(t, got.MetadataUpdated)
-				assert.True(t, got.UpdateFirstSeen)
+				assert.True(t, got.MetadataConflict)
+				assert.True(t, got.ConflictFirstSeen)
 				assert.Equal(t, conflict, got.Info)
-				assert.Equal(t, first, got.Previous)
+				assert.Equal(t, first, got.Conflicting)
 
 				got, err = reg.Register("job-c", conflict)
 				require.NoError(t, err)
-				assert.False(t, got.NeedDefine)
-				assert.False(t, got.OwnerAdded)
-				assert.False(t, got.MetadataUpdated)
-				assert.False(t, got.UpdateFirstSeen)
+				assert.True(t, got.MetadataConflict)
+				assert.False(t, got.ConflictFirstSeen)
 
 				assert.Equal(t, []Owner{"job-a", "job-b", "job-c"}, reg.Owners("node-guid"))
 				assert.False(t, reg.Release("job-a", "node-guid"))
@@ -91,73 +83,34 @@ func TestRegistryScenarios(t *testing.T) {
 
 				got, err := reg.Register("job-a", first)
 				require.NoError(t, err)
-				assert.True(t, got.NeedDefine)
+				assert.Equal(t, map[string]string{"_hostname": "node-a"}, got.Info.Labels)
 
 				got, err = reg.Register("job-b", sameWireInfo)
 				require.NoError(t, err)
-				assert.False(t, got.NeedDefine)
 				assert.Equal(t, map[string]string{"_hostname": "node-a"}, got.Info.Labels)
 			},
 		},
-		"rollback restores metadata update": {
-			run: func(t *testing.T) {
-				reg := New()
-				first := netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-a"}
-				next := netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-b"}
-
-				_, err := reg.Register("job-a", first)
-				require.NoError(t, err)
-				got, err := reg.Register("job-b", next)
-				require.NoError(t, err)
-				require.True(t, got.MetadataUpdated)
-				require.True(t, got.OwnerAdded)
-
-				reg.Rollback("job-b", got)
-
-				info, ok := reg.Lookup("node-guid")
-				require.True(t, ok)
-				assert.Equal(t, "node-a", info.Hostname)
-				assert.Equal(t, []Owner{"job-a"}, reg.Owners("node-guid"))
-			},
-		},
-		"rollback does not undo newer metadata update": {
+		"conflict warnings are per state and bounded": {
 			run: func(t *testing.T) {
 				reg := New()
 				_, err := reg.Register("job-a", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-a"})
 				require.NoError(t, err)
-				rollback, err := reg.Register("job-b", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-b"})
-				require.NoError(t, err)
-				_, err = reg.Register("job-c", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-c"})
-				require.NoError(t, err)
 
-				reg.Rollback("job-b", rollback)
-
-				info, ok := reg.Lookup("node-guid")
-				require.True(t, ok)
-				assert.Equal(t, "node-c", info.Hostname)
-				assert.Equal(t, []Owner{"job-a", "job-c"}, reg.Owners("node-guid"))
-			},
-		},
-		"update warnings are per state and bounded": {
-			run: func(t *testing.T) {
-				reg := New()
-				_, err := reg.Register("job", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-a"})
+				got, err := reg.Register("job-b", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-b"})
 				require.NoError(t, err)
+				assert.True(t, got.ConflictFirstSeen)
 
-				got, err := reg.Register("job", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-b"})
+				got, err = reg.Register("job-b", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-a"})
 				require.NoError(t, err)
-				assert.True(t, got.UpdateFirstSeen)
+				assert.False(t, got.MetadataConflict)
 
-				got, err = reg.Register("job", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-a"})
+				got, err = reg.Register("job-b", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-b"})
 				require.NoError(t, err)
-				assert.True(t, got.UpdateFirstSeen)
-
-				got, err = reg.Register("job", netdataapi.HostInfo{GUID: "node-guid", Hostname: "node-b"})
-				require.NoError(t, err)
-				assert.False(t, got.UpdateFirstSeen)
+				assert.True(t, got.MetadataConflict)
+				assert.False(t, got.ConflictFirstSeen)
 
 				for i := range maxReportedMetadataStatesPerGUID + 1 {
-					_, err = reg.Register("job", netdataapi.HostInfo{
+					_, err = reg.Register("job-b", netdataapi.HostInfo{
 						GUID:     "node-guid",
 						Hostname: fmt.Sprintf("node-%d", i),
 					})
@@ -243,9 +196,6 @@ func TestRegistryConcurrentScenarios(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				info, ok := reg.Lookup("node-guid")
-				require.True(t, ok)
-				require.NotEmpty(t, info.Hostname)
 				require.Len(t, reg.Owners("node-guid"), owners)
 			},
 		},

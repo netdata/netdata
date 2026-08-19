@@ -18,6 +18,7 @@ int do_module_libsensors(int update_every, const char *name);
 int do_module_audit(int update_every, const char *name);
 
 void module_libsensors_cleanup(void);
+void module_libsensors_register_functions(struct functions_evloop_globals *wg);
 
 void debugfs2lower(char *name);
 const char *debugfs_rrdset_type_name(RRDSET_TYPE chart_type);

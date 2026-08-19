@@ -57,6 +57,7 @@ void dyncfg_load_all(void);
 void dyncfg_file_load(const char *filename);
 void dyncfg_file_save(const char *id, DYNCFG *df);
 void dyncfg_file_delete(const char *id);
+bool dyncfg_file_read_payload(FILE *fp, BUFFER *payload, size_t expected_size);
 
 // Returns the canonical command mask a node should advertise given its type
 // and current source_type. Idempotent and order-independent: re-run after a

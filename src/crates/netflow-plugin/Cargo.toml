@@ -17,19 +17,27 @@ allocative = { workspace = true }
 async-trait = { workspace = true }
 bitflags = { workspace = true }
 bitvec = { workspace = true }
+bumpalo = { workspace = true }
 bytesize = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-journal-common = { workspace = true }
-journal-core = { workspace = true }
-journal-engine = { workspace = true }
-journal-index = { workspace = true }
-journal-log-writer = { workspace = true }
-journal-registry = { workspace = true }
+# Journal I/O uses the published systemd-journal-sdk crates (was vendored path
+# crates), inherited via the workspace journal-sdk-* keys; in-code idents are
+# journal_sdk_*. Scope: netflow-plugin only; log-viewer/otel still use the
+# vendored workspace crates (tracked as a follow-up). One source of journal
+# code in this binary.
+journal-sdk-common = { workspace = true }
+journal-sdk-core = { workspace = true }
+journal-sdk-engine = { workspace = true }
+journal-sdk-host = { workspace = true }
+journal-sdk-index = { workspace = true }
+journal-sdk-log-writer = { workspace = true }
+journal-sdk-registry = { workspace = true }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
 hashbrown = { workspace = true }
 libc = { workspace = true }
+lru = { workspace = true }
 ipnet = { workspace = true }
 ipnet-trie = { workspace = true }
 itoa = { workspace = true }
@@ -45,7 +53,9 @@ netgauze-bmp-pkt = { workspace = true, features = ["codec"] }
 notify = { workspace = true }
 roaring = { workspace = true, features = ["allocative"] }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
+# The Function contract uses object key order for grouped columns and labels.
+# Declare this here so the plugin does not rely on another crate unifying it.
+serde_json = { workspace = true, features = ["preserve_order"] }
 serde_yaml = { workspace = true }
 sflow-parser = { workspace = true }
 tokio = { workspace = true }
@@ -54,7 +64,7 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 regex = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
-reqwest = { workspace = true, features = ["json", "rustls"] }
+reqwest = { workspace = true, default-features = true, features = ["stream", "json", "rustls"] }
 schemars = { workspace = true }
 socket2 = { workspace = true }
 tonic = { workspace = true, features = ["transport", "tls-native-roots"] }

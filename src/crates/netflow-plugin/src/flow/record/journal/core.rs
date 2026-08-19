@@ -11,7 +11,7 @@ pub(super) fn encode_core_journal_fields(record: &FlowRecord, writer: &mut Journ
     writer.push_str("EXPORTER_REGION", &record.exporter_region);
     writer.push_str("EXPORTER_TENANT", &record.exporter_tenant);
     writer.push_u16_when(record.has_etype(), "ETYPE", record.etype);
-    writer.push_u8("PROTOCOL", record.protocol);
+    writer.push_u8_when(true, "PROTOCOL", record.protocol);
     writer.push_u64("BYTES", record.bytes);
     writer.push_u64("PACKETS", record.packets);
     writer.push_u64("FLOWS", record.flows);

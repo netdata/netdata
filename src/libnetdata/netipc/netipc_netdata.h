@@ -4,10 +4,10 @@
 #define NETDATA_NETIPC_NETDATA_H 1
 
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/netipc/include/netipc/netipc_protocol.h"
 
 #if defined(OS_LINUX) || defined(OS_WINDOWS)
 #include "netipc/netipc_service.h"
-#include "netipc/netipc_protocol.h"
 
 // derive a netipc auth token from the current NETDATA_INVOCATION_ID
 uint64_t netipc_auth_token(void);

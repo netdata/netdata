@@ -25,7 +25,15 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
     RRDHOST_FLAGS *flags = &host->exporting_flags[instance->index];
 
     if (unlikely((*flags & (RRDHOST_FLAG_EXPORTING_SEND | RRDHOST_FLAG_EXPORTING_DONT_SEND)) == 0)) {
-        const char *host_name = (host == localhost) ? "localhost" : rrdhost_hostname(host);
+        RRDHOST_IDENTITY identity = { 0 };
+        const char *host_name;
+
+        if (host == localhost)
+            host_name = "localhost";
+        else {
+            identity = rrdhost_identity_acquire(host);
+            host_name = string2str(identity.hostname);
+        }
 
         if (!instance->config.hosts_pattern || simple_pattern_matches(instance->config.hosts_pattern, host_name)) {
             *flags |= RRDHOST_FLAG_EXPORTING_SEND;
@@ -34,6 +42,8 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
             *flags |= RRDHOST_FLAG_EXPORTING_DONT_SEND;
             netdata_log_info("disabled exporting of host '%s' for instance '%s'", host_name, instance->config.name);
         }
+
+        rrdhost_identity_release(&identity);
     }
 
     if (likely(*flags & RRDHOST_FLAG_EXPORTING_SEND))
@@ -69,18 +79,36 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
             *flags |= RRDSET_FLAG_EXPORTING_SEND;
         else {
             *flags |= RRDSET_FLAG_EXPORTING_IGNORE;
-            netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.", rrdset_id(st), rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(debug_flags & D_EXPORTING)) {
+                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.", rrdset_id(st), string2str(identity.hostname));
+                rrdhost_identity_release(&identity);
+            }
+#endif
             return 0;
         }
     }
 
     if(unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-        netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", rrdset_id(st), rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", rrdset_id(st), string2str(identity.hostname));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 
     if(unlikely(st->rrd_memory_mode == RRD_DB_MODE_NONE && !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-        netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", rrdset_id(st), rrdhost_hostname(host), rrd_memory_mode_name(host->rrd_memory_mode));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", rrdset_id(st), string2str(identity.hostname), rrd_memory_mode_name(host->rrd_memory_mode));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 

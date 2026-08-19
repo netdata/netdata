@@ -7,6 +7,14 @@
       "minLength": 1,
       "description": "A unique ID for the item. Must be URL safe."
     },
+    "page_description": {
+      "description": "Optional explicit page description used when the overview cannot produce an accurate, unique 50-160 character summary. Values must already be trimmed and semantically complete. Leading hyphens, leading or trailing whitespace, C0/C1 controls, surrogate code points, Unicode line or paragraph separators, Markdown-special characters (*, _, [, ], <, >, #, backtick, ~), CommonMark list or thematic-break block starts, URLs, double quotes, backslashes, terminal colons, terminal ellipses (Unicode … or ASCII ...), and unbalanced parentheses are not supported.",
+      "type": "string",
+      "format": "netdata-balanced-parentheses",
+      "minLength": 50,
+      "maxLength": 160,
+      "pattern": "^(?!-)(?!\\s)(?!.*\\s$)(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u2028\\u2029\\uD800-\\uDFFF])(?!.*(?:[A-Za-z][A-Za-z0-9+.-]*://|[Mm][Aa][Ii][Ll][Tt][Oo]:|[Ww][Ww][Ww]\\.))(?!.*[*_\\[\\]<>#`~])(?![-+*] )(?![0-9]{1,9}[.)] )(?!-(?: *-){2,}$)(?!.*:$)(?!.*(?:…|\\.\\.\\.)$)[^\"\\\\]+$"
+    },
     "instance": {
       "type": "object",
       "description": "Information about the integration instance.",
@@ -14,6 +22,9 @@
         "name": {
           "description": "Integration display name. Use official spelling for applications.",
           "type": "string"
+        },
+        "description": {
+          "$ref": "#/$defs/page_description"
         },
         "link": {
           "description": "Link to the instance official website if any.",

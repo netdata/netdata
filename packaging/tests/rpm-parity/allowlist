@@ -1,0 +1,18 @@
+# Reviewed, accepted deviations for the RPM spec-vs-CPack parity check.
+# Extended regexes; a unified-diff +/- line matching any of them is ignored.
+
+# Build-id artifact entries (/usr/lib/.build-id/xx/<hash> symlinks and their
+# per-prefix directories) are derived from the content hash of each built
+# binary. The two package sets come from two separate builds, and the
+# binaries embed build-specific data (the build-info cmake cache, configure
+# command line), so the hashes — and therefore these paths — can never
+# match. rpmbuild generates the entries itself with fixed root:root
+# ownership and the artifact flag; everything about them except the hash is
+# invariant, which is what this pattern pins down.
+^[+-](40755|120777)\|root:root\|a\|[^|]*\|/usr/lib/\.build-id(/.*)?$
+
+# CPack emits one empty line between a scriptlet section tag and the
+# embedded scriptlet file's content; rpmbuild's spec path does not. Blank
+# lines are semantically inert in shell scriptlets. The pattern matches only
+# entirely-empty added lines.
+^\+$

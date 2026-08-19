@@ -71,18 +71,6 @@ extern "C" {
 #include "analytics.h"
 
 // global netdata daemon variables
-extern const char *netdata_configured_hostname;
-extern const char *netdata_configured_user_config_dir;
-extern const char *netdata_configured_stock_config_dir;
-extern const char *netdata_configured_stock_data_dir;
-extern const char *netdata_configured_log_dir;
-extern const char *netdata_configured_primary_plugins_dir;
-extern const char *netdata_configured_web_dir;
-extern const char *netdata_configured_cache_dir;
-extern const char *netdata_configured_varlib_dir;
-extern const char *netdata_configured_cloud_dir;
-extern const char *netdata_configured_home_dir;
-extern const char *netdata_configured_host_prefix;
 extern bool netdata_anonymous_statistics_enabled;
 
 // Thread-safe system timezone access.

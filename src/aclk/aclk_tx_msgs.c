@@ -26,17 +26,30 @@ static bool aclk_size_add_overflow(size_t *total, size_t add)
 
 #define ACLK_HEADER_VERSION (2)
 
-uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+// Returns MQTT_WSS_OK (0) when the message was handed to the mqtt layer, non-zero otherwise -
+// mqtt_wss_publish5()'s error code where it produced one, and 1 for a message that never reached
+// it. Either way the message has been freed. `packet_id` is optional and reports the assigned id
+// (0 when none was assigned).
+//
+// Callers that must know whether the message really went out MUST test the return code: the send
+// can fail for reasons that carry no packet id at all - an offline or disconnecting client, a full
+// mqtt buffer, a message the server rejects as too big - and a caller that does not want the id
+// passes NULL. The id is informational, for matching a later PUBACK.
+int aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname, uint16_t *packet_id)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
     UNUSED(msgname);
 #endif
-    uint16_t packet_id = 0;
+    uint16_t pid = 0;
     const char *topic = aclk_get_topic(subtopic);
+
+    if (packet_id)
+        *packet_id = 0;
 
     if (unlikely(!topic)) {
         netdata_log_error("Couldn't get topic. Aborting message send.");
-        return 0;
+        freez(msg);
+        return 1;
     }
 
     if (aclklog_enabled) {
@@ -45,11 +58,14 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         freez(json);
     }
 
-    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &pid);
     if (rc != MQTT_WSS_OK)
-        packet_id = 0;
+        return rc;
 
-    return packet_id;
+    if (packet_id)
+        *packet_id = pid;
+
+    return MQTT_WSS_OK;
 }
 
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
@@ -69,17 +85,22 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
     len = strlen(str);
 
+    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
     size_t full_msg_len = len;
-    if (payload_len)
-        full_msg_len += strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len;
+    if (payload_len && unlikely(
+            aclk_size_add_overflow(&full_msg_len, sep_len) ||
+            aclk_size_add_overflow(&full_msg_len, payload_len))) {
+        json_object_put(msg);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
 
     full_msg = mallocz(full_msg_len);
     memcpy(full_msg, str, len);
     json_object_put(msg);
 
     if (payload_len) {
-        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1);
-        len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
+        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+        len += sep_len;
         memcpy(&full_msg[len], payload, payload_len);
     }
 
@@ -134,12 +155,14 @@ static struct json_object *create_hdr(const char *type, const char *msg_id)
     tmp = json_object_new_int64(ts_us);
     json_object_object_add(obj, "timestamp-offset-usec", tmp);
 
-    tmp = json_object_new_int64(aclk_session_sec);
+    usec_t session = aclk_session_load();
+
+    tmp = json_object_new_int64(session / USEC_PER_SEC);
     json_object_object_add(obj, "connect", tmp);
 
 // TODO handle this somehow see above
-//    tmp = json_object_new_uint64(0 /* TODO aclk_session_us */);
-    tmp = json_object_new_int64(aclk_session_us);
+//    tmp = json_object_new_uint64(session % USEC_PER_SEC);
+    tmp = json_object_new_int64(session % USEC_PER_SEC);
     json_object_object_add(obj, "connect-offset-usec", tmp);
 
     tmp = json_object_new_int(ACLK_HEADER_VERSION);
@@ -293,7 +316,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = aclk_get_agent_capas(),
     };
 
@@ -316,7 +339,8 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         return 0;
     }
 
-    pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
+    // a failed publish leaves pid at 0, which is what this returned before it reported the code
+    (void)aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection", &pid);
     if (claim_id_is_set(previous_claim_id))
         claim_id_clear_previous_working();
 
@@ -327,7 +351,7 @@ char *aclk_generate_lwt(size_t *size) {
     update_agent_connection_t conn = {
         .reachable = 0,
         .lwt = 1,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = NULL
     };
 

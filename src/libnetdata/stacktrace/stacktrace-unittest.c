@@ -2,6 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "stacktrace.h"
+#include "stacktrace-common.h"
 
 // Structure to hold all test data
 typedef struct {
@@ -92,6 +93,9 @@ static void inline_function_to_capture_stack_trace(stacktrace_test_data_t *test_
 int stacktrace_unittest(void) {
     // Initialize stacktrace subsystem
     stacktrace_init();
+
+    bool cache_collision_test = stacktrace_cache_unittest() == 0;
+    fprintf(stderr, "\nSTACKTRACE CACHE COLLISION TEST: %s\n", cache_collision_test ? "SUCCESS" : "FAILURE");
     
     // Setup test data structure
     stacktrace_test_data_t test_data = {
@@ -133,7 +137,7 @@ int stacktrace_unittest(void) {
     buffer_free(test_data.indirect_root_cause);
     
     // Report overall test status - success if both analyses succeed
-    bool test_success = direct_analysis && indirect_analysis;
+    bool test_success = cache_collision_test && direct_analysis && indirect_analysis;
     fprintf(stderr, "\nSTACKTRACE TEST: Overall result: %s\n",
             test_success ? "SUCCESS" : "FAILURE");
     

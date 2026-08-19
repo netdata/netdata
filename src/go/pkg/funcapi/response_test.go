@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMethodConfig_WithPresentationReturnsUpdatedCopy(t *testing.T) {
-	cfg := MethodConfig{ID: "topology"}
+func TestFunctionConfig_WithPresentationReturnsUpdatedCopy(t *testing.T) {
+	cfg := FunctionConfig{ID: "topology"}
 
 	updated := cfg.WithPresentation(map[string]any{"mode": "graph"})
 

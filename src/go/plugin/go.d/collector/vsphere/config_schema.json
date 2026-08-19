@@ -38,6 +38,122 @@
         "minimum": 60,
         "default": 300
       },
+      "tag_categories": {
+        "title": "vSphere tag categories",
+        "description": "Optional glob-pattern allowlist of vSphere tag category names to expose as chart labels. Each list item is one pattern, so names with spaces are supported. Disabled by default because tags are user-defined metadata and can expose internal names. Use \"*\" only when all tag categories are intentional. Label keys are vsphere_tag_<sanitized_category>; multiple tags in the same category are sorted and joined with \"|\".",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "vSphere tag category",
+          "type": "string",
+          "default": "Environment"
+        },
+        "default": []
+      },
+      "custom_attributes": {
+        "title": "vSphere custom attributes",
+        "description": "Optional glob-pattern allowlist of vSphere custom attribute names to expose as chart labels. Each list item is one pattern, so names with spaces are supported. Disabled by default because custom attributes are user-defined metadata and can expose internal names, ownership data, or secrets stored by administrators. Custom attribute values are sent verbatim as labels; never enable patterns that can match secret values. Use \"*\" only when all custom attributes are intentional. Label keys are vsphere_custom_attribute_<sanitized_name>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "vSphere custom attribute",
+          "type": "string",
+          "default": "Owner"
+        },
+        "default": []
+      },
+      "collect_datastore_clusters": {
+        "title": "Collect datastore clusters",
+        "description": "If enabled, collects aggregate capacity and Storage DRS status for datastore clusters (StoragePod objects). Disabled by default because it adds another discovered resource class.",
+        "type": "boolean",
+        "default": false
+      },
+      "datastore_cluster_include": {
+        "title": "Datastore cluster selector",
+        "description": "Simple-pattern allowlist for discovered datastore clusters when collect_datastore_clusters is enabled. Matching datastore clusters are included in metrics, labels, cached discovery state, and topology. Patterns match /Datacenter/DatastoreCluster, the datastore cluster name, or the vSphere managed object ID.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "Datastore cluster selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "collect_vsan": {
+        "title": "Collect vSAN metrics",
+        "description": "If enabled, collects vSAN cluster capacity, vSAN cluster health, and vSAN cluster, host, and VM performance metrics through the vSAN Management API. Disabled by default because it requires vSAN APIs and the vSAN Performance Service, and adds additional vCenter queries. Use the vSAN selectors to choose the concrete vSAN performance entity refs queried.",
+        "type": "boolean",
+        "default": false
+      },
+      "vsan_cluster_include": {
+        "title": "vSAN cluster selector",
+        "description": "Simple-pattern allowlist for vSAN clusters when collect_vsan is enabled. Patterns match /Datacenter/Cluster, the cluster name, the vSphere managed object ID, or vsan_uuid:<uuid>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "vSAN cluster selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "vsan_host_include": {
+        "title": "vSAN host selector",
+        "description": "Simple-pattern allowlist for vSAN host performance entities when collect_vsan is enabled. Patterns match /Datacenter/Cluster/Host, the host name, the vSphere managed object ID, or vsan_node_uuid:<uuid>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "vSAN host selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "vsan_vm_include": {
+        "title": "vSAN VM selector",
+        "description": "Simple-pattern allowlist for vSAN VM performance entities when collect_vsan is enabled. Patterns match /Datacenter/Cluster/Host/VM, the VM name, the vSphere managed object ID, or instance_uuid:<uuid>.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "vSAN VM selector",
+          "type": "string",
+          "default": "/*"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "collect_network_topology": {
+        "title": "Collect network topology",
+        "description": "If enabled, discovers vSphere Network and Distributed Virtual Port Group objects for the cached vSphere Topology function. Disabled by default to avoid extra vCenter discovery calls for existing users.",
+        "type": "boolean",
+        "default": false
+      },
       "not_follow_redirects": {
         "title": "Not follow redirects",
         "description": "If set, the client will not follow HTTP redirects automatically.",
@@ -60,8 +176,8 @@
           "title": "Host selector",
           "description": "",
           "type": "string",
-          "default": "/*/*/*",
-          "pattern": "^$|^/"
+          "default": "/*",
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -79,8 +195,8 @@
           "title": "VM selector",
           "description": "",
           "type": "string",
-          "default": "/*/*/*/*",
-          "pattern": "^$|^/"
+          "default": "/*",
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -98,8 +214,8 @@
           "title": "Datastore selector",
           "description": "",
           "type": "string",
-          "default": "/*/*",
-          "pattern": "^$|^/"
+          "default": "/*",
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -117,8 +233,8 @@
           "title": "Cluster selector",
           "description": "",
           "type": "string",
-          "default": "/*/*",
-          "pattern": "^$|^/"
+          "default": "/*",
+          "pattern": "^/"
         },
         "default": [
           "/*"
@@ -209,11 +325,7 @@
     "required": [
       "url",
       "username",
-      "password",
-      "host_include",
-      "vm_include",
-      "datastore_include",
-      "cluster_include"
+      "password"
     ]
   },
   "uiSchema": {
@@ -231,17 +343,45 @@
             "url",
             "timeout",
             "discovery_interval",
-            "not_follow_redirects",
             "vnode"
           ]
         },
         {
-          "title": "Hosts, VMs, Datastores & Clusters selector",
+          "title": "Filters",
           "fields": [
             "host_include",
             "vm_include",
             "datastore_include",
             "cluster_include"
+          ]
+        },
+        {
+          "title": "Labels",
+          "fields": [
+            "tag_categories",
+            "custom_attributes"
+          ]
+        },
+        {
+          "title": "Stores",
+          "fields": [
+            "collect_datastore_clusters",
+            "datastore_cluster_include"
+          ]
+        },
+        {
+          "title": "vSAN",
+          "fields": [
+            "collect_vsan",
+            "vsan_cluster_include",
+            "vsan_host_include",
+            "vsan_vm_include"
+          ]
+        },
+        {
+          "title": "Topology",
+          "fields": [
+            "collect_network_topology"
           ]
         },
         {
@@ -259,20 +399,6 @@
             "tls_cert",
             "tls_key"
           ]
-        },
-        {
-          "title": "Proxy",
-          "fields": [
-            "proxy_url",
-            "proxy_username",
-            "proxy_password"
-          ]
-        },
-        {
-          "title": "Headers",
-          "fields": [
-            "headers"
-          ]
         }
       ]
     },
@@ -289,6 +415,21 @@
     "force_http2": {
       "ui:widget": "hidden"
     },
+    "not_follow_redirects": {
+      "ui:widget": "hidden"
+    },
+    "proxy_url": {
+      "ui:widget": "hidden"
+    },
+    "proxy_username": {
+      "ui:widget": "hidden"
+    },
+    "proxy_password": {
+      "ui:widget": "hidden"
+    },
+    "headers": {
+      "ui:widget": "hidden"
+    },
     "autodetection_retry": {
       "ui:help": "This option determines how frequently (in seconds) Netdata will retry data collection jobs that failed initially, with the value of 60 meaning it retries to start data collection jobs every 60 seconds, while setting it to 0 disables this retry mechanism entirely."
     },
@@ -299,7 +440,7 @@
       "ui:help": "**Important**: vSphere generates real-time statistics every 20 seconds. Setting this value lower won't improve data accuracy. For larger vSphere deployments, consider increasing this value to ensure complete data collection during each cycle. To find the optimal value, run the collector in debug mode and see how long it takes to collect metrics."
     },
     "url": {
-      "ui:placeholder": "https://203.0.113.0"
+      "ui:placeholder": "https://vcenter.local"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
@@ -308,6 +449,24 @@
       "ui:listFlavour": "list"
     },
     "vm_include": {
+      "ui:listFlavour": "list"
+    },
+    "tag_categories": {
+      "ui:listFlavour": "list"
+    },
+    "custom_attributes": {
+      "ui:listFlavour": "list"
+    },
+    "vsan_cluster_include": {
+      "ui:listFlavour": "list"
+    },
+    "vsan_host_include": {
+      "ui:listFlavour": "list"
+    },
+    "vsan_vm_include": {
+      "ui:listFlavour": "list"
+    },
+    "datastore_cluster_include": {
       "ui:listFlavour": "list"
     },
     "datastore_include": {
@@ -320,13 +479,7 @@
       "ui:placeholder": "admin@vsphere.local",
       "ui:widget": "password"
     },
-    "proxy_username": {
-      "ui:widget": "password"
-    },
     "password": {
-      "ui:widget": "password"
-    },
-    "proxy_password": {
       "ui:widget": "password"
     }
   }

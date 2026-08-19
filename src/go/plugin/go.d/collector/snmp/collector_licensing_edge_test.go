@@ -70,7 +70,7 @@ func TestCollector_Collect_LicensingAggregation_ReadsTypedRowsAndIgnoresPrivateM
 			setMockClientInitExpect(mockSNMP)
 			setMockClientSysInfoExpect(mockSNMP)
 
-			collr := New()
+			collr := newTestSNMPCollector()
 			collr.Config = prepareV2Config()
 			collr.CreateVnode = false
 			collr.Ping.Enabled = false

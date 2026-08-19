@@ -354,12 +354,15 @@ static char *simple_pattern_trim_around_equal(const char *src) {
     char *dst = store;
     while (*src) {
         if (*src == '=') {
-            if (*(dst -1) == ' ')
+            if (dst > store && *(dst - 1) == ' ')
                 dst--;
 
             *dst++ = *src++;
             if (*src == ' ')
                 src++;
+
+            if (!*src)
+                break;
         }
 
         *dst++ = *src++;
@@ -429,7 +432,7 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
         }
     }
 
-    if(!ap->config.update_every) {
+    if(ap->config.update_every <= 0) {
         netdata_log_error(
             "HEALTH: alert '%s' has no frequency (parameter 'every'). Source: %s",
             string2str(ap->config.name), string2str(ap->config.source));
@@ -445,6 +448,17 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
         if(msg)
             *msg = "no db lookup, calculation and warning/critical conditions";
         return false;
+    }
+
+    for(RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next) {
+        if(!isfinite(t->config.delay_multiplier)) {
+            netdata_log_error(
+                "HEALTH: alert '%s' has a non-finite delay multiplier. Source: %s",
+                string2str(t->config.name), string2str(t->config.source));
+            if(msg)
+                *msg = "non-finite delay multiplier";
+            return false;
+        }
     }
 
     // activate the match patterns in it

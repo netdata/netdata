@@ -42,7 +42,11 @@ static inline buffered_reader_ret_t buffered_reader_read(struct buffered_reader 
     if(unlikely(remaining <= 0))
         return BUFFERED_READER_READ_BUFFER_FULL;
 
-    ssize_t bytes_read = read(fd, read_at, remaining);
+    ssize_t bytes_read;
+    do {
+        bytes_read = read(fd, read_at, remaining);
+    } while(unlikely(bytes_read < 0 && errno == EINTR));
+
     if(unlikely(bytes_read <= 0))
         return BUFFERED_READER_READ_FAILED;
 

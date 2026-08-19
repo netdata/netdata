@@ -98,6 +98,83 @@ func TestWinClientRefreshFromReadyNoop(t *testing.T) {
 	}
 }
 
+func TestWinClientCallTimeoutOnWedgedPeer(t *testing.T) {
+	svc := uniqueWinService("go_win_call_timeout")
+	srv := startRawWinSessionServer(t, svc, testWinServerConfig(),
+		func(session *windows.Session, hdr protocol.Header, payload []byte) error {
+			_ = session
+			_ = hdr
+			_ = payload
+			time.Sleep(150 * time.Millisecond)
+			return nil
+		})
+
+	client := NewIncrementClient(winTestRunDir, svc, testWinClientConfig())
+	defer client.Close()
+	waitWinClientReady(t, client)
+
+	start := time.Now()
+	_, err := client.CallIncrementWithTimeout(41, 30)
+	elapsed := time.Since(start)
+	if !errors.Is(err, protocol.ErrTimeout) {
+		t.Fatalf("CallIncrementWithTimeout error = %v, want %v", err, protocol.ErrTimeout)
+	}
+	if elapsed > time.Second {
+		t.Fatalf("timeout took too long: %s", elapsed)
+	}
+
+	srv.wait(t)
+}
+
+func TestWinClientAbortUnblocksCall(t *testing.T) {
+	svc := uniqueWinService("go_win_call_abort")
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	srv := startRawWinSessionServer(t, svc, testWinServerConfig(),
+		func(session *windows.Session, hdr protocol.Header, payload []byte) error {
+			_ = session
+			_ = hdr
+			_ = payload
+			close(entered)
+			<-release
+			return nil
+		})
+
+	client := NewIncrementClient(winTestRunDir, svc, testWinClientConfig())
+	defer client.Close()
+	waitWinClientReady(t, client)
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := client.CallIncrementWithTimeout(41, 5000)
+		errCh <- err
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("server handler did not receive request")
+	}
+
+	start := time.Now()
+	client.Abort()
+	var err error
+	select {
+	case err = <-errCh:
+	case <-time.After(time.Second):
+		t.Fatal("Abort did not unblock the call within one second")
+	}
+	if !errors.Is(err, protocol.ErrAborted) {
+		t.Fatalf("aborted call error = %v, want %v", err, protocol.ErrAborted)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("abort took too long: %s", elapsed)
+	}
+
+	close(release)
+	srv.wait(t)
+}
+
 func TestWinServerStopWhileIdle(t *testing.T) {
 	svc := uniqueWinService("go_win_stop_idle")
 	server := NewServer(
@@ -685,6 +762,58 @@ func TestWinRetryOnClosedSession(t *testing.T) {
 	}
 }
 
+func TestWinCallWithRetryStopsWhenOverflowCannotGrowCapacity(t *testing.T) {
+	svc := uniqueWinService("go_win_retry_no_growth")
+	ts := startTestSnapshotServerWinWithConfig(svc, testWinServerConfig())
+	defer ts.stop()
+
+	client := NewSnapshotClient(winTestRunDir, svc, testWinClientConfig())
+	defer client.Close()
+	waitWinClientReady(t, client)
+
+	attempts := 0
+	err := client.callWithRetry(func() error {
+		attempts++
+		return protocol.ErrOverflow
+	})
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("callWithRetry no-growth error = %v, want ErrOverflow", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("callWithRetry no-growth attempts = %d, want 1", attempts)
+	}
+	if client.state != StateBroken {
+		t.Fatalf("callWithRetry no-growth state = %d, want StateBroken", client.state)
+	}
+}
+
+func TestWinCallWithRetryCapsOverflowGrowthRetries(t *testing.T) {
+	svc := uniqueWinService("go_win_retry_growth_cap")
+	ts := startTestSnapshotServerWinWithConfig(svc, testWinServerConfig())
+	defer ts.stop()
+
+	client := NewSnapshotClient(winTestRunDir, svc, testWinClientConfig())
+	defer client.Close()
+	waitWinClientReady(t, client)
+	client.config.MaxRequestPayloadBytes = protocol.MaxPayloadDefault
+
+	attempts := 0
+	err := client.callWithRetry(func() error {
+		attempts++
+		client.config.MaxRequestPayloadBytes++
+		return protocol.ErrOverflow
+	})
+	if !errors.Is(err, protocol.ErrOverflow) {
+		t.Fatalf("callWithRetry growth-cap error = %v, want ErrOverflow", err)
+	}
+	if attempts != 8 {
+		t.Fatalf("callWithRetry growth-cap attempts = %d, want 8", attempts)
+	}
+	if client.state != StateBroken {
+		t.Fatalf("callWithRetry growth-cap state = %d, want StateBroken", client.state)
+	}
+}
+
 func TestWinHandlerFailure(t *testing.T) {
 	svc := uniqueWinService("go_win_handler_fail")
 	ts := startTestServerWinWithConfig(svc, testWinServerConfig(), protocol.MethodCgroupsSnapshot, winFailingSnapshotDispatchHandler())
@@ -754,7 +883,7 @@ func TestWinCacheLookupBeforeRefresh(t *testing.T) {
 	if cache.Ready() {
 		t.Fatal("cache should not be ready")
 	}
-	if _, found := cache.Lookup(123, "anything"); found {
+	if cacheHasForTest(cache, 123, "anything") {
 		t.Fatal("lookup before refresh should miss")
 	}
 }
@@ -787,7 +916,7 @@ func TestWinCacheFullRoundTrip(t *testing.T) {
 		t.Fatal("cache should be ready after refresh")
 	}
 
-	item, found := cache.Lookup(1001, "docker-abc123")
+	item, found := cacheDupForTest(cache, 1001, "docker-abc123")
 	if !found {
 		t.Fatal("expected cached item")
 	}
@@ -830,7 +959,7 @@ func TestWinCacheRefreshFailurePreserves(t *testing.T) {
 	if !cache.Ready() {
 		t.Fatal("cache should be ready")
 	}
-	if _, found := cache.Lookup(1001, "docker-abc123"); !found {
+	if !cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("expected first cached item")
 	}
 
@@ -843,7 +972,7 @@ func TestWinCacheRefreshFailurePreserves(t *testing.T) {
 	if !cache.Ready() {
 		t.Fatal("cache should preserve readiness")
 	}
-	if _, found := cache.Lookup(1001, "docker-abc123"); !found {
+	if !cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("old cache data should be preserved")
 	}
 
@@ -889,13 +1018,13 @@ func TestWinCacheLookupHashNameMismatch(t *testing.T) {
 		t.Fatal("refresh should succeed")
 	}
 
-	if _, found := cache.Lookup(1001, "wrong-name"); found {
+	if cacheHasForTest(cache, 1001, "wrong-name") {
 		t.Fatal("lookup with wrong name should miss")
 	}
-	if _, found := cache.Lookup(9999, "docker-abc123"); found {
+	if cacheHasForTest(cache, 9999, "docker-abc123") {
 		t.Fatal("lookup with wrong hash should miss")
 	}
-	if item, found := cache.Lookup(1001, "docker-abc123"); !found || item.Hash != 1001 {
+	if item, found := cacheDupForTest(cache, 1001, "docker-abc123"); !found || item.Hash != 1001 {
 		t.Fatalf("expected exact hash+name match, got found=%v item=%+v", found, item)
 	}
 }
@@ -913,7 +1042,7 @@ func TestWinCacheCloseResetsState(t *testing.T) {
 	if cache.Ready() {
 		t.Fatal("cache should not be ready after close")
 	}
-	if _, found := cache.Lookup(1001, "docker-abc123"); found {
+	if cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("lookup after close should miss")
 	}
 
@@ -982,7 +1111,7 @@ func TestWinCacheLargeDataset(t *testing.T) {
 
 	for i := uint32(0); i < itemCount; i++ {
 		name := fmt.Sprintf("cgroup-%d", i)
-		item, found := cache.Lookup(i+1000, name)
+		item, found := cacheDupForTest(cache, i+1000, name)
 		if !found {
 			t.Fatalf("item %d not found", i)
 		}

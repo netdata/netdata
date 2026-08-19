@@ -40,12 +40,12 @@ func (r jobV2HostRef) isGlobal() bool { return r.kind == jobV2HostGlobal }
 func (r jobV2HostRef) isVnode() bool  { return r.kind == jobV2HostVnode }
 
 type jobV2EmissionDecision struct {
-	targetHost           jobV2HostRef
-	needEngineReload     bool
-	hostScope            *chartemit.HostScope
-	defineInfo           netdataapi.HostInfo
-	registryOwner        vnoderegistry.Owner
-	registryRegistration vnoderegistry.Registration
+	targetHost       jobV2HostRef
+	needEngineReload bool
+	hostScope        *chartemit.HostScope
+	defineInfo       netdataapi.HostInfo
+	registryOwner    vnoderegistry.Owner
+	observeRegistry  bool
 }
 
 type jobV2HostState struct {
@@ -53,6 +53,7 @@ type jobV2HostState struct {
 	definedInfo   netdataapi.HostInfo
 	engineHost    jobV2HostRef
 	cleanupOwner  jobV2HostRef
+	cleanupInfo   netdataapi.HostInfo
 	cleanupCharts map[string]chartengine.ChartMeta
 	// registryOwners tracks successfully emitted vnode owners so cleanup can
 	// release them after obsolete-chart emission.
@@ -65,6 +66,21 @@ func (s *jobV2HostState) invalidateDefine() {
 	}
 	s.definedHost = jobV2HostRef{}
 	s.definedInfo = netdataapi.HostInfo{}
+}
+
+func (s *jobV2HostState) needsDefinition(target jobV2HostRef, info netdataapi.HostInfo) bool {
+	return s == nil ||
+		s.definedHost != target ||
+		s.definedInfo.GUID != info.GUID ||
+		s.definedInfo.Hostname != info.Hostname ||
+		!maps.Equal(s.definedInfo.Labels, info.Labels)
+}
+
+func (s *jobV2HostState) tracksRegistryOwner(owner vnoderegistry.Owner, guid string) bool {
+	if s == nil || owner == "" || guid == "" {
+		return false
+	}
+	return s.registryOwners[owner] == guid
 }
 
 func (s *jobV2HostState) prepareEmission(vnode vnodes.VirtualNode) (jobV2EmissionDecision, error) {
@@ -150,6 +166,11 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 	}
 
 	s.cleanupOwner = decision.targetHost
+	s.cleanupInfo = netdataapi.HostInfo{
+		GUID:     decision.defineInfo.GUID,
+		Hostname: decision.defineInfo.Hostname,
+		Labels:   maps.Clone(decision.defineInfo.Labels),
+	}
 }
 
 func (s *jobV2HostState) releaseRegistryOwners(registry *vnoderegistry.Registry) {

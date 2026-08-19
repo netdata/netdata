@@ -4,7 +4,6 @@ package azure_monitor
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"maps"
 	"os"
@@ -50,98 +49,8 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-func TestConfigSchema_RuntimeContract(t *testing.T) {
-	raw, err := os.ReadFile("config_schema.json")
-	require.NoError(t, err)
-
-	var doc map[string]any
-	require.NoError(t, json.Unmarshal(raw, &doc))
-
-	schema := requireMapField(t, doc, "jsonSchema")
-	assert.ElementsMatch(t, []string{"subscription_ids", "auth"}, requireStringSliceField(t, schema, "required"))
-
-	properties := requireMapField(t, schema, "properties")
-
-	discovery := requireMapField(t, properties, "discovery")
-	assert.NotContains(t, discovery, "required")
-	discoveryProps := requireMapField(t, discovery, "properties")
-	assert.Contains(t, discoveryProps, "refresh_every")
-	assert.Contains(t, discoveryProps, "mode")
-	assert.NotContains(t, discoveryProps, "mode_filters")
-	assert.NotContains(t, discoveryProps, "mode_query")
-
-	profiles := requireMapField(t, properties, "profiles")
-	assert.NotContains(t, profiles, "required")
-	profileProps := requireMapField(t, profiles, "properties")
-	assert.Contains(t, profileProps, "mode")
-	assert.NotContains(t, profileProps, "mode_exact")
-	assert.NotContains(t, profileProps, "mode_combined")
-
-	virtualNodes := requireMapField(t, properties, "virtual_nodes")
-	assert.NotContains(t, virtualNodes, "required")
-	virtualNodeProps := requireMapField(t, virtualNodes, "properties")
-	byResourceTag := requireMapField(t, virtualNodeProps, "by_resource_tag")
-	assert.Equal(t, "string", byResourceTag["type"])
-
-	uiSchema := requireMapField(t, doc, "uiSchema")
-	uiProfiles := requireMapField(t, uiSchema, "profiles")
-	_, hasIDs := uiProfiles["ids"]
-	assert.False(t, hasIDs)
-	_, hasNames := uiProfiles["names"]
-	assert.False(t, hasNames)
-	_, hasModeAuto := uiProfiles["mode_auto"]
-	assert.True(t, hasModeAuto)
-	_, hasModeExact := uiProfiles["mode_exact"]
-	assert.True(t, hasModeExact)
-	_, hasModeCombined := uiProfiles["mode_combined"]
-	assert.True(t, hasModeCombined)
-
-	tabs := requireArrayField(t, requireMapField(t, uiSchema, "ui:options"), "tabs")
-	var baseFields, vnodeFields []string
-	for _, item := range tabs {
-		tab, ok := item.(map[string]any)
-		require.True(t, ok)
-		switch tab["title"] {
-		case "Base":
-			baseFields = requireStringSliceField(t, tab, "fields")
-		case "Virtual Node":
-			vnodeFields = requireStringSliceField(t, tab, "fields")
-		}
-	}
-	assert.NotContains(t, baseFields, "vnode")
-	assert.NotContains(t, baseFields, "virtual_nodes")
-	assert.ElementsMatch(t, []string{"vnode", "virtual_nodes"}, vnodeFields)
-}
-
-func TestConfigSchema_ProfileTagHelpText(t *testing.T) {
-	raw, err := os.ReadFile("config_schema.json")
-	require.NoError(t, err)
-
-	var doc map[string]any
-	require.NoError(t, json.Unmarshal(raw, &doc))
-
-	schema := requireMapField(t, doc, "jsonSchema")
-	assert.NotContains(t, schema, "allOf")
-
-	uiSchema := requireMapField(t, doc, "uiSchema")
-	discovery := requireMapField(t, uiSchema, "discovery")
-	modeQuery := requireMapField(t, discovery, "mode_query")
-	kql := requireMapField(t, modeQuery, "kql")
-	help, ok := kql["ui:help"].(string)
-	require.True(t, ok)
-	assert.Contains(t, help, "project `tags`")
-
-	uiProfiles := requireMapField(t, uiSchema, "profiles")
-	for _, mode := range []string{"mode_auto", "mode_exact", "mode_combined"} {
-		modeUI := requireMapField(t, uiProfiles, mode)
-		entries := requireMapField(t, modeUI, "entries")
-		items := requireMapField(t, entries, "items")
-		filters := requireMapField(t, items, "filters")
-		tags := requireMapField(t, filters, "tags")
-		help, ok := tags["ui:help"].(string)
-		require.True(t, ok)
-		assert.Contains(t, help, "Only supported when `discovery.mode` is `filters`")
-	}
+func TestConfigSchema_MatchesMetadataGroups(t *testing.T) {
+	collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")
 }
 
 func TestAzureMonitorStaticArtifacts_WorkloadVirtualNodes(t *testing.T) {
@@ -388,43 +297,6 @@ func TestParseStrictQueryDiscoveryRow_OptionalTags(t *testing.T) {
 			assert.Equal(t, tc.wantTags, resource.Tags)
 		})
 	}
-}
-
-func requireMapField(t *testing.T, m map[string]any, key string) map[string]any {
-	t.Helper()
-
-	value, ok := m[key]
-	require.Truef(t, ok, "missing key %q", key)
-	out, ok := value.(map[string]any)
-	require.Truef(t, ok, "key %q is not an object", key)
-	return out
-}
-
-func requireStringSliceField(t *testing.T, m map[string]any, key string) []string {
-	t.Helper()
-
-	value, ok := m[key]
-	require.Truef(t, ok, "missing key %q", key)
-	items, ok := value.([]any)
-	require.Truef(t, ok, "key %q is not an array", key)
-
-	out := make([]string, 0, len(items))
-	for _, item := range items {
-		s, ok := item.(string)
-		require.Truef(t, ok, "key %q contains a non-string item", key)
-		out = append(out, s)
-	}
-	return out
-}
-
-func requireArrayField(t *testing.T, m map[string]any, key string) []any {
-	t.Helper()
-
-	value, ok := m[key]
-	require.Truef(t, ok, "missing key %q", key)
-	items, ok := value.([]any)
-	require.Truef(t, ok, "key %q is not an array", key)
-	return items
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {

@@ -6,7 +6,14 @@
 #include "daemon/win_system-info.h"
 
 // coverity[ +tainted_string_sanitize_content : arg-0 ]
-static inline void coverity_remove_taint(char *s __maybe_unused) { }
+static inline void coverity_remove_taint(char *s __maybe_unused) {
+    // intentionally empty: only a marker for the Coverity taint sanitizer
+    // (see the annotation above); it has no runtime effect.
+}
+
+static char *system_info_strdupz(const char *s) {
+    return s ? strdupz(s) : NULL;
+}
 
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b) {
     if(a && b)
@@ -16,8 +23,11 @@ void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_syst
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL
-int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, char *name, char *value) {
+int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, const char *name, const char *value) {
     int res = 0;
+
+    if (unlikely(!name || !value))
+        return 1;
 
     if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
         return res;
@@ -194,6 +204,7 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface, "_net_default_iface");
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_ip, "_net_default_iface_ip");
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_detection, "_net_default_iface_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_id, "_hw_product_id");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_name, "_hw_product_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_sys_vendor, "_hw_sys_vendor");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_type, "_hw_product_type");
@@ -270,6 +281,9 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
     if (system_info->network_default_iface_detection)
         rrdlabels_add(labels, "_net_default_iface_detection", system_info->network_default_iface_detection, RRDLABEL_SRC_AUTO);
 
+    if (system_info->hw_product_id)
+        rrdlabels_add(labels, "_hw_product_id", system_info->hw_product_id, RRDLABEL_SRC_AUTO);
+
     if (system_info->hw_product_name)
         rrdlabels_add(labels, "_hw_product_name", system_info->hw_product_name, RRDLABEL_SRC_AUTO);
 
@@ -281,13 +295,19 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
-    if (unlikely(!system_info)) {
+    if (!system_info) {
         netdata_log_error("SYSTEM INFO: System info structure is NULL.");
         return 1;
     }
 
     // Populate hardware product fields from the daemon status file when it is available/initialized.
     {
+        const char *product_id = daemon_status_file_get_product_id();
+        if (product_id && *product_id) {
+            freez(system_info->hw_product_id);
+            system_info->hw_product_id = strdupz(product_id);
+        }
+
         const char *product_name = daemon_status_file_get_product_name();
         if (product_name && *product_name) {
             freez(system_info->hw_product_name);
@@ -438,6 +458,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->network_default_iface);
         freez(system_info->network_default_iface_ip);
         freez(system_info->network_default_iface_detection);
+        freez(system_info->hw_product_id);
         freez(system_info->hw_product_name);
         freez(system_info->hw_sys_vendor);
         freez(system_info->hw_product_type);
@@ -447,8 +468,60 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
 
 struct rrdhost_system_info *rrdhost_system_info_create(void) {
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
-    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
     return system_info;
+}
+
+struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info) {
+    if(unlikely(!system_info))
+        return NULL;
+
+    struct rrdhost_system_info *copy = rrdhost_system_info_create();
+
+    copy->cloud_provider_type = system_info_strdupz(system_info->cloud_provider_type);
+    copy->cloud_instance_type = system_info_strdupz(system_info->cloud_instance_type);
+    copy->cloud_instance_region = system_info_strdupz(system_info->cloud_instance_region);
+    copy->host_os_name = system_info_strdupz(system_info->host_os_name);
+    copy->host_os_id = system_info_strdupz(system_info->host_os_id);
+    copy->host_os_id_like = system_info_strdupz(system_info->host_os_id_like);
+    copy->host_os_version = system_info_strdupz(system_info->host_os_version);
+    copy->host_os_version_id = system_info_strdupz(system_info->host_os_version_id);
+    copy->host_os_detection = system_info_strdupz(system_info->host_os_detection);
+    copy->host_cores = system_info_strdupz(system_info->host_cores);
+    copy->host_cpu_freq = system_info_strdupz(system_info->host_cpu_freq);
+    copy->host_cpu_model = system_info_strdupz(system_info->host_cpu_model);
+    copy->host_ram_total = system_info_strdupz(system_info->host_ram_total);
+    copy->host_disk_space = system_info_strdupz(system_info->host_disk_space);
+    copy->container_os_name = system_info_strdupz(system_info->container_os_name);
+    copy->container_os_id = system_info_strdupz(system_info->container_os_id);
+    copy->container_os_id_like = system_info_strdupz(system_info->container_os_id_like);
+    copy->container_os_version = system_info_strdupz(system_info->container_os_version);
+    copy->container_os_version_id = system_info_strdupz(system_info->container_os_version_id);
+    copy->container_os_detection = system_info_strdupz(system_info->container_os_detection);
+    copy->kernel_name = system_info_strdupz(system_info->kernel_name);
+    copy->kernel_version = system_info_strdupz(system_info->kernel_version);
+    copy->architecture = system_info_strdupz(system_info->architecture);
+    copy->virtualization = system_info_strdupz(system_info->virtualization);
+    copy->virt_detection = system_info_strdupz(system_info->virt_detection);
+    copy->container = system_info_strdupz(system_info->container);
+    copy->container_detection = system_info_strdupz(system_info->container_detection);
+    copy->is_k8s_node = system_info_strdupz(system_info->is_k8s_node);
+    copy->hops = system_info->hops;
+    copy->ml_capable = system_info->ml_capable;
+    copy->ml_enabled = system_info->ml_enabled;
+    copy->install_type = system_info_strdupz(system_info->install_type);
+    copy->prebuilt_arch = system_info_strdupz(system_info->prebuilt_arch);
+    copy->prebuilt_dist = system_info_strdupz(system_info->prebuilt_dist);
+    copy->network_default_iface = system_info_strdupz(system_info->network_default_iface);
+    copy->network_default_iface_ip = system_info_strdupz(system_info->network_default_iface_ip);
+    copy->network_default_iface_detection = system_info_strdupz(system_info->network_default_iface_detection);
+    copy->mc_version = system_info->mc_version;
+    copy->hw_product_id = system_info_strdupz(system_info->hw_product_id);
+    copy->hw_product_name = system_info_strdupz(system_info->hw_product_name);
+    copy->hw_sys_vendor = system_info_strdupz(system_info->hw_sys_vendor);
+    copy->hw_product_type = system_info_strdupz(system_info->hw_product_type);
+
+    return copy;
 }
 
 const char *rrdhost_system_info_install_type(struct rrdhost_system_info *si) {
@@ -551,7 +624,7 @@ int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_hos
     ret += cb("NETDATA_CONTAINER_OS_ID_LIKE", system_info->container_os_id_like, uuid);
     ret += cb("NETDATA_CONTAINER_OS_VERSION", system_info->container_os_version, uuid);
     ret += cb("NETDATA_CONTAINER_OS_VERSION_ID", system_info->container_os_version_id, uuid);
-    ret += cb("NETDATA_CONTAINER_OS_DETECTION", system_info->host_os_detection, uuid);
+    ret += cb("NETDATA_CONTAINER_OS_DETECTION", system_info->container_os_detection, uuid);
     ret += cb("NETDATA_HOST_OS_NAME", system_info->host_os_name, uuid);
     ret += cb("NETDATA_HOST_OS_ID", system_info->host_os_id, uuid);
     ret += cb("NETDATA_HOST_OS_ID_LIKE", system_info->host_os_id_like, uuid);
@@ -721,8 +794,14 @@ bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
     if(ds->read_system_info)
         return false;
 
+    if(localhost)
+        spinlock_lock(&localhost->rrdhost_update_lock);
+
     struct rrdhost_system_info *ri = (localhost && localhost->system_info) ? localhost->system_info : NULL;
     if(!ri) {
+        if(localhost)
+            spinlock_unlock(&localhost->rrdhost_update_lock);
+
         // nothing we can do, let it be
         return false;
     }
@@ -769,12 +848,22 @@ bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds) {
 
     ds->read_system_info = true;
 
+    spinlock_unlock(&localhost->rrdhost_update_lock);
+
     return true;
 }
 
 bool localhost_is_docker() {
-    if (localhost && localhost->system_info) {
-        return (localhost->system_info->container && strcmp(localhost->system_info->container, "docker") == 0);
+    bool ret = false;
+
+    if (localhost) {
+        spinlock_lock(&localhost->rrdhost_update_lock);
+
+        if (localhost->system_info)
+            ret = localhost->system_info->container && strcmp(localhost->system_info->container, "docker") == 0;
+
+        spinlock_unlock(&localhost->rrdhost_update_lock);
     }
-    return false;
+
+    return ret;
 };

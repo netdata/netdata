@@ -2,11 +2,17 @@
 
 #include "common.h"
 
-static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
+// chart_obsolete: the whole chart is being torn down (RRDSET_FLAG_OBSOLETE), so
+// every dimension must be archived/freed even though chart-level obsoletion does
+// not set RRDDIM_FLAG_OBSOLETE on the dimensions. Without this authorization the
+// per-dimension flag gate below would reject every dimension of a chart-level
+// obsoletion, the caller could never reach rrdset_free(), and the chart plus its
+// ring buffers would be retained until process exit.
+static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd, bool chart_obsolete) {
     RRDSET *st = rd->rrdset;
 
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && spinlock_trylock(&rd->destroy_lock)) {
-        if(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+    if((chart_obsolete || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) && spinlock_trylock(&rd->destroy_lock)) {
+        if(!chart_obsolete && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
             spinlock_unlock(&rd->destroy_lock);
             return false;
         }
@@ -30,15 +36,21 @@ static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
 
 // Returns the number of dimensions actually archived this call.
 //
+// chart_obsolete: the whole chart is being torn down (RRDSET_FLAG_OBSOLETE).
+// It selects every dimension as a candidate and authorizes archiving dimensions
+// that carry no per-dimension RRDDIM_FLAG_OBSOLETE (chart-level obsoletion does
+// not set the per-dimension flag). When false, only individually-flagged
+// dimensions are candidates (the RRDSET_FLAG_OBSOLETE_DIMENSIONS path).
+//
 // Two callable shapes:
-//   1. all_dimensions == false and RRDSET_FLAG_OBSOLETE_DIMENSIONS unset:
+//   1. chart_obsolete == false and RRDSET_FLAG_OBSOLETE_DIMENSIONS unset:
 //      early-return path. Nothing scanned, flag not touched, returns 0.
 //   2. Any other case: scans the dimensions. The flag is cleared up
 //      front, then re-set at the end iff some candidate could not be
 //      archived this pass. Callers on this path can detect "all
 //      candidates archived" by reading the flag after the call.
-static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
-    if(!all_dimensions && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
+static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool chart_obsolete) {
+    if(!chart_obsolete && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
         return 0;
 
     worker_is_busy(UV_EVENT_ARCHIVE_CHART_DIMENSIONS);
@@ -52,7 +64,7 @@ static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all
     size_t dim_archives = 0;
 
     dfe_start_write(st->rrddim_root_index, rd) {
-        bool candidate = (all_dimensions || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE));
+        bool candidate = (chart_obsolete || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE));
 
         if(candidate) {
             dim_candidates++;
@@ -60,7 +72,7 @@ static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all
             if(rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now) {
                 size_t references = dictionary_acquired_item_references(rd_dfe.item);
                 if(references == 1) {
-                    if(svc_rrddim_obsolete_to_archive(rd))
+                    if(svc_rrddim_obsolete_to_archive(rd, chart_obsolete))
                         dim_archives++;
                 }
             }
@@ -75,7 +87,7 @@ static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all
 }
 
 static bool svc_rrdset_lock_for_deletion(RRDSET *st, time_t now) {
-    if(st->last_accessed_time_s + rrdset_free_obsolete_time_s < now &&
+    if(rrdset_last_accessed_time_s(st) + rrdset_free_obsolete_time_s < now &&
         st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now &&
         st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now &&
         spinlock_trylock(&st->destroy_lock)) {
@@ -126,7 +138,7 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
             partial_candidates++;
 
             if(!is_replicating) {
-                archived_items += svc_rrdset_archive_obsolete_dimensions(st, false);
+                archived_items += svc_rrdset_archive_obsolete_dimensions(st, /* chart_obsolete = */ false);
 
                 // "all candidates archived" -> flag was not re-set inside.
                 if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
@@ -138,7 +150,7 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
             full_candidates++;
 
             if(!is_replicating && svc_rrdset_lock_for_deletion(st, now)) {
-                archived_items += svc_rrdset_archive_obsolete_dimensions(st, true);
+                archived_items += svc_rrdset_archive_obsolete_dimensions(st, /* chart_obsolete = */ true);
 
                 if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {
                     full_archives++;
@@ -196,17 +208,30 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         if (rrdhost_is_local(host) || IS_VIRTUAL_HOST_OS(host))
             continue;
 
+        // Two-phase obsolete-all: decide under receiver_lock (short held),
+        // run the O(charts) walk + ml_host_disconnected without the lock,
+        // gated by RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS so a reconnecting
+        // receiver bails out in rrdhost_set_receiver() instead of overlapping.
+        bool obsolete_all = false;
+
         rrdhost_receiver_lock(host);
 
         time_t now = now_realtime_sec();
 
         if (!host->receiver &&
             host->stream.rcv.status.last_connected == 0 &&
-            (host->stream.rcv.status.last_disconnected + rrdset_free_obsolete_time_s < now)) {
-            svc_rrdhost_obsolete_all_charts(host);
+            (host->stream.rcv.status.last_disconnected + rrdset_free_obsolete_time_s < now) &&
+            !rrdhost_flag_check(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS)) {
+            rrdhost_flag_set(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS);
+            obsolete_all = true;
         }
 
         rrdhost_receiver_unlock(host);
+
+        if (obsolete_all) {
+            svc_rrdhost_obsolete_all_charts(host);
+            rrdhost_flag_clear(host, RRDHOST_FLAG_OBSOLETE_ALL_IN_PROGRESS);
+        }
     }
 
     rrd_rdunlock();
@@ -249,6 +274,9 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
                 continue;
         }
 
+        if (!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock))
+            continue;
+
         worker_is_busy(UV_EVENT_FREE_HOST);
 
         if (delete) {
@@ -274,17 +302,22 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
 
             // Re-validate host still exists for cleanup
             RRDHOST *host_check = rrdhost_find_by_guid(machine_guid);
-            if (host_check) {
+            if (host_check == host) {
                 unregister_node(host_check->machine_guid);
+                rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
                 rrdhost_free___while_having_rrd_wrlock(host_check);
             }
+            else
+                rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
 
             // Restart iteration - the list may have changed while lock was released
             next = localhost;
             now = now_realtime_sec();
         }
-        else
+        else {
             rrdhost_cleanup_data_collection_and_health(host);
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+        }
     }
     rrd_wrunlock();
 }

@@ -5,6 +5,27 @@ pub(crate) fn synthetic_bucket_labels(bucket_label: &'static str) -> BTreeMap<St
     BTreeMap::from([(String::from("_bucket"), String::from(bucket_label))])
 }
 
+pub(crate) fn ordered_group_labels(
+    labels: &BTreeMap<String, String>,
+    group_by: &[String],
+) -> Map<String, Value> {
+    let mut ordered = Map::new();
+
+    for field in group_by {
+        if let Some(value) = labels.get(field) {
+            ordered.insert(field.clone(), Value::String(value.clone()));
+        }
+    }
+
+    for (field, value) in labels {
+        if !ordered.contains_key(field) {
+            ordered.insert(field.clone(), Value::String(value.clone()));
+        }
+    }
+
+    ordered
+}
+
 pub(crate) fn new_bucket_aggregate(bucket_label: &'static str) -> AggregatedFlow {
     AggregatedFlow {
         labels: synthetic_bucket_labels(bucket_label),

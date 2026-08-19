@@ -183,7 +183,7 @@ static int aclk_parse_otp_error(const char *json_str) {
     }
 
     if (block_retry > 0)
-        aclk_disable_runtime = 1;
+        __atomic_store_n(&aclk_disable_runtime, 1, __ATOMIC_RELAXED);
 
     if (backoff > 0)
         aclk_block_until = now_monotonic_sec() + backoff;
@@ -263,7 +263,7 @@ static int aclk_parse_otp_error(const char *json_str) {
     }
 
     if (block_retry > 0)
-        aclk_disable_runtime = 1;
+        __atomic_store_n(&aclk_disable_runtime, 1, __ATOMIC_RELAXED);
 
     if (backoff > 0)
         aclk_block_until = now_monotonic_sec() + backoff;
@@ -428,16 +428,16 @@ static int private_decrypt(RSA *p_key, unsigned char * enc_data, int data_len, u
     size_t outlen = EVP_PKEY_size(p_key);
     EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(p_key, NULL);
     if (!ctx)
-        return 1;
+        return -1;
 
     if (EVP_PKEY_decrypt_init(ctx) <= 0) {
         EVP_PKEY_CTX_free(ctx);
-        return 1;
+        return -1;
     }
 
     if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) {
         EVP_PKEY_CTX_free(ctx);
-        return 1;
+        return -1;
     }
 
     *decrypted = mallocz(outlen);

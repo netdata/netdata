@@ -6,8 +6,11 @@ ALWAYS_INLINE void completion_reset(struct completion *p)
 {
     if (!p)
         return;
+
+    netdata_mutex_lock(&p->mutex);
     p->completed = 0;
     p->completed_jobs = 0;
+    netdata_mutex_unlock(&p->mutex);
 }
 
 ALWAYS_INLINE void completion_init(struct completion *p)

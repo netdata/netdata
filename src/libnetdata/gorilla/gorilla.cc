@@ -29,6 +29,29 @@ static uint32_t gorilla_buffer_nbytes(uint32_t nbits) {
     return slots * RRDENG_GORILLA_32BIT_SLOT_BYTES;
 }
 
+static constexpr size_t gorilla_buffer_data_bits(size_t n) {
+    return (n * bit_size<uint32_t>()) - (sizeof(gorilla_header_t) * CHAR_BIT);
+}
+
+static bool gorilla_disk_buffer_has_valid_nbits(const gorilla_buffer_t *gbuf) {
+    return gbuf->header.nbits < gorilla_buffer_data_bits(RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
+}
+
+static uint32_t gorilla_data_word_load(const uint32_t *word)
+{
+    return __atomic_load_n(word, __ATOMIC_RELAXED);
+}
+
+static void gorilla_data_word_store(uint32_t *word, uint32_t value)
+{
+    __atomic_store_n(word, value, __ATOMIC_RELAXED);
+}
+
+static void gorilla_data_word_or(uint32_t *word, uint32_t value)
+{
+    __atomic_fetch_or(word, value, __ATOMIC_RELAXED);
+}
+
 static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits)
 {
     assert(nbits > 0 && nbits <= bit_size<uint32_t>());
@@ -39,20 +62,20 @@ static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits
     pos += nbits;
 
     if (offset == 0) {
-        buf[index] = v;
+        gorilla_data_word_store(&buf[index], v);
     } else {
         const size_t remaining_bits = bit_size<uint32_t>() - offset;
 
         // write the lower part of the value
         const uint32_t low_bits_mask = ((uint32_t) 1 << remaining_bits) - 1;
         const uint32_t lowest_bits_in_value = v & low_bits_mask;
-        buf[index] |= (lowest_bits_in_value << offset);
+        gorilla_data_word_or(&buf[index], lowest_bits_in_value << offset);
 
         if (nbits > remaining_bits) {
             // write the upper part of the value
             const uint32_t high_bits_mask = ~low_bits_mask;
             const uint32_t highest_bits_in_value = (v & high_bits_mask) >> (remaining_bits);
-            buf[index + 1] = highest_bits_in_value;
+            gorilla_data_word_store(&buf[index + 1], highest_bits_in_value);
         }
     }
 }
@@ -67,19 +90,22 @@ static void bit_buffer_read(const uint32_t *buf, size_t pos, uint32_t *v, size_t
     pos += nbits;
 
     if (offset == 0) {
+        uint32_t word = gorilla_data_word_load(&buf[index]);
         *v = (nbits == bit_size<uint32_t>()) ?
-                    buf[index] :
-                    buf[index] & (((uint32_t) 1 << nbits) - 1);
+                    word :
+                    word & (((uint32_t) 1 << nbits) - 1);
     } else {
         const size_t remaining_bits = bit_size<uint32_t>() - offset;
 
         // extract the lower part of the value
+        uint32_t word = gorilla_data_word_load(&buf[index]);
         if (nbits < remaining_bits) {
-            *v = (buf[index] >> offset) & (((uint32_t) 1 << nbits) - 1);
+            *v = (word >> offset) & (((uint32_t) 1 << nbits) - 1);
         } else {
-            *v = (buf[index] >> offset) & (((uint32_t) 1 << remaining_bits) - 1);
+            *v = (word >> offset) & (((uint32_t) 1 << remaining_bits) - 1);
             nbits -= remaining_bits;
-            *v |= (buf[index + 1] & (((uint32_t) 1 << nbits) - 1)) << remaining_bits;
+            word = gorilla_data_word_load(&buf[index + 1]);
+            *v |= (word & (((uint32_t) 1 << nbits) - 1)) << remaining_bits;
         }
     }
 }
@@ -104,7 +130,7 @@ void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, siz
     gbuf->header.entries = 0;
     gbuf->header.nbits = 0;
 
-    uint32_t capacity = (n * bit_size<uint32_t>()) - (sizeof(gorilla_header_t) * CHAR_BIT);
+    uint32_t capacity = gorilla_buffer_data_bits(n);
 
     gw->prev_number = 0;
     gw->prev_xor_lzc = 0;
@@ -260,57 +286,36 @@ bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t
     return true;
 }
 
-uint32_t gorilla_buffer_patch(gorilla_buffer_t *gbuf) {
+bool gorilla_buffer_patch(gorilla_buffer_t *gbuf, size_t nbuffers, uint32_t *entries) {
     gorilla_buffer_t *curr_gbuf = gbuf;
     uint32_t n = curr_gbuf->header.entries;
+    size_t buffers = 1;
+
+    if(unlikely(!gorilla_disk_buffer_has_valid_nbits(curr_gbuf)))
+        return false;
 
     while (curr_gbuf->header.next) {
-        uint32_t *buf = reinterpret_cast<uint32_t *>(gbuf);
-        gbuf = reinterpret_cast<gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
+        if(unlikely(buffers == nbuffers))
+            return false;
 
-        assert(((uintptr_t) (gbuf) % sizeof(uintptr_t)) == 0 &&
+        auto *buf = static_cast<unsigned char *>(static_cast<void *>(curr_gbuf));
+        auto *next_gbuf = static_cast<gorilla_buffer_t *>(static_cast<void *>(buf + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
+
+        assert(((uintptr_t) (next_gbuf) % sizeof(uintptr_t)) == 0 &&
                "Gorilla buffer not aligned to uintptr_t");
 
-        curr_gbuf->header.next = gbuf;
+        curr_gbuf->header.next = next_gbuf;
         curr_gbuf = curr_gbuf->header.next;
+        buffers++;
+
+        if(unlikely(!gorilla_disk_buffer_has_valid_nbits(curr_gbuf)))
+            return false;
 
         n += curr_gbuf->header.entries;
     }
 
-    return n;
-}
-
-size_t gorilla_buffer_unpatched_nbuffers(const gorilla_buffer_t *gbuf) {
-    size_t nbuffers = 0;
-    while(gbuf) {
-        nbuffers++;
-
-        if(gbuf->header.next) {
-            const auto *buf = reinterpret_cast<const uint32_t *>(gbuf);
-            gbuf = reinterpret_cast<const gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
-        }
-        else
-            break;
-    }
-
-    return nbuffers;
-}
-
-size_t gorilla_buffer_unpatched_nbytes(const gorilla_buffer_t *gbuf) {
-    size_t nbytes = sizeof(gorilla_buffer_t);
-    while(gbuf) {
-        if(gbuf->header.next) {
-            nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
-            const auto *buf = reinterpret_cast<const uint32_t *>(gbuf);
-            gbuf = reinterpret_cast<const gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
-        }
-        else {
-            nbytes += gorilla_buffer_nbytes(gbuf->header.nbits);
-            break;
-        }
-    }
-
-    return nbytes;
+    *entries = n;
+    return true;
 }
 
 gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw)
@@ -349,6 +354,16 @@ gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *gbuf)
     };
 }
 
+static bool gorilla_reader_read_bits(gorilla_reader_t *gr, const uint32_t *data, uint32_t *number, size_t nbits)
+{
+    if (unlikely(gr->position > gr->capacity || nbits > gr->capacity - gr->position))
+        return false;
+
+    bit_buffer_read(data, gr->position, number, nbits);
+    gr->position += nbits;
+    return true;
+}
+
 extern "C" {
     ALWAYS_INLINE_ONLY bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number)
     {
@@ -381,18 +396,17 @@ extern "C" {
 
         // read the first number
         if (gr->index == 0) {
-            bit_buffer_read(data, gr->position, number, bit_size<uint32_t>());
-
+            if (unlikely(!gorilla_reader_read_bits(gr, data, number, bit_size<uint32_t>())))
+                return false;
             gr->index++;
-            gr->position += bit_size<uint32_t>();
             gr->prev_number = *number;
             return true;
         }
 
         // process same-number bit
         uint32_t is_same_number;
-        bit_buffer_read(data, gr->position, &is_same_number, 1);
-        gr->position++;
+        if (unlikely(!gorilla_reader_read_bits(gr, data, &is_same_number, 1)))
+            return false;
 
         if (is_same_number) {
             *number = gr->prev_number;
@@ -404,18 +418,19 @@ extern "C" {
         uint32_t xor_lzc = gr->prev_xor_lzc;
 
         uint32_t same_xor_lzc;
-        bit_buffer_read(data, gr->position, &same_xor_lzc, 1);
-        gr->position++;
+        if (unlikely(!gorilla_reader_read_bits(gr, data, &same_xor_lzc, 1)))
+            return false;
 
         if (!same_xor_lzc) {
-            bit_buffer_read(data, gr->position, &xor_lzc, (bit_size<uint32_t>() == 32) ? 5 : 6);
-            gr->position += (bit_size<uint32_t>() == 32) ? 5 : 6;
+            size_t xor_lzc_bits = (bit_size<uint32_t>() == 32) ? 5 : 6;
+            if (unlikely(!gorilla_reader_read_bits(gr, data, &xor_lzc, xor_lzc_bits)))
+                return false;
         }
 
         // process the non-lzc suffix
         uint32_t xor_value = 0;
-        bit_buffer_read(data, gr->position, &xor_value, bit_size<uint32_t>() - xor_lzc);
-        gr->position += bit_size<uint32_t>() - xor_lzc;
+        if (unlikely(!gorilla_reader_read_bits(gr, data, &xor_value, bit_size<uint32_t>() - xor_lzc)))
+            return false;
 
         *number = (gr->prev_number ^ xor_value);
 
@@ -489,7 +504,44 @@ private:
     std::vector<uint32_t *> Buffers;
 };
 
+static void fuzz_disk_buffer_patch(const uint8_t *data, size_t size) {
+    if (size == 0)
+        return;
+
+    const size_t buffer_size = RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+    if (size > SIZE_MAX - (buffer_size - 1))
+        return;
+
+    const size_t disk_size = ((size + buffer_size - 1) / buffer_size) * buffer_size;
+    const size_t nbuffers = disk_size / buffer_size;
+    const size_t words = disk_size / sizeof(uint32_t);
+
+    Storage S;
+    gorilla_buffer_t *disk_buffer = S.alloc_buffer(words);
+    memcpy(disk_buffer, data, size);
+
+    uint32_t entries = 0;
+    if (gorilla_buffer_patch(disk_buffer, nbuffers, &entries)) {
+        gorilla_reader_t gr = gorilla_reader_init(disk_buffer);
+
+        // entries is fuzzer-controlled, so keep this path bounded.
+        constexpr uint32_t max_reads = 16384;
+        if (entries > max_reads)
+            entries = max_reads;
+
+        for (uint32_t i = 0; i != entries; i++) {
+            uint32_t number = 0;
+            if (!gorilla_reader_read(&gr, &number))
+                break;
+        }
+    }
+
+    S.free_buffers();
+}
+
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+    fuzz_disk_buffer_patch(Data, Size);
+
     if (Size < 4)
         return 0;
 

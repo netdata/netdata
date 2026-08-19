@@ -45,7 +45,7 @@ The diagram above shows how the Metrics tab connects to related features and sin
 
 ## How the Dashboard is Organized
 
-The dashboard displays various charts organized by their [context](/docs/dashboards-and-charts/netdata-charts.md#contexts). At the beginning of each section, there is a predefined arrangement of charts that provides an overview for that particular group of metrics.
+The dashboard displays various charts organized by their [context](/docs/dashboards-and-charts/netdata-charts.md#contexts). At the beginning of each section, there is a predefined arrangement of charts that provides an overview for that particular group of metrics — including the first section, which summarizes the node's overall system resources such as CPU, memory, disk, and network. The exact charts and gauges shown depend on the node's hardware and enabled collectors.
 
 The available chart types and grouping options allow flexible data visualization for troubleshooting and analysis.
 

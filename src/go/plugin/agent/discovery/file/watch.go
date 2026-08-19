@@ -48,14 +48,6 @@ func NewWatcher(reg confgroup.Registry, paths []string) *Watcher {
 	return d
 }
 
-func (w *Watcher) String() string {
-	return w.Name()
-}
-
-func (w *Watcher) Name() string {
-	return "file watcher"
-}
-
 func (w *Watcher) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	w.Info("instance is started")
 	defer func() { w.Info("instance is stopped") }()

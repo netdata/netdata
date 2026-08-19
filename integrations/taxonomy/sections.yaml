@@ -68,6 +68,13 @@ sections:
     section_order: 110
     status: active
 
+  - id: applications.mssql
+    parent_id: applications
+    title: Microsoft SQL Server
+    icon: mssql
+    section_order: 115
+    status: active
+
   - id: applications.postgres
     parent_id: applications
     title: PostgreSQL

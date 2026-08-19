@@ -25,10 +25,10 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 5,
 		},
-		Methods:       yugabyteMethods,
-		MethodHandler: yugabyteFunctionHandler,
-		Create:        func() collectorapi.CollectorV1 { return New() },
-		Config:        func() any { return &Config{} },
+		SharedFunctions: yugabyteMethods,
+		MethodHandler:   yugabyteFunctionHandler,
+		Create:          func() collectorapi.CollectorV1 { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 

@@ -125,14 +125,14 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rd->rrddim_store_metric_count++;
 
     if(likely(rd->rrddim_store_metric_count > 1)) {
-        usec_t expected = rd->rrddim_store_metric_last_ut + rd->update_every * USEC_PER_SEC;
+        usec_t expected = rd->rrddim_store_metric_last_ut + rd->rrdset->update_every * USEC_PER_SEC;
 
         if(point_end_time_ut != rd->rrddim_store_metric_last_ut) {
             internal_error(true,
                            "%s COLLECTION: 'host:%s/chart:%s/dim:%s' granularity %d, collection %zu, expected to store at tier 0 a value at %llu, but it gave %llu [%s%llu usec] (called from %s(), previously by %s())",
                            (point_end_time_ut < rd->rrddim_store_metric_last_ut) ? "**PAST**" : "GAP",
                            rrdhost_hostname(rd->rrdset->rrdhost), rrdset_id(rd->rrdset), rrddim_id(rd),
-                           rd->update_every,
+                           rd->rrdset->update_every,
                            rd->rrddim_store_metric_count,
                            expected, point_end_time_ut,
                            (point_end_time_ut < rd->rrddim_store_metric_last_ut)?"by -" : "gap ",

@@ -98,8 +98,8 @@ pr_require_gh() {
 # Bot logins recognized by the skill. The first regex matches the AI reviewers
 # the skill iterates with autonomously; the second matches CI/quality bots
 # whose comments are informational (sonar quality gate, etc.).
-PR_AI_BOT_RE='^(cubic-dev-ai|copilot|copilot-pull-request-reviewer|github-copilot)\[bot\]$'
-PR_INFO_BOT_RE='^(sonarqubecloud|netdata-bot|github-actions|coderabbitai)\[bot\]$'
+PR_AI_BOT_RE='^(cubic-dev-ai|copilot|copilot-pull-request-reviewer|github-copilot|coderabbitai)\[bot\]$'
+PR_INFO_BOT_RE='^(sonarqubecloud|netdata-bot|github-actions)\[bot\]$'
 
 # Classify a login -> "ai_bot" | "info_bot" | "human".
 pr_classify_author() {

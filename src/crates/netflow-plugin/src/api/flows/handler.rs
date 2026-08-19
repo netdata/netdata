@@ -9,9 +9,9 @@ use std::sync::Arc;
 use tokio::task;
 
 use super::model::{
-    FLOWS_FUNCTION_VERSION, FLOWS_SCHEMA_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowAutocompleteData,
-    FlowAutocompleteResponse, FlowMetricsData, FlowMetricsResponse, FlowsData,
-    FlowsFunctionResponse, FlowsResponse,
+    FLOWS_FUNCTION_NAME, FLOWS_FUNCTION_VERSION, FLOWS_SCHEMA_VERSION, FLOWS_UPDATE_EVERY_SECONDS,
+    FlowAutocompleteData, FlowAutocompleteResponse, FlowMetricsData, FlowMetricsResponse,
+    FlowsData, FlowsFunctionResponse, FlowsResponse,
 };
 use super::params::{accepted_params, flows_required_params};
 
@@ -56,8 +56,15 @@ impl NetflowFlowsHandler {
                     .map_err(|err| NetdataPluginError::Other {
                         message: format!("failed to autocomplete facet values: {err:#}"),
                     })?;
-            let mut stats = self.metrics.snapshot();
-            stats.extend(query_output.stats);
+            let query::FlowAutocompleteQueryOutput {
+                agent_id,
+                field,
+                term,
+                values,
+                mut stats,
+                warnings,
+            } = query_output;
+            self.metrics.extend_snapshot(&mut stats);
 
             Ok(FlowsFunctionResponse::Autocomplete(
                 FlowAutocompleteResponse {
@@ -68,14 +75,14 @@ impl NetflowFlowsHandler {
                         schema_version: FLOWS_SCHEMA_VERSION.to_string(),
                         source: "netflow".to_string(),
                         layer: "3".to_string(),
-                        agent_id: query_output.agent_id,
+                        agent_id,
                         collected_at: Utc::now().to_rfc3339(),
                         mode: "autocomplete".to_string(),
-                        field: query_output.field,
-                        term: query_output.term,
-                        values: query_output.values,
+                        field,
+                        term,
+                        values,
                         stats,
-                        warnings: query_output.warnings,
+                        warnings,
                     },
                     has_history: true,
                     update_every: FLOWS_UPDATE_EVERY_SECONDS,
@@ -98,8 +105,16 @@ impl NetflowFlowsHandler {
                 message: format!("failed to query flow metrics: {err:#}"),
             })?;
             let view = request.normalized_view().to_string();
-            let mut stats = self.metrics.snapshot();
-            stats.extend(query_output.stats);
+            let query::FlowMetricsQueryOutput {
+                agent_id,
+                group_by,
+                columns,
+                metric,
+                chart,
+                mut stats,
+                warnings,
+            } = query_output;
+            self.metrics.extend_snapshot(&mut stats);
 
             Ok(FlowsFunctionResponse::Metrics(FlowMetricsResponse {
                 status: 200,
@@ -109,15 +124,15 @@ impl NetflowFlowsHandler {
                     schema_version: FLOWS_SCHEMA_VERSION.to_string(),
                     source: "netflow".to_string(),
                     layer: "3".to_string(),
-                    agent_id: query_output.agent_id,
+                    agent_id,
                     collected_at: Utc::now().to_rfc3339(),
                     view,
-                    group_by: query_output.group_by,
-                    columns: query_output.columns,
-                    metric: query_output.metric,
-                    chart: query_output.chart,
+                    group_by,
+                    columns,
+                    metric,
+                    chart,
                     stats,
-                    warnings: query_output.warnings,
+                    warnings,
                 },
                 has_history: true,
                 update_every: FLOWS_UPDATE_EVERY_SECONDS,
@@ -144,8 +159,17 @@ impl NetflowFlowsHandler {
                 message: format!("failed to query flows: {err:#}"),
             })?;
             let view = request.normalized_view().to_string();
-            let mut stats = self.metrics.snapshot();
-            stats.extend(query_output.stats);
+            let query::FlowQueryOutput {
+                agent_id,
+                group_by,
+                columns,
+                flows,
+                mut stats,
+                metrics,
+                warnings,
+                facets,
+            } = query_output;
+            self.metrics.extend_snapshot(&mut stats);
 
             Ok(FlowsFunctionResponse::Table(FlowsResponse {
                 status: 200,
@@ -155,16 +179,16 @@ impl NetflowFlowsHandler {
                     schema_version: FLOWS_SCHEMA_VERSION.to_string(),
                     source: "netflow".to_string(),
                     layer: "3".to_string(),
-                    agent_id: query_output.agent_id,
+                    agent_id,
                     collected_at: Utc::now().to_rfc3339(),
                     view,
-                    group_by: query_output.group_by,
-                    columns: query_output.columns,
-                    flows: query_output.flows,
+                    group_by,
+                    columns,
+                    flows,
                     stats,
-                    metrics: query_output.metrics,
-                    warnings: query_output.warnings,
-                    facets: query_output.facets,
+                    metrics,
+                    warnings,
+                    facets,
                 },
                 has_history: true,
                 update_every: FLOWS_UPDATE_EVERY_SECONDS,
@@ -264,8 +288,10 @@ impl FunctionHandler for NetflowFlowsHandler {
     }
 
     fn declaration(&self) -> FunctionDeclaration {
-        let mut func_decl =
-            FunctionDeclaration::new("flows:netflow", "NetFlow/IPFIX/sFlow flow analysis data");
+        let mut func_decl = FunctionDeclaration::new(
+            FLOWS_FUNCTION_NAME,
+            "NetFlow/IPFIX/sFlow flow analysis data",
+        );
         func_decl.global = true;
         func_decl.tags = Some("flows".to_string());
         func_decl.access =
@@ -339,5 +365,21 @@ mod tests {
             String::from_utf8_lossy(&err.payload).contains("Invalid request:"),
             "expected invalid request error payload"
         );
+    }
+
+    #[test]
+    fn parse_request_rejects_metric_selections_as_bad_request() {
+        for field in ["BYTES", "PACKETS", "FLOWS"] {
+            let payload = format!(r#"{{"selections":{{"{field}":["1"]}}}}"#);
+            let err = parse_flows_request(&test_call(&[], Some(&payload)))
+                .expect_err("metric selection should fail");
+            let response = String::from_utf8_lossy(&err.payload);
+
+            assert_eq!(err.status, 400);
+            assert!(
+                response.contains(&format!("unsupported selection field `{field}`")),
+                "unexpected response for {field}: {response}"
+            );
+        }
     }
 }

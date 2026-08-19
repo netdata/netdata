@@ -13,9 +13,9 @@
 //!
 //! # Architecture
 //!
-//! The engine layer provides the foundational infrastructure that higher-level crates
-//! (like `journal-sql` and `journal-function`) build upon. It handles all the complexity
-//! of file indexing, caching strategies, and query execution.
+//! The engine layer provides the foundational infrastructure that higher-level
+//! query crates build upon. It handles all the complexity of file indexing,
+//! caching strategies, and query execution.
 
 // Public modules
 pub mod cache;

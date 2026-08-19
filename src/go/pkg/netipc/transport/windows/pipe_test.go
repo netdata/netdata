@@ -30,6 +30,18 @@ func TestMinU32(t *testing.T) {
 	}
 }
 
+func TestMaxU32(t *testing.T) {
+	if got := maxU32(9, 1); got != 9 {
+		t.Fatalf("maxU32(9, 1) = %d, want 9", got)
+	}
+	if got := maxU32(1, 9); got != 9 {
+		t.Fatalf("maxU32(1, 9) = %d, want 9", got)
+	}
+	if got := maxU32(5, 5); got != 5 {
+		t.Fatalf("maxU32(5, 5) = %d, want 5", got)
+	}
+}
+
 func TestHighestBit(t *testing.T) {
 	cases := []struct {
 		mask uint32
@@ -216,5 +228,60 @@ func TestSetNamedPipeHandleStateInvalidHandle(t *testing.T) {
 	mode := uint32(_PIPE_READMODE_MESSAGE)
 	if err := setNamedPipeHandleState(syscall.InvalidHandle, &mode); err == nil {
 		t.Fatal("setNamedPipeHandleState on invalid handle should fail")
+	}
+}
+
+func TestWaitReadableClosedSession(t *testing.T) {
+	session := &Session{handle: syscall.InvalidHandle}
+	ready, err := session.WaitReadable(1)
+	if err == nil {
+		t.Fatal("WaitReadable on closed session should fail")
+	}
+	if ready {
+		t.Fatal("WaitReadable on closed session returned ready")
+	}
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("WaitReadable on closed session = %v, want ErrBadParam", err)
+	}
+}
+
+func TestSessionRoleAccessors(t *testing.T) {
+	session := &Session{role: RoleServer}
+	if session.Role() != RoleServer {
+		t.Fatalf("Role() = %v, want RoleServer", session.Role())
+	}
+	if session.GetRole() != RoleServer {
+		t.Fatalf("GetRole() = %v, want RoleServer", session.GetRole())
+	}
+}
+
+func TestClosedListenerAcceptAndClose(t *testing.T) {
+	listener := &Listener{handle: syscall.InvalidHandle}
+	if got := listener.Handle(); got != syscall.InvalidHandle {
+		t.Fatalf("closed listener handle = %v, want InvalidHandle", got)
+	}
+	listener.Close()
+	if _, err := listener.AcceptWithConfig(1, ServerConfig{}); !errors.Is(err, ErrAccept) {
+		t.Fatalf("closed listener AcceptWithConfig = %v, want ErrAccept", err)
+	}
+}
+
+func TestListenerAcceptRejectsInvalidOpenHandle(t *testing.T) {
+	listener := &Listener{handle: 0}
+	if _, err := listener.AcceptWithConfig(1, ServerConfig{}); !errors.Is(err, ErrAccept) {
+		t.Fatalf("invalid listener handle AcceptWithConfig = %v, want ErrAccept", err)
+	}
+	if listener.accepting {
+		t.Fatalf("listener accepting flag should be cleared after failed accept")
+	}
+}
+
+func TestCreatePipeInstanceRejectsInvalidPipeName(t *testing.T) {
+	handle, err := createPipeInstance([]uint16{0}, defaultPipeBufSize, false)
+	if !errors.Is(err, ErrCreatePipe) {
+		t.Fatalf("createPipeInstance(empty name) = handle %v err %v, want ErrCreatePipe", handle, err)
+	}
+	if handle != syscall.InvalidHandle {
+		t.Fatalf("createPipeInstance(empty name) handle = %v, want InvalidHandle", handle)
 	}
 }

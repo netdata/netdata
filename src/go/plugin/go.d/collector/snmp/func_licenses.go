@@ -14,8 +14,8 @@ import (
 
 const licensesMethodID = "licenses"
 
-func licensesMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func licensesFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:          licensesMethodID,
 		Name:        "Licenses",
 		UpdateEvery: 10,

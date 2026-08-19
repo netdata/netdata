@@ -3,15 +3,14 @@
 package snmptopology
 
 import (
-	"time"
-
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
-	device := topologyDevice{
-		ManagementIP:       dev.Hostname,
+func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologymodel.Device {
+	device := topologymodel.Device{
+		ManagementIP:       normalizeEligibleManagementIP(dev.Hostname),
 		ChartIDPrefix:      topologyProfileChartIDPrefix,
 		ChartContextPrefix: topologyProfileChartContextPrefix,
 		SysObjectID:        dev.SysObjectID,
@@ -47,9 +46,13 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
 	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasModel); value != "" && device.Model == "" {
 		device.Model = value
 	}
+	if value := topologyutil.NormalizeTopologyRouterID(device.Labels[tagOSPFRouterID]); value != "" {
+		device.OSPFRouterID = value
+		setTopologyMetadataLabelIfMissing(device.Labels, tagOSPFRouterID, value)
+	}
 
 	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysUptime); value != "" {
-		if uptime := parsePositiveInt64(value); uptime > 0 {
+		if uptime := topologyutil.ParsePositiveInt64(value); uptime > 0 {
 			device.SysUptime = uptime
 		}
 	}
@@ -71,42 +74,4 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
 	}
 
 	return device
-}
-
-func (c *topologyCache) snapshot() (topologyData, bool) {
-	if !c.hasFreshSnapshotAt(time.Now()) {
-		return topologyData{}, false
-	}
-
-	local := c.localDevice
-	local = normalizeTopologyDevice(local)
-
-	observations, localDeviceID := c.buildEngineObservations(local)
-	if len(observations) == 0 {
-		return topologyData{}, false
-	}
-
-	result, err := topologyengine.BuildL2ResultFromObservations(observations, topologyengine.DiscoverOptions{
-		EnableLLDP:   true,
-		EnableCDP:    true,
-		EnableBridge: true,
-		EnableARP:    true,
-	})
-	if err != nil {
-		return topologyData{}, false
-	}
-
-	data := topologyengine.ToTopologyData(result, topologyengine.TopologyDataOptions{
-		SchemaVersion:  topologySchemaVersion,
-		Source:         "snmp",
-		Layer:          "2",
-		View:           "summary",
-		AgentID:        c.agentID,
-		LocalDeviceID:  localDeviceID,
-		CollectedAt:    c.lastUpdate,
-		ResolveDNSName: resolveTopologyReverseDNSName,
-	})
-
-	augmentLocalActorFromCache(&data, local)
-	return data, true
 }

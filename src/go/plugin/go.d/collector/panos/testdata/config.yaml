@@ -1,0 +1,15 @@
+vnode: firewall-a
+update_every: 60
+url: https://192.0.2.1
+timeout: 3
+api_key: test-api-key
+username: netdata
+password: secret
+vsys: vsys1
+tls_skip_verify: true
+tls_ca: /tmp/ca.pem
+tls_cert: /tmp/cert.pem
+tls_key: /tmp/key.pem
+proxy_url: http://proxy.local:8080
+headers:
+  X-Test: test

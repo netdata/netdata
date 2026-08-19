@@ -2,8 +2,6 @@ use super::*;
 
 pub(crate) fn v9_canonical_key(field: V9Field) -> Option<&'static str> {
     match field {
-        V9Field::InBytes => Some("BYTES"),
-        V9Field::InPkts => Some("PACKETS"),
         V9Field::Flows => Some("FLOWS"),
         V9Field::IpProtocolVersion => Some("ETYPE"),
         V9Field::Protocol => Some("PROTOCOL"),
@@ -16,7 +14,7 @@ pub(crate) fn v9_canonical_key(field: V9Field) -> Option<&'static str> {
         V9Field::Ipv4NextHop
         | V9Field::BgpIpv4NextHop
         | V9Field::Ipv6NextHop
-        | V9Field::BpgIpv6NextHop => Some("NEXT_HOP"),
+        | V9Field::BgpIpv6NextHop => Some("NEXT_HOP"),
         V9Field::SrcAs => Some("SRC_AS"),
         V9Field::DstAs => Some("DST_AS"),
         V9Field::InputSnmp => Some("IN_IF"),
@@ -51,11 +49,7 @@ pub(crate) fn v9_canonical_key(field: V9Field) -> Option<&'static str> {
 
 pub(crate) fn ipfix_canonical_key(field: &IPFixField) -> Option<&'static str> {
     match field {
-        IPFixField::IANA(IANAIPFixField::OctetDeltaCount) => Some("BYTES"),
-        IPFixField::IANA(IANAIPFixField::PostOctetDeltaCount) => Some("BYTES"),
         IPFixField::IANA(IANAIPFixField::InitiatorOctets) => Some("BYTES"),
-        IPFixField::IANA(IANAIPFixField::PacketDeltaCount) => Some("PACKETS"),
-        IPFixField::IANA(IANAIPFixField::PostPacketDeltaCount) => Some("PACKETS"),
         IPFixField::IANA(IANAIPFixField::InitiatorPackets) => Some("PACKETS"),
         IPFixField::IANA(IANAIPFixField::IpVersion) => Some("ETYPE"),
         IPFixField::IANA(IANAIPFixField::ProtocolIdentifier) => Some("PROTOCOL"),

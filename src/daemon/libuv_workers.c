@@ -77,6 +77,7 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_REGISTER_NODE, "register node");
     worker_register_job_name(UV_EVENT_UPDATE_NODE_COLLECTORS, "update collectors");
     worker_register_job_name(UV_EVENT_UPDATE_NODE_INFO, "send node info");
+    worker_register_job_name(UV_EVENT_UPDATE_NODE_MANIFEST, "send node manifest");
     worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT, "ctx send snapshot");
     worker_register_job_name(UV_EVENT_CTX_SEND_SNAPSHOT_UPD, "ctx send update");
     worker_register_job_name(UV_EVENT_NODE_STATE_UPDATE, "node state update");

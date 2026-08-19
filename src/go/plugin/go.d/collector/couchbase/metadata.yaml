@@ -6,6 +6,7 @@ modules:
       module_name: couchbase
       monitored_instance:
         name: Couchbase
+        description: "Monitor Couchbase bucket operations, items, disk use, memory use, quota consumption, and cache residency."
         link: https://www.couchbase.com/
         icon_filename: couchbase.svg
         categories:
@@ -199,7 +200,7 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8091
-                
+
                   - name: remote
                     url: http://203.0.113.0:8091
     troubleshooting:

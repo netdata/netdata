@@ -3,6 +3,7 @@
 #include "rrd.h"
 #include "storage-engine.h"
 #include "rrddim-collection.h"
+#include "ram/rrddim_mem.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
@@ -28,6 +29,10 @@ struct rrddim_constructor {
     } react_action;
 
 };
+
+static inline int32_t rrddim_normalize_divisor(int32_t divisor) {
+    return divisor ? divisor : 1;
+}
 
 // isolated call to appear
 // separate in statistics
@@ -60,8 +65,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->algorithm = ctr->algorithm;
     rd->multiplier = ctr->multiplier;
-    rd->divisor = ctr->divisor;
-    if(!rd->divisor) rd->divisor = 1;
+    rd->divisor = rrddim_normalize_divisor(ctr->divisor);
 
     rd->rrdset = st;
 
@@ -209,22 +213,39 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     netdata_log_debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
-    if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
-        /* This metric has no data and no references */
+    // finalize collection first (tears down tier collect handles); its return
+    // means "the db still has retention for this dimension".
+    bool has_db_retention = rrddim_finalize_collection_and_check_retention(rd);
+
+    // Delete the dimension's SQLite metadata when freeing it leaves no queryable
+    // data behind:
+    //   - dbengine: only when no on-disk retention remains;
+    //   - ram/alloc/none: all use the in-memory rrddim storage backend, so data
+    //     lives only in RAM and a freed dimension is always orphaned (the
+    //     retention check above misreports these modes as retained).
+    if ((rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE && !has_db_retention) ||
+        rd->rrd_memory_mode == RRD_DB_MODE_RAM ||
+        rd->rrd_memory_mode == RRD_DB_MODE_ALLOC ||
+        rd->rrd_memory_mode == RRD_DB_MODE_NONE) {
         metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
+
+    bool db_data_lifetime_transferred = false;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            eng->api.metric_release(rd->tiers[tier].smh);
+            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RRDDIM)
+                db_data_lifetime_transferred |= rrddim_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
+            else
+                eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
         }
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 
-    if(rd->db.data) {
+    if(rd->db.data && !db_data_lifetime_transferred) {
         pulse_db_rrd_memory_sub(rd->db.memsize);
 
         if(rd->rrd_memory_mode == RRD_DB_MODE_RAM)
@@ -291,8 +312,8 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
                 continue;
 
             if(td->algorithm != rd->algorithm
-               || ABS(td->multiplier) != ABS(rd->multiplier)
-               || ABS(td->divisor)    != ABS(rd->divisor)) {
+               || rrddim_scale_magnitude(td->multiplier) != rrddim_scale_magnitude(rd->multiplier)
+               || rrddim_scale_magnitude(td->divisor)    != rrddim_scale_magnitude(rd->divisor)) {
                 if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
 #ifdef NETDATA_INTERNAL_CHECKS
                     netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
@@ -338,8 +359,8 @@ void rrddim_index_destroy(RRDSET *st) {
     st->rrddim_root_index = NULL;
 }
 
-static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
-    return dictionary_get(st->rrddim_root_index, id);
+static inline const DICTIONARY_ITEM *rrddim_index_find_and_acquire(RRDSET *st, const char *id) {
+    return dictionary_get_and_acquire_item(st->rrddim_root_index, id);
 }
 
 // ----------------------------------------------------------------------------
@@ -348,13 +369,16 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
 inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
-    RRDDIM *rd = rrddim_index_find(st, id);
+    const DICTIONARY_ITEM *rd_item = rrddim_index_find_and_acquire(st, id);
+    RRDDIM *rd = dictionary_acquired_item_value(rd_item);
     if(rd) {
         if(!include_obsolete && rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st))
-            return NULL;
-
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+            rd = NULL;
+        else
+            rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
+
+    dictionary_acquired_item_release(st->rrddim_root_index, rd_item);
 
     return rd;
 }
@@ -370,7 +394,7 @@ inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id, bool
             return NULL;
         }
 
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
 
     return rda;
@@ -435,6 +459,8 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
 }
 
 inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
+    divisor = rrddim_normalize_divisor(divisor);
+
     if(unlikely(rd->divisor == divisor))
         return 0;
 
@@ -514,17 +540,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 
     RRDDIM *rd = NULL;
     while(!rd) {
-        rd = rrddim_index_find(st, id);
-        if(rd) {
-            if(spinlock_trylock(&rd->destroy_lock)) {
-                rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
-                spinlock_unlock(&rd->destroy_lock);
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(st->rrddim_root_index, id);
+        if(item) {
+            RRDDIM *existing_rd = dictionary_acquired_item_value(item);
+            if(spinlock_trylock(&existing_rd->destroy_lock)) {
+                rrddim_isnot_obsolete___safe_from_collector_thread(st, existing_rd);
+                spinlock_unlock(&existing_rd->destroy_lock);
             }
             else {
-                rd = NULL;
+                dictionary_acquired_item_release(st->rrddim_root_index, item);
                 microsleep(1 * USEC_PER_MS);
                 continue;
             }
+
+            dictionary_acquired_item_release(st->rrddim_root_index, item);
         }
 
         struct rrddim_constructor tmp = {
@@ -665,13 +694,7 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *
 //        *((int64_t *)Pvalue) = *((int64_t *)Pvalue) + 1;
 //    spinlock_unlock(&st->rrdhost->accounting.spinlock);
 
-    NETDATA_DOUBLE v = value >= 0 ? (NETDATA_DOUBLE)value : (NETDATA_DOUBLE)(-value);
-    if (unlikely(v > rrddim_collected_max_as_double(rd))) {
-        if(rrddim_is_float(rd))
-            rrddim_set_collected_max_float(rd, v);
-        else
-            rrddim_set_collected_max_int(rd, (int64_t)v);
-    }
+    rrddim_update_collected_max_from_int(rd, value);
     // For int dims return the last collected int; for float dims the integer return is meaningless, so return 0 to avoid truncation misuse.
     if(rrddim_is_float(rd))
         return 0;

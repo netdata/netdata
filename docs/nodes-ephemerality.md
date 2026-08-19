@@ -44,6 +44,72 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 | `streaming_never_connected` | A permanent node has never connected to a Parent.       |
 | `streaming_disconnected`    | A previously connected permanent node has disconnected. |
 
+:::important
+
+Both alerts are configured with `to: silent` by default. They trigger and appear on the Parent dashboard but **do not send notifications** unless you explicitly enable them. They also apply only to **permanent nodes** — ephemeral nodes are excluded.
+
+:::
+
+### Enabling Notifications for Streaming Alerts
+
+1. **Override each alert to send notifications.** Choose one method:
+
+   **Via Netdata Cloud (recommended):** Use the [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md) to edit `streaming_disconnected` and `streaming_never_connected` on the Parent node. The UI creates a dynamic configuration that takes precedence over the stock template. See [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) for details. Repeat for both alerts.
+
+   **Via config file:** On the Parent node, create or edit `/etc/netdata/health.d/streaming.conf`. An override must be a complete alert definition (see [Overriding Stock Alerts](/src/health/overriding-stock-alerts.md)); change `to: silent` to a role. `sysadmin` is the convention used by the stock alerts; any string is accepted:
+
+   ```yaml
+        template: streaming_disconnected
+              on: netdata.streaming_inbound
+           class: Availability
+            type: Streaming
+       component: Streaming
+    chart labels: type=permanent
+            calc: ${stale disconnected}
+           units: nodes
+           every: 10s
+            warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0
+           delay: up 5m down 5m multiplier 1.5 max 30m
+         summary: Permanent streaming nodes disconnected
+            info: Permanent child nodes disconnected from this parent. \
+                  If nodes are expected to disconnect, mark them as ephemeral, by editing their netdata.conf \
+                  and setting: [global].is ephemeral node = yes
+              to: sysadmin
+   ```
+
+   Repeat for `streaming_never_connected` — note that `template`, `calc`, `summary`, and `info` all differ:
+
+   ```yaml
+        template: streaming_never_connected
+              on: netdata.streaming_inbound
+           class: Availability
+            type: Streaming
+       component: Streaming
+    chart labels: type=permanent
+            calc: ${stale archived}
+           units: nodes
+           every: 10s
+            warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0
+           delay: up 5m down 5m multiplier 1.5 max 30m
+         summary: Permanent streaming nodes never connected
+            info: Permanent child nodes never connected to this parent. \
+                  If these nodes should actually be ephemeral, run: \
+                  netdatacli mark-stale-nodes-ephemeral ALL_NODES
+              to: sysadmin
+   ```
+
+   After saving the file, reload health on the Parent:
+
+   ```bash
+   sudo netdatacli reload-health
+   ```
+
+   Make sure the role you choose has recipients wired up in your notification method(s) — see [Centralized Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md) for Cloud setup.
+
+2. **Enable Cloud notifications.** An administrator must [enable Alert notifications for the Space](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md#manage-space-notification-settings). Without this step, Netdata Cloud will not forward any alert notifications.
+
+**See also:** [Centralized Cloud Notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md) for notification setup, and [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md) for troubleshooting node offline states.
+
 ## Automatic Node Instance Cleanup in Netdata Cloud
 
 Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.

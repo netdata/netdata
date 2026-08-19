@@ -1,6 +1,6 @@
 ---
 name: codacy-audit
-description: Codacy Cloud workflow for this repository -- run Codacy's analyzers locally before `git push` (mirrors what Codacy CI runs), and fetch/cluster Codacy issues for any PR via the v3 API. Use when the user mentions Codacy, "codacy analysis", `codacy-analysis-cli`, "codacy issues on PR", "fix codacy CI", "codacy markdownlint findings", or any Codacy gate failing on a netdata-org PR. Ships scripts analyze-local.sh (docker/binary runner for codacy-analysis-cli) and pr-issues.sh (paginated v3 issue fetch + group-by tool/pattern/severity/file). Token-safe -- CODACY_TOKEN never reaches assistant-visible stdout. Read-only by design in the current SOW; write actions (mark FP, mark fixed) are deferred.
+description: Codacy Cloud workflow for this repository -- run Codacy's analyzers locally before `git push` (mirrors what Codacy CI runs), and fetch/cluster Codacy issues for any PR via the v3 API. Use when the user mentions Codacy, "codacy analysis", `codacy-analysis-cli`, "codacy issues on PR", "fix codacy CI", "codacy markdownlint findings", or any Codacy gate failing on a netdata-org PR. Ships scripts analyze-local.sh (docker/binary runner for codacy-analysis-cli) and pr-issues.sh (paginated v3 issue fetch + group-by tool/pattern/severity/file). Token-safe -- CODACY_TOKEN never reaches assistant-visible stdout. Read-only by design; write actions (mark FP, mark fixed) require a GitHub issue or branch-local SOW.
 ---
 
 # Codacy audit skill
@@ -28,7 +28,7 @@ Examples worth capturing:
 
 Each concrete question that requires non-trivial analysis (multiple wrapper calls, jq pipelines, cross-referencing other skills) MUST become a how-to under `how-tos/<slug>.md` AND get an entry in `how-tos/INDEX.md` BEFORE the task is reported complete. Skipping this means the next assistant repeats the analysis from scratch.
 
-## Scope (current SOW)
+## Scope
 
 In scope:
 
@@ -36,7 +36,7 @@ In scope:
 - Read-only PR-issue queries against the v3 API.
 - Token-safe wrappers (sentinel-driven no-leak self-test).
 
-Out of scope (deferred to a future SOW):
+Out of scope until a real use case creates a GitHub issue or branch-local SOW:
 
 - Write actions (mark issue as false-positive, mark as fixed, modify ignore-patterns).
 - Master-backlog triage on the 31,425+ open issues.
@@ -72,6 +72,38 @@ $ .agents/skills/codacy-audit/scripts/analyze-local.sh
 
 Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
 
+Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
+results, the output file may have a `.json` suffix but contain tool-runner logs
+instead of JSON. Always verify with `jq empty <dump>` before treating a local
+dump as finding evidence. If GitHub check-run annotations are empty too, use
+`pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
+and re-check after the next push.
+
+One common local cause is gitignored generated output with restrictive file
+permissions. For example, if local scratch output under `.local/` contains files
+not readable by the Docker container, Codacy logs `Could not read file` messages
+and the saved `.json` dump is plain text. Fix or move the local generated output
+before trusting local analyzer output.
+
+Operational gotcha: the public Codacy v3 analysis endpoint can expose PR issue
+details even when GitHub check-run annotations are empty and no `CODACY_TOKEN`
+is available:
+
+```
+curl -fsS \
+  "https://api.codacy.com/api/v3/analysis/organizations/gh/netdata/repositories/netdata/pull-requests/<PR>/issues?limit=100"
+```
+
+Filter for `.data[] | select(.deltaType == "Added")` to identify the issues
+that still block the PR. Treat `commitInfo` fields as sensitive operational
+metadata; do not copy names or email addresses into committed artifacts.
+
+Operational gotcha: Codacy's PR issue API can lag behind the GitHub check-run
+after a new push. If `pr-issues.sh` still reports findings but the Codacy
+check-run for the current head SHA is green, inspect `.commitIssue.commitInfo.sha`
+in the dump. Findings anchored to an older commit are stale cache and should not
+be treated as current-head blockers.
+
 To restrict to a single tool (matches what Codacy reported on a CI run):
 
 ```
@@ -96,7 +128,7 @@ limits can fail before `jq` starts.
 
 ## Path discipline
 
-This skill follows `<repo>/.agents/sow/specs/sensitive-data-discipline.md`:
+This skill follows `<repo>/.agents/sensitive-data-discipline.md`:
 
 - Repo files: repo-relative (`<repo>/src/...`).
 - Codacy account / org / repo identifiers: env-keyed.

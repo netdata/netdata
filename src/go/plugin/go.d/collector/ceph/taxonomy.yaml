@@ -1,0 +1,68 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: ceph
+placements:
+  - id: ceph
+    section_id: applications
+    title: Ceph
+    icon: apps
+    families: true
+    properties: {important: true, grouping: true}
+    items:
+      - type: group
+        id: availability-health
+        title: Availability and Health
+        items:
+          - ceph.component_collection_status
+          - ceph.cluster_status
+          - ceph.cluster_scrub_status
+          - ceph.cluster_pgs_count
+          - ceph.cluster_pgs_by_status_count
+          - ceph.cluster_pgs_per_osd_count
+      - type: group
+        id: cluster-inventory
+        title: Cluster Inventory
+        items:
+          - ceph.cluster_hosts_count
+          - ceph.cluster_monitors_count
+          - ceph.cluster_osds_count
+          - ceph.cluster_osds_by_status_count
+          - ceph.cluster_managers_count
+          - ceph.cluster_object_gateways_count
+          - ceph.cluster_iscsi_gateways_count
+          - ceph.cluster_iscsi_gateways_by_status_count
+          - ceph.cluster_pools_count
+      - type: group
+        id: capacity
+        title: Capacity
+        items:
+          - ceph.cluster_physical_capacity_utilization
+          - ceph.cluster_physical_capacity_usage
+          - ceph.cluster_objects_count
+          - ceph.cluster_object_copies_health
+          - ceph.cluster_objects_unfound
+      - type: group
+        id: cluster-performance
+        title: Cluster Performance
+        items:
+          - ceph.cluster_client_io
+          - ceph.cluster_client_iops
+          - ceph.cluster_recovery_throughput
+      - type: group
+        id: osds
+        title: OSDs
+        items:
+          - ceph.osd_status
+          - ceph.osd_space_usage
+          - ceph.osd_io
+          - ceph.osd_iops
+          - ceph.osd_latency
+      - type: group
+        id: pools
+        title: Pools
+        items:
+          - ceph.pool_space_utilization
+          - ceph.pool_space_usage
+          - ceph.pool_objects_count
+          - ceph.pool_io
+          - ceph.pool_iops

@@ -4,138 +4,197 @@ package snmptopology
 
 import (
 	"context"
-	"net"
 	"net/netip"
 	"sort"
 	"strings"
 	"sync"
-	"time"
+	"sync/atomic"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
 const (
-	topologyReverseDNSTimeout  = 50 * time.Millisecond
-	topologyReverseDNSCacheTTL = 10 * time.Minute
-	topologyReverseDNSNegTTL   = 30 * time.Second
+	topologyReverseDNSMaxCandidates  = 1024
+	topologyReverseDNSMaxConcurrency = 4
 )
 
-type topologyReverseDNSCacheEntry struct {
-	name      string
-	expiresAt time.Time
+type topologyReverseDNSConfig struct {
+	maxCandidates int
+	concurrency   int
 }
 
-type topologyReverseDNSResolver struct {
-	mu      sync.RWMutex
-	timeout time.Duration
-	ttl     time.Duration
-	cache   map[string]topologyReverseDNSCacheEntry
+type topologyReverseDNSWarmer struct {
+	resolver *reversedns.Resolver
+	config   topologyReverseDNSConfig
+	warming  atomic.Bool
 }
 
-func newTopologyReverseDNSResolver(timeout, ttl time.Duration) *topologyReverseDNSResolver {
-	return &topologyReverseDNSResolver{
-		timeout: timeout,
-		ttl:     ttl,
-		cache:   make(map[string]topologyReverseDNSCacheEntry),
+type topologyReverseDNSCandidateCollector struct {
+	resolver   *reversedns.Resolver
+	mu         sync.Mutex
+	candidates map[netip.Addr]struct{}
+}
+
+func newTopologyReverseDNSWarmer(resolver *reversedns.Resolver) *topologyReverseDNSWarmer {
+	return newTopologyReverseDNSWarmerWithConfig(resolver, topologyReverseDNSConfig{})
+}
+
+func newTopologyReverseDNSWarmerWithConfig(resolver *reversedns.Resolver, config topologyReverseDNSConfig) *topologyReverseDNSWarmer {
+	if resolver == nil {
+		panic("snmp_topology reverse DNS warmer requires a non-nil resolver")
+	}
+	config = normalizeTopologyReverseDNSConfig(config)
+	return &topologyReverseDNSWarmer{resolver: resolver, config: config}
+}
+
+func normalizeTopologyReverseDNSConfig(config topologyReverseDNSConfig) topologyReverseDNSConfig {
+	if config.maxCandidates <= 0 {
+		config.maxCandidates = topologyReverseDNSMaxCandidates
+	}
+	if config.concurrency <= 0 {
+		config.concurrency = topologyReverseDNSMaxConcurrency
+	}
+	return config
+}
+
+func newTopologyReverseDNSCandidateCollector(resolver *reversedns.Resolver) *topologyReverseDNSCandidateCollector {
+	if resolver == nil {
+		return nil
+	}
+	return &topologyReverseDNSCandidateCollector{
+		resolver:   resolver,
+		candidates: make(map[netip.Addr]struct{}),
 	}
 }
 
-// lookupCached returns the cached result for ip without performing any network I/O.
-// Returns "" when the IP has never been resolved or its cache entry has expired.
-func (r *topologyReverseDNSResolver) lookupCached(ip string) string {
-	if r == nil {
+func (c *topologyReverseDNSCandidateCollector) lookupCached(ip string) string {
+	if c == nil {
 		return ""
 	}
-	addr, err := netip.ParseAddr(strings.TrimSpace(ip))
-	if err != nil || !addr.IsValid() {
+	addr, ok := normalizeTopologyReverseDNSCandidateIP(ip)
+	if !ok {
 		return ""
 	}
-	ip = addr.Unmap().String()
 
-	r.mu.RLock()
-	entry, ok := r.cache[ip]
-	r.mu.RUnlock()
-	if ok && time.Now().Before(entry.expiresAt) {
-		return entry.name
+	c.mu.Lock()
+	c.candidates[addr] = struct{}{}
+	c.mu.Unlock()
+
+	result := c.resolver.Lookup(addr)
+	if result.State == reversedns.StatePositive {
+		return result.Name
 	}
 	return ""
 }
 
-func (r *topologyReverseDNSResolver) lookup(ip string) string {
-	if r == nil {
-		return ""
+func (c *topologyReverseDNSCandidateCollector) collectedCandidates() []netip.Addr {
+	if c == nil {
+		return nil
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	out := make([]netip.Addr, 0, len(c.candidates))
+	for addr := range c.candidates {
+		out = append(out, addr)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Compare(out[j]) < 0 })
+	return out
+}
+
+func (r *topologyReverseDNSWarmer) warm(ctx context.Context, candidates []netip.Addr) {
+	if r == nil || ctx == nil || len(candidates) == 0 || ctx.Err() != nil {
+		return
+	}
+	if !r.warming.CompareAndSwap(false, true) {
+		return
+	}
+	defer r.warming.Store(false)
+	r.warmStarted(ctx, candidates)
+}
+
+func (r *topologyReverseDNSWarmer) warmAsync(ctx context.Context, candidates []netip.Addr) bool {
+	if r == nil || ctx == nil || len(candidates) == 0 || ctx.Err() != nil {
+		return false
+	}
+	if !r.warming.CompareAndSwap(false, true) {
+		return false
+	}
+	go func() {
+		defer r.warming.Store(false)
+		r.warmStarted(ctx, candidates)
+	}()
+	return true
+}
+
+func (r *topologyReverseDNSWarmer) warmStarted(ctx context.Context, candidates []netip.Addr) {
+	ips := r.warmCandidates(candidates)
+	if len(ips) == 0 {
+		return
+	}
+
+	workers := min(r.config.concurrency, len(ips))
+
+	jobs := make(chan netip.Addr)
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for addr := range jobs {
+				_, _ = r.resolver.Resolve(ctx, addr)
+			}
+		}()
+	}
+
+sendJobs:
+	for _, addr := range ips {
+		select {
+		case <-ctx.Done():
+			break sendJobs
+		case jobs <- addr:
+		}
+	}
+	close(jobs)
+	wg.Wait()
+}
+
+func (r *topologyReverseDNSWarmer) warmCandidates(candidates []netip.Addr) []netip.Addr {
+	seen := make(map[netip.Addr]struct{}, len(candidates))
+	out := make([]netip.Addr, 0, len(candidates))
+	for _, addr := range candidates {
+		if len(out) >= r.config.maxCandidates {
+			break
+		}
+		addr = addr.Unmap()
+		if !isEligibleTopologyReverseDNSAddress(addr) {
+			continue
+		}
+		if _, ok := seen[addr]; ok {
+			continue
+		}
+		seen[addr] = struct{}{}
+		if r.resolver.Lookup(addr).State != reversedns.StateMiss {
+			continue
+		}
+		out = append(out, addr)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Compare(out[j]) < 0 })
+	return out
+}
+
+func normalizeTopologyReverseDNSCandidateIP(ip string) (netip.Addr, bool) {
 	addr, err := netip.ParseAddr(strings.TrimSpace(ip))
 	if err != nil || !addr.IsValid() {
-		return ""
+		return netip.Addr{}, false
 	}
-	ip = addr.Unmap().String()
-	now := time.Now()
-
-	r.mu.RLock()
-	entry, ok := r.cache[ip]
-	r.mu.RUnlock()
-	if ok && now.Before(entry.expiresAt) {
-		return entry.name
+	addr = addr.Unmap()
+	if !isEligibleTopologyReverseDNSAddress(addr) {
+		return netip.Addr{}, false
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
-	defer cancel()
-	names, err := net.DefaultResolver.LookupAddr(ctx, ip)
-	resolved := ""
-	if err == nil {
-		resolved = topologyNormalizeReverseDNSName(names)
-	}
-	ttl := r.ttl
-	if resolved == "" && topologyReverseDNSNegTTL > 0 {
-		ttl = topologyReverseDNSNegTTL
-	}
-
-	r.mu.Lock()
-	r.cache[ip] = topologyReverseDNSCacheEntry{
-		name:      resolved,
-		expiresAt: now.Add(ttl),
-	}
-	r.mu.Unlock()
-
-	return resolved
+	return addr, true
 }
 
-func topologyNormalizeReverseDNSName(names []string) string {
-	if len(names) == 0 {
-		return ""
-	}
-	seen := make(map[string]struct{}, len(names))
-	out := make([]string, 0, len(names))
-	for _, name := range names {
-		name = strings.TrimSpace(name)
-		name = strings.TrimSuffix(name, ".")
-		name = strings.ToLower(name)
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		out = append(out, name)
-	}
-	if len(out) == 0 {
-		return ""
-	}
-	sort.Strings(out)
-	return out[0]
-}
-
-var defaultTopologyReverseDNSResolver = newTopologyReverseDNSResolver(topologyReverseDNSTimeout, topologyReverseDNSCacheTTL)
-
-// resolveTopologyReverseDNSName performs a live DNS lookup (with cache).
-// Used during the collector's Collect() cycle to warm the cache.
-func resolveTopologyReverseDNSName(ip string) string {
-	return defaultTopologyReverseDNSResolver.lookup(ip)
-}
-
-// resolveTopologyReverseDNSNameCached returns a cached DNS name if available,
-// or an empty string if the IP has not been resolved yet. Never blocks on network I/O.
-// Used during function responses to avoid external calls.
-func resolveTopologyReverseDNSNameCached(ip string) string {
-	return defaultTopologyReverseDNSResolver.lookupCached(ip)
+func isEligibleTopologyReverseDNSAddress(addr netip.Addr) bool {
+	return isEligibleTopologyIPAddress(addr)
 }
