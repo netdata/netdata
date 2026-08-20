@@ -137,7 +137,7 @@ func TestTopologyRoleProfiles_AllExactSelectorsResolve(t *testing.T) {
 		},
 		{
 			profile: "topology-role-l3-neighbor",
-			count:   53,
+			count:   54,
 			kinds: []ddprofiledefinition.TopologyKind{
 				ddprofiledefinition.KindArpEntry,
 				ddprofiledefinition.KindArpLegacyEntry,
@@ -177,30 +177,98 @@ func TestTopologyRoleProfiles_AllExactSelectorsResolve(t *testing.T) {
 }
 
 func TestTopologyRoleProfiles_QualifiedSelectors(t *testing.T) {
-	t.Run("Ubiquiti enterprise root", func(t *testing.T) {
-		names, kinds := resolvedTopologyProfileFacts("1.3.6.1.4.1", "Ubiquiti USW-Flex-XG")
-		assert.Contains(t, names, "topology-role-qbridge")
-		assert.Contains(t, names, "topology-role-l3-neighbor")
-		assert.Contains(t, kinds, ddprofiledefinition.KindQbridgeFdbEntry)
-		assert.Contains(t, kinds, ddprofiledefinition.KindArpEntry)
+	tests := map[string]struct {
+		oid            string
+		sysDescr       string
+		wantProfiles   []string
+		absentProfiles []string
+		wantKinds      []ddprofiledefinition.TopologyKind
+		absentKinds    []ddprofiledefinition.TopologyKind
+	}{
+		"Ubiquiti enterprise-root Flex switch": {
+			oid:          "1.3.6.1.4.1",
+			sysDescr:     "Ubiquiti USW-Flex-XG",
+			wantProfiles: []string{"topology-role-qbridge", "topology-role-l3-neighbor"},
+			wantKinds:    []ddprofiledefinition.TopologyKind{ddprofiledefinition.KindQbridgeFdbEntry, ddprofiledefinition.KindArpEntry},
+		},
+		"unrelated enterprise-root device": {
+			oid:            "1.3.6.1.4.1",
+			sysDescr:       "unrelated enterprise device",
+			absentProfiles: []string{"topology-role-qbridge", "topology-role-l3-neighbor"},
+			absentKinds:    []ddprofiledefinition.TopologyKind{ddprofiledefinition.KindQbridgeFdbEntry, ddprofiledefinition.KindArpEntry},
+		},
+		"SONiC Net-SNMP": {
+			oid:          "1.3.6.1.4.1.8072.3.2.10",
+			sysDescr:     "SONiC Software Version",
+			wantProfiles: []string{"topology-role-l3-neighbor"},
+			wantKinds:    []ddprofiledefinition.TopologyKind{ddprofiledefinition.KindArpEntry},
+		},
+		"UniFi switch with generic Net-SNMP identity": {
+			oid:          "1.3.6.1.4.1.8072.3.2.10",
+			sysDescr:     "linux ubnt UniFi Switch",
+			wantProfiles: []string{"topology-role-qbridge", "topology-role-l3-neighbor"},
+			wantKinds: []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindIfName,
+				ddprofiledefinition.KindQbridgeFdbEntry,
+				ddprofiledefinition.KindArpEntry,
+			},
+			absentKinds: []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindFdbEntry,
+				ddprofiledefinition.KindStpPort,
+				ddprofiledefinition.KindLldpRem,
+			},
+		},
+		"UniFi gateway with generic Net-SNMP identity": {
+			oid:            "1.3.6.1.4.1.8072.3.2.10",
+			sysDescr:       "Linux Router 6.6.43-ui-ipq9574",
+			wantProfiles:   []string{"topology-role-l3-neighbor"},
+			absentProfiles: []string{"topology-role-qbridge"},
+			wantKinds:      []ddprofiledefinition.TopologyKind{ddprofiledefinition.KindArpEntry},
+			absentKinds: []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindFdbEntry,
+				ddprofiledefinition.KindQbridgeFdbEntry,
+				ddprofiledefinition.KindStpPort,
+				ddprofiledefinition.KindLldpRem,
+			},
+		},
+		"UniFi AP with exact enterprise identity": {
+			oid:            "1.3.6.1.4.1.41112",
+			sysDescr:       "Ubiquiti UniFi U6 Mesh",
+			wantProfiles:   []string{"topology-role-l3-neighbor"},
+			absentProfiles: []string{"topology-role-qbridge"},
+			wantKinds:      []ddprofiledefinition.TopologyKind{ddprofiledefinition.KindArpLegacyEntry},
+			absentKinds: []ddprofiledefinition.TopologyKind{
+				ddprofiledefinition.KindFdbEntry,
+				ddprofiledefinition.KindQbridgeFdbEntry,
+				ddprofiledefinition.KindStpPort,
+				ddprofiledefinition.KindLldpRem,
+			},
+		},
+		"unrelated generic Net-SNMP agent": {
+			oid:            "1.3.6.1.4.1.8072.3.2.10",
+			sysDescr:       "Linux Net-SNMP agent",
+			absentProfiles: []string{"topology-role-qbridge", "topology-role-l3-neighbor"},
+			absentKinds:    []ddprofiledefinition.TopologyKind{ddprofiledefinition.KindQbridgeFdbEntry, ddprofiledefinition.KindArpEntry},
+		},
+	}
 
-		names, kinds = resolvedTopologyProfileFacts("1.3.6.1.4.1", "unrelated enterprise device")
-		assert.NotContains(t, names, "topology-role-qbridge")
-		assert.NotContains(t, names, "topology-role-l3-neighbor")
-		assert.NotContains(t, kinds, ddprofiledefinition.KindQbridgeFdbEntry)
-		assert.NotContains(t, kinds, ddprofiledefinition.KindArpEntry)
-	})
-
-	t.Run("SONiC Net-SNMP", func(t *testing.T) {
-		const oid = "1.3.6.1.4.1.8072.3.2.10"
-		names, kinds := resolvedTopologyProfileFacts(oid, "SONiC Software Version")
-		assert.Contains(t, names, "topology-role-l3-neighbor")
-		assert.Contains(t, kinds, ddprofiledefinition.KindArpEntry)
-
-		names, kinds = resolvedTopologyProfileFacts(oid, "Linux Net-SNMP agent")
-		assert.NotContains(t, names, "topology-role-l3-neighbor")
-		assert.NotContains(t, kinds, ddprofiledefinition.KindArpEntry)
-	})
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			names, kinds := resolvedTopologyProfileFacts(tc.oid, tc.sysDescr)
+			for _, profile := range tc.wantProfiles {
+				assert.Contains(t, names, profile)
+			}
+			for _, profile := range tc.absentProfiles {
+				assert.NotContains(t, names, profile)
+			}
+			for _, kind := range tc.wantKinds {
+				assert.Contains(t, kinds, kind)
+			}
+			for _, kind := range tc.absentKinds {
+				assert.NotContains(t, kinds, kind)
+			}
+		})
+	}
 }
 
 func TestTopologyRoleProfiles_ArubaGuard(t *testing.T) {

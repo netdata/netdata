@@ -1,4 +1,4 @@
-# Topology capabilities for devices with fixture-backed Q-BRIDGE-MIB FDB support.
+# Topology capabilities for devices with evidence-backed Q-BRIDGE-MIB FDB support.
 
 extends:
   - _std-topology-interface-mib.yaml
@@ -61,6 +61,13 @@ selector:
     sysdescr:
       include:
         - USW-Flex-XG
+  # UniFi switches expose the generic Net-SNMP identity, so the vendor marker is required.
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.8072.3.2.10
+    sysdescr:
+      include:
+        - Linux UBNT
   # Profile extends does not merge selectors, so this guard is repeated by each Aruba switch role.
   - sysobjectid:
       include:

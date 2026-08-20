@@ -1,4 +1,4 @@
-# Topology capabilities for devices with fixture-backed IP-MIB neighbor tables.
+# Topology capabilities for devices with evidence-backed IP-MIB neighbor tables.
 
 extends:
   - _std-topology-arp-mib.yaml
@@ -57,6 +57,7 @@ selector:
         - 1.3.6.1.4.1.35265.1.83
         - 1.3.6.1.4.1.35265.1.92
         - 1.3.6.1.4.1.35265.1.176
+        - 1.3.6.1.4.1.41112
         - 1.3.6.1.4.1.52642.1.99.5802
         - 1.3.6.1.4.1.52642.2.1.45.101
   - sysobjectid:
@@ -71,6 +72,14 @@ selector:
     sysdescr:
       include:
         - SONiC
+  # UniFi switches and gateways share the generic Net-SNMP identity.
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.8072.3.2.10
+    sysdescr:
+      include:
+        - Linux UBNT
+        - ui-ipq9574
   # Profile extends does not merge selectors, so this guard is repeated by each Aruba switch role.
   - sysobjectid:
       include:
