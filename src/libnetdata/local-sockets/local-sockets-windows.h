@@ -120,27 +120,14 @@ typedef struct {
     char username[LS_WIN_USERNAME_MAX];
 } LS_WINDOWS_PROC;
 
-static inline void ls_win_sid_username_init_once(void) {
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-    static bool initialized = false;
-
-    if(__atomic_load_n(&initialized, __ATOMIC_ACQUIRE))
-        return;
-
-    spinlock_lock(&spinlock);
-    if(!__atomic_load_n(&initialized, __ATOMIC_ACQUIRE)) {
-        cached_sid_username_init();
-        __atomic_store_n(&initialized, true, __ATOMIC_RELEASE);
-    }
-    spinlock_unlock(&spinlock);
-}
-
 static inline void ls_win_resolve_username(DWORD pid, char *dst, size_t dst_size) {
-    dst[0] = '\0';
-    if(!dst_size)
+    if(!dst || !dst_size)
         return;
 
-    ls_win_sid_username_init_once();
+    dst[0] = '\0';
+
+    // idempotent and thread-safe; safe to call on every resolution
+    cached_sid_username_init();
 
     HANDLE hp = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
     if(!hp)
@@ -295,39 +282,32 @@ static inline void ls_win_fill_endpoint_ipv6(struct socket_endpoint *ep, const U
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// table fetching with ERROR_INSUFFICIENT_BUFFER retry
+// table fetching with ERROR_INSUFFICIENT_BUFFER retry.
+// Sockets can be created between the size probe and the fetch on a busy host,
+// so the second call may still report ERROR_INSUFFICIENT_BUFFER; retry once
+// with the size the API reports before giving up.
 
-static inline void *ls_win_fetch_tcp_table(ULONG af) {
-    DWORD size = 0;
-    DWORD rc = GetExtendedTcpTable(NULL, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
-    if(rc != ERROR_INSUFFICIENT_BUFFER || size == 0)
-        return NULL;
-
-    void *table = mallocz(size);
-    rc = GetExtendedTcpTable(table, &size, FALSE, af, TCP_TABLE_OWNER_PID_ALL, 0);
-    if(rc != 0) { // NO_ERROR
-        freez(table);
-        return NULL;
+#define LS_WIN_DEFINE_TABLE_FETCH(name, fn, table_class)                     \
+    static inline void *name(ULONG af) {                                     \
+        DWORD size = 0;                                                      \
+        DWORD rc = fn(NULL, &size, FALSE, af, table_class, 0);               \
+        if(rc != ERROR_INSUFFICIENT_BUFFER || size == 0)                     \
+            return NULL;                                                     \
+        void *table = mallocz(size);                                         \
+        rc = fn(table, &size, FALSE, af, table_class, 0);                    \
+        if(rc == ERROR_INSUFFICIENT_BUFFER) {                                \
+            table = reallocz(table, size);                                   \
+            rc = fn(table, &size, FALSE, af, table_class, 0);                \
+        }                                                                    \
+        if(rc != 0) {                                                      \
+            freez(table);                                                    \
+            return NULL;                                                     \
+        }                                                                    \
+        return table;                                                        \
     }
 
-    return table;
-}
-
-static inline void *ls_win_fetch_udp_table(ULONG af) {
-    DWORD size = 0;
-    DWORD rc = GetExtendedUdpTable(NULL, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
-    if(rc != ERROR_INSUFFICIENT_BUFFER || size == 0)
-        return NULL;
-
-    void *table = mallocz(size);
-    rc = GetExtendedUdpTable(table, &size, FALSE, af, UDP_TABLE_OWNER_PID, 0);
-    if(rc != 0) { // NO_ERROR
-        freez(table);
-        return NULL;
-    }
-
-    return table;
-}
+LS_WIN_DEFINE_TABLE_FETCH(ls_win_fetch_tcp_table, GetExtendedTcpTable, TCP_TABLE_OWNER_PID_ALL)
+LS_WIN_DEFINE_TABLE_FETCH(ls_win_fetch_udp_table, GetExtendedUdpTable, UDP_TABLE_OWNER_PID)
 
 // --------------------------------------------------------------------------------------------------------------------
 // platform backend entry point
