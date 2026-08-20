@@ -19,18 +19,16 @@ import os
 
 def load_payload(path):
     raw = io.open(path, encoding='utf-8', errors='replace').read()
-    # payload is between the FUNCTION_RESULT_BEGIN header line and
-    # the FUNCTION_RESULT_END trailing line
-    start = raw.find("\n")
-    if start == -1:
-        start = 0
+    if raw.startswith("FUNCTION_RESULT_BEGIN"):
+        # pluginsd wire format: strip the BEGIN header line and the
+        # FUNCTION_RESULT_END trailing line.
+        start = raw.find("\n")
+        start = 0 if start == -1 else start + 1
+        end = raw.find("FUNCTION_RESULT_END")
+        raw = raw[start:end] if end != -1 else raw[start:]
     else:
-        start += 1
-    end = raw.find("FUNCTION_RESULT_END")
-    if end != -1:
-        raw = raw[start:end]
-    else:
-        raw = raw[start:]
+        # --test emits the JSON body directly (no pluginsd wrapper).
+        raw = raw.strip()
     return json.loads(raw)
 
 

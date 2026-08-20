@@ -129,14 +129,6 @@ jobs:
             tail -n 15 "$err"
             python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py "$out"
           }
-          # diagnostic: does --test produce any output as a non-root runner
-          # (the previous failure produced an empty payload)?
-          set +e
-          printf '%s' '{}' | timeout 120 "$plugin" --test network-connections > /tmp/nv_conn.json 2> /tmp/nv_conn.err
-          echo "--- network-connections non-root: exit=$? stdout_bytes=$(wc -c < /tmp/nv_conn.json)"
-          head -c 200 /tmp/nv_conn.json | cat -A
-          echo
-          set -e
           validate aggregated '{}'
           validate pid '{"selections":{"group_by":"pid"}}'
           validate detailed '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}'
