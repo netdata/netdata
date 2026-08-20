@@ -71,14 +71,15 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.db = db
 	}
 
-	version, _, _ := c.serverProperties()
-	if version == "" {
-		ver, engineEdition, err := c.queryVersion()
+	version, majorVersion, engineEdition, loaded := c.serverProperties()
+	if !loaded {
+		var err error
+		version, engineEdition, err = c.queryVersion()
 		if err != nil {
 			return nil, fmt.Errorf("failed to query version: %v", err)
 		}
-		c.setServerProperties(ver, engineEdition)
-		version, majorVersion, engineEdition := c.serverProperties()
+		c.setServerProperties(version, engineEdition)
+		version, majorVersion, engineEdition, _ = c.serverProperties()
 		c.Debugf("connected to SQL Server version %s (major: %d, engine edition: %d)", version, majorVersion, engineEdition)
 	}
 
@@ -159,14 +160,7 @@ func (c *Collector) queryVersion() (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	var version string
-	var engineEdition int
-	err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &engineEdition)
-	if err != nil {
-		return "", 0, err
-	}
-
-	return version, engineEdition, nil
+	return c.queryServerProperties(ctx)
 }
 
 func (c *Collector) collectInstanceMetrics(mx map[string]int64) error {

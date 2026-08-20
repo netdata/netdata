@@ -1019,15 +1019,16 @@ modules:
                   ADD EVENT sqlserver.error_reported(
                     ACTION(sqlserver.sql_text, sqlserver.query_hash)
                   )
-                  ADD TARGET package0.ring_buffer;
+                  ADD TARGET package0.ring_buffer
+                  WITH (STARTUP_STATE = ON);
                   GO
 
                   ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
                   GO
                   ```
 
-                  Set `functions.error_info.use_ring_buffer: true`. The session must remain running, and its events are
-                  lost on restart or failover.
+                  Set `functions.error_info.use_ring_buffer: true`. The session starts automatically after restart or
+                  failover, but events previously held in memory are lost.
 
                   **Azure SQL Database — event_file (default):**
 
@@ -1062,14 +1063,16 @@ modules:
                   ADD EVENT sqlserver.error_reported(
                     ACTION(sqlserver.sql_text, sqlserver.query_hash)
                   )
-                  ADD TARGET package0.ring_buffer;
+                  ADD TARGET package0.ring_buffer
+                  WITH (STARTUP_STATE = ON);
                   GO
 
                   ALTER EVENT SESSION [netdata_errors] ON DATABASE STATE = START;
                   GO
                   ```
 
-                  Set `functions.error_info.use_ring_buffer: true`. The database-scoped session must remain running.
+                  Set `functions.error_info.use_ring_buffer: true`. The database-scoped session starts automatically
+                  after restart, failover, or maintenance, but events previously held in memory are lost.
 
                   ```sql
                   -- SQL Server 2022+ and Azure SQL Managed Instance 2022+

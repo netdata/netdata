@@ -150,6 +150,29 @@ func TestEnsureEngineEditionAlsoCachesVersion(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestEnsureEngineEditionCachesUnparsableVersion(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("ProductVersion.*EngineEdition").
+		WillReturnRows(sqlmock.NewRows([]string{"version", "engine_edition"}).AddRow("invalid", 3))
+
+	c := New()
+	c.db = db
+
+	edition, err := c.ensureEngineEdition(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 3, edition)
+	assert.Equal(t, 0, c.currentMajorVersion())
+
+	// A successful query is cached even when the version cannot be parsed.
+	edition, err = c.ensureEngineEdition(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 3, edition)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestCleanAGName(t *testing.T) {
 	tests := []struct {
 		name     string

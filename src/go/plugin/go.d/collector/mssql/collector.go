@@ -154,10 +154,11 @@ type Collector struct {
 
 	db *sql.DB
 
-	serverPropertiesMu sync.RWMutex
-	version            string
-	majorVersion       int // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
-	engineEdition      int
+	serverPropertiesMu     sync.RWMutex
+	serverPropertiesLoaded bool
+	version                string
+	majorVersion           int // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
+	engineEdition          int
 
 	seenDatabases        map[string]bool
 	seenDatabasesWithLog map[string]bool
@@ -206,17 +207,19 @@ func (c *Collector) currentMajorVersion() int {
 	return major
 }
 
-func (c *Collector) serverProperties() (string, int, int) {
+func (c *Collector) serverProperties() (string, int, int, bool) {
 	c.serverPropertiesMu.RLock()
 	version := c.version
 	major := c.majorVersion
 	edition := c.engineEdition
+	loaded := c.serverPropertiesLoaded
 	c.serverPropertiesMu.RUnlock()
-	return version, major, edition
+	return version, major, edition, loaded
 }
 
 func (c *Collector) setServerProperties(version string, edition int) {
 	c.serverPropertiesMu.Lock()
+	c.serverPropertiesLoaded = true
 	c.version = version
 	c.majorVersion = parseMajorVersion(version)
 	c.engineEdition = edition
@@ -224,27 +227,34 @@ func (c *Collector) setServerProperties(version string, edition int) {
 }
 
 func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
-	if _, major, edition := c.serverProperties(); major != 0 && edition != 0 {
+	if _, _, edition, loaded := c.serverProperties(); loaded {
 		return edition, nil
 	}
 
-	var version string
-	var edition int
-	if err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
+	version, edition, err := c.queryServerProperties(ctx)
+	if err != nil {
 		return 0, err
 	}
 
 	c.serverPropertiesMu.Lock()
-	if c.version == "" {
+	if !c.serverPropertiesLoaded {
+		c.serverPropertiesLoaded = true
 		c.version = version
 		c.majorVersion = parseMajorVersion(version)
-	}
-	if c.engineEdition == 0 {
 		c.engineEdition = edition
 	}
 	edition = c.engineEdition
 	c.serverPropertiesMu.Unlock()
 	return edition, nil
+}
+
+func (c *Collector) queryServerProperties(ctx context.Context) (string, int, error) {
+	var version string
+	var edition int
+	if err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
+		return "", 0, err
+	}
+	return version, edition, nil
 }
 
 func (c *Collector) isAzureSQLDatabase() bool {
