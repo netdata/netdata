@@ -4,7 +4,6 @@ package ddsnmpcollector
 
 import (
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -33,14 +32,11 @@ func TestCollector_Collect_CiscoCDPTopologyWithoutOrdinaryMetrics(t *testing.T) 
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 	require.NotEmpty(t, profile.Definition.Topology)
 
-	fixture := mustLoadSNMPFixture(t, "../../../../../../testdata/snmp/snmprec/iosxe_c9800.snmprec")
 	device := newStatefulSNMPDevice()
-	for _, pdu := range fixture.entries {
-		oid := trimOID(pdu.Name)
-		if strings.HasPrefix(oid, cdpCacheTableOID+".") || strings.HasPrefix(oid, ifNameColumnOID+".") {
-			device.set(pdu)
-		}
-	}
+	device.set(createStringPDU(ifNameColumnOID+".5", "TenGigabitEthernet0/1/0"))
+	device.set(createStringPDU(ifNameColumnOID+".6", "TenGigabitEthernet0/1/1"))
+	device.set(createIntegerPDU(cdpCacheTableOID+".1.3.5.1", 1))
+	device.set(createIntegerPDU(cdpCacheTableOID+".1.3.6.2", 1))
 
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
