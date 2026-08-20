@@ -490,15 +490,21 @@ func (c *Collector) fetchMSSQLPlanOpsForDB(ctx context.Context, dbName string, h
 		return map[string]mssqlPlanOps{}, nil
 	}
 
-	escapedDB := strings.ReplaceAll(dbName, "]", "]]")
+	queryView := "sys.query_store_query"
+	planView := "sys.query_store_plan"
+	if !c.isAzureSQLDatabase() {
+		escapedDB := strings.ReplaceAll(dbName, "]", "]]")
+		queryView = fmt.Sprintf("[%s].sys.query_store_query", escapedDB)
+		planView = fmt.Sprintf("[%s].sys.query_store_plan", escapedDB)
+	}
 	query := fmt.Sprintf(`
 SELECT
   CONVERT(VARCHAR(64), q.query_hash, 1) AS query_hash,
   CAST(p.query_plan AS NVARCHAR(MAX)) AS query_plan
-FROM [%s].sys.query_store_query q
-INNER JOIN [%s].sys.query_store_plan p ON q.query_id = p.query_id
+FROM %s q
+INNER JOIN %s p ON q.query_id = p.query_id
 WHERE q.query_hash IN (%s);
-`, escapedDB, escapedDB, strings.Join(validHashes, ","))
+`, queryView, planView, strings.Join(validHashes, ","))
 
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {

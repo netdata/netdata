@@ -367,6 +367,24 @@ func TestBuildQueryStoreSQL_AzureSQLDatabaseUsesCurrentDatabase(t *testing.T) {
 	assert.NotContains(t, query, "QUOTENAME(name)")
 }
 
+func TestFetchMSSQLPlanOpsForDB_AzureSQLDatabaseUsesCurrentDatabase(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`FROM sys\.query_store_query q`).
+		WillReturnRows(sqlmock.NewRows([]string{"query_hash", "query_plan"}))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+
+	ops, err := c.fetchMSSQLPlanOpsForDB(context.Background(), "azure-db", []string{"0x01"})
+	require.NoError(t, err)
+	assert.Empty(t, ops)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
