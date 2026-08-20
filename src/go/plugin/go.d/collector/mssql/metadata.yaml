@@ -832,7 +832,7 @@ modules:
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to a server that exposes Query Store (SQL Server 2016 (13.x) and later, and Azure SQL Database)<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if the collector is still initializing, the server does not expose Query Store, or no user database has Query Store enabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
         - id: deadlock-info
           name: Deadlock Info
@@ -913,9 +913,10 @@ modules:
             Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
             with both the `sql_text` and `query_hash` actions.
 
-            The session must be created by an administrator and include an `event_file` target. Netdata reads the event file
-            and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
-            reliable mapping into `top-queries` (query text fallback is best-effort).
+            The session must be created by an administrator and include either an `event_file` target (the default) or a
+            `ring_buffer` target when `functions.error_info.use_ring_buffer` is enabled. Netdata returns recent error events
+            with error number, message, and SQL text. The `query_hash` action is required for reliable mapping into
+            `top-queries` (query text fallback is best-effort).
 
             Use cases:
             - Identify recent query errors and their messages
@@ -951,17 +952,18 @@ modules:
                 visibility: hidden
                 description: "Query hash captured with the error event (used for mapping into top-queries)."
           performance: |
-            Executes on-demand queries against the configured Extended Events event file:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time
+            Executes on-demand queries against the configured Extended Events target:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time
           security: |
             Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only
           prerequisites:
             list:
               - title: Create Extended Events session for error capture
                 description: |
-                  Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions:
+                  Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions.
+                  Choose one target that matches `functions.error_info.use_ring_buffer`:
 
                   ```sql
-                  -- Create the Extended Events session with event_file target
+                  -- event_file (default): Netdata reads the configured file, including retained events after the session stops.
                   CREATE EVENT SESSION [netdata_errors] ON SERVER
                   ADD EVENT sqlserver.error_reported(
                     ACTION(sqlserver.sql_text, sqlserver.query_hash)
@@ -972,8 +974,24 @@ modules:
                   -- Start the session
                   ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
                   GO
+                  ```
 
-                  -- Grant required permission
+                  ```sql
+                  -- ring_buffer: set functions.error_info.use_ring_buffer: true.
+                  -- The session must remain running while Netdata reads the target.
+                  CREATE EVENT SESSION [netdata_errors] ON SERVER
+                  ADD EVENT sqlserver.error_reported(
+                    ACTION(sqlserver.sql_text, sqlserver.query_hash)
+                  )
+                  ADD TARGET package0.ring_buffer;
+                  GO
+
+                  ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
+                  GO
+                  ```
+
+                  ```sql
+                  -- Grant required permission for either target.
                   GRANT VIEW SERVER STATE TO [netdata_user];
                   ```
 
@@ -983,10 +1001,12 @@ modules:
                   jobs:
                     - name: local
                       dsn: "sqlserver://user:pass@localhost:1433"
-                      error_info_session_name: your_session_name
+                      functions:
+                        error_info:
+                          session_name: your_session_name
                   ```
           availability: |
-            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `functions.error_info.disabled` is false<br/>• When `functions.error_info.use_ring_buffer` is false, the Extended Events session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the Extended Events session is running and has a ring_buffer target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the selected target is unavailable or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
     metrics:
       folding:
