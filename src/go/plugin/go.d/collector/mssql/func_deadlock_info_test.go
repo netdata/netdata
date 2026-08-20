@@ -12,6 +12,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	mssqlDriver "github.com/microsoft/go-mssqldb"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -340,6 +341,65 @@ func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestCollectErrorInfo_ResolverTimeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.DeadlineExceeded)
+
+	c := New()
+	c.db = db
+	handler := newFuncErrorInfo(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background())
+	assert.Equal(t, 504, response.Status)
+	assert.Contains(t, response.Message, "timed out")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectErrorInfo_ResolverCancellation(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.Canceled)
+
+	c := New()
+	c.db = db
+	handler := newFuncErrorInfo(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background())
+	assert.Equal(t, 499, response.Status)
+	assert.Contains(t, response.Message, "canceled")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestErrorInfoFunctionTimeoutOverridesCollectorTimeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").
+		WillDelayFor(20 * time.Millisecond).
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
+	mock.ExpectQuery("fn_xe_file_target_read_file").
+		WillDelayFor(20 * time.Millisecond).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}))
+
+	c := New()
+	c.db = db
+	c.Timeout = confopt.Duration(5 * time.Millisecond)
+	c.Functions.ErrorInfo.Timeout = confopt.Duration(200 * time.Millisecond)
+	handler := newFuncErrorInfo(&funcRouter{collector: c})
+
+	response := handler.Handle(context.Background(), errorInfoMethodID, nil)
+	assert.Equal(t, 200, response.Status)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
@@ -446,6 +506,24 @@ func TestCollectDeadlockInfo_Timeout(t *testing.T) {
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 504, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "timed out")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectDeadlockInfo_Cancellation(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("fn_xe_file_target_read_file").
+		WillReturnError(context.Canceled)
+
+	c := New()
+	c.db = db
+	handler := newTestDeadlockHandler(c)
+
+	resp := handler.collectData(context.Background())
+	require.Equal(t, 499, resp.Status)
+	assert.Contains(t, strings.ToLower(resp.Message), "canceled")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

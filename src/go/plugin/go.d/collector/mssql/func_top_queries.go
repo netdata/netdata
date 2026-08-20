@@ -242,7 +242,12 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, errQueryStoreNotEnabled) {
+			return nil, err
+		}
+		// Let Handle classify transient discovery failures as 499/500/504. Job Manager
+		// maps MethodParams errors to 503 before the handler can preserve that distinction.
+		return nil, nil
 	}
 
 	cols := f.buildAvailableColumns(availableCols)
@@ -260,8 +265,8 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	}
 	supported, err := f.queryStoreSupported(ctx)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
+		if response := mssqlFunctionContextError(ctx, err); response != nil {
+			return response
 		}
 		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to detect Query Store support: %v", err)}
 	}
@@ -271,6 +276,9 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
 	if err != nil {
+		if response := mssqlFunctionContextError(ctx, err); response != nil {
+			return response
+		}
 		if errors.Is(err, errQueryStoreNotEnabled) {
 			return funcapi.UnavailableResponse(queryStoreNotEnabled)
 		}
@@ -296,8 +304,8 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
+		if response := mssqlFunctionContextError(ctx, err); response != nil {
+			return response
 		}
 		colIDs := make([]string, len(cols))
 		for i, col := range cols {
@@ -312,11 +320,17 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	data, err := f.scanDynamicRows(rows, cols)
 	if err != nil {
+		if response := mssqlFunctionContextError(ctx, err); response != nil {
+			return response
+		}
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
 	errorStatus, errorDetails := f.router.collector.collectMSSQLErrorDetails(ctx)
 	planOpsByDB := f.router.collector.collectMSSQLPlanOps(ctx, data, cols)
+	if response := mssqlFunctionContextError(ctx, ctx.Err()); response != nil {
+		return response
+	}
 	extraCols := append(mssqlErrorAttributionColumns(), mssqlPlanAttributionColumns()...)
 
 	queryIdx := -1
@@ -475,15 +489,6 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 	}
 	f.router.collector.queryStoreColsMu.RUnlock()
 
-	// Slow path: query and cache
-	f.router.collector.queryStoreColsMu.Lock()
-	defer f.router.collector.queryStoreColsMu.Unlock()
-
-	// Double-check after acquiring write lock
-	if f.router.collector.queryStoreCols != nil {
-		return f.router.collector.queryStoreCols, nil
-	}
-
 	// Find any database with Query Store enabled (excluding system databases)
 	var sampleDB string
 	err := f.router.collector.db.QueryRowContext(ctx, `
@@ -493,6 +498,9 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 		  AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
 	`).Scan(&sampleDB)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errQueryStoreNotEnabled
 		}
@@ -500,9 +508,13 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 	}
 
 	// Use dynamic SQL to get column metadata from that database's Query Store view
-	query := fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, sampleDB)
+	escapedDB := strings.ReplaceAll(sampleDB, "]", "]]")
+	query := fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, escapedDB)
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, fmt.Errorf("failed to query Query Store columns from %s: %w", sampleDB, err)
 	}
 	defer rows.Close()
@@ -526,7 +538,12 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 	cols["query_sql_text"] = true
 	cols["database_name"] = true
 
-	f.router.collector.queryStoreCols = cols
+	f.router.collector.queryStoreColsMu.Lock()
+	if f.router.collector.queryStoreCols == nil {
+		f.router.collector.queryStoreCols = cols
+	}
+	cols = f.router.collector.queryStoreCols
+	f.router.collector.queryStoreColsMu.Unlock()
 
 	return cols, nil
 }
@@ -625,7 +642,7 @@ func (f *funcTopQueries) buildSelectExpressions(cols []topQueriesColumn, dbNameE
 }
 
 func (f *funcTopQueries) buildDynamicSQL(cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
-	selectParts := f.buildSelectExpressions(cols, "''' + name + N'''")
+	selectParts := f.buildSelectExpressions(cols, "' + QUOTENAME(name, '''') + N'")
 	selectExpr := strings.Join(selectParts, ",\n        ")
 
 	timeFilter := ""

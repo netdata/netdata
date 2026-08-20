@@ -274,8 +274,8 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 
 	deadlockTime, deadlockXML, err := f.queryLatestDeadlock(ctx)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return f.buildResponse(504, "deadlock query timed out", nil)
+		if response := mssqlFunctionContextError(ctx, err); response != nil {
+			return f.buildResponse(response.Status, response.Message, nil)
 		}
 		if isDeadlockPermissionError(err) {
 			return f.buildResponse(403, deadlockPermissionMessage(), nil)
@@ -290,6 +290,9 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 
 	dbNames, dbErr := f.queryDatabaseNames(ctx)
 	if dbErr != nil {
+		if response := mssqlFunctionContextError(ctx, dbErr); response != nil {
+			return f.buildResponse(response.Status, response.Message, nil)
+		}
 		f.router.collector.Debugf("deadlock-info: database name mapping failed: %v", dbErr)
 		dbNames = map[int]string{}
 	}
@@ -337,9 +340,6 @@ func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []
 }
 
 func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, string, error) {
-	qctx, cancel := context.WithTimeout(ctx, f.router.collector.Timeout.Duration())
-	defer cancel()
-
 	query := querySystemHealthLatestDeadlockEventFile
 	if f.router.collector.Functions.DeadlockInfo.UseRingBuffer {
 		query = querySystemHealthLatestDeadlockRingBuffer
@@ -347,7 +347,7 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 
 	var deadlockTime sql.NullTime
 	var deadlockXML sql.NullString
-	err := f.router.collector.db.QueryRowContext(qctx, query).Scan(&deadlockTime, &deadlockXML)
+	err := f.router.collector.db.QueryRowContext(ctx, query).Scan(&deadlockTime, &deadlockXML)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, "", nil
@@ -366,10 +366,7 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 }
 
 func (f *funcDeadlockInfo) queryDatabaseNames(ctx context.Context) (map[int]string, error) {
-	qctx, cancel := context.WithTimeout(ctx, f.router.collector.Timeout.Duration())
-	defer cancel()
-
-	rows, err := f.router.collector.db.QueryContext(qctx, queryDatabaseNamesByID)
+	rows, err := f.router.collector.db.QueryContext(ctx, queryDatabaseNamesByID)
 	if err != nil {
 		return nil, err
 	}

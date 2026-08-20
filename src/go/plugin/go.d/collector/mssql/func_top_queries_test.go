@@ -188,6 +188,127 @@ func TestTopQueries_QueryStoreCapabilityError(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestTopQueries_QueryStoreColumnDiscoveryTimeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(context.DeadlineExceeded)
+
+	supported := true
+	c := New()
+	c.db = db
+	c.queryStoreSupported = &supported
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background(), "")
+	assert.Equal(t, 504, response.Status)
+	assert.Contains(t, response.Message, "timed out")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTopQueries_QueryStoreColumnDiscoveryCancellation(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(context.Canceled)
+
+	supported := true
+	c := New()
+	c.db = db
+	c.queryStoreSupported = &supported
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background(), "")
+	assert.Equal(t, 499, response.Status)
+	assert.Contains(t, response.Message, "canceled")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTopQueries_MethodParamsDefersTransientColumnDiscoveryErrorsToHandle(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(context.DeadlineExceeded)
+
+	supported := true
+	c := New()
+	c.db = db
+	c.queryStoreSupported = &supported
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
+	require.NoError(t, err)
+	assert.Nil(t, params)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDetectQueryStoreColumns_RespectsContextWhileAnotherProbeRuns(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+	db.SetMaxOpenConns(2)
+	mock.MatchExpectationsInOrder(false)
+
+	mock.ExpectQuery("SELECT TOP 1 name").
+		WillDelayFor(300 * time.Millisecond).
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT TOP 1 name").
+		WillDelayFor(300 * time.Millisecond).
+		WillReturnError(sql.ErrNoRows)
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := handler.detectQueryStoreColumns(context.Background())
+		firstDone <- err
+	}()
+
+	require.Eventually(t, func() bool { return db.Stats().InUse == 1 }, time.Second, time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	_, err = handler.detectQueryStoreColumns(ctx)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(started), 250*time.Millisecond)
+	assert.ErrorIs(t, <-firstDone, errQueryStoreNotEnabled)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDetectQueryStoreColumns_EscapesDatabaseIdentifier(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT TOP 1 name").
+		WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("db]name"))
+	mock.ExpectQuery(`SELECT TOP 0 \* FROM \[db\]\]name\]\.sys\.query_store_runtime_stats`).
+		WillReturnRows(sqlmock.NewRows([]string{"count_executions", "avg_duration"}))
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	cols, err := handler.detectQueryStoreColumns(context.Background())
+	require.NoError(t, err)
+	assert.True(t, cols["count_executions"])
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestBuildDynamicSQL_QuotesDatabaseLabel(t *testing.T) {
+	handler := &funcTopQueries{}
+	query := handler.buildDynamicSQL([]topQueriesColumn{topQueriesColumns[2], topQueriesColumns[3]}, "calls", 7, 10)
+
+	assert.Contains(t, query, "QUOTENAME(name, '''')")
+	assert.NotContains(t, query, "''' + name + N'''")
+}
+
 func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)

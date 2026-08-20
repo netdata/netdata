@@ -182,6 +182,9 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 	limit := f.router.collector.topQueriesLimit()
 	status, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
 	if err != nil {
+		if response := mssqlFunctionContextError(ctx, err); response != nil {
+			return response
+		}
 		if isDeadlockPermissionError(err) {
 			return &funcapi.FunctionResponse{Status: 403, Message: errorInfoPermissionMessage()}
 		}
@@ -487,10 +490,7 @@ INNER JOIN [%s].sys.query_store_plan p ON q.query_id = p.query_id
 WHERE q.query_hash IN (%s);
 `, escapedDB, escapedDB, strings.Join(validHashes, ","))
 
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
-
-	rows, err := c.db.QueryContext(qctx, query)
+	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -534,9 +534,6 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 		return mssqlErrorAttrNotEnabled, nil, errors.New("session not found")
 	}
 
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
-
 	query := queryMSSQLErrorInfoEventFile
 	args := []any{
 		sql.Named("filePath", target.filePath),
@@ -548,7 +545,7 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 		args = []any{sql.Named("sessionName", sessionName), sql.Named("limit", limit)}
 	}
 
-	rows, err := c.db.QueryContext(qctx, query, args...)
+	rows, err := c.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return mssqlErrorAttrNotSupported, nil, err
 	}
@@ -608,12 +605,9 @@ type mssqlErrorReadTarget struct {
 // The ring_buffer target only exists while the session is running, so that path still
 // goes through the runtime DMVs.
 func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName string) (mssqlErrorReadTarget, bool, error) {
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
-
 	if !c.Functions.ErrorInfo.UseRingBuffer {
 		var configured sql.NullString
-		err := c.db.QueryRowContext(qctx, queryMSSQLErrorSessionEventFilePath, sql.Named("sessionName", sessionName)).Scan(&configured)
+		err := c.db.QueryRowContext(ctx, queryMSSQLErrorSessionEventFilePath, sql.Named("sessionName", sessionName)).Scan(&configured)
 		if errors.Is(err, sql.ErrNoRows) {
 			return mssqlErrorReadTarget{}, false, nil
 		}
@@ -628,7 +622,7 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 	}
 
 	var count int
-	err := c.db.QueryRowContext(qctx, queryMSSQLErrorActiveSessionExists, sql.Named("sessionName", sessionName)).Scan(&count)
+	err := c.db.QueryRowContext(ctx, queryMSSQLErrorActiveSessionExists, sql.Named("sessionName", sessionName)).Scan(&count)
 	if err != nil {
 		return mssqlErrorReadTarget{}, false, err
 	}
@@ -636,7 +630,7 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 		return mssqlErrorReadTarget{}, false, nil
 	}
 
-	err = c.db.QueryRowContext(qctx, queryMSSQLErrorSessionHasRingBuffer, sql.Named("sessionName", sessionName)).Scan(&count)
+	err = c.db.QueryRowContext(ctx, queryMSSQLErrorSessionHasRingBuffer, sql.Named("sessionName", sessionName)).Scan(&count)
 	if err != nil {
 		return mssqlErrorReadTarget{}, false, err
 	}
