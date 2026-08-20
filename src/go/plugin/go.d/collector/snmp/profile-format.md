@@ -418,9 +418,19 @@ topology:
 
 - `kind` is required and must be one of the closed topology kinds below.
 - Topology row symbol names must not start with `_`.
+- For table rows, each configured row symbol is a structural presence anchor.
+  When its PDU exists, the collector emits the tagged topology observation with
+  an internal neutral value of `0`; it does not convert the PDU value to a
+  number. Choose a readable column that is present for every usable row. This
+  allows OctetString columns such as an ARP physical address to anchor a row.
+  Scalar topology symbols retain their ordinary value semantics.
 - Topology rows do not use chart/export-only fields such as `chart_meta`,
   `metric_type`, `mapping`, `transform`, `scale_factor`, `format`, or
   `constant_value_one` on the row value symbol.
+- Table topology row symbols also reject `extract_value`, `match_pattern`, and
+  `match_value` because structural presence mode intentionally ignores the
+  anchor PDU value. These transformations remain valid for scalar topology
+  symbols and for `metric_tags`.
 - `metric_tags` inside a topology row work like table metric tags and identify
   or enrich the topology row.
 - `systemUptime` stays under `metrics:` for regular SNMP collection. It is not a
@@ -447,11 +457,38 @@ stp_port
 vtp_vlan
 arp_entry
 arp_legacy_entry
+ospf_neighbor
 ```
 
 Topology mixins can be inherited through `extends` just like metric mixins. When
 two inherited topology rows collide, the identity is `kind + table identity +
 symbol name`, matching regular table metric merge behavior.
+
+#### Stock topology composition
+
+Stock profiles compose topology capabilities independently:
+
+- `_std-topology-ip-mib.yaml` provides IPv4 address, interface-index, and
+  netmask facts used for L3 subnet topology. `generic-device.yaml` and
+  `generic-ups.yaml` extend it as their baseline. The legacy `ipAddrTable`
+  address is derived from the row index, so the readable ifIndex and netmask
+  columns are sufficient.
+- `_std-topology-interface-mib.yaml` provides interface identity and status.
+- `_std-topology-bridge-base-mib.yaml`, `_std-topology-fdb-mib.yaml`,
+  `_std-topology-q-bridge-mib.yaml`, `_std-topology-stp-mib.yaml`, and
+  `_std-topology-arp-mib.yaml` are attached only to profiles or topology role
+  selectors whose device role and available MIB rows justify those walks.
+
+Profile matching is additive: every matching selector contributes its inherited
+capabilities. A job with no usable `sysObjectID` resolves only the profiles
+listed in `manual_profiles`. To retain the standard IPv4 topology baseline in
+that case, include `generic-device` explicitly alongside the device profile:
+
+```yaml
+manual_profiles:
+  - vendor-profile
+  - generic-device
+```
 
 #### Scalar symbol fallbacks
 
@@ -1452,7 +1489,7 @@ They work the same in **both** places:
 - `format`
     ```yaml
     symbol:
-      OID: 1.3.6.1.2.1.17.1.1
+      OID: 1.3.6.1.2.1.17.1.1.0
       name: dot1dBaseBridgeAddress
       format: hex
     ```
@@ -1488,7 +1525,7 @@ metadata:
     fields:
       bridge_base_address:
         symbol:
-          OID: 1.3.6.1.2.1.17.1.1
+          OID: 1.3.6.1.2.1.17.1.1.0
           name: dot1dBaseBridgeAddress
           format: hex
 ```

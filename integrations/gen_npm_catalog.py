@@ -103,6 +103,10 @@ FALLBACK_ICON = 'SNMP.png'
 # plugin (network-viewer.plugin, otel.plugin, netdata).
 PLUGIN_GO_D = 'go.d.plugin'
 
+# Selectable topology-role profiles add capabilities to matched devices; they
+# are not standalone device families and must not produce device catalog pages.
+INTERNAL_TOPOLOGY_ROLE_PREFIX = 'topology-role-'
+
 # Page descriptions that cannot be mechanically shortened without losing a
 # complete, profile-specific statement. Keys are the rendered page names.
 PAGE_DESCRIPTIONS = {
@@ -207,6 +211,11 @@ def load_profiles():
     return profiles
 
 
+def is_device_catalog_profile(name):
+    """Return whether a profile represents a public device integration."""
+    return not name.startswith('_') and not name.startswith(INTERNAL_TOPOLOGY_ROLE_PREFIX)
+
+
 def resolve_extends(name, profiles, seen=None):
     """Return the set of all module filenames reachable from `name` via transitive extends."""
     if seen is None:
@@ -242,7 +251,7 @@ def collect_vendors(profiles):
     """
     vendors = {}
     for name, p in profiles.items():
-        if name.startswith('_'):
+        if not is_device_catalog_profile(name):
             continue
         reachable = resolve_extends(name, profiles)
         vendor = device_field(p['data'], 'vendor') or inherited_field(reachable, profiles, 'vendor')
@@ -713,7 +722,7 @@ def build_device_modules(profiles):
     """One catalog page per concrete device profile (per profile, not per vendor),
     each listing the metrics it adds, grouped by family."""
     modules = []
-    for name in sorted(n for n in profiles if not n.startswith('_')):
+    for name in sorted(n for n in profiles if is_device_catalog_profile(n)):
         data = profiles[name]['data']
         vendor = device_field(data, 'vendor') or inherited_field(resolve_extends(name, profiles), profiles, 'vendor')
         dev_type = device_field(data, 'type') or inherited_field(resolve_extends(name, profiles), profiles, 'type')
@@ -1130,7 +1139,7 @@ def write_gap_report(profiles):
     """List device-profile metrics missing chart_meta (family/unit/description),
     so the profiles can be annotated. Written next to the catalogue for review."""
     rows = []
-    for name in sorted(n for n in profiles if not n.startswith('_')):
+    for name in sorted(n for n in profiles if is_device_catalog_profile(n)):
         for met in extract_profile_metrics(name, profiles):
             missing = [k for k in ('family', 'unit', 'desc') if not (met[k] and met[k] != 'Uncategorized')]
             if missing:

@@ -31,9 +31,7 @@ func (c *topologyCache) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) 
 
 		if len(tags) > 0 {
 			c.applyLLDPLocalDeviceProfileTags(tags)
-			c.updateLocalBridgeIdentityFromTags(tags)
-			c.applySTPProfileTags(tags)
-			c.applyVTPProfileTags(tags)
+			c.applyBridgeProfileTags(tags)
 			c.applyOSPFProfileTags(tags)
 		}
 	}

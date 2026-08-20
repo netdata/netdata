@@ -10,7 +10,7 @@ import (
 )
 
 func (c *topologyCache) resolveLocalBaseBridgeAddress(localManagementIP string) string {
-	baseBridgeAddress := strings.TrimSpace(c.stpBaseBridgeAddress)
+	baseBridgeAddress := strings.TrimSpace(c.bridgeBaseAddress)
 	if baseBridgeAddress == "" {
 		baseBridgeAddress = c.deriveLocalBridgeMACFromFDBSelfEntries()
 	}

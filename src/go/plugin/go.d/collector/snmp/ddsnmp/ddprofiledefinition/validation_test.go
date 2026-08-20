@@ -1303,16 +1303,11 @@ func Test_validateEnrichMetadata(t *testing.T) {
 						},
 						"bridge_base_address": {
 							Symbol: SymbolConfig{
-								OID:    "1.3.6.1.2.1.17.1.1",
+								OID:    "1.3.6.1.2.1.17.1.1.0",
 								Name:   "dot1dBaseBridgeAddress",
 								Format: "hex",
 							},
-						},
-						"vtp_version": {
-							Symbol: SymbolConfig{
-								OID:  "1.3.6.1.4.1.9.9.46.1.1.1",
-								Name: "vtpVersion",
-							},
+							Consumers: ConsumerSet{ConsumerTopology},
 						},
 					},
 				},

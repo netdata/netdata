@@ -3,6 +3,8 @@
 package snmptopology
 
 import (
+	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,9 +14,63 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+func TestFindTopologyProfiles_IPBaselineBoundaries(t *testing.T) {
+	tests := map[string]struct {
+		device       ddsnmp.DeviceConnectionInfo
+		wantProfiles []string
+		wantIPKinds  int
+	}{
+		"Palo Alto inherits generic device": {
+			device:       ddsnmp.DeviceConnectionInfo{SysObjectID: "1.3.6.1.4.1.25461.2.3.33"},
+			wantProfiles: []string{"generic-device.yaml", "palo-alto.yaml"},
+			wantIPKinds:  1,
+		},
+		"generic UPS owns its baseline": {
+			device:       ddsnmp.DeviceConnectionInfo{SysObjectID: "1.3.6.1.2.1.33"},
+			wantProfiles: []string{"generic-ups.yaml"},
+			wantIPKinds:  1,
+		},
+		"manual composition keeps explicit generic topology owner": {
+			device: ddsnmp.DeviceConnectionInfo{
+				ManualProfiles: []string{"palo-alto", "generic-device"},
+			},
+			// Projection drops the vendor profile after its OSPF topology symbol is
+			// deduplicated against generic-device; the explicit IP baseline remains.
+			wantProfiles: []string{"generic-device.yaml"},
+			wantIPKinds:  1,
+		},
+		"manual vendor alone does not inject baseline": {
+			device: ddsnmp.DeviceConnectionInfo{
+				ManualProfiles: []string{"palo-alto"},
+			},
+			wantProfiles: []string{"palo-alto.yaml"},
+			wantIPKinds:  0,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profiles := (&Collector{}).findTopologyProfiles(tc.device)
+			var profileNames []string
+			ipKinds := 0
+			for _, profile := range profiles {
+				profileNames = append(profileNames, filepath.Base(profile.SourceFile))
+				for _, topology := range profile.Definition.Topology {
+					if topology.Kind == ddprofiledefinition.KindIpIfIndex {
+						ipKinds++
+					}
+				}
+			}
+			sort.Strings(profileNames)
+			assert.Equal(t, tc.wantProfiles, profileNames)
+			assert.Equal(t, tc.wantIPKinds, ipKinds, "unexpected projected IP topology owner count")
+		})
+	}
+}
+
 func TestFindTopologyProfiles_UsesDeclarativeProfileExtensions(t *testing.T) {
 	profiles := (&Collector{}).findTopologyProfiles(ddsnmp.DeviceConnectionInfo{
-		SysObjectID: "1.3.6.1.4.1.9.1.1",
+		SysObjectID: "1.3.6.1.4.1.9.1.111",
 	})
 	require.NotEmpty(t, profiles)
 
@@ -64,7 +120,7 @@ func TestFindTopologyProfiles_UsesDeclarativeProfileExtensions(t *testing.T) {
 		field string
 	}{
 		"lldp-system-name": {field: "lldp_loc_sys_name"},
-		"vtp-version":      {field: "vtp_version"},
+		"bridge-address":   {field: "bridge_base_address"},
 	} {
 		t.Run("metadata/"+name, func(t *testing.T) {
 			assert.Contains(t, metadataFields, tc.field)

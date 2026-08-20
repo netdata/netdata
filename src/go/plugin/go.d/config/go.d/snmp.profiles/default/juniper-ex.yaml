@@ -17,6 +17,9 @@ extends:
   - _juniper-firewall.yaml
   - _juniper-junos-generic.yaml
   - _juniper.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 metadata:
   device:

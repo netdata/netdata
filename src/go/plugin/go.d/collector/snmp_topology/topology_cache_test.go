@@ -147,7 +147,7 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	assert.Equal(t, "Gi0/3", data.Links[0].Dst.PortID)
 }
 
-func TestTopologyCache_UpdateTopologyProfileTags_STPBridgeAddressSetsSNMPIdentity(t *testing.T) {
+func TestTopologyCache_UpdateTopologyProfileTags_BridgeAddressSetsSNMPIdentity(t *testing.T) {
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{Hostname: "10.20.4.2"})
 	cache.localDevice.ChassisID = "10.20.4.2"
 	cache.localDevice.ChassisIDType = "management_ip"
@@ -158,12 +158,12 @@ func TestTopologyCache_UpdateTopologyProfileTags_STPBridgeAddressSetsSNMPIdentit
 		},
 	}})
 
-	require.Equal(t, "18:fd:74:33:1a:9c", cache.stpBaseBridgeAddress)
+	require.Equal(t, "18:fd:74:33:1a:9c", cache.bridgeBaseAddress)
 	require.Equal(t, "18:fd:74:33:1a:9c", cache.localDevice.ChassisID)
 	require.Equal(t, "macAddress", cache.localDevice.ChassisIDType)
 }
 
-func TestTopologyCache_UpdateFdbEntry_STPBridgeAddressTagSetsSNMPIdentity(t *testing.T) {
+func TestTopologyCache_UpdateFdbEntry_DoesNotSetBridgeIdentityFromRowTags(t *testing.T) {
 	cache := newTopologyCache()
 	cache.localDevice = topologymodel.Device{
 		ChassisID:     "10.20.4.2",
@@ -171,15 +171,15 @@ func TestTopologyCache_UpdateFdbEntry_STPBridgeAddressTagSetsSNMPIdentity(t *tes
 	}
 
 	cache.updateFdbEntry(map[string]string{
-		tagStpBaseBridgeAddress: "18 FD 74 33 1A 9C",
-		tagFdbMac:               "70:49:a2:65:72:cd",
-		tagFdbBridgePort:        "7",
-		tagFdbStatus:            "learned",
+		tagBridgeBaseAddress: "18 FD 74 33 1A 9C",
+		tagFdbMac:            "70:49:a2:65:72:cd",
+		tagFdbBridgePort:     "7",
+		tagFdbStatus:         "learned",
 	})
 
-	require.Equal(t, "18:fd:74:33:1a:9c", cache.stpBaseBridgeAddress)
-	require.Equal(t, "18:fd:74:33:1a:9c", cache.localDevice.ChassisID)
-	require.Equal(t, "macAddress", cache.localDevice.ChassisIDType)
+	require.Empty(t, cache.bridgeBaseAddress)
+	require.Equal(t, "10.20.4.2", cache.localDevice.ChassisID)
+	require.Equal(t, "management_ip", cache.localDevice.ChassisIDType)
 }
 
 func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromInterfacePhysAddress(t *testing.T) {
@@ -355,6 +355,44 @@ func TestTopologyCache_LLDPExplicitNonIPFamilyDoesNotBecomeManagementIP(t *testi
 		AddressType: "16",
 		Source:      "lldp_local",
 	})
+}
+
+func TestTopologyCacheFinalizePreparesStableObservationSnapshot(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.staleAfter = time.Hour
+	cache.agentID = "agent-test"
+	cache.localDevice = topologymodel.Device{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "192.0.2.1",
+	}
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIfName:  "Ethernet7",
+		tagTopoIfAdmin: "up",
+		tagTopoIfOper:  "up",
+	})
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIPAddr:  "192.0.2.1",
+		tagTopoIPMask:  "255.255.255.255",
+	})
+	cache.finalizeTopologyCache()
+
+	require.True(t, cache.hasPreparedSnapshot)
+	prepared := cache.preparedSnapshot
+	rebuilt, ok := cache.buildObservationSnapshotLocked()
+	require.True(t, ok)
+	require.Equal(t, rebuilt, prepared)
+
+	first, ok := cache.snapshotEngineObservations()
+	require.True(t, ok)
+	second, ok := cache.snapshotEngineObservations()
+	require.True(t, ok)
+	require.Equal(t, prepared, first)
+	require.Equal(t, first, second)
 }
 
 func TestTopologyCache_LLDPExplicitNonIPFamilyIsRejectedAcrossIngresses(t *testing.T) {
@@ -1279,7 +1317,7 @@ func TestTopologyCache_STPObservation(t *testing.T) {
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
 	}
-	cache.stpBaseBridgeAddress = "00:11:22:33:44:55"
+	cache.bridgeBaseAddress = "00:11:22:33:44:55"
 	cache.updateBridgePortMap(map[string]string{
 		tagBridgeBasePort: "3",
 		tagBridgeIfIndex:  "3",
