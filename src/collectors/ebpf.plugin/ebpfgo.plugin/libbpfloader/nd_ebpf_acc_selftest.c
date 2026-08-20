@@ -30,6 +30,73 @@ struct nd_ebpf_acc_selftest_entry {
 
 /* Returns 0 on success, or a distinct positive code per failed assertion so a
  * failure names itself. */
+
+/* Snapshot-shaped item for the merge test: pid first, as
+ * nd_ebpf_snapshot_merge_same_pid() requires. */
+struct nd_ebpf_snapshot_selftest_item {
+    uint32_t pid;
+    uint64_t ct;
+    uint64_t counter;
+    char comm[16];
+};
+ND_EBPF_ASSERT_PID_FIRST(struct nd_ebpf_snapshot_selftest_item);
+
+static void nd_ebpf_snapshot_selftest_merge(void *dst_v, const void *src_v)
+{
+    struct nd_ebpf_snapshot_selftest_item *dst = dst_v;
+    const struct nd_ebpf_snapshot_selftest_item *src = src_v;
+
+    if (src->ct > dst->ct)
+        dst->ct = src->ct;
+    dst->counter += src->counter;
+    if (!dst->comm[0] && src->comm[0])
+        nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), src->comm, sizeof(src->comm));
+}
+
+/* Exercises the shared per-thread row collapse the map walk depends on.
+ * Returns 0 on success or a 3x code. */
+static int nd_ebpf_snapshot_merge_selftest(void)
+{
+    /* Unsorted, with three rows for pid 7 and two for pid 3 — the per-thread
+     * case the map walk produces. */
+    struct nd_ebpf_snapshot_selftest_item items[] = {
+        {7, 100, 5, ""},
+        {3, 500, 1, "three"},
+        {7, 300, 5, "seven"},
+        {9, 50, 2, "nine"},
+        {3, 400, 1, ""},
+        {7, 200, 5, ""},
+    };
+
+    size_t n = nd_ebpf_snapshot_merge_same_pid(
+        items, sizeof(items) / sizeof(items[0]), sizeof(items[0]),
+        nd_ebpf_snapshot_selftest_merge);
+
+    if (n != 3)
+        return 30;
+    /* Ascending by pid after the merge. */
+    if (items[0].pid != 3 || items[1].pid != 7 || items[2].pid != 9)
+        return 31;
+    /* Counters summed across the collapsed rows. */
+    if (items[0].counter != 2 || items[1].counter != 15 || items[2].counter != 2)
+        return 32;
+    /* ct is the maximum, not the last seen. */
+    if (items[0].ct != 500 || items[1].ct != 300 || items[2].ct != 50)
+        return 33;
+    /* A name found on any row survives, even when the surviving row was empty. */
+    if (items[1].comm[0] != 's')
+        return 34;
+
+    /* Fewer than two rows is a no-op, not a corruption. */
+    struct nd_ebpf_snapshot_selftest_item one = {42, 1, 1, "x"};
+    if (nd_ebpf_snapshot_merge_same_pid(&one, 1, sizeof(one), nd_ebpf_snapshot_selftest_merge) != 1)
+        return 35;
+    if (one.pid != 42 || one.counter != 1)
+        return 36;
+
+    return 0;
+}
+
 static int acc_selftest_body(void)
 {
     int rc = 0;
@@ -143,6 +210,11 @@ cleanup:
     memset(&uninit, 0, sizeof(uninit));
     if (nd_ebpf_acc_find_or_add(&uninit, 1234) != NULL)
         return 17;
+
+    /* The shared map-walk helper cachestat and dcstat both route through. */
+    int merge_rc = nd_ebpf_snapshot_merge_selftest();
+    if (merge_rc)
+        return merge_rc;
 
     return 0;
 }

@@ -72,6 +72,13 @@ func loadCollectorConfigFiles(legacyFile string) (pluginConfigFile, bool, error)
 
 	var merged pluginConfigFile
 	found := false
+	// `ebpf load mode = return` is warned about for every module except dcstat.
+	// The C dcstat module always attached both a kprobe and a kretprobe, so
+	// `return` was a no-op there rather than a request for behaviour this port
+	// dropped; warning about it would flag a config that was always redundant.
+	// The exemption is keyed on the module's own overlay file, but the [global]
+	// section of ebpf.d.conf is parsed under the same call, so a global `return`
+	// is also silent while dcstat is the module being loaded.
 	allowReturnLoadMode := legacyFile == dcstatLegacyConfigFile
 	for _, path := range []string{
 		filepath.Join(stockRoot, pluginPrimaryConfigFile),

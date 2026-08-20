@@ -52,3 +52,33 @@ func useEmptyConfigRoots(t *testing.T) {
 	t.Setenv("NETDATA_USER_CONFIG_DIR", t.TempDir())
 	t.Setenv("NETDATA_STOCK_CONFIG_DIR", t.TempDir())
 }
+
+// TestResolveUpdateEvery pins the precedence every module's startup path depends
+// on: config wins over the legacy numeric CLI argument, which wins over the
+// module default. All four collectors route through this one function
+// (main.go:113,137,169,206), so a silent inversion would change every module's
+// interval at once.
+func TestResolveUpdateEvery(t *testing.T) {
+	const fallback = 10
+
+	tests := map[string]struct {
+		cliArg, cfgVal, want int
+	}{
+		"config wins over CLI":            {cliArg: 5, cfgVal: 7, want: 7},
+		"CLI used when config unset":      {cliArg: 5, cfgVal: 0, want: 5},
+		"fallback when neither is set":    {cliArg: 0, cfgVal: 0, want: fallback},
+		"config wins even when lower":     {cliArg: 60, cfgVal: 1, want: 1},
+		"negative config is not positive": {cliArg: 5, cfgVal: -1, want: 5},
+		"negative CLI falls through":      {cliArg: -1, cfgVal: 0, want: fallback},
+		"both negative yields fallback":   {cliArg: -3, cfgVal: -3, want: fallback},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := resolveUpdateEvery(tc.cliArg, tc.cfgVal, fallback); got != tc.want {
+				t.Fatalf("resolveUpdateEvery(cli=%d, cfg=%d, fallback=%d) = %d, want %d",
+					tc.cliArg, tc.cfgVal, fallback, got, tc.want)
+			}
+		})
+	}
+}

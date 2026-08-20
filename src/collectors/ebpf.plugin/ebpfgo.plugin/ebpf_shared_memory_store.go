@@ -166,9 +166,13 @@ func (s *ebpfSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher, sel
 	return publisher.Publish(s.entries, flags)
 }
 
-// MarkDCStatInactive clears the DCSTAT flag from activeModules.  Called
-// per-cycle when the dcstat per-PID snapshot fails and via defer when the
-// dcstat goroutine exits, so the consumer does not treat stale rows as live.
+// MarkDCStatInactive clears the DCSTAT flag from activeModules, so a consumer
+// does not treat stale rows as live.
+//
+// The only production caller is the dcstat goroutine's exit path (main.go).  A
+// per-cycle snapshot failure goes through ClearDCStatApps instead, which clears
+// the flag AND empties the rows; this entry point exists for shutdown, where the
+// rows are about to become unreachable anyway.
 func (s *ebpfSharedMemoryStore) MarkDCStatInactive() {
 	s.mu.Lock()
 	s.activeModules &^= ebpfgoSHMFlagDCStat

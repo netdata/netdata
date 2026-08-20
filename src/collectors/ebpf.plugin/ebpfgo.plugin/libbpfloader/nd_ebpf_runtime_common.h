@@ -126,6 +126,91 @@ static inline void nd_ebpf_destroy_links(struct bpf_link ***links, size_t count)
     *links = NULL;
 }
 
+/* ------------------------------------------------------------------------
+ * Per-PID map-walk helpers
+ *
+ * cachestat and dcstat walk their per-PID BPF map identically; only the counter
+ * fields differ.  The field-agnostic steps live here so the per-module loop keeps
+ * typed field access, which is where readability actually matters.
+ * ------------------------------------------------------------------------ */
+
+/* Resolves the TGID for one map entry.
+ *
+ * With ND_EBPF_APPS_LEVEL_ALL the BPF key is the thread ID and the process TGID
+ * lives in the per-CPU values.  Shared memory must be keyed by TGID so
+ * cgroup.procs lookups succeed.  Falls back to the map key only when every
+ * per-CPU copy still reads 0, which is the race at entry creation — counters are
+ * zero then, so the entry is harmless. */
+static inline uint32_t nd_ebpf_snapshot_tgid(
+    const void *values,
+    int per_cpu_count,
+    size_t value_size,
+    size_t tgid_offset,
+    uint32_t fallback_key)
+{
+    for (int i = 0; i < per_cpu_count; i++) {
+        uint32_t tgid;
+        memcpy(&tgid, (const char *)values + (size_t)i * value_size + tgid_offset, sizeof(tgid));
+        if (tgid != 0)
+            return tgid;
+    }
+    return fallback_key;
+}
+
+/* Ensures the persistent output buffer can hold one more item, doubling on
+ * demand.  Capacity persists across cycles, so the steady state allocates
+ * nothing. */
+static inline void nd_ebpf_snapshot_reserve(void **items, size_t *cap, size_t item_size, size_t needed)
+{
+    if (needed < *cap)
+        return;
+
+    size_t new_cap = *cap ? *cap * 2 : 64;
+    *items = reallocz(*items, new_cap * item_size);
+    *cap = new_cap;
+}
+
+/* Folds one already-accumulated item into another with the same pid. */
+typedef void (*nd_ebpf_snapshot_merge_fn)(void *dst, const void *src);
+
+/* Collapses per-thread rows into one row per process.
+ *
+ * Threads of the same process produce separate map entries carrying the same
+ * TGID, so the buffer is sorted by pid and consecutive duplicates are merged in
+ * place.  Requires pid to be the first member of the item type — callers assert
+ * that with ND_EBPF_ASSERT_PID_FIRST.  Returns the surviving item count. */
+static inline size_t nd_ebpf_snapshot_merge_same_pid(
+    void *items,
+    size_t count,
+    size_t item_size,
+    nd_ebpf_snapshot_merge_fn merge)
+{
+    if (count < 2)
+        return count;
+
+    qsort(items, count, item_size, nd_ebpf_pid_first_u32_cmp);
+
+    size_t merged = 0;
+    for (size_t i = 0; i < count; i++) {
+        char *cur = (char *)items + i * item_size;
+        char *last = (char *)items + (merged ? merged - 1 : 0) * item_size;
+
+        uint32_t cur_pid, last_pid;
+        memcpy(&cur_pid, cur, sizeof(cur_pid));
+        memcpy(&last_pid, last, sizeof(last_pid));
+
+        if (merged == 0 || last_pid != cur_pid) {
+            char *dst = (char *)items + merged * item_size;
+            if (dst != cur)
+                memcpy(dst, cur, item_size);
+            merged++;
+        } else {
+            merge(last, cur);
+        }
+    }
+    return merged;
+}
+
 /* Copies a TASK_COMM_LEN name into a wider NUL-terminated destination. */
 static inline void nd_ebpf_copy_comm(char *dst, size_t dst_size, const char *src, size_t src_size)
 {

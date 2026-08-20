@@ -637,6 +637,22 @@ int netdata_dcstat_runtime_snapshot(
     return 0;
 }
 
+/* nd_ebpf_snapshot_merge_same_pid() callback: fold one same-pid row into
+ * another.  Only the counter set is module-specific. */
+static void dcstat_snapshot_merge_same_pid(void *dst_v, const void *src_v)
+{
+    struct netdata_ebpf_dcstat_pid_snapshot *dst = dst_v;
+    const struct netdata_ebpf_dcstat_pid_snapshot *src = src_v;
+
+    if (src->ct > dst->ct)
+        dst->ct = src->ct;
+    dst->cache_access += src->cache_access;
+    dst->file_system += src->file_system;
+    dst->not_found += src->not_found;
+    if (!dst->comm[0] && src->comm[0])
+        nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), src->comm, sizeof(src->comm));
+}
+
 int netdata_dcstat_runtime_snapshot_apps(
     struct netdata_ebpf_dcstat_runtime *rt,
     int maps_per_core,
@@ -698,11 +714,8 @@ int netdata_dcstat_runtime_snapshot_apps(
             continue;
         }
 
-        if (out_count >= rt->items_cap) {
-            size_t new_cap = rt->items_cap ? rt->items_cap * 2 : 64;
-            rt->items_buf = reallocz(rt->items_buf, new_cap * sizeof(*rt->items_buf));
-            rt->items_cap = new_cap;
-        }
+        nd_ebpf_snapshot_reserve(
+            (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf), out_count);
 
         /*
          * With NETDATA_APPS_LEVEL_ALL the BPF key is the thread ID (TID); the
@@ -711,15 +724,8 @@ int netdata_dcstat_runtime_snapshot_apps(
          * next_key only when every per-CPU entry has tgid == 0 (race at entry
          * creation; counters are zero then, so the entry is harmless).
          */
-        uint32_t tgid = 0;
-        for (int i = 0; i < count; i++) {
-            if (values[i].tgid != 0) {
-                tgid = values[i].tgid;
-                break;
-            }
-        }
-        if (tgid == 0)
-            tgid = next_key;
+        uint32_t tgid = nd_ebpf_snapshot_tgid(
+            values, count, sizeof(*values), offsetof(struct netdata_ebpf_dcstat_pid_entry, tgid), next_key);
 
         struct netdata_ebpf_dcstat_pid_snapshot *dst = &rt->items_buf[out_count];
         memset(dst, 0, sizeof(*dst));
@@ -731,11 +737,8 @@ int netdata_dcstat_runtime_snapshot_apps(
             dst->cache_access += values[i].cache_access;
             dst->file_system += values[i].file_system;
             dst->not_found += values[i].not_found;
-            if (!dst->comm[0] && values[i].name[0]) {
-                size_t comm_len = strnlen(values[i].name, sizeof(values[i].name));
-                memcpy(dst->comm, values[i].name, comm_len);
-                dst->comm[comm_len] = '\0';
-            }
+            if (!dst->comm[0] && values[i].name[0])
+                nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), values[i].name, sizeof(values[i].name));
         }
         out_count++;
 
@@ -754,28 +757,8 @@ int netdata_dcstat_runtime_snapshot_apps(
      * same TGID.  Sort by pid (TGID) and merge consecutive same-pid entries so
      * each shared-memory slot represents one process.
      */
-    if (out_count > 1) {
-        qsort(rt->items_buf, out_count, sizeof(*rt->items_buf), nd_ebpf_pid_first_u32_cmp);
-
-        size_t merged_count = 0;
-        for (size_t i = 0; i < out_count; i++) {
-            if (merged_count == 0 || rt->items_buf[merged_count - 1].pid != rt->items_buf[i].pid) {
-                if (merged_count != i)
-                    rt->items_buf[merged_count] = rt->items_buf[i];
-                merged_count++;
-            } else {
-                struct netdata_ebpf_dcstat_pid_snapshot *m = &rt->items_buf[merged_count - 1];
-                if (rt->items_buf[i].ct > m->ct)
-                    m->ct = rt->items_buf[i].ct;
-                m->cache_access += rt->items_buf[i].cache_access;
-                m->file_system += rt->items_buf[i].file_system;
-                m->not_found += rt->items_buf[i].not_found;
-                if (!m->comm[0] && rt->items_buf[i].comm[0])
-                    memcpy(m->comm, rt->items_buf[i].comm, sizeof(m->comm));
-            }
-        }
-        out_count = merged_count;
-    }
+    out_count = nd_ebpf_snapshot_merge_same_pid(
+        rt->items_buf, out_count, sizeof(*rt->items_buf), dcstat_snapshot_merge_same_pid);
 
     out->items = rt->items_buf;
     out->count = out_count;
