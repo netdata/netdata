@@ -82,7 +82,8 @@ jobs:
             -DENABLE_BUNDLED_PROTOBUF=Off
 
       - name: Build test binaries
-        run: echo "${TEST_TARGETS}" | xargs ninja -C build
+        run: |
+          (echo "${TEST_TARGETS}"; echo network-viewer.plugin) | xargs ninja -C build
 
       - name: Run test binaries
         run: |
@@ -100,6 +101,24 @@ jobs:
 
       - name: Validate topology fixtures
         run: python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py
+
+      - name: Validate network-viewer topology payload (live)
+        run: |
+          set -euo pipefail
+          plugin="$(find build -name 'network-viewer.plugin' -type f -executable | head -n 1)"
+          if [ -z "$plugin" ]; then
+            echo "::error::network-viewer.plugin binary not found"
+            exit 1
+          fi
+          echo "--- topology aggregated (process_name)"
+          printf '' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_aggregated.json
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py /tmp/nv_aggregated.json
+          echo "--- topology aggregated (pid)"
+          printf '%s' '{"selections":{"group_by":"pid"}}' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_pid.json
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py /tmp/nv_pid.json
+          echo "--- topology detailed"
+          printf '%s' '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_detailed.json
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py /tmp/nv_detailed.json
 
   asan-tests:
     name: Unit Tests (ASAN)

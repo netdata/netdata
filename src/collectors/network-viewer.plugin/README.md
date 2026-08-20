@@ -8,7 +8,9 @@ This collector directory contains three integrations that share the same plugin 
 
 ## Overview
 
-`network-viewer.plugin` builds the Linux socket-table viewer on Linux and the TCP/UDP perflib collectors on Windows.
+`network-viewer.plugin` builds the shared network-connections and topology
+viewers on Linux/FreeBSD/macOS/Windows and the TCP/UDP perflib collectors on
+Windows.
 
 ## Default Configuration
 
