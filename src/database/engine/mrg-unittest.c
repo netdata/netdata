@@ -1011,7 +1011,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
     if(after_uuid != 0) {
         fprintf(stderr,
                 "ERROR: pgc_open_cache_to_journal_v2() mutated a freed slot's "
-                "uuid (0 -> %u) - the low half of the same free-list pointer\n",
+                "uuid (0 -> %" PRIu32 ") - the low half of the same free-list pointer\n",
                 after_uuid);
         errors++;
     }
@@ -1145,13 +1145,16 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     METRIC *first = mrg_metric_add_and_acquire(mrg, entry, &added);
     if(!first) {
         fprintf(stderr, "ERROR: cannot add the first metric\n");
+        errors++;
         goto cleanup_early;
     }
     METRIC *old_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, first);
 
     // delete it; `pinned` keeps the uuid (and therefore the id) alive
     if(!mrg_metric_release_and_delete(mrg, first)) {
+        // the reference is dropped either way; false only means it was retained
         fprintf(stderr, "ERROR: the first metric was not deleted\n");
+        errors++;
         goto cleanup_early;
     }
 
@@ -1175,6 +1178,7 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     METRIC *decoy = mrg_metric_add_and_acquire(mrg, decoy_entry, &decoy_added);
     if(!decoy) {
         fprintf(stderr, "ERROR: cannot add the decoy metric\n");
+        errors++;
         goto cleanup_early;
     }
 
@@ -1183,6 +1187,13 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     METRIC *second = mrg_metric_add_and_acquire(mrg, entry, &added);
     if(!second || !added) {
         fprintf(stderr, "ERROR: cannot re-create the metric for the same uuid\n");
+        errors++;
+        // This branch skips cleanup_metric, so release both references here.
+        // Leaving them held would make mrg_destroy() report "metrics still
+        // referenced" and bury the real failure behind a second error.
+        if(second)
+            mrg_metric_release_and_delete(mrg, second);
+        mrg_metric_release_and_delete(mrg, decoy);
         goto cleanup_early;
     }
     METRIC *new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, second);
@@ -1199,8 +1210,8 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     }
 
     if(shared_id != pinned) {
-        fprintf(stderr, "ERROR: re-created metric got uuid id %u, expected the "
-                        "pinned %u - the premise of this test does not hold\n",
+        fprintf(stderr, "ERROR: re-created metric got uuid id %" PRIu32 ", expected "
+                        "the pinned %" PRIu32 " - the premise of this test does not hold\n",
                 shared_id, pinned);
         errors++;
         goto cleanup_metric;
