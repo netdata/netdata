@@ -2676,7 +2676,7 @@ void pgc_open_cache_to_journal_v2(
         // makes both pages index successfully and exposes it.)
         PValue = JudyLIns(&JudyL_metrics, (Word_t)xio->uuid_id, PJE0);
         if(!PValue || PValue == PJERR)
-            fatal("CACHE: JudyLIns(JudyL_metrics, uuid_id %u) failed, JudyL_metrics = %p, result = %p",
+            fatal("CACHE: JudyLIns(JudyL_metrics, uuid_id %" PRIu32 ") failed, JudyL_metrics = %p, result = %p",
                   xio->uuid_id, JudyL_metrics, PValue);
 
         struct jv2_metrics_info *mi;
