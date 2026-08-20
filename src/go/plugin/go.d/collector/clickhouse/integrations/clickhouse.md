@@ -280,7 +280,7 @@ Metrics:
 | clickhouse.io_seeks | lseek function calls | lseek | ops/s |
 | clickhouse.io_file_opens | File opens | file_open | ops/s |
 | clickhouse.replicated_parts_current_activity | Replicated parts current activity | fetch, send, check | parts |
-| clickhouse.replicas_max_absolute_dela | Replicas max absolute delay | replication_delay | seconds |
+| clickhouse.replicas_max_absolute_delay | Replicas max absolute delay | replication_delay | seconds |
 | clickhouse.replicated_readonly_tables | Replicated tables in readonly state | read_only | tables |
 | clickhouse.replicated_data_loss | Replicated data loss | data_loss | events |
 | clickhouse.replicated_part_fetches | Replicated part fetches | successful, failed | fetches/s |
