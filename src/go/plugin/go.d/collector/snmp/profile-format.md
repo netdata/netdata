@@ -492,7 +492,10 @@ manual_profiles:
 
 #### Scalar symbol fallbacks
 
-You can express “try this OID, otherwise try that OID” by declaring **multiple scalar metrics with the same** `symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, marks missing ones, and **emits** the metric from whichever OID returns data. Missing OIDs are skipped cleanly.
+You can express “try this OID, otherwise try that OID” by declaring **multiple scalar metrics with the same**
+`symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, processes them
+in declaration order, and **emits only the first successfully processed metric**. Missing or unusable earlier OIDs fall
+through to the next declaration.
 
 ```yaml
 metrics:
