@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/dynamic-configuration.md"
+sidebar_label: "Dynamic Configuration Manager"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+description: "Create, test, deploy, enable, and disable collector and alert configurations across nodes from the Netdata UI."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/dynamic-configuration-manager"
+slug: "/netdata-agent/configuration/dynamic-configuration-manager"
+-->
+
+
+
+
 # Dynamic Configuration Manager
 
 ## Overview

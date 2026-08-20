@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/ai-chat-netdata.md"
+sidebar_label: "Chat with Netdata"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/chat-with-netdata"
+slug: "/netdata-ai/mcp/chat-with-netdata"
+-->
+
+
+
+
 # AI Chat with Netdata
 
 Chat with your infrastructure using natural language through two distinct integration architectures. The LLM powering the conversation can be a cloud service — such as OpenAI, Anthropic, or DeepSeek — or a self-hosted provider like Ollama running on your own infrastructure.

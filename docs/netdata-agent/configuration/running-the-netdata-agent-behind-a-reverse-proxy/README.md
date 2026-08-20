@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md"
+sidebar_label: "Running the Agent behind a reverse proxy"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy"
+slug: "/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy"
+-->
+
+
+
+
 # Running Netdata Behind a Reverse Proxy
 
 :::tip Simpler Alternative for Netdata Cloud Users

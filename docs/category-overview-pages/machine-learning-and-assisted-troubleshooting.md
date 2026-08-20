@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md"
+sidebar_label: "Netdata AI"
+learn_status: "Published"
+learn_rel_path: "Netdata AI"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai"
+slug: "/netdata-ai"
+-->
+
+
+
+
 # Netdata AI
 
 Netdata AI is a set of analysis and troubleshooting capabilities built into Netdata Cloud. It turns high‑fidelity telemetry into explanations, timelines, and recommendations so teams resolve issues faster and document decisions with confidence.

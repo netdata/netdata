@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/python.d.plugin/README.md"
+sidebar_label: "python.d.plugin"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/External Plugins"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins/python.d.plugin"
+slug: "/developer-and-contributor-corner/external-plugins/python.d.plugin"
+-->
+
+
+
 # python.d.plugin
 
 `python.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `python`.

@@ -1,3 +1,18 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/profile-format.md"
+sidebar_label: "Prometheus Profile Format"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+keywords: [prometheus, profiles, autogen, collectors, charts]
+description: "Define curated chart profiles for Prometheus endpoints, with scoped autogen selectors that filter the fallback charts of unmatched metrics."
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/prometheus-profile-format"
+slug: "/collecting-metrics/prometheus-profile-format"
+-->
+
+
+
 # Prometheus profile format
 
 Prometheus profiles ship curated charts for recognized exporters. Without a profile, the generic Prometheus collector

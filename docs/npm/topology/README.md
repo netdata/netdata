@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/topology/README.md"
-sidebar_label: "Overview"
+sidebar_label: "Topologies"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Topologies"
-keywords: ['topology', 'network topology', 'lldp', 'cdp', 'fdb', 'arp', 'stp', 'bgp', 'ospf', 'overview']
-endmeta-->
+description: "See how your infrastructure is connected — Layer 2 and Layer 3 device topology, application dependencies, and virtual infrastructure."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/topologies"
+slug: "/network-performance-monitoring/topologies"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

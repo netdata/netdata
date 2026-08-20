@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/scalability.md"
+sidebar_label: "Scalability"
+learn_status: "Published"
+learn_rel_path: "Welcome to Netdata"
+description: "See how Netdata scales from one node to large infrastructures with distributed processing, per-second metrics, and horizontal Parent clusters."
+learn_link: "https://learn.netdata.cloud/docs/welcome-to-netdata/scalability"
+slug: "/welcome-to-netdata/scalability"
+-->
+
+
+
+
 # Scalability: Monitoring at Any Scale
 
 ## TL;DR

@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/crush.md"
+sidebar_label: "Crush"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP/Supported AI Clients"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/supported-ai-clients/crush"
+slug: "/netdata-ai/mcp/supported-ai-clients/crush"
+-->
+
+
+
+
 # Crush
 
 Configure Crush by Charmbracelet to access your Netdata infrastructure through MCP for glamorous terminal-based AI operations.

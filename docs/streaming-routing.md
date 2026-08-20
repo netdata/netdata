@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/streaming-routing.md"
+sidebar_label: "Streaming Routing Reference"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents"
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/streaming-routing-reference"
+slug: "/netdata-parents/streaming-routing-reference"
+-->
+
+
+
+
 # Netdata Streaming Routing
 
 Streaming routing controls how Netdata child nodes connect to parent nodes when multiple parents are available. It handles three key operations: initial parent selection, connection management, and failover.

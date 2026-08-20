@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/makeself/README.md"
+sidebar_label: "Static binary Linux Packages"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation/Linux"
+description: "Users can build the static 64-bit binary package that we ship with every release of the open-source Netdata Agent for debugging or specialize purposes."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/linux/static-binary-linux-packages"
+slug: "/netdata-agent/installation/linux/static-binary-linux-packages"
+-->
+
+
+
+
 # Netdata Static Binary Build
 
 Netdata provides pre-built static binaries for Linux systems where native packages aren't available. The [installer](/packaging/installer/methods/kickstart.md) automatically uses these static builds when needed.

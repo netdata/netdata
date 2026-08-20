@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/functions/databases.md"
+sidebar_label: "Database Queries"
+learn_status: "Published"
+learn_rel_path: "Live View"
+description: "Top and running database queries with deadlock and error attribution for 13 databases."
+learn_link: "https://learn.netdata.cloud/docs/live-view/database-queries"
+slug: "/live-view/database-queries"
+-->
+
+
+
+
 # Database Query Functions
 
 ## Overview

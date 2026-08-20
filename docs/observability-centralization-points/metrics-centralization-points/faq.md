@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/faq.md"
+sidebar_label: "FAQ on Metrics Centralization Points"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents/Metrics Centralization Points"
+description: "Find answers about Netdata Parent sizing, clustering, retention, encryption, replication, and centralization troubleshooting."
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/metrics-centralization-points/faq-on-metrics-centralization-points"
+slug: "/netdata-parents/metrics-centralization-points/faq-on-metrics-centralization-points"
+-->
+
+
+
+
 # FAQ on Metrics Centralization Points
 
 :::tip

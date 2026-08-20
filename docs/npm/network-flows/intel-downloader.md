@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/intel-downloader.md"
 sidebar_label: "Enrichment Intel Downloader"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['ip intelligence', 'mmdb', 'downloader', 'db-ip', 'iptoasn', 'topology-ip-intel-downloader', 'enrichment', 'refresh']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+description: "The bundled tool that fetches IP intelligence data sources and writes MMDB files the netflow plugin reads."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment-intel-downloader"
+slug: "/network-performance-monitoring/network-flows/enrichment-intel-downloader"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

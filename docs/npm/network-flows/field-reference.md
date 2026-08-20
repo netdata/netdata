@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/field-reference.md"
 sidebar_label: "Field Reference"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['fields', 'flow record', 'schema', 'reference']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+description: "Complete list of flow fields with per-protocol availability."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/field-reference"
+slug: "/network-performance-monitoring/network-flows/field-reference"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

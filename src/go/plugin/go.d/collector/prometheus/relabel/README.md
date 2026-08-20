@@ -1,3 +1,18 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md"
+sidebar_label: "Prometheus Metric Relabeling"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+keywords: [prometheus, relabeling, metric_relabel_configs, labels, collectors]
+description: "Rewrite, derive, or drop scraped Prometheus metrics and labels with Prometheus-compatible metric_relabel_configs rules before charts are built."
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/prometheus-metric-relabeling"
+slug: "/collecting-metrics/prometheus-metric-relabeling"
+-->
+
+
+
 # Metric relabeling
 
 Relabeling rewrites, adds, drops, or filters a scraped metric -- its name and its labels -- before charts are built.

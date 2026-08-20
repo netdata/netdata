@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md"
+sidebar_label: "Nginx"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy/nginx"
+slug: "/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy/nginx"
+-->
+
+
+
+
 # Running Netdata behind Nginx
 
 ## Intro

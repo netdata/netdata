@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/getting-started-netdata/guide.md"
+sidebar_label: "Getting Started"
+learn_status: "Published"
+learn_rel_path: "/"
+learn_link: "https://learn.netdata.cloud/docs/getting-started"
+slug: "/getting-started"
+-->
+
+
+
+
 # Getting Started with Netdata
 
 ## Transform Your Infrastructure Monitoring in Minutes, Not Weeks

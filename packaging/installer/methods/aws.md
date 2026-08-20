@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/aws.md"
+sidebar_label: "AWS"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+description: "Install Netdata on AWS instances or EKS, then configure network access and cloud-specific monitoring integrations."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/aws"
+slug: "/netdata-agent/installation/aws"
+-->
+
+
+
+
 # Install Netdata on AWS
 
 Netdata is fully compatible with Amazon Web Services (AWS).

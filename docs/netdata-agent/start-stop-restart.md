@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/start-stop-restart.md"
+sidebar_label: "Service Control"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Maintenance"
+description: "Manage the Netdata Agent daemon, load configuration changes, and troubleshoot stuck processes on systemd and non-systemd nodes."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/maintenance/service-control"
+slug: "/netdata-agent/maintenance/service-control"
+-->
+
+
+
+
 # Service Control
 
 :::tip

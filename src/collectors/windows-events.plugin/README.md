@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md"
+sidebar_label: "Windows Events Plugin Reference"
+learn_status: "Published"
+learn_rel_path: "Logs/Windows Event Logs"
+learn_link: "https://learn.netdata.cloud/docs/logs/windows-event-logs/windows-events-plugin-reference"
+slug: "/logs/windows-event-logs/windows-events-plugin-reference"
+-->
+
+
+
 # Windows Events plugin
 
 [KEY FEATURES](#key-features) | [EVENTS SOURCES](#events-sources) | [EVENT FIELDS](#event-fields) |

@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/scheduled-investigations.md"
+sidebar_label: "Scheduled Investigations"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Investigations"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/investigations/scheduled-investigations"
+slug: "/netdata-ai/investigations/scheduled-investigations"
+-->
+
+
+
+
 # Scheduled Investigations
 
 Automate recurring custom analyses by scheduling your own investigation prompts. Great for weekly health checks, monthly cost reviews, and SLO conformance reporting.

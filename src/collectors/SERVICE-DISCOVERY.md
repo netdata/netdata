@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/SERVICE-DISCOVERY.md"
+sidebar_label: "Service Discovery"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics/Service Discovery"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/service-discovery"
+slug: "/collecting-metrics/service-discovery"
+-->
+
+
+
+
 # Service Discovery
 
 Stop hand-writing collector jobs for every host, container, or device. Netdata's Service Discovery (SD) finds monitorable targets in your environment and turns them into collector jobs automatically.

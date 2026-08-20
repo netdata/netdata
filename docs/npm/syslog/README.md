@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/syslog/README.md"
-sidebar_label: "Overview"
+sidebar_label: "Syslog from Network Devices"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Syslog from Network Devices"
-keywords: ['syslog', 'opentelemetry', 'otel', 'otlp', 'network devices', 'logs', 'overview']
-endmeta-->
+description: "Ingest syslog from network devices through the OpenTelemetry Collector and explore it in the Logs tab."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/syslog-from-network-devices"
+slug: "/network-performance-monitoring/syslog-from-network-devices"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

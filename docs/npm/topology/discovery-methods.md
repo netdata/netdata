@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/topology/discovery-methods.md"
 sidebar_label: "Discovery Methods"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Topologies"
-keywords: ['topology', 'lldp', 'cdp', 'fdb', 'arp', 'stp', 'bgp', 'ospf', 'discovery']
-endmeta-->
+description: "What LLDP, CDP, FDB, ARP, STP, BGP, and OSPF each contribute to the map."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/topologies/discovery-methods"
+slug: "/network-performance-monitoring/topologies/discovery-methods"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

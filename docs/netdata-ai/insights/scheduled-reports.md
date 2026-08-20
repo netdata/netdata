@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/scheduled-reports.md"
+sidebar_label: "Scheduled Reports"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Insights"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/insights/scheduled-reports"
+slug: "/netdata-ai/insights/scheduled-reports"
+-->
+
+
+
+
 # Scheduled Reports
 
 Automate your reporting workflow. Scheduled AI reports let you run Insights and Investigations on a recurring cadence and deliver the results automatically—turning manual, repetitive work into a hands‑off process.

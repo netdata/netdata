@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/fleet-configuration-management.md"
+sidebar_label: "Fleet Deployment and Configuration Management"
+learn_status: "Published"
+learn_rel_path: "Welcome to Netdata"
+learn_link: "https://learn.netdata.cloud/docs/welcome-to-netdata/fleet-deployment-and-configuration-management"
+slug: "/welcome-to-netdata/fleet-deployment-and-configuration-management"
+-->
+
+
+
+
 # Fleet Deployment and Configuration Management
 
 As infrastructures grow from a handful of servers to thousands of nodes across mixed environments (Linux, Kubernetes, Windows, macOS, FreeBSD), managing observability agents becomes one of the most painful operational tasks.

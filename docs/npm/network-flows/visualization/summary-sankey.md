@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/summary-sankey.md"
 sidebar_label: "Sankey and Table"
 learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['sankey', 'table', 'top-n', 'aggregation', 'visualization']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows/Visualization"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/sankey-and-table"
+slug: "/network-performance-monitoring/network-flows/visualization/sankey-and-table"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

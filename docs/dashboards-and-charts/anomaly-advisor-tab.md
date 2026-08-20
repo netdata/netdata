@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/anomaly-advisor-tab.md"
+sidebar_label: "Anomalies"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+description: "Quickly find anomalous metrics anywhere in your infrastructure."
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/anomalies"
+slug: "/dashboards-and-charts/tabs/anomalies"
+-->
+
+
+
+
 # Anomaly Advisor Tab
 
 The **Anomaly Advisor** tab helps you identify potentially anomalous metrics and charts by focusing on a highlighted timeframe of interest. This feature uses Netdata's **Anomaly Rate ML scoring** to rank metrics based on unusual behavior.

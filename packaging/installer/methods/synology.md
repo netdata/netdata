@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md"
+sidebar_label: "Synology"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+description: "The Netdata Agent can be installed on AMD64-compatible NAS systems using the 64-bit pre-compiled static binary."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/synology"
+slug: "/netdata-agent/installation/synology"
+-->
+
+
+
+
 # Install Netdata on Synology
 
 > This community-maintained guide may not reflect the latest changes.

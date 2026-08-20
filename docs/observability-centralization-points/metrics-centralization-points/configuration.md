@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md"
+sidebar_label: "Configuring Metrics Centralization Points"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents/Metrics Centralization Points"
+description: "Configure stream.conf for Netdata Children and Parents, including API keys, TLS encryption, routing, and troubleshooting."
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/metrics-centralization-points/configuring-metrics-centralization-points"
+slug: "/netdata-parents/metrics-centralization-points/configuring-metrics-centralization-points"
+-->
+
+
+
+
 # Configuring Metrics Centralization Points
 
 :::tip

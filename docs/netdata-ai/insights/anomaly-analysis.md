@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/anomaly-analysis.md"
+sidebar_label: "Anomaly Analysis"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Insights"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/insights/anomaly-analysis"
+slug: "/netdata-ai/insights/anomaly-analysis"
+-->
+
+
+
+
 # Anomaly Analysis
 
 Get a forensics‑grade explanation of unusual behavior. The Anomaly Analysis report correlates ML‑detected anomalies across nodes and metrics, reconstructs the timeline, and proposes likely root causes with supporting evidence.

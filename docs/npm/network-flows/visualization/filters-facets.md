@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/filters-facets.md"
 sidebar_label: "Filters and Facets"
 learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['filters', 'facets', 'autocomplete', 'search', 'fts', 'negative match', 'visualization']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows/Visualization"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/filters-and-facets"
+slug: "/network-performance-monitoring/network-flows/visualization/filters-and-facets"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

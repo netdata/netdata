@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/backup-and-restore-an-agent.md"
+sidebar_label: "Backup and restore an Agent"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Maintenance"
+description: "What actions you need to do to backup and Agent and restore it."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/maintenance/backup-and-restore-an-agent"
+slug: "/netdata-agent/maintenance/backup-and-restore-an-agent"
+-->
+
+
+
+
 # Backing up a Netdata Agent
 
 :::tip

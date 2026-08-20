@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/bgp/README.md"
-sidebar_label: "Overview"
+sidebar_label: "BGP Monitoring"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/BGP Monitoring"
-keywords: ['bgp', 'bgp4-mib', 'peering', 'routing', 'snmp', 'overview']
-endmeta-->
+description: "Monitor BGP peer state, prefixes, and session health on your routers."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/bgp-monitoring"
+slug: "/network-performance-monitoring/bgp-monitoring"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

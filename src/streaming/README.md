@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/streaming/README.md"
+sidebar_label: "Parent-Child Configuration Reference"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents"
+description: "Configure real-time metric streaming and historical replication between Netdata Children and Parents."
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/parent-child-configuration-reference"
+slug: "/netdata-parents/parent-child-configuration-reference"
+-->
+
+
+
 # Parent-Child Configuration Reference
 
 ## Introduction

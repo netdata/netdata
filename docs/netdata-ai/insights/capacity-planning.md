@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/capacity-planning.md"
+sidebar_label: "Capacity Planning"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Insights"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/insights/capacity-planning"
+slug: "/netdata-ai/insights/capacity-planning"
+-->
+
+
+
+
 # Capacity Planning
 
 Stop guessing and plan with confidence. The Capacity Planning report projects growth, highlights inflection points, and recommends concrete hardware or configuration changes backed by your actual utilization trends.

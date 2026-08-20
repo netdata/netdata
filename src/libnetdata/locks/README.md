@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/libnetdata/locks/README.md"
+sidebar_label: "Locks"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/libnetdata"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/libnetdata/locks"
+slug: "/developer-and-contributor-corner/libnetdata/locks"
+-->
+
+
+
 # Locks
 
 ## How to trace netdata locks

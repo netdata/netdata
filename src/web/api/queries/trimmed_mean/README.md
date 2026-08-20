@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/queries/trimmed_mean/README.md"
+sidebar_label: "Trimmed Mean"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/REST API/Queries"
+description: "Use trimmed-mean in API queries and health entities to find the average value from a sample, eliminating any unwanted spikes in the returned metrics."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api/queries/trimmed-mean"
+slug: "/developer-and-contributor-corner/rest-api/queries/trimmed-mean"
+-->
+
+
+
 # Trimmed Mean
 
 The trimmed mean is the average value of a series excluding the smallest and biggest points.

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/conversations.md"
+sidebar_label: "Conversations"
+learn_status: "Published"
+learn_rel_path: "Netdata AI"
+keywords: [conversations, chat, real-time, live exhibits]
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/conversations"
+slug: "/netdata-ai/conversations"
+-->
+
+
+
+
 # Conversations
 
 Real-Time Conversations is a live, interactive interface for engaging in a back-and-forth dialogue with Netdata AI. Unlike Investigations and Insights reports that generate comprehensive async documents, Conversations are designed for the rapid-fire "what if" questions and quick exploration that happen in the heat of troubleshooting.

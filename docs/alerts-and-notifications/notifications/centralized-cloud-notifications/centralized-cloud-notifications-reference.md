@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md"
+sidebar_label: "Centralized Cloud Notifications Reference"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications/Notifications/Centralized Cloud Notifications"
+description: "Configure Netdata Cloud to send notifications to your team whenever any node on your infrastructure triggers an alert threshold."
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference"
+slug: "/alerts-&-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference"
+-->
+
+
+
+
 # Centralized Cloud Notifications Reference
 
 Netdata Cloud sends Alert notifications for nodes in warning, critical, or [unreachable](/docs/netdata-cloud/node-states-and-transitions.md) states, ensuring Alerts are managed centrally and efficiently.

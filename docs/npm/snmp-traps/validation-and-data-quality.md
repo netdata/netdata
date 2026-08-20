@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/validation-and-data-quality.md"
 sidebar_label: "Validation and Data Quality"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'validation', 'data quality', 'source identity', 'trusted relays', 'otlp', 'siem']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Prove first receipt, source identity, profile coverage, enrichment quality, backend health, retention, and downstream fields."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/validation-and-data-quality"
+slug: "/network-performance-monitoring/snmp-traps/validation-and-data-quality"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

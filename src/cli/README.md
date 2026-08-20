@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/cli/README.md"
+sidebar_label: "Agent CLI"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+description: "The Netdata Agent includes a command-line experience for reloading health configuration, reopening log files, halting the daemon, and more."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/agent-cli"
+slug: "/netdata-agent/agent-cli"
+-->
+
+
+
+
 # Netdata Agent CLI
 
 The `netdatacli` executable offers a straightforward way to manage the Netdata Agent's operations.

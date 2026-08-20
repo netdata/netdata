@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md"
+sidebar_label: "Redistributed Software"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/redistributed-software"
+slug: "/developer-and-contributor-corner/redistributed-software"
+-->
+
+
+
+
 # Redistributed software
 
 Netdata copyright info:<br/>

@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/README.md"
-sidebar_label: "Overview"
+sidebar_label: "Network Flows"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['netflow', 'sflow', 'ipfix', 'network flows', 'traffic analysis', 'overview']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+description: "Collect, enrich, and visualize NetFlow, IPFIX, and sFlow data with the Netdata Agent."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows"
+slug: "/network-performance-monitoring/network-flows"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

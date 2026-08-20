@@ -1,3 +1,19 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md"
+sidebar_label: "OTLP Ingestion"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics/OpenTelemetry"
+keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, collector]
+description: "Export metrics and logs from an OpenTelemetry Collector to a Netdata Agent"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/opentelemetry/otlp-ingestion"
+slug: "/collecting-metrics/opentelemetry/otlp-ingestion"
+-->
+
+
+
+
 # Ingest OpenTelemetry Metrics and Logs
 
 Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry data or an OpenTelemetry Collector is already part of your observability pipeline. For host and application metrics that Netdata can collect directly, the native collector is usually simpler and exposes purpose-built charts and alerts.

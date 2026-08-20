@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/exporting/README.md"
+sidebar_label: "Exporting reference"
+learn_status: "Published"
+learn_rel_path: "Exporting Metrics"
+description: "With the exporting engine, you can archive your Netdata metrics to multiple external databases for long-term storage or further analysis."
+learn_link: "https://learn.netdata.cloud/docs/exporting-metrics/exporting-reference"
+slug: "/exporting-metrics/exporting-reference"
+-->
+
+
+
 # Exporting Reference
 
 This reference guide provides comprehensive information about enabling, configuring, and monitoring Netdata's exporting engine for sending metrics to external time-series databases.

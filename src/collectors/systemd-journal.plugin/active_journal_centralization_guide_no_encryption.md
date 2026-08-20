@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md"
+sidebar_label: "Active journal source without encryption"
+learn_status: "Published"
+learn_rel_path: "Logs/Logs Centralization Points with systemd-journald"
+learn_link: "https://learn.netdata.cloud/docs/logs/logs-centralization-points-with-systemd-journald/active-journal-source-without-encryption"
+slug: "/logs/logs-centralization-points-with-systemd-journald/active-journal-source-without-encryption"
+-->
+
+
+
 # Active journal source without encryption
 
 This page will guide you through creating an active journal source without the use of encryption.

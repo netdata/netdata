@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md"
+sidebar_label: "Disk & Retention"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Resource Utilization"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/resource-utilization/disk-&-retention"
+slug: "/netdata-agent/resource-utilization/disk-&-retention"
+-->
+
+
+
+
 # Disk Requirements &amp; Retention
 
 ## Database Modes and Tiers

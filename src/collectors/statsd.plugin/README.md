@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md"
+sidebar_label: "StatsD"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/statsd"
+slug: "/collecting-metrics/statsd"
+-->
+
+
+
 # StatsD Collector
 
 ## What is StatsD?

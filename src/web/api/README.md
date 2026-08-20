@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/README.md"
+sidebar_label: "REST API"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/REST API"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api"
+slug: "/developer-and-contributor-corner/rest-api"
+-->
+
+
+
 # Netdata APIs
 
 Netdata Cloud provides APIs for programmatic access to your monitoring infrastructure.

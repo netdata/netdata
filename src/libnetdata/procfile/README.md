@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/libnetdata/procfile/README.md"
+sidebar_label: "procfile"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/libnetdata"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/libnetdata/procfile"
+slug: "/developer-and-contributor-corner/libnetdata/procfile"
+-->
+
+
+
 # PROCFILE
 
 procfile is a library for reading text data files (i.e `/proc` files) in the fastest possible way.

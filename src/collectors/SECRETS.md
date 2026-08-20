@@ -1,3 +1,18 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/SECRETS.md"
+sidebar_label: "Secrets Management"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics/Secrets Management"
+description: "Use secret references to avoid storing credentials in plain text. Supports environment variables, files, commands, and secretstore backends."
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/secrets-management"
+slug: "/collecting-metrics/secrets-management"
+-->
+
+
+
+
 # Secrets Management
 
 Keep collector credentials out of plain-text configuration files.

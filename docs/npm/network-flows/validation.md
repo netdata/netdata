@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/validation.md"
 sidebar_label: "Validation and Data Quality"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['validation', 'snmp cross-check', 'data quality', 'sanity check']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality"
+slug: "/network-performance-monitoring/network-flows/validation-and-data-quality"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

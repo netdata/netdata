@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/configuration.md"
 sidebar_label: "Configuration"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['configuration', 'netflow.yaml', 'tuning', 'retention', 'listener']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+description: "Full reference for netflow.yaml configuration options."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/configuration"
+slug: "/network-performance-monitoring/network-flows/configuration"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

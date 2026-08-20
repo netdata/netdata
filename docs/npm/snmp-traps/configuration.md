@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/configuration.md"
 sidebar_label: "Configuration"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'configuration', 'snmpv3', 'usm', 'allowlist', 'dedup', 'otlp', 'journal']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Configure listener endpoints, SNMP versions, source controls, storage, forwarding, deduplication, and profile metrics."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/configuration"
+slug: "/network-performance-monitoring/snmp-traps/configuration"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

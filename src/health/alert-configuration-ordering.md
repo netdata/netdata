@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/alert-configuration-ordering.md"
+sidebar_label: "Alert Configuration Ordering"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications"
+keywords: [alerts, health, ordering, precedence, templates, alarms]
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-ordering"
+slug: "/alerts-&-notifications/alert-configuration-ordering"
+-->
+
+
+
 # Alert Configuration Ordering
 
 This document explains how Netdata's alerting system is designed and how it determines which alert definition applies when multiple definitions could match the same data.

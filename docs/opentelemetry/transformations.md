@@ -1,3 +1,19 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/opentelemetry/transformations.md"
+sidebar_label: "Transformations"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics/OpenTelemetry"
+keywords: [opentelemetry, otel, ottl, transform, filter, json, logs]
+description: "Parse, enrich, normalize, and filter OpenTelemetry logs before exporting them to Netdata"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/opentelemetry/transformations"
+slug: "/collecting-metrics/opentelemetry/transformations"
+-->
+
+
+
+
 # Transform and Filter OpenTelemetry Logs
 
 Use Collector processors when several receivers need the same normalization, enrichment, or filtering before they export to Netdata. Prefer a receiver's built-in parser for source-specific work; use the `transform` processor for reusable OTTL changes and the `filter` processor to drop records.

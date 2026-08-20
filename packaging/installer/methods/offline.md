@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md"
+sidebar_label: "Offline systems"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation/Linux"
+description: "Install the Netdata Agent on offline/air gapped systems to benefit from real-time, per-second monitoring without connecting to the internet."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/linux/offline-systems"
+slug: "/netdata-agent/installation/linux/offline-systems"
+-->
+
+
+
+
 # Install Netdata on Offline Systems
 
 This guide explains how to install Netdata Agent on systems without internet access.

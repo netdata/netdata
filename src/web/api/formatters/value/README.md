@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/formatters/value/README.md"
+sidebar_label: "Value formatter"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/REST API/Formatters"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api/formatters/value-formatter"
+slug: "/developer-and-contributor-corner/rest-api/formatters/value-formatter"
+-->
+
+
+
 # Value formatter
 
 The Value formatter presents [results of database queries](/src/web/api/queries/README.md) as a single value.

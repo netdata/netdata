@@ -1,3 +1,18 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/cloudwatch/profile-format.md"
+sidebar_label: "AWS CloudWatch Profile Format"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+keywords: [aws, cloudwatch, profiles, collectors, metrics]
+description: "Define CloudWatch namespaces, supported regions, resource dimensions, metrics, statistics, and dynamic charts in reusable profiles."
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/aws-cloudwatch-profile-format"
+slug: "/collecting-metrics/aws-cloudwatch-profile-format"
+-->
+
+
+
 # AWS CloudWatch profile format
 
 CloudWatch profiles define which metrics the collector queries and how those metrics become Netdata charts. Each profile

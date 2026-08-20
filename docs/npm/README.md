@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/README.md"
-sidebar_label: "Overview"
+sidebar_label: "Network Performance Monitoring"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring"
-keywords: ['network performance monitoring', 'npm', 'snmp', 'network', 'topology', 'flows', 'traps', 'overview']
-endmeta-->
+description: "Monitor your whole network from one Agent per site — devices, topology, flows, traps, and logs, unified in Netdata Cloud."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring"
+slug: "/network-performance-monitoring"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

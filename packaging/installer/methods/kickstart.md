@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kickstart.md"
+sidebar_label: "Linux"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation/Linux"
+description: "The kickstart.sh script installs Netdata from source, including all dependencies required to connect to Netdata Cloud, with a single command."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/linux"
+slug: "/netdata-agent/installation/linux"
+-->
+
+
+
+
 import { OneLineInstall } from '@site/src/components/OneLineInstall/'
 import { Install, InstallBox } from '@site/src/components/Install/'
 import Tabs from '@theme/Tabs';

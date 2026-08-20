@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md"
+sidebar_label: "Lighttpd v1.4.x"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy/lighttpd-v1.4.x"
+slug: "/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy/lighttpd-v1.4.x"
+-->
+
+
+
+
 # Running Netdata behind lighttpd v1.4.x
 
 Here is a config for accessing Netdata in a suburl via lighttpd 1.4.46 and newer:

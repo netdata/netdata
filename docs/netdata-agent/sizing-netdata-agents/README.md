@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/README.md"
+sidebar_label: "Resource Utilization"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Resource Utilization"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/resource-utilization"
+slug: "/netdata-agent/resource-utilization"
+-->
+
+
+
+
 # Resource utilization
 
 Netdata is designed to automatically adjust its resource consumption based on the specific workload.

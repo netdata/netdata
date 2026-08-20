@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/retention-querying.md"
 sidebar_label: "Retention and Tiers"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['retention', 'tiers', 'rollup', 'tier selection']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/retention-and-tiers"
+slug: "/network-performance-monitoring/network-flows/retention-and-tiers"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/dashboards-tab.md"
+sidebar_label: "Dashboards"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+description: "Design new dashboards that target your infrastructure's unique needs and share them with your team fortargeted visual anomaly detection or incident response."
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/dashboards"
+slug: "/dashboards-and-charts/tabs/dashboards"
+-->
+
+
+
+
 # Dashboards Tab
 
 With **Netdata Cloud**, you can build **custom dashboards** that target your infrastructure's unique needs. Dashboards help you centralize key metrics from any number of distributed systems, offering a clear, interactive overview of your infrastructure.

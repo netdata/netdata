@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/impact-on-resources.md"
+sidebar_label: "Impact on Cloud VMs"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Resource Utilization"
+description: "Recommended VM sizing and the resource impact of running Netdata on cloud VMs (AWS, Azure, GCP)."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/resource-utilization/impact-on-cloud-vms"
+slug: "/netdata-agent/resource-utilization/impact-on-cloud-vms"
+-->
+
+
+
+
 # Impact of Running Netdata on Cloud Provided VMs
 
 ## Overview

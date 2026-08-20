@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/netdata-support-bundle.md"
+sidebar_label: "Netdata Support Bundle"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+keywords: [support bundle, diagnostics, troubleshooting, bug report, support ticket, sanitized logs]
+description: "Collect a sanitized diagnostics archive from a Netdata Agent and attach it to a support ticket or bug report."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/netdata-support-bundle"
+slug: "/developer-and-contributor-corner/netdata-support-bundle"
+-->
+
+
+
+
 # Netdata Support Bundle
 
 The Netdata Support Bundle is a diagnostic collector that ships with the Netdata Agent. It gathers configuration, logs, process state, and runtime information from a single node into one sanitized archive that you can attach to a support ticket or a GitHub bug report.

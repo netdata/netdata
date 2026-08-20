@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md"
+sidebar_label: "Logs Centralization Points with systemd-journald"
+learn_status: "Published"
+learn_rel_path: "Logs/Logs Centralization Points with systemd-journald"
+learn_link: "https://learn.netdata.cloud/docs/logs/logs-centralization-points-with-systemd-journald"
+slug: "/logs/logs-centralization-points-with-systemd-journald"
+-->
+
+
+
+
 # Logs Centralization Points with systemd-journald
 
 ```mermaid

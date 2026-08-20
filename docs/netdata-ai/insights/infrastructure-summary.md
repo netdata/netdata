@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/infrastructure-summary.md"
+sidebar_label: "Infrastructure Summary"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Insights"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/insights/infrastructure-summary"
+slug: "/netdata-ai/insights/infrastructure-summary"
+-->
+
+
+
+
 # Infrastructure Summary
 
 The Infrastructure Summary report synthesizes the last hours, days, or weeks of your infrastructure into a concise, shareable narrative. It combines critical timelines, anomaly context, alert analysis, and actionable recommendations so your team can quickly align on what happened and what to do next.

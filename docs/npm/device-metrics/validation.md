@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/validation.md"
 sidebar_label: "Validation"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'validation', 'data quality', 'profile match', 'counters', 'trust']
-endmeta-->
+description: "Confirm profile match, 64-bit counters, and clean polling before you trust the data."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics/validation"
+slug: "/network-performance-monitoring/device-metrics/validation"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

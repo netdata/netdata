@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/queries/sum/README.md"
+sidebar_label: "Sum"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/REST API/Queries"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api/queries/sum"
+slug: "/developer-and-contributor-corner/rest-api/queries/sum"
+-->
+
+
+
 # Sum
 
 This module sums all the values in the time-frame requested.

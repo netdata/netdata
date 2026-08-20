@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/running-through-cf-tunnels.md"
+sidebar_label: "Running a Local Dashboard through Cloudflare Tunnels"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/running-a-local-dashboard-through-cloudflare-tunnels"
+slug: "/developer-and-contributor-corner/running-a-local-dashboard-through-cloudflare-tunnels"
+-->
+
+
+
+
 # Running a Local Dashboard through Cloudflare Tunnels
 
 ## Summary of tasks

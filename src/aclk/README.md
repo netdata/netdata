@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/aclk/README.md"
+sidebar_label: "Agent-Cloud Link (ACLK)"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+description: "The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud."
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/agent-cloud-link-aclk"
+slug: "/netdata-cloud/agent-cloud-link-aclk"
+-->
+
+
+
+
 # Agent-Cloud link (ACLK)
 
 The Agent-Cloud Link (ACLK) provides secure communication between your Netdata Agents and Cloud. This connection:

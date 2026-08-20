@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/best-practices.md"
+sidebar_label: "Parent Configuration Best Practices"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents"
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/parent-configuration-best-practices"
+slug: "/netdata-parents/parent-configuration-best-practices"
+-->
+
+
+
+
 # Parent Configuration Best Practices
 
 A Parent node is a Netdata Agent configured to receive metrics from multiple Child nodes. It acts as the central long-term storage layer, providing a unified view, longer retention, and high availability when used with replication.

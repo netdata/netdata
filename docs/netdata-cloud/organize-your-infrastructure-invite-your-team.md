@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md"
+sidebar_label: "Spaces and Rooms"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud/Spaces and Rooms"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/spaces-and-rooms"
+slug: "/netdata-cloud/spaces-and-rooms"
+-->
+
+
+
+
 # Spaces and Rooms
 
 This guide explains how you can effectively organize your infrastructure monitoring using Netdata Cloud.

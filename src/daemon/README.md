@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/daemon/README.md"
+sidebar_label: "Daemon"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/daemon"
+slug: "/netdata-agent/daemon"
+-->
+
+
+
 # Daemon
 
 The Netdata Daemon, often referred to as the Netdata Agent, controls the entire operation of the monitoring system. This document provides an overview of command-line options, debugging, and troubleshooting.

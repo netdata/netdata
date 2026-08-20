@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/custom-investigations.md"
+sidebar_label: "Custom Investigations"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Investigations"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/investigations/custom-investigations"
+slug: "/netdata-ai/investigations/custom-investigations"
+-->
+
+
+
+
 # Custom Investigations
 
 Create deeply researched, context‑aware analyses by asking Netdata open‑ended questions about your infrastructure. Custom Investigations correlate metrics, anomalies, and events to answer the questions dashboards can’t—typically in about two minutes.

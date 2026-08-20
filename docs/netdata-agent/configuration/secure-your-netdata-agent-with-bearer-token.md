@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md"
+sidebar_label: "Bearer Token Protection"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration/Securing Agents"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents/bearer-token-protection"
+slug: "/netdata-agent/configuration/securing-agents/bearer-token-protection"
+-->
+
+
+
+
 # Secure Your Netdata Agent with Bearer Token Protection
 
 Netdata provides native bearer token protection that integrates with Netdata Cloud Single Sign-On (SSO). With a single configuration setting, you can secure direct access to your Netdata Agents and Parents while inheriting the same permissions and roles your users have in Netdata Cloud.

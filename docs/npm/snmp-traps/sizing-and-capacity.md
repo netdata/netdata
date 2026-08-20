@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/sizing-and-capacity.md"
-sidebar_label: "Sizing and Capacity"
+sidebar_label: "Sizing and Capacity Planning"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'sizing', 'capacity planning', 'storm control', 'udp buffer', 'rcvbuferrors']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Plan receiver capacity, output backends, retention, storm controls, profile metrics, source visibility, and validation."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/sizing-and-capacity-planning"
+slug: "/network-performance-monitoring/snmp-traps/sizing-and-capacity-planning"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

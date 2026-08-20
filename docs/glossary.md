@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/glossary.md"
+sidebar_label: "Glossary"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary"
+slug: "/developer-and-contributor-corner/glossary"
+-->
+
+
+
+
 # Glossary
 
 Welcome to Netdata's terminology guide! Whether you're a seasoned engineer or just starting your journey in system monitoring, this glossary helps demystify the terms used throughout our documentation and community.

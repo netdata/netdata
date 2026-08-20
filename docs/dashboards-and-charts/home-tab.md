@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/home-tab.md"
+sidebar_label: "Tabs"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+description: "With Netdata Cloud's War Rooms, you can see real-time metrics, from any number of nodes in your infrastructure, in composite charts."
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs"
+slug: "/dashboards-and-charts/tabs"
+-->
+
+
+
+
 # Home tab
 
 The **Home tab** offers a **real-time overview of your Room** in Netdata Cloud. Use it to quickly assess your infrastructure's health and key metrics at a glance.

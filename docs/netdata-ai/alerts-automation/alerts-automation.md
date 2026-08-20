@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/alerts-automation/alerts-automation.md"
+sidebar_label: "Alerts Automation"
+learn_status: "Published"
+learn_rel_path: "Netdata AI"
+keywords: [alerts, automation, ai alerts]
+description: "AI-powered alert creation and suggestions"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/alerts-automation"
+slug: "/netdata-ai/alerts-automation"
+-->
+
+
+
+
 # Alerts Automation
 
 Alerts Automation uses AI to suggest, generate, and test alert configurations for you — no need to learn Netdata's alert syntax or manually tune thresholds. Describe what you want to monitor in plain English, review the generated configuration against historical data, and deploy it to your nodes.

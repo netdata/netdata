@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/guidelines.md"
+sidebar_label: "Contribute to the documentation"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/Contribute to the documentation"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/contribute-to-the-documentation"
+slug: "/developer-and-contributor-corner/contribute-to-the-documentation"
+-->
+
+
+
+
 # Contribute to the documentation
 
 Welcome to our documentation developer guidelines!

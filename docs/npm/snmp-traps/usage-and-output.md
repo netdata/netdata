@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/usage-and-output.md"
 sidebar_label: "Usage and Output"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'usage', 'output', 'trap rows', 'varbinds', 'deduplication', 'decode errors']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Read normal trap rows, decode errors, deduplication summaries, varbinds, tags, and payload fields."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/usage-and-output"
+slug: "/network-performance-monitoring/snmp-traps/usage-and-output"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

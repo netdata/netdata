@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/api-tokens.md"
+sidebar_label: "API Tokens"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud/Authentication & Authorization"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/api-tokens"
+slug: "/netdata-cloud/authentication-&-authorization/api-tokens"
+-->
+
+
+
+
 # API Tokens
 
 API tokens (Bearer tokens) enable you to access Netdata resources programmatically. These tokens authenticate and authorize API requests, allowing you to interact with Netdata services securely from external applications, scripts, or integrations.

@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/daemon/config/README.md"
+sidebar_label: "Daemon"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+description: "The Netdata Agent's daemon is installed preconfigured to collect thousands of metrics every second, but is highly configurable for real-world workloads."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/daemon"
+slug: "/netdata-agent/configuration/daemon"
+-->
+
+
+
 # Daemon Configuration Reference
 
 You can fine-tune your Netdata daemon's behavior using the main configuration file located at `/INSTALL_PREFIX/netdata/netdata.conf`. While Netdata works effectively with default settings, this file allows you to fine-tune its behavior.

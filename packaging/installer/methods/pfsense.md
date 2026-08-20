@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md"
+sidebar_label: "pfSense"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+description: "Install Netdata on pfSense to monitor the health and performance of firewalls with thousands of real-time, per-second metrics."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/pfsense"
+slug: "/netdata-agent/installation/pfsense"
+-->
+
+
+
+
 # Install Netdata on pfSense CE
 
 :::info

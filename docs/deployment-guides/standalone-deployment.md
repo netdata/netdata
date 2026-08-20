@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/deployment-guides/standalone-deployment.md"
+sidebar_label: "Netdata Agent"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent"
+slug: "/netdata-agent"
+-->
+
+
+
+
 # Single Agent Deployment
 
 The simplest way to use Netdata - install it, and you're monitoring. Each Agent works independently with zero configuration.

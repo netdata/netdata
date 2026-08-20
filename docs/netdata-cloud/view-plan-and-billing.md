@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/view-plan-and-billing.md"
+sidebar_label: "Netdata Plans & Billing"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/netdata-plans-&-billing"
+slug: "/netdata-cloud/netdata-plans-&-billing"
+-->
+
+
+
+
 # Netdata Plans & Billing
 
 Netdata offers a **Community plan**, a free SaaS, Open Source Agent, and paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.

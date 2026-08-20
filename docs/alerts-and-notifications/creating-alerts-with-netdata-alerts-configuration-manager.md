@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md"
+sidebar_label: "Creating Alerts with the Alerts Configuration Manager"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications"
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/creating-alerts-with-the-alerts-configuration-manager"
+slug: "/alerts-&-notifications/creating-alerts-with-the-alerts-configuration-manager"
+-->
+
+
+
+
 # Creating Alerts with Netdata Alerts Configuration Manager
 
 The **Netdata Alerts Configuration Manager** lets you create and fine-tune alerts directly from the Netdata Cloud Dashboard using a visual UI wizard.

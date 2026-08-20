@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/performance-optimization.md"
+sidebar_label: "Performance Optimization"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Insights"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/insights/performance-optimization"
+slug: "/netdata-ai/insights/performance-optimization"
+-->
+
+
+
+
 # Performance Optimization
 
 Find bottlenecks before users notice. The Performance Optimization report analyzes contention patterns, throttling risks, and systemic inefficiencies, then produces prioritized, concrete remediation steps tied to your observed workload.

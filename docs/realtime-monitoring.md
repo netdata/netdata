@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md"
+sidebar_label: "Real-time Monitoring"
+learn_status: "Published"
+learn_rel_path: "Welcome to Netdata"
+description: "Learn how Netdata delivers one-second collection and sub-two-second visibility without sacrificing fidelity as infrastructure scales."
+learn_link: "https://learn.netdata.cloud/docs/welcome-to-netdata/real-time-monitoring"
+slug: "/welcome-to-netdata/real-time-monitoring"
+-->
+
+
+
+
 # Real-Time Monitoring: The Netdata Standard
 
 ## TL;DR

@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/README.md"
-sidebar_label: "Overview"
+sidebar_label: "SNMP Traps"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'snmp', 'trap', 'inform', 'network events', 'logs', 'netops', 'secops', 'snmpv3', 'otlp', 'siem']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Receive, decode, store, query, and forward SNMP Trap and INFORM events with the Netdata Agent."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps"
+slug: "/network-performance-monitoring/snmp-traps"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

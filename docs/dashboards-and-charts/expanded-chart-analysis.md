@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/expanded-chart-analysis.md"
+sidebar_label: "Expanded Chart Analysis"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/expanded-chart-analysis"
+slug: "/dashboards-and-charts/expanded-chart-analysis"
+-->
+
+
+
+
 # Expanded Chart Analysis
 
 Analyze your metrics in-depth with Netdata's Expanded Chart Analysis feature. Access detailed statistics, discover correlated metrics, and investigate anomalies directly from any chart.

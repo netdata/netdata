@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/registry/README.md"
+sidebar_label: "Registry"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+description: "Understand how the Netdata Registry links browsers, Agents, URLs, and accounts to support unified cross-Agent dashboards."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/registry"
+slug: "/netdata-agent/registry"
+-->
+
+
+
 # Registry
 
 Netdata uses a **central Registry**. Together with certain browser features, it allows for unified cross-Agent dashboards. For example, when you jump from Agent to Agent using the node menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts, etc.) are propagated to the new Agent, so that the new dashboard will come with exactly the same view.

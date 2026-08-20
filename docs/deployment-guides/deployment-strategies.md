@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-strategies.md"
+sidebar_label: "Configuration Examples"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents"
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/configuration-examples"
+slug: "/netdata-parents/configuration-examples"
+-->
+
+
+
+
 # Configuration Examples
 
 These practical examples will help you optimize Netdata for various real-world deployment scenarios.

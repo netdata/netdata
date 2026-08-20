@@ -1,3 +1,18 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/framework/charttpl/README.md"
+sidebar_label: "Chart Template Format"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+keywords: [charts, templates, collectors, dimensions, labels]
+description: "Define dynamic Netdata chart groups, instances, labels, dimensions, lifecycle, and presentation using declarative templates."
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/chart-template-format"
+slug: "/collecting-metrics/chart-template-format"
+-->
+
+
+
 # Chart Template Format
 
 ## Overview

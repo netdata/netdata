@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/README.md"
+sidebar_label: "MCP"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp"
+slug: "/netdata-ai/mcp"
+-->
+
+
+
+
 # Netdata MCP
 
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) works in **two directions** with Netdata:

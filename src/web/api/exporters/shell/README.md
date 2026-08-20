@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md"
+sidebar_label: "Shell Scripts"
+learn_status: "Published"
+learn_rel_path: "Exporting Metrics"
+learn_link: "https://learn.netdata.cloud/docs/exporting-metrics/shell-scripts"
+slug: "/exporting-metrics/shell-scripts"
+-->
+
+
+
 # Shell exporter
 
 Shell scripts can now query Netdata:

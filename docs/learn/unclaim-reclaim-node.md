@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/learn/unclaim-reclaim-node.md"
+sidebar_label: "Unclaim and Reclaim a Node"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/unclaim-and-reclaim-a-node"
+slug: "/netdata-cloud/unclaim-and-reclaim-a-node"
+-->
+
+
+
+
 # Unclaiming and Reclaiming a Node
 
 :::note

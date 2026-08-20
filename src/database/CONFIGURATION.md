@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/database/CONFIGURATION.md"
+sidebar_label: "Database"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+description: "With a single configuration change, the Netdata Agent can store days, weeks, or months of metrics at its famous per-second granularity."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/database"
+slug: "/netdata-agent/configuration/database"
+-->
+
+
+
 # Database Configuration Reference
 
 You can configure the Agent's Database through the database settings. For a deeper understanding of the Database components, see the [Database overview](/src/database/README.md).

@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/enrichment.md"
 sidebar_label: "Enrichment"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: [enrichment, geoip, asn, bgp, classifiers, network labels, mmdb, ipam]
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+description: "Order of evaluation, provider chains, MMDB shared mechanism, and the cross-cutting properties that span every enrichment method."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment"
+slug: "/network-performance-monitoring/network-flows/enrichment"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

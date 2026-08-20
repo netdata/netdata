@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/queries/percentile/README.md"
+sidebar_label: "Percentile"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/REST API/Queries"
+description: "Use percentile in API queries and health entities to find the 'percentile' value from a sample, eliminating any unwanted spikes in the returned metrics."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api/queries/percentile"
+slug: "/developer-and-contributor-corner/rest-api/queries/percentile"
+-->
+
+
+
 # Percentile
 
 The percentile is the average value of a series using only the smaller N percentile of the values.

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/kubernetes-tab.md"
+sidebar_label: "Kubernetes"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+description: "Netdata Cloud features rich, zero-configuration Kubernetes monitoring for the resource utilization and application metrics of Kubernetes (k8s) clusters."
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/kubernetes"
+slug: "/dashboards-and-charts/tabs/kubernetes"
+-->
+
+
+
+
 # Kubernetes tab
 
 The Netdata dashboards feature enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) dashboard.

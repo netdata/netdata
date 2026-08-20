@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/REFERENCE.md"
+sidebar_label: "Alert Configuration Reference"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications"
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-reference"
+slug: "/alerts-&-notifications/alert-configuration-reference"
+-->
+
+
+
 # Configure Health Alerts
 
 :::tip

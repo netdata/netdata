@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md"
+sidebar_label: "Clustering and High Availability of Netdata Parents"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents/Metrics Centralization Points"
+description: "Build highly available Netdata Parent clusters with Child failover, Parent synchronization, and safe maintenance procedures."
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents"
+slug: "/netdata-parents/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents"
+-->
+
+
+
+
 # Clustering and High Availability of Netdata Parents
 
 :::tip

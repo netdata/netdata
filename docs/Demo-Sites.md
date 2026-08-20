@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md"
+sidebar_label: "Live Demo"
+learn_status: "Published"
+learn_rel_path: "/"
+learn_link: "https://learn.netdata.cloud/docs/live-demo"
+slug: "/live-demo"
+-->
+
+
+
+
 
 # Live demos
 

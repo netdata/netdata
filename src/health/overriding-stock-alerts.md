@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/overriding-stock-alerts.md"
+sidebar_label: "Overriding Stock Alerts"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications"
+keywords: [alerts, health, override, stock, templates, alarms]
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/overriding-stock-alerts"
+slug: "/alerts-&-notifications/overriding-stock-alerts"
+-->
+
+
+
 # Overriding Stock Alerts
 
 This guide explains how to customize Netdata's stock alerts. User configurations survive upgrades, making this the recommended approach.

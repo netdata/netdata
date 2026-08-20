@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md"
+sidebar_label: "Update"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Maintenance"
+description: "If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly or stable version."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/maintenance/update"
+slug: "/netdata-agent/maintenance/update"
+-->
+
+
+
+
 # Update Netdata
 
 :::tip

@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/notifications/README.md"
+sidebar_label: "Agent Notifications Reference"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications/Notifications/Agent Dispatched Notifications"
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications/agent-notifications-reference"
+slug: "/alerts-&-notifications/notifications/agent-dispatched-notifications/agent-notifications-reference"
+-->
+
+
+
 # Agent Alert Notifications
 
 Netdata's Agent can send alert notifications directly from each node. It supports a wide range of services, multiple recipients, and role-based routing.

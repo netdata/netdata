@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md"
+sidebar_label: "Kubernetes"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+description: "Deploy Netdata to monitor a Kubernetes cluster to monitor the health, performance, resource utilization, and application metrics of a Kubernetes cluster in real time."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes"
+slug: "/netdata-agent/installation/kubernetes"
+-->
+
+
+
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 

@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/licensing/README.md"
-sidebar_label: "Overview"
+sidebar_label: "Licensing Monitoring"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Licensing Monitoring"
-keywords: ['license', 'licensing', 'entitlement', 'expiry', 'snmp', 'overview']
-endmeta-->
+description: "Track license state and expiry across your network devices before a feature silently stops."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/licensing-monitoring"
+slug: "/network-performance-monitoring/licensing-monitoring"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

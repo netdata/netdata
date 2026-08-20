@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md"
+sidebar_label: "Compile from source code"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/Build the Netdata Agent Yourself"
+description: "Package maintainers and power users may be interested in manually building Netdata from source without using any of our installation scripts."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/build-the-netdata-agent-yourself/compile-from-source-code"
+slug: "/developer-and-contributor-corner/build-the-netdata-agent-yourself/compile-from-source-code"
+-->
+
+
+
+
 # Manually build Netdata from source
 
 These instructions are for advanced users and distribution package

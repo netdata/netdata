@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/README.md"
+sidebar_label: "Dashboards and Charts"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts"
+slug: "/dashboards-and-charts"
+-->
+
+
+
+
 # Dashboards and Charts
 
 This guide explains how to access both **Agent** and **Cloud** dashboards in Netdata, with direct links to explore each section in more detail.

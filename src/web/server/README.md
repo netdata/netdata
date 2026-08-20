@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/server/README.md"
+sidebar_label: "Web Server Reference"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration/Securing Agents"
+description: "The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents/web-server-reference"
+slug: "/netdata-agent/configuration/securing-agents/web-server-reference"
+-->
+
+
+
 # Web Server Configuration Reference
 
 You can configure Netdata's built-in web server to control how it serves dashboards, handles connections, and manages security. The web server is `static-threaded`, with a fixed, configurable number of threads.

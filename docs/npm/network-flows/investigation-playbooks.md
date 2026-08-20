@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/investigation-playbooks.md"
 sidebar_label: "Investigation Playbooks"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['playbooks', 'investigation', 'workflows', 'troubleshooting traffic']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/investigation-playbooks"
+slug: "/network-performance-monitoring/network-flows/investigation-playbooks"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

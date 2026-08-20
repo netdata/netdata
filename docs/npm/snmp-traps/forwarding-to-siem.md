@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/forwarding-to-siem.md"
 sidebar_label: "Forwarding to SIEM"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'siem', 'forwarding', 'otlp', 'journal', 'logs']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Forward trap events through journal-native workflows or OTLP/gRPC and map fields in downstream log systems."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/forwarding-to-siem"
+slug: "/network-performance-monitoring/snmp-traps/forwarding-to-siem"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

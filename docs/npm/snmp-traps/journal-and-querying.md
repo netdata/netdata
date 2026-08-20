@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/journal-and-querying.md"
 sidebar_label: "Journal and Querying"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'journal', 'querying', 'logs', 'journalctl', 'export']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Query, export, copy, and inspect direct-journal trap data with Netdata Logs and journalctl-compatible workflows."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/journal-and-querying"
+slug: "/network-performance-monitoring/snmp-traps/journal-and-querying"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

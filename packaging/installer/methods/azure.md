@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/azure.md"
+sidebar_label: "Azure"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+description: "Install Netdata on Azure virtual machines, then configure network access and Azure-specific monitoring integrations."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/azure"
+slug: "/netdata-agent/installation/azure"
+-->
+
+
+
+
 # Install Netdata on Azure
 
 Netdata is fully compatible with Azure.

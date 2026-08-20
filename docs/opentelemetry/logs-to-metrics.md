@@ -1,3 +1,19 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-to-metrics.md"
+sidebar_label: "Logs-to-Metrics"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics/OpenTelemetry"
+keywords: [opentelemetry, otel, logs, metrics, count, filter, ottl]
+description: "Count matching OpenTelemetry log records and chart their rate in Netdata"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/opentelemetry/logs-to-metrics"
+slug: "/collecting-metrics/opentelemetry/logs-to-metrics"
+-->
+
+
+
+
 # Create Metrics from OpenTelemetry Logs
 
 An OpenTelemetry Collector can count matching log records and export the result to Netdata as a metric while it continues forwarding the original logs. This example drops health-check noise and charts warning and error records per second.

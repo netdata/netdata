@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/profile.plugin/README.md"
+sidebar_label: "profile.plugin"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/External Plugins"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins/profile.plugin"
+slug: "/developer-and-contributor-corner/external-plugins/profile.plugin"
+-->
+
+
+
 # profile.plugin
 
 This plugin allows someone to backfill an Agent with random data.

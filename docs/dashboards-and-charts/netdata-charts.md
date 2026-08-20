@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/netdata-charts.md"
+sidebar_label: "Charts"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/charts"
+slug: "/dashboards-and-charts/charts"
+-->
+
+
+
+
 # Netdata Charts
 
 Netdata charts provide **real-time, per-second metrics** to help you troubleshoot and explore your infrastructure with high-resolution insights.

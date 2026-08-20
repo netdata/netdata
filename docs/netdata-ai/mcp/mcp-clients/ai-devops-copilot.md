@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md"
+sidebar_label: "Supported AI Clients"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP/Supported AI Clients"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/supported-ai-clients"
+slug: "/netdata-ai/mcp/supported-ai-clients"
+-->
+
+
+
+
 # Supported AI Clients
 
 AI clients like **Claude Desktop**, **Cursor**, **Visual Studio Code**, **JetBrains IDEs**, **Netdata Web Client**, **Claude Code**, and **Gemini CLI** act as Model Context Protocol (MCP) clients that connect to Netdata's MCP server to bring real observability data into your AI workflows. This enables natural‑language analysis with context from your infrastructure and, for CLI tools, optional automation.

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/metric-correlations.md"
+sidebar_label: "Metric Correlations"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Troubleshooting"
+description: "Quickly find metrics and charts closely related to a particular timeframe of interest anywhere in your infrastructure to discover the root cause faster."
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/troubleshooting/metric-correlations"
+slug: "/netdata-ai/troubleshooting/metric-correlations"
+-->
+
+
+
+
 # Metric Correlations
 
 The **Metric Correlations** feature helps you quickly identify metrics and charts relevant to a specific time window of interest, allowing for faster root cause analysis.

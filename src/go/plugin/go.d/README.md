@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/README.md"
+sidebar_label: "go.d.plugin"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/External Plugins/go.d.plugin"
+description: "go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins/go.d.plugin"
+slug: "/developer-and-contributor-corner/external-plugins/go.d.plugin"
+-->
+
+
+
 # go.d.plugin
 
 `go.d.plugin` is a [Netdata](https://github.com/netdata/netdata) external plugin:

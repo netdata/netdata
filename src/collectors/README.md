@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/README.md"
+sidebar_label: "Collecting Metrics"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics"
+slug: "/collecting-metrics"
+-->
+
+
+
+
 # Collectors
 
 Netdata automatically collects per-second metrics from thousands of data sources without any configuration:

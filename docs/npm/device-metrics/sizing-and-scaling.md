@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/sizing-and-scaling.md"
 sidebar_label: "Sizing and Scaling"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'sizing', 'scaling', 'capacity', 'hub', 'parents', 'distributed', 'per-site']
-endmeta-->
+description: "How many devices one Agent should poll, and how to scale with hubs and Parents."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics/sizing-and-scaling"
+slug: "/network-performance-monitoring/device-metrics/sizing-and-scaling"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/anti-patterns.md"
 sidebar_label: "Anti-patterns"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'anti-patterns', 'mistakes', 'pitfalls', 'polling', 'counters', 'security']
-endmeta-->
+description: "The common SNMP polling mistakes and how to avoid them."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics/anti-patterns"
+slug: "/network-performance-monitoring/device-metrics/anti-patterns"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

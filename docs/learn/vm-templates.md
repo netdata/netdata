@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/learn/vm-templates.md"
+sidebar_label: "VM Templates"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+keywords: [vm, template, clone, kvm, proxmox, vagrant, terraform]
+description: "Prepare VM templates so each clone gets a unique Netdata identity"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/vm-templates"
+slug: "/netdata-agent/vm-templates"
+-->
+
+
+
+
 # VM Templates and Clones
 
 :::danger

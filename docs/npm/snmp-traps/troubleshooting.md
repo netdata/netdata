@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/troubleshooting.md"
 sidebar_label: "Troubleshooting"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'troubleshooting', 'receiver pipeline', 'decode errors', 'snmpv3', 'journal', 'otlp']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Diagnose missing rows, inactive listeners, UDP delivery, allowlist drops, SNMPv3 failures, profile issues, backend failures, and retention problems."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/troubleshooting"
+slug: "/network-performance-monitoring/snmp-traps/troubleshooting"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md"
+sidebar_label: "Health API Calls"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications"
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/health-api-calls"
+slug: "/alerts-&-notifications/health-api-calls"
+-->
+
+
+
 # Health API Calls
 
 ## Health Read API

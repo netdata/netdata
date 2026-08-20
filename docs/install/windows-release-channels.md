@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/install/windows-release-channels.md"
+sidebar_label: "Switching Install Types and Release Channels"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation/Windows"
+description: "Guide to choosing and switching between different Netdata Windows installation methods and release channels"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/windows/switching-install-types-and-release-channels"
+slug: "/netdata-agent/installation/windows/switching-install-types-and-release-channels"
+-->
+
+
+
+
 # Switching Netdata Install Types and Release Channels on Windows
 
 You can switch between different Netdata release channels on Windows based on your needs. This guide covers the process with step-by-step instructions.

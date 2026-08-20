@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md"
+sidebar_label: "Passive journal centralization without encryption"
+learn_status: "Published"
+learn_rel_path: "Logs/Logs Centralization Points with systemd-journald"
+learn_link: "https://learn.netdata.cloud/docs/logs/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption"
+slug: "/logs/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption"
+-->
+
+
+
+
 # Passive journal centralization without encryption
 
 This page will guide you through creating a passive journal centralization setup without the use of encryption.

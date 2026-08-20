@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/learn/node-identities.md"
+sidebar_label: "Node Identities"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+keywords: [guid, machine guid, node id, claimed id, identity, vnode, virtual node, dyncfg, dynamic configuration]
+description: "Understanding how Netdata identifies nodes across Agents Parents and Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/node-identities"
+slug: "/netdata-agent/node-identities"
+-->
+
+
+
+
 # Node Identities
 
 :::tip

@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/overview.md"
-sidebar_label: "Overview"
+sidebar_label: "Visualization"
 learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['visualization', 'overview', 'queries', 'fts', 'url sharing', 'group-by']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows/Visualization"
+description: "How queries work, the controls every panel shares, and where each panel fits."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization"
+slug: "/network-performance-monitoring/network-flows/visualization"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

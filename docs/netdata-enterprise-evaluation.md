@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation.md"
+sidebar_label: "Enterprise Evaluation Guide"
+learn_status: "Published"
+learn_rel_path: "Welcome to Netdata"
+keywords: [real-time observability, infrastructure monitoring]
+description: "Evaluate Netdata architecture, deployment models, infrastructure requirements, security, integrations, and operational capabilities."
+learn_link: "https://learn.netdata.cloud/docs/welcome-to-netdata/enterprise-evaluation-guide"
+slug: "/welcome-to-netdata/enterprise-evaluation-guide"
+-->
+
+
+
+
 # Netdata at a Glance: Enterprise Evaluation Guide
 
 ## Introduction

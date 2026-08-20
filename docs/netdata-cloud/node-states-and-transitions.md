@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-states-and-transitions.md"
+sidebar_label: "Node States and Transitions"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+keywords: [node states, live, stale, offline, unseen, transitions]
+description: "Understanding node connection states and state transitions in Netdata Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/node-states-and-transitions"
+slug: "/netdata-cloud/node-states-and-transitions"
+-->
+
+
+
+
 # Node States
 
 Netdata provides dashboards at multiple levels of your infrastructure. Each level displays node states based on what it can observe. This page explains what each state means, when transitions happen, and how to configure the behavior.

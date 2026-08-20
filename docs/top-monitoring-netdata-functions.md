@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md"
+sidebar_label: "Live View"
+learn_status: "Published"
+learn_rel_path: "Live View"
+description: "Present the Netdata Functions what these are and why they should be used."
+learn_link: "https://learn.netdata.cloud/docs/live-view"
+slug: "/live-view"
+-->
+
+
+
+
 # Live View
 
 Netdata Agent collectors provide on-demand, runtime executable functions on the host where they are deployed. Available since v1.37.1.

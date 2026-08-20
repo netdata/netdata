@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/installation.md"
 sidebar_label: "Installation"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp', 'traps', 'installation', 'go.d', 'udp', 'snmpv3']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/installation"
+slug: "/network-performance-monitoring/snmp-traps/installation"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

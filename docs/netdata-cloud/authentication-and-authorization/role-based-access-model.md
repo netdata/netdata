@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md"
+sidebar_label: "Role-based access model"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud/Authentication & Authorization"
+description: "Explanation of Netdata roles and permissions linked to them"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/role-based-access-model"
+slug: "/netdata-cloud/authentication-&-authorization/role-based-access-model"
+-->
+
+
+
+
 # Role-Based Access Control (RBAC)
 
 ## Overview

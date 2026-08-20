@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/quick-start.md"
 sidebar_label: "Quick Start"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['quick start', 'snmp traps', 'snmp', 'trap', 'logs', 'getting started']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Configure a listener, send a test trap, and prove Netdata received it."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/quick-start"
+slug: "/network-performance-monitoring/snmp-traps/quick-start"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

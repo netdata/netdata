@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/README.md"
+sidebar_label: "Notifications"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications/Notifications"
+description: "Send Netdata alerts from a centralized place with Netdata Cloud, or configure nodes individually, to enable incident response and faster resolution."
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/notifications"
+slug: "/alerts-&-notifications/notifications"
+-->
+
+
+
+
 # Notifications
 
 Netdata supports two ways to send alert notifications: **from Netdata Cloud** or **from the Netdata Agent**.

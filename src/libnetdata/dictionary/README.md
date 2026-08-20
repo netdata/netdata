@@ -1,10 +1,15 @@
 <!--
-custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/dictionary/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/libnetdata/dictionary/README.md"
 sidebar_label: "Dictionaries"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata"
+learn_rel_path: "Developer and Contributor Corner/libnetdata"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/libnetdata/dictionaries"
+slug: "/developer-and-contributor-corner/libnetdata/dictionaries"
 -->
+
+
+
+
 
 # Dictionaries
 

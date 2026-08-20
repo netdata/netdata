@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md"
+sidebar_label: "systemd-cat-native"
+learn_status: "Published"
+learn_rel_path: "Logs"
+learn_link: "https://learn.netdata.cloud/docs/logs/systemd-cat-native"
+slug: "/logs/systemd-cat-native"
+-->
+
+
+
 # systemd-cat-native
 
 `systemd` includes a utility called `systemd-cat`. This utility reads log lines from its standard input and sends them

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/README.md"
+sidebar_label: "Configuration"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+description: "Netdata is zero-configuration for most users, but complex infrastructures may require you to tweak some of the Agent's granular settings."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration"
+slug: "/netdata-agent/configuration"
+-->
+
+
+
+
 # Netdata Agent Configuration
 
 :::info

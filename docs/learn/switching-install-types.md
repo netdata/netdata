@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/learn/switching-install-types.md"
+sidebar_label: "Switch Install Types and Release Channels"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation/Linux"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/linux/switch-install-types-and-release-channels"
+slug: "/netdata-agent/installation/linux/switch-install-types-and-release-channels"
+-->
+
+
+
+
 # Switching Netdata Install Types and Release Channels
 
 You can switch between different Netdata installation types and release channels based on your needs. This guide covers both scenarios with step-by-step instructions.

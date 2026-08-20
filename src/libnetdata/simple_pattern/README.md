@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/libnetdata/simple_pattern/README.md"
+sidebar_label: "Simple patterns"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/libnetdata"
+description: "Netdata supports simple patterns, which are less cryptic versions of regular expressions. Use familiar notation for powerful results."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/libnetdata/simple-patterns"
+slug: "/developer-and-contributor-corner/libnetdata/simple-patterns"
+-->
+
+
+
 # Simple patterns
 
 Unix prefers regular expressions. But they are just too hard, too cryptic to use, write and understand.

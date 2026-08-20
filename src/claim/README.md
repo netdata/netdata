@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/claim/README.md"
+sidebar_label: "Connect Agent"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/connect-agent"
+slug: "/netdata-cloud/connect-agent"
+-->
+
+
+
+
 # Connect Agent to Cloud
 
 This section guides you through installing and securely connecting a new Agent to Netdata Cloud via the encrypted Agent-Cloud Link  ([ACLK](/src/aclk/README.md)). Connecting your Agent to your Space unlocks centralized monitoring, easier collaboration, and more.

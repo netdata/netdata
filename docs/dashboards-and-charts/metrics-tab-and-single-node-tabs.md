@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md"
+sidebar_label: "Metrics"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/metrics"
+slug: "/dashboards-and-charts/tabs/metrics"
+-->
+
+
+
+
 # Metrics Tab and Single Node Tabs
 
 The **Metrics tab** provides real-time, per-second time series charts for all nodes in a Room. It helps you visualize, explore, and troubleshoot metrics across your entire infrastructure in one place.

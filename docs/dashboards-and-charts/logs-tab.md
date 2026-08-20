@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/logs-tab.md"
+sidebar_label: "Logs"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/logs"
+slug: "/dashboards-and-charts/tabs/logs"
+-->
+
+
+
+
 # Logs tab
 
 The Logs tab provides a structured, searchable view of logs collected from across your infrastructure, supporting multiple log sources depending on the Node's operating system.

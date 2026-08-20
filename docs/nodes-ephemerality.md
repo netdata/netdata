@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/nodes-ephemerality.md"
+sidebar_label: "Node Types and Lifecycle Reference"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents"
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/node-types-and-lifecycle-reference"
+slug: "/netdata-parents/node-types-and-lifecycle-reference"
+-->
+
+
+
+
 # Node Types and Lifecycle Strategies
 
 Netdata categorizes nodes as **ephemeral** or **permanent** to help you tailor alerting, cleanup, and monitoring strategies for dynamic or static infrastructures.

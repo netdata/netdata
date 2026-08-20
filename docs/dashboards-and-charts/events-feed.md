@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/events-feed.md"
+sidebar_label: "Events"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+description: "Present the Netdata Events feed."
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/events"
+slug: "/dashboards-and-charts/tabs/events"
+-->
+
+
+
+
 # Events Tab
 
 The **Events tab** provides a powerful feed that tracks key activities across your infrastructure and Space. It helps you investigate historical events, making it easier to correlate changes with anomalies or node behavior.

@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md"
+sidebar_label: "Passive journal centralization with encryption using self-signed certificates"
+learn_status: "Published"
+learn_rel_path: "Logs/Logs Centralization Points with systemd-journald"
+learn_link: "https://learn.netdata.cloud/docs/logs/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates"
+slug: "/logs/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates"
+-->
+
+
+
+
 # Passive journal centralization with encryption using self-signed certificates
 
 This page will guide you through creating a **passive** journal centralization setup using **self-signed certificates** for encryption and authorization.

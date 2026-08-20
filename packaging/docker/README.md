@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/docker/README.md"
+sidebar_label: "Docker"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/docker"
+slug: "/netdata-agent/installation/docker"
+-->
+
+
+
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 

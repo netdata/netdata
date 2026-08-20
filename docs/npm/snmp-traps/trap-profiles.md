@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/trap-profiles.md"
 sidebar_label: "Trap Profiles"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'trap profiles', 'mib conversion', 'trap oid', 'trap metrics', 'netops', 'noc', 'sre']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Understand stock trap coverage, custom profiles, overrides, MIB conversion, and profile-defined metrics."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/trap-profiles"
+slug: "/network-performance-monitoring/snmp-traps/trap-profiles"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packages.md"
+sidebar_label: "Native Linux Distribution packages"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation/Linux"
+description: "Instructions for how to install Netdata using native DEB or RPM packages."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/linux/native-linux-distribution-packages"
+slug: "/netdata-agent/installation/linux/native-linux-distribution-packages"
+-->
+
+
+
+
 # Install Netdata Using Native DEB/RPM Packages
 
 :::note

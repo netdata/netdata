@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/README.md"
+sidebar_label: "Prometheus"
+learn_status: "Published"
+learn_rel_path: "Exporting Metrics"
+description: "Export Netdata metrics to Prometheus for archiving and further analysis."
+learn_link: "https://learn.netdata.cloud/docs/exporting-metrics/prometheus"
+slug: "/exporting-metrics/prometheus"
+-->
+
+
+
 # Using Netdata with Prometheus
 
 Netdata exports metrics to Prometheus through two methods:

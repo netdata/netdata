@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/functions/processes.md"
+sidebar_label: "Processes"
+learn_status: "Published"
+learn_rel_path: "Live View"
+learn_link: "https://learn.netdata.cloud/docs/live-view/processes"
+slug: "/live-view/processes"
+-->
+
+
+
+
 # Function: Top / Processes
 
 ## Quick Info

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md"
+sidebar_label: "Manage alert notification silencing rules"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications/Notifications/Centralized Cloud Notifications"
+description: "Master Netdata alert management via notification silencing rules for efficient and focused monitoring."
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules"
+slug: "/alerts-&-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules"
+-->
+
+
+
+
 # Manage Alert Notification Silencing Rules
 
 From the Cloud interface, you can manage your space's Alert notification silencing rules settings as well as allow users to define their personal ones.

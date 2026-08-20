@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md"
+sidebar_label: "SNMP Profile Format"
+learn_status: "Published"
+learn_rel_path: "Network Performance Monitoring/Device Metrics/Configuration"
+description: "Learn how Netdata’s SNMP collector uses profiles."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics/configuration/snmp-profile-format"
+slug: "/network-performance-monitoring/device-metrics/configuration/snmp-profile-format"
+-->
+
+
+
 # SNMP Profile Format
 
 ## Overview

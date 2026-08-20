@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/bandwidth-requirements.md"
+sidebar_label: "Bandwidth"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Resource Utilization"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/resource-utilization/bandwidth"
+slug: "/netdata-agent/resource-utilization/bandwidth"
+-->
+
+
+
+
 # Bandwidth Requirements
 
 ## Production Systems: Standalone Netdata

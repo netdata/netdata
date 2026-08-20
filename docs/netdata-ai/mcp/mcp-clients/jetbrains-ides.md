@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md"
+sidebar_label: "JetBrains IDEs"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP/Supported AI Clients"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/supported-ai-clients/jetbrains-ides"
+slug: "/netdata-ai/mcp/supported-ai-clients/jetbrains-ides"
+-->
+
+
+
+
 # JetBrains IDEs
 
 Configure JetBrains IDEs to access your Netdata infrastructure through MCP.

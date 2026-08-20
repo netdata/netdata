@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_REFERENCE.md"
+sidebar_label: "Functions v3 Protocol reference"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/External Plugins"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins/functions-v3-protocol-reference"
+slug: "/developer-and-contributor-corner/external-plugins/functions-v3-protocol-reference"
+-->
+
+
+
 # Netdata Functions v3 Protocol - Technical Reference
 
 > **Note**: This is the technical specification. For a practical guide to implementing functions, see [Functions Developer Guide](/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md). Topology Functions use the dedicated [Topology Function Schema](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md).

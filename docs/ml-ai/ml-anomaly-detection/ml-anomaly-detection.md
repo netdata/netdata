@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md"
+sidebar_label: "Anomaly Detection"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Anomaly Detection"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/anomaly-detection"
+slug: "/netdata-ai/anomaly-detection"
+-->
+
+
+
+
 # Machine Learning Anomaly Detection
 
 Netdata uses k-means clustering to detect anomalies for each collected metric automatically.

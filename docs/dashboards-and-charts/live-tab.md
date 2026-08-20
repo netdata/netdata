@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/live-tab.md"
+sidebar_label: "Live"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+description: "Access live information from monitored nodes through Netdata Functions"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/live"
+slug: "/dashboards-and-charts/tabs/live"
+-->
+
+
+
+
 # Live Tab
 
 The **Live tab** gives you real-time access to [Netdata Functions](/docs/top-monitoring-netdata-functions.md) that can be executed on any node running the Netdata Agent. These specialized routines, provided by various collectors, deliver live information from your monitored nodes—including database monitoring functions, network topology maps, process explorers, and more.

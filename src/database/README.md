@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/database/README.md"
+sidebar_label: "Database"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/database"
+slug: "/netdata-agent/database"
+-->
+
+
+
 # Database
 
 Netdata stores detailed metrics at one-second granularity using its Database engine. This document provides an overview of the various elements of the Database, if you want to configure it, check the [configuration reference page](/src/database/CONFIGURATION.md)

@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/troubleshooting.md"
 sidebar_label: "Troubleshooting"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['troubleshooting', 'debugging', 'plugin health', 'failures']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting"
+slug: "/network-performance-monitoring/network-flows/troubleshooting"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

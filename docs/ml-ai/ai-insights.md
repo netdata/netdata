@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md"
+sidebar_label: "Insights"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Insights"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/insights"
+slug: "/netdata-ai/insights"
+-->
+
+
+
+
 # AI Insights
 
 AI Insights generates on‑demand reports from your Netdata telemetry to explain what happened, why it happened, and recommended next steps. Reports use per‑second metrics, local anomaly scores, and correlation across nodes, then present evidence and actions in a concise, shareable format.

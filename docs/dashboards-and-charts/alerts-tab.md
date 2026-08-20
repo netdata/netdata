@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/alerts-tab.md"
+sidebar_label: "Alerts"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/alerts"
+slug: "/dashboards-and-charts/tabs/alerts"
+-->
+
+
+
+
 # Alerts Tab
 
 Netdata provides hundreds of pre-configured health alerts to notify you when an anomaly or performance issue affects your node or its applications.

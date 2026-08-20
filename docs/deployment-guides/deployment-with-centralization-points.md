@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-with-centralization-points.md"
+sidebar_label: "Netdata Parents"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents"
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents"
+slug: "/netdata-parents"
+-->
+
+
+
+
 # Parents: Your Centralization Points
 
 ***Parents*** are Netdata Agents that collect and store data from other Agents ("***Children***"). They act as centralization points for your observability data.

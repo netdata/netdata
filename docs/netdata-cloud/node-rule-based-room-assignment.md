@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-rule-based-room-assignment.md"
+sidebar_label: "Node Rule-Based Room Assignment"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud/Spaces and Rooms"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/spaces-and-rooms/node-rule-based-room-assignment"
+slug: "/netdata-cloud/spaces-and-rooms/node-rule-based-room-assignment"
+-->
+
+
+
+
 # Node Rule-Based Room Assignment
 
 You can organize Nodes within Rooms automatically using configurable label-based rules. This feature simplifies infrastructure management by dynamically assigning Nodes to appropriate Rooms based on their host labels, eliminating manual intervention.

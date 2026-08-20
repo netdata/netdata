@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md"
+sidebar_label: "Monitor, troubleshoot, and debug applications with eBPF metrics"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+description: "Use Netdata's built-in eBPF metrics collector to monitor, troubleshoot, and debug your custom application using low-level kernel feedback."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/monitor-troubleshoot-and-debug-applications-with-ebpf-metrics"
+slug: "/developer-and-contributor-corner/monitor-troubleshoot-and-debug-applications-with-ebpf-metrics"
+-->
+
+
+
+
 # Monitor, troubleshoot, and debug applications with eBPF metrics
 
 When trying to troubleshoot or debug a finicky application, there's no such thing as too much information. At Netdata,

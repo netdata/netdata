@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/topology/dependency-mapping.md"
 sidebar_label: "Application Dependency Mapping"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Topologies"
-keywords: ['dependency mapping', 'service map', 'network connections', 'sockets', 'processes', 'containers', 'kubernetes', 'systemd', 'topology']
-endmeta-->
+description: "Which process, container, and Kubernetes workload talks to which, read from the kernel with no instrumentation."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/topologies/application-dependency-mapping"
+slug: "/network-performance-monitoring/topologies/application-dependency-mapping"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

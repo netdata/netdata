@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/README.md"
+sidebar_label: "Exporting Metrics"
+learn_status: "Published"
+learn_rel_path: "Exporting Metrics"
+description: "Use the exporting engine to send Netdata metrics to popular external time series databases for long-term storage or further analysis."
+learn_link: "https://learn.netdata.cloud/docs/exporting-metrics"
+slug: "/exporting-metrics"
+-->
+
+
+
+
 # Export Metrics to External Time-Series Databases
 
 Netdata natively provides long-term metrics retention through its tiered database design. This architecture delivers significantly longer retention (months to years) and faster queries (typically 20+ times faster) compared to other common time-series databases.

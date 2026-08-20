@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md"
+sidebar_label: "Netdata Cloud"
+learn_status: "Published"
+learn_rel_path: "Security and Privacy Design"
+description: "Learn how Netdata Cloud secures metadata, live metric access, authentication, authorization, communications, and infrastructure."
+learn_link: "https://learn.netdata.cloud/docs/security-and-privacy-design/netdata-cloud"
+slug: "/security-and-privacy-design/netdata-cloud"
+-->
+
+
+
+
 # Netdata Cloud Security and Privacy Design
 
 :::tip

@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-code.md"
+sidebar_label: "Claude Code"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP/Supported AI Clients"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/supported-ai-clients/claude-code"
+slug: "/netdata-ai/mcp/supported-ai-clients/claude-code"
+-->
+
+
+
+
 # Claude Code
 
 Configure Claude Code to access your Netdata infrastructure through MCP.

@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/deployment-guides/README.md"
+sidebar_label: "Quickstart Deployment"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/quickstart-deployment"
+slug: "/netdata-agent/quickstart-deployment"
+-->
+
+
+
+
 # Deployment Guides
 
 Get Netdata up and running in your infrastructure. Choose a deployment method that fits your needs.

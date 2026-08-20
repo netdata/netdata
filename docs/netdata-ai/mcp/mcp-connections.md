@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-connections.md"
+sidebar_label: "MCP Connections"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/mcp-connections"
+slug: "/netdata-ai/mcp/mcp-connections"
+-->
+
+
+
+
 # MCP Connections
 
 An alert tells you *what* changed. It rarely tells you *why*. That answer usually lives somewhere else — the pull request that shipped minutes earlier, the incident already open in PagerDuty, the runbook sitting in Confluence.

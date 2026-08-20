@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/troubleshooting/troubleshoot.md"
+sidebar_label: "Alert Troubleshooting"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Troubleshooting"
+description: "Use Netdata AI to investigate alerts, correlate abnormal metrics and logs, assess urgency, and develop a root-cause hypothesis."
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/troubleshooting/alert-troubleshooting"
+slug: "/netdata-ai/troubleshooting/alert-troubleshooting"
+-->
+
+
+
+
 # AI-Powered Alert Troubleshooting
 
 ## Overview

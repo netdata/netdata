@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/README.md"
+sidebar_label: "Installation"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation"
+slug: "/netdata-agent/installation"
+-->
+
+
+
+
 # Netdata Agent Installation
 
 Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment guides](/docs/deployment-guides/README.md) to understand what better suites your needs.

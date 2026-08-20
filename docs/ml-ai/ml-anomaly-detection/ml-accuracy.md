@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-accuracy.md"
+sidebar_label: "ML Accuracy"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Anomaly Detection"
+description: "Analysis of Netdata's ML anomaly detection accuracy, false positive rates, and comparison with other approaches"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/anomaly-detection/ml-accuracy"
+slug: "/netdata-ai/anomaly-detection/ml-accuracy"
+-->
+
+
+
+
 # Analysis of Netdata's ML Anomaly Detection System
 
 ## Abstract

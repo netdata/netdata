@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/field-reference.md"
 sidebar_label: "Field Reference"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'field reference', 'trap fields', 'journal fields', 'varbinds', 'otlp', 'siem']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Complete reference for journal fields, report types, enrichment fields, varbind fields, tags, and OTLP mappings."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/field-reference"
+slug: "/network-performance-monitoring/snmp-traps/field-reference"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

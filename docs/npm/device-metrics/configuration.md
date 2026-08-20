@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/configuration.md"
 sidebar_label: "Configuration"
 learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'configuration', 'snmpv3', 'community', 'profiles', 'credentials', 'update_every']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Device Metrics/Configuration"
+description: "Credentials, SNMPv3, multiple devices, and the polling options."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics/configuration"
+slug: "/network-performance-monitoring/device-metrics/configuration"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

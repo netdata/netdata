@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/dyncfg.md"
+sidebar_label: "Dynamic Configuration"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+description: "Integrate plugins and modules with Netdata Dynamic Configuration using JSON Schema, validation, persistence, and generated UI forms."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/dynamic-configuration"
+slug: "/developer-and-contributor-corner/dynamic-configuration"
+-->
+
+
+
+
 # Developing with Dynamic Configuration (DynCfg)
 
 :::tip

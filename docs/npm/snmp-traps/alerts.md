@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/alerts.md"
 sidebar_label: "Alerts"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'alerts', 'health', 'severity', 'routing', 'silencing']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Understand, route, and silence the default SNMP trap health alerts."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/alerts"
+slug: "/network-performance-monitoring/snmp-traps/alerts"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

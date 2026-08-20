@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs.md"
+sidebar_label: "Monitor Nginx or Apache web server log files with Netdata"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/monitor-nginx-or-apache-web-server-log-files-with-netdata"
+slug: "/developer-and-contributor-corner/monitor-nginx-or-apache-web-server-log-files-with-netdata"
+-->
+
+
+
+
 # Monitor Nginx or Apache web server log files
 
 Parsing web server log files with Netdata, revealing the volume of redirects, requests and other metrics, can give you a better overview of your infrastructure.

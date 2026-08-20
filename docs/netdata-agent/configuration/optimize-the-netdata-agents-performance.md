@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md"
+sidebar_label: "Performance Optimization"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+description: "While the Netdata Agent is designed to monitor a system with only 1% CPU, you can optimize its performance for low-resource systems."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/performance-optimization"
+slug: "/netdata-agent/configuration/performance-optimization"
+-->
+
+
+
+
 # Agent Performance Optimization Guide
 
 While Netdata Agents work seamlessly out-of-the-box with comprehensive monitoring, you can tune their configuration for better performance when needed.

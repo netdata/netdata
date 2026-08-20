@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/gcp.md"
+sidebar_label: "GCP"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+description: "Install Netdata on Google Cloud instances, then configure VPC access and Google Cloud monitoring integrations."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/gcp"
+slug: "/netdata-agent/installation/gcp"
+-->
+
+
+
+
 # Install Netdata on GCP
 
 Netdata is fully compatible with the Google Cloud Platform (GCP).

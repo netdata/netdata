@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/README.md"
+sidebar_label: "Alerts & Notifications"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications"
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications"
+slug: "/alerts-&-notifications"
+-->
+
+
+
 # Alerts and Notifications in Netdata
 
 ## Introduction to Alerting

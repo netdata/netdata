@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/time-series.md"
 sidebar_label: "Time-Series"
 learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['time series', 'top-n over time', 'trends', 'visualization']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows/Visualization"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/time-series"
+slug: "/network-performance-monitoring/network-flows/visualization/time-series"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

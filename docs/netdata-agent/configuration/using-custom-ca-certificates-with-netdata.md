@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md"
+sidebar_label: "Using custom CA certificates with Netdata"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata"
+slug: "/netdata-agent/configuration/using-custom-ca-certificates-with-netdata"
+-->
+
+
+
+
 # Using custom CA certificates with Netdata
 
 When streaming over an encrypted connection, exporting metrics to a secure endpoint, collecting metrics from secure

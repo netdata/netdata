@@ -1,4 +1,16 @@
-<!-- markdownlint-disable MD013 MD043 -->
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md"
+sidebar_label: "SNMP Trap Profile Format"
+learn_status: "Published"
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Reference for SNMP trap profile YAML, trap definitions, varbind metadata, rendering, and profile metric rules."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/snmp-trap-profile-format"
+slug: "/network-performance-monitoring/snmp-traps/snmp-trap-profile-format"
+-->
+
+
+
+
 
 # SNMP Trap Profile Format
 

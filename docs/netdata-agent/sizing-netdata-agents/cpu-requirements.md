@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md"
+sidebar_label: "CPU"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Resource Utilization"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/resource-utilization/cpu"
+slug: "/netdata-agent/resource-utilization/cpu"
+-->
+
+
+
+
 # CPU Utilization
 
 Netdata's CPU usage depends on the features you enable. For details, see [resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).

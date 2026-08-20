@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-oss-limitations.md"
+sidebar_label: "Access Control and Feature Availability"
+learn_status: "Published"
+learn_rel_path: "Security and Privacy Design"
+description: "Feature availability across Anonymous access Netdata Cloud Community and Business tiers"
+learn_link: "https://learn.netdata.cloud/docs/security-and-privacy-design/access-control-and-feature-availability"
+slug: "/security-and-privacy-design/access-control-and-feature-availability"
+-->
+
+
+
+
 # Netdata Access Control and Feature Availability
 
 This document explains the access control policies that govern feature availability in Netdata, and how these change based on your authentication and subscription status.

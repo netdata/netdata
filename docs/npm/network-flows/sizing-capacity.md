@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/sizing-capacity.md"
 sidebar_label: "Sizing and Capacity Planning"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['sizing', 'capacity', 'planning', 'storage', 'memory', 'scaling', 'distributed']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+description: "Practical scaling guide -- plugin cap, storage, memory, and distributed deployment."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/sizing-and-capacity-planning"
+slug: "/network-performance-monitoring/network-flows/sizing-and-capacity-planning"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

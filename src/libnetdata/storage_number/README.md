@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/libnetdata/storage_number/README.md"
+sidebar_label: "Storage number"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/libnetdata"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/libnetdata/storage-number"
+slug: "/developer-and-contributor-corner/libnetdata/storage-number"
+-->
+
+
+
 # Netdata storage number
 
 Although `netdata` does all its calculations using `long double`, it stores all values using

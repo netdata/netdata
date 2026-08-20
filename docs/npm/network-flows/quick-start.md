@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/quick-start.md"
 sidebar_label: "Quick Start"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['quick start', 'netflow', 'sflow', 'ipfix', 'getting started', 'setup']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+description: "Get network flow monitoring running in five minutes."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/quick-start"
+slug: "/network-performance-monitoring/network-flows/quick-start"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

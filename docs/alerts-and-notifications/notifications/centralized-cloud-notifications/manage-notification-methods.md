@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md"
+sidebar_label: "Manage notification methods"
+learn_status: "Published"
+learn_rel_path: "Alerts & Notifications/Notifications/Centralized Cloud Notifications"
+description: "Instructions on how to manage notification methods"
+learn_link: "https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications/manage-notification-methods"
+slug: "/alerts-&-notifications/notifications/centralized-cloud-notifications/manage-notification-methods"
+-->
+
+
+
+
 # Manage Notification Methods
 
 From the Cloud interface, you can manage your Space's notification settings as well as allow users to personalize their notification settings.

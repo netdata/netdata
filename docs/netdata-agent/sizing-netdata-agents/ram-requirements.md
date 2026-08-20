@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md"
+sidebar_label: "RAM"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Resource Utilization"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/resource-utilization/ram"
+slug: "/netdata-agent/resource-utilization/ram"
+-->
+
+
+
+
 # RAM Utilization
 
 Using the default [Database Tier configuration](/src/database/README.md#tiers), Netdata needs about 16KiB per unique metric collected, independently of the data collection frequency.

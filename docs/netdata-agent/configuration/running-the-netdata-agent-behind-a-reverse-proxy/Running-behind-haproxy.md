@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md"
+sidebar_label: "HAProxy"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy/haproxy"
+slug: "/netdata-agent/configuration/securing-agents/running-the-agent-behind-a-reverse-proxy/haproxy"
+-->
+
+
+
+
 # Running Netdata behind HAProxy
 
 > HAProxy is a free, very fast and reliable solution offering high availability, load balancing, and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic websites

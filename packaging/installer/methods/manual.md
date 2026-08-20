@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md"
+sidebar_label: "Install the Netdata Agent from a Git checkout"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+description: "Use the Netdata Agent source code from GitHub, plus helper scripts to set up your system, to install Netdata without packages or binaries."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/install-the-netdata-agent-from-a-git-checkout"
+slug: "/developer-and-contributor-corner/install-the-netdata-agent-from-a-git-checkout"
+-->
+
+
+
+
 # Install Netdata on Linux from a Git checkout
 
 To install the latest git version of Netdata, please follow these 2 steps:

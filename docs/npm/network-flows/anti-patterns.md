@@ -1,10 +1,16 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/anti-patterns.md"
 sidebar_label: "Anti-patterns"
 learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['anti-patterns', 'mistakes', 'pitfalls', 'gotchas', 'misuse']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/Network Flows"
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns"
+slug: "/network-performance-monitoring/network-flows/anti-patterns"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

@@ -1,3 +1,18 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/cgroups.plugin/README.md"
+sidebar_label: "Containers and cgroups"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+description: "Monitor containers and virtual machines via Linux cgroups, with friendly name resolution for Docker, Kubernetes, Podman, LXC, libvirt, Proxmox, and more."
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/containers-and-cgroups"
+slug: "/collecting-metrics/containers-and-cgroups"
+-->
+
+
+
+
 # Monitor Cgroups (cgroups.plugin)
 
 You can monitor containers and virtual machines using **cgroups**.

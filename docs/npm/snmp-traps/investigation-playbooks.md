@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/investigation-playbooks.md"
 sidebar_label: "Investigation Playbooks"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'investigation', 'playbooks', 'incident response', 'deduplication', 'siem']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Follow operator playbooks for storms, critical traps, interface changes, restart signals, missing traps, unknown OIDs, SNMPv3 failures, and forwarding checks."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/investigation-playbooks"
+slug: "/network-performance-monitoring/snmp-traps/investigation-playbooks"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

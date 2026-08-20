@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/index.md"
+sidebar_label: "Investigations"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Investigations"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/investigations"
+slug: "/netdata-ai/investigations"
+-->
+
+
+
+
 # Investigations
 
 Ask Netdata anything about your infrastructure and get a deeply researched answer in minutes. Investigations turn your question and context into an analysis that correlates metrics, anomalies, and events across your systems.

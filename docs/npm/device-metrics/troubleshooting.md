@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/troubleshooting.md"
 sidebar_label: "Troubleshooting"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'troubleshooting', 'timeout', 'snmpv3', 'profile', 'gaps', 'mtu']
-endmeta-->
+description: "Timeouts, missing metrics, SNMPv3 auth, gaps, and phantom spikes."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics/troubleshooting"
+slug: "/network-performance-monitoring/device-metrics/troubleshooting"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

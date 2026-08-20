@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/nodes-tab.md"
+sidebar_label: "Nodes"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts/Tabs"
+description: "See charts from all your nodes in one pane of glass, then dive in to embedded dashboards for granular troubleshooting of ongoing issues."
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/tabs/nodes"
+slug: "/dashboards-and-charts/tabs/nodes"
+-->
+
+
+
+
 # Nodes tab
 
 The **Nodes tab** provides a live, centralized view of every node in your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview), allowing you to filter, sort, and interact with key node information.

@@ -38,6 +38,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: netdata/learn
+          ref: dcc2885a8c0ab62b0af60c5bd39ef67612d06206
           path: learn
 
       - name: Init python env

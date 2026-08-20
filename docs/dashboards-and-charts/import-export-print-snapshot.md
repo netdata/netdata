@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/import-export-print-snapshot.md"
+sidebar_label: "Import, export, and print a snapshot"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner"
+description: "Snapshots can be incredibly useful for diagnosing anomalies after they've already happened, and are interoperable with any other node running Netdata."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/import-export-and-print-a-snapshot"
+slug: "/developer-and-contributor-corner/import-export-and-print-a-snapshot"
+-->
+
+
+
+
 # Import, export, and print a snapshot
 
 > ❗This feature is only available on v1 dashboards, it hasn't been port-forwarded to v2.

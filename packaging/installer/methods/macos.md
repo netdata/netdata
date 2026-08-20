@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/macos.md"
+sidebar_label: "macOS"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/macos"
+slug: "/netdata-agent/installation/macos"
+-->
+
+
+
+
 # Install Netdata on macOS
 
 You can install Netdata in one of the three following ways:

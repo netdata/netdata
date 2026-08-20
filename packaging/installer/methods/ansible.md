@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/ansible.md"
+sidebar_label: "Ansible"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation"
+description: "Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/ansible"
+slug: "/netdata-agent/installation/ansible"
+-->
+
+
+
+
 # Deploy Netdata with Ansible
 
 Meet [Ansible](https://ansible.com), a popular tool for provisioning, configuration management, and infrastructure as code (IaC).

@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/REFERENCE.md"
+sidebar_label: "Collectors configuration"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/collectors-configuration"
+slug: "/collecting-metrics/collectors-configuration"
+-->
+
+
+
+
 # Collector configuration
 
 Find available collectors in the [Collecting Metrics](/src/collectors/README.md) guide and on our [Integrations page](https://www.netdata.cloud/integrations).

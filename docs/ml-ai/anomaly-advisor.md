@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/ml-ai/anomaly-advisor.md"
+sidebar_label: "Anomaly Advisor"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Troubleshooting"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/troubleshooting/anomaly-advisor"
+slug: "/netdata-ai/troubleshooting/anomaly-advisor"
+-->
+
+
+
+
 # Anomaly Advisor
 
 The Anomaly Advisor (the "Anomalies" tab on Netdata dashboards) is a troubleshooting assistant that correlates anomalies across your entire infrastructure and presents them as a ranked list of metrics, sorted by anomaly severity.

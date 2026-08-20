@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/quick-start.md"
 sidebar_label: "Quick Start"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'quick start', 'getting started', 'first device', 'auto-detection']
-endmeta-->
+description: "Get one device polling and auto-detected in a few minutes."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics/quick-start"
+slug: "/network-performance-monitoring/device-metrics/quick-start"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

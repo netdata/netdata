@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-desktop.md"
+sidebar_label: "Claude Desktop"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP/Supported AI Clients"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/supported-ai-clients/claude-desktop"
+slug: "/netdata-ai/mcp/supported-ai-clients/claude-desktop"
+-->
+
+
+
+
 # Claude Desktop
 
 Configure Claude Desktop to access your Netdata infrastructure through MCP.

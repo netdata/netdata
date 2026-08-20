@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/README.md"
+sidebar_label: "Netdata Cloud"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud"
+slug: "/netdata-cloud"
+-->
+
+
+
+
 # Netdata Cloud
 
 Netdata Cloud is a powerful service that transforms your standalone Netdata Agent installations into a unified, scalable observability solution. It achieves this without centralizing metric storage, ensuring optimal performance and cost-effectiveness even at enterprise scale.

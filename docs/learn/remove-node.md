@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/learn/remove-node.md"
+sidebar_label: "Remove Agent"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/remove-agent"
+slug: "/netdata-cloud/remove-agent"
+-->
+
+
+
+
 # Removing a node from your Netdata Cloud Space
 
 You can remove a node from your Space in Netdata Cloud, but the process depends on the node's current state and requires different approaches for different scenarios.

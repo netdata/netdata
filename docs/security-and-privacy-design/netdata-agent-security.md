@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md"
+sidebar_label: "Netdata Agent"
+learn_status: "Published"
+learn_rel_path: "Security and Privacy Design"
+description: "Learn how Netdata Agent protects raw data, isolates collectors, limits privileges, encrypts communications, and controls access."
+learn_link: "https://learn.netdata.cloud/docs/security-and-privacy-design/netdata-agent"
+slug: "/security-and-privacy-design/netdata-agent"
+-->
+
+
+
+
 # Netdata Agent Security and Privacy Design
 
 :::tip

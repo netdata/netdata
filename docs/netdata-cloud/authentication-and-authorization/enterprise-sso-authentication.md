@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md"
+sidebar_label: "Enterprise SSO Authentication"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud/Authentication & Authorization"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/enterprise-sso-authentication"
+slug: "/netdata-cloud/authentication-&-authorization/enterprise-sso-authentication"
+-->
+
+
+
+
 # Enterprise SSO Authentication
 
 Enterprise Single Sign-On (SSO) integration enables you to manage Netdata Cloud access through your existing identity management solution. This simplifies user authentication and improves security through centralized access control.

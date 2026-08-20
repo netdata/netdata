@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md"
+sidebar_label: "Functions developer guide"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/External Plugins"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/external-plugins/functions-developer-guide"
+slug: "/developer-and-contributor-corner/external-plugins/functions-developer-guide"
+-->
+
+
+
 # Netdata Functions: Developer Guide
 
 > **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md). For topology Functions, use the dedicated [Topology Function Schema](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md).

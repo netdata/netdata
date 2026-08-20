@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/securing-netdata-agents.md"
+sidebar_label: "Securing Agents"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration/Securing Agents"
+description: "Your data and systems are safe with Netdata, but we recommend a few easy ways to improve the security of your infrastructure."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents"
+slug: "/netdata-agent/configuration/securing-agents"
+-->
+
+
+
+
 # Securing Netdata Agents
 
 By default, your Netdata Agent exposes its local dashboard on port `19999`. If your node has a public IP address, the dashboard and metrics are accessible to anyone at `http://NODE:19999`.

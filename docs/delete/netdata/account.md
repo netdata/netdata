@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md"
+sidebar_label: "Account Deletion"
+learn_status: "Published"
+learn_rel_path: "Netdata Cloud"
+learn_link: "https://learn.netdata.cloud/docs/netdata-cloud/account-deletion"
+slug: "/netdata-cloud/account-deletion"
+-->
+
+
+
+
 # How to Delete Your Netdata Account
 
 :::note

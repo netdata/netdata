@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md"
+sidebar_label: "Organize systems, metrics, and alerts"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts"
+slug: "/netdata-agent/configuration/organize-systems-metrics-and-alerts"
+-->
+
+
+
+
 # Organize systems, metrics, and alerts
 
 When you monitor dozens or hundreds of systems, you need powerful ways to keep everything organized. Netdata helps you structure your infrastructure with Spaces, Rooms, virtual nodes, host labels, and metric labels.

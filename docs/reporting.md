@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/reporting.md"
+sidebar_label: "Reporting"
+learn_status: "Published"
+learn_rel_path: "Welcome to Netdata"
+keywords: [power bi, tableau, looker, qlik, reporting, business intelligence, bi, grafana, ai insights, mcp, executive reports, board reporting, data export]
+description: "Extract infrastructure insights for stakeholders and BI tools using AI Insights, AI assistants (MCP), Grafana, or data export to Power BI, Tableau, and other analytics platforms."
+learn_link: "https://learn.netdata.cloud/docs/welcome-to-netdata/reporting"
+slug: "/welcome-to-netdata/reporting"
+-->
+
+
+
+
 # Reporting
 
 Extract infrastructure insights for stakeholders, leadership, and external tools. Netdata provides four ways to create reports—from asking a simple question to exporting raw metrics into your existing business intelligence stack.

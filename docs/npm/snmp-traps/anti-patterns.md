@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/anti-patterns.md"
-sidebar_label: "Anti-Patterns"
+sidebar_label: "Anti-patterns"
 learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'anti-patterns', 'security', 'operations', 'validation', 'capacity']
-endmeta-->
+learn_rel_path: "Network Performance Monitoring/SNMP Traps"
+description: "Avoid unsafe listeners, broad relay trust, inline secrets, high-cardinality metrics, noisy alerting, and storage blind spots."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/snmp-traps/anti-patterns"
+slug: "/network-performance-monitoring/snmp-traps/anti-patterns"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

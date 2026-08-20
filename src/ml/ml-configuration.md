@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/ml/ml-configuration.md"
+sidebar_label: "ML Configuration"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Anomaly Detection"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/anomaly-detection/ml-configuration"
+slug: "/netdata-ai/anomaly-detection/ml-configuration"
+-->
+
+
+
 # ML Configuration
 
 You can use Netdata's [Machine Learning](/src/ml/README.md) capabilities to detect anomalies in your infrastructure metrics. This feature is enabled by default if your [Database mode](/src/database/README.md) is set to `db = dbengine`.

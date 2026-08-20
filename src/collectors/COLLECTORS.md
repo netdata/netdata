@@ -1,4 +1,17 @@
-<!-- markdownlint-disable-file -->
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md"
+sidebar_label: "Monitor Anything"
+learn_status: "Published"
+learn_rel_path: "Welcome to Netdata"
+description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
+learn_link: "https://learn.netdata.cloud/docs/welcome-to-netdata/monitor-anything"
+slug: "/welcome-to-netdata/monitor-anything"
+-->
+
+
+
+
+
 
 # Monitor anything with Netdata
 

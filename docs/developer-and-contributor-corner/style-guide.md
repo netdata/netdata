@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/style-guide.md"
+sidebar_label: "Netdata style guide"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/Contribute to the documentation"
+description: "The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/contribute-to-the-documentation/netdata-style-guide"
+slug: "/developer-and-contributor-corner/contribute-to-the-documentation/netdata-style-guide"
+-->
+
+
+
+
 # Netdata style guide
 
 The _Netdata style guide_ establishes editorial guidelines for any writing produced by the Netdata team or the Netdata community, including documentation, articles, in-product UX copy, and more.

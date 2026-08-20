@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/README.md"
+sidebar_label: "Metrics Centralization Points"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents/Metrics Centralization Points"
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/metrics-centralization-points"
+slug: "/netdata-parents/metrics-centralization-points"
+-->
+
+
+
+
 # Configure Netdata Parents to centralize metrics
 
 ## How Metrics Centralization Works

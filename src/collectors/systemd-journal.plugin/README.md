@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/README.md"
+sidebar_label: "Systemd Journal Plugin Reference"
+learn_status: "Published"
+learn_rel_path: "Logs/Systemd Journal Logs"
+description: "View and analyze logs available in systemd journal"
+learn_link: "https://learn.netdata.cloud/docs/logs/systemd-journal-logs/systemd-journal-plugin-reference"
+slug: "/logs/systemd-journal-logs/systemd-journal-plugin-reference"
+-->
+
+
+
 # `systemd` journal plugin
 
 [KEY FEATURES](#key-features) | [PREREQUISITES](#prerequisites) | [JOURNAL SOURCES](#journal-sources) | [JOURNAL FIELDS](#journal-fields) | [VISUALIZATION](#visualization-capabilities) | [PLAY MODE](#play-mode) | [FULL TEXT SEARCH](#full-text-search) | [QUERY PERFORMANCE](#query-performance) | [PERFORMANCE AT SCALE](#performance-at-scale) | [BEST PRACTICES](#best-practices-for-better-performance) | [CONFIGURATION](#configuration-and-maintenance) | [FAQ](#faq) | [HOW TO TROUBLESHOOT COMMON ISSUES](#how-to-troubleshoot-common-issues) | [HOW TO VERIFY SETUP](#how-to-verify-setup)

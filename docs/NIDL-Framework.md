@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/NIDL-Framework.md"
+sidebar_label: "NIDL Framework"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts"
+description: "Understand Netdata's Nodes, Instances, Dimensions, and Labels model for organizing, exploring, and designing metrics."
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/nidl-framework"
+slug: "/dashboards-and-charts/nidl-framework"
+-->
+
+
+
+
 # NIDL Framework: Guiding Netdata's Observability
 
 ## Introduction

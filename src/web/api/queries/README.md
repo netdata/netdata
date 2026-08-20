@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/queries/README.md"
+sidebar_label: "Queries"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/REST API/Queries"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api/queries"
+slug: "/developer-and-contributor-corner/rest-api/queries"
+-->
+
+
+
 # Database queries/lookup
 
 :::caution

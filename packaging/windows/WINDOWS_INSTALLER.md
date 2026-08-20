@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/windows/WINDOWS_INSTALLER.md"
+sidebar_label: "Windows"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Installation/Windows"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/installation/windows"
+slug: "/netdata-agent/installation/windows"
+-->
+
+
+
+
 # Install Netdata on Windows
 
 Netdata provides a simple Windows installer for quick setup.

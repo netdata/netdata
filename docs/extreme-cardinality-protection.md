@@ -1,3 +1,17 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/extreme-cardinality-protection.md"
+sidebar_label: "Extreme Cardinality Protection"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Resource Utilization"
+keywords: [cardinality, ephemerality, retention, metadata, netdata-meta.db]
+description: "How Netdata limits long-term resource use from short-lived chart instances, and how metadata cleanup affects disk space."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/resource-utilization/extreme-cardinality-protection"
+slug: "/netdata-agent/resource-utilization/extreme-cardinality-protection"
+-->
+
+
+
+
 # Extreme cardinality protection
 
 Extreme cardinality occurs when a node continually creates new, short-lived chart instances. Common causes include ephemeral containers and collectors that repeatedly discover transient resources.

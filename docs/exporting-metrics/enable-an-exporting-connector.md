@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/enable-an-exporting-connector.md"
+sidebar_label: "Enable an exporting connector"
+learn_status: "Published"
+learn_rel_path: "Exporting Metrics"
+description: "Learn how to enable and configure any connector using examples to start exporting metrics to external time-series databases in minutes."
+learn_link: "https://learn.netdata.cloud/docs/exporting-metrics/enable-an-exporting-connector"
+slug: "/exporting-metrics/enable-an-exporting-connector"
+-->
+
+
+
+
 # Enable an Exporting Connector
 
 After selecting the right connector for your [external time-series database](/docs/exporting-metrics/README.md#supported-databases), you can enable the exporting engine and configure your connector. This guide walks through enabling the exporting engine itself, followed by two examples using the OpenTSDB and Graphite connectors.

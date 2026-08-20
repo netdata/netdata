@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md"
+sidebar_label: "Replication of Past Samples"
+learn_status: "Published"
+learn_rel_path: "Netdata Parents/Metrics Centralization Points"
+description: "Learn how Netdata replicates historical samples after reconnection to fill gaps between Children and Parents."
+learn_link: "https://learn.netdata.cloud/docs/netdata-parents/metrics-centralization-points/replication-of-past-samples"
+slug: "/netdata-parents/metrics-centralization-points/replication-of-past-samples"
+-->
+
+
+
+
 # Replication of Past Samples
 
 :::tip

@@ -1,3 +1,19 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/opentelemetry/logs-collection.md"
+sidebar_label: "Logs Collection"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics/OpenTelemetry"
+keywords: [opentelemetry, otel, journald, filelog, syslog, logs, receivers]
+description: "Collect systemd journal, application file, and syslog records through OpenTelemetry Collector receivers"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/opentelemetry/logs-collection"
+slug: "/collecting-metrics/opentelemetry/logs-collection"
+-->
+
+
+
+
 # Collect Logs with OpenTelemetry Collector
 
 Use these recipes to send systemd journal entries and application log files through an OpenTelemetry Collector to Netdata. For network-device syslog, use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md).

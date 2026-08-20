@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/vs-code.md"
+sidebar_label: "Visual Studio Code"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/MCP/Supported AI Clients"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/mcp/supported-ai-clients/visual-studio-code"
+slug: "/netdata-ai/mcp/supported-ai-clients/visual-studio-code"
+-->
+
+
+
+
 # VS Code
 
 Configure Visual Studio Code extensions to access your Netdata infrastructure through MCP.

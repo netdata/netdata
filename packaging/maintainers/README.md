@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/maintainers/README.md"
+sidebar_label: "Package Maintainers"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/Build the Netdata Agent Yourself"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/build-the-netdata-agent-yourself/package-maintainers"
+slug: "/developer-and-contributor-corner/build-the-netdata-agent-yourself/package-maintainers"
+-->
+
+
+
+
 # Package maintainers
 
 This page tracks the package maintainers for Netdata, for various operating systems and versions.

@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md"
+sidebar_label: "Anonymous telemetry events"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/anonymous-telemetry-events"
+slug: "/netdata-agent/anonymous-telemetry-events"
+-->
+
+
+
+
 # Anonymous telemetry events
 
 By default, Netdata collects anonymous usage information from the open-source monitoring Agent. For events like start, stop, crash, etc., we use our own cloud function in GCP. For frontend telemetry (page views, etc.) on the dashboard itself, we use the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog).

@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md"
+sidebar_label: "Security and Privacy Design"
+learn_status: "Published"
+learn_rel_path: "Security and Privacy Design"
+description: "Understand Netdata's security and privacy architecture, data boundaries, encryption, access controls, and compliance practices."
+learn_link: "https://learn.netdata.cloud/docs/security-and-privacy-design"
+slug: "/security-and-privacy-design"
+-->
+
+
+
+
 # Security and Privacy Design
 
 :::tip

@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md"
+sidebar_label: "Forward Secure Sealing (FSS) in Systemd-Journal"
+learn_status: "Published"
+learn_rel_path: "Logs/Systemd Journal Logs"
+learn_link: "https://learn.netdata.cloud/docs/logs/systemd-journal-logs/forward-secure-sealing-fss-in-systemd-journal"
+slug: "/logs/systemd-journal-logs/forward-secure-sealing-fss-in-systemd-journal"
+-->
+
+
+
 # Forward Secure Sealing (FSS) in Systemd-Journal
 
 Forward Secure Sealing (FSS) is a feature in the systemd journal designed to detect log file tampering.

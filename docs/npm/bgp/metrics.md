@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/bgp/metrics.md"
 sidebar_label: "Metrics and Functions"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/BGP Monitoring"
-keywords: ['bgp', 'metrics', 'charts', 'snmp:bgp-peers', 'function', 'alerts']
-endmeta-->
+description: "The snmp.bgp.* charts and the snmp:bgp-peers function."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/bgp-monitoring/metrics-and-functions"
+slug: "/network-performance-monitoring/bgp-monitoring/metrics-and-functions"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

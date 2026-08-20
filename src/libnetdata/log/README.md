@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/libnetdata/log/README.md"
+sidebar_label: "Logging"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/logging"
+slug: "/netdata-agent/logging"
+-->
+
+
+
 # Netdata Logging
 
 :::note

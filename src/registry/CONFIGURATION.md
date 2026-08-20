@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/registry/CONFIGURATION.md"
+sidebar_label: "Registry"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Configuration"
+description: "Configure a private Netdata Registry, access controls, retention, cookies, and Agent settings for cross-server dashboards."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/configuration/registry"
+slug: "/netdata-agent/configuration/registry"
+-->
+
+
+
 # Registry Configuration Reference
 
 You can configure Netdata's **central Registry** to provide unified cross-server dashboards. Together with certain browser features, it allows Netdata to provide these dashboards. The Registry operates with [minimal data transfer](/src/registry/README.md#communication-with-the-registry), with all communication occurring directly between your web browser and the Registry.

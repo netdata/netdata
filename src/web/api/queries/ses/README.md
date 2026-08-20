@@ -1,3 +1,14 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/web/api/queries/ses/README.md"
+sidebar_label: "Single (or Simple) Exponential Smoothing (`ses`)"
+learn_status: "Published"
+learn_rel_path: "Developer and Contributor Corner/REST API/Queries"
+learn_link: "https://learn.netdata.cloud/docs/developer-and-contributor-corner/rest-api/queries/single-or-simple-exponential-smoothing-ses"
+slug: "/developer-and-contributor-corner/rest-api/queries/single-or-simple-exponential-smoothing-ses"
+-->
+
+
+
 # Single (or Simple) Exponential Smoothing (`ses`)
 
 > This query is also available as `ema` and `ewma`.

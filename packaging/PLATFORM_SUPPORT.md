@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md"
+sidebar_label: "Versions & Platforms"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent"
+description: "Present all the supported platform in the Netdata solution"
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/versions-&-platforms"
+slug: "/netdata-agent/versions-&-platforms"
+-->
+
+
+
+
 # Platform support policy
 
 Netdata is evolving rapidly and new features are added at a constant pace. Therefore, we have a frequent release cadence to deliver all these features to you as soon as possible.

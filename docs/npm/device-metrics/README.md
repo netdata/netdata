@@ -1,10 +1,17 @@
-<!--startmeta
+<!--
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/README.md"
-sidebar_label: "Overview"
+sidebar_label: "Device Metrics"
 learn_status: "Published"
 learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'network devices', 'router', 'switch', 'firewall', 'discovery', 'interface', 'overview']
-endmeta-->
+description: "Poll routers, switches, firewalls, and other devices over SNMP with the Netdata Agent."
+learn_link: "https://learn.netdata.cloud/docs/network-performance-monitoring/device-metrics"
+slug: "/network-performance-monitoring/device-metrics"
+-->
+
+
+
+
+
 
 <!-- markdownlint-disable-file -->
 

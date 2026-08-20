@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-ai/troubleshooting/index.md"
+sidebar_label: "Troubleshooting"
+learn_status: "Published"
+learn_rel_path: "Netdata AI/Troubleshooting"
+learn_link: "https://learn.netdata.cloud/docs/netdata-ai/troubleshooting"
+slug: "/netdata-ai/troubleshooting"
+-->
+
+
+
+
 # Troubleshooting
 
 Netdata AI accelerates troubleshooting with three complementary tools:

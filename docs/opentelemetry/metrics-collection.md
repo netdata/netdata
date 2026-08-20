@@ -1,3 +1,19 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/opentelemetry/metrics-collection.md"
+sidebar_label: "Metrics Collection"
+learn_status: "Published"
+toc_max_heading_level: "6"
+toc_collapsible: "true"
+learn_rel_path: "Collecting Metrics/OpenTelemetry"
+keywords: [opentelemetry, otel, prometheus, redis, nginx, postgresql, hostmetrics, receivers]
+description: "Collect Prometheus, Redis, NGINX, PostgreSQL, and host metrics through OpenTelemetry Collector receivers"
+learn_link: "https://learn.netdata.cloud/docs/collecting-metrics/opentelemetry/metrics-collection"
+slug: "/collecting-metrics/opentelemetry/metrics-collection"
+-->
+
+
+
+
 # Collect Metrics with OpenTelemetry Collector
 
 Use these recipes when an OpenTelemetry Collector is already part of your observability pipeline or must fan metrics out to multiple backends. If Netdata is the only consumer, prefer the linked native Netdata collector: it requires fewer moving parts and provides purpose-built charts and alerts.

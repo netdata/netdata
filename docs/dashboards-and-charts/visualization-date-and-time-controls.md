@@ -1,3 +1,15 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md"
+sidebar_label: "Time Controls"
+learn_status: "Published"
+learn_rel_path: "Dashboards and Charts"
+learn_link: "https://learn.netdata.cloud/docs/dashboards-and-charts/time-controls"
+slug: "/dashboards-and-charts/time-controls"
+-->
+
+
+
+
 # Visualization date and time controls
 
 Netdata's dashboard features powerful date visualization controls that include a time control, a timezone selector and a rich date and timeframe selector.

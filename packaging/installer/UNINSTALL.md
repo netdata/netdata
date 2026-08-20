@@ -1,3 +1,16 @@
+<!--
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md"
+sidebar_label: "Uninstall"
+learn_status: "Published"
+learn_rel_path: "Netdata Agent/Maintenance"
+description: "If you are no longer interested in using the Netdata Agent, use the self-contained uninstaller to remove all traces of binaries and configuration files."
+learn_link: "https://learn.netdata.cloud/docs/netdata-agent/maintenance/uninstall"
+slug: "/netdata-agent/maintenance/uninstall"
+-->
+
+
+
+
 # Uninstall Netdata
 
 :::tip
