@@ -147,14 +147,39 @@ if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
   string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
 endif()
 
-set(CACHE_DIR "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
-set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
-set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
-set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
-set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
+# Install layout: each Netdata-owned path is defined once here, as a *_DEST
+# (install-relative, for install(DESTINATION ...)) plus a *_DIR (runtime
+# absolute) derived from it, so the staged tree and the runtime paths cannot
+# drift apart. New install rules must use a *_DEST variable, not a literal path.
+#
+# This covers install() destinations only. The CPack manifests and the RPM file
+# lists in packaging/cmake/Modules/ still spell the layout out, deliberately, to
+# mirror netdata.spec.in; they do not read these variables.
+#
+# *_DIR reaches the rest of the product through config.h (C), -ldflags (Go),
+# corrosion env vars (Rust) and configure_file (shell, service units); the daemon
+# re-exports them to its child plugins as NETDATA_*_DIR. BINDIR/NETDATA_BIN_DIR
+# are the same pairing for the daemon binary, with BINDIR set before
+# include(NetdataPlatform) because Windows overrides it.
+set(LIBEXEC_DEST "usr/libexec/netdata")
+set(PLUGINS_DEST "${LIBEXEC_DEST}/plugins.d")
+set(LIBDIR_DEST "usr/lib/netdata")
+set(LIBCONFIG_DEST "${LIBDIR_DEST}/conf.d")
+set(SYSTEM_DEST "${LIBDIR_DEST}/system")
+set(CONFIG_DEST "etc/netdata")
+set(CACHE_DEST "var/cache/netdata")
+set(LOG_DEST "var/log/netdata")
+set(VARLIB_DEST "var/lib/netdata")
+set(RUN_DEST "var/run/netdata")
 set(STOCK_DATA_DEST "usr/share/netdata")
+
+set(CACHE_DIR "${NETDATA_RUNTIME_PREFIX}/${CACHE_DEST}")
+set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/${CONFIG_DEST}")
+set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/${LIBCONFIG_DEST}")
+set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/${LOG_DEST}")
+set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/${PLUGINS_DEST}")
 set(STOCK_DATA_DIR "${NETDATA_RUNTIME_PREFIX}/${STOCK_DATA_DEST}")
-set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
+set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/${VARLIB_DEST}")
 set(NETDATA_BIN_DIR "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
 if(NOT DEFINED NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
   set(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR "")
