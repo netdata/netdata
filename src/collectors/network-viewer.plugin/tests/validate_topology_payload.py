@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Validate a network-viewer.plugin --test topology:network-connections payload.
+"""
+Validate a network-viewer.plugin --test topology:network-connections payload.
 
 Reads a pluginsd FUNCTION_RESULT payload from the given file (or stdin) and
 checks it against FUNCTION_TOPOLOGY_SCHEMA.json and a few semantic invariants.
@@ -96,35 +97,29 @@ def run_self_test():
     return 0
 
 
-def main(argv):
-    args = list(argv)
+def parse_view_expectations(args):
+    """Pull --mode/--group-by from the argument list; returns (mode, group_by, rc)."""
     expect_mode = None
     expect_group_by = None
-    if "--self-test" in args:
-        return run_self_test()
     while "--mode" in args:
         i = args.index("--mode")
         if i + 1 >= len(args):
             print("--mode requires a value (aggregated|detailed)")
-            return 2
+            return None, None, 2
         expect_mode = args[i + 1]
         del args[i:i + 2]
     while "--group-by" in args:
         i = args.index("--group-by")
         if i + 1 >= len(args):
             print("--group-by requires a value (process_name|pid|container)")
-            return 2
+            return None, None, 2
         expect_group_by = args[i + 1]
         del args[i:i + 2]
+    return expect_mode, expect_group_by, 0
 
-    payload_file = args[0] if len(args) > 0 else None
-    if payload_file is None or payload_file == "-":
-        payload_file = "/dev/stdin"
-    here = os.path.dirname(os.path.abspath(__file__))
-    schema_file = args[1] if len(args) > 1 else os.path.join(
-        here, "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json")
 
-    data = load_payload(payload_file)
+def validate_payload(data, schema_file, expect_mode, expect_group_by):
+    """Run the JSON schema and semantic checks; returns 0 on success."""
     schema = json.load(io.open(schema_file, encoding='utf-8'))
 
     try:
@@ -160,6 +155,26 @@ def main(argv):
           f" (actors={data['data']['actors']['rows']}, links={data['data']['links']['rows']}, "
           f"mode={data['data']['view']['mode']})")
     return 0
+
+
+def main(argv):
+    args = list(argv)
+    if "--self-test" in args:
+        return run_self_test()
+
+    expect_mode, expect_group_by, rc = parse_view_expectations(args)
+    if rc:
+        return rc
+
+    payload_file = args[0] if len(args) > 0 else None
+    if payload_file is None or payload_file == "-":
+        payload_file = "/dev/stdin"
+    here = os.path.dirname(os.path.abspath(__file__))
+    schema_file = args[1] if len(args) > 1 else os.path.join(
+        here, "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json")
+
+    data = load_payload(payload_file)
+    return validate_payload(data, schema_file, expect_mode, expect_group_by)
 
 
 if __name__ == "__main__":
