@@ -2662,11 +2662,22 @@ void pgc_open_cache_to_journal_v2(
         current_extent_index_id = ei->index;
 
         // update the metrics JudyL
-
-        PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
+        //
+        // Keyed by the uuidmap id, NOT by page->metric_id. The journal wants one
+        // entry per UUID: its reader bsearches the metric list by uuid and would
+        // only ever find one group, so two groups for the same uuid would make
+        // one group's pages invisible.
+        //
+        // page->metric_id cannot provide that guarantee. If a metric is deleted
+        // and recreated for the same uuid it gets a NEW pointer, so older pages
+        // can still carry the old one while newer pages carry the new one - two
+        // keys, one uuid. (Before metrics were resolved by id, such an old page
+        // failed to resolve and was skipped, which hid this; resolving by id
+        // makes both pages index successfully and exposes it.)
+        PValue = JudyLIns(&JudyL_metrics, (Word_t)xio->uuid_id, PJE0);
         if(!PValue || PValue == PJERR)
-            fatal("CACHE: JudyLIns(JudyL_metrics, 0x%lx) failed, JudyL_metrics = %p, result = %p",
-                  (long unsigned)page->metric_id, JudyL_metrics, PValue);
+            fatal("CACHE: JudyLIns(JudyL_metrics, uuid_id %u) failed, JudyL_metrics = %p, result = %p",
+                  xio->uuid_id, JudyL_metrics, PValue);
 
         struct jv2_metrics_info *mi;
         if(!*PValue) {
@@ -2739,9 +2750,10 @@ void pgc_open_cache_to_journal_v2(
 
     {
         Pvoid_t *PValue1;
-        bool metric_id_first = true;
-        Word_t metric_id = 0;
-        while ((PValue1 = JudyLFirstThenNext(JudyL_metrics, &metric_id, &metric_id_first))) {
+        // the key is a uuidmap id, not a metric pointer - see the JudyLIns above
+        bool uuid_id_first = true;
+        Word_t uuid_id = 0;
+        while ((PValue1 = JudyLFirstThenNext(JudyL_metrics, &uuid_id, &uuid_id_first))) {
             struct jv2_metrics_info *mi = *PValue1;
 
             Pvoid_t *PValue2;
