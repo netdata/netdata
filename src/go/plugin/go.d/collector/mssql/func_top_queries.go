@@ -202,6 +202,10 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	case topQueriesMethodID:
 		paramsCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 		defer cancel()
+		if _, err := f.router.collector.ensureEngineEdition(paramsCtx); err != nil {
+			// Handle owns the final 499/500/504 response classification.
+			return nil, nil
+		}
 		return f.methodParams(paramsCtx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -217,6 +221,12 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	case topQueriesMethodID:
 		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 		defer cancel()
+		if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
+			if response := mssqlFunctionContextError(queryCtx, err); response != nil {
+				return response
+			}
+			return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
+		}
 		return f.collectData(queryCtx, params.Column(topQueriesParamSort))
 	default:
 		return funcapi.NotFoundResponse(method)
@@ -268,6 +278,9 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 		if response := mssqlFunctionContextError(ctx, err); response != nil {
 			return response
 		}
+		if isDeadlockPermissionError(err) {
+			return funcapi.ErrorResponse(403, "%s", f.router.collector.topQueriesPermissionMessage())
+		}
 		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to detect Query Store support: %v", err)}
 	}
 	if !supported {
@@ -278,6 +291,9 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	if err != nil {
 		if response := mssqlFunctionContextError(ctx, err); response != nil {
 			return response
+		}
+		if isDeadlockPermissionError(err) {
+			return funcapi.ErrorResponse(403, "%s", f.router.collector.topQueriesPermissionMessage())
 		}
 		if errors.Is(err, errQueryStoreNotEnabled) {
 			return funcapi.UnavailableResponse(queryStoreNotEnabled)
@@ -300,12 +316,15 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	timeWindowDays := f.router.collector.topQueriesTimeWindowDays()
 	limit := f.router.collector.topQueriesLimit()
-	query := f.buildDynamicSQL(cols, validatedSortColumn, timeWindowDays, limit)
+	query := f.buildQueryStoreSQL(cols, validatedSortColumn, timeWindowDays, limit)
 
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if response := mssqlFunctionContextError(ctx, err); response != nil {
 			return response
+		}
+		if isDeadlockPermissionError(err) {
+			return funcapi.ErrorResponse(403, "%s", f.router.collector.topQueriesPermissionMessage())
 		}
 		colIDs := make([]string, len(cols))
 		for i, col := range cols {
@@ -459,6 +478,17 @@ func (f *funcTopQueries) queryStoreSupported(ctx context.Context) (bool, error) 
 	}
 	c.queryStoreSupportedMu.RUnlock()
 
+	if c.isAzureSQLDatabase() {
+		supported := true
+		c.queryStoreSupportedMu.Lock()
+		if c.queryStoreSupported == nil {
+			c.queryStoreSupported = &supported
+		}
+		supported = *c.queryStoreSupported
+		c.queryStoreSupportedMu.Unlock()
+		return supported, nil
+	}
+
 	var count int
 	if err := c.db.QueryRowContext(ctx, queryQueryStoreSupported).Scan(&count); err != nil {
 		return false, err
@@ -489,14 +519,21 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 	}
 	f.router.collector.queryStoreColsMu.RUnlock()
 
-	// Find any database with Query Store enabled (excluding system databases)
 	var sampleDB string
-	err := f.router.collector.db.QueryRowContext(ctx, `
+	sampleQuery := `
 		SELECT TOP 1 name
 		FROM sys.databases
 		WHERE is_query_store_on = 1
 		  AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
-	`).Scan(&sampleDB)
+	`
+	if f.router.collector.isAzureSQLDatabase() {
+		sampleQuery = `
+			SELECT DB_NAME()
+			FROM sys.database_query_store_options
+			WHERE actual_state IN (1, 2, 4)
+		`
+	}
+	err := f.router.collector.db.QueryRowContext(ctx, sampleQuery).Scan(&sampleDB)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -507,9 +544,11 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 		return nil, fmt.Errorf("failed to find database with Query Store: %w", err)
 	}
 
-	// Use dynamic SQL to get column metadata from that database's Query Store view
-	escapedDB := strings.ReplaceAll(sampleDB, "]", "]]")
-	query := fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, escapedDB)
+	query := `SELECT TOP 0 * FROM sys.query_store_runtime_stats`
+	if !f.router.collector.isAzureSQLDatabase() {
+		escapedDB := strings.ReplaceAll(sampleDB, "]", "]]")
+		query = fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, escapedDB)
+	}
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -692,6 +731,31 @@ EXEC sp_executesql @sql;
 `, selectExpr, timeFilter, limit, orderByExpr)
 }
 
+func (f *funcTopQueries) buildQueryStoreSQL(cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
+	if !f.router.collector.isAzureSQLDatabase() {
+		return f.buildDynamicSQL(cols, sortColumn, timeWindowDays, limit)
+	}
+
+	selectExpr := strings.Join(f.buildSelectExpressions(cols, "DB_NAME()"), ",\n  ")
+	timeFilter := ""
+	if timeWindowDays > 0 {
+		timeFilter = fmt.Sprintf("WHERE rsi.start_time >= DATEADD(day, -%d, GETUTCDATE())", timeWindowDays)
+	}
+
+	return fmt.Sprintf(`
+SELECT TOP %d
+  %s
+FROM sys.query_store_query q
+INNER JOIN sys.query_store_query_text qt ON q.query_text_id = qt.query_text_id
+INNER JOIN sys.query_store_plan p ON q.query_id = p.query_id
+INNER JOIN sys.query_store_runtime_stats rs ON p.plan_id = rs.plan_id
+INNER JOIN sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
+%s
+GROUP BY q.query_hash, qt.query_sql_text
+ORDER BY [%s] DESC;
+`, limit, selectExpr, timeFilter, sortColumn)
+}
+
 func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQueriesColumn) ([][]any, error) {
 	specs := make([]sqlquery.ScanColumnSpec, len(cols))
 	for i, col := range cols {
@@ -706,6 +770,16 @@ func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQu
 		return nil, fmt.Errorf("rows iteration error: %w", err)
 	}
 	return data, nil
+}
+
+func (c *Collector) topQueriesPermissionMessage() string {
+	if c.isAzureSQLDatabase() {
+		return "top-queries requires VIEW DATABASE PERFORMANCE STATE in the connected database"
+	}
+	if c.currentMajorVersion() >= 16 {
+		return "top-queries requires VIEW SERVER PERFORMANCE STATE and VIEW DATABASE PERFORMANCE STATE in every queried user database"
+	}
+	return "top-queries requires VIEW SERVER STATE and VIEW DATABASE STATE in every queried user database"
 }
 
 func mssqlTopQueriesScanSpec(col topQueriesColumn) sqlquery.ScanColumnSpec {

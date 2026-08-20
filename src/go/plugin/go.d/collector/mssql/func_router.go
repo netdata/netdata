@@ -21,6 +21,16 @@ func mssqlFunctionContextError(ctx context.Context, err error) *funcapi.Function
 	return nil
 }
 
+func (c *Collector) xeReadPermission() string {
+	if c.isAzureSQLDatabase() {
+		return "VIEW DATABASE PERFORMANCE STATE"
+	}
+	if c.currentMajorVersion() >= 16 {
+		return "VIEW SERVER PERFORMANCE STATE"
+	}
+	return "VIEW SERVER STATE"
+}
+
 // funcRouter routes method calls to appropriate function handlers.
 type funcRouter struct {
 	collector *Collector

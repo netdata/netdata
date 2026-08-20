@@ -154,7 +154,10 @@ type Collector struct {
 
 	db *sql.DB
 
-	version string
+	serverPropertiesMu sync.RWMutex
+	version            string
+	majorVersion       int // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
+	engineEdition      int
 
 	seenDatabases        map[string]bool
 	seenDatabasesWithLog map[string]bool
@@ -164,9 +167,8 @@ type Collector struct {
 	seenJobs             map[string]string
 	seenReplications     map[string]bool
 
-	hadrEnabled  bool // true if Always On AG is enabled on this instance
-	hadrChecked  bool // true after the HADR check has been performed
-	majorVersion int  // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
+	hadrEnabled bool // true if Always On AG is enabled on this instance
+	hadrChecked bool // true after the HADR check has been performed
 
 	seenAGs                map[string]bool // key: ag_name
 	seenAGReplicas         map[string]bool // key: ag_name + "_" + replica_server_name
@@ -183,6 +185,70 @@ type Collector struct {
 	queryStoreSupported   *bool // nil until the capability probe has run
 
 	funcRouter *funcRouter
+}
+
+const (
+	engineEditionAzureSQLDatabase = 5
+	engineEditionAzureSQLMI       = 8
+)
+
+func (c *Collector) currentEngineEdition() int {
+	c.serverPropertiesMu.RLock()
+	edition := c.engineEdition
+	c.serverPropertiesMu.RUnlock()
+	return edition
+}
+
+func (c *Collector) currentMajorVersion() int {
+	c.serverPropertiesMu.RLock()
+	major := c.majorVersion
+	c.serverPropertiesMu.RUnlock()
+	return major
+}
+
+func (c *Collector) serverProperties() (string, int, int) {
+	c.serverPropertiesMu.RLock()
+	version := c.version
+	major := c.majorVersion
+	edition := c.engineEdition
+	c.serverPropertiesMu.RUnlock()
+	return version, major, edition
+}
+
+func (c *Collector) setServerProperties(version string, edition int) {
+	c.serverPropertiesMu.Lock()
+	c.version = version
+	c.majorVersion = parseMajorVersion(version)
+	c.engineEdition = edition
+	c.serverPropertiesMu.Unlock()
+}
+
+func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
+	if _, major, edition := c.serverProperties(); major != 0 && edition != 0 {
+		return edition, nil
+	}
+
+	var version string
+	var edition int
+	if err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
+		return 0, err
+	}
+
+	c.serverPropertiesMu.Lock()
+	if c.version == "" {
+		c.version = version
+		c.majorVersion = parseMajorVersion(version)
+	}
+	if c.engineEdition == 0 {
+		c.engineEdition = edition
+	}
+	edition = c.engineEdition
+	c.serverPropertiesMu.Unlock()
+	return edition, nil
+}
+
+func (c *Collector) isAzureSQLDatabase() bool {
+	return c.currentEngineEdition() == engineEditionAzureSQLDatabase
 }
 
 func (c *Collector) Configuration() any {

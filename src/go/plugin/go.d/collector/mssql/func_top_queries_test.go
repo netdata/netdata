@@ -84,6 +84,7 @@ func TestTopQueries_UnavailableWhenQueryStoreCatalogMissing(t *testing.T) {
 
 	c := New()
 	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
@@ -111,6 +112,7 @@ func TestTopQueries_UnavailableWhenQueryStoreNotEnabledOnAnyDatabase(t *testing.
 
 	c := New()
 	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	response := handler.collectData(context.Background(), "")
@@ -126,11 +128,9 @@ func TestTopQueries_AvailableOnAzureSQLDatabaseReportingVersion12(t *testing.T) 
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("is_query_store_on").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-
 	c := New()
 	c.db = db
-	c.majorVersion = 12 // as reported by Azure SQL Database
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	supported, err := handler.queryStoreSupported(context.Background())
@@ -149,6 +149,7 @@ func TestTopQueries_QueryStoreCapabilityTimeout(t *testing.T) {
 
 	c := New()
 	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	method := topQueriesFunctionConfig()
@@ -174,6 +175,7 @@ func TestTopQueries_QueryStoreCapabilityError(t *testing.T) {
 
 	c := New()
 	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	method := topQueriesFunctionConfig()
@@ -199,6 +201,7 @@ func TestTopQueries_QueryStoreColumnDiscoveryTimeout(t *testing.T) {
 	c := New()
 	c.db = db
 	c.queryStoreSupported = &supported
+	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	response := handler.collectData(context.Background(), "")
@@ -226,6 +229,26 @@ func TestTopQueries_QueryStoreColumnDiscoveryCancellation(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestTopQueries_QueryStorePermissionDenied(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("is_query_store_on").
+		WillReturnError(errors.New("VIEW SERVER PERFORMANCE STATE permission was denied"))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background(), "")
+	assert.Equal(t, 403, response.Status)
+	assert.Contains(t, response.Message, "VIEW SERVER PERFORMANCE STATE")
+	assert.Contains(t, response.Message, "VIEW DATABASE PERFORMANCE STATE")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestTopQueries_MethodParamsDefersTransientColumnDiscoveryErrorsToHandle(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
@@ -237,6 +260,7 @@ func TestTopQueries_MethodParamsDefersTransientColumnDiscoveryErrorsToHandle(t *
 	c := New()
 	c.db = db
 	c.queryStoreSupported = &supported
+	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
@@ -307,6 +331,40 @@ func TestBuildDynamicSQL_QuotesDatabaseLabel(t *testing.T) {
 
 	assert.Contains(t, query, "QUOTENAME(name, '''')")
 	assert.NotContains(t, query, "''' + name + N'''")
+}
+
+func TestDetectQueryStoreColumns_AzureSQLDatabaseUsesCurrentDatabase(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("sys.database_query_store_options").
+		WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("azure-db"))
+	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.query_store_runtime_stats`).
+		WillReturnRows(sqlmock.NewRows([]string{"count_executions", "avg_duration"}))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	cols, err := handler.detectQueryStoreColumns(context.Background())
+	require.NoError(t, err)
+	assert.True(t, cols["count_executions"])
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestBuildQueryStoreSQL_AzureSQLDatabaseUsesCurrentDatabase(t *testing.T) {
+	c := New()
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	query := handler.buildQueryStoreSQL([]topQueriesColumn{topQueriesColumns[2], topQueriesColumns[3]}, "calls", 7, 10)
+
+	assert.Contains(t, query, "DB_NAME() AS [database]")
+	assert.Contains(t, query, "FROM sys.query_store_query q")
+	assert.NotContains(t, query, "FROM sys.databases")
+	assert.NotContains(t, query, "QUOTENAME(name)")
 }
 
 func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t *testing.T) {
