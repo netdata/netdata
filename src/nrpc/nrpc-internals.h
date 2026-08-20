@@ -196,6 +196,14 @@ void nrpc_method_release(struct nrpc_method *method);
 // release. The tombstone is read as one atomic pair with the pointer (out
 // param, NULL-tolerant), so the delete-window error text can never misreport
 // against a descriptor the tombstone does not belong to.
+//
+// PRECONDITION: the caller must be holding this slot's dictionary entry in
+// place across the call - either an acquired item reference, or a read-locked
+// traversal. Emptying the slot is the value destructor's job, and the two
+// forms block it differently: an outstanding item reference defers the
+// destructor, while the traversal's read lock excludes the write-locked delete
+// it runs under. Reach a slot holding neither and the descriptor can be torn
+// out from under this lock, leaving NULL to dereference.
 static inline struct nrpc_method *nrpc_slot_acquire(struct nrpc_method_slot *slot, bool *unregistered_out) {
     spinlock_lock(&slot->spinlock);
     struct nrpc_method *method = slot->method;

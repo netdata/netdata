@@ -158,7 +158,7 @@ void nrpc_inflight_calls_create(void) {
 // pluginsd transport for its own inflight dictionary - a key-format change on
 // either side would silently turn every lookup here into a miss.
 bool nrpc_call_deadline(const char *call_id, usec_t *out_stop_monotonic_ut) {
-    if(unlikely(!out_stop_monotonic_ut || !call_id || !*call_id || !nrpc_inflight_calls.dict))
+    if(unlikely(!out_stop_monotonic_ut || !call_id || !*call_id))
         return false;
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(nrpc_inflight_calls.dict, call_id);
@@ -172,9 +172,19 @@ bool nrpc_call_deadline(const char *call_id, usec_t *out_stop_monotonic_ut) {
     return true;
 }
 
-// called ONLY from the ASAN-gated shutdown path: in normal
-// operation the table lives for the process lifetime and is never torn down -
-// the destroy exists so leak checking sees a clean heap
+// This has exactly one call site: the leak-checking cleanup at the end of the
+// daemon shutdown, which sits behind FSANITIZE_ADDRESS - a macro the tree
+// consumes but no build defines. So as things stand the block is compiled out
+// everywhere, this function never runs, and the table lives for the whole
+// process lifetime.
+//
+// That is why no accessor tests the dictionary for NULL. The test would be
+// dead today, and it would not be protection even if the block were switched
+// on: the teardown is ordered after every thread that could reach the table
+// has been joined, and a thread that outlived that join to reach one accessor
+// reaches the other five just as easily. Ordering is the guarantee; a NULL
+// test in one of six places could only disguise which contract is meant to
+// hold.
 void nrpc_inflight_calls_destroy(void) {
     if(!nrpc_inflight_calls.dict)
         return;
@@ -760,15 +770,15 @@ static void nrpc_call_cancel_internal(struct nrpc_call *call) {
     if(!call)
         return;
 
-    bool cancelled = __atomic_load_n(&call->cancelled, __ATOMIC_RELAXED);
-    if(cancelled) {
+    // One read-modify-write, so exactly one caller wins the transition: two
+    // threads cancelling the same call_id would otherwise both read false and
+    // both dispatch the hook below, sending a duplicate cancel downstream.
+    if(__atomic_exchange_n(&call->cancelled, true, __ATOMIC_RELAXED)) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "NRPC: received a CANCEL request for call_id '%s', but it is already cancelled.",
                call->call_id);
         return;
     }
-
-    __atomic_store_n(&call->cancelled, true, __ATOMIC_RELAXED);
 
     // Dispatch gates on the serving handle of the CALL's descriptor - the
     // registration whose handler actually ran - not on whatever the registry

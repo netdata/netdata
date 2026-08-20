@@ -41,19 +41,23 @@ static struct nrpc_registry *nrpc_ut_registry(RRDHOST *host) {
 
 // Borrow the CURRENT descriptor of a method for direct-inspection assertions.
 // The dictionary value is a SLOT pointing at an immutable descriptor, so
-// inspection goes through a descriptor pin; the suites run these blocks with
-// no concurrent re-registration, so the borrow (pin + immediate release)
-// cannot dangle within a test block - the same discipline as
-// nrpc_ut_registry() above.
+// inspection goes through a descriptor pin. The item reference is held ACROSS
+// the pin, which is what nrpc_slot_acquire() requires of every caller - a
+// plain get would hand back the slot with its entry already released. The
+// suites run these blocks with no concurrent re-registration, so the borrow
+// (pin + immediate release) cannot dangle within a test block - the same
+// discipline as nrpc_ut_registry() above.
 static struct nrpc_method *nrpc_ut_method(RRDHOST *host, const char *name) {
     struct nrpc_registry *registry = nrpc_ut_registry(host);
     if(!registry) return NULL;
 
-    struct nrpc_method_slot *slot = dictionary_get(registry->dict, name);
-    if(!slot) return NULL;
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(registry->dict, name);
+    if(!item) return NULL;
 
+    struct nrpc_method_slot *slot = dictionary_acquired_item_value(item);
     struct nrpc_method *method = nrpc_slot_acquire(slot, NULL);
     nrpc_method_release(method);
+    dictionary_acquired_item_release(registry->dict, item);
     return method;
 }
 
