@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""
-Validate a network-viewer.plugin --test topology:network-connections payload.
+"""Validate a network-viewer.plugin --test topology:network-connections payload."""
 
-Reads a pluginsd FUNCTION_RESULT payload from the given file (or stdin) and
-checks it against FUNCTION_TOPOLOGY_SCHEMA.json and a few semantic invariants.
+# Reads a pluginsd FUNCTION_RESULT payload (or the raw JSON a --test run emits)
+# from the given file and checks it against FUNCTION_TOPOLOGY_SCHEMA.json plus
+# a few semantic invariants.
+#
+# Usage:
+#   validate_topology_payload.py <payload_file> [<schema_file>] [--mode <mode>]
+#                                [--group-by <group_by>] [--self-test]
+# When <schema_file> is omitted it defaults to
+# src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json relative to the repository root
+# (taken from the script location). --mode / --group-by assert the view the
+# caller requested; --self-test runs the built-in regression tests and exits.
 
-Usage:
-  validate_topology_payload.py <payload_file> [<schema_file>] [--mode <mode>]
-                               [--group-by <group_by>] [--self-test]
-When <schema_file> is omitted it defaults to src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json
-relative to the repository root (taken from the script location).
---mode / --group-by assert the view the caller requested; --self-test runs the
-built-in regression tests and exits.
-"""
 
 import io
 import json
