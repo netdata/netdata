@@ -172,8 +172,9 @@ adaptation_contracts:
       - generic configured-job collection failure remains the scrape owner
     differences:
       - Netdata selects the latest matching chart/alert instance by equal label overlap instead of PromQL vector matching
-      - the source pending state is not reproduced for current composite signals
-      - missing or ambiguous operands become NaN rather than a fabricated clear or active state
+      - the source 30-second pending state is not reproduced for current compound monitor conditions
+      - a missing or ambiguous operand is NaN rather than a fabricated active state; when the primary condition is
+        numerically inactive, the rule clears without resolving an optional secondary helper that Ceph has withdrawn
   per_image_current_timestamp_difference:
     preserved:
       - per-image local-versus-remote snapshot timestamp inequality
@@ -1469,7 +1470,7 @@ alerts:
       owner: mgr_prometheus
       context: prometheus.ceph.health.health_checks.state
       labels: name=PG_AVAILABILITY
-      calc: '($value == nan or $value == inf or $ceph_osd_down_current == nan or $ceph_osd_down_current == inf) ? (nan) : ($value == 1 and $ceph_osd_down_current != 1)'
+      calc: '($value == nan or $value == inf) ? (nan) : (($value == 1) ? (($ceph_osd_down_current == nan or $ceph_osd_down_current == inf) ? (nan) : (($ceph_osd_down_current == 1) ? (0) : (1))) : (0))'
       units: status
       condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'
       recipient: sysadmin
