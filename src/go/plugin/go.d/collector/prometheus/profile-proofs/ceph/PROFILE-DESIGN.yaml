@@ -5118,11 +5118,11 @@ views:
       total:
         signal: mon_metadata
         components:
-        - value
+          - value
       in_quorum:
         signal: mon_quorum_status
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -5570,7 +5570,7 @@ views:
     labels:
       dimensions: {}
       promote:
-      - severity
+        - severity
       omit: {}
   health.slow_operations.current_operations:
     family: Ceph/Health/Slow Operations
@@ -5844,7 +5844,7 @@ views:
       value:
         signal: hardware_temperature_celsius
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -6096,7 +6096,7 @@ views:
       namespace_count:
         signal: nvmeof_subsystem_namespace_count
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -6113,7 +6113,7 @@ views:
       count:
         signal: nvmeof_subsystem_namespace_count
         components:
-        - value
+          - value
       limit:
         signal: nvmeof_subsystem_namespace_limit
         components:
@@ -7519,11 +7519,11 @@ views:
       total:
         signal: osd_metadata
         components:
-        - value
+          - value
       up:
         signal: osd_up
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
