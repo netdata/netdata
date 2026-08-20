@@ -1420,29 +1420,39 @@ func TestCollector_CephM04DerivedBoundaries(t *testing.T) {
 		})
 	}
 
-	blockingIO := func(pgAvailability, osdDown float64) float64 {
-		if math.IsNaN(pgAvailability) || math.IsInf(pgAvailability, 0) ||
-			math.IsNaN(osdDown) || math.IsInf(osdDown, 0) {
+	blockingIO := func(pgAvailability, osdDown float64, osdDownResolved bool) float64 {
+		if math.IsNaN(pgAvailability) || math.IsInf(pgAvailability, 0) {
 			return math.NaN()
 		}
-		if pgAvailability == 1 && osdDown != 1 {
-			return 1
+		if pgAvailability != 1 {
+			// Ceph can withdraw an inactive OSD_DOWN health-check chart entirely.
+			// The inactive primary condition must clear without resolving that helper.
+			return 0
 		}
-		return 0
+		if osdDown == 1 {
+			return 0
+		}
+		if !osdDownResolved || math.IsNaN(osdDown) || math.IsInf(osdDown, 0) {
+			return math.NaN()
+		}
+		return 1
 	}
 	for _, tc := range []struct {
 		name              string
 		availability, osd float64
+		osdResolved       bool
 		want              float64
 		undefined         bool
 	}{
-		{name: "availability with OSD down", availability: 1, osd: 1},
-		{name: "availability without OSD down", availability: 1, osd: 0, want: 1},
-		{name: "no availability", availability: 0, osd: 1},
-		{name: "invalid OSD state", availability: 1, osd: math.NaN(), undefined: true},
+		{name: "availability with OSD down", availability: 1, osd: 1, osdResolved: true},
+		{name: "availability without OSD down", availability: 1, osd: 0, osdResolved: true, want: 1},
+		{name: "no availability", availability: 0, osd: 1, osdResolved: true},
+		{name: "inactive condition with withdrawn OSD chart", availability: 0},
+		{name: "invalid OSD state", availability: 1, osd: math.NaN(), osdResolved: true, undefined: true},
+		{name: "active condition with withdrawn OSD chart", availability: 1, undefined: true},
 	} {
 		t.Run("blocking I/O "+tc.name, func(t *testing.T) {
-			got := blockingIO(tc.availability, tc.osd)
+			got := blockingIO(tc.availability, tc.osd, tc.osdResolved)
 			if tc.undefined {
 				assert.True(t, math.IsNaN(got))
 				return
