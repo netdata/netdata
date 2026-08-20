@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -135,6 +136,57 @@ func TestTopQueries_AvailableOnAzureSQLDatabaseReportingVersion12(t *testing.T) 
 	supported, err := handler.queryStoreSupported(context.Background())
 	require.NoError(t, err)
 	assert.True(t, supported)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTopQueries_QueryStoreCapabilityTimeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background(), "")
+	assert.Equal(t, 504, response.Status)
+	assert.Contains(t, response.Message, "timed out")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestQueryStoreSupported_NotBlockedByColumnDiscovery(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+	mock.MatchExpectationsInOrder(false)
+
+	mock.ExpectQuery("SELECT TOP 1 name").
+		WillDelayFor(300 * time.Millisecond).
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("is_query_store_on").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	discoveryDone := make(chan error, 1)
+	go func() {
+		_, err := handler.detectQueryStoreColumns(context.Background())
+		discoveryDone <- err
+	}()
+
+	// Wait until column discovery is inside the delayed database query.
+	require.Eventually(t, func() bool { return db.Stats().InUse == 1 }, time.Second, time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	supported, err := handler.queryStoreSupported(ctx)
+	require.NoError(t, err)
+	assert.True(t, supported)
+	assert.ErrorIs(t, <-discoveryDone, errQueryStoreNotEnabled)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

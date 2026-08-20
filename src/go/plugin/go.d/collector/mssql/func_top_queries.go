@@ -258,6 +258,9 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	}
 	supported, err := f.queryStoreSupported(ctx)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
+		}
 		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("failed to detect Query Store support: %v", err)}
 	}
 	if !supported {
@@ -433,19 +436,12 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 func (f *funcTopQueries) queryStoreSupported(ctx context.Context) (bool, error) {
 	c := f.router.collector
 
-	c.queryStoreMu.RLock()
+	c.queryStoreSupportedMu.RLock()
 	if cached := c.queryStoreSupported; cached != nil {
-		c.queryStoreMu.RUnlock()
+		c.queryStoreSupportedMu.RUnlock()
 		return *cached, nil
 	}
-	c.queryStoreMu.RUnlock()
-
-	c.queryStoreMu.Lock()
-	defer c.queryStoreMu.Unlock()
-
-	if cached := c.queryStoreSupported; cached != nil {
-		return *cached, nil
-	}
+	c.queryStoreSupportedMu.RUnlock()
 
 	var count int
 	if err := c.db.QueryRowContext(ctx, queryQueryStoreSupported).Scan(&count); err != nil {
@@ -453,7 +449,12 @@ func (f *funcTopQueries) queryStoreSupported(ctx context.Context) (bool, error) 
 	}
 
 	supported := count > 0
-	c.queryStoreSupported = &supported
+	c.queryStoreSupportedMu.Lock()
+	if c.queryStoreSupported == nil {
+		c.queryStoreSupported = &supported
+	}
+	supported = *c.queryStoreSupported
+	c.queryStoreSupportedMu.Unlock()
 
 	return supported, nil
 }
@@ -464,17 +465,17 @@ func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[to
 
 func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result
-	f.router.collector.queryStoreMu.RLock()
+	f.router.collector.queryStoreColsMu.RLock()
 	if f.router.collector.queryStoreCols != nil {
 		cols := f.router.collector.queryStoreCols
-		f.router.collector.queryStoreMu.RUnlock()
+		f.router.collector.queryStoreColsMu.RUnlock()
 		return cols, nil
 	}
-	f.router.collector.queryStoreMu.RUnlock()
+	f.router.collector.queryStoreColsMu.RUnlock()
 
 	// Slow path: query and cache
-	f.router.collector.queryStoreMu.Lock()
-	defer f.router.collector.queryStoreMu.Unlock()
+	f.router.collector.queryStoreColsMu.Lock()
+	defer f.router.collector.queryStoreColsMu.Unlock()
 
 	// Double-check after acquiring write lock
 	if f.router.collector.queryStoreCols != nil {
