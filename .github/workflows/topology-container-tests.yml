@@ -111,7 +111,7 @@ jobs:
             exit 1
           fi
           echo "--- topology aggregated (process_name)"
-          printf '' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_aggregated.json
+          printf '%s' '{}' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_aggregated.json
           python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py /tmp/nv_aggregated.json
           echo "--- topology aggregated (pid)"
           printf '%s' '{"selections":{"group_by":"pid"}}' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_pid.json
