@@ -232,7 +232,9 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 	}
 	supported, err := f.queryStoreSupported(ctx)
 	if err != nil {
-		return nil, err
+		// Function dispatch maps MethodParams errors to 503 before Handle runs. Keep the
+		// static sort parameter on transient probe failures so Handle can return 500/504.
+		return nil, nil
 	}
 	if !supported {
 		return nil, errors.New(queryStoreUnavailable)

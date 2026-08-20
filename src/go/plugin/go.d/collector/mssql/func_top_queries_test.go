@@ -145,28 +145,59 @@ func TestTopQueries_QueryStoreCapabilityTimeout(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
+	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
 
 	c := New()
 	c.db = db
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
-	response := handler.collectData(context.Background(), "")
+	method := topQueriesFunctionConfig()
+	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
+	require.NoError(t, err)
+	params = funcapi.MergeParamConfigs(method.RequiredParams, params)
+	resolved := funcapi.ResolveParams(params, nil)
+
+	response := handler.Handle(context.Background(), topQueriesMethodID, resolved)
 	assert.Equal(t, 504, response.Status)
 	assert.Contains(t, response.Message, "timed out")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestQueryStoreSupported_NotBlockedByColumnDiscovery(t *testing.T) {
+func TestTopQueries_QueryStoreCapabilityError(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
 	defer db.Close()
+
+	probeErr := errors.New("capability probe failed")
+	mock.ExpectQuery("is_query_store_on").WillReturnError(probeErr)
+	mock.ExpectQuery("is_query_store_on").WillReturnError(probeErr)
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	method := topQueriesFunctionConfig()
+	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
+	require.NoError(t, err)
+	params = funcapi.MergeParamConfigs(method.RequiredParams, params)
+	resolved := funcapi.ResolveParams(params, nil)
+
+	response := handler.Handle(context.Background(), topQueriesMethodID, resolved)
+	assert.Equal(t, 500, response.Status)
+	assert.Contains(t, response.Message, probeErr.Error())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+	db.SetMaxOpenConns(1)
 	mock.MatchExpectationsInOrder(false)
 
 	mock.ExpectQuery("SELECT TOP 1 name").
 		WillDelayFor(300 * time.Millisecond).
 		WillReturnError(sql.ErrNoRows)
-	mock.ExpectQuery("is_query_store_on").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	c := New()
 	c.db = db
@@ -183,9 +214,11 @@ func TestQueryStoreSupported_NotBlockedByColumnDiscovery(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
+	started := time.Now()
 	supported, err := handler.queryStoreSupported(ctx)
-	require.NoError(t, err)
-	assert.True(t, supported)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.False(t, supported)
+	assert.Less(t, time.Since(started), 250*time.Millisecond)
 	assert.ErrorIs(t, <-discoveryDone, errQueryStoreNotEnabled)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
