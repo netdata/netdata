@@ -82,6 +82,15 @@ static void data_source_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
 static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_match *match, BUFFER *error, unsigned flags) {
     STRING *on = NULL;
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "on", on, error, flags);
+
+    // string_strdupz("") returns NULL, so an empty 'on' is indistinguishable downstream from a
+    // missing one, and health_prototype_to_json() writes a NULL 'on' back out as "" - which used to
+    // let a match-everything rule persist across restarts. Refuse it where we can still report why.
+    if(!on && (flags & (JSONC_REQUIRED | JSONC_STRICT))) {
+        buffer_sprintf(error, "member '%s.on' cannot be empty", path);
+        return false;
+    }
+
     if(match->is_template)
         match->on.context = on;
     else
@@ -280,7 +289,7 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
     return true;
 }
 
-static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, size_t payload_len, BUFFER *error, const char *name, unsigned flags) {
+RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, size_t payload_len, BUFFER *error, const char *name, unsigned flags) {
     RRD_ALERT_PROTOTYPE *base = callocz(1, sizeof(*base));
     CLEAN_JSON_OBJECT *jobj = NULL;
 

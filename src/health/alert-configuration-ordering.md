@@ -115,6 +115,12 @@ Only **one** alert can exist per (instance, alert_name) pair. When multiple defi
 
 This is why overriding works: create an alert with the same name, and yours is processed first.
 
+Definitions sharing a name are kept together as one set of rules, and **every rule in the set must be
+valid on its own**. If any of them is missing `on`, is missing its update frequency, or has no
+`lookup`/`calc`/`warn`/`crit`, the whole set is rejected and the alert is not created at all — the
+daemon log names the offending rule. This matters for the common per-OS pattern, where one alert name
+carries one rule per `host labels: _os=...` value.
+
 ## Dynamic Configuration Exception
 
 Alerts created or modified through the Netdata UI or API behave differently:
