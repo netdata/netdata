@@ -104,4 +104,9 @@ void network_viewer_topology_function(
     bool *cancelled, BUFFER *payload, HTTP_ACCESS access,
     const char *source, void *data);
 
+// Topology payload renderer (exposed for the POSIX --test path in
+// network-viewer.c).
+BUFFER *network_viewer_topology_result(
+    char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload);
+
 #endif /* NETDATA_NETWORK_VIEWER_TOPOLOGY_H */

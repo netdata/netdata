@@ -5177,7 +5177,7 @@ BUFFER *nv_response_preamble(void) {
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     return wb;
 }
-static BUFFER *network_viewer_topology_result(
+BUFFER *network_viewer_topology_result(
     char *function, usec_t *stop_monotonic_ut,
     bool *cancelled, BUFFER *payload) {
 
