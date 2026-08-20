@@ -28,19 +28,6 @@ fallback_type:
     - ceph_rbd_mirror_metadata
     - ceph_rgw_metadata
     - ceph_smb_metadata
-autogen:
-  selector:
-    deny:
-      - ceph_hardware_cpu_cores
-      - ceph_hardware_fan_rpm
-      - ceph_hardware_health
-      - ceph_hardware_memory_capacity_bytes
-      - ceph_hardware_storage_capacity_bytes
-      - ceph_hardware_temperature_celsius
-      - ceph_recoverystate_perf_pg_rebuild_duration_count
-      - ceph_recoverystate_perf_pg_rebuild_duration_sum
-      - ceph_recoverystate_perf_pg_rebuild_max_secs
-      - ceph_recoverystate_perf_pg_rebuild_min_secs
 relabeling:
   - match: ceph_*
     metric_relabel_configs:
@@ -519,7 +506,7 @@ template:
               aggregation: sum
             - title: State and Metadata — Metadata
               context: state_metadata
-              units: '{status}'
+              units: monitors
               label_promotion: []
               dimensions:
                 - selector: ceph_mon_metadata
@@ -534,7 +521,7 @@ template:
                 optional_by_labels: []
             - title: State and Metadata — Quorum Status
               context: state_quorum_status
-              units: '{status}'
+              units: monitors
               label_promotion: []
               dimensions:
                 - selector: ceph_mon_quorum_status
@@ -897,7 +884,7 @@ template:
           charts:
             - title: State and Metadata
               context: state
-              units: '{status}'
+              units: OSDs
               label_promotion: []
               dimensions:
                 - selector: ceph_osd_metadata
@@ -934,7 +921,7 @@ template:
               aggregation: sum
             - title: OSD State
               context: state
-              units: '{status}'
+              units: OSDs
               label_promotion: []
               dimensions:
                 - selector: ceph_osd_in
