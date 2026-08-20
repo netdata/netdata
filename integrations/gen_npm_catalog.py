@@ -874,9 +874,10 @@ def build_topology_modules():
     ]
 
     # network-viewer.plugin builds topology:network-connections on Linux, FreeBSD,
-    # macOS, and Windows: network-viewer.c provides the shared v1 renderer and the
-    # Linux/macOS/FreeBSD socket backend, network-viewer-windows.c registers the
-    # same Function on Windows. Container/Kubernetes/systemd enrichment needs the
+    # macOS, and Windows: network-viewer-topology.c provides the shared v1 renderer;
+    # network-viewer.c provides the Linux/macOS/FreeBSD entry point and socket
+    # backend, while network-viewer-windows.c registers the same Function on Windows.
+    # Container/Kubernetes/systemd enrichment needs the
     # APPS_LOOKUP client, which is Linux-only (network-viewer-apps-lookup-client.h).
     other = [
         ('Live Network Connections', 'network-viewer.plugin', 'network-viewer', 'network.svg',

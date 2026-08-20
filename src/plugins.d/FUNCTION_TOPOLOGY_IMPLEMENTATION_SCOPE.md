@@ -77,9 +77,12 @@ Likely homes:
 - producer path: `src/collectors/network-viewer.plugin/network-viewer.c` (Linux/FreeBSD/macOS) and `src/collectors/network-viewer.plugin/network-viewer-windows.c` (Windows);
 - the Function now emits `netdata.topology.v1` at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:1674`;
-- the Function parses `aggregated` / `mode:aggregated` and `detailed` /
-  `mode:detailed`, with aggregated as the default, at
-  `src/collectors/network-viewer.plugin/network-viewer-topology.c:477`;
+- POST requests select the view with `selections.group_by` (`process_name`,
+  `pid`, or `container`, `process_name` by default) and `selections.mode`
+  (`aggregated` or `detailed`, aggregated by default), parsed at
+  `src/collectors/network-viewer.plugin/network-viewer-topology.c:474`; the
+  `aggregated` / `mode:aggregated` and `detailed` / `mode:detailed` spellings
+  are retained as compatibility aliases;
 - response metadata exposes the `mode` selector at
   `src/collectors/network-viewer.plugin/network-viewer-topology.c:5134`;
 - actors, graph links, and optional socket evidence rows are emitted as compact
