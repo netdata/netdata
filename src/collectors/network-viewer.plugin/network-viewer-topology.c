@@ -150,10 +150,6 @@ typedef struct {
 
 
 typedef struct {
-    uint64_t starttime;
-} NV_PID_STARTTIME_CACHE_ENTRY;
-
-typedef struct {
     size_t process_actor_count;
     size_t socket_link_count;
     size_t local_ip_count;

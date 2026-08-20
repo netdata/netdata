@@ -88,6 +88,11 @@ void network_viewer_emit_response(const char *transaction, BUFFER *wb);
     buffer_free(_nv_wb); \
 } while(0)
 
+// Starttime cache entry shared with the connections code in network-viewer.c
+typedef struct {
+    uint64_t starttime;
+} NV_PID_STARTTIME_CACHE_ENTRY;
+
 // Helpers the connections code in network-viewer.c still needs from the
 // topology translation unit.
 void nv_pid_append(uint32_t **pids, size_t *count, size_t *capacity, pid_t pid);

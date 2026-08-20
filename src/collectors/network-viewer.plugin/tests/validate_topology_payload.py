@@ -16,6 +16,7 @@ import json
 import sys
 import os
 
+
 def load_payload(path):
     raw = io.open(path, encoding='utf-8', errors='replace').read()
     # payload is between the FUNCTION_RESULT_BEGIN header line and
@@ -31,6 +32,7 @@ def load_payload(path):
     else:
         raw = raw[start:]
     return json.loads(raw)
+
 
 def semantic_checks(data):
     errors = []
@@ -52,6 +54,7 @@ def semantic_checks(data):
     if "view" not in d or d["view"].get("mode") not in ("aggregated", "detailed"):
         errors.append("missing/invalid view.mode")
     return errors
+
 
 def main(argv):
     payload_file = argv[0] if len(argv) > 0 else None
