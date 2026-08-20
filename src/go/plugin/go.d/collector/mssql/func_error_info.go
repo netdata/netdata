@@ -656,11 +656,16 @@ func eventFileReadTarget(configured string) mssqlErrorReadTarget {
 	}
 
 	prefix := path + "_0_"
+	base := strings.ReplaceAll(path, `\`, "/")
+	if idx := strings.LastIndex(base, "/"); idx >= 0 {
+		base = base[idx+1:]
+	}
+	filePrefix := base + "_0_"
 	lower := strings.ToLower(path)
 	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
-		return mssqlErrorReadTarget{filePath: prefix, filePrefix: prefix}
+		return mssqlErrorReadTarget{filePath: prefix, filePrefix: filePrefix}
 	}
-	return mssqlErrorReadTarget{filePath: prefix + "*.xel", filePrefix: prefix}
+	return mssqlErrorReadTarget{filePath: prefix + "*.xel", filePrefix: filePrefix}
 }
 
 // mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events

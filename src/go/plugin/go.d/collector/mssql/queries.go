@@ -432,22 +432,30 @@ WHERE xs.name = @sessionName
 // emits. It is not converted here because query_hash exceeds bigint range, so
 // CAST(... AS bigint) would overflow; mssqlQueryHashToHex does it in Go instead.
 const queryMSSQLErrorInfoEventFile = `
-WITH xevents AS (
-  SELECT CAST(event_data AS XML) AS event_xml
+WITH file_events AS (
+  SELECT
+    CAST(event_data AS XML) AS event_xml,
+    RIGHT(
+      file_name,
+      CHARINDEX('/', REVERSE('/' + REPLACE(file_name, '\', '/'))) - 1
+    ) AS file_basename
   FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
   WHERE object_name = 'error_reported'
-    AND LEN(file_name) > LEN(@filePrefix) + 4
-    AND LEFT(file_name, LEN(@filePrefix)) = @filePrefix
-    AND RIGHT(file_name, 4) = '.xel'
-    AND TRY_CONVERT(decimal(38, 0), SUBSTRING(
-      file_name,
+), xevents AS (
+  SELECT event_xml
+  FROM file_events
+  WHERE LEN(file_basename) > LEN(@filePrefix) + 4
+    AND LEFT(file_basename, LEN(@filePrefix)) = @filePrefix
+    AND RIGHT(file_basename, 4) = '.xel'
+    AND SUBSTRING(
+      file_basename,
       LEN(@filePrefix) + 1,
       CASE
-        WHEN LEN(file_name) > LEN(@filePrefix) + 4
-        THEN LEN(file_name) - LEN(@filePrefix) - 4
+        WHEN LEN(file_basename) > LEN(@filePrefix) + 4
+        THEN LEN(file_basename) - LEN(@filePrefix) - 4
         ELSE 0
       END
-    )) IS NOT NULL
+    ) NOT LIKE '%[^0123456789]%'
 )
 SELECT TOP (@limit)
   event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') AS event_time,

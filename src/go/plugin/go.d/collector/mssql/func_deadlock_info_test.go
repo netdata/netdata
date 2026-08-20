@@ -163,7 +163,7 @@ func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.
 	require.NoError(t, err)
 	assert.True(t, available)
 	assert.Equal(t, `C:\Logs\nd_err_0_*.xel`, target.filePath)
-	assert.Equal(t, `C:\Logs\nd_err_0_`, target.filePrefix)
+	assert.Equal(t, `nd_err_0_`, target.filePrefix)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -212,7 +212,7 @@ func TestEventFileReadTarget(t *testing.T) {
 		"absolute .xel uses the generated rollover suffix": {
 			configured: `C:\Logs\netdata_errors.xel`,
 			wantPath:   `C:\Logs\netdata_errors_0_*.xel`,
-			wantPrefix: `C:\Logs\netdata_errors_0_`,
+			wantPrefix: `netdata_errors_0_`,
 		},
 		"bare name uses the generated rollover suffix": {
 			configured: "netdata_errors.xel",
@@ -227,12 +227,12 @@ func TestEventFileReadTarget(t *testing.T) {
 		"https target uses a wildcard-free blob prefix": {
 			configured: "https://storage.example/container/netdata_errors.xel",
 			wantPath:   "https://storage.example/container/netdata_errors_0_",
-			wantPrefix: "https://storage.example/container/netdata_errors_0_",
+			wantPrefix: "netdata_errors_0_",
 		},
 		"http target uses a wildcard-free blob prefix": {
 			configured: "http://storage.example/container/netdata_errors.xel",
 			wantPath:   "http://storage.example/container/netdata_errors_0_",
-			wantPrefix: "http://storage.example/container/netdata_errors_0_",
+			wantPrefix: "netdata_errors_0_",
 		},
 		"surrounding whitespace is trimmed": {
 			configured: "  netdata_errors.xel  ",
@@ -296,9 +296,10 @@ func TestQueryMSSQLErrorInfoEventFile_ReadsResolvedPathAndRawHash(t *testing.T) 
 
 	// The path must come from the resolver, never be rebuilt from the session name.
 	assert.Contains(t, query, "sys.fn_xe_file_target_read_file(@filepath, null, null, null)")
-	assert.Contains(t, query, "left(file_name, len(@fileprefix)) = @fileprefix")
-	assert.Contains(t, query, "right(file_name, 4) = '.xel'")
-	assert.Contains(t, query, "try_convert(decimal(38, 0)")
+	assert.Contains(t, query, "replace(file_name, '\\', '/')")
+	assert.Contains(t, query, "left(file_basename, len(@fileprefix)) = @fileprefix")
+	assert.Contains(t, query, "right(file_basename, 4) = '.xel'")
+	assert.Contains(t, query, "not like '%[^0123456789]%'")
 	assert.NotContains(t, query, "@sessionname")
 	// query_hash must stay raw: it exceeds bigint range, so SQL-side conversion overflows.
 	assert.NotContains(t, query, "varbinary(8)")
@@ -309,6 +310,7 @@ func TestQueryMSSQLErrorInfoEventFile_SQLServer2014Compatible(t *testing.T) {
 	query := strings.ToLower(queryMSSQLErrorInfoEventFile)
 
 	assert.NotContains(t, query, "timestamp_utc")
+	assert.NotContains(t, query, "try_convert")
 	assert.Contains(t, query, "cast(event_data as xml) as event_xml")
 	assert.Contains(t, query, "event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') as event_time")
 	assert.Contains(t, query, "order by event_time desc")
@@ -323,7 +325,7 @@ func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
 		WithArgs("netdata_errors").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
 	mock.ExpectQuery("fn_xe_file_target_read_file").
-		WithArgs(`C:\Logs\nd_err_0_*.xel`, `C:\Logs\nd_err_0_`, 500).
+		WithArgs(`C:\Logs\nd_err_0_*.xel`, `nd_err_0_`, 500).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
 		}))
