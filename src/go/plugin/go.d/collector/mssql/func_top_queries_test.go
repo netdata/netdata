@@ -4,9 +4,11 @@ package mssql
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -69,6 +71,156 @@ func TestTopQueriesColumns_HasRequiredColumns(t *testing.T) {
 	for _, id := range required {
 		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
+}
+
+// A server without sys.databases.is_query_store_on (pre-2016) must report top-queries as
+// unavailable instead of failing with "Invalid column name".
+func TestTopQueries_UnavailableWhenQueryStoreCatalogMissing(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("is_query_store_on").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
+	assert.Nil(t, params)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SQL Server 2016")
+
+	// The capability result is cached, so no second probe is issued.
+	response := handler.collectData(context.Background(), "")
+	assert.Equal(t, 503, response.Status)
+	assert.Contains(t, response.Message, "SQL Server 2016")
+
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Query Store present but not turned on anywhere is a configuration state, so it must be
+// reported as unavailable (503) rather than as a server error (500).
+func TestTopQueries_UnavailableWhenQueryStoreNotEnabledOnAnyDatabase(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("is_query_store_on").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(sql.ErrNoRows)
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background(), "")
+	assert.Equal(t, 503, response.Status)
+	assert.Contains(t, response.Message, "enabled on at least one user database")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Azure SQL Database reports ProductVersion 12.x but does expose Query Store. Version-number
+// gating used to disable top-queries there; capability detection must keep it available.
+func TestTopQueries_AvailableOnAzureSQLDatabaseReportingVersion12(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("is_query_store_on").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	c := New()
+	c.db = db
+	c.majorVersion = 12 // as reported by Azure SQL Database
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	supported, err := handler.queryStoreSupported(context.Background())
+	require.NoError(t, err)
+	assert.True(t, supported)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTopQueries_QueryStoreCapabilityTimeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
+	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	method := topQueriesFunctionConfig()
+	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
+	require.NoError(t, err)
+	params = funcapi.MergeParamConfigs(method.RequiredParams, params)
+	resolved := funcapi.ResolveParams(params, nil)
+
+	response := handler.Handle(context.Background(), topQueriesMethodID, resolved)
+	assert.Equal(t, 504, response.Status)
+	assert.Contains(t, response.Message, "timed out")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestTopQueries_QueryStoreCapabilityError(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	probeErr := errors.New("capability probe failed")
+	mock.ExpectQuery("is_query_store_on").WillReturnError(probeErr)
+	mock.ExpectQuery("is_query_store_on").WillReturnError(probeErr)
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	method := topQueriesFunctionConfig()
+	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
+	require.NoError(t, err)
+	params = funcapi.MergeParamConfigs(method.RequiredParams, params)
+	resolved := funcapi.ResolveParams(params, nil)
+
+	response := handler.Handle(context.Background(), topQueriesMethodID, resolved)
+	assert.Equal(t, 500, response.Status)
+	assert.Contains(t, response.Message, probeErr.Error())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	mock.MatchExpectationsInOrder(false)
+
+	mock.ExpectQuery("SELECT TOP 1 name").
+		WillDelayFor(300 * time.Millisecond).
+		WillReturnError(sql.ErrNoRows)
+
+	c := New()
+	c.db = db
+	handler := newFuncTopQueries(&funcRouter{collector: c})
+
+	discoveryDone := make(chan error, 1)
+	go func() {
+		_, err := handler.detectQueryStoreColumns(context.Background())
+		discoveryDone <- err
+	}()
+
+	// Wait until column discovery is inside the delayed database query.
+	require.Eventually(t, func() bool { return db.Stats().InUse == 1 }, time.Second, time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	supported, err := handler.queryStoreSupported(ctx)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.False(t, supported)
+	assert.Less(t, time.Since(started), 250*time.Millisecond)
+	assert.ErrorIs(t, <-discoveryDone, errQueryStoreNotEnabled)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestTopQueriesScanDynamicRows(t *testing.T) {
