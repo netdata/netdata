@@ -168,7 +168,7 @@
         "properties": {
           "top_queries": {
             "title": "Top Queries",
-            "description": "Configuration for the top-queries function using SQL Server Query Store.",
+            "description": "Configuration for top-queries using Query Store across enabled user databases on SQL Server/Managed Instance, or the connected database on Azure SQL Database.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -219,7 +219,7 @@
               },
               "use_ring_buffer": {
                 "title": "Use Ring Buffer",
-                "description": "Use ring_buffer target instead of event_file for system_health session. Enable for Azure SQL Database without blob storage.",
+                "description": "Use the ring_buffer target instead of event_file for the built-in system_health session on SQL Server or Azure SQL Managed Instance. deadlock-info is unavailable on Azure SQL Database.",
                 "type": "boolean",
                 "default": false
               }
@@ -244,13 +244,13 @@
               },
               "session_name": {
                 "title": "Session Name",
-                "description": "Name of the Extended Events session that captures error_reported events.",
+                "description": "Name of the server-scoped (SQL Server/Managed Instance) or database-scoped (Azure SQL Database) Extended Events session that captures error_reported events.",
                 "type": "string",
                 "default": "netdata_errors"
               },
               "use_ring_buffer": {
                 "title": "Use Ring Buffer",
-                "description": "Use ring_buffer target instead of event_file. Enable for Azure SQL Database without blob storage.",
+                "description": "Use ring_buffer instead of event_file. The session must remain running; data is volatile and XML parsing can be slower. Useful when persistent event_file storage is unavailable, including Azure SQL Database without Blob Storage.",
                 "type": "boolean",
                 "default": false
               }
@@ -305,29 +305,29 @@
     "functions": {
       "top_queries": {
         "disabled": {
-          "ui:help": "WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text."
+          "ui:help": "WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text. Query text and runtime views require version-specific server and per-database performance-state permissions."
         },
         "time_window_days": {
-          "ui:help": "Limits Query Store data to recent days. Lower values improve performance on busy servers."
+          "ui:help": "Limits Query Store data to recent days. Lower positive values improve performance on busy servers; 0 uses 7 days and -1 includes all available history."
         }
       },
       "deadlock_info": {
         "disabled": {
-          "ui:help": "WARNING: Query text may contain unmasked sensitive literals. Requires VIEW SERVER STATE permission."
+          "ui:help": "WARNING: Query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, or VIEW SERVER STATE on older versions. Unavailable on Azure SQL Database."
         },
         "use_ring_buffer": {
-          "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower."
+          "ui:help": "Use the volatile system_health ring buffer on SQL Server or Azure SQL Managed Instance. It can be slower to parse. Azure SQL Database is unsupported."
         }
       },
       "error_info": {
         "disabled": {
-          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER STATE permission."
+          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, VIEW SERVER STATE on older versions, or on Azure SQL Database VIEW DATABASE PERFORMANCE STATE for event_file and VIEW DATABASE STATE for ring_buffer."
         },
         "session_name": {
-          "ui:help": "The Extended Events session must be created by an administrator and include an event_file target capturing sqlserver.error_reported with sql_text action."
+          "ui:help": "The administrator-created Extended Events session must capture sqlserver.error_reported with sql_text and query_hash actions, using an event_file (default) or ring_buffer target. Use ON DATABASE for Azure SQL Database."
         },
         "use_ring_buffer": {
-          "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower."
+          "ui:help": "Use the volatile ring buffer when persistent event_file storage is unavailable. The session must remain running and XML parsing can be slower."
         }
       }
     },

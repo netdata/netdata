@@ -4,7 +4,9 @@ package mssql
 
 // queryVersion retrieves SQL Server version info
 const queryVersion = `
-SELECT SERVERPROPERTY('ProductVersion') AS version;
+SELECT
+  CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion')) AS version,
+  CONVERT(int, SERVERPROPERTY('EngineEdition')) AS engine_edition;
 `
 
 // queryUserConnections counts user vs system connections
@@ -399,6 +401,12 @@ FROM sys.dm_xe_sessions
 WHERE name = @sessionName;
 `
 
+const queryMSSQLErrorActiveDatabaseSessionExists = `
+SELECT COUNT(*)
+FROM sys.dm_xe_database_sessions
+WHERE name = @sessionName;
+`
+
 // queryMSSQLErrorSessionEventFilePath returns the filename configured on the session's
 // event_file target. The on-disk name is operator-chosen and need not match the session
 // name, so it has to be read from the catalog rather than guessed.
@@ -415,11 +423,32 @@ WHERE ses.name = @sessionName
   AND fld.name = 'filename';
 `
 
+const queryMSSQLErrorDatabaseSessionEventFilePath = `
+SELECT CONVERT(nvarchar(2048), fld.value) AS file_path
+FROM sys.database_event_sessions AS ses
+INNER JOIN sys.database_event_session_targets AS tgt
+  ON tgt.event_session_id = ses.event_session_id
+INNER JOIN sys.database_event_session_fields AS fld
+  ON fld.event_session_id = tgt.event_session_id
+ AND fld.object_id = tgt.target_id
+WHERE ses.name = @sessionName
+  AND tgt.name = 'event_file'
+  AND fld.name = 'filename';
+`
+
 // queryMSSQLErrorSessionHasRingBuffer verifies that the session has a ring_buffer target.
 const queryMSSQLErrorSessionHasRingBuffer = `
 SELECT COUNT(*)
 FROM sys.dm_xe_session_targets AS xet
 JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
+WHERE xs.name = @sessionName
+  AND xet.target_name = 'ring_buffer';
+`
+
+const queryMSSQLErrorDatabaseSessionHasRingBuffer = `
+SELECT COUNT(*)
+FROM sys.dm_xe_database_session_targets AS xet
+JOIN sys.dm_xe_database_sessions AS xs ON xs.address = xet.event_session_address
 WHERE xs.name = @sessionName
   AND xet.target_name = 'ring_buffer';
 `
@@ -476,6 +505,26 @@ WITH xevents AS (
   SELECT CAST(xet.target_data AS XML) AS target_data
   FROM sys.dm_xe_session_targets AS xet
   JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
+  WHERE xs.name = @sessionName
+    AND xet.target_name = 'ring_buffer'
+)
+SELECT TOP (@limit)
+  xevent.value('@timestamp', 'datetime2(7)') AS event_time,
+  xevent.value('(data[@name="error_number"]/value)[1]', 'int') AS error_number,
+  xevent.value('(data[@name="state"]/value)[1]', 'int') AS error_state,
+  xevent.value('(data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
+  xevent.value('(action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
+  xevent.value('(action[@name="query_hash"]/value)[1]', 'nvarchar(32)') AS query_hash
+FROM xevents
+CROSS APPLY target_data.nodes('RingBufferTarget/event[@name="error_reported"]') AS T(xevent)
+ORDER BY event_time DESC;
+`
+
+const queryMSSQLErrorInfoDatabaseRingBuffer = `
+WITH xevents AS (
+  SELECT CAST(xet.target_data AS XML) AS target_data
+  FROM sys.dm_xe_database_session_targets AS xet
+  JOIN sys.dm_xe_database_sessions AS xs ON xs.address = xet.event_session_address
   WHERE xs.name = @sessionName
     AND xet.target_name = 'ring_buffer'
 )

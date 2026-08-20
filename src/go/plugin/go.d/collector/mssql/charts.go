@@ -1403,7 +1403,7 @@ func (c *Collector) addAGCharts(agName string) {
 		agRecoveryHealthChartTmpl.Copy(),
 	}
 
-	if c.majorVersion >= 15 { // SQL Server 2019+
+	if c.currentMajorVersion() >= 15 { // SQL Server 2019+
 		*charts = append(*charts, agThreadsChartTmpl.Copy())
 	}
 
@@ -1464,7 +1464,7 @@ func (c *Collector) addAGDatabaseReplicaCharts(agName, replicaServer, dbName str
 		agDBJoinedChartTmpl.Copy(),
 	}
 
-	if c.majorVersion >= 13 { // SQL Server 2016+
+	if c.currentMajorVersion() >= 13 { // SQL Server 2016+
 		*charts = append(*charts, agDBSecondaryLagChartTmpl.Copy())
 	}
 

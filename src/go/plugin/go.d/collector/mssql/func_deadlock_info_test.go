@@ -12,6 +12,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	mssqlDriver "github.com/microsoft/go-mssqldb"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -203,6 +204,87 @@ func TestResolveMSSQLErrorReadTarget_RingBufferRequiresRunningSession(t *testing
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestResolveMSSQLErrorReadTarget_AzureSQLDatabaseUsesDatabaseCatalog(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("database_event_session_fields").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("https://storage.example/events/netdata_errors.xel"))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	require.NoError(t, err)
+	assert.True(t, available)
+	assert.Equal(t, "https://storage.example/events/netdata_errors_0_", target.filePath)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestResolveMSSQLErrorReadTarget_AzureSQLDatabaseUsesDatabaseRingBufferDMVs(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("dm_xe_database_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	c.Functions.ErrorInfo.UseRingBuffer = true
+
+	_, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	require.NoError(t, err)
+	assert.True(t, available)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestResolveMSSQLErrorReadTarget_AzureSQLManagedInstanceUsesServerCatalog(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("16.0.4265.3", engineEditionAzureSQLMI)
+
+	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
+	require.NoError(t, err)
+	assert.True(t, available)
+	assert.Equal(t, `C:\Logs\nd_err_0_*.xel`, target.filePath)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFetchMSSQLErrorRows_AzureSQLDatabaseUsesDatabaseRingBufferQuery(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("dm_xe_database_sessions").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("FROM sys.dm_xe_database_session_targets").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}))
+
+	c := New()
+	c.db = db
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	c.Functions.ErrorInfo.UseRingBuffer = true
+
+	status, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	assert.Empty(t, rows)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestEventFileReadTarget(t *testing.T) {
 	tests := map[string]struct {
 		configured string
@@ -340,6 +422,66 @@ func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestCollectErrorInfo_ResolverTimeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.DeadlineExceeded)
+
+	c := New()
+	c.db = db
+	handler := newFuncErrorInfo(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background())
+	assert.Equal(t, 504, response.Status)
+	assert.Contains(t, response.Message, "timed out")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectErrorInfo_ResolverCancellation(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.Canceled)
+
+	c := New()
+	c.db = db
+	handler := newFuncErrorInfo(&funcRouter{collector: c})
+
+	response := handler.collectData(context.Background())
+	assert.Equal(t, 499, response.Status)
+	assert.Contains(t, response.Message, "canceled")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestErrorInfoFunctionTimeoutOverridesCollectorTimeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").
+		WillDelayFor(20 * time.Millisecond).
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
+	mock.ExpectQuery("fn_xe_file_target_read_file").
+		WillDelayFor(20 * time.Millisecond).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}))
+
+	c := New()
+	c.db = db
+	c.Timeout = confopt.Duration(5 * time.Millisecond)
+	c.Functions.ErrorInfo.Timeout = confopt.Duration(200 * time.Millisecond)
+	c.setServerProperties("16.0.4265.3", 3)
+	handler := newFuncErrorInfo(&funcRouter{collector: c})
+
+	response := handler.Handle(context.Background(), errorInfoMethodID, nil)
+	assert.Equal(t, 200, response.Status)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
@@ -413,12 +555,84 @@ func TestCollectDeadlockInfo_PermissionDenied(t *testing.T) {
 
 	c := New()
 	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 403, resp.Status)
-	assert.Contains(t, strings.ToLower(resp.Message), "view server state")
+	assert.Contains(t, resp.Message, "VIEW SERVER PERFORMANCE STATE")
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectErrorInfo_PermissionDenied(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").
+		WillReturnError(mssqlDriver.Error{Number: 297, Message: "VIEW SERVER PERFORMANCE STATE permission was denied"})
+
+	c := New()
+	c.db = db
+	c.setServerProperties("16.0.4265.3", 3)
+	handler := newFuncErrorInfo(&funcRouter{collector: c})
+
+	resp := handler.collectData(context.Background())
+	require.Equal(t, 403, resp.Status)
+	assert.Contains(t, resp.Message, "VIEW SERVER PERFORMANCE STATE")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFunctionPermissionMessagesMatchEngineAndVersion(t *testing.T) {
+	tests := map[string]struct {
+		version       string
+		engineEdition int
+		want          string
+	}{
+		"SQL Server 2022": {
+			version:       "16.0.4265.3",
+			engineEdition: 3,
+			want:          "VIEW SERVER PERFORMANCE STATE",
+		},
+		"SQL Server 2019": {
+			version:       "15.0.4420.2",
+			engineEdition: 3,
+			want:          "VIEW SERVER STATE",
+		},
+		"Azure SQL Database": {
+			version:       "12.0.2000.8",
+			engineEdition: engineEditionAzureSQLDatabase,
+			want:          "VIEW DATABASE PERFORMANCE STATE",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.setServerProperties(tc.version, tc.engineEdition)
+			assert.Contains(t, c.errorInfoPermissionMessage(), tc.want)
+			assert.Contains(t, c.deadlockPermissionMessage(), tc.want)
+			assert.Contains(t, c.topQueriesPermissionMessage(), tc.want)
+		})
+	}
+}
+
+func TestErrorInfoPermissionMessage_AzureSQLDatabaseRingBuffer(t *testing.T) {
+	c := New()
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	c.Functions.ErrorInfo.UseRingBuffer = true
+
+	assert.Contains(t, c.errorInfoPermissionMessage(), "VIEW DATABASE STATE")
+}
+
+func TestCollectDeadlockInfo_UnavailableOnAzureSQLDatabase(t *testing.T) {
+	c := New()
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	handler := newTestDeadlockHandler(c)
+
+	resp := handler.collectData(context.Background())
+	require.Equal(t, 503, resp.Status)
+	assert.Contains(t, resp.Message, "Azure SQL Database")
 }
 
 func TestCollectDeadlockInfo_Disabled(t *testing.T) {
@@ -446,6 +660,24 @@ func TestCollectDeadlockInfo_Timeout(t *testing.T) {
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 504, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "timed out")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectDeadlockInfo_Cancellation(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("fn_xe_file_target_read_file").
+		WillReturnError(context.Canceled)
+
+	c := New()
+	c.db = db
+	handler := newTestDeadlockHandler(c)
+
+	resp := handler.collectData(context.Background())
+	require.Equal(t, 499, resp.Status)
+	assert.Contains(t, strings.ToLower(resp.Message), "canceled")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

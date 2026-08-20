@@ -71,14 +71,16 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.db = db
 	}
 
-	if c.version == "" {
-		ver, err := c.queryVersion()
+	version, majorVersion, engineEdition, loaded := c.serverProperties()
+	if !loaded {
+		var err error
+		version, engineEdition, err = c.queryVersion()
 		if err != nil {
 			return nil, fmt.Errorf("failed to query version: %v", err)
 		}
-		c.version = ver
-		c.majorVersion = parseMajorVersion(c.version)
-		c.Debugf("connected to SQL Server version %s (major: %d)", c.version, c.majorVersion)
+		c.setServerProperties(version, engineEdition)
+		version, majorVersion, engineEdition, _ = c.serverProperties()
+		c.Debugf("connected to SQL Server version %s (major: %d, engine edition: %d)", version, majorVersion, engineEdition)
 	}
 
 	if !c.hadrChecked {
@@ -154,17 +156,11 @@ func (c *Collector) resolveConnectionParams() (string, string, error) {
 	return driverName, dsn, nil
 }
 
-func (c *Collector) queryVersion() (string, error) {
+func (c *Collector) queryVersion() (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	var version string
-	err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version)
-	if err != nil {
-		return "", err
-	}
-
-	return version, nil
+	return c.queryServerProperties(ctx)
 }
 
 func (c *Collector) collectInstanceMetrics(mx map[string]int64) error {
@@ -1180,7 +1176,7 @@ func (c *Collector) collectAvailabilityGroups(mx map[string]int64) error {
 	if err := c.collectAGAutoPageRepair(mx); err != nil {
 		c.Debugf("AG auto page repair query failed: %v", err)
 	}
-	if c.majorVersion >= 15 { // SQL Server 2019+
+	if c.currentMajorVersion() >= 15 { // SQL Server 2019+
 		if err := c.collectAGThreads(mx); err != nil {
 			c.Debugf("AG threads query failed: %v", err)
 		}
@@ -1286,7 +1282,7 @@ func (c *Collector) collectAGDatabaseReplicas(mx map[string]int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	query := agDatabaseReplicaQuery(c.majorVersion)
+	query := agDatabaseReplicaQuery(c.currentMajorVersion())
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("AG database replicas query failed: %v", err)
