@@ -151,9 +151,10 @@ def validate_payload(data, schema_file, expect_mode, expect_group_by):
             print(" -", e)
         return 1
 
+    d = data["data"]
     print(f"OK: payload validates against {os.path.basename(schema_file)}"
-          f" (actors={data['data']['actors']['rows']}, links={data['data']['links']['rows']}, "
-          f"mode={data['data']['view']['mode']})")
+          f" (actors={d['actors'].get('rows')}, links={d['links'].get('rows')}, "
+          f"mode={d['view'].get('mode')})")
     return 0
 
 
