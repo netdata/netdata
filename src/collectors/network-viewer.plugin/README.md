@@ -2,7 +2,7 @@
 
 This collector directory contains three integrations that share the same plugin target:
 
-- [Network Connections](integrations/network_connections.md) on Linux
+- [Network Connections](integrations/network_connections.md) on Linux, FreeBSD, macOS, and Windows
 - [TCP Stack](integrations/tcp_stack.md) on Windows
 - [UDP Stack](integrations/udp_stack.md) on Windows
 
@@ -14,5 +14,5 @@ Windows.
 
 ## Default Configuration
 
-The Linux `Network Connections` integration has no collector-specific options.
+The `Network Connections` integration has no collector-specific options.
 The Windows `TCP Stack` and `UDP Stack` integrations have no collector-specific options.

@@ -6,9 +6,12 @@ Reads a pluginsd FUNCTION_RESULT payload from the given file (or stdin) and
 checks it against FUNCTION_TOPOLOGY_SCHEMA.json and a few semantic invariants.
 
 Usage:
-  validate_topology_payload.py <payload_file> [<schema_file>]
+  validate_topology_payload.py <payload_file> [<schema_file>] [--mode <mode>]
+                               [--group-by <group_by>] [--self-test]
 When <schema_file> is omitted it defaults to src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json
 relative to the repository root (taken from the script location).
+--mode / --group-by assert the view the caller requested; --self-test runs the
+built-in regression tests and exits.
 """
 
 import io
@@ -21,18 +24,24 @@ def load_payload(path):
     raw = io.open(path, encoding='utf-8', errors='replace').read()
     if raw.startswith("FUNCTION_RESULT_BEGIN"):
         # pluginsd wire format: strip the BEGIN header line and the
-        # FUNCTION_RESULT_END trailing line.
+        # FUNCTION_RESULT_END trailing line. The trailer is only removed when
+        # it is a complete trailing line, never when the text appears inside
+        # a JSON string value.
         start = raw.find("\n")
         start = 0 if start == -1 else start + 1
-        end = raw.find("FUNCTION_RESULT_END")
-        raw = raw[start:end] if end != -1 else raw[start:]
+        lines = raw[start:].splitlines()
+        while lines and not lines[-1].strip():
+            lines.pop()
+        if lines and lines[-1].strip() == "FUNCTION_RESULT_END":
+            lines.pop()
+        raw = "\n".join(lines).strip()
     else:
         # --test emits the JSON body directly (no pluginsd wrapper).
         raw = raw.strip()
     return json.loads(raw)
 
 
-def semantic_checks(data):
+def semantic_checks(data, expect_mode=None, expect_group_by=None):
     errors = []
     if data.get("type") != "topology":
         errors.append("payload type is not 'topology'")
@@ -49,17 +58,64 @@ def semantic_checks(data):
         errors.append("missing types.actor_types registry")
     if "presentation" not in d:
         errors.append("missing presentation")
-    if "view" not in d or d["view"].get("mode") not in ("aggregated", "detailed"):
+    view = d.get("view")
+    if not isinstance(view, dict):
+        return errors + ["missing view object"]
+    mode = view.get("mode")
+    if mode not in ("aggregated", "detailed"):
         errors.append("missing/invalid view.mode")
+    elif expect_mode and mode != expect_mode:
+        errors.append(f"view.mode is {mode!r}, expected {expect_mode!r}")
+    if expect_group_by and view.get("scope") != expect_group_by:
+        errors.append(
+            f"view.scope is {view.get('scope')!r}, expected {expect_group_by!r}")
     return errors
 
 
+def run_self_test():
+    """Regression tests for payload parsing edge cases."""
+    payload = {
+        "status": 200, "type": "topology", "v": 3,
+        "data": {"view": {"mode": "aggregated", "scope": "process_name"}}}
+    body = json.dumps(payload)
+    # A JSON string that contains the trailer text must survive parsing.
+    tricky = body.replace('"process_name"', '"FUNCTION_RESULT_END"')
+    wrapped = "FUNCTION_RESULT_BEGIN \"123\" 200 \"result\" 0\n" + tricky + "\nFUNCTION_RESULT_END\n"
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".out", delete=False) as f:
+        f.write(wrapped)
+        name = f.name
+    try:
+        parsed = load_payload(name)
+    finally:
+        os.unlink(name)
+    if parsed["data"]["view"]["scope"] != "FUNCTION_RESULT_END":
+        print("self-test FAILED: FUNCTION_RESULT_END inside JSON string was stripped")
+        return 1
+    print("self-test OK")
+    return 0
+
+
 def main(argv):
-    payload_file = argv[0] if len(argv) > 0 else None
+    args = list(argv)
+    expect_mode = None
+    expect_group_by = None
+    if "--self-test" in args:
+        return run_self_test()
+    while "--mode" in args:
+        i = args.index("--mode")
+        expect_mode = args[i + 1]
+        del args[i:i + 2]
+    while "--group-by" in args:
+        i = args.index("--group-by")
+        expect_group_by = args[i + 1]
+        del args[i:i + 2]
+
+    payload_file = args[0] if len(args) > 0 else None
     if payload_file is None or payload_file == "-":
         payload_file = "/dev/stdin"
     here = os.path.dirname(os.path.abspath(__file__))
-    schema_file = argv[1] if len(argv) > 1 else os.path.join(
+    schema_file = args[1] if len(args) > 1 else os.path.join(
         here, "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json")
 
     data = load_payload(payload_file)
@@ -68,7 +124,7 @@ def main(argv):
     try:
         import jsonschema
     except ImportError:
-        errors = semantic_checks(data)
+        errors = semantic_checks(data, expect_mode, expect_group_by)
         if errors:
             print("SEMANTIC FAILURES:")
             for e in errors:
@@ -87,7 +143,7 @@ def main(argv):
             print(f" ... and {len(errs) - 20} more")
         return 1
 
-    errors = semantic_checks(data)
+    errors = semantic_checks(data, expect_mode, expect_group_by)
     if errors:
         print("SEMANTIC FAILURES:")
         for e in errors:

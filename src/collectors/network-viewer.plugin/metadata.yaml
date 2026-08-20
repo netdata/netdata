@@ -360,7 +360,7 @@ modules:
           combining the results into a single table grouped by transport protocol and IP family.
       supported_platforms:
         include:
-          - windows
+          - Windows
         exclude: []
       multi_instance: false
       additional_permissions:
