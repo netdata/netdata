@@ -461,16 +461,18 @@ modules:
                 - name: reads
                 - name: writes
         - name: Logical Disk
-          description: "These metrics refer to Logical Disks."
+          description: "These metrics refer to Logical Disks. Volumes without a drive letter are included, addressed by the folder they are mounted on - this covers Cluster Shared Volumes on failover-cluster nodes, which Windows exposes only as 'C:\\ClusterStorage\\VolumeN'."
           labels:
             - name: mount_point
-              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:', 'C:\\ClusterStorage\\Volume1')."
             - name: driver_type
               description: "Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk)."
             - name: filesystem
-              description: "File system format used on the volume (e.g., NTFS, FAT32)."
+              description: "File system format used on the volume (e.g., ntfs, refs, csvfs)."
             - name: rw_mode
               description: "Current read/write permissions status of the volume (read-only access, read and write access)."
+            - name: serial_number
+              description: "Volume serial number reported by Windows, in hexadecimal."
           metrics:
             - name: disk.space
               description: Disk Space Usage

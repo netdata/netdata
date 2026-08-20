@@ -15,6 +15,7 @@ struct logical_disk {
     UINT DriveType;
     DWORD SerialNumber;
     ULONG divisor;
+    ULONG chart_divisor; // the divisor the dimensions were created with
     bool readonly;
 
     STRING *filesystem;
@@ -181,6 +182,8 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 }
 
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
+static DICTIONARY *mountPoints = NULL, *deviceMountPaths = NULL;
+static usec_t mountPointsRefreshedUT = 0;
 static void initialize(void)
 {
     physical_disk_initialize(&system_physical_total);
@@ -196,56 +199,292 @@ static void initialize(void)
 
     dictionary_register_insert_callback(physicalDisks, dict_physical_disk_insert_cb, NULL);
     dictionary_register_delete_callback(physicalDisks, dict_physical_disk_delete_cb, NULL);
+
+    mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    deviceMountPaths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// mount point registry
+//
+// The perflib LogicalDisk object cannot enumerate every volume worth reporting. Failover Clustering
+// hides Cluster Shared Volumes from the volume manager: a CSV gets no drive letter, no volume GUID
+// and no LogicalDisk instance, and it is invisible to the volume enumeration APIs too. Its only
+// per-node handle is the mount point under %SystemDrive%\ClusterStorage. Volumes mounted into a
+// folder may also be published by perflib under their bare device name (HarddiskVolumeN), which an
+// operator cannot map back to anything.
+//
+// So we keep our own registry of mount paths, refreshed on an interval, and use it both to resolve
+// perflib device names and to publish the volumes perflib never lists.
+
+// Long enough for the extended-length paths Windows accepts, in UTF-8 bytes.
+#define ND_MOUNT_PATH_MAX 1024
+
+// Volumes and CSVs do not come and go often; rescanning every collection would be pure syscall cost.
+#define MOUNT_POINTS_REFRESH_EVERY_UT (60 * USEC_PER_SEC)
+
+// Canonical form of a mount path: no trailing backslash, so "C:\" and "C:" are the same instance.
+static void canonicalize_mount_path(char *path)
+{
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '\\')
+        path[--len] = '\0';
+}
+
+// Build the Win32 root path used to query a volume:
+//   "C:"                      -> "C:\"
+//   "C:\ClusterStorage\Volume1" -> "C:\ClusterStorage\Volume1\"
+//   "HarddiskVolume7"         -> "\\.\HarddiskVolume7\"
+static bool volume_root_path_w(const char *name, wchar_t *dst, size_t dst_count)
+{
+    if (!name || !*name || !dst || dst_count < 2)
+        return false;
+
+    char path[ND_MOUNT_PATH_MAX];
+    if ((isalpha((uint8_t)name[0]) && name[1] == ':') || name[0] == '\\')
+        snprintfz(path, sizeof(path), "%s", name);
+    else
+        snprintfz(path, sizeof(path), "\\\\.\\%s", name);
+
+    size_t len = strlen(path);
+    if (len && path[len - 1] != '\\' && len + 2 <= sizeof(path)) {
+        path[len] = '\\';
+        path[len + 1] = '\0';
+    }
+
+    return utf8_to_utf16(dst, dst_count, path, -1) > 0;
+}
+
+// Total and free bytes of the volume the given path resolves to. This follows mount points, which
+// is what makes CSVs readable: the CSVFS driver answers for C:\ClusterStorage\VolumeN.
+static bool volume_space(const char *name, uint64_t *total_bytes, uint64_t *free_bytes)
+{
+    wchar_t rootPath[ND_MOUNT_PATH_MAX];
+    if (!volume_root_path_w(name, rootPath, _countof(rootPath)))
+        return false;
+
+    // Description of incompatibilities present in both methods we are using
+    // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
+    // We are using the variable that should not be affected by quotas.
+    //
+    // GetDiskFreeSpaceEx() failing is the only reliable "this volume cannot be read" signal: a CSV
+    // mount point is not a drive root, so pre-screening it with GetDriveType() would discard the
+    // very volumes this pass exists to collect.
+    ULARGE_INTEGER totalAvailableToCaller, totalNumberOfBytes, totalNumberOfFreeBytes;
+    if (!GetDiskFreeSpaceExW(rootPath, &totalAvailableToCaller, &totalNumberOfBytes, &totalNumberOfFreeBytes))
+        return false;
+
+    *total_bytes = totalNumberOfBytes.QuadPart;
+    *free_bytes = totalNumberOfFreeBytes.QuadPart;
+    return true;
+}
+
+// Register every mount path of a volume; returns the first one, used as the volume's display name.
+static void mount_points_add_volume_paths(const wchar_t *volumeGUID, char *first_path, size_t first_path_size)
+{
+    wchar_t stack_buf[512];
+    wchar_t *buf = stack_buf;
+    DWORD buf_count = _countof(stack_buf);
+    DWORD needed = 0;
+
+    if (!GetVolumePathNamesForVolumeNameW(volumeGUID, buf, buf_count, &needed)) {
+        if (GetLastError() != ERROR_MORE_DATA || !needed)
+            return;
+
+        buf = mallocz((size_t)needed * sizeof(wchar_t));
+        buf_count = needed;
+
+        if (!GetVolumePathNamesForVolumeNameW(volumeGUID, buf, buf_count, &needed)) {
+            freez(buf);
+            return;
+        }
+    }
+
+    // the result is a MULTI_SZ: every mount path of the volume, terminated by an empty string
+    for (const wchar_t *p = buf; *p; p += wcslen(p) + 1) {
+        char path[ND_MOUNT_PATH_MAX];
+        if (!utf16_to_utf8(path, sizeof(path), p, -1))
+            continue;
+
+        canonicalize_mount_path(path);
+        if (!*path)
+            continue;
+
+        dictionary_set(mountPoints, path, NULL, 0);
+
+        if (first_path && !*first_path)
+            snprintfz(first_path, first_path_size, "%s", path);
+    }
+
+    if (buf != stack_buf)
+        freez(buf);
+}
+
+// Map the volume's NT device name (\Device\HarddiskVolumeN) to a mount path, so a perflib instance
+// named after the device can be published under a name operators recognize.
+static void mount_points_map_device(const wchar_t *volumeGUID, const char *mount_path)
+{
+    // "\\?\Volume{guid}\" -> "Volume{guid}"
+    size_t len = wcslen(volumeGUID);
+    if (len < 5 || wcsncmp(volumeGUID, L"\\\\?\\", 4) != 0)
+        return;
+
+    wchar_t name[MAX_PATH + 1];
+    size_t name_len = len - 4;
+    if (name_len >= _countof(name))
+        return;
+
+    memcpy(name, volumeGUID + 4, name_len * sizeof(wchar_t));
+    name[name_len] = L'\0';
+    while (name_len && name[name_len - 1] == L'\\')
+        name[--name_len] = L'\0';
+
+    wchar_t target[MAX_PATH + 1];
+    if (!QueryDosDeviceW(name, target, _countof(target)))
+        return;
+
+    // perflib publishes the leaf of the device name, e.g. "HarddiskVolume7"
+    const wchar_t *leaf = wcsrchr(target, L'\\');
+    leaf = leaf ? leaf + 1 : target;
+
+    char device[128];
+    if (!utf16_to_utf8(device, sizeof(device), leaf, -1) || !*device)
+        return;
+
+    dictionary_set(deviceMountPaths, device, (void *)mount_path, strlen(mount_path) + 1);
+}
+
+static void mount_points_scan_volumes(void)
+{
+    wchar_t volumeGUID[MAX_PATH + 1];
+
+    HANDLE h = FindFirstVolumeW(volumeGUID, _countof(volumeGUID));
+    if (h == INVALID_HANDLE_VALUE)
+        return;
+
+    do {
+        char first_path[ND_MOUNT_PATH_MAX] = "";
+        mount_points_add_volume_paths(volumeGUID, first_path, sizeof(first_path));
+
+        // a volume with no mount path is not reachable, so there is nothing to name it after
+        if (*first_path)
+            mount_points_map_device(volumeGUID, first_path);
+
+    } while (FindNextVolumeW(h, volumeGUID, _countof(volumeGUID)));
+
+    FindVolumeClose(h);
+}
+
+// Cluster Shared Volumes are hidden from the volume APIs above; the mount points under
+// %SystemDrive%\ClusterStorage are the only handle every cluster node has on them.
+static void mount_points_scan_cluster_storage(void)
+{
+    wchar_t windir[MAX_PATH + 1];
+    UINT len = GetSystemWindowsDirectoryW(windir, _countof(windir));
+    if (!len || len >= _countof(windir) || windir[1] != L':' ||
+        !((windir[0] >= L'A' && windir[0] <= L'Z') || (windir[0] >= L'a' && windir[0] <= L'z')))
+        return;
+
+    static const wchar_t suffix[] = L":\\ClusterStorage\\*";
+    wchar_t pattern[_countof(suffix) + 1];
+    pattern[0] = windir[0];
+    memcpy(&pattern[1], suffix, sizeof(suffix));
+
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE)
+        return;
+
+    do {
+        if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            continue;
+
+        if (fd.cFileName[0] == L'.' &&
+            (fd.cFileName[1] == L'\0' || (fd.cFileName[1] == L'.' && fd.cFileName[2] == L'\0')))
+            continue;
+
+        char name[ND_MOUNT_PATH_MAX];
+        if (!utf16_to_utf8(name, sizeof(name), fd.cFileName, -1) || !*name)
+            continue;
+
+        char path[ND_MOUNT_PATH_MAX];
+        snprintfz(path, sizeof(path), "%c:\\ClusterStorage\\%s", (char)windir[0], name);
+        dictionary_set(mountPoints, path, NULL, 0);
+
+    } while (FindNextFileW(h, &fd));
+
+    FindClose(h);
+}
+
+static void mount_points_refresh(usec_t now_ut)
+{
+    if (mountPointsRefreshedUT && now_ut - mountPointsRefreshedUT < MOUNT_POINTS_REFRESH_EVERY_UT)
+        return;
+
+    mountPointsRefreshedUT = now_ut;
+
+    // the registry is a snapshot - volumes and CSVs are added and removed while we run
+    dictionary_flush(mountPoints);
+    dictionary_flush(deviceMountPaths);
+
+    mount_points_scan_volumes();
+    mount_points_scan_cluster_storage();
+}
+
+// Perflib names a letterless volume after its device (HarddiskVolumeN). Publish it under a mount
+// path when it has one, so the instance is recognizable and its metadata can be queried.
+static void logical_disk_resolve_name(const char *instance, char *dst, size_t dst_size)
+{
+    if (!strpbrk(instance, ":\\")) {
+        const char *mount_path = dictionary_get(deviceMountPaths, instance);
+        if (mount_path && *mount_path) {
+            snprintfz(dst, dst_size, "%s", mount_path);
+            return;
+        }
+    }
+
+    snprintfz(dst, dst_size, "%s", instance);
+    canonicalize_mount_path(dst);
+}
+
+// Volume metadata: filesystem, serial number and read-only state. The perflib instance name is
+// UTF-8, so the wide APIs are the only correct way to pass it back to Windows.
 static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
 {
-    if (!diskName || !*diskName)
+    wchar_t rootPath[ND_MOUNT_PATH_MAX];
+    if (!volume_root_path_w(diskName, rootPath, _countof(rootPath)))
         return NULL;
 
-    char fileSystemNameBuffer[128] = {0}; // Buffer for file system name
-    char pathBuffer[260] = {0};           // Path buffer to accommodate different formats
-    char volumeName[260 + 1] = {0};
+    d->DriveType = GetDriveTypeW(rootPath);
+
+    wchar_t volumeName[MAX_PATH + 1] = {0};
+    wchar_t fileSystemName[64] = {0};
     DWORD serialNumber = 0;
     DWORD maxComponentLength = 0;
     DWORD fileSystemFlags = 0;
-    BOOL success;
 
-    // Check if the input is likely a drive letter (e.g., "C:")
-    if (isalpha((uint8_t)diskName[0]) && diskName[1] == ':' && diskName[2] == '\0')
-        snprintfz(pathBuffer, sizeof(pathBuffer) - 1, "%s\\", diskName); // Format as "C:\"
-    else
-        // Assume it's a Volume GUID path or a device path
-        snprintfz(pathBuffer, sizeof(pathBuffer) - 1, "\\\\.\\%s\\", diskName); // Format as "\\.\HarddiskVolume1\"
+    if (!GetVolumeInformationW(
+            rootPath,
+            volumeName,
+            _countof(volumeName),
+            &serialNumber,
+            &maxComponentLength,
+            &fileSystemFlags,
+            fileSystemName,
+            _countof(fileSystemName)))
+        return NULL;
 
-    d->DriveType = GetDriveTypeA(pathBuffer);
+    d->readonly = fileSystemFlags & FILE_READ_ONLY_VOLUME;
+    d->SerialNumber = serialNumber;
 
-    // Attempt to get the volume information
-    success = GetVolumeInformationA(
-        pathBuffer,                  // Path to the disk
-        volumeName,                  // Volume name buffer
-        260,                         // Size of volume name buffer
-        &serialNumber,               // Volume serial number
-        &maxComponentLength,         // Maximum component length
-        &fileSystemFlags,            // File system flags
-        fileSystemNameBuffer,        // File system name buffer
-        sizeof(fileSystemNameBuffer) // Size of file system name buffer
-    );
+    char fileSystem[128];
+    if (!utf16_to_utf8(fileSystem, sizeof(fileSystem), fileSystemName, -1) || !*fileSystem)
+        return NULL;
 
-    if (success) {
-        d->readonly = fileSystemFlags & FILE_READ_ONLY_VOLUME;
-        d->SerialNumber = serialNumber;
+    for (char *c = fileSystem; *c; c++)
+        *c = (char)tolower((uint8_t)*c);
 
-        if (fileSystemNameBuffer[0]) {
-            char *s = fileSystemNameBuffer;
-            while (*s) {
-                *s = tolower((uint8_t)*s);
-                s++;
-            }
-            return string_strdupz(fileSystemNameBuffer); // Duplicate the file system name
-        }
-    }
-    return NULL;
+    return string_strdupz(fileSystem);
 }
 
 static const char *drive_type_to_str(UINT type)
@@ -269,41 +508,84 @@ static const char *drive_type_to_str(UINT type)
     }
 }
 
-static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
-                                        PERF_OBJECT_TYPE *pObjectType,
-                                        PERF_INSTANCE_DEFINITION *pi,
-                                        struct logical_disk *d)
+// Space for a perflib instance. The Win32 APIs are authoritative and report bytes; the perflib
+// "% Free Space" counter (free/total in MiB) is only the fallback for volumes they cannot open.
+static void logical_disk_set_space(PERF_DATA_BLOCK *pDataBlock,
+                                   PERF_OBJECT_TYPE *pObjectType,
+                                   PERF_INSTANCE_DEFINITION *pi,
+                                   struct logical_disk *d,
+                                   const char *name)
 {
-    ULARGE_INTEGER totalNumberOfBytes;
-    ULARGE_INTEGER totalNumberOfFreeBytes;
-    ULARGE_INTEGER totalAvailableToCaller;
+    uint64_t total_bytes, free_bytes;
 
-// https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
-#define MAX_DRIVE_LENGTH 255
-    char path[MAX_DRIVE_LENGTH + 1];
-    snprintfz(path, MAX_DRIVE_LENGTH, "%s\\", windows_shared_buffer);
-
-    // Description of incompatibilities present in both methods we are using
-    // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
-    // We are using the variable that should not be affected by qyota ()
-    if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
-                                                                     &totalAvailableToCaller,
-                                                                     &totalNumberOfBytes,
-                                                                     &totalNumberOfFreeBytes)) {
+    if (!volume_space(name, &total_bytes, &free_bytes)) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
         d->divisor = 1024;
         return;
     }
 
     d->divisor = GIGA_FACTOR;
-    d->percentDiskFree.current.Data = totalNumberOfFreeBytes.QuadPart;
-    d->percentDiskFree.current.Time = totalNumberOfBytes.QuadPart;
+    d->percentDiskFree.current.Data = (ULONGLONG)free_bytes;
+    d->percentDiskFree.current.Time = (LONGLONG)total_bytes;
+}
+
+// percentDiskFree carries the free space in Data and the size of the volume in Time, both scaled by
+// divisor. Shared by the perflib pass and the mount point pass so every volume looks the same.
+static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
+{
+    if (!d->st_disk_space) {
+        d->st_disk_space = rrdset_create_localhost(
+            "disk_space",
+            name,
+            NULL,
+            name,
+            "disk.space",
+            "Disk Space Usage",
+            "GiB",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibStorage",
+            NETDATA_CHART_PRIO_DISKSPACE_SPACE,
+            update_every,
+            RRDSET_TYPE_STACKED);
+
+        rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            d->st_disk_space->rrdlabels,
+            "filesystem",
+            d->filesystem ? string2str(d->filesystem) : "unknown",
+            RRDLABEL_SRC_AUTO);
+        rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
+
+        {
+            char buf[UINT64_HEX_MAX_LENGTH];
+            print_uint64_hex(buf, d->SerialNumber);
+            rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
+        }
+
+        d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+        d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+        d->chart_divisor = d->divisor;
+    }
+    else if (d->chart_divisor != d->divisor) {
+        // the source switched between the Win32 APIs (bytes) and the perflib counter (MiB)
+        rrddim_set_divisor(d->st_disk_space, d->rd_disk_space_free, (int32_t)d->divisor);
+        rrddim_set_divisor(d->st_disk_space, d->rd_disk_space_used, (int32_t)d->divisor);
+        d->chart_divisor = d->divisor;
+    }
+
+    // the perflib counter reports free space that can exceed the reported size on some volumes
+    ULONGLONG free_space = d->percentDiskFree.current.Data;
+    ULONGLONG total_space = (ULONGLONG)d->percentDiskFree.current.Time;
+    ULONGLONG used_space = (total_space > free_space) ? total_space - free_space : 0;
+
+    rrddim_set_by_pointer(d->st_disk_space, d->rd_disk_space_free, (collected_number)free_space);
+    rrddim_set_by_pointer(d->st_disk_space, d->rd_disk_space_used, (collected_number)used_space);
+    rrdset_done(d->st_disk_space);
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
 {
-    DICTIONARY *dict = logicalDisks;
-
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "LogicalDisk");
     if (!pObjectType)
         return false;
@@ -320,75 +602,72 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct logical_disk *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
+        char name[ND_MOUNT_PATH_MAX];
+        logical_disk_resolve_name(windows_shared_buffer, name, sizeof(name));
+
+        struct logical_disk *d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
         d->last_collected = now_ut;
 
         if (!d->collected_metadata) {
-            d->filesystem = getFileSystemType(d, windows_shared_buffer);
+            d->filesystem = getFileSystemType(d, name);
             d->collected_metadata = true;
         }
 
-        netdata_set_hd_usage(pDataBlock, pObjectType, pi, d);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->freeMegabytes);
-
-        if (!d->st_disk_space) {
-            d->st_disk_space = rrdset_create_localhost(
-                "disk_space",
-                windows_shared_buffer,
-                NULL,
-                windows_shared_buffer,
-                "disk.space",
-                "Disk Space Usage",
-                "GiB",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibStorage",
-                NETDATA_CHART_PRIO_DISKSPACE_SPACE,
-                update_every,
-                RRDSET_TYPE_STACKED);
-
-            rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", windows_shared_buffer, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
-            rrdlabels_add(
-                d->st_disk_space->rrdlabels,
-                "filesystem",
-                d->filesystem ? string2str(d->filesystem) : "unknown",
-                RRDLABEL_SRC_AUTO);
-            rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
-
-            {
-                char buf[UINT64_HEX_MAX_LENGTH];
-                print_uint64_hex(buf, d->SerialNumber);
-                rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
-            }
-
-            d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
-            d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
-        rrddim_set_by_pointer(
-            d->st_disk_space, d->rd_disk_space_free, (collected_number)d->percentDiskFree.current.Data);
-        rrddim_set_by_pointer(
-            d->st_disk_space,
-            d->rd_disk_space_used,
-            (collected_number)(d->percentDiskFree.current.Time - d->percentDiskFree.current.Data));
-        rrdset_done(d->st_disk_space);
-    }
-
-    // cleanup - delete callback will handle resource cleanup
-    {
-        struct logical_disk *d;
-        dfe_start_write(dict, d)
-        {
-            if (d->last_collected < now_ut)
-                dictionary_del(dict, d_dfe.name);
-        }
-        dfe_done(d);
-        dictionary_garbage_collect(dict);
+        logical_disk_set_space(pDataBlock, pObjectType, pi, d, name);
+        logical_disk_chart(d, name, update_every);
     }
 
     return true;
+}
+
+// Volumes perflib does not list: Cluster Shared Volumes, and any volume mounted into a folder that
+// perflib skipped. Runs after the perflib pass, so volumes already collected this cycle are left
+// alone and never produce a second chart.
+static void do_mount_points(int update_every, usec_t now_ut)
+{
+    void *v;
+    dfe_start_read(mountPoints, v)
+    {
+        const char *name = v_dfe.name;
+
+        struct logical_disk *d = dictionary_get(logicalDisks, name);
+        if (d && d->last_collected == now_ut)
+            continue;
+
+        uint64_t total_bytes, free_bytes;
+        if (!volume_space(name, &total_bytes, &free_bytes))
+            // gone, or not ready - an existing instance ages out through the stale eviction below
+            continue;
+
+        d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
+
+        if (!d->collected_metadata) {
+            d->filesystem = getFileSystemType(d, name);
+            d->collected_metadata = true;
+        }
+
+        d->divisor = GIGA_FACTOR;
+        d->percentDiskFree.current.Data = (ULONGLONG)free_bytes;
+        d->percentDiskFree.current.Time = (LONGLONG)total_bytes;
+        d->last_collected = now_ut;
+
+        logical_disk_chart(d, name, update_every);
+    }
+    dfe_done(v);
+}
+
+// Must run after every producer of logical disk instances, or an instance created by one pass would
+// be evicted before the next pass had a chance to collect it.
+static void logical_disk_evict_stale(usec_t now_ut)
+{
+    struct logical_disk *d;
+    dfe_start_write(logicalDisks, d)
+    {
+        if (d->last_collected < now_ut)
+            dictionary_del(logicalDisks, d_dfe.name);
+    }
+    dfe_done(d);
+    dictionary_garbage_collect(logicalDisks);
 }
 
 static void physical_disk_labels(RRDSET *st, void *data)
@@ -722,6 +1001,7 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     logical_id = RegistryFindIDByName("LogicalDisk");
     physical_id = RegistryFindIDByName("PhysicalDisk");
 
+    // the mount point pass does not depend on perflib, so it still runs when LogicalDisk is missing
     if (logical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND && physical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
@@ -729,11 +1009,17 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     // query and consume each block before issuing the next call to avoid pointer aliasing.
     usec_t now_ut = now_monotonic_usec();
 
+    // must happen before the perflib pass: it resolves perflib device names to mount paths
+    mount_points_refresh(now_ut);
+
     if (logical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(logical_id);
         if (pDataBlock)
             do_logical_disk(pDataBlock, update_every, now_ut);
     }
+
+    do_mount_points(update_every, now_ut);
+    logical_disk_evict_stale(now_ut);
 
     if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(physical_id);
