@@ -29,11 +29,12 @@ type Config struct {
 
 func New(cfg Config) *Collector {
 	coll := &Collector{
-		log:           cfg.Log.With(slog.String("ddsnmp", "collector")),
-		profiles:      make(map[string]*profileState),
-		missingOIDs:   make(map[string]bool),
-		tableCache:    newTableCache(30*time.Minute, 1),
-		tableIdentity: buildTableIdentity(cfg.Profiles),
+		log:                       cfg.Log.With(slog.String("ddsnmp", "collector")),
+		profiles:                  make(map[string]*profileState),
+		missingOIDs:               make(map[string]bool),
+		regularScalarNamesScratch: make(map[string]struct{}),
+		tableCache:                newTableCache(30*time.Minute, 1),
+		tableIdentity:             buildTableIdentity(cfg.Profiles),
 	}
 
 	for _, prof := range cfg.Profiles {
@@ -51,11 +52,12 @@ func New(cfg Config) *Collector {
 
 type (
 	Collector struct {
-		log           *logger.Logger
-		profiles      map[string]*profileState
-		missingOIDs   map[string]bool
-		tableCache    *tableCache
-		tableIdentity *tableIdentity
+		log                       *logger.Logger
+		profiles                  map[string]*profileState
+		missingOIDs               map[string]bool
+		regularScalarNamesScratch map[string]struct{}
+		tableCache                *tableCache
+		tableIdentity             *tableIdentity
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -183,6 +185,25 @@ func (c *Collector) sortedProfileStates() []*profileState {
 	return profiles
 }
 
+func (c *Collector) keepFirstRegularScalarMetricByName(metrics []ddsnmp.Metric) []ddsnmp.Metric {
+	if len(metrics) < 2 {
+		return metrics
+	}
+	if c.regularScalarNamesScratch == nil {
+		c.regularScalarNamesScratch = make(map[string]struct{})
+	} else {
+		clear(c.regularScalarNamesScratch)
+	}
+
+	return slices.DeleteFunc(metrics, func(metric ddsnmp.Metric) bool {
+		if _, ok := c.regularScalarNamesScratch[metric.Name]; ok {
+			return true
+		}
+		c.regularScalarNamesScratch[metric.Name] = struct{}{}
+		return false
+	})
+}
+
 func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 	var hidden []ddsnmp.Metric
 	for _, metric := range metrics {
@@ -234,6 +255,7 @@ func (c *Collector) prepareProfileCollection(ps *profileState) (*preparedProfile
 	if err != nil {
 		return nil, err
 	}
+	scalarMetrics = c.keepFirstRegularScalarMetricByName(scalarMetrics)
 	pm.Metrics = append(pm.Metrics, scalarMetrics...)
 	pm.Stats.Timing.Scalar = time.Since(now)
 	pm.Stats.Metrics.Scalar += int64(len(scalarMetrics))
