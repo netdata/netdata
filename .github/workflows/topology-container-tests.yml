@@ -130,6 +130,9 @@ jobs:
             shift 2
             local out="$tmpd/${name}.json" err="$tmpd/${name}.err"
             set +e
+            # shellcheck disable=SC2024 # the redirect must stay in the runner
+            # (the plugin only runs as root; the output file must be readable
+            # by the validator running as the runner user)
             printf '%s' "$payload" | "${run_as_root[@]}" timeout 120 "$plugin" --test topology:network-connections > "$out" 2> "$err"
             local rc=$?
             set -e

@@ -1213,11 +1213,26 @@ int main(int argc, char **argv)
 
         const char *function = NULL;
         uint64_t timeout_seconds = 60;
-        for(int i = 2; i < argc; i++) {
-            if(strcmp(argv[i], "--timeout") == 0 && i + 1 < argc)
-                timeout_seconds = str2ull(argv[++i], NULL);
+        bool bad_args = false;
+        for(int i = 2; i < argc && !bad_args; i++) {
+            if(strcmp(argv[i], "--timeout") == 0) {
+                if(i + 1 >= argc) {
+                    fprintf(stderr, "--timeout requires a value\n");
+                    bad_args = true;
+                }
+                else
+                    timeout_seconds = str2ull(argv[++i], NULL);
+            }
+            else if(strncmp(argv[i], "--", 2) == 0) {
+                fprintf(stderr, "unrecognized option '%s'\n", argv[i]);
+                bad_args = true;
+            }
             else if(!function)
                 function = argv[i];
+        }
+        if(bad_args) {
+            netdata_mutex_destroy(&stdout_mutex);
+            return 2;
         }
 
         if(!function || strcmp(function, NETWORK_TOPOLOGY_VIEWER_FUNCTION) != 0) {
@@ -1246,15 +1261,21 @@ int main(int argc, char **argv)
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + timeout_seconds * USEC_PER_SEC;
         char *function_copy = strdupz(function);
-        network_viewer_topology_function(
-            "123", function_copy, &stop_monotonic_ut, &cancelled,
-            payload, HTTP_ACCESS_ALL, NULL, NULL);
+        BUFFER *result = network_viewer_topology_result(
+            function_copy, &stop_monotonic_ut, &cancelled, payload);
+        if(result) {
+            netdata_mutex_lock(&stdout_mutex);
+            pluginsd_function_result_to_stdout("123", result);
+            netdata_mutex_unlock(&stdout_mutex);
+        }
         fflush(stdout);
 
+        int rc = (!result || result->response_code < HTTP_RESP_OK || result->response_code >= 300) ? 1 : 0;
+        buffer_free(result);
         freez(function_copy);
         buffer_free(payload);
         netdata_mutex_destroy(&stdout_mutex);
-        return 0;
+        return rc;
     }
 
     netdata_mutex_init(&stdout_mutex);

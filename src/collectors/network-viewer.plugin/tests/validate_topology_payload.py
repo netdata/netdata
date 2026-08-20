@@ -29,7 +29,7 @@ def load_payload(path):
         # a JSON string value.
         start = raw.find("\n")
         start = 0 if start == -1 else start + 1
-        lines = raw[start:].splitlines()
+        lines = raw[start:].split("\n")
         while lines and not lines[-1].strip():
             lines.pop()
         if lines and lines[-1].strip() == "FUNCTION_RESULT_END":
@@ -49,7 +49,7 @@ def semantic_checks(data, expect_mode=None, expect_group_by=None):
         errors.append("payload version is not 3")
     d = data.get("data")
     if not isinstance(d, dict):
-        return ["missing data object"]
+        return errors + ["missing data object"]
     for table in ("actors", "links"):
         t = d.get(table)
         if not isinstance(t, dict) or "columns" not in t or "values" not in t:
@@ -104,10 +104,16 @@ def main(argv):
         return run_self_test()
     while "--mode" in args:
         i = args.index("--mode")
+        if i + 1 >= len(args):
+            print("--mode requires a value (aggregated|detailed)")
+            return 2
         expect_mode = args[i + 1]
         del args[i:i + 2]
     while "--group-by" in args:
         i = args.index("--group-by")
+        if i + 1 >= len(args):
+            print("--group-by requires a value (process_name|pid|container)")
+            return 2
         expect_group_by = args[i + 1]
         del args[i:i + 2]
 
