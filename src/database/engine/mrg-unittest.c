@@ -1065,12 +1065,233 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
 #endif
 }
 
+// Captures what the indexer grouped, so the test can assert on it.
+struct jv2_group_capture {
+    size_t metrics;
+    size_t pages;
+    bool called;
+};
+
+static bool jv2_group_capture_cb(
+    Word_t section __maybe_unused, unsigned datafile_fileno __maybe_unused,
+    uint8_t type __maybe_unused, Pvoid_t JudyL_metrics __maybe_unused,
+    Pvoid_t JudyL_extents_pos __maybe_unused, size_t count_of_unique_extents __maybe_unused,
+    size_t count_of_unique_metrics, size_t count_of_unique_pages,
+    void *data) {
+    struct jv2_group_capture *c = data;
+    c->metrics = count_of_unique_metrics;
+    c->pages = count_of_unique_pages;
+    c->called = true;
+    // false => the caller unwinds the pages without trying to write a journal
+    return false;
+}
+
+// Two open-cache pages for the SAME uuid but with DIFFERENT page->metric_id
+// values must be indexed as ONE metric.
+//
+// This happens in production when a metric is deleted and re-created for the
+// same uuid: the new METRIC gets a new pointer, while older open-cache pages
+// still carry the old one. The uuidmap id survives the deletion whenever
+// something else still references that uuid - another tier's METRIC for the same
+// dimension, for instance - so both pages legitimately carry the same uuid_id.
+//
+// It matters because journal v2 wants one entry per uuid:
+// journalfile_migrate_to_v2_callback() builds and sorts a uuid list, and its
+// readers bsearch() by uuid. Two entries for one uuid means one group's pages
+// are unreachable in the written journal.
+//
+// Keying JudyL_metrics by page->metric_id produces two groups here. Keying it by
+// the page's uuid_id produces one.
+//
+// Note this only became reachable once metrics were resolved by id: while the
+// indexer dereferenced page->metric_id, the older page failed to resolve and was
+// skipped, so the duplicate could not form.
+static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
+    fprintf(stderr, "\nTesting jv2 groups one uuid once (deterministic)...\n");
+    int errors = 0;
+
+    enum { TEST_FILENO = 9 };
+    const Word_t section = (Word_t)&test_ctx_0;
+
+    MRG *mrg = mrg_create_for_unittest();
+    MRG *saved_main_mrg = main_mrg;
+    main_mrg = mrg;
+
+    PGC *cache = pgc_create(
+        "jv2-same-uuid-test",
+        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
+        64, NULL, jv2_stale_metric_save_dirty_cb,
+        10, 10, 1000, 10,
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+
+    nd_uuid_t shared;
+    uuid_generate_random(shared);
+
+    // Pin the uuid for the duration. In production another tier's METRIC holds
+    // this reference; without it, deleting the first metric would drop the
+    // uuidmap entry and the re-created metric would get a DIFFERENT id, which is
+    // not the case under test.
+    const UUIDMAP_ID pinned = uuidmap_create(shared);
+
+    MRG_ENTRY entry = {
+        .uuid = &shared,
+        .section = section,
+        .first_time_s = 0,          // no retention, so it is deletable on release
+        .last_time_s = 0,
+        .latest_update_every_s = 0,
+    };
+
+    bool added = false;
+    METRIC *first = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!first) {
+        fprintf(stderr, "ERROR: cannot add the first metric\n");
+        goto cleanup_early;
+    }
+    METRIC *old_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, first);
+
+    // delete it; `pinned` keeps the uuid (and therefore the id) alive
+    if(!mrg_metric_release_and_delete(mrg, first)) {
+        fprintf(stderr, "ERROR: the first metric was not deleted\n");
+        goto cleanup_early;
+    }
+
+    // Consume the slot the delete just freed, so the re-created metric below is
+    // forced onto a different address. Without this, ARAL hands the same slot
+    // straight back and there is no "two pointers, one uuid" case to test.
+    // The decoy shares the victim's uuid partition (last byte) so that it
+    // allocates from the same partition ARAL, and it is held alive until
+    // teardown so the slot is not released again.
+    nd_uuid_t decoy_uuid;
+    uuid_generate_random(decoy_uuid);
+    decoy_uuid[15] = shared[15];
+    bool decoy_added = false;
+    MRG_ENTRY decoy_entry = {
+        .uuid = &decoy_uuid,
+        .section = section,
+        .first_time_s = 2,          // retention, so it is not deletable on release
+        .last_time_s = 3,
+        .latest_update_every_s = 1,
+    };
+    METRIC *decoy = mrg_metric_add_and_acquire(mrg, decoy_entry, &decoy_added);
+    if(!decoy) {
+        fprintf(stderr, "ERROR: cannot add the decoy metric\n");
+        goto cleanup_early;
+    }
+
+    // re-create for the same uuid -> new pointer, same id
+    added = false;
+    METRIC *second = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!second || !added) {
+        fprintf(stderr, "ERROR: cannot re-create the metric for the same uuid\n");
+        goto cleanup_early;
+    }
+    METRIC *new_ptr = (METRIC *)(uintptr_t)mrg_metric_id(mrg, second);
+    const UUIDMAP_ID shared_id = mrg_metric_uuidmap_id(mrg, second);
+
+    if(new_ptr == old_ptr) {
+        // ARAL handed back the same slot, so there is no "two pointers, one
+        // uuid" situation to test. Not a product defect - just an inconclusive
+        // run, and better reported than silently passing.
+        fprintf(stderr, "ERROR: re-created metric reused the same address; "
+                        "this test cannot form the case it exists to check\n");
+        errors++;
+        goto cleanup_metric;
+    }
+
+    if(shared_id != pinned) {
+        fprintf(stderr, "ERROR: re-created metric got uuid id %u, expected the "
+                        "pinned %u - the premise of this test does not hold\n",
+                shared_id, pinned);
+        errors++;
+        goto cleanup_metric;
+    }
+
+    // two hot pages, same section and datafile, same uuid_id, DIFFERENT
+    // metric_id, distinct start times so they are distinct pages
+    struct extent_io_data xio_old = {
+        .fileno = TEST_FILENO, .block = 4096, .bytes = 4096, .uuid_id = shared_id,
+    };
+    struct extent_io_data xio_new = {
+        .fileno = TEST_FILENO, .block = 8192, .bytes = 4096, .uuid_id = shared_id,
+    };
+
+    bool a1 = false, a2 = false;
+    PGC_PAGE *p_old = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section, .metric_id = (Word_t)old_ptr,
+        .start_time_s = 100, .end_time_s = 200, .size = 4096, .data = NULL,
+        .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_old,
+    }, &a1);
+    PGC_PAGE *p_new = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = section, .metric_id = (Word_t)new_ptr,
+        .start_time_s = 300, .end_time_s = 400, .size = 4096, .data = NULL,
+        .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_new,
+    }, &a2);
+
+    if(!p_old || !p_new || !a1 || !a2) {
+        fprintf(stderr, "ERROR: cannot add the two hot pages\n");
+        errors++;
+    }
+    else {
+        struct jv2_group_capture cap = { 0 };
+        pgc_open_cache_to_journal_v2(cache, section, TEST_FILENO, 1,
+                                     jv2_group_capture_cb, &cap, true);
+
+        if(!cap.called) {
+            fprintf(stderr, "ERROR: the migrate callback was never invoked\n");
+            errors++;
+        }
+        else {
+            // THE assertion.
+            if(cap.metrics != 1) {
+                fprintf(stderr,
+                        "ERROR: the indexer grouped one uuid into %zu metric "
+                        "entries (expected 1) - journal v2 wants one entry per "
+                        "uuid, so the extra group's pages become unreachable\n",
+                        cap.metrics);
+                errors++;
+            }
+            if(cap.pages != 2) {
+                fprintf(stderr,
+                        "ERROR: the indexer saw %zu pages (expected 2)\n",
+                        cap.pages);
+                errors++;
+            }
+        }
+    }
+
+    if(p_old) pgc_page_release(cache, p_old);
+    if(p_new) pgc_page_release(cache, p_new);
+
+cleanup_metric:
+    mrg_metric_release_and_delete(mrg, second);
+    mrg_metric_release_and_delete(mrg, decoy);
+
+cleanup_early:
+    pgc_destroy(cache, false);
+    uuidmap_free(pinned);
+    main_mrg = saved_main_mrg;
+
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n", referenced);
+        errors++;
+    }
+
+    if(errors)
+        fprintf(stderr, "jv2 same-uuid grouping test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "jv2 same-uuid grouping test: OK\n");
+
+    return errors;
+}
+
 int mrg_unittest(void) {
     int errors = dbengine_accounting_helpers_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
     errors += mrg_stale_metric_pointer_unittest();
     errors += mrg_jv2_stale_metric_not_dereferenced_unittest();
+    errors += mrg_jv2_same_uuid_grouped_once_unittest();
     errors += mrg_uuid_lookup_delete_race_unittest();
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
