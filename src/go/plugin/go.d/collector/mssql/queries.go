@@ -436,6 +436,18 @@ WITH xevents AS (
   SELECT CAST(event_data AS XML) AS event_xml
   FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
   WHERE object_name = 'error_reported'
+    AND LEN(file_name) > LEN(@filePrefix) + 4
+    AND LEFT(file_name, LEN(@filePrefix)) = @filePrefix
+    AND RIGHT(file_name, 4) = '.xel'
+    AND TRY_CONVERT(decimal(38, 0), SUBSTRING(
+      file_name,
+      LEN(@filePrefix) + 1,
+      CASE
+        WHEN LEN(file_name) > LEN(@filePrefix) + 4
+        THEN LEN(file_name) - LEN(@filePrefix) - 4
+        ELSE 0
+      END
+    )) IS NOT NULL
 )
 SELECT TOP (@limit)
   event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') AS event_time,

@@ -538,7 +538,11 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 	defer cancel()
 
 	query := queryMSSQLErrorInfoEventFile
-	args := []any{sql.Named("filePath", target.filePath), sql.Named("limit", limit)}
+	args := []any{
+		sql.Named("filePath", target.filePath),
+		sql.Named("filePrefix", target.filePrefix),
+		sql.Named("limit", limit),
+	}
 	if c.Functions.ErrorInfo.UseRingBuffer {
 		query = queryMSSQLErrorInfoRingBuffer
 		args = []any{sql.Named("sessionName", sessionName), sql.Named("limit", limit)}
@@ -592,7 +596,8 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 // mssqlErrorReadTarget says where error_reported events should be read from.
 type mssqlErrorReadTarget struct {
 	// filePath is the event_file read pattern. Empty when reading the ring buffer.
-	filePath string
+	filePath   string
+	filePrefix string
 }
 
 // resolveMSSQLErrorReadTarget locates the Extended Events target for a session, reporting
@@ -615,11 +620,11 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 		if err != nil {
 			return mssqlErrorReadTarget{}, false, err
 		}
-		path := eventFileReadPath(configured.String)
-		if path == "" {
+		target := eventFileReadTarget(configured.String)
+		if target.filePath == "" {
 			return mssqlErrorReadTarget{}, false, nil
 		}
-		return mssqlErrorReadTarget{filePath: path}, true, nil
+		return target, true, nil
 	}
 
 	var count int
@@ -638,13 +643,13 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 	return mssqlErrorReadTarget{}, count > 0, nil
 }
 
-// eventFileReadPath turns the configured event_file filename into the read path for the
-// generated <base>_0_<ticks>.xel files. Local files use a wildcard; Azure Storage uses
-// the wildcard-free blob prefix required by sys.fn_xe_file_target_read_file.
-func eventFileReadPath(configured string) string {
+// eventFileReadTarget turns the configured event_file filename into the read path and
+// exact generated-file prefix. Local files use a wildcard; Azure Storage uses the
+// wildcard-free blob prefix required by sys.fn_xe_file_target_read_file.
+func eventFileReadTarget(configured string) mssqlErrorReadTarget {
 	path := strings.TrimSpace(configured)
 	if path == "" {
-		return ""
+		return mssqlErrorReadTarget{}
 	}
 	if strings.HasSuffix(strings.ToLower(path), ".xel") {
 		path = path[:len(path)-len(".xel")]
@@ -653,9 +658,9 @@ func eventFileReadPath(configured string) string {
 	prefix := path + "_0_"
 	lower := strings.ToLower(path)
 	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
-		return prefix
+		return mssqlErrorReadTarget{filePath: prefix, filePrefix: prefix}
 	}
-	return prefix + "*.xel"
+	return mssqlErrorReadTarget{filePath: prefix + "*.xel", filePrefix: prefix}
 }
 
 // mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events

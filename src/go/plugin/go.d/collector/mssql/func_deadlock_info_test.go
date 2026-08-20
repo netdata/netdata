@@ -163,6 +163,7 @@ func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.
 	require.NoError(t, err)
 	assert.True(t, available)
 	assert.Equal(t, `C:\Logs\nd_err_0_*.xel`, target.filePath)
+	assert.Equal(t, `C:\Logs\nd_err_0_`, target.filePrefix)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -202,44 +203,52 @@ func TestResolveMSSQLErrorReadTarget_RingBufferRequiresRunningSession(t *testing
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestEventFileReadPath(t *testing.T) {
+func TestEventFileReadTarget(t *testing.T) {
 	tests := map[string]struct {
 		configured string
-		want       string
+		wantPath   string
+		wantPrefix string
 	}{
 		"absolute .xel uses the generated rollover suffix": {
 			configured: `C:\Logs\netdata_errors.xel`,
-			want:       `C:\Logs\netdata_errors_0_*.xel`,
+			wantPath:   `C:\Logs\netdata_errors_0_*.xel`,
+			wantPrefix: `C:\Logs\netdata_errors_0_`,
 		},
 		"bare name uses the generated rollover suffix": {
 			configured: "netdata_errors.xel",
-			want:       "netdata_errors_0_*.xel",
+			wantPath:   "netdata_errors_0_*.xel",
+			wantPrefix: "netdata_errors_0_",
 		},
 		"name without extension uses the generated rollover suffix": {
 			configured: "netdata_errors",
-			want:       "netdata_errors_0_*.xel",
+			wantPath:   "netdata_errors_0_*.xel",
+			wantPrefix: "netdata_errors_0_",
 		},
 		"https target uses a wildcard-free blob prefix": {
 			configured: "https://storage.example/container/netdata_errors.xel",
-			want:       "https://storage.example/container/netdata_errors_0_",
+			wantPath:   "https://storage.example/container/netdata_errors_0_",
+			wantPrefix: "https://storage.example/container/netdata_errors_0_",
 		},
 		"http target uses a wildcard-free blob prefix": {
 			configured: "http://storage.example/container/netdata_errors.xel",
-			want:       "http://storage.example/container/netdata_errors_0_",
+			wantPath:   "http://storage.example/container/netdata_errors_0_",
+			wantPrefix: "http://storage.example/container/netdata_errors_0_",
 		},
 		"surrounding whitespace is trimmed": {
 			configured: "  netdata_errors.xel  ",
-			want:       "netdata_errors_0_*.xel",
+			wantPath:   "netdata_errors_0_*.xel",
+			wantPrefix: "netdata_errors_0_",
 		},
 		"empty stays empty": {
 			configured: "   ",
-			want:       "",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, eventFileReadPath(tc.configured))
+			target := eventFileReadTarget(tc.configured)
+			assert.Equal(t, tc.wantPath, target.filePath)
+			assert.Equal(t, tc.wantPrefix, target.filePrefix)
 		})
 	}
 }
@@ -287,6 +296,9 @@ func TestQueryMSSQLErrorInfoEventFile_ReadsResolvedPathAndRawHash(t *testing.T) 
 
 	// The path must come from the resolver, never be rebuilt from the session name.
 	assert.Contains(t, query, "sys.fn_xe_file_target_read_file(@filepath, null, null, null)")
+	assert.Contains(t, query, "left(file_name, len(@fileprefix)) = @fileprefix")
+	assert.Contains(t, query, "right(file_name, 4) = '.xel'")
+	assert.Contains(t, query, "try_convert(decimal(38, 0)")
 	assert.NotContains(t, query, "@sessionname")
 	// query_hash must stay raw: it exceeds bigint range, so SQL-side conversion overflows.
 	assert.NotContains(t, query, "varbinary(8)")
@@ -300,6 +312,30 @@ func TestQueryMSSQLErrorInfoEventFile_SQLServer2014Compatible(t *testing.T) {
 	assert.Contains(t, query, "cast(event_data as xml) as event_xml")
 	assert.Contains(t, query, "event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') as event_time")
 	assert.Contains(t, query, "order by event_time desc")
+}
+
+func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("server_event_session_fields").
+		WithArgs("netdata_errors").
+		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
+	mock.ExpectQuery("fn_xe_file_target_read_file").
+		WithArgs(`C:\Logs\nd_err_0_*.xel`, `C:\Logs\nd_err_0_`, 500).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
+		}))
+
+	c := New()
+	c.db = db
+
+	status, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	require.NoError(t, err)
+	assert.Equal(t, mssqlErrorAttrEnabled, status)
+	assert.Empty(t, rows)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestCollectDeadlockInfo_ParseError(t *testing.T) {
