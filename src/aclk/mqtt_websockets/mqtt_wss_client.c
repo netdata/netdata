@@ -18,6 +18,12 @@
 #define POLLFD_SOCKET  0
 #define POLLFD_PIPE    1
 
+#if defined(OS_WINDOWS)
+typedef SOCKET mqtt_wss_wakeup_fd_t;
+#else
+typedef int mqtt_wss_wakeup_fd_t;
+#endif
+
 #define PING_TIMEOUT    (60)  //Expect a ping response within this time (seconds)
 time_t ping_timeout = 0;
 
@@ -107,7 +113,7 @@ struct mqtt_wss_client_struct {
 
 // nonblock IO related
     int sockfd;
-    int write_notif_pipe[2];
+    mqtt_wss_wakeup_fd_t write_notif_pipe[2];
     struct pollfd poll_fds[2];
 
 // monotonic time of the last forward progress (plaintext moved, a clean poll() timeout, or -
@@ -155,10 +161,60 @@ struct mqtt_wss_client_struct {
 #endif
 };
 
+#if defined(OS_WINDOWS)
+// WSAPoll() accepts Winsock sockets, not CRT pipe handles. Create a connected
+// loopback pair so every descriptor in the ACLK poll set is a socket.
+static bool mqtt_wss_create_wakeup_sockets(mqtt_wss_wakeup_fd_t fds[2]) {
+    SOCKET listener = INVALID_SOCKET;
+    SOCKET reader = INVALID_SOCKET;
+    SOCKET writer = INVALID_SOCKET;
+    struct sockaddr_in address = { 0 };
+    int address_len = sizeof(address);
+    u_long nonblocking = 1;
+
+    listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(listener == INVALID_SOCKET)
+        goto fail;
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if(bind(listener, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR ||
+       listen(listener, 1) == SOCKET_ERROR ||
+       getsockname(listener, (struct sockaddr *)&address, &address_len) == SOCKET_ERROR)
+        goto fail;
+
+    writer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(writer == INVALID_SOCKET || connect(writer, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
+        goto fail;
+
+    reader = accept(listener, NULL, NULL);
+    if(reader == INVALID_SOCKET)
+        goto fail;
+
+    if(ioctlsocket(reader, FIONBIO, &nonblocking) == SOCKET_ERROR ||
+       ioctlsocket(writer, FIONBIO, &nonblocking) == SOCKET_ERROR)
+        goto fail;
+
+    closesocket(listener);
+    fds[PIPE_READ_END] = reader;
+    fds[PIPE_WRITE_END] = writer;
+    return true;
+
+fail:
+    if(listener != INVALID_SOCKET)
+        closesocket(listener);
+    if(reader != INVALID_SOCKET)
+        closesocket(reader);
+    if(writer != INVALID_SOCKET)
+        closesocket(writer);
+    return false;
+}
+#endif
+
 static void mqtt_wss_close_sockfd(mqtt_wss_client client)
 {
     if (client->sockfd >= 0)
-        close(client->sockfd);
+        sock_close(client->sockfd);
 
     client->sockfd = -1;
     client->poll_fds[POLLFD_SOCKET].fd = -1;
@@ -218,14 +274,22 @@ mqtt_wss_client mqtt_wss_new(
         goto fail_1;
     }
 
-#ifdef __APPLE__
+#if defined(OS_WINDOWS)
+    if (!mqtt_wss_create_wakeup_sockets(client->write_notif_pipe)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create ACLK wakeup sockets");
+        goto fail_2;
+    }
+#elif defined(__APPLE__)
     if (pipe(client->write_notif_pipe)) {
-#else
-    if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
-#endif
         nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create pipe");
         goto fail_2;
     }
+#else
+    if (pipe2(client->write_notif_pipe, O_CLOEXEC /*| O_DIRECT*/)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Couldn't create pipe");
+        goto fail_2;
+    }
+#endif
 
     client->poll_fds[POLLFD_PIPE].fd = client->write_notif_pipe[PIPE_READ_END];
     client->poll_fds[POLLFD_PIPE].events = POLLIN;
@@ -260,8 +324,8 @@ void mqtt_wss_destroy(mqtt_wss_client client)
 {
     mqtt_ng_destroy(client->mqtt);
 
-    close(client->write_notif_pipe[PIPE_WRITE_END]);
-    close(client->write_notif_pipe[PIPE_READ_END]);
+    sock_close(client->write_notif_pipe[PIPE_WRITE_END]);
+    sock_close(client->write_notif_pipe[PIPE_READ_END]);
 
     ws_client_destroy(client->ws_client);
 
@@ -506,7 +570,13 @@ int mqtt_wss_connect(
     }
 
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+#if defined(OS_WINDOWS)
+        if (!netdata_ssl_load_windows_ca_certs(client->ssl_ctx))
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "ACLK: failed to load CA certs from Windows Certificate Store; SSL verify will fail");
+#else
         SSL_CTX_set_default_verify_paths(client->ssl_ctx);
+#endif
         SSL_CTX_set_verify(client->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
     } else
         nd_log(NDLS_DAEMON, NDLP_ERR, "SSL Certificate checking completely disabled!!!");
@@ -806,14 +876,22 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
 
 static void mqtt_wss_wakeup(mqtt_wss_client client)
 {
+#if defined(OS_WINDOWS)
+    (void)send(client->write_notif_pipe[PIPE_WRITE_END], " ", 1, 0);
+#else
     if(write(client->write_notif_pipe[PIPE_WRITE_END], " ", 1) <= 0) { ; }
+#endif
 }
 
 #define THROWAWAY_BUF_SIZE 32
 char throwaway[THROWAWAY_BUF_SIZE];
-static void util_clear_pipe(int fd)
+static void util_clear_pipe(mqtt_wss_wakeup_fd_t fd)
 {
+#if defined(OS_WINDOWS)
+    (void)recv(fd, throwaway, THROWAWAY_BUF_SIZE, 0);
+#else
     if(read(fd, throwaway, THROWAWAY_BUF_SIZE) <= 0)  { ; }
+#endif
 }
 
 // Did either wire counter move? Split out so the comparison is unit-testable.

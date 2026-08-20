@@ -524,4 +524,257 @@ int test_dbengine(void) {
     return (int)(errors + value_errors + time_errors);
 }
 
+#define DBENGINE_PLATFORM_TEST_TIERS 2
+#define DBENGINE_PLATFORM_TEST_TIMEOUT_S 30
+
+struct dbengine_platform_test_init {
+    uv_thread_t thread;
+    struct completion completed;
+    char path[RRDENG_PATH_MAX];
+    size_t tier;
+    int ret;
+    volatile bool *start;
+};
+
+struct dbengine_platform_test_watchdog {
+    volatile bool finished;
+};
+
+static void dbengine_platform_test_init_tier(void *arg)
+{
+    struct dbengine_platform_test_init *init = arg;
+
+    while (!__atomic_load_n(init->start, __ATOMIC_ACQUIRE))
+        yield_the_processor();
+
+    init->ret = rrdeng_init(NULL, init->path, RRDENG_MIN_DISK_SPACE_MB, init->tier, 0);
+    completion_mark_complete(&init->completed);
+}
+
+static void dbengine_platform_test_watchdog(void *arg)
+{
+    struct dbengine_platform_test_watchdog *watchdog = arg;
+    uint64_t deadline = uv_hrtime() + DBENGINE_PLATFORM_TEST_TIMEOUT_S * NSEC_PER_SEC;
+
+    while (!__atomic_load_n(&watchdog->finished, __ATOMIC_ACQUIRE)) {
+        if (uv_hrtime() >= deadline) {
+            fprintf(stderr, "DBENGINE platform unittest: timed out after %d seconds; terminating the test process\n",
+                    DBENGINE_PLATFORM_TEST_TIMEOUT_S);
+            fflush(stderr);
+            exit(EXIT_FAILURE);
+        }
+
+        sleep_usec(100 * USEC_PER_MS);
+    }
+}
+
+static int dbengine_platform_test_empty_directory(const char *path, size_t tier)
+{
+    uv_fs_t scandir_req;
+    int ret = uv_fs_scandir(NULL, &scandir_req, path, 0, NULL);
+    if (ret < 0) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot scan tier %zu test directory: %s\n",
+                tier, uv_strerror(ret));
+        uv_fs_req_cleanup(&scandir_req);
+        return 1;
+    }
+
+    int errors = 0;
+    uv_dirent_t entry;
+    while ((ret = uv_fs_scandir_next(&scandir_req, &entry)) != UV_EOF) {
+        if (ret < 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot read tier %zu test directory: %s\n",
+                    tier, uv_strerror(ret));
+            errors++;
+            break;
+        }
+
+        if (entry.type == UV_DIRENT_DIR) {
+            fprintf(stderr, "DBENGINE platform unittest: unexpected directory in tier %zu test directory\n", tier);
+            errors++;
+            continue;
+        }
+
+        char child_path[RRDENG_PATH_MAX];
+        char filename[RRDENG_PATH_MAX];
+        snprintfz(child_path, sizeof(child_path), "%s/%s", path, entry.name);
+        os_translate_path(filename, child_path, sizeof(filename));
+
+        uv_fs_t unlink_req;
+        ret = uv_fs_unlink(NULL, &unlink_req, filename, NULL);
+        uv_fs_req_cleanup(&unlink_req);
+        if (ret < 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot remove a file from tier %zu test directory: %s\n",
+                    tier, uv_strerror(ret));
+            errors++;
+        }
+    }
+    uv_fs_req_cleanup(&scandir_req);
+
+    return errors;
+}
+
+int dbengine_platform_unittest(void)
+{
+    struct dbengine_platform_test_init init[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    struct dbengine_platform_test_watchdog watchdog = { 0 };
+    char test_root[RRDENG_PATH_MAX];
+    char test_template[RRDENG_PATH_MAX];
+    char native_test_root[RRDENG_PATH_MAX];
+    size_t test_root_length = sizeof(test_root);
+    uv_thread_t watchdog_thread;
+    bool watchdog_started = false;
+    bool init_completion_initialized[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    bool init_thread_created[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    bool init_thread_joined[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    bool dbengine_initialized[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    bool start = false;  // synchronization is via __atomic_load_n / __atomic_store_n; volatile is redundant.
+    int errors = 0;
+
+    if (uv_os_tmpdir(test_root, &test_root_length) != 0 || !test_root_length) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot determine the temporary directory\n");
+        return 1;
+    }
+
+    snprintfz(test_template, sizeof(test_template), "%s/netdata-dbengine-platform-XXXXXX", test_root);
+    uv_fs_t mkdtemp_req;
+    if (uv_fs_mkdtemp(NULL, &mkdtemp_req, test_template, NULL) < 0) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot create a temporary test directory\n");
+        return 1;
+    }
+
+    strncpyz(test_root, mkdtemp_req.path, sizeof(test_root) - 1);
+    uv_fs_req_cleanup(&mkdtemp_req);
+    os_translate_path(native_test_root, test_root, sizeof(native_test_root));
+
+    nd_profile.storage_tiers = DBENGINE_PLATFORM_TEST_TIERS;
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        char tier_path[RRDENG_PATH_MAX];
+
+        snprintfz(tier_path, sizeof(tier_path), "%s/tier%zu", test_root, tier);
+        os_translate_path(init[tier].path, tier_path, sizeof(init[tier].path));
+        if (mkdir(init[tier].path, 0775) != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot create tier %zu directory\n", tier);
+            errors++;
+            goto cleanup_directories;
+        }
+
+        init[tier].tier = tier;
+    }
+
+    if (uv_thread_create(&watchdog_thread, dbengine_platform_test_watchdog, &watchdog) != 0) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot create timeout watchdog\n");
+        errors++;
+        goto cleanup_directories;
+    }
+    watchdog_started = true;
+
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        completion_init(&init[tier].completed);
+        init_completion_initialized[tier] = true;
+        init[tier].start = &start;
+        if (uv_thread_create(&init[tier].thread, dbengine_platform_test_init_tier, &init[tier]) != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot create tier %zu initialization thread\n", tier);
+            completion_destroy(&init[tier].completed);
+            init_completion_initialized[tier] = false;
+            errors++;
+            goto cleanup_watchdog;
+        }
+        init_thread_created[tier] = true;
+    }
+    __atomic_store_n(&start, true, __ATOMIC_RELEASE);
+
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (!completion_timedwait_for(&init[tier].completed, DBENGINE_PLATFORM_TEST_TIMEOUT_S)) {
+            fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization timed out\n", tier);
+            errors++;
+            goto cleanup_watchdog;
+        }
+
+        if (uv_thread_join(&init[tier].thread) != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot join tier %zu initialization thread\n", tier);
+            errors++;
+            goto cleanup_watchdog;
+        }
+        init_thread_joined[tier] = true;
+        completion_destroy(&init[tier].completed);
+        init_completion_initialized[tier] = false;
+
+        if (init[tier].ret != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization failed (%d)\n", tier, init[tier].ret);
+            errors++;
+            goto cleanup_watchdog;
+        }
+        dbengine_initialized[tier] = true;
+
+        if (!completion_timedwait_for(&multidb_ctx[tier]->loading.load_mrg, DBENGINE_PLATFORM_TEST_TIMEOUT_S)) {
+            fprintf(stderr, "DBENGINE platform unittest: tier %zu MRG startup timed out\n", tier);
+            errors++;
+            goto cleanup_watchdog;
+        }
+        completion_destroy(&multidb_ctx[tier]->loading.load_mrg);
+    }
+
+cleanup_watchdog:
+    __atomic_store_n(&start, true, __ATOMIC_RELEASE);
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (!init_thread_created[tier]) {
+            if (init_completion_initialized[tier]) {
+                completion_destroy(&init[tier].completed);
+                init_completion_initialized[tier] = false;
+            }
+            continue;
+        }
+
+        if (init_thread_joined[tier])
+            continue;
+
+        if (uv_thread_join(&init[tier].thread) != 0)
+            errors++;
+        else {
+            if (init_completion_initialized[tier]) {
+                completion_destroy(&init[tier].completed);
+                init_completion_initialized[tier] = false;
+            }
+            init_thread_joined[tier] = true;
+            dbengine_initialized[tier] = init[tier].ret == 0;
+        }
+    }
+
+    bool dbengine_shutdown_required = false;
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (!dbengine_initialized[tier])
+            continue;
+
+        (void)rrdeng_exit(multidb_ctx[tier]);
+        dbengine_shutdown_required = true;
+    }
+    if (dbengine_shutdown_required)
+        dbengine_shutdown();
+
+    if (watchdog_started) {
+        __atomic_store_n(&watchdog.finished, true, __ATOMIC_RELEASE);
+        (void)uv_thread_join(&watchdog_thread);
+    }
+
+cleanup_directories:
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (init[tier].path[0])
+            errors += dbengine_platform_test_empty_directory(init[tier].path, tier);
+
+        if (init[tier].path[0] && rmdir(init[tier].path) != 0 && errno != ENOENT) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot remove tier %zu test directory\n", tier);
+            errors++;
+        }
+    }
+    if (rmdir(native_test_root) != 0 && errno != ENOENT) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot remove test directory\n");
+        errors++;
+    }
+
+    if (!errors)
+        fprintf(stderr, "DBENGINE platform unittest: OK\n");
+    return errors ? 1 : 0;
+}
+
 #endif

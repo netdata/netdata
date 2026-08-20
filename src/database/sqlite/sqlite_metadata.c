@@ -636,8 +636,14 @@ done:
 
 static void recover_database(const char *sqlite_database, const char *new_sqlite_database)
 {
+    // UCRT64 SQLite and rename() both require native Windows paths.
+    char native_src[FILENAME_MAX + 1];
+    char native_dst[FILENAME_MAX + 1];
+    os_translate_path(native_src, sqlite_database, sizeof(native_src));
+    os_translate_path(native_dst, new_sqlite_database, sizeof(native_dst));
+
     sqlite3 *database;
-    int rc = sqlite3_open(sqlite_database, &database);
+    int rc = sqlite3_open(native_src, &database);
     if (rc != SQLITE_OK)
         return;
 
@@ -647,7 +653,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     // This will remove the -shm and -wal files when we close the database
     (void)db_execute(database, "select count(*) from sqlite_master limit 0", NULL);
 
-    sqlite3_recover *recover = sqlite3_recover_init(database, "main", new_sqlite_database);
+    sqlite3_recover *recover = sqlite3_recover_init(database, "main", native_dst);
     if (recover) {
 
         rc = sqlite3_recover_run(recover);
@@ -662,7 +668,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
         (void) sqlite3_close_v2(database);
 
         if (rc == SQLITE_OK) {
-            rc = rename(new_sqlite_database, sqlite_database);
+            rc = rename(native_dst, native_src);
             if (rc == 0) {
                 netdata_log_info("Renamed %s", new_sqlite_database);
                 netdata_log_info("     to %s", sqlite_database);
@@ -782,7 +788,10 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     else
         strncpyz(sqlite_database, ":memory:", sizeof(sqlite_database) - 1);
 
-    rc = sqlite3_open(sqlite_database, &db_meta);
+    // UCRT64 SQLite uses Win32 CreateFile, which requires native Windows paths.
+    char native_meta_db[FILENAME_MAX + 1];
+    os_translate_path(native_meta_db, sqlite_database, sizeof(native_meta_db));
+    rc = sqlite3_open(native_meta_db, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
         char *error_str = get_database_extented_error(db_meta, 0, "meta_open");
@@ -1911,13 +1920,16 @@ static void restore_host_context(void *arg)
             db_context_thread = hclt->db_context_thread;
         } else {
             char sqlite_database[FILENAME_MAX + 1];
+            char native_db[FILENAME_MAX + 1];
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
-            int rc = sqlite3_open_v2(sqlite_database, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+            os_translate_path(native_db, sqlite_database, sizeof(native_db));
+            int rc = sqlite3_open_v2(native_db, &db_meta_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK)
                 sql_close_thread_db_safe(&db_meta_thread);
 
             snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
-            rc = sqlite3_open_v2(sqlite_database, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
+            os_translate_path(native_db, sqlite_database, sizeof(native_db));
+            rc = sqlite3_open_v2(native_db, &db_context_thread, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
             if (rc != SQLITE_OK)
                 sql_close_thread_db_safe(&db_context_thread);
 
@@ -2243,23 +2255,12 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
 size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid))
 {
     sqlite3_stmt *res = NULL;
-    sqlite3 *local_meta_db = NULL;
 
-    char sqlite_database[FILENAME_MAX + 1];
-    snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
-    int rc = sqlite3_open_v2(sqlite_database, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
-    if (rc != SQLITE_OK) {
-        sqlite3_close_v2(local_meta_db);
-        local_meta_db = NULL;
-    }
-
-    if (local_meta_db)
-        (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
-
-    if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
-        sqlite3_close_v2(local_meta_db);
+    // MRG construction is part of DBENGINE bootstrap, before metadata_sync_init()
+    // starts the metadata owner thread. Reuse the initialized connection instead
+    // of opening another handle to the same database.
+    if (!PREPARE_STATEMENT(db_meta, GET_UUID_LIST, &res))
         return 0;
-    }
 
     size_t count = 0;
 
@@ -2279,7 +2280,6 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     }
 
     SQLITE_FINALIZE(res);
-    sqlite3_close_v2(local_meta_db);
     COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_INFO, "MRG: Loaded %zu metrics from database in %s", count, report_duration);
     return count;

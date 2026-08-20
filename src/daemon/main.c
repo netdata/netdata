@@ -58,6 +58,19 @@ static void set_nofile_limit(struct rlimit *rl) {
         netdata_log_error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
 }
 
+static void start_static_thread(struct netdata_static_thread *st) {
+    if(!st->enabled) {
+        netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
+        return;
+    }
+
+    if(st->thread)
+        return;
+
+    netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
+    st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+}
+
 static const struct option_def {
     const char val;
     const char *description;
@@ -298,6 +311,7 @@ static void fatal_status_file_save(void) {
     exit(1);
 }
 
+
 int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
@@ -492,6 +506,7 @@ int netdata_main(int argc, char **argv) {
                             if (aclk_timeout_unittest() + https_client_timeout_unittest() +
                                 mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
+                            if (os_windows_path_translation_unittest()) return 1;
                             if (unit_test_windows_virt_normalize()) return 1;
                             if (unit_test_windows_virt_resolution()) return 1;
                             if (unit_test_windows_container()) return 1;
@@ -508,6 +523,7 @@ int netdata_main(int argc, char **argv) {
                             if (string_unittest(10000)) return 1;
                             if (dictionary_unittest(10000)) return 1;
                             if (aral_unittest(10000)) return 1;
+                            if (judy_unittest()) return 1;
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
@@ -562,6 +578,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "judytest") == 0) {
+                            unittest_running = true;
+                            return judy_unittest();
                         }
                         else if(strcmp(optarg, "aralconcurrency") == 0) {
                             unittest_running = true;
@@ -705,6 +725,21 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "dbengineplatformtest") == 0) {
+                            unittest_running = true;
+                            if (sqlite_library_init())
+                                return 1;
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = dbengine_platform_unittest();
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
@@ -1091,8 +1126,21 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("cd to user config dir");
 
     // cd into config_dir to allow the plugins refer to their config files using relative filenames
+#if defined(OS_WINDOWS)
+    // netdata_configured_user_config_dir is in POSIX/MSYS2 form (/c/...).
+    // UCRT64's chdir() calls SetCurrentDirectoryA() directly without POSIX
+    // translation — /c/... would resolve to C:\c\... which does not exist.
+    // Convert to Windows-native form first so SetCurrentDirectoryA() succeeds.
+    {
+        char win_config_dir[FILENAME_MAX + 1];
+        os_translate_path(win_config_dir, netdata_configured_user_config_dir, FILENAME_MAX);
+        if(chdir(win_config_dir) == -1)
+            fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+    }
+#else
     if(chdir(netdata_configured_user_config_dir) == -1)
         fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("analytics");
@@ -1144,8 +1192,9 @@ int netdata_main(int argc, char **argv) {
         if(st->config_name)
             st->enabled = inicfg_get_boolean(&netdata_config, st->config_section, st->config_name, st->enabled);
 
-        if(st->enabled && st->init_routine)
+        if(st->enabled && st->init_routine) {
             st->init_routine();
+        }
 
         if(st->env_name)
             nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
@@ -1162,10 +1211,26 @@ int netdata_main(int argc, char **argv) {
     nd_web_api_init();
     mcp_initialize_subsystem();
     web_server_threading_selection();
+#ifdef OS_WINDOWS
+    netdata_conf_section_web();
+#endif
 
     delta_startup_time("web server sockets");
-    if(web_server_mode != WEB_SERVER_MODE_NONE)
+    if(web_server_mode != WEB_SERVER_MODE_NONE) {
         web_server_listen_sockets_setup();
+    }
+
+#ifdef OS_WINDOWS
+    set_nofile_limit(&rlimit_nofile);
+
+    // Windows does not fork later, so static dashboard files can be served while runtime initialization continues.
+    for (i = 0; static_threads[i].name != NULL; i++) {
+        struct netdata_static_thread *st = &static_threads[i];
+
+        if(st->start_routine == socket_listen_main_static_threaded)
+            start_static_thread(st);
+    }
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("sqlite");
@@ -1192,7 +1257,9 @@ int netdata_main(int argc, char **argv) {
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
+#ifndef OS_WINDOWS
     set_nofile_limit(&rlimit_nofile);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("stop temporary spawn server");
@@ -1268,11 +1335,12 @@ int netdata_main(int argc, char **argv) {
     set_late_analytics_variables(system_info);
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("RRD structures");
-
     delta_startup_time("commands liveness support");
 
     commands_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("RRD structures");
 
     abort_on_fatal_disable();
     if (rrd_init(netdata_configured_hostname, system_info, false))
@@ -1302,17 +1370,13 @@ int netdata_main(int argc, char **argv) {
     nd_log_limits_reset();
     get_agent_event_time_median_init();
 
+#ifndef OS_WINDOWS
     netdata_conf_section_web();
+#endif
 
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
-
-        if(st->enabled) {
-            netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-            st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
-        }
-        else
-            netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
+        start_static_thread(st);
     }
     ml_start_threads();
 
@@ -1335,6 +1399,29 @@ int netdata_main(int argc, char **argv) {
 
     cleanup_agent_event_log();
     netdata_ready_store(true);
+
+#ifdef OS_WINDOWS
+    // WMI can block for minutes while connecting. All non-WMI discovery remains
+    // before plugin startup; refresh only WMI virtualization after the API is ready.
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "SYSTEM INFO: collecting Windows WMI virtualization metadata after startup readiness.");
+
+    spinlock_lock(&localhost->rrdhost_update_lock);
+    struct rrdhost_system_info *windows_system_info = rrdhost_system_info_dup(localhost->system_info);
+    spinlock_unlock(&localhost->rrdhost_update_lock);
+
+    if(windows_system_info) {
+        netdata_windows_get_wmi_system_info(windows_system_info);
+
+        spinlock_lock(&localhost->rrdhost_update_lock);
+        rrdhost_system_info_swap(localhost->system_info, windows_system_info);
+        rrdhost_flag_set(localhost, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
+        spinlock_unlock(&localhost->rrdhost_update_lock);
+
+        rrdhost_system_info_free(windows_system_info);
+        reload_host_labels();
+    }
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
 

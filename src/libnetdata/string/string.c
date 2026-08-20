@@ -714,8 +714,9 @@ size_t string_destroy(void) {
     
     // Clean up
     freez(entries);
-    if (string_counts)
+    if (string_counts) {
         JudyLFreeArray(&string_counts, PJE0);
+    }
     buffer_free(wb);
 #endif
 

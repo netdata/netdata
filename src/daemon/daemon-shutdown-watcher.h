@@ -48,4 +48,9 @@ void watcher_shutdown_end(void);
 
 void watcher_step_complete(watcher_step_id_t step_id);
 
+// Register a callback invoked once, before abort(), when the watcher times out.
+// On Windows this is used by winsvc.cc to report SERVICE_STOPPED to the SCM
+// so the service does not appear to crash rather than stop. Pass NULL to clear.
+void nd_register_shutdown_timeout_cb(void (*cb)(void));
+
 #endif /* DAEMON_WATCHER_H */

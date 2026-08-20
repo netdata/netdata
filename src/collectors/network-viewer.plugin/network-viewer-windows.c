@@ -5,14 +5,11 @@
 #include "libnetdata/os/system-maps/system-services.h"
 #include "libnetdata/os/system-maps/cached-sid-username.h"
 
-// Minimal IP Helper API forward declarations.
-// <winsock2.h> and <ws2tcpip.h> cannot be included here: libnetdata.h already
-// pulls in POSIX socket headers (via uv.h), and the Windows headers redefine
-// hostent, sockaddr, pollfd etc. causing compile errors on Cygwin/MSYS2.
-// Base types (DWORD, ULONG, UCHAR, BOOL, PVOID, PDWORD) come from <windows.h>
-// which is included for OS_WINDOWS by libnetdata/common.h.
-// inet_ntop / struct in_addr / AF_INET* / INET6_ADDRSTRLEN come from the
-// POSIX headers already included by libnetdata.h.
+// On OS_WINDOWS (UCRT64/MinGW-w64), common.h already includes <iphlpapi.h>
+// which provides all the types and function declarations below.
+// The local forward declarations are only needed when building in environments
+// where <iphlpapi.h> cannot be included directly (e.g. old Cygwin/MSYS2).
+#ifndef OS_WINDOWS
 
 #define MIB_TCP_STATE_CLOSED     1
 #define MIB_TCP_STATE_LISTEN     2
@@ -87,6 +84,25 @@ DWORD WINAPI GetExtendedTcpTable(PVOID pTcpTable, PDWORD pdwSize, BOOL bOrder,
                                  ULONG ulAf, TCP_TABLE_CLASS TableClass, ULONG Reserved);
 DWORD WINAPI GetExtendedUdpTable(PVOID pUdpTable, PDWORD pdwSize, BOOL bOrder,
                                  ULONG ulAf, UDP_TABLE_CLASS TableClass, ULONG Reserved);
+
+#else /* OS_WINDOWS — MIB_TCP_STATE_* may not be defined by iphlpapi.h */
+
+#ifndef MIB_TCP_STATE_CLOSED
+#define MIB_TCP_STATE_CLOSED     1
+#define MIB_TCP_STATE_LISTEN     2
+#define MIB_TCP_STATE_SYN_SENT   3
+#define MIB_TCP_STATE_SYN_RCVD   4
+#define MIB_TCP_STATE_ESTAB      5
+#define MIB_TCP_STATE_FIN_WAIT1  6
+#define MIB_TCP_STATE_FIN_WAIT2  7
+#define MIB_TCP_STATE_CLOSE_WAIT 8
+#define MIB_TCP_STATE_CLOSING    9
+#define MIB_TCP_STATE_LAST_ACK  10
+#define MIB_TCP_STATE_TIME_WAIT 11
+#define MIB_TCP_STATE_DELETE_TCB 12
+#endif
+
+#endif /* OS_WINDOWS */
 
 // Windows-native AF_ values for IP Helper API calls.
 // Cygwin POSIX headers define AF_INET6=10; Windows APIs expect 23.

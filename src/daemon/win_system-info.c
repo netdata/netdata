@@ -55,7 +55,7 @@ static char *netdata_windows_arch(DWORD value)
 
 static DWORD netdata_windows_cpu_frequency(HKEY lKey)
 {
-    DWORD freq = 0;
+    unsigned int freq = 0;
     long ret = netdata_registry_get_dword_from_open_key(&freq, lKey, "~MHz");
     if (ret != ERROR_SUCCESS)
         return freq;
@@ -182,6 +182,12 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
         if (!(lDrives & 1 << i))
             continue;
 
+        char cRoot[] = "C:\\";
+        cRoot[0] = 'A' + i;
+        UINT drive_type = GetDriveTypeA(cRoot);
+        if (drive_type != DRIVE_FIXED && drive_type != DRIVE_RAMDISK)
+            continue;
+
         cVolume[4] = 'A' + i;
         total += netdata_windows_get_disk_size(cVolume);
     }
@@ -257,7 +263,7 @@ static void netdata_windows_discover_os_version(char *os, size_t length, DWORD b
 
 static void netdata_windows_os_kernel_version(char *out, DWORD length, DWORD build)
 {
-    DWORD major, minor;
+    unsigned int major, minor;
     if (!netdata_registry_get_dword(&major,
                                     HKEY_LOCAL_MACHINE,
                                     "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
@@ -618,22 +624,20 @@ static const char *netdata_windows_detect_via_registry(void) {
     return NULL;
 }
 
-static const char *netdata_windows_detect_virt(void) {
-    const char *wmi = netdata_windows_detect_via_wmi();
+static const char *netdata_windows_detect_virt(bool with_wmi) {
+    const char *wmi = with_wmi ? netdata_windows_detect_via_wmi() : NULL;
     const char *smbios = netdata_windows_detect_via_smbios();
     const char *registry = netdata_windows_detect_via_registry();
 
     return netdata_windows_resolve_virt_detection(wmi, smbios, registry);
 }
 
-static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo) {
-    const char *virt = netdata_windows_detect_virt();
+static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo, bool with_wmi) {
+    const char *virt = netdata_windows_detect_virt(with_wmi);
 
+    // WMI can refine this after plugin processes start, so it must not be exported as a provisional environment value.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", virt);
-    nd_setenv("NETDATA_SYSTEM_VIRTUALIZATION", virt, 1);
-
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 const char *netdata_windows_container_from_env(const char *k_host, const char *k_port) {
@@ -691,12 +695,18 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
 
     netdata_windows_cloud(systemInfo);
     netdata_windows_get_cpu(systemInfo);
-    netdata_windows_detect_virtualization(systemInfo);
+    netdata_windows_detect_virtualization(systemInfo, false);
     container = netdata_windows_detect_container_state(systemInfo);
     netdata_windows_container(systemInfo, container);
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
     netdata_windows_install_type(systemInfo);
     netdata_windows_ip(systemInfo);
+}
+
+void netdata_windows_get_wmi_system_info(struct rrdhost_system_info *systemInfo)
+{
+    if(systemInfo)
+        netdata_windows_detect_virtualization(systemInfo, true);
 }
 #endif
