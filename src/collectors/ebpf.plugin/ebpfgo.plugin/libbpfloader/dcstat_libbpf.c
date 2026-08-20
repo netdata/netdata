@@ -128,8 +128,10 @@ ND_EBPF_ASSERT_PID_FIRST(struct netdata_ebpf_dcstat_pid_snapshot);
 
 int netdata_dcstat_runtime_supports_core(void);
 
-/* Global map keys, mirroring enum directory_cache_counters in
- * src/collectors/ebpf.plugin/ebpf_dcstat.h. */
+/* Global map keys.  These mirrored enum directory_cache_counters in
+ * src/collectors/ebpf.plugin/ebpf_dcstat.h, which this port removes; the order is
+ * now fixed by the BPF sources in netdata/ebpf-co-re (dc.bpf.c) and must not be
+ * reordered independently of them. */
 enum netdata_dcstat_global_key {
     NETDATA_DCSTAT_KEY_REFERENCE = 0,
     NETDATA_DCSTAT_KEY_SLOW = 1,

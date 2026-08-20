@@ -112,7 +112,13 @@ static inline void nd_ebpf_destroy_links(struct bpf_link ***links, size_t count)
         return;
 
     for (size_t i = 0; i < count; i++) {
-        if ((*links)[i])
+        /* Attach helpers return error-encoded pointers, not NULL, on failure, and
+         * callers pass the whole array here after spotting one.  libbpf only grew
+         * the IS_ERR_OR_NULL guard inside bpf_link__destroy() in 1.0, while
+         * NetdataLibBPF.cmake still selects the 0.x fork on kernels below 4.14 and
+         * under FORCE_LEGACY_LIBBPF — so filter error pointers here rather than
+         * relying on the library version. */
+        if ((*links)[i] && !libbpf_get_error((*links)[i]))
             bpf_link__destroy((*links)[i]);
     }
 

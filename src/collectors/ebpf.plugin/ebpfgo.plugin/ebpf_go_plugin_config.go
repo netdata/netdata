@@ -396,11 +396,6 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 }
 
-//go:fix inline
-func stringPtr(v string) *string {
-	return new(v)
-}
-
 func parseConfigBool(value string) (bool, bool) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "yes", "true", "on", "1":

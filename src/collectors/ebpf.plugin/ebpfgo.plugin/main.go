@@ -54,6 +54,13 @@ func main() {
 		socketCfg.Enabled = false
 		dnsCfg.Enabled = false
 		dcstatCfg.Enabled = true
+		// resolveDCStatLegacyConfig() skips /proc/kallsyms when the module is
+		// disabled in config, so --dcstat has to resolve the targets itself or it
+		// keeps the hardcoded lookup_fast name.  lookup_fast is a static kernel
+		// function and is frequently emitted suffixed (lookup_fast.isra.0), and
+		// legacy mode has no attach fallback, so skipping this makes --dcstat fail
+		// to load on those kernels.  The C module resolved names unconditionally.
+		dcstatCfg.Targets = resolveDCStatTargets()
 	}
 
 	if !anyProgramEnabled(cachestatCfg, dcstatCfg, socketCfg, dnsCfg) {

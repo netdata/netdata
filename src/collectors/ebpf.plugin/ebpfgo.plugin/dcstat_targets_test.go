@@ -181,3 +181,36 @@ func TestResolveDCStatTargetsLiveHost(t *testing.T) {
 		t.Fatalf("DLookup.Name = %q, want d_lookup", got.DLookup.Name)
 	}
 }
+
+// TestDCStatOnlyResolvesTargets pins that the --dcstat override re-resolves the
+// kallsyms targets.
+//
+// resolveDCStatLegacyConfig() skips /proc/kallsyms when the module is disabled in
+// config, so with `dcstat = no` plus `--dcstat` the config arrives carrying the
+// hardcoded default. lookup_fast is a static kernel function that compilers
+// frequently emit suffixed (lookup_fast.isra.0), and legacy mode has no attach
+// fallback, so failing to re-resolve makes --dcstat unable to load on those
+// kernels — a parity regression against the C module, which resolved names
+// unconditionally.
+func TestDCStatOnlyResolvesTargets(t *testing.T) {
+	// A disabled config leaves the default hardcoded name in place.
+	disabled := defaultDCStatTargets()
+	if disabled.LookupFast.Name != "lookup_fast" {
+		t.Fatalf("default target = %q, want the unresolved %q", disabled.LookupFast.Name, "lookup_fast")
+	}
+
+	// The override path must consult the symbol table. Feed it a table whose
+	// symbol is suffixed, exactly as a real kernel emits it.
+	const suffixed = "lookup_fast.isra.0"
+	resolved := resolveDCStatTargetsFrom(func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(
+			"ffffffff81000000 t " + suffixed + "\n")), nil
+	})
+	if resolved.LookupFast.Name != suffixed {
+		t.Fatalf("resolved target = %q, want %q: --dcstat would attach to the wrong symbol",
+			resolved.LookupFast.Name, suffixed)
+	}
+	if resolved.DLookup.Name != "d_lookup" {
+		t.Fatalf("d_lookup is exported and must stay verbatim, got %q", resolved.DLookup.Name)
+	}
+}
