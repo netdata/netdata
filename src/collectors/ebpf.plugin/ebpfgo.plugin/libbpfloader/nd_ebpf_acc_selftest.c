@@ -10,8 +10,10 @@
  * behaviour is asserted here instead and driven from Go by
  * nd_ebpf_acc_selftest_test.go. */
 
+#include <fcntl.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "nd_ebpf_runtime_common.h"
 
@@ -28,7 +30,7 @@ struct nd_ebpf_acc_selftest_entry {
 
 /* Returns 0 on success, or a distinct positive code per failed assertion so a
  * failure names itself. */
-int netdata_ebpf_acc_selftest(void)
+static int acc_selftest_body(void)
 {
     int rc = 0;
     struct nd_ebpf_acc_table t;
@@ -143,4 +145,31 @@ cleanup:
         return 17;
 
     return 0;
+}
+
+/* Two of the assertions above deliberately drive paths that log a diagnostic:
+ * the per-TGID accumulator cap, and the uninitialised-table guard.  Those
+ * messages are the expected result here, but a passing run then prints
+ * error-looking lines that read as failures in CI output.  Silence stderr for the
+ * duration; the verdict travels in the return code, never on stderr, so nothing
+ * is lost.  If the redirect cannot be set up the test still runs, just noisily. */
+int netdata_ebpf_acc_selftest(void)
+{
+    fflush(stderr);
+    int saved = dup(STDERR_FILENO);
+    int devnull = open("/dev/null", O_WRONLY | O_CLOEXEC);
+    if (saved >= 0 && devnull >= 0)
+        dup2(devnull, STDERR_FILENO);
+
+    int rc = acc_selftest_body();
+
+    fflush(stderr);
+    if (saved >= 0) {
+        dup2(saved, STDERR_FILENO);
+        close(saved);
+    }
+    if (devnull >= 0)
+        close(devnull);
+
+    return rc;
 }
