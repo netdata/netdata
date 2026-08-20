@@ -204,7 +204,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
-| **Profiles** | manual_profiles | A list of profiles to force-apply when auto-detection cannot be used. | [] | no |
+| **Profiles** | manual_profiles | A list of profiles to use when `sysObjectID`-based auto-detection cannot be used. To retain baseline IPv4 topology for a device without a usable `sysObjectID`, include `generic-device` alongside its vendor profile. | [] | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
@@ -388,9 +388,9 @@ jobs:
 ```
 </details>
 
-###### BGP router with forced profile
+###### BGP router without sysObjectID detection
 
-Use `manual_profiles` when auto-detection cannot safely distinguish the device, or when you want to force a specific vendor BGP profile during testing.
+Use `manual_profiles` when the device does not expose a usable `sysObjectID`. List the vendor profile for its BGP data and `generic-device` for baseline IPv4 interface facts used by topology.
 
 This example targets a Cisco ASR router and keeps the optional ICMP latency charts enabled.
 
@@ -405,6 +405,7 @@ jobs:
     community: public
     manual_profiles:
       - cisco-asr
+      - generic-device
     options:
       version: 2
 
@@ -679,10 +680,11 @@ Current BGP peer and peer-family details from cached normalized SNMP data. Each 
 
 Provides the agent-wide SNMP topology view built from all currently running topology-enabled SNMP jobs.
 
-This function reads cached LLDP/CDP, bridge, FDB, ARP, and STP data collected by the independent topology refresh loop and returns a netdata.topology.v1 payload with compact actor, link, evidence, and detail tables. No additional SNMP requests are triggered when calling this function.
+This function reads cached interface/IP, LLDP/CDP, bridge, FDB, ARP, STP, OSPF, and BGP data collected by the independent topology refresh loop and returns a netdata.topology.v1 payload with compact actor, link, evidence, and detail tables. Ordinary automatically detected SNMP devices contribute IPv4 interface and netmask facts for logical subnet membership; bridge and neighbor tables remain device-role scoped. No additional SNMP requests are triggered when calling this function.
 
 Use cases:
 - Discover Layer 2 neighbors and link mapping
+- See managed devices that share an IPv4 subnet
 - Validate cabling and port connections
 - Identify adjacent devices that are discovered but not monitored
 
