@@ -77,6 +77,37 @@ func TestTopologyProfiles_FormerUmbrellaCapabilityMatrix(t *testing.T) {
 	assert.Equal(t, map[string]int{"I": 32, "C": 8, "Q": 11, "S": 12, "A": 29, "V": 4}, counts)
 }
 
+func TestCiscoProfiles_CDPIsTopologyOnly(t *testing.T) {
+	for _, name := range []string{"cisco-catalyst", "cisco-sb"} {
+		t.Run(name, func(t *testing.T) {
+			profile, err := LoadProfileByName(name)
+			require.NoError(t, err)
+
+			assert.False(t, profile.HasExtension("_std-cdp-mib"))
+			assert.True(t, profile.HasExtension("_std-topology-cdp-mib"))
+
+			var ordinaryCDPMetrics []string
+			for _, metric := range profile.Definition.Metrics {
+				if metric.MIB != "CISCO-CDP-MIB" {
+					continue
+				}
+				name := metric.Symbol.Name
+				if name == "" {
+					name = metric.Table.Name
+				}
+				ordinaryCDPMetrics = append(ordinaryCDPMetrics, name)
+			}
+			assert.Empty(t, ordinaryCDPMetrics)
+
+			var kinds []ddprofiledefinition.TopologyKind
+			for _, topology := range profile.Definition.Topology {
+				kinds = append(kinds, topology.Kind)
+			}
+			assert.Contains(t, kinds, ddprofiledefinition.KindCdpCache)
+		})
+	}
+}
+
 func TestTopologyRoleProfiles_AllExactSelectorsResolve(t *testing.T) {
 	tests := []struct {
 		profile string

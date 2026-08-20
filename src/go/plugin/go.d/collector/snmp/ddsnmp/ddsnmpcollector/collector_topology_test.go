@@ -3,16 +3,72 @@
 package ddsnmpcollector
 
 import (
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
+
+func TestCollector_Collect_CiscoCDPTopologyWithoutOrdinaryMetrics(t *testing.T) {
+	const (
+		cdpCacheTableOID     = "1.3.6.1.4.1.9.9.23.1.2.1"
+		cdpInterfaceTableOID = "1.3.6.1.4.1.9.9.23.1.1.1"
+		ifNameColumnOID      = "1.3.6.1.2.1.31.1.1.1.1"
+	)
+
+	profile, err := ddsnmp.LoadProfileByName("cisco-catalyst")
+	require.NoError(t, err)
+	topology := slices.DeleteFunc(slices.Clone(profile.Definition.Topology), func(row ddprofiledefinition.TopologyConfig) bool {
+		return row.Kind != ddsnmp.KindCdpCache
+	})
+	profile.Definition = &ddprofiledefinition.ProfileDefinition{Topology: topology}
+	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
+	require.NotEmpty(t, profile.Definition.Topology)
+
+	fixture := mustLoadSNMPFixture(t, "../../../../../../testdata/snmp/snmprec/iosxe_c9800.snmprec")
+	device := newStatefulSNMPDevice()
+	for _, pdu := range fixture.entries {
+		oid := trimOID(pdu.Name)
+		if strings.HasPrefix(oid, cdpCacheTableOID+".") || strings.HasPrefix(oid, ifNameColumnOID+".") {
+			device.set(pdu)
+		}
+	}
+
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+	device.install(mockHandler)
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+	})
+
+	for range 2 {
+		results, err := collector.Collect()
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Empty(t, results[0].Metrics)
+		require.Len(t, results[0].TopologyMetrics, 2)
+		for _, metric := range results[0].TopologyMetrics {
+			assert.Equal(t, "cdp_cache", metric.Name)
+			assert.Equal(t, ddsnmp.KindCdpCache, metric.TopologyKind)
+			assert.NotEmpty(t, metric.Tags["cdp_if_index"])
+			assert.NotEmpty(t, metric.Tags["cdp_if_name"])
+		}
+	}
+
+	assert.Equal(t, 2, device.walkCount[cdpCacheTableOID])
+	assert.Equal(t, 2, device.walkCount[ifNameColumnOID])
+	assert.Zero(t, device.walkCount[cdpInterfaceTableOID])
+}
 
 func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStructureCache(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)

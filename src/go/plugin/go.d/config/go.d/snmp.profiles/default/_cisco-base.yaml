@@ -3,7 +3,6 @@
 extends:
   - _std-if-mib.yaml
   - _std-lldp-mib.yaml
-  - _std-cdp-mib.yaml
   - _std-topology-cdp-mib.yaml
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
