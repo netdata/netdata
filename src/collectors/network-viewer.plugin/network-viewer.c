@@ -24,6 +24,14 @@
 #include "network_viewer_dns_shared_memory.h"
 #endif
 
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+// BSD kernel protocol counters for the network-protocols Function: struct
+// tcpstat / struct udpstat and the sysctl(3) API reading net.inet.*.stats.
+#include <sys/sysctl.h>
+#include <netinet/tcp_var.h>
+#include <netinet/udp_var.h>
+#endif
+
 // Spawn server used by local-sockets for network-namespace walking (Linux
 // only). Owned by this POSIX main TU; referenced by network-viewer-topology.c.
 SPAWN_SERVER *spawn_srv = NULL;
