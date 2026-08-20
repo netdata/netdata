@@ -406,7 +406,8 @@ func (tc *tableCollector) collectWithCache(ctx *cacheProcessingContext, stats *d
 func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
 	staticTags := parseStaticTags(ctx.config.StaticTags)
 	var metrics []ddsnmp.Metric
-	var errs []error
+	var firstErr error
+	var errorCount int
 
 	for index, columns := range ctx.cachedOIDs {
 		// Get cached tags for this row
@@ -437,7 +438,22 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 				metric, err := tc.rowProcessor.createMetric(sym, pdu, row, ctx.symbolMode)
 				if err != nil {
 					stats.Errors.Processing.Table++
-					errs = append(errs, err)
+					errorCount++
+					if firstErr == nil {
+						firstErr = fmt.Errorf(
+							"profile %q table %q (%s) row %q symbol %q (%s), cached column %s instance %s returned %s type %v could not be processed as a metric value",
+							ctx.profileSource,
+							ctx.tableName,
+							ctx.config.Table.OID,
+							index,
+							sym.Name,
+							sym.OID,
+							columnOID,
+							fullOID,
+							pdu.Name,
+							pdu.Type,
+						)
+					}
 					continue
 				}
 				if metric == nil {
@@ -449,10 +465,10 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 		}
 	}
 
-	if len(errs) > 0 {
+	if errorCount > 0 {
 		key := tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
 		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
-			Warningf("failed to collect table metrics: %v", errors.Join(errs...))
+			Warningf("failed to collect %d cached table metrics; first error: %v", errorCount, firstErr)
 	}
 
 	return metrics, nil

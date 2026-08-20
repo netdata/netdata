@@ -125,7 +125,12 @@ func TestTableCollector_Collect_CachedProcessingWarningIsRateLimitedPerProfile(t
 		assert.Equal(t, int64(1), stats.SNMP.WalkRequests)
 	}
 
-	assert.Equal(t, 2, strings.Count(logs.String(), "failed to collect table metrics"), logs.String())
+	assert.Equal(t, 2, strings.Count(logs.String(), "failed to collect 1 cached table metrics"), logs.String())
+	assert.Contains(t, logs.String(), "cached-processing-a.yaml")
+	assert.Contains(t, logs.String(), "ifInOctets")
+	assert.Contains(t, logs.String(), "cached column 1.3.6.1.2.1.2.2.1.10 instance 1.3.6.1.2.1.2.2.1.10.1")
+	assert.Contains(t, logs.String(), "returned 1.3.6.1.2.1.2.2.1.10.1 type OctetString")
+	assert.NotContains(t, logs.String(), "not-a-number")
 }
 
 func TestTableCollector_Collect_EmptyTableIsNotCachedAsHit(t *testing.T) {
