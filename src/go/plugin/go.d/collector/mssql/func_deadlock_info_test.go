@@ -162,7 +162,7 @@ func TestResolveMSSQLErrorReadTarget_EventFileUsesConfiguredFilename(t *testing.
 	target, available, err := c.resolveMSSQLErrorReadTarget(context.Background(), "netdata_errors")
 	require.NoError(t, err)
 	assert.True(t, available)
-	assert.Equal(t, `C:\Logs\nd_err*.xel`, target.filePath)
+	assert.Equal(t, `C:\Logs\nd_err_0_*.xel`, target.filePath)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -202,30 +202,34 @@ func TestResolveMSSQLErrorReadTarget_RingBufferRequiresRunningSession(t *testing
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestEventFileReadPattern(t *testing.T) {
+func TestEventFileReadPath(t *testing.T) {
 	tests := map[string]struct {
 		configured string
 		want       string
 	}{
-		"absolute .xel gets a rollover wildcard": {
+		"absolute .xel uses the generated rollover suffix": {
 			configured: `C:\Logs\netdata_errors.xel`,
-			want:       `C:\Logs\netdata_errors*.xel`,
+			want:       `C:\Logs\netdata_errors_0_*.xel`,
 		},
-		"bare name gets a rollover wildcard": {
+		"bare name uses the generated rollover suffix": {
 			configured: "netdata_errors.xel",
-			want:       "netdata_errors*.xel",
+			want:       "netdata_errors_0_*.xel",
 		},
-		"name without extension still gets a pattern": {
+		"name without extension uses the generated rollover suffix": {
 			configured: "netdata_errors",
-			want:       "netdata_errors*.xel",
+			want:       "netdata_errors_0_*.xel",
 		},
-		"existing wildcard is preserved": {
-			configured: "netdata_errors*.xel",
-			want:       "netdata_errors*.xel",
+		"https target uses a wildcard-free blob prefix": {
+			configured: "https://storage.example/container/netdata_errors.xel",
+			want:       "https://storage.example/container/netdata_errors_0_",
+		},
+		"http target uses a wildcard-free blob prefix": {
+			configured: "http://storage.example/container/netdata_errors.xel",
+			want:       "http://storage.example/container/netdata_errors_0_",
 		},
 		"surrounding whitespace is trimmed": {
 			configured: "  netdata_errors.xel  ",
-			want:       "netdata_errors*.xel",
+			want:       "netdata_errors_0_*.xel",
 		},
 		"empty stays empty": {
 			configured: "   ",
@@ -235,7 +239,7 @@ func TestEventFileReadPattern(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, eventFileReadPattern(tc.configured))
+			assert.Equal(t, tc.want, eventFileReadPath(tc.configured))
 		})
 	}
 }

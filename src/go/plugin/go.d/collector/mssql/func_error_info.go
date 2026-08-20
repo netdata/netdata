@@ -615,11 +615,11 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 		if err != nil {
 			return mssqlErrorReadTarget{}, false, err
 		}
-		pattern := eventFileReadPattern(configured.String)
-		if pattern == "" {
+		path := eventFileReadPath(configured.String)
+		if path == "" {
 			return mssqlErrorReadTarget{}, false, nil
 		}
-		return mssqlErrorReadTarget{filePath: pattern}, true, nil
+		return mssqlErrorReadTarget{filePath: path}, true, nil
 	}
 
 	var count int
@@ -638,20 +638,24 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 	return mssqlErrorReadTarget{}, count > 0, nil
 }
 
-// eventFileReadPattern turns the filename configured on an event_file target into a pattern
-// that also matches the rollover files SQL Server creates (<base>_<n>_<ticks>.xel).
-func eventFileReadPattern(configured string) string {
+// eventFileReadPath turns the configured event_file filename into the read path for the
+// generated <base>_0_<ticks>.xel files. Local files use a wildcard; Azure Storage uses
+// the wildcard-free blob prefix required by sys.fn_xe_file_target_read_file.
+func eventFileReadPath(configured string) string {
 	path := strings.TrimSpace(configured)
 	if path == "" {
 		return ""
 	}
-	if strings.ContainsAny(path, "*?") {
-		return path
-	}
 	if strings.HasSuffix(strings.ToLower(path), ".xel") {
-		return path[:len(path)-len(".xel")] + "*.xel"
+		path = path[:len(path)-len(".xel")]
 	}
-	return path + "*.xel"
+
+	prefix := path + "_0_"
+	lower := strings.ToLower(path)
+	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
+		return prefix
+	}
+	return prefix + "*.xel"
 }
 
 // mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events
