@@ -110,15 +110,36 @@ jobs:
             echo "::error::network-viewer.plugin binary not found"
             exit 1
           fi
-          echo "--- topology aggregated (process_name)"
-          printf '%s' '{}' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_aggregated.json
-          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py /tmp/nv_aggregated.json
-          echo "--- topology aggregated (pid)"
-          printf '%s' '{"selections":{"group_by":"pid"}}' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_pid.json
-          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py /tmp/nv_pid.json
-          echo "--- topology detailed"
-          printf '%s' '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}' | timeout 120 "$plugin" --test topology:network-connections > /tmp/nv_detailed.json
-          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py /tmp/nv_detailed.json
+          echo "plugin=$plugin"
+          # The plugin enumerates /proc/<pid>/fd, which needs privileges to see
+          # other users' processes; run the live check as root on the
+          # passwordless GitHub runner so the payload carries real sockets.
+          validate() {
+            local name="$1" payload="$2"
+            local out="/tmp/nv_${name}.json" err="/tmp/nv_${name}.err"
+            set +e
+            printf '%s' "$payload" | sudo -n timeout 120 "$plugin" --test topology:network-connections > "$out" 2> "$err"
+            local rc=$?
+            set -e
+            echo "--- topology ${name}: exit=${rc} stdout_bytes=$(wc -c < "$out") stderr_bytes=$(wc -c < "$err")"
+            echo "--- ${name} stdout head:"
+            head -c 400 "$out" | cat -A
+            echo
+            echo "--- ${name} stderr tail:"
+            tail -n 15 "$err"
+            python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py "$out"
+          }
+          # diagnostic: does --test produce any output as a non-root runner
+          # (the previous failure produced an empty payload)?
+          set +e
+          printf '%s' '{}' | timeout 120 "$plugin" --test network-connections > /tmp/nv_conn.json 2> /tmp/nv_conn.err
+          echo "--- network-connections non-root: exit=$? stdout_bytes=$(wc -c < /tmp/nv_conn.json)"
+          head -c 200 /tmp/nv_conn.json | cat -A
+          echo
+          set -e
+          validate aggregated '{}'
+          validate pid '{"selections":{"group_by":"pid"}}'
+          validate detailed '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}'
 
   asan-tests:
     name: Unit Tests (ASAN)
