@@ -97,24 +97,29 @@ def run_self_test():
     return 0
 
 
+def _take_option_value(args, name):
+    """Consume the value following --name; rejects a missing value or a value that is another option."""
+    i = args.index(name)
+    if i + 1 >= len(args) or args[i + 1].startswith("--"):
+        print(f"{name} requires a value")
+        return None, 2
+    value = args[i + 1]
+    del args[i:i + 2]
+    return value, 0
+
+
 def parse_view_expectations(args):
     """Pull --mode/--group-by from the argument list; returns (mode, group_by, rc)."""
     expect_mode = None
     expect_group_by = None
     while "--mode" in args:
-        i = args.index("--mode")
-        if i + 1 >= len(args):
-            print("--mode requires a value (aggregated|detailed)")
-            return None, None, 2
-        expect_mode = args[i + 1]
-        del args[i:i + 2]
+        expect_mode, rc = _take_option_value(args, "--mode")
+        if rc:
+            return None, None, rc
     while "--group-by" in args:
-        i = args.index("--group-by")
-        if i + 1 >= len(args):
-            print("--group-by requires a value (process_name|pid|container)")
-            return None, None, 2
-        expect_group_by = args[i + 1]
-        del args[i:i + 2]
+        expect_group_by, rc = _take_option_value(args, "--group-by")
+        if rc:
+            return None, None, rc
     return expect_mode, expect_group_by, 0
 
 
