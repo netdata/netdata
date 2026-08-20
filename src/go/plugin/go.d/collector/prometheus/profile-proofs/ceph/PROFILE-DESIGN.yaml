@@ -5850,6 +5850,11 @@ views:
       promote: []
       omit: {}
   node_hardware.cooling.fan_speed:
+    display:
+      convention: fan_revolutions_per_minute
+      reason: Preserve the source's rotations-per-minute operator unit while normalizing the semantic axis to revolutions per second.
+      evidence:
+        - ceph_display_conventions
     family: Ceph/Node Hardware/Cooling
     question: What is the current speed of each reported fan?
     entity: node_hardware_fan
@@ -7481,6 +7486,11 @@ views:
       promote: []
       omit: {}
   osd_capacity_and_state.metadata.state:
+    display:
+      convention: osds
+      reason: Render the additive OSD population with the established operator-facing unit.
+      evidence:
+        - ceph_display_conventions
     family: Ceph/OSD Capacity and State/Metadata
     question: What is the state and metadata for each back iface and ceph daemon and ceph version and cluster addr and device
       class and front iface and hostname and objectstore and public addr?
@@ -7495,6 +7505,11 @@ views:
       promote: []
       omit: {}
   osd_capacity_and_state.osd_state.state:
+    display:
+      convention: osds
+      reason: Render the additive OSD population with the established operator-facing unit.
+      evidence:
+        - ceph_display_conventions
     family: Ceph/OSD Capacity and State/OSD State
     question: What is the osd state for each ceph daemon?
     entity: by_ceph_daemon
@@ -7512,6 +7527,11 @@ views:
       promote: []
       omit: {}
   osd_capacity_and_state.osd_state.cluster_summary:
+    display:
+      convention: osds
+      reason: Render the additive OSD population with the established operator-facing unit.
+      evidence:
+        - ceph_display_conventions
     family: Ceph/OSD Capacity and State/OSD State
     question: How many OSDs exist and are currently up for this cluster endpoint?
     entity: cluster

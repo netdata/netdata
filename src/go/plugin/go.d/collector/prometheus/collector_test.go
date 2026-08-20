@@ -1150,7 +1150,7 @@ func TestCollector_CephMGRNamedHealthCheckIdentities(t *testing.T) {
 func TestCollector_CephMGRClusterSummaries(t *testing.T) {
 	var input strings.Builder
 	input.WriteString("# TYPE ceph_mon_metadata gauge\n# TYPE ceph_mon_quorum_status gauge\n")
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		fmt.Fprintf(&input,
 			"ceph_mon_metadata{ceph_daemon=\"mon.%c\",ceph_version=\"19.2.5\",hostname=\"mon-host-%d\",public_addr=\"192.0.2.%d:3300\",rank=\"%d\"} 1\n",
 			'a'+i, i, i+1, i)
@@ -1161,7 +1161,7 @@ func TestCollector_CephMGRClusterSummaries(t *testing.T) {
 		fmt.Fprintf(&input, "ceph_mon_quorum_status{ceph_daemon=\"mon.%c\"} %d\n", 'a'+i, quorum)
 	}
 	input.WriteString("# TYPE ceph_osd_metadata gauge\n# TYPE ceph_osd_up gauge\n")
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		fmt.Fprintf(&input,
 			"ceph_osd_metadata{back_iface=\"back%d\",ceph_daemon=\"osd.%d\",ceph_version=\"19.2.5\",cluster_addr=\"192.0.2.%d:6800\",device_class=\"ssd\",front_iface=\"front%d\",hostname=\"osd-host-%d\",objectstore=\"bluestore\",public_addr=\"198.51.100.%d:6800\"} 1\n",
 			i, i, i+1, i, i, i+1)
@@ -2819,7 +2819,7 @@ func healthAlertTemplatesFromFile(t *testing.T, path string) map[string]map[stri
 
 	templates := make(map[string]map[string]string)
 	var current map[string]string
-	for _, source := range strings.Split(string(content), "\n") {
+	for source := range strings.SplitSeq(string(content), "\n") {
 		line := strings.TrimSpace(source)
 		if name, ok := strings.CutPrefix(line, "template:"); ok {
 			current = make(map[string]string)
