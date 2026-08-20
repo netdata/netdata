@@ -617,6 +617,14 @@ func TestFunctionPermissionMessagesMatchEngineAndVersion(t *testing.T) {
 	}
 }
 
+func TestErrorInfoPermissionMessage_AzureSQLDatabaseRingBuffer(t *testing.T) {
+	c := New()
+	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	c.Functions.ErrorInfo.UseRingBuffer = true
+
+	assert.Contains(t, c.errorInfoPermissionMessage(), "VIEW DATABASE STATE")
+}
+
 func TestCollectDeadlockInfo_UnavailableOnAzureSQLDatabase(t *testing.T) {
 	c := New()
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)

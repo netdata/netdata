@@ -226,6 +226,9 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 
 func (c *Collector) errorInfoPermissionMessage() string {
 	permission := c.xeReadPermission()
+	if c.isAzureSQLDatabase() && c.Functions.ErrorInfo.UseRingBuffer {
+		permission = "VIEW DATABASE STATE"
+	}
 	return fmt.Sprintf("error-info requires %s permission. Grant with: GRANT %s TO [netdata_user];", permission, permission)
 }
 
