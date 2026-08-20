@@ -2250,6 +2250,46 @@ func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
 	require.Equal(t, "web_log.request_processing_time", weblogTemplates["web_log_web_slow"]["on"])
 }
 
+func TestCollector_CephPhase1AlertMatrixComplete(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
+	got := append(cephManifestSOWIDs(manifest.Alerts), cephManifestExtensionSOWIDs(manifest.NetdataExtensions)...)
+
+	// The native physical-capacity policy is owned directly by the native collector health
+	// configuration and metadata; it is not part of the Prometheus source-alert manifest.
+	got = append(got, "CEPH-ND-003")
+
+	want := []string{
+		// M01
+		"CEPH-001", "CEPH-002", "CEPH-013", "CEPH-014", "CEPH-015", "CEPH-016", "CEPH-059",
+		"CEPH-060", "CEPH-061", "CEPH-062", "CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02",
+		// M02
+		"CEPH-003", "CEPH-004", "CEPH-005", "CEPH-017", "CEPH-018", "CEPH-019", "CEPH-020",
+		"CEPH-021", "CEPH-025", "CEPH-027", "CEPH-028", "CEPH-029", "CEPH-030", "CEPH-032",
+		"CEPH-033", "CEPH-034", "CEPH-035", "CEPH-036", "CEPH-037", "CEPH-038", "CEPH-039",
+		// M03
+		"CEPH-063", "CEPH-064", "CEPH-065", "CEPH-066", "CEPH-067", "CEPH-068", "CEPH-069",
+		"CEPH-070", "CEPH-071", "CEPH-072", "CEPH-073", "CEPH-074", "CEPH-075", "CEPH-076",
+		"CEPH-077", "CEPH-098", "CEPH-099", "CEPH-100", "CEPH-101", "CEPH-102", "CEPH-103", "CEPH-104",
+		// M04
+		"CEPH-040", "CEPH-040-HELPER", "CEPH-041", "CEPH-043", "CEPH-044", "CEPH-045", "CEPH-046",
+		"CEPH-046-HELPER", "CEPH-047", "CEPH-047-HELPER", "CEPH-048", "CEPH-049", "CEPH-050",
+		"CEPH-051", "CEPH-052", "CEPH-054", "CEPH-ND-003",
+		// M05
+		"CEPH-006", "CEPH-007", "CEPH-008", "CEPH-009", "CEPH-010", "CEPH-011", "CEPH-012",
+		"CEPH-055", "CEPH-056", "CEPH-057", "CEPH-058",
+		// M06
+		"CEPH-078", "CEPH-080", "CEPH-080-HELPER-PERSIST", "CEPH-082", "CEPH-082-HELPER-READ-TIME",
+		"CEPH-082-HELPER-READ-OPS", "CEPH-083", "CEPH-083-HELPER-WRITE-TIME", "CEPH-083-HELPER-WRITE-OPS",
+		"CEPH-084", "CEPH-092", "CEPH-094", "CEPH-094-HELPER-GATEWAY",
+		// M07
+		"RGW-M-03", "RGW-M-04", "RGW-M-08", "RGW-M-09", "RGW-M-10", "RGW-S-01", "RGW-S-02",
+		"RGW-S-03", "RGW-S-04", "RGW-S-09", "RGW-S-12", "RGW-S-13", "RGW-S-14", "RGW-S-15",
+		"RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20",
+	}
+
+	require.ElementsMatch(t, want, slices.Compact(slices.Sorted(slices.Values(got))))
+}
+
 func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 
