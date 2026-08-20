@@ -51,6 +51,7 @@ func BenchmarkCrossTableResolver_JuniperPeerFamilyLookupScaling(b *testing.B) {
 				}
 			}
 
+			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
 				ctx := newCrossTableContext(nil, nil)

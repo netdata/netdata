@@ -75,6 +75,7 @@ class NPMCatalogProfileVisibilityTest(unittest.TestCase):
         self.assertTrue(is_device_catalog_profile("cisco-catalyst.yaml"))
 
         modules = build_device_modules(load_profiles())
+        self.assertTrue(modules)
         method_descriptions = [
             module["overview"]["data_collection"]["method_description"]
             for module in modules

@@ -184,6 +184,7 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_SeparatesNormalizationSema
 	}
 	binaryPDUs := map[string]gosnmp.SnmpPDU{
 		lookupOID + ".1": createPDU(lookupOID+".1", gosnmp.OctetString, []byte{1, 2}),
+		lookupOID + ".2": createPDU(lookupOID+".2", gosnmp.OctetString, []byte{10, 11}),
 	}
 
 	tests := []struct {
@@ -219,7 +220,7 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_SeparatesNormalizationSema
 		},
 		{name: "raw format", refPDUs: binaryPDUs, lookupValue: string([]byte{1, 2}), wantIndex: "1"},
 		{
-			name: "hex format", refPDUs: binaryPDUs, lookupValue: "1.2", wantIndex: "1",
+			name: "hex format", refPDUs: binaryPDUs, lookupValue: "10.11", wantIndex: "2",
 			configure: func(sym *ddprofiledefinition.SymbolConfigCompat) { sym.Format = "hex" },
 		},
 	}

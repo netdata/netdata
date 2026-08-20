@@ -13,6 +13,7 @@ selector:
         - 1.3.6.1.4.1.12356.106.1.1486
         - 1.3.6.1.4.1.20095.2000.1.14
         - 1.3.6.1.4.1.52642.1.99.5802
+  # Profile extends does not merge selectors, so this guard is repeated by each Aruba switch role.
   - sysobjectid:
       include:
         - '^1\.3\.6\.1\.4\.1\.14823\.1\.1\..+$'

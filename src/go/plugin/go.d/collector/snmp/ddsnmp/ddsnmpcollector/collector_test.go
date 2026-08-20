@@ -154,51 +154,23 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
-	const (
-		sourceTableOID      = "1.3.6.1.4.1.99999.1"
-		sourceMetricOID     = sourceTableOID + ".1.1"
-		dependencyTableOID  = "1.3.6.1.4.1.99999.2"
-		dependencyColumnOID = dependencyTableOID + ".1"
-		dependencyMetricOID = dependencyColumnOID + ".1"
-	)
+	dependencyConfig, sourceConfig := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999")
+	sourceTableOID := sourceConfig.Table.OID
+	sourceMetricOID := sourceConfig.Symbols[0].OID + ".1"
+	dependencyTableOID := dependencyConfig.Table.OID
+	dependencyMetricOID := dependencyConfig.Symbols[0].OID + ".1"
 	dependencyProfile := &ddsnmp.Profile{
 		SourceFile: "dependency-owner.yaml",
 		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind: ddprofiledefinition.KindIfName,
-			MetricsConfig: ddprofiledefinition.MetricsConfig{
-				Table: ddprofiledefinition.SymbolConfig{
-					OID:  dependencyTableOID,
-					Name: "dependencyTable",
-				},
-				Symbols: []ddprofiledefinition.SymbolConfig{{
-					OID:  dependencyColumnOID,
-					Name: "dependencyValue",
-				}},
-			},
+			Kind:          ddprofiledefinition.KindIfName,
+			MetricsConfig: dependencyConfig,
 		}}},
 	}
 	sourceProfile := &ddsnmp.Profile{
 		SourceFile: "source-owner.yaml",
 		Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{
-			Kind: ddprofiledefinition.KindArpEntry,
-			MetricsConfig: ddprofiledefinition.MetricsConfig{
-				Table: ddprofiledefinition.SymbolConfig{
-					OID:  sourceTableOID,
-					Name: "sourceTable",
-				},
-				Symbols: []ddprofiledefinition.SymbolConfig{{
-					OID:  sourceTableOID + ".1",
-					Name: "sourceValue",
-				}},
-				MetricTags: []ddprofiledefinition.MetricTagConfig{{
-					Tag:   "dependency_value",
-					Table: "dependencyTable",
-					Symbol: ddprofiledefinition.SymbolConfigCompat{
-						OID:  dependencyColumnOID,
-						Name: "dependencyValue",
-					},
-				}},
-			},
+			Kind:          ddprofiledefinition.KindArpEntry,
+			MetricsConfig: sourceConfig,
 		}}},
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(sourceProfile)
@@ -242,8 +214,6 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 	assert.Equal(t, int64(1), sourceResult.Stats.SNMP.TablesWalked)
 	assert.Zero(t, sourceResult.Stats.TableCache.Misses)
 
-	dependencyConfig := dependencyProfile.Definition.Topology[0].MetricsConfig
-	sourceConfig := sourceProfile.Definition.Topology[0].MetricsConfig
 	var auxiliaryConfig *ddprofiledefinition.MetricsConfig
 	for i := range sourceProfile.Definition.Topology {
 		cfg := &sourceProfile.Definition.Topology[i].MetricsConfig
@@ -309,42 +279,11 @@ func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *t
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
-	const (
-		sourceTableOID      = "1.3.6.1.4.1.99999.1"
-		sourceColumnOID     = sourceTableOID + ".1"
-		sourceMetricOID     = sourceColumnOID + ".1"
-		dependencyTableOID  = "1.3.6.1.4.1.99999.2"
-		dependencyColumnOID = dependencyTableOID + ".1"
-		dependencyMetricOID = dependencyColumnOID + ".1"
-	)
-	dependencyConfig := ddprofiledefinition.MetricsConfig{
-		Table: ddprofiledefinition.SymbolConfig{
-			OID:  dependencyTableOID,
-			Name: "dependencyTable",
-		},
-		Symbols: []ddprofiledefinition.SymbolConfig{{
-			OID:  dependencyColumnOID,
-			Name: "dependencyValue",
-		}},
-	}
-	sourceConfig := ddprofiledefinition.MetricsConfig{
-		Table: ddprofiledefinition.SymbolConfig{
-			OID:  sourceTableOID,
-			Name: "sourceTable",
-		},
-		Symbols: []ddprofiledefinition.SymbolConfig{{
-			OID:  sourceColumnOID,
-			Name: "sourceValue",
-		}},
-		MetricTags: []ddprofiledefinition.MetricTagConfig{{
-			Tag:   "dependency_value",
-			Table: "dependencyTable",
-			Symbol: ddprofiledefinition.SymbolConfigCompat{
-				OID:  dependencyColumnOID,
-				Name: "dependencyValue",
-			},
-		}},
-	}
+	dependencyConfig, sourceConfig := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999")
+	sourceTableOID := sourceConfig.Table.OID
+	sourceMetricOID := sourceConfig.Symbols[0].OID + ".1"
+	dependencyTableOID := dependencyConfig.Table.OID
+	dependencyMetricOID := dependencyConfig.Symbols[0].OID + ".1"
 	profile := &ddsnmp.Profile{
 		SourceFile: "promoted-source-cache.yaml",
 		Definition: &ddprofiledefinition.ProfileDefinition{
@@ -501,43 +440,12 @@ func TestCollector_Collect_DiscardsOmittedCachedDependentWhenDependencyRefreshes
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
-	const (
-		scalarOID           = "1.3.6.1.4.1.99999.0"
-		sourceTableOID      = "1.3.6.1.4.1.99999.1"
-		sourceColumnOID     = sourceTableOID + ".1"
-		sourceMetricOID     = sourceColumnOID + ".1"
-		dependencyTableOID  = "1.3.6.1.4.1.99999.2"
-		dependencyColumnOID = dependencyTableOID + ".1"
-		dependencyMetricOID = dependencyColumnOID + ".1"
-	)
-	dependencyConfig := ddprofiledefinition.MetricsConfig{
-		Table: ddprofiledefinition.SymbolConfig{
-			OID:  dependencyTableOID,
-			Name: "dependencyTable",
-		},
-		Symbols: []ddprofiledefinition.SymbolConfig{{
-			OID:  dependencyColumnOID,
-			Name: "dependencyValue",
-		}},
-	}
-	sourceConfig := ddprofiledefinition.MetricsConfig{
-		Table: ddprofiledefinition.SymbolConfig{
-			OID:  sourceTableOID,
-			Name: "sourceTable",
-		},
-		Symbols: []ddprofiledefinition.SymbolConfig{{
-			OID:  sourceColumnOID,
-			Name: "sourceValue",
-		}},
-		MetricTags: []ddprofiledefinition.MetricTagConfig{{
-			Tag:   "dependency_value",
-			Table: "dependencyTable",
-			Symbol: ddprofiledefinition.SymbolConfigCompat{
-				OID:  dependencyColumnOID,
-				Name: "dependencyValue",
-			},
-		}},
-	}
+	const scalarOID = "1.3.6.1.4.1.99999.0"
+	dependencyConfig, sourceConfig := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999")
+	sourceTableOID := sourceConfig.Table.OID
+	sourceMetricOID := sourceConfig.Symbols[0].OID + ".1"
+	dependencyTableOID := dependencyConfig.Table.OID
+	dependencyMetricOID := dependencyConfig.Symbols[0].OID + ".1"
 	dependencyProfile := createTestProfile("dependency-owner.yaml", []ddprofiledefinition.MetricsConfig{dependencyConfig})
 	sourceProfile := createTestProfile("source-owner.yaml", []ddprofiledefinition.MetricsConfig{
 		createScalarMetric(scalarOID, "sourceScalar"),
@@ -797,4 +705,25 @@ func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.
 	assert.Equal(t, int64(1), pm.TopologyMetrics[0].Value)
 	assert.Equal(t, ddsnmp.KindIfStatus, pm.TopologyMetrics[0].TopologyKind)
 	require.Empty(t, pm.Metrics)
+}
+
+func crossTableDependencyTestConfigs(oidBase string) (ddprofiledefinition.MetricsConfig, ddprofiledefinition.MetricsConfig) {
+	dependencyColumnOID := oidBase + ".2.1"
+	dependency := ddprofiledefinition.MetricsConfig{
+		Table:   ddprofiledefinition.SymbolConfig{OID: oidBase + ".2", Name: "dependencyTable"},
+		Symbols: []ddprofiledefinition.SymbolConfig{{OID: dependencyColumnOID, Name: "dependencyValue"}},
+	}
+	source := ddprofiledefinition.MetricsConfig{
+		Table:   ddprofiledefinition.SymbolConfig{OID: oidBase + ".1", Name: "sourceTable"},
+		Symbols: []ddprofiledefinition.SymbolConfig{{OID: oidBase + ".1.1", Name: "sourceValue"}},
+		MetricTags: []ddprofiledefinition.MetricTagConfig{{
+			Tag:   "dependency_value",
+			Table: "dependencyTable",
+			Symbol: ddprofiledefinition.SymbolConfigCompat{
+				OID:  dependencyColumnOID,
+				Name: "dependencyValue",
+			},
+		}},
+	}
+	return dependency, source
 }

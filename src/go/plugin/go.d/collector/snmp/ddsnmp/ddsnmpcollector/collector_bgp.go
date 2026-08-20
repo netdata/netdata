@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -151,9 +152,10 @@ func (c *Collector) collectTableBGPRows(configs []ddprofiledefinition.BGPConfig,
 		ctx.orderedTags = buildOrderedTags(metricsCfg)
 		ctx.rows, _, _ = c.tableCollector.organizePDUsByRow(ctx)
 		crossTableCtx := newCrossTableContext(ctx.walkedData, ctx.tableNameToOID)
+		staticTags := parseStaticTags(cfg.StaticTags)
 
 		for rowIndex, rowPDUs := range ctx.rows {
-			row, ok, err := c.buildTableBGPRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx)
+			row, ok, err := c.buildTableBGPRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
 			if err != nil {
 				stats.Errors.Processing.BGP++
 				errs = append(errs, fmt.Errorf("BGP table %q row %q: %w", bgpConfigDisplayName(cfg), rowIndex, err))
@@ -233,13 +235,14 @@ func (c *Collector) buildTableBGPRow(
 	rowPDUs map[string]gosnmp.SnmpPDU,
 	ctx *tableProcessingContext,
 	crossTableCtx *crossTableContext,
+	staticTags map[string]string,
 ) (ddsnmp.BGPRow, bool, error) {
 	rowTags := make(map[string]string)
 	rowData := &tableRowData{
 		index:      rowIndex,
 		pdus:       rowPDUs,
 		tags:       rowTags,
-		staticTags: parseStaticTags(cfg.StaticTags),
+		staticTags: staticTags,
 		tableName:  cfg.Table.Name,
 	}
 	crossTableCtx.rowTags = rowData.tags
@@ -260,7 +263,7 @@ func (c *Collector) buildTableBGPRow(
 		Table:           cfg.Table.Name,
 		RowKey:          rowIndex,
 		StructuralID:    bgpTableStructuralID(cfg.OriginProfileID, cfg.Kind, cfg.ID, trimOID(cfg.Table.OID), rowIndex),
-		Tags:            parseStaticTags(cfg.StaticTags),
+		Tags:            maps.Clone(staticTags),
 	}
 	mergeStringMaps(row.Tags, rowData.tags)
 

@@ -406,16 +406,14 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 
 func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, trigger *tableCollectionRequest) {
 	started := time.Now()
-	pdus, err := s.collector.snmpWalk(route.oid, trigger.scope.stats)
+	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats)
 	trigger.scope.stats.Timing.Table += time.Since(started)
 	if err != nil {
-		trigger.scope.stats.Errors.SNMP++
 		route.state = tableRouteFailed
 		route.err = fmt.Errorf("failed to walk table OID '%s': %w", route.oid, err)
 		return
 	}
 
-	trigger.scope.stats.SNMP.TablesWalked++
 	route.state = tableRouteFresh
 	route.pdus = pdus
 	s.freshData[route.oid] = pdus

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -227,7 +226,7 @@ func (tc *tableCollector) processTableData(ctx *tableProcessingContext, collecti
 		dependenciesReady := len(ctx.rows) == 0 || tc.resolvedDependenciesAvailable(ctx.config, collectionCtx)
 		switch {
 		case len(ctx.rows) > 0 && dependenciesReady:
-			deps := extractTableDependencies(ctx.config, ctx.tableNameToOID)
+			deps := extractTableDependencies(ctx.config, collectionCtx.tableNameToOID)
 			tc.tableCache.cacheRows(ctx.config, ctx.oidCache, ctx.tagCache, deps)
 			tc.log.Debugf("Cached table %s structure with %d rows", ctx.config.Table.Name, len(ctx.oidCache))
 		case len(ctx.rows) > 0:
@@ -554,7 +553,7 @@ func extractTableDependencies(cfg ddprofiledefinition.MetricsConfig, tableNameTo
 	for oid := range deps {
 		result = append(result, oid)
 	}
-	sort.Strings(result)
+	slices.Sort(result)
 
 	return result
 }

@@ -282,14 +282,13 @@ func (tc *tableCache) clearExpired() []string {
 }
 
 func (tc *tableCache) clearTablesLocked(tables map[string]bool) []string {
-	visited := make(map[string]bool)
+	collected := make(map[string]bool)
 	var addRelatedTables func(tableOID string)
 	addRelatedTables = func(tableOID string) {
-		if visited[tableOID] {
+		if collected[tableOID] {
 			return
 		}
-		visited[tableOID] = true
-		tables[tableOID] = true
+		collected[tableOID] = true
 
 		for dependency := range tc.dependenciesByTable[tableOID] {
 			addRelatedTables(dependency)
@@ -303,8 +302,8 @@ func (tc *tableCache) clearTablesLocked(tables map[string]bool) []string {
 		addRelatedTables(tableOID)
 	}
 
-	cleared := make([]string, 0, len(tables))
-	for tableOID := range tables {
+	cleared := make([]string, 0, len(collected))
+	for tableOID := range collected {
 		tc.discardTableLocked(tableOID)
 		cleared = append(cleared, tableOID)
 	}

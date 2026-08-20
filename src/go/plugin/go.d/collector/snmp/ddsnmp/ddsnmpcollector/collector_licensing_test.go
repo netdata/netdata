@@ -416,6 +416,10 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 	assert.EqualValues(t, 7200, vpn.Expiry.RemainingSeconds)
 	assert.EqualValues(t, 50, vpn.Usage.Used)
 	assert.EqualValues(t, 100, vpn.Usage.Capacity)
+	assert.Equal(t, map[string]string{
+		"license_vendor":  "test",
+		"license_feature": "2",
+	}, vpn.Tags)
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTableTags(t *testing.T) {

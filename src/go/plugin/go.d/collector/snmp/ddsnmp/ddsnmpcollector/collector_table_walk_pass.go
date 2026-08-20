@@ -25,6 +25,20 @@ func newTableWalkPass() *tableWalkPass {
 	}
 }
 
+func walkTableWithStats(
+	tc *tableCollector,
+	oid string,
+	stats *ddsnmp.CollectionStats,
+) (map[string]gosnmp.SnmpPDU, error) {
+	pdus, err := tc.snmpWalk(oid, stats)
+	if err != nil {
+		stats.Errors.SNMP++
+		return pdus, err
+	}
+	stats.SNMP.TablesWalked++
+	return pdus, nil
+}
+
 func (p *tableWalkPass) walk(
 	tc *tableCollector,
 	oid string,
@@ -35,15 +49,13 @@ func (p *tableWalkPass) walk(
 		return outcome
 	}
 
-	pdus, err := tc.snmpWalk(oid, stats)
+	pdus, err := walkTableWithStats(tc, oid, stats)
 	outcome := tableWalkOutcome{pdus: pdus, err: err}
 	p.outcomes[oid] = outcome
 	if err != nil {
-		stats.Errors.SNMP++
 		return outcome
 	}
 
 	p.walkedData[oid] = pdus
-	stats.SNMP.TablesWalked++
 	return outcome
 }
