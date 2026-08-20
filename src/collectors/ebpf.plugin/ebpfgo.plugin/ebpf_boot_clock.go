@@ -71,7 +71,10 @@ type bootClock struct {
 // 10 ms in either direction; one shared reference keeps every caller on a single
 // timeline.
 var uptimeRef = sync.OnceValue(func() bootClock {
-	base, _ := bootNanosFromProcUptime() // 0 when unavailable: degraded, still boot-relative
+	// A failed /proc/uptime read yields a process-start-relative fallback. It is
+	// less safe than the boot-relative path, but remains below later boot-clock
+	// tokens and avoids the catastrophic wall-clock domain jump described above.
+	base, _ := bootNanosFromProcUptime()
 	return bootClock{base: base, start: time.Now()}
 })
 

@@ -76,7 +76,7 @@ modules:
               default_value: 10
               required: false
             - name: ebpf load mode
-              description: "Legacy compatibility option. `entry` and `return` are accepted as no-ops; object flavor selects the eBPF runtime."
+              description: "Legacy compatibility option. `entry` is accepted as a no-op; `return` is unsupported and ignored with a warning. Object flavor selects the eBPF runtime."
               default_value: entry
               required: false
             - name: apps
@@ -303,7 +303,7 @@ modules:
           labels: []
           metrics:
             - name: filesystem.dc_hit_ratio
-              description: "Percentage of directory lookups resolved by the cache — `(reference - miss) / reference`. It measures lookup resolution, not how many files are held in the cache. Computed from this interval's counters, so it reflects current behaviour rather than a lifetime average; an interval with no lookups reports 0. The C implementation of this collector divided lifetime totals instead."
+              description: "Percentage of directory lookups resolved by the cache — `(reference - miss) / reference`. It measures lookup resolution, not how many files are held in the cache. Computed from cumulative counters since the eBPF program attached, matching the legacy dcstat contract."
               unit: "%"
               chart_type: line
               dimensions:

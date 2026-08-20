@@ -29,8 +29,7 @@ type dcstatGlobalPublish struct {
 }
 
 type dcstatGlobalState struct {
-	initialized bool
-	prev        dcstatGlobalCounters
+	prev dcstatGlobalCounters
 }
 
 type dcstatGlobalDimension struct {
@@ -47,8 +46,8 @@ type dcstatGlobalChart struct {
 	dimensions []dcstatGlobalDimension
 }
 
-// Chart ids, contexts, units, algorithms, and values match the C dcstat module
-// so existing dashboards and alarms retain their established interval semantics.
+// Chart ids, contexts, units, and algorithms match the C dcstat module. The
+// count dimensions are interval totals, while the ratio is attach-lifetime.
 var dcstatGlobalCharts = []dcstatGlobalChart{
 	{
 		id:      "dc_hit_ratio",
@@ -76,14 +75,11 @@ var dcstatGlobalCharts = []dcstatGlobalChart{
 
 var dcstatGlobalChartsOnce sync.Once
 
-// dcstatHitRatio converts one interval's directory-cache deltas into the hit
-// ratio percentage.  It is the single definition of dcstat's ratio semantics:
-// the global collector and the per-PID shared-memory rows both call it, so the
-// two can never drift apart.
+// dcstatHitRatio converts per-PID directory-cache interval counters into a
+// hit-ratio percentage for shared-memory consumers.
 //
-// The idle convention is the C collector's: no lookups this interval means a
-// ratio of 0.  cachestat deliberately reports 100 for its idle case; the two
-// metrics are not interchangeable.
+// The idle convention is the C collector's: no supplied lookups means a ratio
+// of 0. cachestat deliberately reports 100 for its idle case.
 func dcstatHitRatio(reference, notFound int64) int64 {
 	if reference <= 0 {
 		return 0
@@ -93,22 +89,32 @@ func dcstatHitRatio(reference, notFound int64) int64 {
 	return int64((float64(successful) / float64(reference)) * 100)
 }
 
+// dcstatCumulativeHitRatio preserves the legacy global chart's attach-lifetime
+// semantics without narrowing its uint64 BPF counters to int64 first.
+func dcstatCumulativeHitRatio(reference, notFound uint64) int64 {
+	if reference == 0 {
+		return 0
+	}
+	if notFound > reference {
+		notFound = reference
+	}
+
+	return int64((float64(reference-notFound) / float64(reference)) * 100)
+}
+
 // Update computes the publish values for one collection cycle.
 //
-// Every value is an interval delta, published with the `absolute` algorithm.
-// The first sample self-baselines to avoid presenting all pre-existing kernel
-// activity as one collection interval.
+// Count values are interval deltas, published with the `absolute` algorithm.
+// The ratio uses raw cumulative counters, as the legacy global chart did.
 func (s *dcstatGlobalState) Update(current dcstatGlobalCounters) (dcstatGlobalPublish, bool) {
-	publish := dcstatGlobalPublish{}
-	if s.initialized {
-		publish.Reference = diffCounters(current.Reference, s.prev.Reference)
-		publish.Slow = diffCounters(current.Slow, s.prev.Slow)
-		publish.Miss = diffCounters(current.Miss, s.prev.Miss)
-		publish.Ratio = dcstatHitRatio(publish.Reference, publish.Miss)
+	publish := dcstatGlobalPublish{
+		Ratio:     dcstatCumulativeHitRatio(current.Reference, current.Miss),
+		Reference: diffCounters(current.Reference, s.prev.Reference),
+		Slow:      diffCounters(current.Slow, s.prev.Slow),
+		Miss:      diffCounters(current.Miss, s.prev.Miss),
 	}
 
 	s.prev = current
-	s.initialized = true
 
 	return publish, true
 }

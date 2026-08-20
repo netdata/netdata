@@ -48,7 +48,7 @@ func loadPluginConfigFiles() (pluginConfigFile, bool, error) {
 		filepath.Join(stockRoot, pluginPrimaryConfigFile),
 		filepath.Join(userRoot, pluginPrimaryConfigFile),
 	} {
-		cfg, ok, err := parsePluginConfigFile(path)
+		cfg, ok, err := parsePluginConfigFile(path, false)
 		if err != nil {
 			return pluginConfigFile{}, false, err
 		}
@@ -72,13 +72,14 @@ func loadCollectorConfigFiles(legacyFile string) (pluginConfigFile, bool, error)
 
 	var merged pluginConfigFile
 	found := false
+	allowReturnLoadMode := legacyFile == dcstatLegacyConfigFile
 	for _, path := range []string{
 		filepath.Join(stockRoot, pluginPrimaryConfigFile),
 		filepath.Join(stockRoot, legacyFile),
 		filepath.Join(userRoot, pluginPrimaryConfigFile),
 		filepath.Join(userRoot, legacyFile),
 	} {
-		cfg, ok, err := parsePluginConfigFile(path)
+		cfg, ok, err := parsePluginConfigFile(path, allowReturnLoadMode)
 		if err != nil {
 			return pluginConfigFile{}, false, err
 		}
@@ -106,7 +107,7 @@ func pluginConfigRoots() (userRoot, stockRoot string) {
 	return userRoot, stockRoot
 }
 
-func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
+func parsePluginConfigFile(path string, allowReturnLoadMode bool) (pluginConfigFile, bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -268,10 +269,11 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			found = true
 		case "ebpf load mode":
 			switch strings.ToLower(strings.TrimSpace(value)) {
-			case "entry", "return":
-				// The legacy switch did not change dcstat's probes: it always used
-				// lookup_fast entry and d_lookup return instrumentation. Keep both
-				// values as compatibility no-ops; object flavor chooses the runtime.
+			case "entry":
+			case "return":
+				if !allowReturnLoadMode {
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: ebpf load mode %q is unsupported and ignored\n", path, value)
+				}
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf load mode %q, using default\n", path, value)
 			}

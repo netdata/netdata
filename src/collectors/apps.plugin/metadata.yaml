@@ -155,19 +155,19 @@ modules:
                 - name: ratio
             - name: app.ebpf_dc_reference
               description: Count file access.
-              unit: "files/s"
+              unit: "files"
               chart_type: stacked
               dimensions:
                 - name: files
             - name: app.ebpf_dc_not_cache
               description: Files not present inside directory cache.
-              unit: "files/s"
+              unit: "files"
               chart_type: stacked
               dimensions:
                 - name: files
             - name: app.ebpf_dc_not_found
               description: Files not found.
-              unit: "files/s"
+              unit: "files"
               chart_type: stacked
               dimensions:
                 - name: files

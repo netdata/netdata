@@ -11,8 +11,8 @@ import (
 //
 // Curr/Prev carry the raw cumulative counters so consumers can derive
 // per-interval deltas for any of the three counters themselves (the C struct has
-// only one scalar delta field).  Ratio and CacheAccess are the per-interval
-// values, matching the semantics the C collector gave those two fields.
+// only one scalar delta field). Ratio and CacheAccess are per-interval values
+// for the shared-memory consumers; the legacy C global ratio was cumulative.
 //
 // On the first sample for a PID there is no previous reading, so Prev is set
 // equal to Curr rather than left zero: every consumer derives its deltas as
