@@ -46,6 +46,14 @@
 - Improve timeout handling for HTTPS and MQTT clients ([#23105](https://github.com/netdata/netdata/issues/23105))
 - Fix(mrg): avoid UUID map create/free churn during metric lookups ([#23538](https://github.com/netdata/netdata/issues/23538))
 - Fix(rrdcalc): clarify health initialization flag behavior on child disconnect ([#23541](https://github.com/netdata/netdata/issues/23541))
+- Fix(sqlite_health): fix error check for statement preparation ([#23545](https://github.com/netdata/netdata/issues/23545))
+- Fix(health): lazily populate raised-alert summaries for notifications ([#23544](https://github.com/netdata/netdata/issues/23544))
+- Fix(go.d/snmp_topology): make FDB-inferred topology reliable by default ([#23546](https://github.com/netdata/netdata/issues/23546))
+- Regenerate integrations docs ([#23552](https://github.com/netdata/netdata/issues/23552))
+- Fix coverity  ([#23553](https://github.com/netdata/netdata/issues/23553))
+- Fix typo in clickhouse.replicas_max_absolute_delay ([#23548](https://github.com/netdata/netdata/issues/23548))
+- Apps.plugin: add system.processes_state chart on macOS and FreeBSD ([#23296](https://github.com/netdata/netdata/issues/23296), [#23535](https://github.com/netdata/netdata/issues/23535)) ([#23534](https://github.com/netdata/netdata/issues/23534))
+- Fix claim on Microsoft ([#23547](https://github.com/netdata/netdata/issues/23547))
 
 ## [2.11.0] - 2026-08-12
 
