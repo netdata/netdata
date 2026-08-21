@@ -184,13 +184,18 @@ static void rw_spinlock_reader_churn(void *arg) {
     rw_spinlock_read_lock(ctx->lock);
     __atomic_add_fetch(&ctx->holding, 1, __ATOMIC_RELEASE);
     while (!__atomic_load_n(&ctx->go, __ATOMIC_ACQUIRE))
-        ; // spin until released into churn
+        yield_the_processor(); // wait to be released into churn, without hogging a core
 
     // Phase 2: release into a continuous acquire/release churn stream.
     rw_spinlock_read_unlock(ctx->lock);
     while (!__atomic_load_n(&ctx->stop, __ATOMIC_ACQUIRE)) {
         if (rw_spinlock_tryread_lock(ctx->lock))
             rw_spinlock_read_unlock(ctx->lock);
+
+        // Yield (not sleep) between attempts: the churn stays continuous, but the
+        // parked writer and the other threads still get CPU time on a box with
+        // fewer cores than this test has spinning threads.
+        yield_the_processor();
     }
 }
 
@@ -220,7 +225,7 @@ static int rw_spinlock_writer_liveness_test(void) {
     usec_t ready_deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
     while (__atomic_load_n(&rctx.holding, __ATOMIC_ACQUIRE) < RW_SPINLOCK_TEST_READERS &&
            now_monotonic_usec() < ready_deadline) {
-        ; // spin until all readers hold the read lock
+        yield_the_processor(); // let the readers run
     }
     RW_TEST(__atomic_load_n(&rctx.holding, __ATOMIC_ACQUIRE) == RW_SPINLOCK_TEST_READERS,
             "all readers hold the read lock before the writer starts");
@@ -237,6 +242,7 @@ static int rw_spinlock_writer_liveness_test(void) {
         if (rw_spinlock_tryread_lock(&lock)) {
             // still admitted => writer not pending yet; release and retry
             rw_spinlock_read_unlock(&lock);
+            yield_the_processor(); // let the writer reach the write lock
         }
         else {
             writer_parked = true;
@@ -258,6 +264,9 @@ static int rw_spinlock_writer_liveness_test(void) {
             acquired = true;
             break;
         }
+
+        // Never spin hot here: this loop competes with the writer we are timing.
+        yield_the_processor();
     }
     RW_TEST(acquired, "writer acquires despite continuous reader churn (no starvation)");
 

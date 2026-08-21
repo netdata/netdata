@@ -120,6 +120,12 @@ ALWAYS_INLINE void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, c
                 // Keep it set so new readers back off; wait for existing
                 // readers to drain.
                 i_own_writer_bit = true;
+
+                // Restart the backoff ramp: from here on nobody can enter the
+                // lock (new readers see WRITER_BIT, other writers see it too),
+                // so a long sleep would keep the lock idle-but-blocked after
+                // the last reader drains. Poll the drain from the bottom again.
+                usec = 1;
             }
         }
         else if (__atomic_load_n(&rw_spinlock->counter, __ATOMIC_ACQUIRE) == WRITER_BIT) {
