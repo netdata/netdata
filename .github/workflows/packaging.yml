@@ -52,7 +52,6 @@ jobs:
             **/*.in
             **/*.patch
             **/*.cmake
-            netdata.spec.in
             CMakeLists.txt
             .github/data/distros.yml
             .github/workflows/packaging.yml

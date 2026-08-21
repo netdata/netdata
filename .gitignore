@@ -42,7 +42,6 @@ Makefile.in
 !src/go/**/*.log
 *.pyc
 
-netdata.spec
 sha256sums.txt
 
 upload/
