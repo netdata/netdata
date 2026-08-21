@@ -799,7 +799,7 @@ static int test_prototype_rejects_non_finite_delay_multiplier(int *passed) {
         int error = 0;
         ap.config.calculation = expression_parse("1", &failed_at, &error);
 
-        char *msg = NULL;
+        const char *msg = NULL;
         if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
            strcmp(msg, "non-finite delay multiplier") != 0) {
             fprintf(stderr,
@@ -835,7 +835,7 @@ static int test_prototype_rejects_non_finite_delay_multiplier(int *passed) {
     second->config.delay_multiplier = NAN;
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap._internal.next, second, _internal.prev, _internal.next);
 
-    char *msg = NULL;
+    const char *msg = NULL;
     if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
        strcmp(msg, "non-finite delay multiplier") != 0) {
         fprintf(stderr, "FAILED [prototype rejects non-finite multiplier in later rule]: msg='%s'\n",
@@ -861,7 +861,7 @@ static int test_prototype_rejects_non_positive_update_every(int *passed) {
         ap.config.source = string_strdupz("unittest");
         ap.config.update_every = tests[i];
 
-        char *msg = NULL;
+        const char *msg = NULL;
         if(health_prototype_add(&ap, &msg) || !msg || strcmp(msg, "missing update frequency") != 0) {
             fprintf(stderr,
                     "FAILED [prototype rejects update_every=%d]: msg='%s'\n",
@@ -933,7 +933,7 @@ static int test_prototype_rejects_missing_on(int *passed) {
         string_freez(bad->match.on.context);
         bad->match.on.context = NULL;
 
-        char *msg = NULL;
+        const char *msg = NULL;
         if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
            strcmp(msg, tests[i].expected_msg) != 0) {
             fprintf(stderr, "FAILED [prototype rejects %s]: msg='%s'\n",

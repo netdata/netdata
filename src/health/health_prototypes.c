@@ -415,7 +415,7 @@ void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
 // loop only ever look at the single rule they are given. Validating just the head of the chain let
 // a rule with no 'on' through, and such a rule then attached the alert to every chart of the host
 // (netdata/netdata#23483).
-char *health_prototype_rule_validate(RRD_ALERT_PROTOTYPE *t) {
+const char *health_prototype_rule_validate(RRD_ALERT_PROTOTYPE *t) {
     if(t->match.is_template) {
         if(!t->match.on.context)
             return "missing match 'on' parameter for context";
@@ -435,10 +435,10 @@ char *health_prototype_rule_validate(RRD_ALERT_PROTOTYPE *t) {
     return NULL;
 }
 
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, const char **msg) {
     size_t rule = 0;
     for(RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next, rule++) {
-        char *reason = health_prototype_rule_validate(t);
+        const char *reason = health_prototype_rule_validate(t);
         if(!reason)
             continue;
 

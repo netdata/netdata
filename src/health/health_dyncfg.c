@@ -642,7 +642,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
-                char *msg = "";
+                const char *msg = "";
 
                 nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
                 bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
@@ -768,7 +768,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                 if(!nap)
                     code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
                 else {
-                    char *msg = "";
+                    const char *msg = "";
                     nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
                     bool added = health_prototype_add(nap, &msg); // this swaps ap <-> nap
 
