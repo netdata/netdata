@@ -300,6 +300,35 @@ else()
         set(NETDATA_SWAGGER_COMPONENT netdata)
 endif()
 
+# Host integration paths. These directories belong to the platform, not to
+# Netdata: systemd, logrotate and the distro init system own them and fix their
+# location. They are named here so the whole set is visible in one place, but
+# they are deliberately NOT derived from NETDATA_RUNTIME_PREFIX - rebasing them
+# onto the Netdata layout would install our drop-ins where nothing reads them.
+#
+# All of these are Linux-only, and the rules that use them are currently
+# ungated, so a macOS or FreeBSD build stages them as well. Gating them is a
+# behaviour change and belongs with the platform work, not here.
+set(HOST_LOGROTATE_DEST "etc/logrotate.d")
+set(HOST_INITD_DEST "etc/init.d")
+set(HOST_DEFAULT_DEST "etc/default")
+set(HOST_SYSUSERS_DEST "usr/lib/sysusers.d")
+set(HOST_TMPFILES_DEST "usr/lib/tmpfiles.d")
+set(HOST_JOURNALD_CONF_DEST "usr/lib/systemd/journald@netdata.conf.d")
+set(HOST_SYSTEMD_PRESET_DEST "usr/lib/systemd/system-preset")
+
+# RPM distros ship systemd units in %{_unitdir} (/usr/lib/systemd/system); the
+# DEB layout (and the historical default) uses /lib/systemd/system.
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        set(HOST_SYSTEMD_UNIT_DEST "usr/lib/systemd/system")
+else()
+        set(HOST_SYSTEMD_UNIT_DEST "lib/systemd/system")
+endif()
+
+# DEB policy requires a copyright file in every binary package, under that
+# package's own documentation directory.
+set(PKG_DOC_DEST "usr/share/doc")
+
 cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
@@ -554,7 +583,7 @@ function(netdata_add_deb_copyright component package_name)
                 install(FILES
                         "${PKG_FILES_PATH}/copyright"
                         COMPONENT "${component}"
-                        DESTINATION "usr/share/doc/${package_name}")
+                        DESTINATION "${PKG_DOC_DEST}/${package_name}")
         endif()
 endfunction()
 
@@ -4157,7 +4186,7 @@ install(FILES
 install(FILES
         ${CMAKE_BINARY_DIR}/system/logrotate/netdata
         COMPONENT netdata
-        DESTINATION etc/logrotate.d)
+        DESTINATION ${HOST_LOGROTATE_DEST})
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
 install(FILES
@@ -4218,14 +4247,6 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${SYSTEM_DEST}/systemd/tmpfiles)
 
-# RPM distros ship systemd units in %{_unitdir} (/usr/lib/systemd/system);
-# the DEB layout (and the historical default) uses /lib/systemd/system.
-if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
-        set(NETDATA_SYSTEMD_UNIT_DEST "usr/lib/systemd/system")
-else()
-        set(NETDATA_SYSTEMD_UNIT_DEST "lib/systemd/system")
-endif()
-
 # The spec packages the systemd-235-compatible unit variant on EL 7 and
 # Amazon Linux 2.
 set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service")
@@ -4239,30 +4260,30 @@ if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${NETDATA_PACKAGED_SYSTEMD_UNIT}
                 COMPONENT netdata
-                DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST}
+                DESTINATION ${HOST_SYSTEMD_UNIT_DEST}
                 RENAME netdata.service)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
                 COMPONENT user
-                DESTINATION usr/lib/sysusers.d)
+                DESTINATION ${HOST_SYSUSERS_DEST})
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/tmpfiles/netdata.conf
                 COMPONENT netdata
-                DESTINATION usr/lib/tmpfiles.d)
+                DESTINATION ${HOST_TMPFILES_DEST})
         install(DIRECTORY
                 COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d)
+                DESTINATION ${HOST_JOURNALD_CONF_DEST})
         install(FILES
                 system/systemd/journald@netdata.conf
                 COMPONENT netdata
-                DESTINATION usr/lib/systemd/journald@netdata.conf.d
+                DESTINATION ${HOST_JOURNALD_CONF_DEST}
                 RENAME netdata.conf)
 
         if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
                 install(FILES
                         system/systemd/50-netdata.preset
                         COMPONENT netdata
-                        DESTINATION usr/lib/systemd/system-preset)
+                        DESTINATION ${HOST_SYSTEMD_PRESET_DEST})
         endif()
 endif()
 
@@ -4299,12 +4320,12 @@ if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         install(FILES
                 ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
                 COMPONENT netdata
-                DESTINATION etc/default)
+                DESTINATION ${HOST_DEFAULT_DEST})
 
         install(PROGRAMS
                 ${PKG_FILES_PATH}/deb/netdata/etc/init.d/netdata
                 COMPONENT netdata
-                DESTINATION etc/init.d)
+                DESTINATION ${HOST_INITD_DEST})
 endif()
 
 if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
@@ -4388,11 +4409,11 @@ if(NOT OS_WINDOWS)
     install(FILES
             ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
             COMPONENT netdata
-            DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
+            DESTINATION ${HOST_SYSTEMD_UNIT_DEST})
     install(FILES
             system/systemd/netdata-updater.timer
             COMPONENT netdata
-            DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
+            DESTINATION ${HOST_SYSTEMD_UNIT_DEST})
   endif()
 endif()
 
