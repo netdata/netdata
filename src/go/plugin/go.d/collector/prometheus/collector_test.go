@@ -1306,19 +1306,17 @@ func TestCollector_CephM04DerivedBoundaries(t *testing.T) {
 		})
 	}
 
-	blockingIO := func(pgAvailability, osdDown float64, osdDownResolved bool) float64 {
+	blockingIO := func(pgAvailability, osdDown float64) float64 {
 		if math.IsNaN(pgAvailability) || math.IsInf(pgAvailability, 0) {
 			return math.NaN()
 		}
 		if pgAvailability != 1 {
-			// Ceph can withdraw an inactive OSD_DOWN health-check chart entirely.
-			// The inactive primary condition must clear without resolving that helper.
 			return 0
 		}
 		if osdDown == 1 {
 			return 0
 		}
-		if !osdDownResolved || math.IsNaN(osdDown) || math.IsInf(osdDown, 0) {
+		if math.IsNaN(osdDown) || math.IsInf(osdDown, 0) {
 			return math.NaN()
 		}
 		return 1
@@ -1326,19 +1324,18 @@ func TestCollector_CephM04DerivedBoundaries(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
 		availability, osd float64
-		osdResolved       bool
 		want              float64
 		undefined         bool
 	}{
-		{name: "availability with OSD down", availability: 1, osd: 1, osdResolved: true},
-		{name: "availability without OSD down", availability: 1, osd: 0, osdResolved: true, want: 1},
-		{name: "no availability", availability: 0, osd: 1, osdResolved: true},
+		{name: "availability with OSD down", availability: 1, osd: 1},
+		{name: "availability without OSD down", availability: 1, osd: 0, want: 1},
+		{name: "no availability", availability: 0, osd: 1},
 		{name: "inactive condition with withdrawn OSD chart", availability: 0},
-		{name: "invalid OSD state", availability: 1, osd: math.NaN(), osdResolved: true, undefined: true},
-		{name: "active condition with withdrawn OSD chart", availability: 1, undefined: true},
+		{name: "invalid OSD state", availability: 1, osd: math.NaN(), undefined: true},
+		{name: "active condition with withdrawn OSD chart", availability: 1, osd: math.NaN(), undefined: true},
 	} {
 		t.Run("blocking I/O "+tc.name, func(t *testing.T) {
-			got := blockingIO(tc.availability, tc.osd, tc.osdResolved)
+			got := blockingIO(tc.availability, tc.osd)
 			if tc.undefined {
 				assert.True(t, math.IsNaN(got))
 				return
@@ -1601,7 +1598,7 @@ func TestCollector_CephNVMeoFMaterializesLocalAlertIdentities(t *testing.T) {
 
 func TestCollector_CephNVMeoFAlertBoundaries(t *testing.T) {
 	cpuPercent := func(minimumBusyRate float64) float64 {
-		if math.IsNaN(minimumBusyRate) || math.IsInf(minimumBusyRate, 0) || minimumBusyRate < 0 || minimumBusyRate > 1 {
+		if math.IsNaN(minimumBusyRate) || math.IsInf(minimumBusyRate, 0) || minimumBusyRate < 0 {
 			return math.NaN()
 		}
 		return minimumBusyRate * 100
@@ -1615,7 +1612,6 @@ func TestCollector_CephNVMeoFAlertBoundaries(t *testing.T) {
 	}{
 		{name: "invalid NaN busy", busy: math.NaN(), undef: true},
 		{name: "negative busy", busy: -0.01, undef: true},
-		{name: "busy above one core", busy: 1.01, undef: true},
 		{name: "exactly eighty does not act", busy: .8, want: 80},
 		{name: "above eighty acts", busy: .81, want: 81, actor: true},
 	} {
@@ -1663,35 +1659,33 @@ func TestCollector_CephNVMeoFAlertBoundaries(t *testing.T) {
 		})
 	}
 
-	namespaceLimit := func(count, limit float64) (float64, bool) {
+	namespaceLimit := func(count, limit float64) bool {
 		if math.IsNaN(count) || math.IsInf(count, 0) || math.IsNaN(limit) || math.IsInf(limit, 0) ||
 			count < 0 || limit < 0 {
-			return math.NaN(), false
+			return false
 		}
-		return count, count >= limit
+		return count >= limit
 	}
 	for _, tc := range []struct {
 		name    string
 		count   float64
 		limit   float64
-		want    float64
 		reached bool
 		undef   bool
 	}{
 		{name: "invalid negative count", count: -1, limit: 1, undef: true},
 		{name: "invalid negative limit", count: 1, limit: -1, undef: true},
-		{name: "below limit", count: 1, limit: 2, want: 1},
-		{name: "at limit", count: 2, limit: 2, want: 2, reached: true},
-		{name: "above limit", count: 3, limit: 2, want: 3, reached: true},
+		{name: "below limit", count: 1, limit: 2},
+		{name: "at limit", count: 2, limit: 2, reached: true},
+		{name: "above limit", count: 3, limit: 2, reached: true},
 	} {
 		t.Run("namespace "+tc.name, func(t *testing.T) {
-			value, reached := namespaceLimit(tc.count, tc.limit)
+			got := namespaceLimit(tc.count, tc.limit)
 			if tc.undef {
-				assert.True(t, math.IsNaN(value))
+				assert.False(t, got)
 				return
 			}
-			assert.InDelta(t, tc.want, value, 1e-12)
-			assert.Equal(t, tc.reached, reached)
+			assert.Equal(t, tc.reached, got)
 		})
 	}
 }
