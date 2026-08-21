@@ -127,8 +127,9 @@ type (
 		ddSnmpColl    ddCollector
 		newDdSnmpColl func(ddsnmpcollector.Config) ddCollector
 
-		sysInfo      *snmputils.SysInfo
-		snmpProfiles []*ddsnmp.Profile
+		sysInfo              *snmputils.SysInfo
+		snmpProfiles         []*ddsnmp.Profile
+		deviceMetadataSynced bool
 
 		adjMaxRepetitions uint32
 

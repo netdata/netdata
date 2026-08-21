@@ -16,6 +16,18 @@ func (c *topologyCache) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	profileIdentity := make(map[string]ddsnmp.MetaTag, 2)
+	for _, pm := range pms {
+		for _, key := range []string{"vendor", "model"} {
+			if tag, ok := pm.DeviceMetadata[key]; ok {
+				ddsnmp.MergeMetaTag(profileIdentity, key, tag)
+			}
+		}
+	}
+	local := c.localDevice
+	local.Vendor, local.Model = resolveTopologyDeviceIdentity(local.Vendor, local.Model, profileIdentity, local.Labels)
+	c.localDevice = local
+
 	for _, pm := range pms {
 		tags := topologyMetadataValues(pm.DeviceMetadata)
 		if len(pm.Tags) > 0 {

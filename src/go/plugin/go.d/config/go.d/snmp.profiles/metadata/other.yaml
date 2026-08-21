@@ -8439,7 +8439,6 @@ sysobjectids:
       model: DB Engine
     1.3.6.1.4.1.41112:
       category: Access Point
-      model: UniFi UAP-FlexHD
     1.3.6.1.4.1.41112.1.3:
       category: Switch
       model: Ubiquiti Networks UniFi switch

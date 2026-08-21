@@ -10,6 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
+var deviceIdentityMetadataKeys = [...]string{"vendor", "model"}
+
 func firstVendor(values ...string) string {
 	for _, v := range values {
 		if v != "" {
@@ -48,10 +50,16 @@ func (c *Collector) deviceStoreKey() string {
 
 // registerDeviceState exposes the already-configured SNMP job to SNMP-family
 // consumers without duplicating job configuration.
-func (c *Collector) registerDeviceState(si *snmputils.SysInfo) {
+func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata map[string]ddsnmp.MetaTag) {
 	if c.deviceStore == nil {
 		return
 	}
+	vnodeLabels := c.vnodeLabels()
+	identity := ddsnmp.ResolveDeviceMetadata(map[string]string{
+		"vendor": firstVendor(si.Vendor, si.Organization),
+		"model":  si.Model,
+	}, profileMetadata, vnodeLabels)
+
 	c.deviceStore.Register(c.deviceStoreKey(), ddsnmp.DeviceConnectionInfo{
 		Hostname:        c.Hostname,
 		Port:            c.Options.Port,
@@ -73,13 +81,31 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo) {
 		SysName:         si.Name,
 		SysContact:      si.Contact,
 		SysLocation:     si.Location,
-		Vendor:          firstVendor(si.Vendor, si.Organization),
-		Model:           si.Model,
+		Vendor:          identity["vendor"],
+		Model:           identity["model"],
 
 		DisableBulkWalk: c.disableBulkWalk,
 		ManualProfiles:  c.ManualProfiles,
 		VnodeGUID:       c.vnodeGUID(),
 		VnodeHostname:   c.vnodeHostname(),
-		VnodeLabels:     c.vnodeLabels(),
+		VnodeLabels:     vnodeLabels,
 	})
+}
+
+func (c *Collector) syncDeviceMetadata(pms []*ddsnmp.ProfileMetrics) {
+	if c.deviceMetadataSynced || c.vnode != nil || c.sysInfo == nil {
+		return
+	}
+
+	metadata := make(map[string]ddsnmp.MetaTag, len(deviceIdentityMetadataKeys))
+	for _, pm := range pms {
+		for _, key := range deviceIdentityMetadataKeys {
+			if tag, ok := pm.DeviceMetadata[key]; ok {
+				ddsnmp.MergeMetaTag(metadata, key, tag)
+			}
+		}
+	}
+
+	c.registerDeviceState(c.sysInfo, metadata)
+	c.deviceMetadataSynced = true
 }
