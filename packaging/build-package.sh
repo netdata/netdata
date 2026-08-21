@@ -80,11 +80,6 @@ add_cmake_option ENABLE_LIBBACKTRACE On
 
 add_cmake_option BUILD_FOR_PACKAGING On
 
-# LTO is opt-in in the build system. The DEB and RPM packages are built with it
-# today, so ask for it explicitly here rather than depending on a default; the
-# openSUSE branch below turns it off again for that toolchain.
-add_cmake_option USE_LTO On
-
 [ -d "${SOURCE_DIR}/tmp/ibm_mq" ] && add_cmake_option FETCHCONTENT_SOURCE_DIR_IBM_MQ "${SOURCE_DIR}/tmp/ibm_mq"
 if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
     if [ ! -d "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
