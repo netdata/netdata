@@ -2542,17 +2542,7 @@ include(NetdataPluginXenstat)
 include(NetdataPluginPerf)
 include(NetdataPluginSlabinfo)
 include(NetdataPluginCups)
-if(NEED_NDSUDO)
-    set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
-
-    add_executable(ndsudo ${NDSUDO_FILES})
-
-    install(TARGETS ndsudo
-            COMPONENT netdata
-            DESTINATION ${PLUGINS_DEST})
-    set_source_files_properties(${NDSUDO_FILES} PROPERTIES COMPILE_OPTIONS "-Wno-unused-result")
-endif()
-
+include(NetdataNdsudo)
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
     set(CGROUP_NETWORK_FILES src/collectors/cgroups.plugin/cgroup-network.c)
 
