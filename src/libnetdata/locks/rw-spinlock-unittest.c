@@ -2,12 +2,19 @@
 
 #include "libnetdata/libnetdata.h"
 
-// Deterministic unit tests for the baseline rw-spinlock API semantics that
-// already hold on master. These tests intentionally avoid timing/sleep-based
-// concurrency assertions (kept in the rwlockstest benchmark) so they stay
-// reproducible. They also intentionally do NOT assert writer-priority,
-// writer-starvation prevention, or writer-pending reader blocking; those
-// behaviors belong with the PR that introduces them.
+// Unit tests for the rw-spinlock API semantics.
+//
+// The single-threaded cases cover the baseline API contract (initialization,
+// reader admission, reader/writer exclusion, lock/unlock balance). The
+// multi-threaded cases cover the writer-priority contract: a pending writer
+// blocks new readers (rw_spinlock_writer_priority_test), concurrent writers are
+// mutually exclusive (rw_spinlock_writer_mutex_test), and a writer is not
+// starved by a continuous reader stream (rw_spinlock_writer_liveness_test).
+//
+// All assertions are on states reached through explicit handshakes, not on
+// sleeps or timings; every deadline here is a hang-guard only, never the thing
+// being asserted. Throughput/timing comparisons live in the rwlockstest
+// benchmark, not here.
 
 #define RW_TEST(condition, msg) do {                                            \
         if (!(condition)) {                                                     \
@@ -137,19 +144,30 @@ static int rw_spinlock_writer_mutex_test(void) {
 // ----------------------------------------------------------------------------
 // Writer liveness under reader churn: a pool of readers continuously acquires
 // and releases the read lock while a single writer blocks on the write lock.
-// Under writer-priority the writer must acquire promptly despite the churn (the
-// robust assertion). On the pre-writer-priority implementation a writer can be
-// starved by the reader stream; this test would then fail at the deadline, but
-// because starvation is timing-dependent this fail-on-old-master signal is
-// best-effort, not deterministic (the deterministic guards are the back-off
-// invariant and mutual-exclusion tests).
+// Under writer-priority the writer must acquire promptly despite the churn.
+//
+// The contention is established by a handshake rather than by hoping the threads
+// overlap: every reader first takes the read lock and HOLDS it, then waits for a
+// go signal. Only once all readers are holding is the writer started, and only
+// once the writer has parked (observable through the public API: tryread starts
+// failing) are the readers released into their churn loop. That ordering
+// guarantees the writer is already queued behind held readers before any reader
+// can release, so the writer can never acquire a free, uncontended lock and the
+// test cannot pass vacuously.
+//
+// On the pre-writer-priority implementation (which cleared the writer bit and
+// retried) the churn stream can starve the writer and this test fails at the
+// deadline; because starvation is timing-dependent that fail-on-old-master
+// signal is best-effort, while the deterministic guards remain the back-off
+// invariant and mutual-exclusion tests.
 
 #define RW_SPINLOCK_TEST_READERS 4
 
 typedef struct {
     RW_SPINLOCK *lock;
     uint32_t stop;
-    uint32_t active;   // count of readers that have taken the read lock at least once
+    uint32_t holding; // count of readers currently parked while holding the read lock
+    uint32_t go;      // set by the main thread to release the holding readers into churn
 } rw_spinlock_churn_ctx_t;
 
 typedef struct {
@@ -159,16 +177,20 @@ typedef struct {
 
 static void rw_spinlock_reader_churn(void *arg) {
     rw_spinlock_churn_ctx_t *ctx = (rw_spinlock_churn_ctx_t *)arg;
-    bool counted = false;
+
+    // Phase 1: take the read lock and HOLD it, then announce we are holding and
+    // wait for the go signal. This keeps the lock reader-held so the writer the
+    // main thread starts is forced to park behind us.
+    rw_spinlock_read_lock(ctx->lock);
+    __atomic_add_fetch(&ctx->holding, 1, __ATOMIC_RELEASE);
+    while (!__atomic_load_n(&ctx->go, __ATOMIC_ACQUIRE))
+        ; // spin until released into churn
+
+    // Phase 2: release into a continuous acquire/release churn stream.
+    rw_spinlock_read_unlock(ctx->lock);
     while (!__atomic_load_n(&ctx->stop, __ATOMIC_ACQUIRE)) {
-        if (rw_spinlock_tryread_lock(ctx->lock)) {
-            if (!counted) {
-                // signal (once) that this reader is actively churning
-                __atomic_add_fetch(&ctx->active, 1, __ATOMIC_RELEASE);
-                counted = true;
-            }
+        if (rw_spinlock_tryread_lock(ctx->lock))
             rw_spinlock_read_unlock(ctx->lock);
-        }
     }
 }
 
@@ -182,7 +204,7 @@ static void rw_spinlock_liveness_writer(void *arg) {
 static int rw_spinlock_writer_liveness_test(void) {
     int errors = 0;
     RW_SPINLOCK lock = RW_SPINLOCK_INITIALIZER;
-    rw_spinlock_churn_ctx_t rctx = { .lock = &lock, .stop = 0, .active = 0 };
+    rw_spinlock_churn_ctx_t rctx = { .lock = &lock, .stop = 0, .holding = 0, .go = 0 };
     rw_spinlock_liveness_writer_ctx_t wctx = { .lock = &lock, .acquired = 0 };
 
     fprintf(stderr, "  - writer liveness: a writer must acquire despite %d churning readers\n",
@@ -193,21 +215,39 @@ static int rw_spinlock_writer_liveness_test(void) {
         readers[i] = nd_thread_create("rwsp_rd", NETDATA_THREAD_OPTION_DONT_LOG,
                                       rw_spinlock_reader_churn, &rctx);
 
-    // Do not start the writer until every reader is actively churning (each has
-    // taken the read lock at least once). Otherwise the writer could acquire a
-    // free, uncontended lock before the readers exist and the test would pass
-    // vacuously, exercising none of the writer-vs-readers contention. Bounded
+    // Wait until every reader is parked while HOLDING the read lock. Bounded
     // deadline is only a hang-guard, not a correctness signal.
     usec_t ready_deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
-    while (__atomic_load_n(&rctx.active, __ATOMIC_ACQUIRE) < RW_SPINLOCK_TEST_READERS &&
+    while (__atomic_load_n(&rctx.holding, __ATOMIC_ACQUIRE) < RW_SPINLOCK_TEST_READERS &&
            now_monotonic_usec() < ready_deadline) {
-        ; // spin until all readers are churning
+        ; // spin until all readers hold the read lock
     }
-    RW_TEST(__atomic_load_n(&rctx.active, __ATOMIC_ACQUIRE) == RW_SPINLOCK_TEST_READERS,
-            "all readers are churning before the writer starts");
+    RW_TEST(__atomic_load_n(&rctx.holding, __ATOMIC_ACQUIRE) == RW_SPINLOCK_TEST_READERS,
+            "all readers hold the read lock before the writer starts");
 
     ND_THREAD *writer = nd_thread_create("rwsp_wr", NETDATA_THREAD_OPTION_DONT_LOG,
                                          rw_spinlock_liveness_writer, &wctx);
+
+    // Wait until the writer has parked behind the held readers, detected through
+    // the public API only: once the writer marks itself pending, tryread fails.
+    // The readers are still holding, so the pending state is stable.
+    bool writer_parked = false;
+    usec_t park_deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
+    while (now_monotonic_usec() < park_deadline) {
+        if (rw_spinlock_tryread_lock(&lock)) {
+            // still admitted => writer not pending yet; release and retry
+            rw_spinlock_read_unlock(&lock);
+        }
+        else {
+            writer_parked = true;
+            break;
+        }
+    }
+    RW_TEST(writer_parked, "the writer parks behind the held readers before the churn starts");
+
+    // Release the readers into the churn stream. From here the writer is already
+    // queued, so it must win against a continuous stream of new readers.
+    __atomic_store_n(&rctx.go, 1, __ATOMIC_RELEASE);
 
     // Bounded wait for the writer to acquire. Generous deadline so this never
     // false-fails on writer-priority (acquisition takes microseconds there).
