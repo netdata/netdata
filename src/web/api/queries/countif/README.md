@@ -18,7 +18,7 @@ The target number and the desired condition can be set using the `group_options`
 - `!0`, to match any number except zero.
 - `>=-3` to match any number bigger or equal to -3.
 
-. When an invalid condition is given, the web server can deliver an inaccurate response.
+An invalid condition is rejected with an API error rather than returning an inaccurate response.
 
 ## How to use
 

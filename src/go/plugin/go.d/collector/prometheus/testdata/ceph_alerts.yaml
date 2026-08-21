@@ -1504,7 +1504,7 @@ alerts:
       fidelity: CORRECTED-INTENT
       owner: ceph_pgs_damaged
       context: prometheus.ceph.health.health_checks.state
-      labels: name=OSD_SCRUB_ERRORS !PG_DAMAGED *
+      labels: name=OSD_SCRUB_ERRORS
       lookup: min -5m unaligned of value
       units: status
       condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this == 1)'

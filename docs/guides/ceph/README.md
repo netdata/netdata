@@ -38,7 +38,7 @@ Use this map to identify the Netdata surface that owns the operational question 
 
 | Operational need | What Netdata monitors | Primary owner | Operator behavior |
 |---|---|---|---|
-| Cluster health | Overall health, named Ceph health checks, daemon crashes, slow operations | MGR Prometheus | Categorical failures notify; workload-specific checks can be tuned |
+| Cluster health | Overall health, named Ceph health checks, daemon crashes, slow operations | MGR Prometheus | HEALTH_ERR and other categorical failures notify; HEALTH_WARN and workload-specific checks are silent until enabled and tuned |
 | Monitor availability | MON quorum and quorum risk | MGR Prometheus | Investigate monitor membership and elections |
 | Data integrity | Unfound objects, damaged PGs, scrub errors | MGR Prometheus | Treat as priority data-safety conditions |
 | Placement groups | Active/clean PG counts, scrub status, PG density, recovery blockers | MGR Prometheus | Inspect affected pool and recovery progress |
@@ -199,7 +199,7 @@ The collection alert reports scrape failures, while data-state alerts continue t
 
 The MGR profile provides aggregate RGW telemetry for requests, aborted requests, Lua scripts, notifications, queues, and multisite retries.
 
-Collect the RGW access log with `web_log` to analyze HTTP outcomes, bytes, clients, and latency. The Ceph JSON example maps request, status, size, and client fields, and declares `total_time` as a numeric custom field in milliseconds, preserving Ceph's exact duration field.
+Collect the RGW JSON access log with `web_log` to analyze HTTP outcomes, bytes, clients, and latency. Configure RGW to emit its access log in JSON format and make that file available to the Agent. The Ceph JSON example maps request, status, size, and client fields, and declares `total_time` as a numeric custom field in milliseconds, preserving Ceph's exact duration field.
 
 Use `httpcheck` for unauthenticated endpoint liveness and `x509check` for certificate expiration or revocation.
 

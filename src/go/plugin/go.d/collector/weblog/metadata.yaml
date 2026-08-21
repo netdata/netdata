@@ -271,6 +271,66 @@ modules:
                     label1: field1
                     label2: field2
                 ```
+            - name: custom_fields
+              description: List of custom text fields to collect per request.
+              default_value: '[]'
+              required: false
+              group: Custom fields
+            - name: custom_fields.name
+              description: Field name used for lookup in the parsed log and chart dimensions.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_fields.pattern
+              description: Pattern used to match the custom field.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_time_fields
+              description: List of custom duration fields to collect per request.
+              default_value: '[]'
+              required: false
+              group: Custom fields
+            - name: custom_time_fields.name
+              description: Field name used for lookup in the parsed log.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_time_fields.pattern
+              description: Pattern used to match the custom duration field.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_time_fields.units
+              description: Duration units rendered on the custom time-field charts.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_numeric_fields
+              description: List of custom numeric fields to collect per request.
+              default_value: '[]'
+              required: false
+              group: Custom fields
+            - name: custom_numeric_fields.name
+              description: Field name used for lookup in the parsed log.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_numeric_fields.units
+              description: Units rendered on the custom numeric-field charts.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_numeric_fields.multiplier
+              description: Multiplier applied to the custom numeric field.
+              default_value: 1
+              required: false
+              group: Custom fields
+            - name: custom_numeric_fields.divisor
+              description: Divisor applied to the custom numeric field.
+              default_value: 1
+              required: false
+              group: Custom fields
             - name: regexp_config
               description: RegExp log parser config.
               default_value: ""
