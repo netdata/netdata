@@ -565,36 +565,16 @@ endif()
 include(NetdataSourceLists)
 
 if(OS_WINDOWS)
-    set(LIBNETDATA_WIN_FILES
-            src/libnetdata/os/windows-api/windows_api.c
-            src/libnetdata/os/windows-api/windows_api.h
-    )
-
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
 endif()
 
 if(OS_LINUX OR OS_WINDOWS)
     list(APPEND LIBNETDATA_FILES
-            src/libnetdata/netipc/netipc_netdata.c
-            src/libnetdata/netipc/netipc_netdata.h
+            ${LIBNETDATA_NETIPC_FILES}
     )
 endif()
 
 if(NOT OS_FREEBSD)
-    set(LIBNETDATA_STACKTRACE_FILES
-        src/libnetdata/stacktrace/stacktrace.h
-        src/libnetdata/stacktrace/stacktrace-common.h
-        src/libnetdata/stacktrace/stacktrace-common.c
-        src/libnetdata/stacktrace/stacktrace-array.h
-        src/libnetdata/stacktrace/stacktrace-array.c
-        src/libnetdata/stacktrace/stacktrace-libbacktrace.c
-        src/libnetdata/stacktrace/stacktrace-libunwind.c
-        src/libnetdata/stacktrace/stacktrace-backtrace.c
-        src/libnetdata/stacktrace/stacktrace-none.c
-        src/libnetdata/stacktrace/stacktrace-log.c
-        src/libnetdata/stacktrace/stacktrace-unittest.c
-    )
-
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_STACKTRACE_FILES})
 endif()
 
@@ -607,77 +587,27 @@ endif()
 
 if(ENABLE_ML)
         set(ML_FILES
-                src/ml/ad_charts.h
-                src/ml/ad_charts.cc
-                src/ml/ml.cc
-                src/ml/ml_calculated_number.h
-                src/ml/ml_host.h
-                src/ml/ml_config.h
-                src/ml/ml_config.cc
-                src/ml/ml_dimension.h
-                src/ml/ml_enums.h
-                src/ml/ml_enums.cc
-                src/ml/ml_features.h
-                src/ml/ml_features.cc
-                src/ml/ml_kmeans.h
-                src/ml/ml_kmeans.cc
-                src/ml/ml_queue.h
-                src/ml/ml_worker.h
-                src/ml/ml_string_wrapper.h
-                src/ml/ml_queue.cc
-                src/ml/ml_private.h
-                src/ml/ml_public.h
-                src/ml/ml_public.cc
-                src/ml/ml-unittest.cc
+                ${ML_ENABLED_FILES}
         )
 
         if(NOT ENABLE_MIMALLOC)
-                list(APPEND ML_FILES src/ml/ml_memory.cc)
+                list(APPEND ML_FILES ${ML_MEMORY_FILES})
         endif()
         set_source_files_properties(${ML_FILES} PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 else()
         set(ML_FILES
-                src/ml/ml_public.h
-                src/ml/ml-dummy.c
+                ${ML_DISABLED_FILES}
         )
 endif()
 
 if(ENABLE_DBENGINE)
     list(APPEND RRD_PLUGIN_FILES
-            src/database/engine/rrdengine.c
-            src/database/engine/rrdengine.h
-            src/database/engine/rrddiskprotocol.h
-            src/database/engine/datafile.c
-            src/database/engine/datafile.h
-            src/database/engine/journalfile.c
-            src/database/engine/journalfile.h
-            src/database/engine/rrdenginelib.c
-            src/database/engine/rrdenginelib.h
-            src/database/engine/rrdengineapi.c
-            src/database/engine/rrdengineapi.h
-            src/database/engine/pagecache.c
-            src/database/engine/pagecache.h
-            src/database/engine/page_test.cc
-            src/database/engine/page.c
-            src/database/engine/page.h
-            src/database/engine/cache.c
-            src/database/engine/cache.h
-            src/database/engine/mrg.c
-            src/database/engine/mrg.h
-            src/database/engine/mrg-internals.h
-            src/database/engine/mrg-unittest.c
-            src/database/engine/mrg-load.c
-            src/database/engine/pdc.c
-            src/database/engine/pdc.h
-            src/database/engine/dbengine-unittest.c
-            src/database/engine/dbengine-stresstest.c
-            src/database/engine/dbengine-compression.c
-            src/database/engine/dbengine-compression.h
+            ${RRD_DBENGINE_FILES}
     )
 endif()
 
 set(NETDATA_FILES
-        src/collectors/all.h
+        ${COLLECTORS_ALL_FILES}
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
@@ -697,7 +627,7 @@ set(NETDATA_FILES
 
 if(OS_LINUX)
         list(APPEND NETDATA_FILES
-                src/daemon/static_threads_linux.c
+                ${DAEMON_LINUX_FILES}
                 ${CGROUPS_PLUGIN_FILES}
                 ${DISKSPACE_PLUGIN_FILES}
                 ${PROC_PLUGIN_FILES}
@@ -708,27 +638,25 @@ if(OS_LINUX)
 
         if(ENABLE_SENTRY)
             list(APPEND NETDATA_FILES
-                    src/daemon/sentry-native/sentry-native.c
-                    src/daemon/sentry-native/sentry-native.h)
+                    ${DAEMON_SENTRY_FILES})
         endif()
 elseif(OS_MACOS)
         list(APPEND NETDATA_FILES
-                src/daemon/static_threads_macos.c
+                ${DAEMON_MACOS_FILES}
                 ${MACOS_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
 elseif(OS_FREEBSD)
         list(APPEND NETDATA_FILES
-                src/daemon/static_threads_freebsd.c
+                ${DAEMON_FREEBSD_FILES}
                 ${FREEBSD_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
 elseif(OS_WINDOWS)
         list(APPEND NETDATA_FILES
-                src/daemon/static_threads_windows.c
-                src/daemon/winsvc.cc
+                ${DAEMON_WINDOWS_FILES}
                 ${WINDOWS_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
@@ -778,20 +706,9 @@ check_library_exists(rt clock_gettime "" HAVE_LIBRT)
 if(OS_LINUX)
     set(NETIPC_FILES
             ${NETIPC_PROTOCOL_FILES}
-            src/libnetdata/netipc/src/transport/posix/netipc_uds.c
-            src/libnetdata/netipc/src/transport/posix/netipc_uds_handshake.c
-            src/libnetdata/netipc/src/transport/posix/netipc_uds_inflight.c
-            src/libnetdata/netipc/src/transport/posix/netipc_uds_lifecycle.c
-            src/libnetdata/netipc/src/transport/posix/netipc_uds_receive.c
-            src/libnetdata/netipc/src/transport/posix/netipc_uds_send.c
-            src/libnetdata/netipc/src/transport/posix/netipc_shm.c
+            ${NETIPC_POSIX_TRANSPORT_FILES}
             ${NETIPC_SERVICE_COMMON_FILES}
-            src/libnetdata/netipc/src/service/netipc_service.c
-            src/libnetdata/netipc/src/service/netipc_service_posix_client.c
-            src/libnetdata/netipc/src/service/netipc_service_posix_client_connect.c
-            src/libnetdata/netipc/src/service/netipc_service_posix_client_call.c
-            src/libnetdata/netipc/src/service/netipc_service_posix_server.c
-            src/libnetdata/netipc/src/service/netipc_service_posix_server_session.c
+            ${NETIPC_POSIX_SERVICE_FILES}
     )
 
     add_library(netipc STATIC ${NETIPC_FILES})
@@ -807,15 +724,9 @@ if(OS_LINUX)
 elseif(OS_WINDOWS)
     set(NETIPC_FILES
             ${NETIPC_PROTOCOL_FILES}
-            src/libnetdata/netipc/src/transport/windows/netipc_named_pipe.c
-            src/libnetdata/netipc/src/transport/windows/netipc_win_shm.c
+            ${NETIPC_WINDOWS_TRANSPORT_FILES}
             ${NETIPC_SERVICE_COMMON_FILES}
-            src/libnetdata/netipc/src/service/netipc_service_win.c
-            src/libnetdata/netipc/src/service/netipc_service_win_client.c
-            src/libnetdata/netipc/src/service/netipc_service_win_client_connect.c
-            src/libnetdata/netipc/src/service/netipc_service_win_client_call.c
-            src/libnetdata/netipc/src/service/netipc_service_win_server.c
-            src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
+            ${NETIPC_WINDOWS_SERVICE_FILES}
     )
 
     add_library(netipc STATIC ${NETIPC_FILES})
@@ -1130,16 +1041,6 @@ install(TARGETS nd-run
 
 if(ENABLE_PLUGIN_DEBUGFS)
     # Define debugfs.plugin source files
-    set(DEBUGFS_PLUGIN_FILES
-            src/collectors/debugfs.plugin/debugfs_plugin.c
-            src/collectors/debugfs.plugin/debugfs_plugin.h
-            src/collectors/debugfs.plugin/module-numa-extfrag.c
-            src/collectors/debugfs.plugin/module-zswap.c
-            src/collectors/debugfs.plugin/module-devices-powercap.c
-            src/collectors/debugfs.plugin/module-libsensors.c
-            src/collectors/debugfs.plugin/module-audit.c
-    )
-
     # Add executable for debugfs.plugin
     add_executable(debugfs.plugin ${DEBUGFS_PLUGIN_FILES})
 
@@ -1265,49 +1166,6 @@ if(OS_MACOS AND OSLOG AND FOUNDATION)
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
-    set(EBPF_PLUGIN_FILES
-            src/collectors/ebpf.plugin/ebpf.c
-            src/collectors/ebpf.plugin/ebpf.h
-            src/collectors/ebpf.plugin/ebpf_dcstat.c
-            src/collectors/ebpf.plugin/ebpf_dcstat.h
-            src/collectors/ebpf.plugin/ebpf_disk.c
-            src/collectors/ebpf.plugin/ebpf_disk.h
-            src/collectors/ebpf.plugin/ebpf_fd.c
-            src/collectors/ebpf.plugin/ebpf_fd.h
-            src/collectors/ebpf.plugin/ebpf_hardirq.c
-            src/collectors/ebpf.plugin/ebpf_hardirq.h
-            src/collectors/ebpf.plugin/ebpf_mdflush.c
-            src/collectors/ebpf.plugin/ebpf_mdflush.h
-            src/collectors/ebpf.plugin/ebpf_mount.c
-            src/collectors/ebpf.plugin/ebpf_mount.h
-            src/collectors/ebpf.plugin/ebpf_filesystem.c
-            src/collectors/ebpf.plugin/ebpf_filesystem.h
-            src/collectors/ebpf.plugin/ebpf_oomkill.c
-            src/collectors/ebpf.plugin/ebpf_oomkill.h
-            src/collectors/ebpf.plugin/ebpf_process.c
-            src/collectors/ebpf.plugin/ebpf_process.h
-            src/collectors/ebpf.plugin/ebpf_shm.c
-            src/collectors/ebpf.plugin/ebpf_shm.h
-            src/collectors/ebpf.plugin/ebpf_softirq.c
-            src/collectors/ebpf.plugin/ebpf_softirq.h
-            src/collectors/ebpf.plugin/ebpf_sync.c
-            src/collectors/ebpf.plugin/ebpf_sync.h
-            src/collectors/ebpf.plugin/ebpf_swap.c
-            src/collectors/ebpf.plugin/ebpf_swap.h
-            src/collectors/ebpf.plugin/ebpf_vfs.c
-            src/collectors/ebpf.plugin/ebpf_vfs.h
-            src/collectors/ebpf.plugin/ebpf_apps.c
-            src/collectors/ebpf.plugin/ebpf_apps.h
-            src/collectors/ebpf.plugin/ebpf_cgroup.c
-            src/collectors/ebpf.plugin/ebpf_cgroup.h
-            src/collectors/ebpf.plugin/ebpf_unittest.c
-            src/collectors/ebpf.plugin/ebpf_unittest.h
-             src/collectors/ebpf.plugin/libbpf_api/ebpf.c
-             src/collectors/ebpf.plugin/libbpf_api/ebpf.h
-             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
-             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.h
-     )
-
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
 
@@ -1420,11 +1278,6 @@ if(ENABLE_PLUGIN_EBPF)
 endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
-        set(LOCAL_LISTENERS_FILES
-                src/collectors/utils/local_listeners.c
-                src/libnetdata/local-sockets/local-sockets.h
-        )
-
         add_executable(local-listeners ${LOCAL_LISTENERS_FILES})
 
         target_compile_options(local-listeners PRIVATE
@@ -1459,47 +1312,27 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 endforeach()
         endif()
 
-        set(NETWORK_VIEWER_COMMON_FILES
-                src/collectors/common-cgroups/cgroup-path.c
-                src/collectors/common-cgroups/cgroup-path.h
-                src/collectors/common-cgroups/cgroup-topology-rules.c
-                src/collectors/common-cgroups/cgroup-topology-rules.h
-                src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-                src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-                src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-                src/collectors/network-viewer.plugin/network-viewer.c
-        )
-
         set(NETWORK_VIEWER_FILES)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
-                        src/libnetdata/local-sockets/local-sockets.h
-                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
-                        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
-                        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
-                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.c
-                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.h
-                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.c
-                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.h
-                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.c
-                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.h
+                        ${NETWORK_VIEWER_LINUX_FILES}
                         ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
         if(OS_WINDOWS)
                 list(APPEND NETWORK_VIEWER_FILES
-                        src/collectors/network-viewer.plugin/network-viewer-windows.c
+                        ${NETWORK_VIEWER_WINDOWS_FILES}
                 )
         endif()
         if(OS_FREEBSD)
                 list(APPEND NETWORK_VIEWER_FILES
-                        src/libnetdata/local-sockets/local-sockets-freebsd.h
+                        ${NETWORK_VIEWER_FREEBSD_FILES}
                         ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
         if(OS_MACOS)
                 list(APPEND NETWORK_VIEWER_FILES
-                        src/libnetdata/local-sockets/local-sockets-macos.h
+                        ${NETWORK_VIEWER_MACOS_FILES}
                         ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
@@ -1584,13 +1417,10 @@ endif()
 #
 
 if(OS_WINDOWS)
-        set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
         configure_file(packaging/windows/resources/netdata_claim.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata_claim.manifest @ONLY)
 
-        set(NETDATACLI_RES_FILES "packaging/windows/resources/netdatacli.rc")
         configure_file(packaging/windows/resources/netdatacli.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacli.manifest @ONLY)
 
-        set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
         configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 
         configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
@@ -1701,25 +1531,6 @@ install(TARGETS systemd-cat-native
 pkg_check_modules(PCRE2 libpcre2-8)
 
 if(PCRE2_FOUND)
-        set(LOG2JOURNAL_FILES
-                ${CONFIG_H}
-                src/collectors/log2journal/log2journal.h
-                src/collectors/log2journal/log2journal.c
-                src/collectors/log2journal/log2journal-help.c
-                src/collectors/log2journal/log2journal-yaml.c
-                src/collectors/log2journal/log2journal-json.c
-                src/collectors/log2journal/log2journal-logfmt.c
-                src/collectors/log2journal/log2journal-pcre2.c
-                src/collectors/log2journal/log2journal-params.c
-                src/collectors/log2journal/log2journal-inject.c
-                src/collectors/log2journal/log2journal-pattern.c
-                src/collectors/log2journal/log2journal-replace.c
-                src/collectors/log2journal/log2journal-rename.c
-                src/collectors/log2journal/log2journal-rewrite.c
-                src/collectors/log2journal/log2journal-txt.h
-                src/collectors/log2journal/log2journal-hashed-key.h
-        )
-
         add_executable(log2journal ${LOG2JOURNAL_FILES})
         target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
         target_compile_options(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
