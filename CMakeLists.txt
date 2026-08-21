@@ -102,36 +102,6 @@ endif()
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
-function(netdata_windows_path_to_runtime_path output_var input_path)
-  set(_converted_path "")
-  set(_cygpath_result 1)
-
-  find_program(_cygpath_executable NAMES cygpath)
-  if(_cygpath_executable)
-    execute_process(
-      COMMAND ${_cygpath_executable} -u "${input_path}"
-      RESULT_VARIABLE _cygpath_result
-      OUTPUT_VARIABLE _converted_path
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      ERROR_QUIET)
-  endif()
-
-  if(NOT _converted_path OR NOT _cygpath_result EQUAL 0)
-    string(REPLACE "\\" "/" _converted_path "${input_path}")
-
-    if(_converted_path MATCHES "^([A-Za-z]):(.*)$")
-      string(TOLOWER "${CMAKE_MATCH_1}" _drive_letter)
-      set(_converted_path "/${_drive_letter}${CMAKE_MATCH_2}")
-    endif()
-  endif()
-
-  if(NOT _converted_path STREQUAL "")
-    string(REGEX REPLACE "/$" "" _converted_path "${_converted_path}")
-  endif()
-
-  set(${output_var} "${_converted_path}" PARENT_SCOPE)
-endfunction()
-
 if(OS_WINDOWS)
   set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
       "Native Windows install prefix used to derive runtime paths")
@@ -476,17 +446,6 @@ endif()
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
 include(NetdataOSRelease)
-
-# DEB policy requires a copyright file in every binary package; RPMs
-# deliberately do not ship one.
-function(netdata_add_deb_copyright component package_name)
-        if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
-                install(FILES
-                        "${PKG_FILES_PATH}/copyright"
-                        COMPONENT "${component}"
-                        DESTINATION "${PKG_DOC_DEST}/${package_name}")
-        endif()
-endfunction()
 
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
