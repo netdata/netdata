@@ -82,8 +82,8 @@ typedef struct query_engine_ops {
 
     bool result_plan_expire_time_overflow;
 
-    // the LATEST grouping with a single output point covering the metric's
-    // last stored sample is answered from the collector's cached value,
+    // the LATEST grouping with a single output point reached by the metric's
+    // latest collection interval is answered from the collector's cached value,
     // without querying the storage engine (no query plan is built)
     bool latest_fast_path;
     NETDATA_DOUBLE latest_fast_path_value;
