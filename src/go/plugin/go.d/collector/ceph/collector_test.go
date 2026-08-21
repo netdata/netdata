@@ -834,17 +834,23 @@ func TestCollector_ChartTemplateContract(t *testing.T) {
 	assert.Equal(t, expectedChartFamilies(), actualFamilies)
 }
 
-func TestCollector_PhysicalCapacityAlertContract(t *testing.T) {
+func cephHealthAlertBlock(t *testing.T, template string) string {
+	t.Helper()
 	alert, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
 	require.NoError(t, err)
 
 	config := string(alert)
-	start := strings.Index(config, "template: ceph_cluster_physical_capacity_utilization")
+	start := strings.Index(config, "template: "+template)
 	require.NotEqual(t, -1, start)
 	block := config[start:]
 	if end := strings.Index(block, "\n template:"); end >= 0 {
 		block = block[:end]
 	}
+	return block
+}
+
+func TestCollector_PhysicalCapacityAlertContract(t *testing.T) {
+	block := cephHealthAlertBlock(t, "ceph_cluster_physical_capacity_utilization")
 	assert.Contains(t, block, "on: ceph.cluster_physical_capacity_utilization")
 	assert.Contains(t, block, "calc: $utilization")
 	assert.Contains(t, block, "to: silent")
@@ -854,16 +860,7 @@ func TestCollector_PhysicalCapacityAlertContract(t *testing.T) {
 }
 
 func TestCollector_ComponentCollectionAlertContract(t *testing.T) {
-	alert, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
-	require.NoError(t, err)
-
-	config := string(alert)
-	start := strings.Index(config, "template: ceph_component_collection_failed")
-	require.NotEqual(t, -1, start)
-	block := config[start:]
-	if end := strings.Index(block, "\n template:"); end >= 0 {
-		block = block[:end]
-	}
+	block := cephHealthAlertBlock(t, "ceph_component_collection_failed")
 	assert.Contains(t, block, "on: ceph.component_collection_status")
 	assert.Contains(t, block, "calc: $failed")
 	assert.Contains(t, block, "${label:component}")

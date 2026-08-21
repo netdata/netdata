@@ -1047,32 +1047,7 @@ func TestCollector_CephMGRReleaseFixturesMaterializeM01AlertIdentities(t *testin
 			input, err := os.ReadFile(promtestutil.Require(t, fixture))
 			require.NoError(t, err)
 
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write(input)
-			}))
-			defer srv.Close()
-
-			collr := New()
-			collr.URL = srv.URL
-			collr.Profiles = ProfilesConfig{Mode: "auto"}
-			require.NoError(t, collr.Init(context.Background()))
-			require.NoError(t, collr.Check(context.Background()))
-			defer collr.Cleanup(context.Background())
-
-			cc := cycle(t, collr.MetricStore())
-			cc.BeginCycle()
-			require.NoError(t, collr.Collect(context.Background()))
-			require.NoError(t, cc.CommitCycleSuccess())
-
-			eng, err := chartengine.New()
-			require.NoError(t, err)
-			require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-			attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-			require.NoError(t, err)
-			defer attempt.Abort()
-			plan := attempt.Plan()
-			require.NoError(t, attempt.Commit())
-
+			plan := collectCephPlan(t, input).plan
 			var healthCheckNames, daemonHealthTypes []string
 			for _, item := range plan.Actions {
 				create, ok := item.(chartengine.CreateChartAction)
@@ -1111,31 +1086,7 @@ func TestCollector_CephMGRNamedHealthCheckIdentities(t *testing.T) {
 	for _, name := range want {
 		fmt.Fprintf(&input, "ceph_health_detail{name=\"%s\",severity=\"HEALTH_WARN\"} 1\n", name)
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(input.String()))
-	}))
-	defer srv.Close()
-
-	collr := New()
-	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	require.NoError(t, collr.Init(context.Background()))
-	require.NoError(t, collr.Check(context.Background()))
-	defer collr.Cleanup(context.Background())
-
-	cc := cycle(t, collr.MetricStore())
-	cc.BeginCycle()
-	require.NoError(t, collr.Collect(context.Background()))
-	require.NoError(t, cc.CommitCycleSuccess())
-
-	eng, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-	defer attempt.Abort()
-	plan := attempt.Plan()
-	require.NoError(t, attempt.Commit())
+	plan := collectCephPlan(t, []byte(input.String())).plan
 
 	var actual []string
 	for _, action := range plan.Actions {
@@ -1172,32 +1123,7 @@ func TestCollector_CephMGRClusterSummaries(t *testing.T) {
 		fmt.Fprintf(&input, "ceph_osd_up{ceph_daemon=\"osd.%d\"} %d\n", i, up)
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(input.String()))
-	}))
-	defer srv.Close()
-
-	collr := New()
-	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	require.NoError(t, collr.Init(context.Background()))
-	require.NoError(t, collr.Check(context.Background()))
-	defer collr.Cleanup(context.Background())
-
-	cc := cycle(t, collr.MetricStore())
-	cc.BeginCycle()
-	require.NoError(t, collr.Collect(context.Background()))
-	require.NoError(t, cc.CommitCycleSuccess())
-
-	eng, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-	defer attempt.Abort()
-	plan := attempt.Plan()
-	require.NoError(t, attempt.Commit())
-
+	plan := collectCephPlan(t, []byte(input.String())).plan
 	const (
 		monSummary  = "prometheus.ceph.control_plane.monitor.cluster_summary"
 		monMetadata = "prometheus.ceph.control_plane.monitor.state_metadata"
@@ -1230,15 +1156,7 @@ func TestCollector_CephMGRClusterSummaries(t *testing.T) {
 		t.Helper()
 		update, ok := updates[chart.ChartID]
 		require.Truef(t, ok, "chart %q has no update", chart.ChartID)
-		actual := make(map[string]float64)
-		for _, value := range update.Values {
-			if value.IsFloat {
-				actual[value.Name] = value.Float64
-			} else {
-				actual[value.Name] = float64(value.Int64)
-			}
-		}
-		assert.Equal(t, expected, actual)
+		assert.Equal(t, expected, chartUpdateValues(t, update))
 	}
 	requireChartValues(creates[monSummary][0], map[string]float64{"total": 3, "in_quorum": 2})
 	requireChartValues(creates[osdSummary][0], map[string]float64{"total": 10, "up": 9})
@@ -1290,32 +1208,7 @@ func TestCollector_CephM05RBDMirrorTimestampMaterialization(t *testing.T) {
 	input.WriteString("ceph_rbd_mirror_snapshot_image_local_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"behind\",namespace=\"other\",pool=\"other\"} 99\n")
 	input.WriteString("ceph_rbd_mirror_snapshot_image_remote_timestamp{ceph_daemon=\"rbd-mirror.a\",image=\"behind\",namespace=\"other\",pool=\"other\"} 100\n")
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(input.String()))
-	}))
-	defer srv.Close()
-
-	collr := New()
-	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	require.NoError(t, collr.Init(context.Background()))
-	require.NoError(t, collr.Check(context.Background()))
-	defer collr.Cleanup(context.Background())
-
-	cc := cycle(t, collr.MetricStore())
-	cc.BeginCycle()
-	require.NoError(t, collr.Collect(context.Background()))
-	require.NoError(t, cc.CommitCycleSuccess())
-
-	eng, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-	defer attempt.Abort()
-	plan := attempt.Plan()
-	require.NoError(t, attempt.Commit())
-
+	plan := collectCephPlan(t, []byte(input.String())).plan
 	const context = "prometheus.ceph.rbd_mirror.snapshot_replication.timestamp"
 	chartContexts := make(map[string]string)
 	updates := make(map[string]chartengine.UpdateChartAction)
@@ -1332,14 +1225,7 @@ func TestCollector_CephM05RBDMirrorTimestampMaterialization(t *testing.T) {
 	require.Len(t, updates, 3, "each mirrored image retains its own chart identity")
 
 	for chartID, update := range updates {
-		actual := make(map[string]float64)
-		for _, value := range update.Values {
-			if value.IsFloat {
-				actual[value.Name] = value.Float64
-			} else {
-				actual[value.Name] = float64(value.Int64)
-			}
-		}
+		actual := chartUpdateValues(t, update)
 		require.Len(t, actual, 2, "chart %q must expose both timestamps", chartID)
 		switch actual["local_timestamp"] {
 		case 100:
@@ -1475,32 +1361,7 @@ func TestCollector_CephM04PoolDifferenceMaterialization(t *testing.T) {
 		fmt.Fprintf(&input, "ceph_pg_total{pool_id=%q} %v\n", pool, values[2])
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(input.String()))
-	}))
-	defer srv.Close()
-
-	collr := New()
-	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	require.NoError(t, collr.Init(context.Background()))
-	require.NoError(t, collr.Check(context.Background()))
-	defer collr.Cleanup(context.Background())
-
-	cc := cycle(t, collr.MetricStore())
-	cc.BeginCycle()
-	require.NoError(t, collr.Collect(context.Background()))
-	require.NoError(t, cc.CommitCycleSuccess())
-
-	eng, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-	defer attempt.Abort()
-	plan := attempt.Plan()
-	require.NoError(t, attempt.Commit())
-
+	plan := collectCephPlan(t, []byte(input.String())).plan
 	const context = "prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state"
 	chartContexts := make(map[string]string)
 	updates := make(map[string]chartengine.UpdateChartAction)
@@ -1515,14 +1376,7 @@ func TestCollector_CephM04PoolDifferenceMaterialization(t *testing.T) {
 	}
 	require.Len(t, updates, 3, "one PG chart instance must remain per pool")
 	for chartID, update := range updates {
-		actual := make(map[string]float64)
-		for _, value := range update.Values {
-			if value.IsFloat {
-				actual[value.Name] = value.Float64
-			} else {
-				actual[value.Name] = float64(value.Int64)
-			}
-		}
+		actual := chartUpdateValues(t, update)
 		switch actual["pg_total"] {
 		case 100:
 			switch actual["clean"] {
@@ -1553,32 +1407,7 @@ func TestCollector_CephHardwareProfileReleaseGating(t *testing.T) {
 			input, err := os.ReadFile(promtestutil.Require(t, fixturePath))
 			require.NoError(t, err)
 
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write(input)
-			}))
-			defer srv.Close()
-
-			collr := New()
-			collr.URL = srv.URL
-			collr.Profiles = ProfilesConfig{Mode: "auto"}
-			require.NoError(t, collr.Init(context.Background()))
-			require.NoError(t, collr.Check(context.Background()))
-			defer collr.Cleanup(context.Background())
-
-			cc := cycle(t, collr.MetricStore())
-			cc.BeginCycle()
-			require.NoError(t, collr.Collect(context.Background()))
-			require.NoError(t, cc.CommitCycleSuccess())
-
-			eng, err := chartengine.New()
-			require.NoError(t, err)
-			require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-			attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-			require.NoError(t, err)
-			defer attempt.Abort()
-			plan := attempt.Plan()
-			require.NoError(t, attempt.Commit())
-
+			plan := collectCephPlan(t, input).plan
 			healthIDs := make(map[string]chartengine.CreateChartAction)
 			temperatureIDs := make(map[string]chartengine.CreateChartAction)
 			for _, action := range plan.Actions {
@@ -1715,32 +1544,7 @@ func TestCollector_CephNVMeoFMaterializesLocalAlertIdentities(t *testing.T) {
 	input, err := os.ReadFile(promtestutil.Require(t, "prometheus/profiles/ceph/fixtures/ceph_nvmeof.prom"))
 	require.NoError(t, err)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write(input)
-	}))
-	defer srv.Close()
-
-	collr := New()
-	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	require.NoError(t, collr.Init(context.Background()))
-	require.NoError(t, collr.Check(context.Background()))
-	defer collr.Cleanup(context.Background())
-
-	cc := cycle(t, collr.MetricStore())
-	cc.BeginCycle()
-	require.NoError(t, collr.Collect(context.Background()))
-	require.NoError(t, cc.CommitCycleSuccess())
-
-	eng, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-	defer attempt.Abort()
-	plan := attempt.Plan()
-	require.NoError(t, attempt.Commit())
-
+	plan := collectCephPlan(t, input).plan
 	byContext := make(map[string][]chartengine.CreateChartAction)
 	updates := make(map[string]chartengine.UpdateChartAction)
 	for _, action := range plan.Actions {
@@ -1774,15 +1578,7 @@ func TestCollector_CephNVMeoFMaterializesLocalAlertIdentities(t *testing.T) {
 		t.Helper()
 		update, ok := updates[chart.ChartID]
 		require.Truef(t, ok, "chart %q has no update", chart.ChartID)
-		values := make(map[string]float64)
-		for _, value := range update.Values {
-			if value.IsFloat {
-				values[value.Name] = value.Float64
-			} else {
-				values[value.Name] = float64(value.Int64)
-			}
-		}
-		return values
+		return chartUpdateValues(t, update)
 	}
 	for _, reactor := range byContext["prometheus.ceph.nvme_of.gateways.time_accumulation"] {
 		require.Contains(t, chartValues(reactor), "busy")
@@ -1905,32 +1701,7 @@ func TestCollector_CephRGWAlertChartsMaterialize(t *testing.T) {
 		"prometheus/profiles/ceph/fixtures/ceph_reef_ceph_exporter_limit11.prom"))
 	require.NoError(t, err)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write(input)
-	}))
-	defer srv.Close()
-
-	collr := New()
-	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	require.NoError(t, collr.Init(context.Background()))
-	require.NoError(t, collr.Check(context.Background()))
-	defer collr.Cleanup(context.Background())
-
-	cc := cycle(t, collr.MetricStore())
-	cc.BeginCycle()
-	require.NoError(t, collr.Collect(context.Background()))
-	require.NoError(t, cc.CommitCycleSuccess())
-
-	eng, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-	defer attempt.Abort()
-	plan := attempt.Plan()
-	require.NoError(t, attempt.Commit())
-
+	plan := collectCephPlan(t, input).plan
 	created := make(map[string]int)
 	for _, action := range plan.Actions {
 		if create, ok := action.(chartengine.CreateChartAction); ok {
@@ -2809,6 +2580,54 @@ func cephManifestExtensionSOWIDs(extensions map[string]cephNetdataExtension) []s
 func cephHealthAlertTemplates(t *testing.T) map[string]map[string]string {
 	t.Helper()
 	return healthAlertTemplatesFromFile(t, "../../../../../health/health.d/ceph.conf")
+}
+
+type cephCollectorPlan struct {
+	collector *Collector
+	plan      chartengine.Plan
+}
+
+func collectCephPlan(t *testing.T, body []byte) cephCollectorPlan {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	t.Cleanup(func() { collr.Cleanup(context.Background()) })
+
+	cc := cycle(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	eng, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, eng.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
+	attempt, err := eng.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	defer attempt.Abort()
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+	return cephCollectorPlan{collector: collr, plan: plan}
+}
+
+func chartUpdateValues(t *testing.T, update chartengine.UpdateChartAction) map[string]float64 {
+	t.Helper()
+	values := make(map[string]float64)
+	for _, value := range update.Values {
+		if value.IsFloat {
+			values[value.Name] = value.Float64
+		} else {
+			values[value.Name] = float64(value.Int64)
+		}
+	}
+	return values
 }
 
 func healthAlertTemplatesFromFile(t *testing.T, path string) map[string]map[string]string {
