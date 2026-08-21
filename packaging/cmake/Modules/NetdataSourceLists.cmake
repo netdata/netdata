@@ -1503,60 +1503,6 @@ set(NETIPC_WINDOWS_SERVICE_FILES
         src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
 )
 
-# network-viewer: the OS-independent sources
-set(NETWORK_VIEWER_COMMON_FILES
-        src/collectors/common-cgroups/cgroup-path.c
-        src/collectors/common-cgroups/cgroup-path.h
-        src/collectors/common-cgroups/cgroup-topology-rules.c
-        src/collectors/common-cgroups/cgroup-topology-rules.h
-        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-        src/collectors/network-viewer.plugin/network-viewer-topology.c
-        src/collectors/network-viewer.plugin/network-viewer-topology.h
-        src/collectors/network-viewer.plugin/network-viewer.c
-)
-
-# network-viewer: Linux
-set(NETWORK_VIEWER_LINUX_FILES
-        src/libnetdata/local-sockets/local-sockets.h
-        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
-        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
-        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
-        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.c
-        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.h
-        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.c
-        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.h
-        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.c
-        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.h
-)
-
-# network-viewer: Windows. This list is self-contained on purpose - the
-# OS_WINDOWS branch is the one that does not append NETWORK_VIEWER_COMMON_FILES.
-set(NETWORK_VIEWER_WINDOWS_FILES
-        src/collectors/network-viewer.plugin/network-viewer-windows.c
-        src/collectors/common-cgroups/cgroup-path.c
-        src/collectors/common-cgroups/cgroup-path.h
-        src/collectors/common-cgroups/cgroup-topology-rules.c
-        src/collectors/common-cgroups/cgroup-topology-rules.h
-        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-        src/collectors/network-viewer.plugin/network-viewer-topology.c
-        src/collectors/network-viewer.plugin/network-viewer-topology.h
-        src/libnetdata/local-sockets/local-sockets-windows.h
-)
-
-# network-viewer: FreeBSD
-set(NETWORK_VIEWER_FREEBSD_FILES
-        src/libnetdata/local-sockets/local-sockets-freebsd.h
-)
-
-# network-viewer: macOS
-set(NETWORK_VIEWER_MACOS_FILES
-        src/libnetdata/local-sockets/local-sockets-macos.h
-)
-
 # log2journal
 set(LOG2JOURNAL_FILES
         ${CONFIG_H}

@@ -1077,75 +1077,7 @@ include(NetdataPluginEBPF)
 
 include(NetdataPluginLocalListeners)
 
-if(ENABLE_PLUGIN_NETWORK_VIEWER)
-        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
-                # GCC still performs LTO when linking slim LTO static archives into a
-                # non-LTO target. Build these archives as fat objects and force a
-                # regular final link to avoid exhausting the i386 linker.
-                foreach(_network_viewer_fat_lto_target judy libnetdata netipc json-c)
-                        if(TARGET ${_network_viewer_fat_lto_target})
-                                target_compile_options(${_network_viewer_fat_lto_target} PRIVATE -ffat-lto-objects)
-                        endif()
-                endforeach()
-        endif()
-
-        set(NETWORK_VIEWER_FILES)
-        if(OS_LINUX)
-                list(APPEND NETWORK_VIEWER_FILES
-                        ${NETWORK_VIEWER_LINUX_FILES}
-                        ${NETWORK_VIEWER_COMMON_FILES}
-                )
-        endif()
-        if(OS_WINDOWS)
-                list(APPEND NETWORK_VIEWER_FILES
-                        ${NETWORK_VIEWER_WINDOWS_FILES}
-                )
-        endif()
-        if(OS_FREEBSD)
-                list(APPEND NETWORK_VIEWER_FILES
-                        ${NETWORK_VIEWER_FREEBSD_FILES}
-                        ${NETWORK_VIEWER_COMMON_FILES}
-                )
-        endif()
-        if(OS_MACOS)
-                list(APPEND NETWORK_VIEWER_FILES
-                        ${NETWORK_VIEWER_MACOS_FILES}
-                        ${NETWORK_VIEWER_COMMON_FILES}
-                )
-        endif()
-
-        add_executable(network-viewer.plugin ${NETWORK_VIEWER_FILES})
-        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
-                set_property(TARGET network-viewer.plugin PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
-                target_link_options(network-viewer.plugin PRIVATE -fno-lto)
-        endif()
-
-        target_compile_options(network-viewer.plugin PRIVATE
-                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
-        target_include_directories(network-viewer.plugin PRIVATE
-                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
-        target_link_libraries(network-viewer.plugin libnetdata
-                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
-
-        install(TARGETS network-viewer.plugin
-                COMPONENT plugin-network-viewer
-                DESTINATION ${PLUGINS_DEST})
-
-        if(OS_LINUX)
-                add_executable(network-viewer-apps-lookup-client-test EXCLUDE_FROM_ALL
-                        src/collectors/network-viewer.plugin/tests/test_network_viewer_apps_lookup_client.c)
-                target_link_libraries(network-viewer-apps-lookup-client-test libnetdata)
-
-                add_executable(network-viewer-topology-containers-test EXCLUDE_FROM_ALL
-                        src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_containers.c
-                        src/collectors/common-cgroups/cgroup-path.c
-                        src/collectors/common-cgroups/cgroup-topology-rules.c
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
-                target_link_libraries(network-viewer-topology-containers-test libnetdata)
-        endif()
-
-        netdata_add_deb_copyright(plugin-network-viewer netdata-plugin-network-viewer)
-endif()
+include(NetdataPluginNetworkViewer)
 
 #
 # exporters
