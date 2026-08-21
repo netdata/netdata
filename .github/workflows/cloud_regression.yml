@@ -4,6 +4,7 @@ on:
     branches: [master]
     paths:
       - 'CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.cc'
       - '**.cpp'
