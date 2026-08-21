@@ -2543,16 +2543,7 @@ include(NetdataPluginPerf)
 include(NetdataPluginSlabinfo)
 include(NetdataPluginCups)
 include(NetdataNdsudo)
-if(ENABLE_PLUGIN_CGROUP_NETWORK)
-    set(CGROUP_NETWORK_FILES src/collectors/cgroups.plugin/cgroup-network.c)
-
-    add_executable(cgroup-network ${CGROUP_NETWORK_FILES})
-    target_link_libraries(cgroup-network libnetdata)
-
-    install(TARGETS cgroup-network
-            COMPONENT netdata
-            DESTINATION ${PLUGINS_DEST})
-endif()
+include(NetdataCgroupNetwork)
 
 #
 # Test executables. None is installed, referenced elsewhere, or registered with CTest; the project defines no add_test().
