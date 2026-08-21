@@ -2537,27 +2537,7 @@ target_link_libraries(spawn-tester libnetdata)
 #
 include(NetdataPluginApps)
 include(NetdataPluginFreeipmi)
-if(ENABLE_PLUGIN_NFACCT)
-    if (NOT MNL_FOUND)
-        message(FATAL_ERROR "Can not build nfacct.plugin because MNL library could not be found.")
-    endif()
-
-    pkg_check_modules(NFACCT REQUIRED libnetfilter_acct)
-
-    set(NFACCT_PLUGIN_FILES src/collectors/nfacct.plugin/plugin_nfacct.c)
-
-    add_executable(nfacct.plugin ${NFACCT_PLUGIN_FILES})
-    target_link_libraries (nfacct.plugin libnetdata ${MNL_LIBRARIES} ${NFACCT_LIBRARIES})
-    target_include_directories(nfacct.plugin PRIVATE ${MNL_INCLUDE_DIRS} ${NFACCT_INCLUDE_DIRS})
-    target_compile_options(nfacct.plugin PRIVATE ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
-
-    install(TARGETS nfacct.plugin
-            COMPONENT plugin-nfacct
-            DESTINATION ${PLUGINS_DEST})
-
-    netdata_add_deb_copyright(plugin-nfacct netdata-plugin-nfacct)
-endif()
-
+include(NetdataPluginNfacct)
 if(ENABLE_PLUGIN_XENSTAT)
     pkg_check_modules(XENSTAT REQUIRED xenstat)
     pkg_check_modules(XENLIGHT REQUIRED xenlight)
