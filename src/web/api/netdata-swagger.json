@@ -4894,8 +4894,8 @@
               "enum": [
                 "on",
                 "off",
-                true,
-                false,
+                "true",
+                "false",
                 "yes",
                 "no"
               ]
@@ -5878,8 +5878,8 @@
               "enum": [
                 "on",
                 "off",
-                true,
-                false,
+                "true",
+                "false",
                 "yes",
                 "no"
               ]
