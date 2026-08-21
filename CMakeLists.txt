@@ -1067,26 +1067,7 @@ include(NetdataTests)
 
 include(NetdataPluginSystemdJournal)
 
-if(ENABLE_PLUGIN_SYSTEMD_UNITS)
-        if(NOT SYSTEMD_FOUND)
-                message(FATAL_ERROR "Systemd units plugin requires systemd, but systemd was not found.")
-        endif()
-
-        if(SYSTEMD_VERSION LESS 221)
-            message(FATAL_ERROR "Systemd units plugin requires systemd 221 or newer, but only systemd ${SYSTEMD_VERSION} was found.")
-        endif()
-
-        include(FetchContent)
-
-        add_executable(systemd-units.plugin ${SYSTEMD_UNITS_PLUGIN_FILES})
-        target_link_libraries(systemd-units.plugin libnetdata)
-
-        install(TARGETS systemd-units.plugin
-                COMPONENT plugin-systemd-units
-                DESTINATION ${PLUGINS_DEST})
-
-        netdata_add_deb_copyright(plugin-systemd-units netdata-plugin-systemd-units)
-endif()
+include(NetdataPluginSystemdUnits)
 
 if(OS_WINDOWS)
         add_executable(windows-events.plugin ${WINDOWS_EVENTS_PLUGIN_FILES})

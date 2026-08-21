@@ -880,10 +880,6 @@ set(STATSD_PLUGIN_FILES
         src/collectors/statsd.plugin/statsd.c
 )
 
-set(SYSTEMD_UNITS_PLUGIN_FILES
-        src/collectors/systemd-units.plugin/plugin_systemd_units.c
-)
-
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
         src/streaming/stream-trace.h
