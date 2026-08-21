@@ -2538,24 +2538,7 @@ target_link_libraries(spawn-tester libnetdata)
 include(NetdataPluginApps)
 include(NetdataPluginFreeipmi)
 include(NetdataPluginNfacct)
-if(ENABLE_PLUGIN_XENSTAT)
-    pkg_check_modules(XENSTAT REQUIRED xenstat)
-    pkg_check_modules(XENLIGHT REQUIRED xenlight)
-
-    set(XENSTAT_PLUGIN_FILES src/collectors/xenstat.plugin/xenstat_plugin.c)
-
-    add_executable(xenstat.plugin ${XENSTAT_PLUGIN_FILES})
-    target_link_libraries (xenstat.plugin libnetdata ${XENLIGHT_LIBRARIES} ${XENSTAT_LIBRARIES})
-    target_include_directories(xenstat.plugin PRIVATE ${XENLIGHT_INCLUDE_DIRS} ${XENSTAT_INCLUDE_DIRS})
-    target_compile_options(xenstat.plugin PRIVATE ${XENLIGHT_CFLAGS_OTHER} ${XENSTAT_CFLAGS_OTHER})
-
-    install(TARGETS xenstat.plugin
-            COMPONENT plugin-xenstat
-            DESTINATION ${PLUGINS_DEST})
-
-    netdata_add_deb_copyright(plugin-xenstat netdata-plugin-xenstat)
-endif()
-
+include(NetdataPluginXenstat)
 if(ENABLE_PLUGIN_PERF)
     set(PERF_PLUGIN_FILES src/collectors/perf.plugin/perf_plugin.c)
 
