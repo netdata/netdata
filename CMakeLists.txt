@@ -3886,7 +3886,7 @@ if(ENABLE_PLUGIN_OTEL)
             COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
             DESTINATION ${LIBCONFIG_DEST}/otel.d/v1/metrics)
 
-    install(DIRECTORY COMPONENT plugin-otel DESTINATION etc/netdata/otel.d/v1/metrics)
+    install(DIRECTORY COMPONENT plugin-otel DESTINATION ${CONFIG_DEST}/otel.d/v1/metrics)
 endif()
 
 
@@ -4003,16 +4003,16 @@ configure_file(packaging/cmake/config.cmake.h.in config.h)
 
 install(TARGETS netdata COMPONENT netdata DESTINATION "${BINDIR}")
 
-install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
-install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
-install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/registry)
-install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/cloud.d)
-install(DIRECTORY COMPONENT netdata DESTINATION var/run/netdata)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/custom-plugins.d)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/health.d)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/ssl)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/statsd.d)
+install(DIRECTORY COMPONENT netdata DESTINATION ${CACHE_DEST})
+install(DIRECTORY COMPONENT netdata DESTINATION ${LOG_DEST})
+install(DIRECTORY COMPONENT netdata DESTINATION ${VARLIB_DEST}/registry)
+install(DIRECTORY COMPONENT netdata DESTINATION ${VARLIB_DEST}/cloud.d)
+install(DIRECTORY COMPONENT netdata DESTINATION ${RUN_DEST})
+install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST})
+install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/custom-plugins.d)
+install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/health.d)
+install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/ssl)
+install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/statsd.d)
 install(DIRECTORY COMPONENT netdata DESTINATION ${LIBCONFIG_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${LIBCONFIG_DEST}/schema.d)
 install(DIRECTORY COMPONENT netdata DESTINATION ${PLUGINS_DEST})
@@ -4135,25 +4135,25 @@ configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONL
 install(FILES
         ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/launchd)
+        DESTINATION ${SYSTEM_DEST}/launchd)
 
 configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/freebsd/rc.d)
+        DESTINATION ${SYSTEM_DEST}/freebsd/rc.d)
 
 configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/initd/init.d)
+        DESTINATION ${SYSTEM_DEST}/initd/init.d)
 
 configure_file(system/logrotate/netdata.in system/logrotate/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/logrotate/netdata
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/logrotate)
+        DESTINATION ${SYSTEM_DEST}/logrotate)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/logrotate/netdata
         COMPONENT netdata
@@ -4163,60 +4163,60 @@ configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/lsb/init.d)
+        DESTINATION ${SYSTEM_DEST}/lsb/init.d)
 
 configure_file(system/openrc/conf.d/netdata.in system/openrc/conf.d/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/openrc/conf.d/netdata
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/openrc/conf.d)
+        DESTINATION ${SYSTEM_DEST}/openrc/conf.d)
 
 configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/openrc/init.d)
+        DESTINATION ${SYSTEM_DEST}/openrc/init.d)
 
 configure_file(system/runit/run.in system/runit/run @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/runit/run
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/runit)
+        DESTINATION ${SYSTEM_DEST}/runit)
 
 configure_file(system/dinit/netdata.in system/dinit/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/dinit/netdata
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/dinit)
+        DESTINATION ${SYSTEM_DEST}/dinit)
 
 configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
+        DESTINATION ${SYSTEM_DEST}/systemd)
 
 install(FILES
         system/systemd/journald@netdata.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
+        DESTINATION ${SYSTEM_DEST}/systemd)
 
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
+        DESTINATION ${SYSTEM_DEST}/systemd)
 
 configure_file(system/systemd/sysusers.conf.in system/systemd/sysusers/netdata.conf @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd/sysusers)
+        DESTINATION ${SYSTEM_DEST}/systemd/sysusers)
 
 configure_file(system/systemd/tmpfiles.conf.in system/systemd/tmpfiles/netdata.conf @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/tmpfiles/netdata.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd/tmpfiles)
+        DESTINATION ${SYSTEM_DEST}/systemd/tmpfiles)
 
 # RPM distros ship systemd units in %{_unitdir} (/usr/lib/systemd/system);
 # the DEB layout (and the historical default) uses /lib/systemd/system.
@@ -4269,7 +4269,7 @@ endif()
 install(FILES
         system/systemd/50-netdata.preset
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
+        DESTINATION ${SYSTEM_DEST}/systemd)
 
 install(FILES
         system/vnodes/vnodes.conf
@@ -4279,17 +4279,17 @@ install(FILES
 install(FILES
         system/.install-type
         COMPONENT netdata
-        DESTINATION etc/netdata)
+        DESTINATION ${CONFIG_DEST})
 
 install(PROGRAMS
         system/edit-config
         COMPONENT netdata
-        DESTINATION etc/netdata)
+        DESTINATION ${CONFIG_DEST})
 
 if(BUILD_FOR_PACKAGING)
-        set(NETDATA_CONF_DEST "etc/netdata")
+        set(NETDATA_CONF_DEST "${CONFIG_DEST}")
 else()
-        set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
+        set(NETDATA_CONF_DEST "${LIBCONFIG_DEST}")
 endif()
 
 #
@@ -4369,7 +4369,7 @@ if(NOT OS_WINDOWS)
   install(FILES
           ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
           COMPONENT netdata
-          DESTINATION usr/lib/netdata/system/cron)
+          DESTINATION ${SYSTEM_DEST}/cron)
 
   configure_file(system/systemd/netdata-updater.service.in
                  system/systemd/netdata-updater.service
@@ -4377,12 +4377,12 @@ if(NOT OS_WINDOWS)
   install(FILES
           ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
           COMPONENT netdata
-          DESTINATION usr/lib/netdata/system/systemd)
+          DESTINATION ${SYSTEM_DEST}/systemd)
 
   install(FILES
           system/systemd/netdata-updater.timer
           COMPONENT netdata
-          DESTINATION usr/lib/netdata/system/systemd)
+          DESTINATION ${SYSTEM_DEST}/systemd)
 
   if(BUILD_FOR_PACKAGING)
     install(FILES
@@ -4469,7 +4469,7 @@ endif()
 #
 
 if(ENABLE_PLUGIN_CHARTS)
-  install(DIRECTORY COMPONENT plugin-chartsd DESTINATION etc/netdata/charts.d)
+  install(DIRECTORY COMPONENT plugin-chartsd DESTINATION ${CONFIG_DEST}/charts.d)
 
   configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
   install(PROGRAMS
@@ -4536,7 +4536,7 @@ install(FILES
 #
 
 if(ENABLE_PLUGIN_PYTHON)
-  install(DIRECTORY COMPONENT plugin-pythond DESTINATION etc/netdata/python.d)
+  install(DIRECTORY COMPONENT plugin-pythond DESTINATION ${CONFIG_DEST}/python.d)
 
   configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
   install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
@@ -4590,7 +4590,7 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
 # go.d.plugin
 #
 if(ENABLE_PLUGIN_GO)
-    install(DIRECTORY COMPONENT plugin-go DESTINATION etc/netdata/go.d)
+    install(DIRECTORY COMPONENT plugin-go DESTINATION ${CONFIG_DEST}/go.d)
 
     install(FILES src/go/plugin/go.d/config/go.d.conf
             COMPONENT plugin-go
