@@ -281,8 +281,13 @@ modules:
               default_value: ''
               required: true
               group: Custom fields
-            - name: custom_fields.pattern
-              description: Pattern used to match the custom field.
+            - name: custom_fields.patterns.name
+              description: Dimension name for a custom-field pattern.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_fields.patterns.match
+              description: Pattern matched against the custom-field value. Match syntax in [matcher](/src/go/pkg/matcher/README.md#supported-format).
               default_value: ''
               required: true
               group: Custom fields
@@ -296,15 +301,10 @@ modules:
               default_value: ''
               required: true
               group: Custom fields
-            - name: custom_time_fields.pattern
-              description: Pattern used to match the custom duration field.
-              default_value: ''
-              required: true
-              group: Custom fields
-            - name: custom_time_fields.units
-              description: Duration units rendered on the custom time-field charts.
-              default_value: ''
-              required: true
+            - name: custom_time_fields.histogram
+              description: Histogram buckets, in seconds. Summary charts always render milliseconds.
+              default_value: '[]'
+              required: false
               group: Custom fields
             - name: custom_numeric_fields
               description: List of custom numeric fields to collect per request.
