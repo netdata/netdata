@@ -1,0 +1,53 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: redfish
+placements:
+  - id: redfish
+    section_id: remote-devices
+    title: Redfish-managed hardware
+    short_name: Redfish
+    icon: hardware
+    families: true
+    properties:
+      important: false
+      grouping: false
+    single_node:
+      properties:
+        grouping: true
+    items:
+      - type: grid
+        id: redfish-overview
+        items:
+          - type: context
+            title: Collection Status
+            contexts: [redfish.collection.status]
+            chart_library: d3pie
+            layout: {left: 0, top: 0, width: 3, height: 4}
+          - type: context
+            title: System Health
+            contexts: [redfish.system.health]
+            chart_library: d3pie
+            layout: {left: 3, top: 0, width: 3, height: 4}
+          - type: context
+            title: Resource Acquisition
+            contexts: [redfish.collection.resources]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: {left: 6, top: 0, width: 3, height: 4}
+          - type: context
+            title: Collection Duration
+            contexts: [redfish.collection.duration]
+            chart_library: dygraph
+            layout: {left: 9, top: 0, width: 3, height: 4}
+      - type: selector
+        id: redfish-standard-contexts
+        title: Redfish hardware metrics
+        context_prefix:
+          - redfish.
+        context_prefix_exclude:
+          - redfish.log_backend.
+      - type: selector
+        id: redfish-common-sensors
+        title: Standard hardware sensor metrics
+        context_prefix:
+          - system.hw.sensor.

@@ -95,6 +95,7 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus/client_model v0.6.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	github.com/stmcginnis/gofish v0.23.0
 	go.mongodb.org/mongo-driver/v2 v2.8.0
 	golang.org/x/sys v0.47.0
 	gopkg.in/yaml.v3 v3.0.1

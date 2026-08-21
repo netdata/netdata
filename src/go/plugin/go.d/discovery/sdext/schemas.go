@@ -18,3 +18,6 @@ var schemaHTTP string
 
 //go:embed "config_schema_snmp.json"
 var schemaSNMP string
+
+//go:embed "config_schema_redfish.json"
+var schemaRedfish string
