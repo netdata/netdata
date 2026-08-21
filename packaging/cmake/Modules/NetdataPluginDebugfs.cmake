@@ -6,9 +6,13 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# add_subdirectory() and CMAKE_CURRENT_BINARY_DIR below are relative to the repository and build roots, which include() preserves. This is the only block in the root file that used either.
+# add_subdirectory() and CMAKE_CURRENT_BINARY_DIR below are relative to the
+# repository and build roots, which include() preserves. This is the only
+# block in the root file that used either.
 #
-# Its source list moved here from NetdataSourceLists.cmake per D27: a plugin module owns its own inventory. It stays above the guard so it is still defined unconditionally, exactly as before.
+# Its source list moved here from NetdataSourceLists.cmake per D27: a plugin
+# module owns its own inventory. It stays above the guard so it is still
+# defined unconditionally, exactly as before.
 
 # debugfs.plugin
 set(DEBUGFS_PLUGIN_FILES

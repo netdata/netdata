@@ -6,11 +6,16 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# The two blocks move together: the first decides ENABLE_NETDATA_JOURNAL_FILE_READER and the second is its only consumer. Both keep their original position relative to each other and to the rest of the file.
+# The two blocks move together: the first decides
+# ENABLE_NETDATA_JOURNAL_FILE_READER and the second is its only consumer. Both
+# keep their original position relative to each other and to the rest of the
+# file.
 #
-# Its source list moved here from NetdataSourceLists.cmake per D27, and stays above the guards so it is still defined unconditionally.
+# Its source list moved here from NetdataSourceLists.cmake per D27, and stays
+# above the guards so it is still defined unconditionally.
 #
-# FINDINGS.md F25: the fallback below fires after the crate import it depends on. Pre-existing, preserved unchanged by this move, not fixed here.
+# FINDINGS.md F25: the fallback below fires after the crate import it depends
+# on. Pre-existing, preserved unchanged by this move, not fixed here.
 
 set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-fstat.c

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# network-viewer: the socket and container topology collector, and its two test binaries.
+# network-viewer: the socket and container topology collector, and its
+# two test binaries.
 #
 # Relocated verbatim from the root CMakeLists.txt. include()d rather than
 # add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR

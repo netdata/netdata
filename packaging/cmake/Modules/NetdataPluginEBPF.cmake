@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# ebpf: eBPF-based collection, its Go companion plugin, and the legacy programs.
+# ebpf: eBPF-based collection, its Go companion plugin, and the legacy
+# programs.
 #
 # Relocated verbatim from the root CMakeLists.txt. include()d rather than
 # add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
