@@ -1116,12 +1116,6 @@ set(MACOS_PLUGIN_FILES
         src/collectors/macos.plugin/macos_nvme.c
 )
 
-set(MACOS_LOGS_PLUGIN_FILES
-        src/collectors/macos-logs.plugin/macos-logs.c
-        src/collectors/macos-logs.plugin/macos-logs.h
-        src/collectors/macos-logs.plugin/macos-logs-oslog.m
-)
-
 set(FREEBSD_PLUGIN_FILES
         src/collectors/freebsd.plugin/plugin_freebsd.c
         src/collectors/freebsd.plugin/plugin_freebsd.h

@@ -1071,15 +1071,7 @@ include(NetdataPluginSystemdUnits)
 
 include(NetdataPluginWindowsEvents)
 
-if(OS_MACOS AND OSLOG AND FOUNDATION)
-        add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
-        target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
-        target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})
-
-        install(TARGETS macos-logs.plugin
-                COMPONENT plugin-macos-logs
-                DESTINATION ${PLUGINS_DEST})
-endif()
+include(NetdataPluginMacosLogs)
 
 if(ENABLE_PLUGIN_EBPF)
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
