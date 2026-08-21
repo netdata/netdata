@@ -6,7 +6,8 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# Its source list, executable and install rule move together; that is the only form of source-list extraction that does not risk the NETDATA_FILES/LIBNETDATA_FILES composition.
+# Its source list, executable and install rule move together, so nothing here
+# takes part in the NETDATA_FILES/LIBNETDATA_FILES composition.
 
 if(ENABLE_PLUGIN_NFACCT)
     if (NOT MNL_FOUND)
