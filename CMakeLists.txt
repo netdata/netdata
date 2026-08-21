@@ -1065,30 +1065,7 @@ include(NetdataCgroupNetwork)
 
 include(NetdataTests)
 
-# Enable rust implementation if we don't have systemd and we want the journal plugin
-if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT SYSTEMD_FOUND)
-        if (NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
-                message(WARNING "Systemd journal package not found, will try netdata's journal reader which requires cargo.")
-                set(ENABLE_NETDATA_JOURNAL_FILE_READER True)
-        endif()
-endif()
-
-if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
-        add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
-
-        if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-                target_compile_definitions(systemd-journal.plugin PRIVATE HAVE_RUST_PROVIDER)
-                target_link_libraries(systemd-journal.plugin journal_reader_ffi)
-        endif()
-
-        target_link_libraries(systemd-journal.plugin libnetdata)
-
-        install(TARGETS systemd-journal.plugin
-                COMPONENT plugin-systemd-journal
-                DESTINATION ${PLUGINS_DEST})
-
-        netdata_add_deb_copyright(plugin-systemd-journal netdata-plugin-systemd-journal)
-endif()
+include(NetdataPluginSystemdJournal)
 
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
         if(NOT SYSTEMD_FOUND)

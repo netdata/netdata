@@ -880,24 +880,6 @@ set(STATSD_PLUGIN_FILES
         src/collectors/statsd.plugin/statsd.c
 )
 
-set(SYSTEMD_JOURNAL_PLUGIN_FILES
-        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
-        src/collectors/systemd-journal.plugin/systemd-internals.h
-        src/collectors/systemd-journal.plugin/systemd-main.c
-        src/collectors/systemd-journal.plugin/systemd-journal.c
-        src/collectors/systemd-journal.plugin/systemd-journal-function.h
-        src/collectors/systemd-journal.plugin/systemd-journal-execute.h
-        src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
-        src/collectors/systemd-journal.plugin/systemd-journal-files.c
-        src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
-        src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
-        src/collectors/systemd-journal.plugin/provider/netdata_provider.c
-        src/collectors/systemd-journal.plugin/provider/netdata_provider.h
-        src/collectors/systemd-journal.plugin/provider/rust_provider.h
-        src/libnetdata/os/system-maps/system-services.h
-        src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
-)
-
 set(SYSTEMD_UNITS_PLUGIN_FILES
         src/collectors/systemd-units.plugin/plugin_systemd_units.c
 )

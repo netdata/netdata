@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# systemd-journal: journal log collection, with the Rust reader fallback.
+#
+# Relocated verbatim from the root CMakeLists.txt. include()d rather than
+# add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
+# keep pointing at the repository and build roots, which every relative path
+# below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
+#
+# The two blocks move together: the first decides ENABLE_NETDATA_JOURNAL_FILE_READER and the second is its only consumer. Both keep their original position relative to each other and to the rest of the file.
+#
+# Its source list moved here from NetdataSourceLists.cmake per D27, and stays above the guards so it is still defined unconditionally.
+#
+# FINDINGS.md F25: the fallback below fires after the crate import it depends on. Pre-existing, preserved unchanged by this move, not fixed here.
+
+set(SYSTEMD_JOURNAL_PLUGIN_FILES
+        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
+        src/collectors/systemd-journal.plugin/systemd-internals.h
+        src/collectors/systemd-journal.plugin/systemd-main.c
+        src/collectors/systemd-journal.plugin/systemd-journal.c
+        src/collectors/systemd-journal.plugin/systemd-journal-function.h
+        src/collectors/systemd-journal.plugin/systemd-journal-execute.h
+        src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
+        src/collectors/systemd-journal.plugin/systemd-journal-files.c
+        src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
+        src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
+        src/collectors/systemd-journal.plugin/provider/netdata_provider.c
+        src/collectors/systemd-journal.plugin/provider/netdata_provider.h
+        src/collectors/systemd-journal.plugin/provider/rust_provider.h
+        src/libnetdata/os/system-maps/system-services.h
+        src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
+)
+
+# Enable rust implementation if we don't have systemd and we want the journal plugin
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT SYSTEMD_FOUND)
+        if (NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
+                message(WARNING "Systemd journal package not found, will try netdata's journal reader which requires cargo.")
+                set(ENABLE_NETDATA_JOURNAL_FILE_READER True)
+        endif()
+endif()
+
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+        add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
+
+        if(ENABLE_NETDATA_JOURNAL_FILE_READER)
+                target_compile_definitions(systemd-journal.plugin PRIVATE HAVE_RUST_PROVIDER)
+                target_link_libraries(systemd-journal.plugin journal_reader_ffi)
+        endif()
+
+        target_link_libraries(systemd-journal.plugin libnetdata)
+
+        install(TARGETS systemd-journal.plugin
+                COMPONENT plugin-systemd-journal
+                DESTINATION ${PLUGINS_DEST})
+
+        netdata_add_deb_copyright(plugin-systemd-journal netdata-plugin-systemd-journal)
+endif()
