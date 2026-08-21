@@ -221,6 +221,80 @@ Use `calc` when the source's current value is the full condition. Test start-up,
 obsoletion separately. `delay:` controls Netdata alert transition/notification hysteresis; it is not a general substitute
 for a Prometheus `for:` duration.
 
+## Control Flapping With Three Combinable Layers
+
+Stability is a signal-shaping problem, a threshold-boundary problem, and a transition-confirmation problem. Address them
+deliberately in that order. Do not label every anti-flapping technique “hysteresis”: only `delay:` postpones an alert
+transition.
+
+### Layer 1 — stabilize the queried value
+
+Use `lookup:` to make `$this` a stable aggregate over an explicit observation window:
+
+```text
+lookup: average -5m unaligned of latency
+```
+
+- `average` smooths noisy utilization, rate, latency, and utilization-like signals.
+- `min` requires every observed numeric sample to remain active, appropriate for persisted binary fault states.
+- `max` preserves worst-case excursions when the incident is defined by peaks.
+- `countif` expresses percent-of-observed-time semantics.
+
+This reduces noise but cannot prevent a stable aggregate from hovering near one threshold. A 5-minute average near 100 ms
+can still cross a 100 ms threshold repeatedly.
+
+### Layer 2 — separate raise and clear thresholds
+
+For policy thresholds whose signal may hover near the boundary, use a state-dependent predicate:
+
+```text
+warn: $this > (($status >= $WARNING) ? (90) : (100))
+crit: $this > (($status == $CRITICAL) ? (95) : (99))
+```
+
+This changes one threshold into two thresholds:
+
+- clear-to-warning raises above 100;
+- active-warning clears below 90;
+- critical can independently use another raise/clear pair.
+
+Important semantics:
+
+- This is **not hysteresis** and does not delay any transition.
+- The alert continues evaluating at its normal `every:` cadence.
+- It only changes the boundary used by the current status, so a genuine crossing of the recovery threshold acts
+  immediately.
+- Preserve a non-finite guard around the complete expression when `UNDEFINED` must remain possible.
+
+Prefer this when independent raise/clear boundaries are meaningful and the signal is expected to linger near one boundary.
+Do not use it to redefine a categorical exact condition into a policy band.
+
+### Layer 3 — confirm transitions with true hysteresis
+
+Use `delay:` only when a transition must remain selected for a duration before Netdata executes the transition
+notification:
+
+```text
+delay: down 5m multiplier 1.5 max 1h
+```
+
+- `up` delays a state escalation; `down` delays a recovery/de-escalation.
+- `multiplier` grows the delay when the state changes during the delay.
+- `max` caps the accumulated delay.
+
+This is the only layer that postpones an alert transition notification. It can suppress rapid clear/reactivate
+notification cycles, but it can also postpone a real transition. Use it sparingly and record the expected transition
+delay in the alert contract.
+
+### Selection procedure
+
+1. Establish whether the incident is categorical, threshold policy, or derived arithmetic.
+2. Select the smallest truthful `lookup:` window and aggregation first.
+3. For a noisy policy threshold, choose explicit raise/clear thresholds before adding transition delay.
+4. Add `delay:` only when rapid transition notifications are independently harmful and later notification is acceptable.
+5. Test each layer: input noise, boundary crossing, recovery, reactivation, non-finite input, partial gap, and the exact
+   expected notification time.
+
 ### Persistence Intent
 
 Treat another system's `for: D` as an operator intent to suppress transient conditions. It is not a requirement to emulate
