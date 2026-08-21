@@ -131,16 +131,11 @@ func TestTopologyProductionPath_UniFiActorUsesSharedDynamicProfileMetadata(t *te
 	mainMetrics := collectMainProfileMetrics(t, device, topologyUniFiAPPDUs())
 	metadata := make(map[string]ddsnmp.MetaTag)
 	for _, pm := range mainMetrics {
-		ddsnmp.MergeMetaTags(metadata, pm.DeviceMetadata)
+		ddsnmp.MergeDeviceIdentityMetadata(metadata, pm.DeviceMetadata)
 	}
 	require.Equal(t, ddsnmp.MetaTag{Value: "Ubiquiti", IsExactMatch: true}, metadata["vendor"])
 	require.Equal(t, ddsnmp.MetaTag{Value: "UniFi U6-Mesh", IsExactMatch: true}, metadata["model"])
-	identity := ddsnmp.ResolveDeviceMetadata(map[string]string{
-		"vendor": device.Vendor,
-		"model":  device.Model,
-	}, metadata, nil)
-	device.Vendor = identity["vendor"]
-	device.Model = identity["model"]
+	device.Vendor, device.Model = ddsnmp.ResolveDeviceIdentity(device.Vendor, device.Model, metadata, nil)
 
 	metrics := collectTopologyProfileMetrics(t, device, topologyUniFiAPPDUs())
 	cache := newTestTopologyCache(device)

@@ -30,7 +30,7 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologymodel.Dev
 	if len(dev.VnodeLabels) > 0 {
 		device.Labels = cloneTopologyLabels(dev.VnodeLabels)
 	}
-	device.Vendor, device.Model = resolveTopologyDeviceIdentity(device.Vendor, device.Model, nil, device.Labels)
+	device.Vendor, device.Model = ddsnmp.ResolveDeviceIdentity(device.Vendor, device.Model, nil, device.Labels)
 	metadata := newTopologyMetadataIndex(device.Labels)
 
 	if value := metadata.value(topologyMetadataAliasSysDescr); value != "" && device.SysDescr == "" {

@@ -60,6 +60,24 @@ func TestMergeMetaTags(t *testing.T) {
 	}
 }
 
+func TestMergeDeviceIdentityMetadata(t *testing.T) {
+	dest := map[string]MetaTag{
+		"vendor": {Value: "wildcard-vendor"},
+	}
+	src := map[string]MetaTag{
+		"vendor":        {Value: "exact-vendor", IsExactMatch: true},
+		"model":         {Value: "profile-model"},
+		"serial_number": {Value: "ignored-serial", IsExactMatch: true},
+	}
+
+	MergeDeviceIdentityMetadata(dest, src)
+
+	require.Equal(t, map[string]MetaTag{
+		"vendor": {Value: "exact-vendor", IsExactMatch: true},
+		"model":  {Value: "profile-model"},
+	}, dest)
+}
+
 func TestResolveDeviceMetadata(t *testing.T) {
 	base := map[string]string{
 		"vendor": "static-vendor",
@@ -103,4 +121,23 @@ func TestResolveDeviceMetadataFinalEmptyValueRemainsAuthoritative(t *testing.T) 
 	value, ok := resolved["model"]
 	require.True(t, ok)
 	require.Empty(t, value)
+}
+
+func TestResolveDeviceIdentity(t *testing.T) {
+	vendor, model := ResolveDeviceIdentity(
+		"static-vendor",
+		"static-model",
+		map[string]MetaTag{
+			"vendor":        {Value: "wildcard-vendor"},
+			"model":         {Value: "exact-model", IsExactMatch: true},
+			"serial_number": {Value: "ignored-serial", IsExactMatch: true},
+		},
+		map[string]string{
+			"model":         "final-model",
+			"serial_number": "ignored-final-serial",
+		},
+	)
+
+	require.Equal(t, "static-vendor", vendor)
+	require.Equal(t, "final-model", model)
 }

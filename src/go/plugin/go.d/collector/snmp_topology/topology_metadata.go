@@ -5,8 +5,6 @@ package snmptopology
 import (
 	"sort"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
 var (
@@ -98,25 +96,6 @@ func (idx topologyMetadataIndex) value(aliases []string) string {
 		}
 	}
 	return ""
-}
-
-func resolveTopologyDeviceIdentity(
-	vendor string,
-	model string,
-	profile map[string]ddsnmp.MetaTag,
-	final map[string]string,
-) (string, string) {
-	finalIdentity := make(map[string]string, 2)
-	for _, key := range []string{"vendor", "model"} {
-		if value, ok := final[key]; ok {
-			finalIdentity[key] = value
-		}
-	}
-	resolved := ddsnmp.ResolveDeviceMetadata(map[string]string{
-		"vendor": vendor,
-		"model":  model,
-	}, profile, finalIdentity)
-	return resolved["vendor"], resolved["model"]
 }
 
 func setTopologyMetadataLabelIfMissing(labels map[string]string, key, value string) {

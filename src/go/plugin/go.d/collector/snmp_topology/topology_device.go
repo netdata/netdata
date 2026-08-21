@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
@@ -44,7 +45,7 @@ func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 	if dev.ChassisID != "" && dev.ChassisIDType == "" {
 		dev.ChassisIDType = "unknown"
 	}
-	dev.Vendor, dev.Model = resolveTopologyDeviceIdentity(dev.Vendor, dev.Model, nil, dev.Labels)
+	dev.Vendor, dev.Model = ddsnmp.ResolveDeviceIdentity(dev.Vendor, dev.Model, nil, dev.Labels)
 	metadata := newTopologyMetadataIndex(dev.Labels)
 	if value := metadata.value(topologyMetadataAliasSysDescr); value != "" && dev.SysDescr == "" {
 		dev.SysDescr = value

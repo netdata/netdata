@@ -10,8 +10,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
-var deviceIdentityMetadataKeys = [...]string{"vendor", "model"}
-
 func firstVendor(values ...string) string {
 	for _, v := range values {
 		if v != "" {
@@ -55,10 +53,12 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 		return
 	}
 	vnodeLabels := c.vnodeLabels()
-	identity := ddsnmp.ResolveDeviceMetadata(map[string]string{
-		"vendor": firstVendor(si.Vendor, si.Organization),
-		"model":  si.Model,
-	}, profileMetadata, vnodeLabels)
+	vendor, model := ddsnmp.ResolveDeviceIdentity(
+		firstVendor(si.Vendor, si.Organization),
+		si.Model,
+		profileMetadata,
+		vnodeLabels,
+	)
 
 	c.deviceStore.Register(c.deviceStoreKey(), ddsnmp.DeviceConnectionInfo{
 		Hostname:        c.Hostname,
@@ -81,8 +81,8 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 		SysName:         si.Name,
 		SysContact:      si.Contact,
 		SysLocation:     si.Location,
-		Vendor:          identity["vendor"],
-		Model:           identity["model"],
+		Vendor:          vendor,
+		Model:           model,
 
 		DisableBulkWalk: c.disableBulkWalk,
 		ManualProfiles:  c.ManualProfiles,
@@ -97,13 +97,9 @@ func (c *Collector) syncDeviceMetadata(pms []*ddsnmp.ProfileMetrics) {
 		return
 	}
 
-	metadata := make(map[string]ddsnmp.MetaTag, len(deviceIdentityMetadataKeys))
+	metadata := make(map[string]ddsnmp.MetaTag, 2)
 	for _, pm := range pms {
-		for _, key := range deviceIdentityMetadataKeys {
-			if tag, ok := pm.DeviceMetadata[key]; ok {
-				ddsnmp.MergeMetaTag(metadata, key, tag)
-			}
-		}
+		ddsnmp.MergeDeviceIdentityMetadata(metadata, pm.DeviceMetadata)
 	}
 
 	c.registerDeviceState(c.sysInfo, metadata)
