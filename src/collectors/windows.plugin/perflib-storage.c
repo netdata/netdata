@@ -303,7 +303,7 @@ static void mount_points_add_volume_paths(const wchar_t *volumeGUID, char *first
     // the result is a MULTI_SZ: every mount path of the volume, terminated by an empty string
     for (const wchar_t *p = buf; *p; p += wcslen(p) + 1) {
         char path[ND_MOUNT_PATH_MAX];
-        if (!utf16_to_utf8(path, sizeof(path), p, -1))
+        if (!utf16_to_utf8(path, sizeof(path), p, -1, NULL))
             continue;
 
         canonicalize_mount_path(path);
@@ -348,7 +348,7 @@ static void mount_points_map_device(const wchar_t *volumeGUID, const char *mount
     leaf = leaf ? leaf + 1 : target;
 
     char device[128];
-    if (!utf16_to_utf8(device, sizeof(device), leaf, -1) || !*device)
+    if (!utf16_to_utf8(device, sizeof(device), leaf, -1, NULL) || !*device)
         return;
 
     dictionary_set(deviceMountPaths, device, (void *)mount_path, strlen(mount_path) + 1);
@@ -404,7 +404,7 @@ static void mount_points_scan_cluster_storage(void)
             continue;
 
         char name[ND_MOUNT_PATH_MAX];
-        if (!utf16_to_utf8(name, sizeof(name), fd.cFileName, -1) || !*name)
+        if (!utf16_to_utf8(name, sizeof(name), fd.cFileName, -1, NULL) || !*name)
             continue;
 
         char path[ND_MOUNT_PATH_MAX];
@@ -478,7 +478,7 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
     d->SerialNumber = serialNumber;
 
     char fileSystem[128];
-    if (!utf16_to_utf8(fileSystem, sizeof(fileSystem), fileSystemName, -1) || !*fileSystem)
+    if (!utf16_to_utf8(fileSystem, sizeof(fileSystem), fileSystemName, -1, NULL) || !*fileSystem)
         return NULL;
 
     for (char *c = fileSystem; *c; c++)
