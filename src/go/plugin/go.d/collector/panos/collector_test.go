@@ -25,28 +25,32 @@ import (
 )
 
 var (
-	dataConfigJSON, _       = os.ReadFile("testdata/config.json")
-	dataConfigYAML, _       = os.ReadFile("testdata/config.yaml")
-	dataLegacyBGPPeers, _   = os.ReadFile("testdata/legacy_bgp_peers.xml")
-	dataAdvancedBGPPeers, _ = os.ReadFile("testdata/advanced_bgp_peers.xml")
-	dataSystemInfo, _       = os.ReadFile("testdata/system_info.xml")
-	dataHAState, _          = os.ReadFile("testdata/ha_state.xml")
-	dataEnvironment, _      = os.ReadFile("testdata/environment.xml")
-	dataLicenses, _         = os.ReadFile("testdata/licenses.xml")
-	dataIPSecSA, _          = os.ReadFile("testdata/ipsec_sa.xml")
+	dataConfigJSON, _          = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _          = os.ReadFile("testdata/config.yaml")
+	dataLegacyBGPPeers, _      = os.ReadFile("testdata/legacy_bgp_peers.xml")
+	dataAdvancedBGPPeers, _    = os.ReadFile("testdata/advanced_bgp_peers.xml")
+	dataAdvancedBGPPeersARE, _ = os.ReadFile("testdata/advanced_bgp_peers_are.xml")
+	dataAdvancedBGPSummary, _  = os.ReadFile("testdata/advanced_bgp_summary_are.xml")
+	dataSystemInfo, _          = os.ReadFile("testdata/system_info.xml")
+	dataHAState, _             = os.ReadFile("testdata/ha_state.xml")
+	dataEnvironment, _         = os.ReadFile("testdata/environment.xml")
+	dataLicenses, _            = os.ReadFile("testdata/licenses.xml")
+	dataIPSecSA, _             = os.ReadFile("testdata/ipsec_sa.xml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":       dataConfigJSON,
-		"dataConfigYAML":       dataConfigYAML,
-		"dataLegacyBGPPeers":   dataLegacyBGPPeers,
-		"dataAdvancedBGPPeers": dataAdvancedBGPPeers,
-		"dataSystemInfo":       dataSystemInfo,
-		"dataHAState":          dataHAState,
-		"dataEnvironment":      dataEnvironment,
-		"dataLicenses":         dataLicenses,
-		"dataIPSecSA":          dataIPSecSA,
+		"dataConfigJSON":          dataConfigJSON,
+		"dataConfigYAML":          dataConfigYAML,
+		"dataLegacyBGPPeers":      dataLegacyBGPPeers,
+		"dataAdvancedBGPPeers":    dataAdvancedBGPPeers,
+		"dataAdvancedBGPPeersARE": dataAdvancedBGPPeersARE,
+		"dataAdvancedBGPSummary":  dataAdvancedBGPSummary,
+		"dataSystemInfo":          dataSystemInfo,
+		"dataHAState":             dataHAState,
+		"dataEnvironment":         dataEnvironment,
+		"dataLicenses":            dataLicenses,
+		"dataIPSecSA":             dataIPSecSA,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -1688,6 +1692,43 @@ func TestParseBGPPeers(t *testing.T) {
 				assert.Equal(t, int64(93784), peers[0].Uptime)
 			},
 		},
+		"advanced routing engine json": {
+			data:    dataAdvancedBGPPeersARE,
+			wantLen: 3,
+			validate: func(t *testing.T, peers []bgpPeer) {
+				byName := make(map[string]bgpPeer, len(peers))
+				for _, p := range peers {
+					byName[p.PeerAddress] = p
+				}
+
+				est := byName["198.51.100.10"]
+				assert.Equal(t, "192.0.2.2", est.VR, "vr is the logical-router id until summary enrichment")
+				assert.Equal(t, "established", est.State)
+				assert.Equal(t, "65020", est.RemoteAS)
+				assert.Equal(t, "core", est.PeerGroup)
+				assert.True(t, est.HasUptime)
+				assert.Equal(t, int64(1136150), est.Uptime)
+				assert.Equal(t, int64(189375), est.MessagesIn)
+				require.Len(t, est.PrefixCounters, 1)
+				assert.Equal(t, "ipv4", est.PrefixCounters[0].AFI)
+				assert.Equal(t, "unicast", est.PrefixCounters[0].SAFI)
+				assert.True(t, est.PrefixCounters[0].HasIncomingAccepted)
+				assert.Equal(t, int64(9), est.PrefixCounters[0].IncomingAccepted)
+				assert.True(t, est.PrefixCounters[0].HasOutgoingAdvertised)
+				assert.Equal(t, int64(5), est.PrefixCounters[0].OutgoingAdvertised)
+				assert.False(t, est.PrefixCounters[0].HasIncomingTotal)
+				assert.False(t, est.PrefixCounters[0].HasIncomingRejected)
+
+				con := byName["203.0.113.10"]
+				assert.Equal(t, "connect", con.State)
+				assert.False(t, con.HasUptime)
+				assert.Equal(t, int64(0), con.Uptime)
+				require.Len(t, con.PrefixCounters, 1)
+				assert.True(t, con.PrefixCounters[0].HasIncomingAccepted)
+				assert.Equal(t, int64(0), con.PrefixCounters[0].IncomingAccepted)
+				assert.False(t, con.PrefixCounters[0].HasOutgoingAdvertised)
+			},
+		},
 		"error response with nested lines": {
 			data:    []byte(`<response status="error" code="16"><msg><line>Unauthorized</line><line>Invalid API key</line></msg></response>`),
 			wantErr: "Unauthorized; Invalid API key",
@@ -1854,6 +1895,87 @@ func TestParseBGPPeers(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseBGPSummary(t *testing.T) {
+	tests := map[string]struct {
+		data    []byte
+		want    map[string]string
+		wantErr string
+	}{
+		"advanced routing engine summary": {
+			data: dataAdvancedBGPSummary,
+			want: map[string]string{
+				"192.0.2.1": "lr-a",
+				"192.0.2.2": "lr-b",
+			},
+		},
+		"non-json result yields no mapping": {
+			data: []byte(`<response status="success"><result><entry/></result></response>`),
+			want: nil,
+		},
+		"error response": {
+			data:    []byte(`<response status="error" code="16"><msg><line>Unauthorized</line></msg></response>`),
+			wantErr: "Unauthorized",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseBGPSummary(tc.data)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestCollector_enrichBGPPeerVRs(t *testing.T) {
+	t.Run("resolves logical-router names from summary", func(t *testing.T) {
+		collr := New()
+		api := &mockAPIClient{responses: map[string][]byte{advancedBGPSummaryCommand: dataAdvancedBGPSummary}}
+		collr.apiClient = api
+
+		peers := []bgpPeer{
+			{VR: "192.0.2.1", routerID: "192.0.2.1", PeerAddress: "192.0.2.10"},
+			{VR: "192.0.2.2", routerID: "192.0.2.2", PeerAddress: "198.51.100.10"},
+			{VR: "192.0.2.9", routerID: "192.0.2.9", PeerAddress: "203.0.113.10"},
+		}
+		collr.enrichBGPPeerVRs(context.Background(), peers)
+
+		assert.Equal(t, "lr-a", peers[0].VR)
+		assert.Equal(t, "lr-b", peers[1].VR)
+		// Unmatched router-id keeps its interim value; still distinguishes routers.
+		assert.Equal(t, "192.0.2.9", peers[2].VR)
+	})
+
+	t.Run("skips peers without a router-id", func(t *testing.T) {
+		collr := New()
+		api := &mockAPIClient{responses: map[string][]byte{advancedBGPSummaryCommand: dataAdvancedBGPSummary}}
+		collr.apiClient = api
+
+		// Legacy/advanced-XML peers carry their vr name and no router-id; no
+		// summary query should be issued for them.
+		peers := []bgpPeer{{VR: "lr-a", PeerAddress: "192.0.2.1"}}
+		collr.enrichBGPPeerVRs(context.Background(), peers)
+
+		assert.Equal(t, "lr-a", peers[0].VR)
+		assert.Empty(t, api.commands)
+	})
+
+	t.Run("summary query failure leaves interim router-id", func(t *testing.T) {
+		collr := New()
+		collr.Logger = logger.NewWithWriter(&bytes.Buffer{})
+		api := &mockAPIClient{errors: map[string]error{advancedBGPSummaryCommand: errors.New("boom")}}
+		collr.apiClient = api
+
+		peers := []bgpPeer{{VR: "192.0.2.1", routerID: "192.0.2.1", PeerAddress: "192.0.2.32"}}
+		collr.enrichBGPPeerVRs(context.Background(), peers)
+		assert.Equal(t, "192.0.2.1", peers[0].VR)
+	})
 }
 
 func TestParseReadOnlyTelemetry(t *testing.T) {

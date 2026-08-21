@@ -28,10 +28,11 @@ const (
 	logKeyBGPNoPeers     = "panos:bgp:no_peers"
 	logKeyBGPLegacy      = "panos:bgp:legacy"
 	logKeyBGPAdvanced    = "panos:bgp:advanced"
+	logKeyBGPSummary     = "panos:bgp:summary"
 )
 
 var advancedBGPPeerCommands = []string{
-	"<show><advanced-routing><bgp><peer><details></details></peer></bgp></advanced-routing></show>",
+	"<show><advanced-routing><bgp><peer><detail></detail></peer></bgp></advanced-routing></show>",
 	"<show><advanced-routing><bgp><peer><status></status></peer></bgp></advanced-routing></show>",
 	"<show><advanced-routing><bgp><peer></peer></bgp></advanced-routing></show>",
 }
@@ -59,7 +60,13 @@ type bgpPeer struct {
 	UpdatesOut     int64
 	Flaps          int64
 	Established    int64
+	HasUptime      bool
 	PrefixCounters []bgpPrefixCounter
+
+	// routerID is the ARE logical-router BGP router-id captured from the JSON
+	// path, used to resolve the vr label to the logical-router name via the
+	// summary lookup. Empty for legacy/XML peers, which already carry their vr.
+	routerID string
 }
 
 type bgpPrefixCounter struct {
@@ -69,6 +76,11 @@ type bgpPrefixCounter struct {
 	IncomingAccepted   int64
 	IncomingRejected   int64
 	OutgoingAdvertised int64
+
+	HasIncomingTotal      bool
+	HasIncomingAccepted   bool
+	HasIncomingRejected   bool
+	HasOutgoingAdvertised bool
 }
 
 type panosResponseMessage struct {
@@ -258,6 +270,10 @@ func parseBGPPeers(body []byte) ([]bgpPeer, error) {
 		return nil, nil
 	}
 
+	if payload, ok := extractResultJSON(innerXML); ok {
+		return parseAdvancedBGPPeersJSON([]byte(payload))
+	}
+
 	entries, err := decodeBGPPeerEntries(innerXML)
 	if err != nil {
 		return nil, err
@@ -419,6 +435,7 @@ func (e panosBGPPeerEntry) toBGPPeer() (bgpPeer, bool, error) {
 		UpdatesOut:     updatesOut,
 		Flaps:          flaps,
 		Established:    established,
+		HasUptime:      true,
 		PrefixCounters: prefixCounters,
 	}
 
@@ -530,6 +547,11 @@ func (e panosBGPPrefixEntry) toBGPPrefixCounter(peerAddr string) (bgpPrefixCount
 		IncomingAccepted:   incomingAccepted,
 		IncomingRejected:   incomingRejected,
 		OutgoingAdvertised: outgoingAdvertised,
+
+		HasIncomingTotal:      true,
+		HasIncomingAccepted:   true,
+		HasIncomingRejected:   true,
+		HasOutgoingAdvertised: true,
 	}, nil
 }
 
@@ -790,7 +812,7 @@ func bgpCommandName(cmd string) string {
 	case legacyBGPPeerCommand:
 		return "legacy routing BGP peer query"
 	case advancedBGPPeerCommands[0]:
-		return "advanced routing BGP peer details query"
+		return "advanced routing BGP peer detail query"
 	case advancedBGPPeerCommands[1]:
 		return "advanced routing BGP peer status query"
 	case advancedBGPPeerCommands[2]:

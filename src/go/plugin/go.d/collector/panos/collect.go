@@ -43,6 +43,7 @@ func (c *Collector) collect(ctx context.Context) (bool, error) {
 	peers, err := c.collectBGPPeers(ctx)
 	result.add(false, err)
 	if len(peers) > 0 {
+		c.enrichBGPPeerVRs(ctx, peers)
 		monitoredPeers := orderedBGPPeers(peers)
 		result.add(c.collectPeerMetrics(monitoredPeers), nil)
 		result.add(c.collectVRMetrics(peers), nil)
@@ -113,7 +114,9 @@ func (c *Collector) collectPeerMetrics(peers []bgpPeer) bool {
 	for _, peer := range peers {
 		labels := peerLabelValues(peer)
 		observeStateSetVec(c.metrics.bgp.peerState, peer.State, labels...)
-		c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(peer.Uptime))
+		if peer.HasUptime {
+			c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(peer.Uptime))
+		}
 		c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesIn))
 		c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesOut))
 		c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesIn))
@@ -123,10 +126,18 @@ func (c *Collector) collectPeerMetrics(peers []bgpPeer) bool {
 
 		for _, counter := range peer.PrefixCounters {
 			prefixLabels := prefixLabelValues(peer, counter)
-			c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingTotal))
-			c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingAccepted))
-			c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingRejected))
-			c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).Observe(float64(counter.OutgoingAdvertised))
+			if counter.HasIncomingTotal {
+				c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingTotal))
+			}
+			if counter.HasIncomingAccepted {
+				c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingAccepted))
+			}
+			if counter.HasIncomingRejected {
+				c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingRejected))
+			}
+			if counter.HasOutgoingAdvertised {
+				c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).Observe(float64(counter.OutgoingAdvertised))
+			}
 		}
 	}
 
