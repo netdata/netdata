@@ -3453,6 +3453,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
                 src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
                 src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                src/collectors/network-viewer.plugin/network-viewer-topology.c
+                src/collectors/network-viewer.plugin/network-viewer-topology.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 
@@ -3475,6 +3477,16 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_WINDOWS)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/collectors/network-viewer.plugin/network-viewer-windows.c
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-path.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology.h
+                        src/libnetdata/local-sockets/local-sockets-windows.h
                 )
         endif()
         if(OS_FREEBSD)

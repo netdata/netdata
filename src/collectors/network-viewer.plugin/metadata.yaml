@@ -20,6 +20,7 @@ modules:
         - ports
         - freebsd
         - macos
+        - windows
       related_resources:
         integrations:
           list: []
@@ -40,11 +41,19 @@ modules:
           macOS run can omit protected processes; the plugin logs a warning when
           permission-denied socket data or truncated process/socket list reads make
           results incomplete.
+          On Windows it consumes the IP Helper API (`GetExtendedTcpTable` /
+          `GetExtendedUdpTable`) and a Toolhelp process snapshot to attribute
+          sockets to processes; SID account names come from the process tokens.
+          UDP rows are listener-only because the API does not expose remote
+          endpoints.
+          The `topology:network-connections` Function is available on every
+          supported OS, including Windows.
       supported_platforms:
         include:
           - Linux
           - FreeBSD
           - macOS
+          - Windows
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -351,7 +360,7 @@ modules:
           combining the results into a single table grouped by transport protocol and IP family.
       supported_platforms:
         include:
-          - windows
+          - Windows
         exclude: []
       multi_instance: false
       additional_permissions:
