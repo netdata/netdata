@@ -528,6 +528,9 @@ int netdata_cachestat_runtime_prepare(
  * Ring buffer event layout — must match struct netdata_cachestat_event_t
  * in ebpf-co-re/kernel-collector/includes/netdata_cache_buffer.h.
  */
+/* Layout is shared with the BPF side, which is always LP64. A 32-bit userland
+ * gives uint64_t 4-byte alignment, which would shrink this from 48 to 44 bytes
+ * and silently disagree with the BPF program, so pin the alignment explicitly. */
 struct cachestat_rb_event {
     uint64_t ct;
     uint32_t pid;
@@ -537,7 +540,11 @@ struct cachestat_rb_event {
     char     name[16]; /* TASK_COMM_LEN */
     uint8_t  action;
     uint8_t  pad[3];
-};
+} __attribute__((aligned(8)));
+
+_Static_assert(
+    sizeof(struct cachestat_rb_event) == 48,
+    "cachestat_rb_event size does not match BPF-side layout");
 
 enum {
     CACHESTAT_RB_EVENT_PAGE_CACHE_LRU = 0,
