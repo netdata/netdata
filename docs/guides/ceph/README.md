@@ -15,6 +15,22 @@ Netdata gives you a complete operational view of Ceph by collecting three comple
 - Dashboard API component integrity and on-demand Ceph investigation Functions.
 - Per-node disks, filesystems, network interfaces, processes, and logs through Netdata's host collectors.
 
+## Ceph telemetry and Netdata
+
+Ceph natively exposes metrics in the Prometheus exposition format through two interfaces:
+
+- The **Ceph Manager Prometheus module** is the cluster-level surface. The active Manager periodically builds a metric cache from cluster state and publishes it at an HTTP metrics endpoint.
+- The official **`ceph-exporter`** is the host-local surface. It gathers daemon and admin-socket telemetry on each Ceph node and publishes it in the same format.
+
+The word “Prometheus” here refers to the exposition wire format, not the Prometheus monitoring stack. Netdata reads Ceph's native endpoints directly, recognizes the official metric families with its built-in Ceph profile, and creates charts and alerts from that state. You do not need to install Prometheus Server, Alertmanager, or another database for this monitoring to work. If you already operate Prometheus, it can continue reading Ceph independently; coexistence is optional.
+
+Telemetry freshness has two independent clocks:
+
+1. **Producer interval:** Ceph controls how often the MGR metric cache or `ceph-exporter` daemon metrics are refreshed.
+2. **Consumer interval:** Netdata controls how often it reads the currently exposed cache through the job's `update_every`.
+
+Matching the Netdata interval to the producer interval normally produces one useful observation per Ceph refresh. Reading more frequently can repeat the same cached state, while reading less frequently can skip producer updates. Choose the interval according to the observation you need: every producer update, periodic trend sampling, lower endpoint traffic, or tighter visibility for a selected surface.
+
 ## Operational coverage map
 
 Use this map to identify the Netdata surface that owns the operational question you are investigating.
@@ -80,7 +96,7 @@ A Parent can receive streams from every Ceph Agent. Parenting changes where data
 
 ### MGR Prometheus module
 
-Enable the Ceph MGR Prometheus module and expose one stable HTTP or HTTPS endpoint for the cluster. Configure the Netdata Prometheus collector to scrape that endpoint. The built-in Ceph profile recognizes the official metric surface automatically.
+Enable the Ceph MGR Prometheus module and expose one stable HTTP or HTTPS endpoint for the cluster. Configure the Netdata Prometheus collector to read that endpoint. The built-in Ceph profile recognizes the official metric surface automatically.
 
 For high availability, put a stable address in front of the active MGR and keep the Netdata job name and virtual-node identity stable.
 
@@ -90,7 +106,7 @@ Deploy or enable official `ceph-exporter` on each Ceph node whose daemon telemet
 
 ### Ceph Dashboard API
 
-Enable the Ceph Dashboard module, secure it with TLS, and create a read-only Dashboard user. Configure one native Ceph collector job per cluster. The Dashboard collector complements Prometheus: it owns API component integrity and provides Ceph investigation Functions.
+Enable the Ceph Dashboard module, secure it with TLS, and create a read-only Dashboard user. Configure one native Ceph collector job per cluster. The Dashboard collector complements the metric endpoints: it owns API component integrity and provides Ceph investigation Functions.
 
 ## Supported releases
 
@@ -110,17 +126,34 @@ Release-specific charts follow the telemetry exposed by each Ceph release. For e
 - Preserve stable job identity through redirects and failover. Chart identity and alert ownership depend on it.
 - If Ceph redirects HTTP to HTTPS, configure the final HTTPS URL explicitly rather than relying on redirect following.
 
-## Collection cadence and cardinality
+## Sizing and Ceph impact
 
-Netdata scrape frequency does not control Ceph producer refresh frequency.
+Monitoring workload has four components:
 
-- The MGR Prometheus module refreshes its metric cache on its configured Ceph-side interval.
-- `ceph-exporter` refreshes daemon metrics on its configured interval.
-- Netdata samples the exposed current cache at the job's `update_every`.
+1. **Ceph producer work:** the Manager refreshes its metric cache, and `ceph-exporter` gathers daemon counters. Ceph controls this work through its own configuration.
+2. **Endpoint serving work:** each collection request reads and transfers the current exposition. Cost scales with the enabled metric surface.
+3. **Netdata processing work:** parsing, chart planning, and health evaluation scale with the selected families and resulting chart cardinality.
+4. **Storage and retention:** chart and dimension counts drive database volume; the streaming topology determines where long retention is stored.
 
-Match the Netdata interval to the producer cache interval when you want to avoid redundant samples. A faster scrape does not force Ceph to refresh more often.
+Use the collection model to choose scope:
 
-Ceph can expose a large metric surface. Set job-level `max_time_series` and `max_time_series_per_metric` after measuring your release and exporter configuration. Enable broad optional debug or detail surfaces only after sizing the resulting chart and dimension cardinality.
+- Collect one logical MGR job per Ceph cluster, use a stable active-MGR endpoint or failover target, and align its interval with the Manager cache interval.
+- Collect each `ceph-exporter` on the host whose daemon detail you need, and align its interval with the exporter refresh interval.
+- Choose a Dashboard interval appropriate for cluster size, and use selectors and entity caps when complete OSD or pool detail is unnecessary.
+- Enable broad optional diagnostic surfaces after measuring the resulting cardinality.
+- Treat tenant, user, and bucket detail as a separate capacity decision: those surfaces can grow with the object-storage environment.
+- Use hardware telemetry knowing that it scales with the reported component inventory.
+- Run investigation Functions on demand during an incident rather than as a continuous inventory process.
+
+Use job-level `max_time_series` and `max_time_series_per_metric` to bound an exposed surface. These limits do not reduce Ceph's producer cost, but they control Netdata's processing and storage boundary.
+
+Size the deployment from measured behavior:
+
+1. Enable the intended telemetry surfaces.
+2. Run a representative workload for several days.
+3. Measure charts, dimensions, labels, endpoint response size, collection duration, Agent CPU and memory, and storage growth.
+4. Select local retention and Parent placement.
+5. Export to long-term storage when multi-year history is required.
 
 ## Alert ownership and routing
 
