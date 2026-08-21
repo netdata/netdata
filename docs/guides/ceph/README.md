@@ -1,6 +1,6 @@
 # Monitor Ceph
 
-Netdata gives you a complete operational view of Ceph by collecting three complementary telemetry surfaces: the MGR Prometheus module, official `ceph-exporter`, and the Ceph Dashboard API. Deploy one Agent close to each Ceph node to monitor cluster state, daemon health, host resources, RGW traffic, and local hardware together.
+Netdata gives you a complete operational view of Ceph by collecting four complementary telemetry surfaces: the MGR Prometheus module, official `ceph-exporter`, the NVMe-oF gateway exporter, and the Ceph Dashboard API. Deploy one Agent close to each Ceph node to monitor cluster state, daemon health, host resources, RGW traffic, and local hardware together.
 
 ## What you can monitor
 
@@ -17,10 +17,11 @@ Netdata gives you a complete operational view of Ceph by collecting three comple
 
 ## Ceph telemetry and Netdata
 
-Ceph natively exposes metrics in the Prometheus exposition format through two interfaces:
+Ceph natively exposes metrics in the Prometheus exposition format through three interfaces:
 
 - The **Ceph Manager Prometheus module** is the cluster-level surface. The active Manager periodically builds a metric cache from cluster state and publishes it at an HTTP metrics endpoint.
 - The official **`ceph-exporter`** is the host-local surface. It gathers daemon and admin-socket telemetry on each Ceph node and publishes it in the same format.
+- The **NVMe-oF gateway exporter** is the gateway-local surface. Each gateway daemon publishes its own Prometheus endpoint, normally on port 10008.
 
 The word “Prometheus” here refers to the exposition wire format, not the Prometheus monitoring stack. Netdata reads Ceph's native endpoints directly, recognizes the official metric families with its built-in Ceph profile, and creates charts and alerts from that state. You do not need to install Prometheus Server, Alertmanager, or another database for this monitoring to work. If you already operate Prometheus, it can continue reading Ceph independently; coexistence is optional.
 
@@ -81,8 +82,9 @@ Run one Agent on each Ceph node. Each Agent monitors the Ceph services and host 
 
 | Surface | Deployment | What it provides |
 |---|---|---|
-| MGR Prometheus module | One logical job per Ceph cluster | Cluster health, quorum, capacity, placement groups, pools, RGW aggregate telemetry, and exporter-local NVMe-oF telemetry |
+| MGR Prometheus module | One logical job per Ceph cluster | Cluster health, quorum, capacity, placement groups, pools, and RGW aggregate telemetry |
 | `ceph-exporter` | One job on each node whose daemon telemetry you need | Host-local daemon performance and daemon inventory |
+| NVMe-oF gateway exporter | One job on each gateway endpoint | Gateway-local runtime, block-device, host, subsystem, and namespace telemetry |
 | Ceph Dashboard API | One logical job per Ceph cluster | Dashboard API component integrity and Ceph investigation Functions |
 | Host collectors | Every Agent | Node disks, filesystems, network interfaces, processes, and logs |
 
@@ -103,6 +105,10 @@ For high availability, put a stable address in front of the active MGR and keep 
 ### ceph-exporter
 
 Deploy or enable official `ceph-exporter` on each Ceph node whose daemon telemetry you need. Collect from each exporter on its own host. Use the exporter priority limit to select the daemon counters published, and size `max_time_series` and `max_time_series_per_metric` for that surface.
+
+### NVMe-oF gateway exporter
+
+Enable the exporter in each Ceph NVMe-oF gateway deployment and collect every gateway endpoint whose local state you need. Preserve one stable job identity per gateway endpoint. The default gateway metrics port is 10008, but the deployment may configure a different port. Size each local job for that gateway's series surface.
 
 ### Ceph Dashboard API
 
@@ -157,12 +163,13 @@ Size the deployment from measured behavior:
 
 ## Alert ownership and routing
 
-The MGR Prometheus profile owns cluster and exporter-local Ceph alerts:
+The built-in Ceph profile recognizes all three Prometheus interfaces. Alert ownership follows the configured endpoint: one MGR job owns cluster-level alerts, and each gateway-exporter job owns its gateway-local alerts. The covered incidents are:
 
 - cluster health and manager-module health;
 - monitor quorum and OSD population summaries;
 - placement group, pool, capacity, and recovery conditions;
-- hardware and NVMe-oF conditions exposed by supported exporters;
+- node-proxy hardware conditions exposed by MGR;
+- gateway-local NVMe-oF conditions exposed by each gateway-exporter job;
 - RGW notification, Lua, request-fallback, queue-pressure, and multisite retry conditions.
 
 The native Dashboard collector owns API component collection failures. Generic Netdata collectors own host-local and endpoint checks:

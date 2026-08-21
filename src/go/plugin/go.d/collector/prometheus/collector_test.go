@@ -1722,13 +1722,29 @@ func TestCollector_CephRGWAlertChartsMaterialize(t *testing.T) {
 
 func TestCollector_CephRGWAlertBoundaries(t *testing.T) {
 	templates := cephHealthAlertTemplates(t)
-	want := map[string]struct {
+	occurrence := map[string]struct {
+		lookup    string
+		condition string
+		recipient string
+	}{
+		"rgw_notification_event_lost":            {"max -1m unaligned of event_lost", "crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)", "sysadmin"},
+		"rgw_notification_missing_configuration": {"max -1m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)", "sysadmin"},
+		"rgw_lua_script_failed":                  {"max -1m unaligned of failure", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)", "sysadmin"},
+	}
+	for name, expected := range occurrence {
+		t.Run(name, func(t *testing.T) {
+			block, ok := templates[name]
+			require.Truef(t, ok, "template %s is absent", name)
+			assert.Equal(t, expected.lookup, block["lookup"])
+			assert.Equal(t, expected.condition, block["condition"])
+			assert.Equal(t, expected.recipient, block["to"])
+		})
+	}
+
+	sustained := map[string]struct {
 		lookup    string
 		condition string
 	}{
-		"rgw_notification_event_lost":             {"min -1m unaligned of event_lost", "crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
-		"rgw_notification_missing_configuration":  {"min -1m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
-		"rgw_lua_script_failed":                   {"min -1m unaligned of failure", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
 		"rgw_failed_request_rate_fallback":        {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
 		"rgw_notification_push_or_store_failures": {"min -5m unaligned of push_failed,store_fail", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
 		"rgw_notification_inflight_pressure":      {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)"},
@@ -1737,7 +1753,7 @@ func TestCollector_CephRGWAlertBoundaries(t *testing.T) {
 		"rgw_multisite_fetch_errors":              {"min -5m unaligned of errors", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
 		"rgw_multisite_poll_errors":               {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
 	}
-	for name, expected := range want {
+	for name, expected := range sustained {
 		t.Run(name, func(t *testing.T) {
 			block, ok := templates[name]
 			require.Truef(t, ok, "template %s is absent", name)
@@ -1747,25 +1763,23 @@ func TestCollector_CephRGWAlertBoundaries(t *testing.T) {
 		})
 	}
 
-	// min is the all-observed-samples time grouping: one recovery sample clears
-	// the rule even when earlier samples in the same window were active.
-	allSamples := func(samples []float64) float64 {
+	// max preserves any failure occurrence in the window, independent of event volume.
+	anyOccurrence := func(samples []float64) float64 {
 		if len(samples) == 0 {
 			return math.NaN()
 		}
-		minimum := samples[0]
+		maximum := samples[0]
 		for _, sample := range samples[1:] {
-			if sample < minimum {
-				minimum = sample
+			if sample > maximum {
+				maximum = sample
 			}
 		}
-		return minimum
+		return maximum
 	}
-	assert.InDelta(t, 0, allSamples([]float64{.1, 0, 0}), 1e-12)
-	assert.InDelta(t, 999, allSamples([]float64{1001, 1000, 999}), 1e-12)
-	assert.True(t, math.IsNaN(allSamples(nil)))
+	assert.InDelta(t, .1, anyOccurrence([]float64{0, .1, 0}), 1e-12)
+	assert.InDelta(t, float64(0), anyOccurrence([]float64{0, 0, 0}), 1e-12)
+	assert.True(t, math.IsNaN(anyOccurrence(nil)))
 }
-
 func TestCollector_CephMGRAlertContract(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	templates := cephHealthAlertTemplates(t)
@@ -1838,6 +1852,12 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		}
 		require.NotEmptyf(t, extension.Fidelity, "%s has no extension fidelity", name)
 		require.NotEmptyf(t, extension.Owner, "%s has no extension owner", name)
+		switch extension.SOWID {
+		case "RGW-M-08", "RGW-M-09", "RGW-M-10":
+			require.Equal(t, "rgw_categorical_counter_occurrence", extension.Adaptation)
+		case "RGW-S-04", "RGW-S-16":
+			require.Equal(t, "rgw_counter_rate_window", extension.Adaptation)
+		}
 		if extension.Adaptation != "" {
 			_, ok := manifest.AdaptationContracts[extension.Adaptation]
 			require.Truef(t, ok, "%s references unknown adaptation %q", name, extension.Adaptation)
@@ -2386,6 +2406,17 @@ func TestCollector_CephMetadataModelsProducerScopes(t *testing.T) {
 	assert.Equal(t, 5, exporter.UpdateEvery)
 }
 
+func TestCollector_CephNVMeoFAlertsAreOwnedByLocalExporter(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
+	for _, mapping := range manifest.Alerts {
+		if !strings.HasPrefix(mapping.Netdata.Context, "prometheus.ceph.nvme_of.") {
+			continue
+		}
+		assert.Equalf(t, "nvmeof_exporter", mapping.Netdata.Owner,
+			"%s must name its local gateway-exporter owner", mapping.SOWID)
+	}
+}
+
 func TestCollector_CephMetadataVNodeExampleDeclaresPrerequisite(t *testing.T) {
 	var metadata struct {
 		Modules []struct {
@@ -2458,12 +2489,15 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 		break
 	}
 	expected := make(map[string]string)
+	publicMapping := func(disposition string) bool {
+		return disposition != "reuse" && disposition != "reject" &&
+			disposition != "internal-helper" && disposition != "subsumed-helper"
+	}
 	for name, mapping := range manifest.Alerts {
-		if mapping.Netdata.Disposition != "reuse" && mapping.Netdata.Disposition != "reject" {
+		if publicMapping(mapping.Netdata.Disposition) {
 			expected[name] = mapping.Netdata.Context
 		}
 	}
-	expected["ceph_unknown_health_check"] = manifest.NetdataExtensions["ceph_unknown_health_check"].Context
 	for name, extension := range manifest.NetdataExtensions {
 		if extension.Context != "" && extension.Condition != "" {
 			expected[name] = extension.Context
@@ -2471,13 +2505,8 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 	}
 	assert.Equal(t, expected, actual)
 	for name, metadataInfo := range info {
-		if name == "ceph_unknown_health_check" {
-			assert.Contains(t, metadataInfo, "available sample")
-			assert.Contains(t, cephHealthAlertTemplates(t)[name]["info"], "available sample")
-			continue
-		}
-		assert.Truef(t, strings.HasPrefix(cephHealthAlertTemplates(t)[name]["info"], metadataInfo),
-			"metadata alert %q does not match its shipped health-template info", name)
+		assert.Equalf(t, cephHealthAlertTemplates(t)[name]["info"], metadataInfo,
+			"metadata alert %q does not exactly match its shipped health-template info", name)
 	}
 }
 

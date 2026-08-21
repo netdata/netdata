@@ -533,7 +533,7 @@ sidebar:
       - meta:
           label: Ceph
           edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/ceph/README.md
-          description: Deploy distributed Ceph monitoring with the MGR Prometheus module, ceph-exporter, the Dashboard API collector, alerts, Parents, retention, and integrations.
+          description: Deploy distributed Ceph monitoring with the MGR Prometheus module, ceph-exporter, the NVMe-oF gateway exporter, the Dashboard API collector, alerts, Parents, retention, and integrations.
           keywords: [ceph, prometheus, mgr, exporter, dashboard, alerts, retention, parent, rgw, nvme-of]
       - type: integration_placeholder
         integration_kind: collectors
