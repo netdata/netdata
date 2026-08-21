@@ -354,6 +354,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+            - name: cgroup.dc_ratio
+              description: Percentage of directory lookups resolved by the cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: cgroup.dc_reference
+              description: Count file access
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: reference
+            - name: cgroup.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: cgroup.dc_not_found
+              description: Files not found
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: miss
             - name: cgroup.net_conn_ipv4
               description: TCP v4 outbound connections
               unit: "connections/s"
@@ -1108,6 +1132,30 @@ modules:
             - name: systemd.service.cachestat_misses
               description: Files out of page cache
               unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
+            - name: systemd.service.dc_ratio
+              description: Percentage of directory lookups resolved by the cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: systemd.service.dc_reference
+              description: Count file access
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: reference
+            - name: systemd.service.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: systemd.service.dc_not_found
+              description: Files not found
+              unit: "files"
               chart_type: line
               dimensions:
                 - name: miss
