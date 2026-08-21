@@ -85,10 +85,11 @@ func buildDeviceActorDetail(
 	match graph.Match,
 	addresses []string,
 ) model.ProjectionDeviceActorDetail {
-	discovered := strings.TrimSpace(localDeviceID) == "" || dev.ID != localDeviceID
+	deviceID := strings.TrimSpace(dev.ID)
+	discovered := deviceID != "" && deviceID != strings.TrimSpace(localDeviceID)
 
 	detail := model.ProjectionDeviceActorDetail{
-		DeviceID:              strings.TrimSpace(dev.ID),
+		DeviceID:              deviceID,
 		Discovered:            discovered,
 		Inferred:              topologyDeviceInferred(dev),
 		ManagementIP:          selectedDeviceManagementIP(dev),
