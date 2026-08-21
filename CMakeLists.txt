@@ -2540,20 +2540,7 @@ include(NetdataPluginFreeipmi)
 include(NetdataPluginNfacct)
 include(NetdataPluginXenstat)
 include(NetdataPluginPerf)
-if(ENABLE_PLUGIN_SLABINFO)
-    set(SLABINFO_PLUGIN_FILES src/collectors/slabinfo.plugin/slabinfo.c)
-
-    add_executable(slabinfo.plugin ${SLABINFO_PLUGIN_FILES})
-    target_link_libraries(slabinfo.plugin libnetdata)
-
-    install(TARGETS slabinfo.plugin
-            COMPONENT plugin-slabinfo
-            DESTINATION ${PLUGINS_DEST})
-
-    netdata_add_deb_copyright(plugin-slabinfo netdata-plugin-slabinfo)
-endif()
-
-
+include(NetdataPluginSlabinfo)
 if(ENABLE_PLUGIN_CUPS)
     pkg_check_modules(CUPS libcups)
     if(NOT CUPS_FOUND)
