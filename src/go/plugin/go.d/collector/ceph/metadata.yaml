@@ -332,7 +332,7 @@ modules:
       - name: ceph_component_collection_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.component_collection_status
-        info: 'Ceph ${label:component} metric collection for cluster ${label:fsid} is failing'
+        info: "Metric collection for the Ceph ${label:component} component is failing while other Ceph metrics continue to be collected"
       - name: ceph_cluster_physical_capacity_utilization
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.cluster_physical_capacity_utilization

@@ -41,7 +41,7 @@ modules:
           description: ""
     setup: &setup
       prerequisites:
-        list: [ ]
+        list: []
       configuration: &prometheus_configuration
         file:
           name: go.d/prometheus.conf
@@ -429,13 +429,13 @@ modules:
         - As Histogram if it has 'le' label.
 
         **The rest are ignored**.
-      availability: [ ]
+      availability: []
       dynamic_context_prefixes:
         - prefix: prometheus.
           reason: >-
             Generic autogen and built-in profiles emit endpoint- and application-specific contexts under the prometheus
             namespace.
-      scopes: [ ]
+      scopes: []
   - <<: *module
     meta:
       <<: *meta
@@ -4590,8 +4590,9 @@ modules:
         list:
           - title: Enable an official Ceph Prometheus endpoint
             description: |
-              Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics or
-              deploy the official `ceph-exporter` for host-local daemon performance metrics. The stock profile supports the
+              Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics,
+              deploy the official `ceph-exporter` for host-local daemon performance metrics, or enable the Ceph NVMe-oF
+              gateway exporter on each gateway endpoint. The stock profile supports the
               default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
               counters are required and size the job limits for the resulting series count. When cephadm node-proxy hardware
               reporting is enabled, hardware series scale with the cluster-wide component inventory; size both
@@ -4627,6 +4628,19 @@ modules:
                     expected_prefix: ceph_
                     max_time_series: 20000
                     max_time_series_per_metric: 4000
+            - name: Ceph NVMe-oF gateway exporter
+              description: |
+                Collect one local gateway endpoint per Ceph NVMe-oF gateway whose local state is required. The gateway
+                exporter is independent of the MGR endpoint and normally listens on port 10008. Preserve one stable job
+                identity for each gateway and size the local series limits independently.
+              config: |
+                jobs:
+                  - name: ceph-nvmeof-gateway-a
+                    url: http://127.0.0.1:10008/metrics
+                    update_every: 5
+                    expected_prefix: ceph_
+                    max_time_series: 10000
+                    max_time_series_per_metric: 2000
             - name: Ceph MGR with virtual node
               description: |
                 Use a virtual node when the cluster identity should remain independent of the Agent currently scraping its
@@ -4653,34 +4667,14 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.subsystems.state_metadata
         info: 'Every available sample in the 5-minute observation window reports an NVMe-oF subsystem configured without host security.'
-      - name: ceph_nvmeof_gateway_cpu_10m
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.nvme_of.gateways.time_accumulation
-        info: 'Holds the lowest local reactor busy-rate sample observed over ten minutes for the gateway CPU policy.'
       - name: ceph_nvmeof_gateway_cpu
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.gateways.time_accumulation
         info: 'The current lowest local reactor busy-rate sample in the 10-minute observation window is above 80 percent.'
-      - name: ceph_nvmeof_read_latency_1m
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
-        info: 'Holds the local one-minute per-block-device read service-time rate.'
-      - name: ceph_nvmeof_read_operations_1m
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.nvme_of.block_devices.operations
-        info: 'Holds the local one-minute per-block-device completed-read rate.'
       - name: ceph_nvmeof_high_read_latency
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
         info: 'The current local one-minute read service-time ratio exceeds 10 milliseconds per completed read.'
-      - name: ceph_nvmeof_write_latency_1m
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
-        info: 'Holds the local one-minute per-block-device write service-time rate.'
-      - name: ceph_nvmeof_write_operations_1m
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.nvme_of.block_devices.operations
-        info: 'Holds the local one-minute per-block-device completed-write rate.'
       - name: ceph_nvmeof_high_write_latency
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
@@ -4688,15 +4682,11 @@ modules:
       - name: ceph_nvmeof_host_keepalive_timeout
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.hosts.keepalive_timeout_state
-        info: 'The exporter currently reports a host disconnected by keepalive timeout. Exporter refresh reads and clears this one-shot state.'
+        info: 'The gateway exporter currently reports host ${label:host_nqn} disconnected from subsystem ${label:nqn}. Inspect the initiator link and reconnect behavior. Exporter refresh reads and clears this one-shot state.'
       - name: ceph_nvmeof_subsystem_namespace_limit
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.subsystems.namespace_capacity
         info: 'The current subsystem namespace count is at or above its configured limit.'
-      - name: ceph_nvmeof_gateway_namespaces
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.nvme_of.gateways.namespace_count
-        info: 'Sums subsystem namespace counts inside the local exporter endpoint.'
       - name: ceph_nvmeof_too_many_namespaces
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.gateways.namespace_count
@@ -4704,15 +4694,15 @@ modules:
       - name: rgw_notification_event_lost
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.object_gateway.notifications.events
-        info: 'Every available sample in the 1-minute observation window reports a non-zero final notification-event loss rate.'
+        info: 'One or more final notification-event losses occurred in the 1-minute observation window. Inspect the affected RGW instance and notification endpoint.'
       - name: rgw_notification_missing_configuration
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.object_gateway.notifications.missing_configurations
-        info: 'Every available sample in the 1-minute observation window reports a non-zero notification missing-configuration rate.'
+        info: 'One or more notifications were rejected for missing configuration in the 1-minute observation window. Inspect the affected RGW instance and notification configuration.'
       - name: rgw_lua_script_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.object_gateway.lua.script_executions
-        info: 'Every available sample in the 1-minute observation window reports a non-zero Lua script failure rate.'
+        info: 'One or more configured Lua request scripts failed in the 1-minute observation window. Inspect the affected RGW instance and script error logs.'
       - name: rgw_failed_request_rate_fallback
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.object_gateway.requests_and_queue.failed_requests
@@ -4744,19 +4734,19 @@ modules:
       - name: ceph_health_error
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.cluster_status.state
-        info: 'Every available Ceph MGR health sample in the 5-minute observation window is HEALTH_ERR.'
+        info: 'Every available Ceph MGR health sample in the 5-minute observation window is HEALTH_ERR. Review active cause-specific Ceph alerts and use `ceph health detail` for the current cause.'
       - name: ceph_health_warning
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.cluster_status.state
-        info: 'Every available Ceph MGR health sample in the 15-minute observation window is HEALTH_WARN.'
+        info: 'Every available Ceph MGR health sample in the 15-minute observation window is HEALTH_WARN. Use `ceph health detail` for the current cause.'
       - name: ceph_daemon_crash
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports a recent daemon crash.'
+        info: 'Every available sample in the 1-minute observation window reports a recent daemon crash. Use `ceph health detail` for the affected daemon and crash details.'
       - name: ceph_mgr_module_crash
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 5-minute observation window reports a recent manager-module crash.'
+        info: 'Every available sample in the 5-minute observation window reports a recent manager-module crash. Use `ceph health detail` for the affected module and crash details.'
       - name: ceph_daemon_slow_ops
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.daemon_health.item_count
@@ -4764,39 +4754,39 @@ modules:
       - name: ceph_slow_ops
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.slow_operations.current_operations
-        info: 'Every available sample in the 30-second observation window reports one or more cluster slow operations.'
+        info: 'Every available sample in the 30-second observation window reports one or more cluster slow operations. Use `ceph health detail` to identify the cause.'
       - name: cephadm_daemon_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 30-second observation window reports a failed cephadm daemon.'
+        info: 'Every available sample in the 30-second observation window reports a failed cephadm daemon. Use `ceph health detail` for the affected daemon and failure details.'
       - name: cephadm_paused
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports that cephadm is paused.'
+        info: 'Every available sample in the 1-minute observation window reports that cephadm is paused. Resume cephadm or use `ceph health detail` to determine why it was paused.'
       - name: cephadm_upgrade_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 30-second observation window reports a cephadm upgrade exception.'
+        info: 'Every available sample in the 30-second observation window reports a cephadm upgrade exception. Use `ceph health detail` for the failed upgrade step.'
       - name: ceph_device_failure_predicted
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports a device predicted to fail.'
+        info: 'Every available sample in the 1-minute observation window reports a device predicted to fail. Use `ceph health detail` and `ceph device ls` to identify it.'
       - name: ceph_device_failure_prediction_too_high
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports that removing all predicted failures would compromise availability.'
+        info: 'Every available sample in the 1-minute observation window reports that removing all predicted failures would compromise availability. Add capacity before relocating data.'
       - name: ceph_device_failure_relocation_incomplete
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports blocked relocation from a predicted device failure.'
+        info: 'Every available sample in the 1-minute observation window reports blocked relocation from a predicted device failure. Check free capacity and the balancer.'
       - name: ceph_cooling_degraded
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports warning health for a reported fan component.'
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log.'
       - name: ceph_cooling_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports error health for a reported fan component.'
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log.'
       - name: ceph_dimm_temperature_high
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.temperature.temperature
@@ -4828,11 +4818,11 @@ modules:
       - name: ceph_memory_degraded
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports warning health for a reported memory component.'
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors.'
       - name: ceph_memory_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports error health for a reported memory component.'
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors.'
       - name: ceph_motherboard_temperature_high
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.temperature.temperature
@@ -4840,11 +4830,11 @@ modules:
       - name: ceph_nvme_drive_degraded
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports warning health for a reported storage component.'
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs.'
       - name: ceph_nvme_drive_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports error health for a reported storage component.'
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs.'
       - name: ceph_nvme_temperature_high
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.temperature.temperature
@@ -4852,27 +4842,27 @@ modules:
       - name: ceph_network_degraded
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports warning health for a reported network component.'
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors.'
       - name: ceph_network_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports error health for a reported network component.'
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors.'
       - name: ceph_power_supply_degraded
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports warning health for a reported power component.'
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log.'
       - name: ceph_power_supply_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports error health for a reported power component.'
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log.'
       - name: ceph_processor_degraded
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports warning health for a reported processor component.'
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect processor health and thermals.'
       - name: ceph_processor_failed
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.health.state
-        info: 'Every available sample in the 1-minute observation window reports error health for a reported processor component.'
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect processor health and thermals.'
       - name: ceph_processor_temperature_high
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.node_hardware.temperature.temperature
@@ -4909,10 +4899,6 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.rbd_mirror.snapshot_replication.timestamp
         info: 'The current local and remote snapshot timestamps differ for this mirrored image.'
-      - name: ceph_osd_all_up
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
-        info: 'Holds the current all-configured-OSDs-up state.'
       - name: ceph_object_missing
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
@@ -4933,10 +4919,6 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
         info: 'Every available sample in the 1-minute observation window reports recovery blocked by OSD fullness.'
-      - name: ceph_osd_down_current
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.health.health_checks.state
-        info: 'Holds the current OSD-down health state.'
       - name: ceph_pg_unavailable_blocking_io
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
@@ -4945,10 +4927,6 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
         info: 'Every available sample in the 5-minute observation window reports damaged placement-group data.'
-      - name: ceph_osd_scrub_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
-        metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 5-minute observation window reports scrub errors when PG-damage is not already active.'
       - name: ceph_pgs_high_per_osd
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
@@ -4976,15 +4954,15 @@ modules:
       - name: ceph_mon_clock_skew
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports monitor clock skew.'
+        info: 'Every available sample in the 1-minute observation window reports monitor clock skew. Use `ceph time-sync-status` and inspect the monitors'' time synchronization services.'
       - name: ceph_mon_diskspace_critical
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports critically low monitor-store space.'
+        info: 'Every available sample in the 1-minute observation window reports critically low monitor-store space. Use `ceph health detail` to identify the affected monitor.'
       - name: ceph_mon_diskspace_low
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 5-minute observation window reports low monitor-store space.'
+        info: 'Every available sample in the 5-minute observation window reports low monitor-store space. Use `ceph health detail` to identify the affected monitor.'
       - name: ceph_mon_down
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.control_plane.monitor.cluster_summary
@@ -5000,7 +4978,7 @@ modules:
       - name: ceph_osd_down
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 5-minute observation window reports a down OSD.'
+        info: 'Every available sample in the 5-minute observation window reports a down OSD. Use `ceph health detail` to identify affected OSDs and hosts.'
       - name: ceph_osd_down_high
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
@@ -5008,11 +4986,11 @@ modules:
       - name: ceph_osd_full
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports an OSD at its full threshold.'
+        info: 'Every available sample in the 1-minute observation window reports an OSD at its full threshold. Use `ceph health detail` and `ceph osd df` to identify it.'
       - name: ceph_osd_host_down
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 5-minute observation window reports an offline OSD host.'
+        info: 'Every available sample in the 5-minute observation window reports an offline OSD host. Use `ceph health detail` to identify the host and its OSDs.'
       - name: ceph_osd_internal_disk_size_mismatch
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
@@ -5020,19 +4998,19 @@ modules:
       - name: ceph_osd_near_full
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 5-minute observation window reports an OSD at its near-full threshold.'
+        info: 'Every available sample in the 5-minute observation window reports an OSD at its near-full threshold. Use `ceph health detail` and `ceph osd df` to identify it.'
       - name: ceph_osd_read_errors
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 30-second observation window reports BlueStore read errors that succeeded only after retries.'
+        info: 'Every available sample in the 30-second observation window reports BlueStore read errors that succeeded only after retries. Inspect the affected hardware and kernel.'
       - name: ceph_osd_timeouts_cluster_network
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports slow backend OSD heartbeats.'
+        info: 'Every available sample in the 1-minute observation window reports slow backend OSD heartbeats. Inspect the cluster network for latency or loss.'
       - name: ceph_osd_timeouts_public_network
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports slow frontend OSD heartbeats.'
+        info: 'Every available sample in the 1-minute observation window reports slow frontend OSD heartbeats. Inspect the public network for latency or loss.'
       - name: ceph_osd_too_many_repairs
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
@@ -5040,7 +5018,7 @@ modules:
       - name: ceph_unknown_health_check
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Every available sample in the 1-minute observation window reports an unclassified ordinary health check.'
+        info: 'Every available sample in the 1-minute observation window reports the unclassified health check ${label:name}. Use `ceph health detail` for its recorded explanation.'
 
   - <<: *module
     meta:

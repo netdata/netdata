@@ -859,6 +859,65 @@ func TestCollector_PhysicalCapacityAlertContract(t *testing.T) {
 	assert.Contains(t, block, "crit: $this > (($status == $CRITICAL) ? (90) : (98))")
 }
 
+func cephHealthTemplates(t *testing.T) map[string]map[string]string {
+	t.Helper()
+	content, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
+	require.NoError(t, err)
+
+	templates := make(map[string]map[string]string)
+	var current map[string]string
+	for source := range strings.SplitSeq(string(content), "\n") {
+		line := strings.TrimSpace(source)
+		if name, ok := strings.CutPrefix(line, "template:"); ok {
+			current = make(map[string]string)
+			templates[strings.TrimSpace(name)] = current
+			continue
+		}
+		if current == nil {
+			continue
+		}
+		if value, ok := strings.CutPrefix(line, "info:"); ok {
+			current["info"] = strings.TrimSpace(value)
+		}
+	}
+	return templates
+}
+
+func TestCollector_PublicAlertInfoMatchesHealthTemplates(t *testing.T) {
+	templates := cephHealthTemplates(t)
+
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				ModuleName string `yaml:"module_name"`
+			} `yaml:"meta"`
+			Alerts []struct {
+				Name string `yaml:"name"`
+				Info string `yaml:"info"`
+			} `yaml:"alerts"`
+		} `yaml:"modules"`
+	}
+	content, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(content, &metadata))
+
+	var public []struct {
+		Name string `yaml:"name"`
+		Info string `yaml:"info"`
+	}
+	for _, module := range metadata.Modules {
+		if module.Meta.ModuleName == "ceph" {
+			public = module.Alerts
+			break
+		}
+	}
+	require.Len(t, public, 2)
+	for _, alert := range public {
+		assert.Equalf(t, templates[alert.Name]["info"], alert.Info,
+			"metadata alert %q does not exactly match its shipped health-template info", alert.Name)
+	}
+}
+
 func TestCollector_ComponentCollectionAlertContract(t *testing.T) {
 	block := cephHealthAlertBlock(t, "ceph_component_collection_failed")
 	assert.Contains(t, block, "on: ceph.component_collection_status")

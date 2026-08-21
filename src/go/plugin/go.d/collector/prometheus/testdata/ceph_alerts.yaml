@@ -73,14 +73,25 @@ adaptation_contracts:
       - aggregation remains inside one exporter endpoint instead of combining gateways across a cluster
       - the compound count-versus-limit condition is evaluated from current stored dimensions; the source one-minute
         persistence window is not represented because a health lookup cannot persist this cross-dimension comparison
+  rgw_categorical_counter_occurrence:
+    preserved:
+      - each rendered counter-rate occurrence within the observation window
+      - source counter population and threshold direction
+      - recovery when the occurrence leaves the observation window
+    differences:
+      - the health lookup evaluates the rendered counter rate over an occurrence window rather than treating the lifetime
+        cumulative total as currently active
+      - a partial collection gap does not reset the observation window
+      - categorical failure occurrences notify by default
   rgw_counter_rate_window:
     preserved:
-      - source counter population and threshold direction
+      - sustained source counter population and threshold direction
+      - silent workload-policy routing
       - recovery when no new source failures occur
     differences:
-      - the health lookup evaluates the rendered counter rate over an observation window rather than treating the lifetime
-        cumulative total as currently active
-      - partial collection gaps do not reset the observation window
+      - the health lookup evaluates the rendered counter rate over a sustained observation window rather than treating the
+        lifetime cumulative total as currently active
+      - a partial collection gap does not reset the observation window
   rgw_policy_pressure_window:
     preserved:
       - current source population and affected RGW instance identity
@@ -2187,7 +2198,7 @@ alerts:
     netdata:
       disposition: internal-helper
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.block_devices.time_accumulation
       labels: ''
       lookup: average -1m unaligned of read_seconds
@@ -2211,7 +2222,7 @@ alerts:
     netdata:
       disposition: internal-helper
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.block_devices.operations
       labels: ''
       lookup: average -1m unaligned of reads_completed
@@ -2235,7 +2246,7 @@ alerts:
     netdata:
       disposition: internal-helper
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.block_devices.time_accumulation
       labels: ''
       lookup: average -1m unaligned of write_seconds
@@ -2259,7 +2270,7 @@ alerts:
     netdata:
       disposition: internal-helper
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.block_devices.operations
       labels: ''
       lookup: average -1m unaligned of writes_completed
@@ -2284,7 +2295,7 @@ alerts:
     netdata:
       disposition: internal-helper
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.gateways.namespace_count
       labels: ''
       lookup: average -1m unaligned of namespace_count
@@ -2308,7 +2319,7 @@ alerts:
     netdata:
       disposition: ship
       fidelity: NETDATA-ADAPTED
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.subsystems.state_metadata
       labels: allow_any_host=yes
       lookup: min -5m unaligned of metadata
@@ -2332,7 +2343,7 @@ alerts:
     netdata:
       disposition: internal-helper
       fidelity: NETDATA-ADAPTED
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.gateways.time_accumulation
       labels: ''
       lookup: min -10m unaligned of busy
@@ -2359,7 +2370,7 @@ alerts:
     netdata:
       disposition: correct
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.gateways.time_accumulation
       labels: ''
       lookup: ''
@@ -2384,7 +2395,7 @@ alerts:
     netdata:
       disposition: correct
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.block_devices.time_accumulation
       labels: ''
       lookup: ''
@@ -2409,7 +2420,7 @@ alerts:
     netdata:
       disposition: correct
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.block_devices.time_accumulation
       labels: ''
       lookup: ''
@@ -2434,7 +2445,7 @@ alerts:
     netdata:
       disposition: correct
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.hosts.keepalive_timeout_state
       labels: ''
       calc: $value
@@ -2461,7 +2472,7 @@ alerts:
     netdata:
       disposition: correct
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.subsystems.namespace_capacity
       labels: ''
       lookup: ''
@@ -2486,7 +2497,7 @@ alerts:
     netdata:
       disposition: correct
       fidelity: CORRECTED-INTENT
-      owner: mgr_prometheus
+      owner: nvmeof_exporter
       context: prometheus.ceph.nvme_of.gateways.namespace_count
       labels: ''
       lookup: ''
@@ -2574,12 +2585,12 @@ netdata_extensions:
     owner: mgr_prometheus
     context: prometheus.ceph.object_gateway.notifications.events
     labels_policy: none
-    lookup: min -1m unaligned of event_lost
+    lookup: max -1m unaligned of event_lost
     calc: ''
     units: events/s
     condition: 'crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
-    recipient: silent
-    adaptation: rgw_counter_rate_window
+    recipient: sysadmin
+    adaptation: rgw_categorical_counter_occurrence
 
   rgw_notification_missing_configuration:
     sow_id: RGW-M-09
@@ -2588,12 +2599,12 @@ netdata_extensions:
     owner: mgr_prometheus
     context: prometheus.ceph.object_gateway.notifications.missing_configurations
     labels_policy: none
-    lookup: min -1m unaligned of value
+    lookup: max -1m unaligned of value
     calc: ''
     units: events/s
     condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
-    recipient: silent
-    adaptation: rgw_counter_rate_window
+    recipient: sysadmin
+    adaptation: rgw_categorical_counter_occurrence
 
   rgw_lua_script_failed:
     sow_id: RGW-M-10
@@ -2602,12 +2613,12 @@ netdata_extensions:
     owner: mgr_prometheus
     context: prometheus.ceph.object_gateway.lua.script_executions
     labels_policy: none
-    lookup: min -1m unaligned of failure
+    lookup: max -1m unaligned of failure
     calc: ''
     units: executions/s
     condition: 'warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)'
-    recipient: silent
-    adaptation: rgw_counter_rate_window
+    recipient: sysadmin
+    adaptation: rgw_categorical_counter_occurrence
 
   rgw_failed_request_rate_fallback:
     sow_id: RGW-S-04
