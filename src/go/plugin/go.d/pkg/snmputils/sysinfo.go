@@ -178,11 +178,18 @@ func enterpriseNumberFromSysObject(sysObject string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	num, _, ok := strings.Cut(v, ".")
-	if !ok {
+	if num, _, ok := strings.Cut(v, "."); ok {
+		return num, num != ""
+	}
+	if v == "" {
 		return "", false
 	}
-	return num, true
+	for _, ch := range v {
+		if ch < '0' || ch > '9' {
+			return "", false
+		}
+	}
+	return v, true
 }
 
 func enterpriseNumbersMapping() (map[string]string, error) {

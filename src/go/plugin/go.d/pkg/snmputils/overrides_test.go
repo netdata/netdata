@@ -142,6 +142,70 @@ func TestLookupEnterpriseNumber(t *testing.T) {
 	}
 }
 
+func TestEnterpriseNumberFromSysObject(t *testing.T) {
+	tests := map[string]struct {
+		sysObjectID string
+		wantPEN     string
+		wantOK      bool
+	}{
+		"bare numeric PEN": {
+			sysObjectID: "1.3.6.1.4.1.41112",
+			wantPEN:     "41112",
+			wantOK:      true,
+		},
+		"descendant numeric PEN": {
+			sysObjectID: "1.3.6.1.4.1.14988.1",
+			wantPEN:     "14988",
+			wantOK:      true,
+		},
+		"enterprise prefix without PEN": {
+			sysObjectID: "1.3.6.1.4.1",
+		},
+		"empty trailing-dot remainder": {
+			sysObjectID: "1.3.6.1.4.1.",
+		},
+		"empty PEN before descendant": {
+			sysObjectID: "1.3.6.1.4.1..1",
+		},
+		"non-enterprise OID": {
+			sysObjectID: "1.3.6.1.2.1.1.2.0",
+		},
+		"bare non-numeric PEN": {
+			sysObjectID: "1.3.6.1.4.1.vendor",
+		},
+		"existing descendant validation remains unchanged": {
+			sysObjectID: "1.3.6.1.4.1.vendor.product",
+			wantPEN:     "vendor",
+			wantOK:      true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotPEN, gotOK := enterpriseNumberFromSysObject(tc.sysObjectID)
+			assert.Equal(t, tc.wantPEN, gotPEN)
+			assert.Equal(t, tc.wantOK, gotOK)
+		})
+	}
+}
+
+func TestStockUbiquitiBareRootMetadata(t *testing.T) {
+	dir := getSnmpMetadataDir()
+	require.NotEmpty(t, dir, "metadata dir must resolve in tests")
+
+	agg, err := loadOverridesFromDir(dir)
+	require.NoError(t, err)
+	defer withOverrides(t, agg)()
+	withEnterpriseNumbersFile(t, filepath.Join(t.TempDir(), "missing.txt"))
+
+	si := &SysInfo{SysObjectID: "1.3.6.1.4.1.41112"}
+	updateMetadata(si)
+
+	assert.Equal(t, "Ubiquiti", si.Vendor)
+	assert.Equal(t, "Access Point", si.Category)
+	assert.Empty(t, si.Model)
+}
+
 func TestLookupEnterpriseNumberLoadsRegistryFromDisk(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "iana-enterprise-numbers.txt")
 	require.NoError(t, os.WriteFile(path, []byte(`

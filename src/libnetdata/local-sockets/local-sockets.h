@@ -31,7 +31,7 @@
 // direction detection (TCP_LISTEN check) and TCP_STATE_2str display — works.
 // Platform backends convert native states to these TCP_* values before
 // storing the state in LOCAL_SOCKET.state.
-#if defined(OS_FREEBSD) || defined(OS_MACOS)
+#if defined(OS_FREEBSD) || defined(OS_MACOS) || defined(OS_WINDOWS)
 #define TCP_ESTABLISHED  1
 #define TCP_SYN_SENT     2
 #define TCP_SYN_RECV     3
@@ -45,7 +45,7 @@
 #define TCP_CLOSING      11
 #endif
 
-#if !defined(OS_MACOS)
+#if !defined(OS_MACOS) && !defined(OS_WINDOWS)
 #define LOCAL_SOCKETS_HAVE_TCP_INFO 1
 #endif
 
@@ -299,6 +299,12 @@ typedef struct local_socket {
 
     char comm[TASK_COMM_LEN];
     STRING *cmdline;
+#if defined(OS_WINDOWS)
+    // Windows backend fills these so network-viewer can show full exe base
+    // names and SID account names (comm is limited to TASK_COMM_LEN).
+    char win_comm[256];
+    char win_username[128];
+#endif
 
     struct local_port local_port_key;
 
@@ -583,6 +589,7 @@ static inline void local_sockets_fix_cmdline(char* str) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#if defined(OS_LINUX)
 static inline bool
 local_sockets_read_proc_inode_link(LS_STATE *ls, const char *filename, uint64_t *inode, const char *type) {
     char link_target[FILENAME_MAX + 1];
@@ -610,6 +617,8 @@ local_sockets_read_proc_inode_link(LS_STATE *ls, const char *filename, uint64_t 
         return false;
     }
 }
+
+#endif // OS_LINUX -- local_sockets_read_proc_inode_link
 
 #if defined(OS_LINUX) // /proc-based PID + FD walking is Linux-only
 
@@ -1432,6 +1441,7 @@ static inline void local_sockets_track_time(LS_STATE *ls, const char *name) {
     }
 }
 
+#if defined(OS_LINUX) // used only by the /proc-based Linux backend
 static void local_sockets_track_time_by_protocol(LS_STATE *ls, bool mnl, uint16_t family, uint16_t protocol) {
     if(mnl) {
         if(family == AF_INET) {
@@ -1466,6 +1476,8 @@ static void local_sockets_track_time_by_protocol(LS_STATE *ls, bool mnl, uint16_
             local_sockets_track_time(ls, "proc_read_unknown");
     }
 }
+
+#endif // OS_LINUX -- local_sockets_track_time_by_protocol
 
 #if defined(OS_LINUX) // /proc-based socket reading is Linux-only
 
@@ -1527,6 +1539,9 @@ static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
 #elif defined(OS_MACOS)
 // macOS: local_sockets_read_all_system_sockets() is provided by the Darwin backend.
 #include "local-sockets-macos.h"
+#elif defined(OS_WINDOWS)
+// Windows: local_sockets_read_all_system_sockets() is provided by the Windows backend.
+#include "local-sockets-windows.h"
 #endif // platform backend
 
 // --------------------------------------------------------------------------------------------------------------------

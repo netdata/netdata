@@ -163,6 +163,88 @@ func TestTopologyCache_UpdateTopologyProfileTags_BridgeAddressSetsSNMPIdentity(t
 	require.Equal(t, "macAddress", cache.localDevice.ChassisIDType)
 }
 
+func TestTopologyCache_UpdateTopologyProfileTagsResolvesDeviceMetadata(t *testing.T) {
+	tests := map[string]struct {
+		device     ddsnmp.DeviceConnectionInfo
+		metrics    []*ddsnmp.ProfileMetrics
+		wantVendor string
+		wantModel  string
+	}{
+		"exact profile metadata replaces stale static values": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Vendor: "static-vendor",
+				Model:  "static-model",
+			},
+			metrics: []*ddsnmp.ProfileMetrics{
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "wildcard-vendor"},
+						"model":  {Value: "wildcard-model"},
+					},
+				},
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "profile-vendor", IsExactMatch: true},
+						"model":  {Value: "profile-model", IsExactMatch: true},
+					},
+					Tags: map[string]string{
+						"vendor": "generic-tag-vendor",
+						"model":  "generic-tag-model",
+					},
+				},
+			},
+			wantVendor: "profile-vendor",
+			wantModel:  "profile-model",
+		},
+		"non-exact profile metadata preserves non-empty static values": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Vendor: "static-vendor",
+				Model:  "static-model",
+			},
+			metrics: []*ddsnmp.ProfileMetrics{
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "wildcard-vendor"},
+						"model":  {Value: "wildcard-model"},
+					},
+				},
+			},
+			wantVendor: "static-vendor",
+			wantModel:  "static-model",
+		},
+		"final vnode labels remain authoritative": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Vendor: "static-vendor",
+				Model:  "static-model",
+				VnodeLabels: map[string]string{
+					"vendor": "vnode-vendor",
+					"model":  "vnode-model",
+				},
+			},
+			metrics: []*ddsnmp.ProfileMetrics{
+				{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						"vendor": {Value: "profile-vendor", IsExactMatch: true},
+						"model":  {Value: "profile-model", IsExactMatch: true},
+					},
+				},
+			},
+			wantVendor: "vnode-vendor",
+			wantModel:  "vnode-model",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTestTopologyCache(tc.device)
+			cache.updateTopologyProfileTags(tc.metrics)
+
+			assert.Equal(t, tc.wantVendor, cache.localDevice.Vendor)
+			assert.Equal(t, tc.wantModel, cache.localDevice.Model)
+		})
+	}
+}
+
 func TestTopologyCache_UpdateFdbEntry_DoesNotSetBridgeIdentityFromRowTags(t *testing.T) {
 	cache := newTopologyCache()
 	cache.localDevice = topologymodel.Device{

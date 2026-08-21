@@ -1625,6 +1625,8 @@ set(NETWORK_VIEWER_COMMON_FILES
         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
         src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
         src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+        src/collectors/network-viewer.plugin/network-viewer-topology.c
+        src/collectors/network-viewer.plugin/network-viewer-topology.h
         src/collectors/network-viewer.plugin/network-viewer.c
 )
 
@@ -1642,9 +1644,20 @@ set(NETWORK_VIEWER_LINUX_FILES
         src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.h
 )
 
-# network-viewer: Windows
+# network-viewer: Windows. This list is self-contained on purpose - the
+# OS_WINDOWS branch is the one that does not append NETWORK_VIEWER_COMMON_FILES.
 set(NETWORK_VIEWER_WINDOWS_FILES
         src/collectors/network-viewer.plugin/network-viewer-windows.c
+        src/collectors/common-cgroups/cgroup-path.c
+        src/collectors/common-cgroups/cgroup-path.h
+        src/collectors/common-cgroups/cgroup-topology-rules.c
+        src/collectors/common-cgroups/cgroup-topology-rules.h
+        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+        src/collectors/network-viewer.plugin/network-viewer-topology.c
+        src/collectors/network-viewer.plugin/network-viewer-topology.h
+        src/libnetdata/local-sockets/local-sockets-windows.h
 )
 
 # network-viewer: FreeBSD

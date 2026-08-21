@@ -224,6 +224,84 @@ func TestCollector_CollectRegistersAndCleanupUnregistersDevice(t *testing.T) {
 	require.Empty(t, deviceStore.Devices())
 }
 
+func TestCollector_CollectSynchronizesDeviceMetadataOnceWithoutVnode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	profileMetrics := &ddsnmp.ProfileMetrics{
+		Source: "dynamic-device.yaml",
+		DeviceMetadata: map[string]ddsnmp.MetaTag{
+			"vendor": {Value: "profile-vendor", IsExactMatch: true},
+			"model":  {Value: "profile-model", IsExactMatch: true},
+		},
+	}
+	mockCollector := &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{profileMetrics}}
+
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return mockCollector }
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	devices := deviceStore.Devices()
+	require.Len(t, devices, 1)
+	assert.Equal(t, "profile-vendor", devices[0].Vendor)
+	assert.Equal(t, "profile-model", devices[0].Model)
+	assert.Zero(t, mockCollector.metadataCalls, "normal collection metadata must be reused without a separate request")
+
+	profileMetrics.DeviceMetadata["vendor"] = ddsnmp.MetaTag{Value: "later-vendor", IsExactMatch: true}
+	profileMetrics.DeviceMetadata["model"] = ddsnmp.MetaTag{Value: "later-model", IsExactMatch: true}
+	require.NotNil(t, collr.Collect(context.Background()))
+
+	devices = deviceStore.Devices()
+	require.Len(t, devices, 1)
+	assert.Equal(t, "profile-vendor", devices[0].Vendor)
+	assert.Equal(t, "profile-model", devices[0].Model)
+	assert.Equal(t, 2, mockCollector.collectCalls)
+	assert.Zero(t, mockCollector.metadataCalls)
+}
+
+func TestCollector_SetupVnodeAndRegisterDeviceStateShareResolvedMetadata(t *testing.T) {
+	deviceStore := ddsnmp.NewDeviceStore()
+	collr := New(deviceStore)
+	collr.Config = prepareV2Config()
+	collr.Vnode.Labels = map[string]string{
+		"model": "operator-model",
+	}
+
+	si := &snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.41112",
+		Name:        "unifi-ap",
+		Vendor:      "static-vendor",
+		Model:       "static-model",
+	}
+	profileMetadata := map[string]ddsnmp.MetaTag{
+		"vendor": {Value: "profile-vendor", IsExactMatch: true},
+		"model":  {Value: "profile-model", IsExactMatch: true},
+	}
+
+	collr.vnode = collr.setupVnode(si, profileMetadata)
+	collr.registerDeviceState(si, nil)
+
+	devices := deviceStore.Devices()
+	require.Len(t, devices, 1)
+	assert.Equal(t, "profile-vendor", devices[0].VnodeLabels["vendor"])
+	assert.Equal(t, "operator-model", devices[0].VnodeLabels["model"])
+	assert.Equal(t, "profile-vendor", devices[0].Vendor)
+	assert.Equal(t, "operator-model", devices[0].Model)
+}
+
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepare func(m *snmpmock.MockHandler) *Collector
@@ -983,7 +1061,8 @@ type mockDdSnmpCollector struct {
 	meta map[string]ddsnmp.MetaTag
 	err  error
 
-	collectCalls int
+	collectCalls  int
+	metadataCalls int
 }
 
 func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
@@ -992,6 +1071,7 @@ func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 }
 
 func (m *mockDdSnmpCollector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+	m.metadataCalls++
 	return m.meta, nil
 }
 

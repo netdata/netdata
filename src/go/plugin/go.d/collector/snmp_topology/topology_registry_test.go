@@ -169,9 +169,8 @@ func TestBuildProbableTopologySnapshotMatchesIndependentLegacyPath(t *testing.T)
 				},
 			},
 		},
-		LocalDeviceID: "switch-a",
-		AgentID:       "agent-1",
-		CollectedAt:   collectedAt,
+		AgentID:     "agent-1",
+		CollectedAt: collectedAt,
 	}
 	options := topologyoptions.DefaultQueryOptions()
 	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
@@ -204,7 +203,7 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 	strictOptions := options
 	strictOptions.MapType = topologyoptions.MapTypeHighConfidenceInferred
 	strictData, err := projectSNMPL2TopologyData(
-		strictResult, aggregate.AgentID, aggregate.LocalDeviceID, aggregate.CollectedAt, strictOptions,
+		strictResult, aggregate.AgentID, aggregate.CollectedAt, strictOptions,
 	)
 	require.NoError(t, err)
 	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
@@ -216,7 +215,7 @@ func buildProbableTopologySnapshotIndependentLegacyForTest(
 	probableOptions := options
 	probableOptions.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	probableData, err := projectSNMPL2TopologyData(
-		probableResult, aggregate.AgentID, aggregate.LocalDeviceID, aggregate.CollectedAt, probableOptions,
+		probableResult, aggregate.AgentID, aggregate.CollectedAt, probableOptions,
 	)
 	require.NoError(t, err)
 	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)

@@ -22,7 +22,7 @@ The Network Monitor dashboard brings devices, topology, flows, and trap events t
 
 - **Topology** — see how your network connects. Netdata builds Layer 2 maps (LLDP, CDP, MAC/FDB, STP) and Layer 3 maps (BGP, OSPF, ARP), plus the Netdata streaming hierarchy and virtual infrastructure (VMware vSphere, Cato).
 
-- **Application dependencies** — see how your software connects. On monitored hosts (Linux, FreeBSD, and macOS), Netdata reads the kernel's live socket table and maps what each process is talking to; on Linux each one is also attributed to the container, image, systemd unit, or Kubernetes pod that owns it — with no instrumentation and no sidecars. A standard host install needs nothing configured; running the Agent in a container needs a few extra privileges.
+- **Application dependencies** — see how your software connects. On monitored hosts (Linux, FreeBSD, macOS, and Windows), Netdata reads the live socket table and maps what each process is talking to; on Linux each one is also attributed to the container, image, systemd unit, or Kubernetes pod that owns it — with no instrumentation and no sidecars. A standard host install needs nothing configured; running the Agent in a container needs a few extra privileges.
 
 - **BGP monitoring** — peer state, advertised and received prefixes, and session health on your routers, with an interactive peer table and alerts on session changes.
 
