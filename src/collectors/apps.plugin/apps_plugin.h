@@ -18,6 +18,16 @@ struct apps_ebpf_cachestat_totals {
     uint64_t mark_buffer_dirty;
     uint64_t mark_page_accessed;
 };
+
+/* Per-target directory-cache totals for the most recent Go-plugin interval.
+ * The charts use the absolute algorithm, and the ratio is computed from the
+ * same interval. */
+struct apps_ebpf_dcstat_totals {
+    uint64_t reference;
+    uint64_t slow;
+    uint64_t not_found;
+    int64_t ratio;
+};
 #endif
 
 #define OS_FUNC_CONCAT(a, b) a##b
@@ -440,6 +450,7 @@ struct target {
     struct ebpf_publish_cachestat cachestat;
     struct apps_ebpf_cachestat_totals cachestat_totals;
     struct apps_ebpf_cachestat_totals cachestat_totals_prev;
+    struct apps_ebpf_dcstat_totals dcstat_totals;
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1)
@@ -654,6 +665,8 @@ struct pid_stat {
     struct ebpf_pid_stat ebpf;
     // last cachestat ct we consumed; gates per-PID delta accumulation
     uint64_t ebpf_cachestat_ct;
+    // last dcstat ct we consumed; gates per-PID delta accumulation
+    uint64_t ebpf_dcstat_ct;
     bool has_ebpf:1;
 #endif
 };
@@ -814,6 +827,9 @@ bool apps_ebpf_sync_pid_stat(struct pid_stat *p);
 void apps_ebpf_accumulate_cachestat(void);
 bool apps_ebpf_cachestat_is_available(void);
 bool apps_ebpf_cachestat_data_ready(void);
+void apps_ebpf_accumulate_dcstat(void);
+bool apps_ebpf_dcstat_is_available(void);
+bool apps_ebpf_dcstat_data_ready(void);
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------

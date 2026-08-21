@@ -1,0 +1,28 @@
+# Baseline IPv4 interface facts for logical L3 topology.
+# Source: IP-MIB ipAddrTable.
+
+topology:
+  - kind: ip_if_index
+    MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.20
+      name: ipAddrTable
+    symbols:
+      - OID: 1.3.6.1.2.1.4.20.1.2
+        name: ip_if_index
+    metric_tags:
+      - tag: topo_ip_addr
+        symbol:
+          name: ipAdEntAddr
+          format: ip_address
+        index_transform:
+          - start: 0
+            end: 3
+      - tag: topo_if_index
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.2
+          name: ipAdEntIfIndex
+      - tag: topo_ip_netmask
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.3
+          name: ipAdEntNetMask

@@ -106,37 +106,17 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	if fileCfg.Cachestat != nil {
 		cfg.Enabled = *fileCfg.Cachestat
 	}
-	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
-		cfg.UpdateEvery = *fileCfg.UpdateEvery
-	}
-	if fileCfg.AppsEnabled != nil {
-		cfg.AppsEnabled = *fileCfg.AppsEnabled
-	}
-	if fileCfg.Cgroups != nil {
-		cfg.CgroupsEnabled = *fileCfg.Cgroups
-	}
-	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
-		cfg.PidTableSize = applyPidTableSizeClamp(*fileCfg.PidTable)
-	}
-	if fileCfg.MapsPerCore != nil {
-		cfg.MapsPerCore = *fileCfg.MapsPerCore
-	}
-	if fileCfg.BTFPath != nil && *fileCfg.BTFPath != "" {
-		cfg.BTFPath = *fileCfg.BTFPath
-		cfg.HasBTF = kernelBTFSupported(cfg.BTFPath)
-	}
-	if fileCfg.Lifetime != nil && *fileCfg.Lifetime > 0 {
-		// lifetime controls how long the thread runs when activated by a cloud
-		// Function call in the old ebpf.plugin.  The Go plugin runs until
-		// signalled and has no equivalent lifecycle, so this value is parsed
-		// for compatibility but not consumed.
-	}
-	if fileCfg.CollectPidLevel != nil {
-		cfg.AppsLevel = *fileCfg.CollectPidLevel
-	}
-	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
-		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
-	}
+	applyCommonCollectorConfig(fileCfg, collectorCommonConfig{
+		UpdateEvery:    &cfg.UpdateEvery,
+		AppsEnabled:    &cfg.AppsEnabled,
+		CgroupsEnabled: &cfg.CgroupsEnabled,
+		PidTableSize:   &cfg.PidTableSize,
+		MapsPerCore:    &cfg.MapsPerCore,
+		BTFPath:        &cfg.BTFPath,
+		HasBTF:         &cfg.HasBTF,
+		ObjectFlavor:   &cfg.ObjectFlavor,
+		AppsLevel:      &cfg.AppsLevel,
+	})
 	kver, isRHF, err := resolveKernelAndRH()
 	if err != nil {
 		return CachestatLegacyConfig{}, err

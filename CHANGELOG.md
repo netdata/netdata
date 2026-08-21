@@ -54,6 +54,20 @@
 - Fix typo in clickhouse.replicas_max_absolute_delay ([#23548](https://github.com/netdata/netdata/issues/23548))
 - Apps.plugin: add system.processes_state chart on macOS and FreeBSD ([#23296](https://github.com/netdata/netdata/issues/23296), [#23535](https://github.com/netdata/netdata/issues/23535)) ([#23534](https://github.com/netdata/netdata/issues/23534))
 - Fix claim on Microsoft ([#23547](https://github.com/netdata/netdata/issues/23547))
+- Feat(health): index alerts by name for faster variable lookups ([#23554](https://github.com/netdata/netdata/issues/23554))
+- Fix(go.d/snmp): make IPv4 interface facts baseline topology data ([#23557](https://github.com/netdata/netdata/issues/23557))
+- Regenerate integrations docs ([#23556](https://github.com/netdata/netdata/issues/23556))
+- Fix(go.d/snmp_topology): enable UniFi topology profiles ([#23561](https://github.com/netdata/netdata/issues/23561))
+- Remove Ubuntu 25.10 from CI and package builds. ([#22931](https://github.com/netdata/netdata/issues/22931))
+- Address issues with MSSQL 2014 ([#23460](https://github.com/netdata/netdata/issues/23460))
+- Fix(fgo.d/mssql): harden function queries across SQL Server and Azure ([#23564](https://github.com/netdata/netdata/issues/23564))
+- Regenerate integrations docs ([#23563](https://github.com/netdata/netdata/issues/23563))
+- Fix(go.d/snmp): honor scalar fallback order ([#23565](https://github.com/netdata/netdata/issues/23565))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/sts from 1.45.5 to 1.45.6 in /src/go ([#23570](https://github.com/netdata/netdata/issues/23570))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.36.0 to 1.36.1 in /src/go ([#23567](https://github.com/netdata/netdata/issues/23567))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.36 to 1.32.37 in /src/go ([#23575](https://github.com/netdata/netdata/issues/23575))
+- Build(deps): bump github.com/stretchr/testify from 1.11.1 to 1.12.1 in /src/go ([#23574](https://github.com/netdata/netdata/issues/23574))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.66.4 to 1.66.5 in /src/go ([#23571](https://github.com/netdata/netdata/issues/23571))
 
 ## [2.11.0] - 2026-08-12
 

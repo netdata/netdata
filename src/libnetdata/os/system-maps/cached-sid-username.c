@@ -48,7 +48,17 @@ static inline bool sid_cache_compar(SID_KEY *a, SID_KEY *b) {
 }
 
 void cached_sid_username_init(void) {
-    simple_hashtable_init_SID(&sid_globals.hashtable, 100);
+    static bool initialized = false;
+
+    if(__atomic_load_n(&initialized, __ATOMIC_ACQUIRE))
+        return;
+
+    spinlock_lock(&sid_globals.spinlock);
+    if(!__atomic_load_n(&initialized, __ATOMIC_ACQUIRE)) {
+        simple_hashtable_init_SID(&sid_globals.hashtable, 100);
+        __atomic_store_n(&initialized, true, __ATOMIC_RELEASE);
+    }
+    spinlock_unlock(&sid_globals.spinlock);
 }
 
 static char *account2utf8(const wchar_t *user) {

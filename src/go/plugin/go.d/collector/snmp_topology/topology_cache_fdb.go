@@ -18,8 +18,6 @@ func init() {
 }
 
 func (c *topologyCache) updateFdbEntry(tags map[string]string) {
-	c.updateLocalBridgeIdentityFromTags(tags)
-
 	mac := topologyutil.NormalizeMAC(topologyutil.FirstNonEmptyString(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
 		c.fdbRowsDroppedNoMAC++

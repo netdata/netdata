@@ -12,6 +12,11 @@ extends:
   - _cisco-hsrp.yaml
   - _cisco-ntp.yaml
   - _cisco-bfd.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-fdb-mib.yaml
+  - _std-topology-stp-mib.yaml
+  - _std-topology-arp-mib.yaml
+  - _std-topology-cisco-vtp-mib.yaml
 
 metadata:
   device:
@@ -30,7 +35,9 @@ selector:
         - 1.3.6.1.4.1.9.1.1923 # ciscoN9KC93128TX
         - 1.3.6.1.4.1.9.1.1924 # ciscoN9KC9396TX
         - 1.3.6.1.4.1.9.1.1925 # ciscoN9KC9396PX
-        - 1.3.6.1.4.1.9.12.3.1.3.*
+        - '^1\.3\.6\.1\.4\.1\.9\.12\.3\.1\.3\..+$'
+      exclude:
+        - 1.3.6.1.4.1.9.12.3.1.3.1062 # Cisco UCS
 
 metrics:
   - MIB: CISCO-ENTITY-SENSOR-MIB   # TODO: put in abstract profile

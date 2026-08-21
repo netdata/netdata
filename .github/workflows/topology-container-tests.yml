@@ -26,6 +26,9 @@ concurrency:
   group: topology-container-tests-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   TEST_TARGETS: >-
     apps-cgroups-path-test
@@ -82,7 +85,8 @@ jobs:
             -DENABLE_BUNDLED_PROTOBUF=Off
 
       - name: Build test binaries
-        run: echo "${TEST_TARGETS}" | xargs ninja -C build
+        run: |
+          (echo "${TEST_TARGETS}"; echo network-viewer.plugin) | xargs ninja -C build
 
       - name: Run test binaries
         run: |
@@ -100,6 +104,49 @@ jobs:
 
       - name: Validate topology fixtures
         run: python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py
+
+      - name: Validate network-viewer topology payload (live)
+        run: |
+          set -euo pipefail
+          plugin="$(find build -name 'network-viewer.plugin' -type f -executable | head -n 1)"
+          if [ -z "$plugin" ]; then
+            echo "::error::network-viewer.plugin binary not found"
+            exit 1
+          fi
+          # The plugin needs privileges to enumerate /proc/<pid>/fd for all
+          # processes, but PR-controlled code must never run as root: restrict
+          # the privileged run to the trusted push event and keep pull_request
+          # runs unprivileged (the payload is still schema-valid without it).
+          run_as_root=()
+          if [ "${GITHUB_EVENT_NAME:-}" = "push" ]; then
+            run_as_root=(sudo -n)
+          fi
+          tmpd="$(mktemp -d)"
+          trap 'rm -rf "$tmpd"' EXIT
+          # regression tests for the payload parser itself
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py --self-test
+          validate() {
+            local name="$1" payload="$2"
+            shift 2
+            local out="$tmpd/${name}.json" err="$tmpd/${name}.err"
+            set +e
+            # shellcheck disable=SC2024 # the redirect must stay in the runner
+            # (the plugin only runs as root; the output file must be readable
+            # by the validator running as the runner user)
+            printf '%s' "$payload" | "${run_as_root[@]}" timeout 120 "$plugin" --test topology:network-connections > "$out" 2> "$err"
+            local rc=$?
+            set -e
+            echo "--- topology ${name}: exit=${rc} stdout_bytes=$(wc -c < "$out")"
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::topology ${name} command failed with exit code ${rc}"
+              tail -n 15 "$err"
+              return "$rc"
+            fi
+            python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py "$out" "$@"
+          }
+          validate aggregated '{}' --mode aggregated --group-by process_name
+          validate pid '{"selections":{"group_by":"pid"}}' --mode aggregated --group-by pid
+          validate detailed '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}' --mode detailed
 
   asan-tests:
     name: Unit Tests (ASAN)

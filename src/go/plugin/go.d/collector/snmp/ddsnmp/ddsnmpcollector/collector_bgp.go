@@ -29,7 +29,6 @@ type bgpValueContext struct {
 	rowPDUs       map[string]gosnmp.SnmpPDU
 	tableName     string
 	crossTableCtx *crossTableContext
-	oidCache      map[string]string
 }
 
 func (ctx bgpValueContext) lookupPDU(oid string) (gosnmp.SnmpPDU, bool) {
@@ -119,7 +118,7 @@ func (c *Collector) collectScalarBGPRows(configs []ddprofiledefinition.BGPConfig
 func (c *Collector) collectTableBGPRows(configs []ddprofiledefinition.BGPConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.BGPRow, error) {
 	var rows []ddsnmp.BGPRow
 	var errs []error
-	walkedData := make(map[string]map[string]gosnmp.SnmpPDU)
+	walkPass := newTableWalkPass()
 	tableNameToOID := bgpTableNameToOID(configs)
 
 	for _, cfg := range configs {
@@ -127,38 +126,18 @@ func (c *Collector) collectTableBGPRows(configs []ddprofiledefinition.BGPConfig,
 			continue
 		}
 		metricsCfg := bgpConfigAsMetricsConfig(cfg)
-		cachedRows, ok, err := c.collectTableBGPRowsFromCache(cfg, metricsCfg, stats)
-		if err != nil {
-			c.log.Debugf("Cached BGP collection failed for table %s: %v", cfg.Table.Name, err)
-		}
-		if ok {
-			stats.TableCache.Hits++
-			stats.SNMP.TablesCached++
-			rows = append(rows, cachedRows...)
+
+		outcome := walkPass.walk(c.tableCollector, cfg.Table.OID, stats)
+		if outcome.err != nil {
+			errs = append(errs, fmt.Errorf("BGP table %q: %w", bgpConfigDisplayName(cfg), outcome.err))
 			continue
 		}
-		stats.TableCache.Misses++
-
-		tableOID := trimOID(cfg.Table.OID)
-		pdus := walkedData[tableOID]
-		if pdus == nil {
-			var err error
-			pdus, err = c.tableCollector.snmpWalk(cfg.Table.OID, stats)
-			if err != nil {
-				stats.Errors.SNMP++
-				errs = append(errs, fmt.Errorf("BGP table %q: %w", bgpConfigDisplayName(cfg), err))
-				continue
-			}
-			if len(pdus) > 0 {
-				stats.SNMP.TablesWalked++
-				walkedData[tableOID] = pdus
-			}
-		}
+		pdus := outcome.pdus
 		if len(pdus) == 0 {
 			continue
 		}
 
-		if err := c.walkBGPTableDependencies(cfg, metricsCfg, tableNameToOID, walkedData, stats); err != nil {
+		if err := c.walkBGPTableDependencies(cfg, metricsCfg, tableNameToOID, walkPass, stats); err != nil {
 			errs = append(errs, fmt.Errorf("BGP table %q dependencies: %w", bgpConfigDisplayName(cfg), err))
 			continue
 		}
@@ -166,15 +145,17 @@ func (c *Collector) collectTableBGPRows(configs []ddprofiledefinition.BGPConfig,
 		ctx := &tableProcessingContext{
 			config:         metricsCfg,
 			pdus:           pdus,
-			walkedData:     walkedData,
+			walkedData:     walkPass.walkedData,
 			tableNameToOID: tableNameToOID,
 		}
 		ctx.columnOIDs = buildColumnOIDs(metricsCfg)
 		ctx.orderedTags = buildOrderedTags(metricsCfg)
-		ctx.rows, ctx.oidCache, ctx.tagCache = c.tableCollector.organizePDUsByRow(ctx)
+		ctx.rows, _, _ = c.tableCollector.organizePDUsByRow(ctx)
+		crossTableCtx := newCrossTableContext(ctx.walkedData, ctx.tableNameToOID)
+		staticTags := parseStaticTags(cfg.StaticTags)
 
 		for rowIndex, rowPDUs := range ctx.rows {
-			row, ok, err := c.buildTableBGPRow(cfg, rowIndex, rowPDUs, ctx)
+			row, ok, err := c.buildTableBGPRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
 			if err != nil {
 				stats.Errors.Processing.BGP++
 				errs = append(errs, fmt.Errorf("BGP table %q row %q: %w", bgpConfigDisplayName(cfg), rowIndex, err))
@@ -184,9 +165,6 @@ func (c *Collector) collectTableBGPRows(configs []ddprofiledefinition.BGPConfig,
 				rows = append(rows, row)
 			}
 		}
-
-		deps := bgpTableDependencies(cfg, metricsCfg, ctx.tableNameToOID)
-		c.tableCollector.tableCache.cacheData(metricsCfg, ctx.oidCache, ctx.tagCache, deps)
 	}
 
 	if len(rows) == 0 && len(errs) > 0 {
@@ -199,79 +177,17 @@ func (c *Collector) walkBGPTableDependencies(
 	cfg ddprofiledefinition.BGPConfig,
 	metricsCfg ddprofiledefinition.MetricsConfig,
 	tableNameToOID map[string]string,
-	walkedData map[string]map[string]gosnmp.SnmpPDU,
+	walkPass *tableWalkPass,
 	stats *ddsnmp.CollectionStats,
 ) error {
 	var errs []error
 	for _, depOID := range bgpTableDependencies(cfg, metricsCfg, tableNameToOID) {
-		depOID = trimOID(depOID)
-		if walkedData[depOID] != nil {
-			continue
-		}
-		pdus, err := c.tableCollector.snmpWalk(depOID, stats)
-		if err != nil {
-			stats.Errors.SNMP++
-			errs = append(errs, fmt.Errorf("table OID %q: %w", depOID, err))
-			continue
-		}
-		walkedData[depOID] = pdus
-		if len(pdus) > 0 {
-			stats.SNMP.TablesWalked++
+		outcome := walkPass.walk(c.tableCollector, depOID, stats)
+		if outcome.err != nil {
+			errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
 		}
 	}
 	return errors.Join(errs...)
-}
-
-func (c *Collector) collectTableBGPRowsFromCache(cfg ddprofiledefinition.BGPConfig, metricsCfg ddprofiledefinition.MetricsConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.BGPRow, bool, error) {
-	cachedOIDs, cachedTags, ok := c.tableCollector.tableCache.getCachedData(metricsCfg)
-	if !ok {
-		return nil, false, nil
-	}
-
-	columnOIDs := buildColumnOIDs(metricsCfg)
-	var oidsToGet []string
-	for _, columns := range cachedOIDs {
-		for columnOID, fullOID := range columns {
-			if _, ok := columnOIDs[columnOID]; ok {
-				oidsToGet = append(oidsToGet, fullOID)
-			}
-		}
-	}
-	if len(oidsToGet) == 0 {
-		return nil, true, nil
-	}
-
-	pdus, err := c.tableCollector.snmpGet(oidsToGet, stats)
-	if err != nil {
-		return nil, false, err
-	}
-	if len(pdus) < len(oidsToGet)/2 {
-		return nil, false, fmt.Errorf("table structure may have changed, got %d/%d PDUs", len(pdus), len(oidsToGet))
-	}
-
-	var rows []ddsnmp.BGPRow
-	for rowIndex, columns := range cachedOIDs {
-		rowPDUs := make(map[string]gosnmp.SnmpPDU)
-		for columnOID, fullOID := range columns {
-			pdu, ok := pdus[trimOID(fullOID)]
-			if ok {
-				rowPDUs[columnOID] = pdu
-			}
-		}
-		rowTags := maps.Clone(cachedTags[rowIndex])
-		row, ok, err := c.buildTableBGPRowWithTags(cfg, rowIndex, rowPDUs, rowTags, bgpValueContext{
-			rowIndex:  rowIndex,
-			rowPDUs:   rowPDUs,
-			tableName: cfg.Table.Name,
-		})
-		if err != nil {
-			return nil, false, fmt.Errorf("row %q: %w", rowIndex, err)
-		}
-		if ok {
-			rows = append(rows, row)
-		}
-	}
-	return rows, true, nil
 }
 
 func (c *Collector) buildScalarBGPRow(cfg ddprofiledefinition.BGPConfig, pdus map[string]gosnmp.SnmpPDU) (ddsnmp.BGPRow, bool, error) {
@@ -313,21 +229,23 @@ func (c *Collector) buildScalarBGPRow(cfg ddprofiledefinition.BGPConfig, pdus ma
 	return row, true, nil
 }
 
-func (c *Collector) buildTableBGPRow(cfg ddprofiledefinition.BGPConfig, rowIndex string, rowPDUs map[string]gosnmp.SnmpPDU, ctx *tableProcessingContext) (ddsnmp.BGPRow, bool, error) {
+func (c *Collector) buildTableBGPRow(
+	cfg ddprofiledefinition.BGPConfig,
+	rowIndex string,
+	rowPDUs map[string]gosnmp.SnmpPDU,
+	ctx *tableProcessingContext,
+	crossTableCtx *crossTableContext,
+	staticTags map[string]string,
+) (ddsnmp.BGPRow, bool, error) {
 	rowTags := make(map[string]string)
 	rowData := &tableRowData{
 		index:      rowIndex,
 		pdus:       rowPDUs,
 		tags:       rowTags,
-		staticTags: parseStaticTags(cfg.StaticTags),
+		staticTags: staticTags,
 		tableName:  cfg.Table.Name,
 	}
-	crossTableCtx := &crossTableContext{
-		walkedData:       ctx.walkedData,
-		tableNameToOID:   ctx.tableNameToOID,
-		lookupIndexCache: make(map[crossTableLookupKey]string),
-		rowTags:          rowData.tags,
-	}
+	crossTableCtx.rowTags = rowData.tags
 	rowCtx := &tableRowProcessingContext{
 		config:        ctx.config,
 		columnOIDs:    ctx.columnOIDs,
@@ -337,18 +255,7 @@ func (c *Collector) buildTableBGPRow(cfg ddprofiledefinition.BGPConfig, rowIndex
 	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
 		c.log.Debugf("Error processing BGP row tags for %s: %v", rowIndex, err)
 	}
-	maps.Copy(ctx.tagCache[rowIndex], rowData.tags)
 
-	return c.buildTableBGPRowWithTags(cfg, rowIndex, rowPDUs, rowData.tags, bgpValueContext{
-		rowIndex:      rowIndex,
-		rowPDUs:       rowPDUs,
-		tableName:     cfg.Table.Name,
-		crossTableCtx: crossTableCtx,
-		oidCache:      ctx.oidCache[rowIndex],
-	})
-}
-
-func (c *Collector) buildTableBGPRowWithTags(cfg ddprofiledefinition.BGPConfig, rowIndex string, rowPDUs map[string]gosnmp.SnmpPDU, rowTags map[string]string, bgpCtx bgpValueContext) (ddsnmp.BGPRow, bool, error) {
 	row := ddsnmp.BGPRow{
 		OriginProfileID: cfg.OriginProfileID,
 		Kind:            cfg.Kind,
@@ -356,18 +263,15 @@ func (c *Collector) buildTableBGPRowWithTags(cfg ddprofiledefinition.BGPConfig, 
 		Table:           cfg.Table.Name,
 		RowKey:          rowIndex,
 		StructuralID:    bgpTableStructuralID(cfg.OriginProfileID, cfg.Kind, cfg.ID, trimOID(cfg.Table.OID), rowIndex),
-		Tags:            parseStaticTags(cfg.StaticTags),
+		Tags:            maps.Clone(staticTags),
 	}
-	mergeStringMaps(row.Tags, rowTags)
+	mergeStringMaps(row.Tags, rowData.tags)
 
-	if bgpCtx.rowIndex == "" {
-		bgpCtx.rowIndex = rowIndex
-	}
-	if bgpCtx.rowPDUs == nil {
-		bgpCtx.rowPDUs = rowPDUs
-	}
-	if bgpCtx.tableName == "" {
-		bgpCtx.tableName = cfg.Table.Name
+	bgpCtx := bgpValueContext{
+		rowIndex:      rowIndex,
+		rowPDUs:       rowPDUs,
+		tableName:     cfg.Table.Name,
+		crossTableCtx: crossTableCtx,
 	}
 	if err := c.populateBGPRow(&row, cfg, bgpCtx); err != nil {
 		return ddsnmp.BGPRow{}, false, err
@@ -964,9 +868,6 @@ func (c *Collector) lookupBGPValuePDU(cfg ddprofiledefinition.BGPValueConfig, sy
 	pdu, ok := refTablePDUs[fullOID]
 	if !ok {
 		return gosnmp.SnmpPDU{}, sourceOID, false, nil
-	}
-	if ctx.oidCache != nil {
-		ctx.oidCache[sourceOID] = fullOID
 	}
 	return pdu, sourceOID, true, nil
 }

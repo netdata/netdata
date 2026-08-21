@@ -140,7 +140,7 @@ func (c *Collector) ensureInitialized() error {
 		c.addPingCharts()
 	}
 
-	c.registerDeviceState(si)
+	c.registerDeviceState(si, nil)
 
 	return nil
 }
@@ -187,13 +187,7 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 		labels["model"] = si.Model
 	}
 
-	for k, val := range deviceMeta {
-		if v, ok := labels[k]; !ok || v == "" || val.IsExactMatch {
-			labels[k] = val.Value
-		}
-	}
-
-	maps.Copy(labels, c.Vnode.Labels)
+	labels = ddsnmp.ResolveDeviceMetadata(labels, deviceMeta, c.Vnode.Labels)
 
 	return &vnodes.VirtualNode{
 		GUID:     c.Vnode.GUID,

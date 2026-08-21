@@ -95,19 +95,16 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 	if fileCfg.Socket != nil {
 		cfg.Enabled = *fileCfg.Socket
 	}
-	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
-		cfg.UpdateEvery = *fileCfg.UpdateEvery
-	}
-	if fileCfg.MapsPerCore != nil {
-		cfg.MapsPerCore = *fileCfg.MapsPerCore
-	}
-	if fileCfg.BTFPath != nil && *fileCfg.BTFPath != "" {
-		cfg.BTFPath = *fileCfg.BTFPath
-		cfg.HasBTF = kernelBTFSupported(cfg.BTFPath)
-	}
-	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
-		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
-	}
+	// Socket has no apps/cgroups/collect-pid settings of its own, so those
+	// targets stay nil and the shared merge skips them.
+	applyCommonCollectorConfig(fileCfg, collectorCommonConfig{
+		UpdateEvery:  &cfg.UpdateEvery,
+		PidTableSize: &cfg.PidTableSize,
+		MapsPerCore:  &cfg.MapsPerCore,
+		BTFPath:      &cfg.BTFPath,
+		HasBTF:       &cfg.HasBTF,
+		ObjectFlavor: &cfg.ObjectFlavor,
+	})
 	if fileCfg.SocketMonitoringTableSize != nil && *fileCfg.SocketMonitoringTableSize > 0 {
 		cfg.SocketMonitoringTableSize = applySocketTableSizeClamp(
 			*fileCfg.SocketMonitoringTableSize,
@@ -119,9 +116,6 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 			*fileCfg.UDPConnectionTableSize,
 			socketMaxUDPConnectionTableSize,
 			"udp connection table size")
-	}
-	if fileCfg.PidTable != nil && *fileCfg.PidTable > 0 {
-		cfg.PidTableSize = applyPidTableSizeClamp(*fileCfg.PidTable)
 	}
 
 	kver, isRHF, err := resolveKernelAndRH()

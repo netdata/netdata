@@ -457,6 +457,51 @@ func BenchmarkTopologyCacheFDBSnapshotReadLock(b *testing.B) {
 	}
 }
 
+func BenchmarkTopologyCacheAliasSnapshotReadLock(b *testing.B) {
+	for _, aliases := range []int{256, 4096} {
+		b.Run(fmt.Sprintf("aliases=%d", aliases), func(b *testing.B) {
+			now := time.Now()
+			cache := newTopologyCache()
+			cache.updateTime = now
+			cache.staleAfter = time.Hour
+			cache.agentID = "benchmark-agent"
+			cache.localDevice = topologymodel.Device{
+				ChassisID:     "02:00:00:00:00:01",
+				ChassisIDType: "macAddress",
+				SysName:       "benchmark-router",
+				ManagementIP:  "10.1.0.1",
+			}
+			for i := range aliases {
+				ip := benchmarkAliasIPAddress(0, i)
+				cache.localDevice.ManagementAddresses = append(cache.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
+					Address:     ip,
+					AddressType: "ipv4",
+					Source:      "ip_mib",
+				})
+				cache.l3InterfacesByIP[ip] = topologymodel.L3Interface{
+					IP:      ip,
+					Netmask: "255.255.255.0",
+					IfIndex: fmt.Sprintf("%d", i+1),
+				}
+			}
+			cache.finalizeTopologyCache()
+			if _, ok := cache.snapshotEngineObservations(); !ok {
+				b.Fatal("benchmark cache is not renderable")
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				snapshot, ok := cache.snapshotEngineObservations()
+				if !ok {
+					b.Fatal("benchmark cache became unavailable")
+				}
+				runtime.KeepAlive(snapshot)
+			}
+		})
+	}
+}
+
 func BenchmarkSNMPTopologyFunctionDefaultManagedFabricConcurrent(b *testing.B) {
 	registry := benchmarkManagedFabricFDBTopologyRegistry(8, 128, true)
 	deps := funcDepsAdapter{registry: registry}
@@ -824,6 +869,9 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 			LocalIdentifier: caches[0].localDevice.OSPFRouterID,
 			State:           "established",
 		}
+	}
+	for _, cache := range caches {
+		cache.finalizeTopologyCache()
 	}
 
 	return registry

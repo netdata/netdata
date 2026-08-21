@@ -21,6 +21,7 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 		c.markBGPCollectFailed(err)
 		return err
 	}
+	c.syncDeviceMetadata(pms)
 	if c.bgp == nil && profileMetricsHaveBGP(pms) {
 		c.enableBGPIntegration()
 	}

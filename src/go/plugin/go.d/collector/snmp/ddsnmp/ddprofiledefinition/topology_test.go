@@ -187,6 +187,47 @@ func TestValidateEnrichProfile_Topology(t *testing.T) {
 				"topology[0]: constant_value_one cannot be used in topology rows",
 			},
 		},
+		"table presence symbols reject ignored value transforms": {
+			profile: ProfileDefinition{
+				Topology: []TopologyConfig{
+					{
+						Kind: KindArpEntry,
+						MetricsConfig: MetricsConfig{
+							Table: SymbolConfig{OID: "1.3.6.1.2.1.4.35.1", Name: "ipNetToPhysicalTable"},
+							Symbols: []SymbolConfig{{
+								OID:          "1.3.6.1.2.1.4.35.1.4",
+								Name:         "ipNetToPhysicalPhysAddress",
+								ExtractValue: `([0-9a-f]+)`,
+								MatchPattern: `^([0-9a-f]+)$`,
+								MatchValue:   "$1",
+							}},
+							MetricTags: MetricTagConfigList{{Tag: "row", Index: 1}},
+						},
+					},
+				},
+			},
+			wantErrContains: []string{
+				"topology[0]: extract_value cannot be used on table presence symbols",
+				"topology[0]: match_pattern cannot be used on table presence symbols",
+				"topology[0]: match_value cannot be used on table presence symbols",
+			},
+		},
+		"scalar topology value transforms remain valid": {
+			profile: ProfileDefinition{
+				Topology: []TopologyConfig{
+					{
+						Kind: KindIfStatus,
+						MetricsConfig: MetricsConfig{Symbol: SymbolConfig{
+							OID:          "1.3.6.1.4.1.99999.1.0",
+							Name:         "scalarTopologyState",
+							ExtractValue: `state=(\d+)`,
+							MatchPattern: `^(\d+)$`,
+							MatchValue:   "$1",
+						}},
+					},
+				},
+			},
+		},
 		"metric tag extraction fields remain valid": {
 			profile: ProfileDefinition{
 				Topology: []TopologyConfig{

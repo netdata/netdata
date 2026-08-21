@@ -3,6 +3,8 @@ extends:
   - _cisco-base.yaml
   - _cisco-bgp4-mib.yaml
   - _cisco-voice.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 selector:
   - sysobjectid:

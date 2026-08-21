@@ -35,13 +35,19 @@ FLOWS_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'metadata.yaml', False),
 ]
 
+EBPFGO_PATH = REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin'
+
 TAXONOMY_SOURCES = [
     *COLLECTOR_SOURCES,
     *FLOWS_SOURCES,
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'taxonomy.yaml', False),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'taxonomy.yaml', False),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'dns' / 'taxonomy.yaml', False),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'socket' / 'taxonomy.yaml', False),
+    # ebpf-go.plugin declares one taxonomy.yaml per module.  They must be listed
+    # individually because the recursive src/collectors entry only globs
+    # <plugin>/taxonomy.yaml, one level deep (see discover_taxonomy_files).
+    (AGENT_REPO, EBPFGO_PATH / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'dcstat' / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'dns' / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'socket' / 'taxonomy.yaml', False),
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)

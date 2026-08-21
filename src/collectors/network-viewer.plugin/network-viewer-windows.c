@@ -4,89 +4,16 @@
 #include "libnetdata/os/windows-perflib/perflib.h"
 #include "libnetdata/os/system-maps/system-services.h"
 #include "libnetdata/os/system-maps/cached-sid-username.h"
+#include "network-viewer-topology.h"
 
-// Minimal IP Helper API forward declarations.
-// <winsock2.h> and <ws2tcpip.h> cannot be included here: libnetdata.h already
-// pulls in POSIX socket headers (via uv.h), and the Windows headers redefine
-// hostent, sockaddr, pollfd etc. causing compile errors on Cygwin/MSYS2.
-// Base types (DWORD, ULONG, UCHAR, BOOL, PVOID, PDWORD) come from <windows.h>
-// which is included for OS_WINDOWS by libnetdata/common.h.
-// inet_ntop / struct in_addr / AF_INET* / INET6_ADDRSTRLEN come from the
-// POSIX headers already included by libnetdata.h.
-
-#define MIB_TCP_STATE_CLOSED     1
-#define MIB_TCP_STATE_LISTEN     2
-#define MIB_TCP_STATE_SYN_SENT   3
-#define MIB_TCP_STATE_SYN_RCVD   4
-#define MIB_TCP_STATE_ESTAB      5
-#define MIB_TCP_STATE_FIN_WAIT1  6
-#define MIB_TCP_STATE_FIN_WAIT2  7
-#define MIB_TCP_STATE_CLOSE_WAIT 8
-#define MIB_TCP_STATE_CLOSING    9
-#define MIB_TCP_STATE_LAST_ACK  10
-#define MIB_TCP_STATE_TIME_WAIT 11
-#define MIB_TCP_STATE_DELETE_TCB 12
-
-typedef enum { TCP_TABLE_OWNER_PID_ALL = 5 } TCP_TABLE_CLASS;
-typedef enum { UDP_TABLE_OWNER_PID = 1 }    UDP_TABLE_CLASS;
-
-typedef struct {
-    DWORD dwState;
-    DWORD dwLocalAddr;
-    DWORD dwLocalPort;
-    DWORD dwRemoteAddr;
-    DWORD dwRemotePort;
-    DWORD dwOwningPid;
-} MIB_TCPROW_OWNER_PID;
-
-typedef struct {
-    UCHAR ucLocalAddr[16];
-    DWORD dwLocalScopeId;
-    DWORD dwLocalPort;
-    UCHAR ucRemoteAddr[16];
-    DWORD dwRemoteScopeId;
-    DWORD dwRemotePort;
-    DWORD dwState;
-    DWORD dwOwningPid;
-} MIB_TCP6ROW_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_TCPROW_OWNER_PID table[];
-} MIB_TCPTABLE_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_TCP6ROW_OWNER_PID table[];
-} MIB_TCP6TABLE_OWNER_PID;
-
-typedef struct {
-    DWORD dwLocalAddr;
-    DWORD dwLocalPort;
-    DWORD dwOwningPid;
-} MIB_UDPROW_OWNER_PID;
-
-typedef struct {
-    UCHAR ucLocalAddr[16];
-    DWORD dwLocalScopeId;
-    DWORD dwLocalPort;
-    DWORD dwOwningPid;
-} MIB_UDP6ROW_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_UDPROW_OWNER_PID table[];
-} MIB_UDPTABLE_OWNER_PID;
-
-typedef struct {
-    DWORD dwNumEntries;
-    MIB_UDP6ROW_OWNER_PID table[];
-} MIB_UDP6TABLE_OWNER_PID;
-
-DWORD WINAPI GetExtendedTcpTable(PVOID pTcpTable, PDWORD pdwSize, BOOL bOrder,
-                                 ULONG ulAf, TCP_TABLE_CLASS TableClass, ULONG Reserved);
-DWORD WINAPI GetExtendedUdpTable(PVOID pUdpTable, PDWORD pdwSize, BOOL bOrder,
-                                 ULONG ulAf, UDP_TABLE_CLASS TableClass, ULONG Reserved);
+// IP Helper API types and prototypes come from local-sockets-windows.h
+// (included through network-viewer-topology.h); winsock2.h/ws2tcpip.h cannot
+// be included here: libnetdata.h already pulls in POSIX socket headers (via
+// uv.h), and the Windows headers redefine hostent, sockaddr, pollfd etc.
+// causing compile errors on Cygwin/MSYS2. inet_ntop / struct in_addr /
+// AF_INET* / INET6_ADDRSTRLEN come from the POSIX headers already included
+// by libnetdata.h. Base types come from <windows.h> which is included for
+// OS_WINDOWS by libnetdata/common.h.
 
 // Windows-native AF_ values for IP Helper API calls.
 // Cygwin POSIX headers define AF_INET6=10; Windows APIs expect 23.
@@ -1276,6 +1203,81 @@ emit_done:;
 
 int main(int argc, char **argv)
 {
+    // --test topology:network-connections < payload... : render one topology
+    // payload from stdin and print it, without talking to the pluginsd peer.
+    if(argc > 1 && strcmp(argv[1], "--test") == 0) {
+        netdata_mutex_init(&stdout_mutex);
+        nd_log_initialize_for_external_plugins("network-viewer.plugin");
+        netdata_threads_init_for_external_plugins(0);
+        cached_sid_username_init();
+
+        const char *function = NULL;
+        uint64_t timeout_seconds = 60;
+        bool bad_args = false;
+        for(int i = 2; i < argc && !bad_args; i++) {
+            if(strcmp(argv[i], "--timeout") == 0) {
+                if(i + 1 >= argc) {
+                    fprintf(stderr, "--timeout requires a value\n");
+                    bad_args = true;
+                }
+                else
+                    timeout_seconds = str2ull(argv[++i], NULL);
+            }
+            else if(strncmp(argv[i], "--", 2) == 0) {
+                fprintf(stderr, "unrecognized option '%s'\n", argv[i]);
+                bad_args = true;
+            }
+            else if(!function)
+                function = argv[i];
+        }
+        if(bad_args) {
+            netdata_mutex_destroy(&stdout_mutex);
+            return 2;
+        }
+
+        if(!function || strcmp(function, NETWORK_TOPOLOGY_VIEWER_FUNCTION) != 0) {
+            fprintf(stderr, "supported network-viewer test function: %s\n", NETWORK_TOPOLOGY_VIEWER_FUNCTION);
+            netdata_mutex_destroy(&stdout_mutex);
+            return 2;
+        }
+
+        BUFFER *payload = buffer_create(0, NULL);
+        char buf[65536];
+        size_t total = 0;
+        for(;;) {
+            size_t n = fread(buf, 1, sizeof(buf), stdin);
+            if(n == 0)
+                break;
+            total += n;
+            if(total > (16ULL * 1024ULL * 1024ULL)) {
+                fprintf(stderr, "network-viewer --test: request payload too large\n");
+                buffer_free(payload);
+                netdata_mutex_destroy(&stdout_mutex);
+                return 1;
+            }
+            buffer_memcat(payload, buf, n);
+        }
+
+        bool cancelled = false;
+        usec_t stop_monotonic_ut = now_monotonic_usec() + timeout_seconds * USEC_PER_SEC;
+        char *function_copy = strdupz(function);
+        BUFFER *result = network_viewer_topology_result(
+            function_copy, &stop_monotonic_ut, &cancelled, payload);
+        if(result) {
+            netdata_mutex_lock(&stdout_mutex);
+            pluginsd_function_result_to_stdout("123", result);
+            netdata_mutex_unlock(&stdout_mutex);
+        }
+        fflush(stdout);
+
+        int rc = (!result || result->response_code < HTTP_RESP_OK || result->response_code >= 300) ? 1 : 0;
+        buffer_free(result);
+        freez(function_copy);
+        buffer_free(payload);
+        netdata_mutex_destroy(&stdout_mutex);
+        return rc;
+    }
+
     netdata_mutex_init(&stdout_mutex);
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
     netdata_threads_init_for_external_plugins(0);
@@ -1314,6 +1316,11 @@ int main(int argc, char **argv)
             NV_WIN_FUNCTION_CONN, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NV_WIN_FUNCTION_CONN_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             NV_WIN_FUNCTION_PRIORITY);
+    fprintf(stdout,
+            PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
+            NETWORK_TOPOLOGY_VIEWER_FUNCTION, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NETWORK_TOPOLOGY_VIEWER_HELP,
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
+            RRDFUNCTIONS_PRIORITY_DEFAULT);
 
     fflush(stdout);
 
@@ -1324,6 +1331,9 @@ int main(int argc, char **argv)
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
     functions_evloop_add_function(wg, NV_WIN_FUNCTION_CONN, function_network_connections,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
+    functions_evloop_add_function(wg, NETWORK_TOPOLOGY_VIEWER_FUNCTION,
+                                  network_viewer_topology_function,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
     usec_t send_newline_ut = 0;

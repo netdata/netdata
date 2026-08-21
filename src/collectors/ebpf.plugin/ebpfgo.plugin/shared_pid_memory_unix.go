@@ -11,9 +11,17 @@ package main
 // Inline offset getters for per-field ABI verification in assertSharedPidMemoryLayout.
 // Declared as static inline to avoid external-linkage requirements across CGo
 // translation units; CGo inlines the call and needs no exported symbol.
-static inline size_t ebpf_pid_stat_off_pid_fn(void)    { return offsetof(struct ebpf_pid_stat, pid); }
+static inline size_t ebpf_pid_stat_off_pid_fn(void) { return offsetof(struct ebpf_pid_stat, pid); }
+static inline size_t ebpf_pid_stat_off_comm_fn(void) { return offsetof(struct ebpf_pid_stat, comm); }
+static inline size_t ebpf_pid_stat_off_ppid_fn(void) { return offsetof(struct ebpf_pid_stat, ppid); }
+static inline size_t ebpf_pid_stat_off_cachestat_fn(void) { return offsetof(struct ebpf_pid_stat, cachestat); }
+static inline size_t ebpf_pid_stat_off_dc_fn(void) { return offsetof(struct ebpf_pid_stat, dc); }
+static inline size_t ebpf_pid_stat_off_fd_fn(void) { return offsetof(struct ebpf_pid_stat, fd); }
+static inline size_t ebpf_pid_stat_off_process_fn(void) { return offsetof(struct ebpf_pid_stat, process); }
+static inline size_t ebpf_pid_stat_off_shm_fn(void) { return offsetof(struct ebpf_pid_stat, shm); }
+static inline size_t ebpf_pid_stat_off_swap_fn(void) { return offsetof(struct ebpf_pid_stat, swap); }
 static inline size_t ebpf_pid_stat_off_socket_fn(void) { return offsetof(struct ebpf_pid_stat, socket); }
-static inline size_t ebpf_pid_stat_off_vfs_fn(void)    { return offsetof(struct ebpf_pid_stat, vfs); }
+static inline size_t ebpf_pid_stat_off_vfs_fn(void) { return offsetof(struct ebpf_pid_stat, vfs); }
 */
 import "C"
 
@@ -25,20 +33,38 @@ import (
 const sharedPidMemoryRowSize = C.sizeof_struct_ebpf_pid_stat
 
 // assertSharedPidMemoryLayout panics if the Go ebpfPidStat layout drifts from
-// the C struct.  Checks both total size and key field offsets so a field
-// reorder that preserves struct size is also caught.
+// the C struct.
+//
+// EVERY field is checked, not a sample: the total size catches a field being
+// added or resized, but a reorder that preserves size (two same-width modules
+// swapped) moves offsets while sizeof stays put, so a partial check lets it
+// through silently and every consumer then reads the wrong module's counters.
 func assertSharedPidMemoryLayout() {
 	if got := unsafe.Sizeof(ebpfPidStat{}); got != uintptr(sharedPidMemoryRowSize) {
 		panic(fmt.Sprintf("ebpf_pid_stat ABI mismatch: Go=%d C=%d", got, sharedPidMemoryRowSize))
 	}
-	if got, want := unsafe.Offsetof(ebpfPidStat{}.pid), uintptr(C.ebpf_pid_stat_off_pid_fn()); got != want {
-		panic(fmt.Sprintf("ebpf_pid_stat.pid offset mismatch: Go=%d C=%d", got, want))
-	}
-	if got, want := unsafe.Offsetof(ebpfPidStat{}.socket), uintptr(C.ebpf_pid_stat_off_socket_fn()); got != want {
-		panic(fmt.Sprintf("ebpf_pid_stat.socket offset mismatch: Go=%d C=%d", got, want))
-	}
-	if got, want := unsafe.Offsetof(ebpfPidStat{}.vfs), uintptr(C.ebpf_pid_stat_off_vfs_fn()); got != want {
-		panic(fmt.Sprintf("ebpf_pid_stat.vfs offset mismatch: Go=%d C=%d", got, want))
+
+	var row ebpfPidStat
+	for _, f := range []struct {
+		name string
+		got  uintptr
+		want uintptr
+	}{
+		{"pid", unsafe.Offsetof(row.pid), uintptr(C.ebpf_pid_stat_off_pid_fn())},
+		{"comm", unsafe.Offsetof(row.comm), uintptr(C.ebpf_pid_stat_off_comm_fn())},
+		{"ppid", unsafe.Offsetof(row.ppid), uintptr(C.ebpf_pid_stat_off_ppid_fn())},
+		{"cachestat", unsafe.Offsetof(row.cachestat), uintptr(C.ebpf_pid_stat_off_cachestat_fn())},
+		{"dc", unsafe.Offsetof(row.dc), uintptr(C.ebpf_pid_stat_off_dc_fn())},
+		{"fd", unsafe.Offsetof(row.fd), uintptr(C.ebpf_pid_stat_off_fd_fn())},
+		{"process", unsafe.Offsetof(row.process), uintptr(C.ebpf_pid_stat_off_process_fn())},
+		{"shm", unsafe.Offsetof(row.shm), uintptr(C.ebpf_pid_stat_off_shm_fn())},
+		{"swap", unsafe.Offsetof(row.swap), uintptr(C.ebpf_pid_stat_off_swap_fn())},
+		{"socket", unsafe.Offsetof(row.socket), uintptr(C.ebpf_pid_stat_off_socket_fn())},
+		{"vfs", unsafe.Offsetof(row.vfs), uintptr(C.ebpf_pid_stat_off_vfs_fn())},
+	} {
+		if f.got != f.want {
+			panic(fmt.Sprintf("ebpf_pid_stat.%s offset mismatch: Go=%d C=%d", f.name, f.got, f.want))
+		}
 	}
 }
 
