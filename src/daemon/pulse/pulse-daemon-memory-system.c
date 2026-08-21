@@ -124,7 +124,7 @@ void pulse_daemon_memory_system_do(bool extended) {
     // it is therefore a last-known value, at most PULSE_GLIBC_MALLINFO_UPDATE_EVERY stale.
     static size_t glibc_mmaps = 0;
 
-    bool have_mallinfo = false; (void)have_mallinfo;
+    bool have_mallinfo = false;
 
 #ifdef HAVE_C_MALLINFO2
     // latched on the first call: whether mallinfo2() gives us usable numbers. This must
@@ -222,6 +222,10 @@ void pulse_daemon_memory_system_do(bool extended) {
     }
     have_mallinfo = mallinfo_usable;
 #endif // HAVE_C_MALLINFO2
+
+    // read only under HAVE_C_MALLOC_INFO below; keep the cast here, after the last
+    // assignment, so builds without that macro do not report an unread store.
+    (void)have_mallinfo;
 
 #ifdef HAVE_C_MALLOC_INFO
     size_t glibc_arenas, glibc_allocated_arenas, glibc_unused_fast, glibc_unused_rest, glibc_allocated_mmap;
