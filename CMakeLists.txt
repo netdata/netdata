@@ -1069,14 +1069,7 @@ include(NetdataPluginSystemdJournal)
 
 include(NetdataPluginSystemdUnits)
 
-if(OS_WINDOWS)
-        add_executable(windows-events.plugin ${WINDOWS_EVENTS_PLUGIN_FILES})
-        target_link_libraries(windows-events.plugin libnetdata wevtapi)
-
-        install(TARGETS windows-events.plugin
-                COMPONENT plugin-windows-events
-                DESTINATION ${PLUGINS_DEST})
-endif()
+include(NetdataPluginWindowsEvents)
 
 if(OS_MACOS AND OSLOG AND FOUNDATION)
         add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})

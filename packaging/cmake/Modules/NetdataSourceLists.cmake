@@ -1135,26 +1135,6 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/proc.plugin/zfs_common.h
 )
 
-set(WINDOWS_EVENTS_PLUGIN_FILES
-        src/collectors/windows-events.plugin/windows-events.c
-        src/collectors/windows-events.plugin/windows-events.h
-        src/collectors/windows-events.plugin/windows-events-query.h
-        src/collectors/windows-events.plugin/windows-events-query.c
-        src/collectors/windows-events.plugin/windows-events-sources.c
-        src/collectors/windows-events.plugin/windows-events-sources.h
-        src/collectors/windows-events.plugin/windows-events-unicode.c
-        src/collectors/windows-events.plugin/windows-events-unicode.h
-        src/collectors/windows-events.plugin/windows-events-xml.c
-        src/collectors/windows-events.plugin/windows-events-xml.h
-        src/collectors/windows-events.plugin/windows-events-providers.c
-        src/collectors/windows-events.plugin/windows-events-providers.h
-        src/collectors/windows-events.plugin/windows-events-fields-cache.c
-        src/collectors/windows-events.plugin/windows-events-fields-cache.h
-        src/collectors/windows-events.plugin/windows-events-query-builder.c
-        src/collectors/windows-events.plugin/windows-events-query-builder.h
-        src/collectors/windows-events.plugin/windows-events-query-evt-variant.c
-)
-
 set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/windows_plugin.c
         src/collectors/windows.plugin/windows_plugin.h
