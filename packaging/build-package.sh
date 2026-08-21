@@ -131,7 +131,7 @@ case "${PKG_TYPE}" in
         fi
         ;;
     RPM)
-        # Mirrors the per-distro conditionals of netdata.spec.in's %build.
+        # Per-distro build conditionals for the RPM family.
         add_cmake_option NETDATA_PACKAGING_FORMAT rpm
 
         arch="$(uname -m)"
@@ -147,10 +147,9 @@ case "${PKG_TYPE}" in
             *suse*|sles) is_suse=1 ;;
         esac
 
-        # "Legacy" is the spec's centos_ver == 7 tier: EL <= 7 plus Amazon
-        # Linux 2, which lands there because it defines %rhel 7 and the spec
-        # remaps %rhel into centos_ver. EL 6 and i386 are not distinguished
-        # (end-of-life, not part of the RPM build matrix).
+        # The "legacy" tier is EL <= 7 plus Amazon Linux 2, which belongs
+        # there because it reports itself as RHEL 7. EL 6 and i386 are not
+        # distinguished (end-of-life, not part of the RPM build matrix).
         is_legacy_rpm=0
         if { [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; } || \
            { [ "${ID}" = "amzn" ] && [ "${distro_major}" -le 2 ]; }; then
@@ -199,14 +198,14 @@ case "${PKG_TYPE}" in
             add_cmake_option ENABLE_EXPORTER_MONGODB On
         fi
 
-        # openSUSE plus the legacy tier, matching the spec.
+        # openSUSE and the legacy tier build against the bundled protobuf.
         if [ "${is_suse}" = 1 ] || [ "${is_legacy_rpm}" = 1 ]; then
             add_cmake_option ENABLE_BUNDLED_PROTOBUF On
         fi
 
         # RPM distros ship no static libprotobuf, and netdata's protobuf
         # detection prefers static libs; point it at the shared library
-        # explicitly, exactly like the spec's %build does.
+        # explicitly.
         for _pb in /usr/lib64/libprotobuf.so /usr/lib/libprotobuf.so; do
             if [ -e "${_pb}" ]; then
                 add_cmake_option Protobuf_LIBRARY "${_pb}"
@@ -225,17 +224,17 @@ case "${PKG_TYPE}" in
             add_cmake_option FORCE_LEGACY_LIBBPF On
         fi
 
-        # The spec builds through the distro %cmake macro. Reproduce its
-        # build environment, or the binaries differ (missing hardening and
-        # fortified symbols, extra sonames without --as-needed).
+        # Distro RPM builds go through the %cmake macro, which exports the
+        # distro's own optimization and hardening flags. Reproduce that
+        # environment here, or the binaries differ: missing hardening and
+        # fortified symbols, and extra sonames without --as-needed.
         # CMAKE_BUILD_TYPE needs no handling: the top-level CMakeLists.txt
         # defaults an unset value to RelWithDebInfo on every configure.
         #
-        # The legacy tier is the exception: there the spec redefines %cmake
-        # to a bare /cmake/bin/cmake invocation (netdata.spec.in, the
-        # "%global __cmake" blocks) with no flag exports, so exporting
-        # %{optflags} here would over-harden the binaries relative to the
-        # spec build.
+        # The legacy tier is the exception: it builds with a plain cmake
+        # invocation and no flag exports at all, so exporting %{optflags}
+        # there would over-harden its binaries relative to what that tier
+        # has always shipped.
         if [ "${is_legacy_rpm}" = 0 ]; then
             CFLAGS="${CFLAGS:-$(rpm -E '%{?build_cflags}')}"
             [ -n "${CFLAGS}" ] || CFLAGS="$(rpm -E '%{?optflags}')"
@@ -256,9 +255,9 @@ case "${PKG_TYPE}" in
             add_cmake_option CMAKE_SHARED_LINKER_FLAGS "-Wl,--as-needed -Wl,-z,now"
         fi
 
-        # The spec builds the Rust plugins only when a Rust toolchain is
-        # present; the v2 builder images always ship one, so this matters
-        # only if the script runs outside them.
+        # The Rust plugins are built only when a Rust toolchain is present;
+        # the v2 builder images always ship one, so this matters only if the
+        # script runs outside them.
         if ! command -v rustc >/dev/null 2>&1; then
             add_cmake_option ENABLE_PLUGIN_NETFLOW Off
             add_cmake_option ENABLE_PLUGIN_OTEL Off

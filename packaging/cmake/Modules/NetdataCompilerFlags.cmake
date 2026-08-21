@@ -107,12 +107,9 @@ endif()
 # well. What does change: source installs, the Docker image, and plain cmake
 # invocations now build without LTO unless asked.
 #
-# One package path is deliberately left changed. netdata.spec.in only passes
-# -DUSE_LTO=Off under "%if 0%{?suse_version}", so every other spec build relied on
-# the old default and now loses LTO. That path builds the v1 builder images, which
-# no distro in .github/data/distros.yml uses any more, and the spec is slated for
-# removal; the parity harness compares package metadata rather than payload bytes,
-# so it would not have caught the difference either way.
+# One package path was deliberately left changed: the retired v1 builder images
+# relied on the old default and lose LTO. No distro in .github/data/distros.yml
+# uses them any more.
 option(USE_LTO "Use link-time optimization. Off by default: it slows the build down a lot and has needed per-target workarounds." FALSE)
 
 option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)

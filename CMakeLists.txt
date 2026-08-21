@@ -153,8 +153,9 @@ endif()
 # drift apart. New install rules must use a *_DEST variable, not a literal path.
 #
 # This covers install() destinations only. The CPack manifests and the RPM file
-# lists in packaging/cmake/Modules/ still spell the layout out, deliberately, to
-# mirror netdata.spec.in; they do not read these variables.
+# lists in packaging/cmake/Modules/ still spell the layout out, deliberately,
+# because they describe package ownership rather than staging; they do not read
+# these variables.
 #
 # *_DIR reaches the rest of the product through config.h (C), -ldflags (Go),
 # corrosion env vars (Rust) and configure_file (shell, service units); the daemon
@@ -284,9 +285,9 @@ if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
         message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
 endif()
 
-# A few payloads live in different packages per format: the spec keeps the
-# sensors3/otel stock configs and nd-mcp in the main RPM and the swagger
-# files in the dashboard RPM, while the DEB layout groups them with their
+# A few payloads live in different packages per format: RPM keeps the
+# sensors3/otel stock configs and nd-mcp in the main package and the swagger
+# files in the dashboard package, while the DEB layout groups them with their
 # plugins (and swagger with the main package).
 if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         set(NETDATA_SENSORS3_COMPONENT netdata)
@@ -576,8 +577,8 @@ set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
 include(NetdataOSRelease)
 
-# DEB policy requires a copyright file in every binary package; RPMs do not
-# ship one (netdata.spec.in never packaged it).
+# DEB policy requires a copyright file in every binary package; RPMs
+# deliberately do not ship one.
 function(netdata_add_deb_copyright component package_name)
         if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
                 install(FILES
@@ -4248,8 +4249,8 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${SYSTEM_DEST}/systemd/tmpfiles)
 
-# The spec packages the systemd-235-compatible unit variant on EL 7 and
-# Amazon Linux 2.
+# EL 7 and Amazon Linux 2 package the systemd-235-compatible unit variant,
+# because their systemd predates the directives the default unit uses.
 set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service")
 if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND
    ((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
@@ -4330,8 +4331,7 @@ if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
 endif()
 
 if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
-        # The spec's %install stages these RPM-only files; no other install
-        # rule covers them.
+        # RPM-only payloads; no other install rule covers them.
         install(PROGRAMS
                 packaging/installer/netdata-uninstaller.sh
                 COMPONENT netdata
@@ -4376,8 +4376,8 @@ if(NOT OS_WINDOWS)
           DESTINATION ${NETDATA_CONF_DEST})
 
   if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
-    # The spec ships the stock copies under /usr/lib/netdata/conf.d in
-    # addition to the %config(noreplace) ones in /etc/netdata.
+    # RPMs ship the stock copies under /usr/lib/netdata/conf.d in addition to
+    # the %config(noreplace) ones in /etc/netdata.
     install(FILES
             system/netdata.conf
             system/netdata-updater.conf
