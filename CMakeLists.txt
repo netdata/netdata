@@ -4454,38 +4454,11 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION ${PLUGINS_DEST})
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        install(PROGRAMS
-                src/health/notifications/alarm-email.sh
-                src/health/notifications/alarm-test.sh
-                COMPONENT netdata
-                DESTINATION ${PLUGINS_DEST})
-endif()
-
 install(FILES
         src/health/notifications/health_alarm_notify.conf
         src/health/notifications/health_email_recipients.conf
         COMPONENT netdata
         DESTINATION ${LIBCONFIG_DEST})
-#
-# test/ files
-#
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        configure_file(tests/health_mgmtapi/health-cmdapi-test.sh.in tests/health_mgmtapi/health-cmdapi-test.sh @ONLY)
-        configure_file(tests/acls/acl.sh.in tests/acls/acl.sh @ONLY)
-        configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
-        configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
-        configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
-        install(FILES
-                ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
-                ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
-                ${CMAKE_BINARY_DIR}/tests/urls/request.sh
-                ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
-                ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
-                DESTINATION ${PLUGINS_DEST})
-endif()
-
 #
 # charts.d plugin
 #

@@ -147,17 +147,12 @@ tests/profile/benchmark-line-parsing
 tests/profile/benchmark-procfile-parser
 tests/profile/benchmark-value-pairs
 tests/profile/statsd-stress
-tests/health_mgmtapi/health-cmdapi-test.sh
 oprofile_data/
 vgcore.*
 callgrind.out.*
 gmon.out
 gmon.txt
 sitespeed-result/
-tests/acls/acl.sh
-tests/urls/request.sh
-tests/alarm_repetition/alarm.sh
-tests/template_dimension/template_dim.sh
 tests/ebpf/ebpf_thread_function.sh
 aclk/legacy/tests/install-fake-charts.d.sh
 

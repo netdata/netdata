@@ -1,6 +1,6 @@
 # Health command API tester
 
-The directory `tests/health_cmdapi` contains the test script `health-cmdapi-test.sh` for the [health command API](/src/web/api/health/README.md).
+The directory `tests/health_cmdapi` contains the test script `health-cmdapi-test.sh.in` for the [health command API](/src/web/api/health/README.md). The build no longer generates it; substitute `@varlibdir_POST@` by hand to run it.
 
 The script can be executed with options to prepare the system for the tests, run them and restore the system to its previous state. 
 
