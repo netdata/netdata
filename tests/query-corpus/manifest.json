@@ -941,6 +941,14 @@
     "proves": "archived dense and alternating-gap incremental metrics with no tier-0 retention or pre-restart live/cache state preserve exact row evidence from retained tier 1 in both forced-tier and automatic queries: dense numeric rows remain clean and every gapped numeric row is PARTIAL"
   },
   {
+    "name": "CASE-039/sparse-active-latest-table",
+    "proves": "a one-point LATEST query returns the newest value of an active gauge on the exact request-derived timestamp grid, without storage reads, for one-minute and fifteen-minute hot-edge windows through update_every=86400; the latest collection interval is eligible at its exact endpoint and expires one second later"
+  },
+  {
+    "name": "CASE-039/sparse-active-chart",
+    "proves": "an ordinary chart query keeps an active gauge visible for one-minute and fifteen-minute hot-edge windows through update_every=86400, carrying the newest value when the requested window starts after the sample but its next collection is not due"
+  },
+  {
     "name": "CASE-019/v1-json-name-escaping",
     "proves": "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
     "fixed_by": "#23216"
