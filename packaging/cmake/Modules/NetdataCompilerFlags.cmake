@@ -87,11 +87,33 @@ endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
-  option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." FALSE)
 else()
   option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" FALSE)
-  option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." TRUE)
 endif()
+
+# LTO is opt-in, for every build type.
+#
+# It was turned off by default in 2021 (commit 0447a2d40d) because it slows the
+# build down a lot and causes strange linking errors. The move to CMake turned it
+# back on for every build type except Debug, which left netdata-installer.sh
+# saying "--enable-lto ... Default: disabled" while every source build in fact
+# used it. Neither of the 2021 reasons had gone away: this file still needs a
+# per-target workaround for it (see network-viewer.plugin in CMakeLists.txt), and
+# the openSUSE package build still turns it off.
+#
+# packaging/build-package.sh asks for it explicitly, so the DEB and RPM packages
+# CI builds are unchanged, and the makeself static build asks for it too
+# (packaging/makeself/jobs/70-netdata-git.install.sh), so those are unchanged as
+# well. What does change: source installs, the Docker image, and plain cmake
+# invocations now build without LTO unless asked.
+#
+# One package path is deliberately left changed. netdata.spec.in only passes
+# -DUSE_LTO=Off under "%if 0%{?suse_version}", so every other spec build relied on
+# the old default and now loses LTO. That path builds the v1 builder images, which
+# no distro in .github/data/distros.yml uses any more, and the spec is slated for
+# removal; the parity harness compares package metadata rather than payload bytes,
+# so it would not have caught the difference either way.
+option(USE_LTO "Use link-time optimization. Off by default: it slows the build down a lot and has needed per-target workarounds." FALSE)
 
 option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
 mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
