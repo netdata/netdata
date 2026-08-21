@@ -106,33 +106,6 @@ ebpf_module_t ebpf_modules[] = {
      .maps_per_core = CONFIG_BOOLEAN_YES,
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
-    {.info = {.thread_name = "dc", .config_name = "dc", .thread_description = NETDATA_EBPF_DC_MODULE_DESC},
-     .functions =
-         {.start_routine = ebpf_dcstat_thread,
-          .apps_routine = ebpf_dcstat_create_apps_charts,
-          .bpf_unload = ebpf_dcstat_unload_bpf},
-     .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
-     .update_every = EBPF_DEFAULT_UPDATE_EVERY,
-     .global_charts = 1,
-     .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
-     .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT,
-     .cgroup_charts = CONFIG_BOOLEAN_NO,
-     .mode = MODE_ENTRY,
-     .optional = 0,
-     .maps = dcstat_maps,
-     .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE,
-     .names = NULL,
-     .cfg = &dcstat_config,
-     .config_file = NETDATA_DIRECTORY_DCSTAT_CONFIG_FILE,
-     .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
-     .load = EBPF_LOAD_LEGACY,
-     .targets = dc_targets,
-     .probe_links = NULL,
-     .objects = NULL,
-     .thread = NULL,
-     .maps_per_core = CONFIG_BOOLEAN_YES,
-     .lifetime = EBPF_DEFAULT_LIFETIME,
-     .running_time = 0},
     {.info = {.thread_name = "swap", .config_name = "swap", .thread_description = NETDATA_EBPF_SWAP_MODULE_DESC},
      .functions =
          {.start_routine = ebpf_swap_thread,
@@ -467,14 +440,6 @@ struct netdata_static_thread ebpf_threads[] = {
      .init_routine = NULL,
      .start_routine = NULL},
     {.name = "EBPF SYNC",
-     .config_section = NULL,
-     .config_name = NULL,
-     .env_name = NULL,
-     .enabled = 1,
-     .thread = NULL,
-     .init_routine = NULL,
-     .start_routine = NULL},
-    {.name = "EBPF DCSTAT",
      .config_section = NULL,
      .config_name = NULL,
      .env_name = NULL,
@@ -1113,7 +1078,6 @@ static void ebpf_parse_args(int argc, char **argv)
     static struct option long_options[] = {
         {"process", no_argument, 0, 0},
         {"sync", no_argument, 0, 0},
-        {"dcstat", no_argument, 0, 0},
         {"swap", no_argument, 0, 0},
         {"vfs", no_argument, 0, 0},
         {"filesystem", no_argument, 0, 0},
@@ -1175,14 +1139,6 @@ static void ebpf_parse_args(int argc, char **argv)
                 select_threads |= 1 << EBPF_MODULE_SYNC_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("EBPF enabling \"SYNC\" chart, because it was started with the option \"[-]-sync\".");
-#endif
-                break;
-            }
-            case EBPF_MODULE_DCSTAT_IDX: {
-                select_threads |= 1 << EBPF_MODULE_DCSTAT_IDX;
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info(
-                    "EBPF enabling \"DCSTAT\" charts, because it was started with the option \"[-]-dcstat\".");
 #endif
                 break;
             }

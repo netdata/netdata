@@ -255,9 +255,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
 
 You can also enable the following eBPF programs:
 
-- `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
-    `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
-    not found.
+- `dcstat`: The eBPFGo program creates charts that show file access through the directory cache. Its object flavor uses
+    `lookup_fast()` and `d_lookup()` instrumentation to distinguish cache hits, slow-path lookups, and misses.
 - `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
 - `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 - `swap` : This eBPF program creates charts that show information about swap access.
@@ -280,7 +279,8 @@ To configure an eBPF thread:
 2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
     - `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
-    - `dcstat.conf`: Configuration for the `dcstat` thread.
+    - `dcstat.conf`: Legacy compatibility overlay for the eBPFGo `dcstat` program. Prefer enabling `dcstat` in the
+      `[ebpf programs]` section of `ebpf.d.conf`.
     - `disk.conf`: Configuration for the `disk` thread.
     - `dns.conf`: Configuration for the `dns` thread.
     - `fd.conf`: Configuration for the `file descriptor` thread.
@@ -761,9 +761,8 @@ This chart shows the number of calls to `vfs_open`. This function is responsible
 
 #### Directory Cache
 
-Metrics for directory cache are collected using kprobe for `lookup_fast`, because we are interested in the number of
-times this function is accessed. On the other hand, for `d_lookup` we are not only interested in the number of times it
-is accessed, but also in possible errors, so we need to attach a `kretprobe`. For this reason, the following is used:
+The eBPFGo dcstat collector instruments `lookup_fast` for cache lookups and `d_lookup` for slow-path results. The selected
+eBPF object flavor supplies the appropriate attachment method for the running kernel.
 
 - [`lookup_fast`](https://lwn.net/Articles/649115/): Called to look at data inside the directory cache.
 - [`d_lookup`](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/fs/dcache.c?id=052b398a43a7de8c68c13e7fa05d6b3d16ce6801#n2223):

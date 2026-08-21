@@ -22,7 +22,7 @@ func writeTempConfig(t *testing.T, filename, content string) string {
 func parseTempConfig(t *testing.T, filename, content string) pluginConfigFile {
 	t.Helper()
 	path := writeTempConfig(t, filename, content)
-	cfg, ok, err := parsePluginConfigFile(path)
+	cfg, ok, err := parsePluginConfigFile(path, false)
 	if err != nil {
 		t.Fatalf("parse config: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 		"ebpf load mode entry is accepted as no-op": {
 			content: "[global]\nebpf load mode = entry\n",
 		},
-		"ebpf load mode return is recognized but unsupported": {
+		"ebpf load mode return is accepted by the generic parser": {
 			content: "[global]\nebpf load mode = return\n",
 		},
 		"ebpf object flavor buffer ring maps to buffer flavor": {
@@ -200,7 +200,7 @@ func TestParsePluginConfigFileInvalidValuesAreIgnored(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			path := writeTempConfig(t, "ebpf.d.conf", tc.content)
-			cfg, ok, err := parsePluginConfigFile(path)
+			cfg, ok, err := parsePluginConfigFile(path, false)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
