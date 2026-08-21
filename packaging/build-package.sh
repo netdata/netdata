@@ -47,7 +47,10 @@ EOF
     )
 }
 
-add_cmake_option CMAKE_BUILD_TYPE RelWithDebInfo
+# TEMPORARY - REVERT BEFORE MERGE: Debug instead of RelWithDebInfo, for
+# iteration speed. Safe now that the install layout no longer depends on the
+# build type.
+add_cmake_option CMAKE_BUILD_TYPE Debug
 add_cmake_option CMAKE_INSTALL_PREFIX /
 add_cmake_option ENABLE_DASHBOARD on
 add_cmake_option ENABLE_DBENGINE On
@@ -83,7 +86,11 @@ add_cmake_option BUILD_FOR_PACKAGING On
 # LTO is opt-in in the build system. The DEB and RPM packages are built with it
 # today, so ask for it explicitly here rather than depending on a default; the
 # openSUSE branch below turns it off again for that toolchain.
-add_cmake_option USE_LTO On
+#
+# TEMPORARY - REVERT BEFORE MERGE: restore this to "On". Do not delete the line -
+# USE_LTO now defaults to off, so dropping it would silently ship DEB and RPM
+# packages without LTO, and the rpm-parity harness compares metadata, not payload.
+add_cmake_option USE_LTO Off
 
 [ -d "${SOURCE_DIR}/tmp/ibm_mq" ] && add_cmake_option FETCHCONTENT_SOURCE_DIR_IBM_MQ "${SOURCE_DIR}/tmp/ibm_mq"
 if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then

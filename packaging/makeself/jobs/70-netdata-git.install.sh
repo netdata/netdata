@@ -47,6 +47,5 @@ run ./netdata-installer.sh \
   --disable-exporting-mongodb \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
-  --enable-lto \
   ${INSTALLER_ARGS:+${INSTALLER_ARGS}} \
   ${EXTRA_INSTALL_FLAGS:+${EXTRA_INSTALL_FLAGS}} \

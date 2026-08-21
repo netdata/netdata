@@ -7,9 +7,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 include(NetdataVersion)
 netdata_version()
 
+# TEMPORARY - REVERT BEFORE MERGE. Default flipped from RelWithDebInfo to Debug
+# so CI builds without optimization, LTO or hardening while this branch is being
+# worked on. Iteration speed only; this must not merge.
 if(NOT CMAKE_BUILD_TYPE)
-  set(ENV{CMAKE_BUILD_TYPE} "RelWithDebInfo")
-  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+  set(ENV{CMAKE_BUILD_TYPE} "Debug")
+  set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
 project(netdata
@@ -338,6 +341,16 @@ cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead 
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
+
+# TEMPORARY - REVERT BEFORE MERGE. Building the Rust plugins is the slowest part
+# of CI, so force them off here for iteration speed on this branch. A plain set()
+# shadows the cache entry, so this also overrides -DENABLE_PLUGIN_OTEL=On from
+# packaging/build-package.sh and --enable-plugin-otel/--enable-plugin-netflow from
+# netdata-installer.sh on macOS and in the Docker image - one lever instead of
+# three callers. Remove this block to restore Rust builds.
+set(ENABLE_PLUGIN_OTEL OFF)
+set(ENABLE_PLUGIN_NETFLOW OFF)
+set(ENABLE_NETDATA_JOURNAL_FILE_READER OFF)
 
 # Setup Rust/Corrosion for plugins that need it
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)

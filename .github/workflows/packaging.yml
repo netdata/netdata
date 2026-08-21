@@ -2,12 +2,19 @@
 # Handles building of binary packages for the agent.
 name: Packages
 on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - labeled
-      - synchronize
+  # TEMPORARY - REVERT BEFORE MERGE: the pull_request trigger is commented out so
+  # the 19 package jobs do not run while this branch is being developed. They
+  # build the Rust plugins and then assert that plugins.d/otel-plugin exists
+  # (.github/scripts/pkg-test.sh:165 sets NETDATA_LIBEXEC_PREFIX, and
+  # packaging/runtime-check.sh requires that file), which cannot hold while the
+  # temporary commit disables Rust. Restore this block to re-enable them.
+  #
+  # pull_request:
+  #   types:
+  #     - opened
+  #     - reopened
+  #     - labeled
+  #     - synchronize
   push:
     branches:
       - master

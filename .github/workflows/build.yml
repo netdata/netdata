@@ -342,6 +342,12 @@ jobs:
 
   build-static: # Build the static binary archives, and store them as artifacts.
     name: Build Static
+    # TEMPORARY - REVERT BEFORE MERGE: disabled while this branch is developed.
+    # The static build enables both Rust plugins (packaging/makeself/jobs/
+    # 70-netdata-git.install.sh sets INSTALLER_ARGS) and then requires
+    # plugins.d/otel-plugin via packaging/runtime-check.sh, which cannot hold
+    # while the temporary commit disables Rust. Remove this "if" to re-enable.
+    if: false
     needs:
       - file-check
       - static-matrix
