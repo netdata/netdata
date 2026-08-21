@@ -1503,12 +1503,6 @@ set(NETIPC_WINDOWS_SERVICE_FILES
         src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
 )
 
-# local-listeners
-set(LOCAL_LISTENERS_FILES
-        src/collectors/utils/local_listeners.c
-        src/libnetdata/local-sockets/local-sockets.h
-)
-
 # network-viewer: the OS-independent sources
 set(NETWORK_VIEWER_COMMON_FILES
         src/collectors/common-cgroups/cgroup-path.c
