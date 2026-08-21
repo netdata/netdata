@@ -1039,42 +1039,7 @@ install(TARGETS nd-run
 # build plugins
 #
 
-if(ENABLE_PLUGIN_DEBUGFS)
-    # Define debugfs.plugin source files
-    # Add executable for debugfs.plugin
-    add_executable(debugfs.plugin ${DEBUGFS_PLUGIN_FILES})
-
-    # Add vendored libsensors library
-    add_subdirectory(src/collectors/debugfs.plugin/libsensors)
-
-    # Link debugfs.plugin with vendored libsensors
-    target_link_libraries(debugfs.plugin PRIVATE vendored_libsensors)
-
-    # Include vendored libsensors headers
-    target_include_directories(debugfs.plugin PRIVATE
-            src/collectors/debugfs.plugin/libsensors/vendored/lib
-            ${CMAKE_CURRENT_BINARY_DIR}/src/collectors/debugfs.plugin/libsensors # For generated headers
-    )
-
-    # Link against libnetdata and optionally libcap
-    target_link_libraries(debugfs.plugin PRIVATE libnetdata ${CAP_LIBRARIES})
-    target_include_directories(debugfs.plugin PRIVATE ${CAP_INCLUDE_DIRS})
-    target_compile_options(debugfs.plugin PRIVATE ${CAP_CFLAGS_OTHER})
-
-    # Install the debugfs.plugin binary
-    install(TARGETS debugfs.plugin
-            COMPONENT plugin-debugfs
-            DESTINATION ${PLUGINS_DEST})
-
-    install(FILES
-            src/collectors/debugfs.plugin/libsensors/vendored/etc/sensors.conf.default
-            COMPONENT ${NETDATA_SENSORS3_COMPONENT}
-            DESTINATION ${LIBCONFIG_DEST}
-            RENAME sensors3.conf)
-
-    # Install additional packaging files if building for packaging
-    netdata_add_deb_copyright(plugin-debugfs netdata-plugin-debugfs)
-endif()
+include(NetdataPluginDebugfs)
 
 add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
 target_link_libraries(spawn-tester libnetdata)

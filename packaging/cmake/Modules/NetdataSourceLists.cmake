@@ -1556,17 +1556,6 @@ set(NETIPC_WINDOWS_SERVICE_FILES
         src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
 )
 
-# debugfs.plugin
-set(DEBUGFS_PLUGIN_FILES
-        src/collectors/debugfs.plugin/debugfs_plugin.c
-        src/collectors/debugfs.plugin/debugfs_plugin.h
-        src/collectors/debugfs.plugin/module-numa-extfrag.c
-        src/collectors/debugfs.plugin/module-zswap.c
-        src/collectors/debugfs.plugin/module-devices-powercap.c
-        src/collectors/debugfs.plugin/module-libsensors.c
-        src/collectors/debugfs.plugin/module-audit.c
-)
-
 # ebpf.plugin
 set(EBPF_PLUGIN_FILES
         src/collectors/ebpf.plugin/ebpf.c
