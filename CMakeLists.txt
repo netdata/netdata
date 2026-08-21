@@ -2539,19 +2539,7 @@ include(NetdataPluginApps)
 include(NetdataPluginFreeipmi)
 include(NetdataPluginNfacct)
 include(NetdataPluginXenstat)
-if(ENABLE_PLUGIN_PERF)
-    set(PERF_PLUGIN_FILES src/collectors/perf.plugin/perf_plugin.c)
-
-    add_executable(perf.plugin ${PERF_PLUGIN_FILES})
-    target_link_libraries(perf.plugin libnetdata)
-
-    install(TARGETS perf.plugin
-            COMPONENT plugin-perf
-            DESTINATION ${PLUGINS_DEST})
-
-    netdata_add_deb_copyright(plugin-perf netdata-plugin-perf)
-endif()
-
+include(NetdataPluginPerf)
 if(ENABLE_PLUGIN_SLABINFO)
     set(SLABINFO_PLUGIN_FILES src/collectors/slabinfo.plugin/slabinfo.c)
 
