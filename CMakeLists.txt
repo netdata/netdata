@@ -2536,23 +2536,7 @@ target_link_libraries(spawn-tester libnetdata)
 # plugin's whole definition is in one place.
 #
 include(NetdataPluginApps)
-if(ENABLE_PLUGIN_FREEIPMI)
-    pkg_check_modules(IPMI REQUIRED libipmimonitoring)
-
-    set(FREEIPMI_PLUGIN_FILES src/collectors/freeipmi.plugin/freeipmi_plugin.c)
-
-    add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_FILES})
-    target_link_libraries (freeipmi.plugin libnetdata ${IPMI_LIBRARIES})
-    target_include_directories(freeipmi.plugin PRIVATE ${IPMI_INCLUDE_DIRS})
-    target_compile_options(freeipmi.plugin PRIVATE ${IPMI_CFLAGS_OTHER})
-
-    install(TARGETS freeipmi.plugin
-            COMPONENT plugin-freeipmi
-            DESTINATION ${PLUGINS_DEST})
-
-    netdata_add_deb_copyright(plugin-freeipmi netdata-plugin-freeipmi)
-endif()
-
+include(NetdataPluginFreeipmi)
 if(ENABLE_PLUGIN_NFACCT)
     if (NOT MNL_FOUND)
         message(FATAL_ERROR "Can not build nfacct.plugin because MNL library could not be found.")
