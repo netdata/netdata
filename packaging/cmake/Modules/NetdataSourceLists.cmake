@@ -26,7 +26,7 @@ set(LIBJUDY_NEXT_FILES
         src/libnetdata/libjudy/vendored/JudyL/JudyLNextEmpty.c
 )
 
-set(LIBJUDY_SOURCES
+set(LIBJUDY_FILES
         src/libnetdata/libjudy/vendored/Judy.h
         src/libnetdata/libjudy/vendored/JudyCommon/JudyMalloc.c
         src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate.h
@@ -71,7 +71,7 @@ set(INICFG_FILES
         src/libnetdata/inicfg/dyncfg.h
 )
 
-set(CONFIG_FILES
+set(LIBNETDATA_CONFIG_FILES
         src/libnetdata/config/config.h
 )
 
@@ -1062,6 +1062,8 @@ set(CLAIM_WINDOWS_FILES
         src/claim/ui.h
 )
 
+# Not named _FILES on purpose: the name records the policy, that these compile
+# whether or not ACLK is enabled.
 set(ACLK_ALWAYS_BUILD
         src/aclk/aclk_proxy.c
         src/aclk/aclk_proxy.h
@@ -1205,7 +1207,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-asp.c
 )
 
-set(WINDOWS_PLUGIN_DRIVER
+set(WINDOWS_DRIVER_FILES
         src/collectors/windows.plugin/driver/netdata_driver.c
         src/collectors/windows.plugin/driver/netdata_driver.h
 )
@@ -1277,6 +1279,9 @@ set(MQTT_WEBSOCKETS_FILES
         src/aclk/mqtt_websockets/aclk_mqtt_workers.h
 )
 
+# Not named _FILES on purpose: these are .proto schema definitions handed to
+# protoc, not sources of any target. The sources protoc generates from them are
+# appended to ACLK_FILES.
 set(ACLK_PROTO_DEFS
         src/aclk/aclk-schemas/proto/aclk/v1/lib.proto
         src/aclk/aclk-schemas/proto/agent/v1/disconnect.proto

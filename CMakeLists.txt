@@ -579,7 +579,7 @@ if(NOT OS_FREEBSD)
 endif()
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
-list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})
+list(APPEND LIBNETDATA_FILES ${LIBNETDATA_CONFIG_FILES})
 
 if(ENABLE_SYSTEMD_DBUS)
         list(APPEND DAEMON_FILES ${DAEMON_SYSTEMD_WATCHER_FILES})
@@ -668,7 +668,7 @@ set_source_files_properties(src/aclk/schema-wrappers/proto_2_json.cc PROPERTIES 
 # build libjudy
 #
 
-add_library(judy STATIC ${LIBJUDY_SOURCES})
+add_library(judy STATIC ${LIBJUDY_FILES})
 
 target_compile_options(judy PRIVATE
         -Wno-all -Wno-extra
@@ -1451,7 +1451,7 @@ if(OS_WINDOWS)
         set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/netdata_driver.sys")
         set(NETDATA_DRIVER_FILE_INF "${CMAKE_BINARY_DIR}/netdata_driver.inf")
 
-        add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
+        add_library(netdata_driver SHARED ${WINDOWS_DRIVER_FILES})
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
