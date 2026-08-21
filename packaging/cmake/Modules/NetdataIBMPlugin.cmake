@@ -191,7 +191,7 @@ function(install_ibm_runtime component)
   endforeach()
 
   install(DIRECTORY ${IBM_MQ_BUILD_DIR}
-          DESTINATION usr/lib/netdata
+          DESTINATION ${LIBDIR_DEST}
           COMPONENT ${component}
           USE_SOURCE_PERMISSIONS
           FILES_MATCHING REGEX "(${_file_group_0})"

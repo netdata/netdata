@@ -2914,7 +2914,7 @@ if(ENABLE_PLUGIN_DEBUGFS)
     install(FILES
             src/collectors/debugfs.plugin/libsensors/vendored/etc/sensors.conf.default
             COMPONENT ${NETDATA_SENSORS3_COMPONENT}
-            DESTINATION usr/lib/netdata/conf.d
+            DESTINATION ${LIBCONFIG_DEST}
             RENAME sensors3.conf)
 
     # Install additional packaging files if building for packaging
@@ -2977,7 +2977,7 @@ if(ENABLE_PLUGIN_APPS)
 
     install(FILES src/collectors/apps.plugin/apps_groups.conf
             COMPONENT plugin-apps
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 
     netdata_add_deb_copyright(plugin-apps netdata-plugin-apps)
 endif()
@@ -3399,7 +3399,7 @@ if(ENABLE_PLUGIN_EBPF)
     install(FILES
             src/collectors/ebpf.plugin/ebpf.d.conf
             COMPONENT plugin-ebpf
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 
     install(FILES
             src/collectors/ebpf.plugin/ebpf.d/cachestat.conf
@@ -3421,7 +3421,7 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.d/sync.conf
             src/collectors/ebpf.plugin/ebpf.d/vfs.conf
             COMPONENT plugin-ebpf
-            DESTINATION usr/lib/netdata/conf.d/ebpf.d)
+            DESTINATION ${LIBCONFIG_DEST}/ebpf.d)
 
     netdata_add_deb_copyright(plugin-ebpf netdata-plugin-ebpf)
 
@@ -3747,7 +3747,7 @@ if(PCRE2_FOUND)
 
         install(DIRECTORY src/collectors/log2journal/log2journal.d
                 COMPONENT netdata
-                DESTINATION usr/lib/netdata/conf.d)
+                DESTINATION ${LIBCONFIG_DEST})
 endif()
 
 #
@@ -3832,11 +3832,11 @@ if(ENABLE_PLUGIN_SCRIPTS)
 
     install(FILES src/go/plugin/scripts.d/config/scripts.d.conf
             COMPONENT plugin-scripts
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 
     install(DIRECTORY src/go/plugin/scripts.d/config/scripts.d
             COMPONENT plugin-scripts
-            DESTINATION usr/lib/netdata/conf.d
+            DESTINATION ${LIBCONFIG_DEST}
             FILES_MATCHING PATTERN "*.conf")
 endif()
 
@@ -3856,7 +3856,7 @@ if(ENABLE_PLUGIN_IBM)
     # Install IBM plugin configuration files
     install(FILES src/go/plugin/ibm.d/config/ibm.d.conf
             COMPONENT plugin-ibm
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 
     install(FILES
             src/go/plugin/ibm.d/config/ibm.d/as400.conf
@@ -3865,7 +3865,7 @@ if(ENABLE_PLUGIN_IBM)
             src/go/plugin/ibm.d/config/ibm.d/websphere_mp.conf
             src/go/plugin/ibm.d/config/ibm.d/websphere_pmi.conf
             COMPONENT plugin-ibm
-            DESTINATION usr/lib/netdata/conf.d/ibm.d
+            DESTINATION ${LIBCONFIG_DEST}/ibm.d
     )
 
     install_ibm_runtime(plugin-ibm-libs)
@@ -3884,7 +3884,7 @@ if(ENABLE_PLUGIN_OTEL)
 
     install(FILES src/crates/otel-ingestor/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
             COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
-            DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
+            DESTINATION ${LIBCONFIG_DEST}/otel.d/v1/metrics)
 
     install(DIRECTORY COMPONENT plugin-otel DESTINATION etc/netdata/otel.d/v1/metrics)
 endif()
@@ -3902,7 +3902,7 @@ if(ENABLE_PLUGIN_NETFLOW)
 
     install(FILES src/crates/netflow-plugin/configs/netflow.yaml
             COMPONENT plugin-netflow
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 
     if (OS_WINDOWS)
         set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader.exe)
@@ -3932,7 +3932,7 @@ if(ENABLE_PLUGIN_NETFLOW)
 
     install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
             COMPONENT plugin-netflow
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 
     if(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
         set(TOPOLOGY_IP_INTEL_STOCK_PAYLOAD
@@ -4013,8 +4013,8 @@ install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/custom-plugins.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/health.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/ssl)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/statsd.d)
-install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d)
-install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d/schema.d)
+install(DIRECTORY COMPONENT netdata DESTINATION ${LIBCONFIG_DEST})
+install(DIRECTORY COMPONENT netdata DESTINATION ${LIBCONFIG_DEST}/schema.d)
 install(DIRECTORY COMPONENT netdata DESTINATION ${PLUGINS_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${WEB_DEST})
 
@@ -4074,7 +4074,7 @@ if(ENABLE_PLUGIN_OTEL)
 
     install(FILES ${CMAKE_BINARY_DIR}/src/crates/otel-plugin/configs/otel.yaml
             COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 endif()
 
 
@@ -4086,7 +4086,7 @@ install(FILES
         src/collectors/statsd.plugin/example.conf
         src/collectors/statsd.plugin/k6.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d/statsd.d)
+        DESTINATION ${LIBCONFIG_DEST}/statsd.d)
 
 #
 # exporting
@@ -4094,7 +4094,7 @@ install(FILES
 install(FILES
         src/exporting/exporting.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d)
+        DESTINATION ${LIBCONFIG_DEST})
 
 #
 # ioping.plugin
@@ -4102,7 +4102,7 @@ install(FILES
 install(FILES
         src/collectors/ioping.plugin/ioping.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d)
+        DESTINATION ${LIBCONFIG_DEST})
 
 #
 # streaming
@@ -4110,7 +4110,7 @@ install(FILES
 install(FILES
         src/streaming/stream.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d)
+        DESTINATION ${LIBCONFIG_DEST})
 
 #
 # swagger
@@ -4274,7 +4274,7 @@ install(FILES
 install(FILES
         system/vnodes/vnodes.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d/vnodes)
+        DESTINATION ${LIBCONFIG_DEST}/vnodes)
 
 install(FILES
         system/.install-type
@@ -4360,7 +4360,7 @@ if(NOT OS_WINDOWS)
             system/netdata.conf
             system/netdata-updater.conf
             COMPONENT netdata
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
   endif()
 
   configure_file(system/cron/netdata-updater-daily.in
@@ -4424,7 +4424,7 @@ file(GLOB_RECURSE HEALTH_CONF_FILES "src/health/health.d/*.conf")
 install(FILES
         ${HEALTH_CONF_FILES}
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d/health.d)
+        DESTINATION ${LIBCONFIG_DEST}/health.d)
 
 configure_file(src/health/notifications/alarm-notify.sh.in src/health/notifications/alarm-notify.sh @ONLY)
 install(PROGRAMS
@@ -4444,7 +4444,7 @@ install(FILES
         src/health/notifications/health_alarm_notify.conf
         src/health/notifications/health_email_recipients.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d)
+        DESTINATION ${LIBCONFIG_DEST})
 #
 # test/ files
 #
@@ -4485,7 +4485,7 @@ if(ENABLE_PLUGIN_CHARTS)
   install(FILES
           src/collectors/charts.d.plugin/charts.d.conf
           COMPONENT plugin-chartsd
-          DESTINATION usr/lib/netdata/conf.d)
+          DESTINATION ${LIBCONFIG_DEST})
 
   install(PROGRAMS
           src/collectors/charts.d.plugin/example/example.chart.sh
@@ -4499,7 +4499,7 @@ if(ENABLE_PLUGIN_CHARTS)
           src/collectors/charts.d.plugin/libreswan/libreswan.conf
           src/collectors/charts.d.plugin/opensips/opensips.conf
           COMPONENT plugin-chartsd
-          DESTINATION usr/lib/netdata/conf.d/charts.d)
+          DESTINATION ${LIBCONFIG_DEST}/charts.d)
 
   netdata_add_deb_copyright(plugin-chartsd netdata-plugin-chartsd)
 endif()
@@ -4529,7 +4529,7 @@ install(FILES
         src/collectors/systemd-journal.plugin/schema.d/systemd-journal%3Amonitored-directories.json
         src/health/schema.d/health%3Aalert%3Aprototype.json
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/conf.d/schema.d)
+        DESTINATION ${LIBCONFIG_DEST}/schema.d)
 
 #
 # python.d plugin
@@ -4554,7 +4554,7 @@ if(ENABLE_PLUGIN_PYTHON)
 
   install(FILES src/collectors/python.d.plugin/python.d.conf
           COMPONENT plugin-pythond
-          DESTINATION usr/lib/netdata/conf.d)
+          DESTINATION ${LIBCONFIG_DEST})
 
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.conf
@@ -4563,7 +4563,7 @@ if(ENABLE_PLUGIN_PYTHON)
           src/collectors/python.d.plugin/pandas/pandas.conf
           src/collectors/python.d.plugin/traefik/traefik.conf
           COMPONENT plugin-pythond
-          DESTINATION usr/lib/netdata/conf.d/python.d)
+          DESTINATION ${LIBCONFIG_DEST}/python.d)
 
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.chart.py
@@ -4594,60 +4594,60 @@ if(ENABLE_PLUGIN_GO)
 
     install(FILES src/go/plugin/go.d/config/go.d.conf
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d)
+            DESTINATION ${LIBCONFIG_DEST})
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d)
+            DESTINATION ${LIBCONFIG_DEST}/go.d)
     file(GLOB GO_CONF_FILES src/go/plugin/go.d/config/go.d/*.conf)
     install(FILES ${GO_CONF_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d)
+            DESTINATION ${LIBCONFIG_DEST}/go.d)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/sd)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/sd)
     file(GLOB GO_SD_CONF_FILES src/go/plugin/go.d/config/go.d/sd/*.conf)
     install(FILES ${GO_SD_CONF_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/sd)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/sd)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/ss)
     file(GLOB GO_SS_CONF_FILES src/go/plugin/go.d/config/go.d/ss/*.conf)
     install(FILES ${GO_SS_CONF_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/ss)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.profiles/default)
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.profiles/metadata)
 
     file(GLOB GO_SNMP_PROFILE_FILES src/go/plugin/go.d/config/go.d/snmp.profiles/default/*.yaml)
     install(FILES ${GO_SNMP_PROFILE_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.profiles/default)
     file(GLOB GO_SNMP_META_FILES src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/*.yaml)
     install(FILES ${GO_SNMP_META_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.profiles/metadata)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.profiles/metadata)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.trap-profiles)
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.trap-profiles/default)
 
     file(GLOB GO_SNMP_TRAP_PROFILE_FILES CONFIGURE_DEPENDS
             src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yaml
@@ -4696,49 +4696,49 @@ if(ENABLE_PLUGIN_GO)
     " COMPONENT plugin-go)
     install(DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}/"
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.trap-profiles/default
             FILES_MATCHING
                 PATTERN "*.yaml.zst"
                 PATTERN "*.yml.zst")
     install(FILES "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json.zst"
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.trap-profiles)
     install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/snmp.trap-profiles)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/azure_monitor.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/azure_monitor.profiles/default)
     file(GLOB GO_AZURE_MON_PROFILE_FILES src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default/*.yaml)
     install(FILES ${GO_AZURE_MON_PROFILE_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/azure_monitor.profiles/default)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/prometheus.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/prometheus.profiles/default)
     file(GLOB GO_PROMETHEUS_PROFILE_FILES src/go/plugin/go.d/config/go.d/prometheus.profiles/default/*.yaml)
     install(FILES ${GO_PROMETHEUS_PROFILE_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/prometheus.profiles/default)
 
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/cloudwatch.profiles)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/cloudwatch.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/cloudwatch.profiles/default)
     file(GLOB GO_CLOUDWATCH_PROFILE_FILES src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/*.yaml)
     install(FILES ${GO_CLOUDWATCH_PROFILE_FILES}
             COMPONENT plugin-go
-            DESTINATION usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default)
+            DESTINATION ${LIBCONFIG_DEST}/go.d/cloudwatch.profiles/default)
 
     netdata_add_deb_copyright(plugin-go netdata-plugin-go)
 endif()
