@@ -4518,26 +4518,20 @@ modules:
           different Dashboard REST API.
 
           The built-in profile separates cluster-wide MGR health, quorum, capacity, placement groups, pools, and OSD metadata
-          from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. Optional branches cover
+          from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. You can monitor
           CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
           scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
           and Tentacle 20.2.3. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
           exposes cephadm node-proxy CPU, memory, storage, cooling, temperature, and per-component health metrics. Firmware
-          remains source metadata and is not charted because Ceph exposes it as an info family. PG state flags and RGW
-          global/user/bucket views are overlapping diagnostic populations and are not additive totals. Profile relabeling
-          turns dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter, RocksDB cache, Finisher, Throttle, KernelDevice,
-          mClock, messenger, RDMA, DPDK, and service-identity family names into stable profile inputs while preserving their
-          source keys as identity labels. The source-complete profile materializes the entire declared release/producer union
-          with zero generic fallback. Unknown future Ceph families remain visible through generic fallback until their source
-          semantics can be curated; generic visibility is a forward-compatibility guard, not evidence that a known source
-          family was fully modeled. The profile drops only the source-proven raw MGR RGW source-zone aliases because the stable
-          normalized family is already charted.
+          inventory remains available as metadata. PG state flags and RGW global/user/bucket views provide diagnostic detail
+          rather than additive totals. The profile gives dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter,
+          RocksDB cache, Finisher, Throttle, KernelDevice, mClock, messenger, RDMA, DPDK, and service-identity families stable
+          chart identities while preserving their source keys.
 
-          The chart model follows the producer's source lifecycle rather than relying on Prometheus wire type alone. Current
-          populations that Ceph increments and decrements remain absolute, while cumulative work published through gauges is
-          rendered incrementally so Netdata performs rate calculation and reset detection. Shared charts compare only the same
-          counted or measured population: requests, objects, bytes, reservations, state transitions, and other unlike units
-          remain separate even when their wire type or numeric scale is similar.
+          Charts follow each producer's lifecycle. Current populations that Ceph increments and decrements remain absolute,
+          while cumulative work published through gauges is rendered incrementally so Netdata performs rate calculation and
+          reset detection. Shared charts compare only the same counted or measured population, keeping requests, objects,
+          bytes, reservations, and state transitions separate even when their numeric scales are similar.
 
           The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
           `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
@@ -4545,23 +4539,19 @@ modules:
           charted per reported component and temperature sensor with its hostname, category, component, or sensor identity.
           These families are absent on Reef and Squid; their absence creates no chart or alert there.
 
-          Alert ownership is deliberately layered. Configure one logical MGR scrape scope per Ceph cluster for cluster-health
-          alerts and use the native Ceph collector for its complementary Dashboard API collection-integrity alerts. Netdata's
-          generic Prometheus collection alert covers a configured MGR job that cannot scrape; it is distinct from native API
-          component failures and does not report an unconfigured job. The monitor and OSD cluster-summary charts sum member
-          rows only within that MGR job or vnode; they are one cluster instance, not an infrastructure-level aggregation.
-          Use one stable endpoint or failover target that follows the active MGR and one stable job/vnode identity per logical
-          cluster. Separate jobs for active and standby endpoints can create duplicate cluster alert owners.
+          Configure one logical MGR job per Ceph cluster for cluster-health alerts and one native Ceph Dashboard job for
+          API component integrity. The generic Prometheus collection alert reports a configured MGR job that cannot scrape;
+          the native collector reports Dashboard API component failures. Monitor and OSD cluster-summary charts represent
+          one cluster job or virtual node. Use one stable endpoint or failover target that follows the active MGR, and keep
+          one stable job or virtual-node identity per cluster.
 
           Cluster-summary alerts evaluate the latest stored dimensions on each Netdata health beat. A failed scrape does not
           obsolete the chart or fabricate new values, so the data-state alert may continue evaluating the last stored state;
           the generic collection alert owns that scrape failure. When the collector knows the chart has disappeared and
           obsoletes it, its instance alerts are removed.
 
-          Ceph's node root-filesystem and packet-drop recommendations are owned by Netdata's generic per-filesystem and
-          per-interface host alerts on the Agents collecting each Ceph node, not by the MGR profile. Those stock policies use
-          Netdata's own thresholds, windows, directionality, hysteresis, and routing. They remain silent policy guidance where
-          applicable and are not duplicated under Ceph-specific names.
+          Netdata's per-filesystem and per-interface host alerts monitor root-filesystem usage and packet drops on each Ceph
+          node. These host-wide policies use Netdata's thresholds, windows, directionality, hysteresis, and routing.
         method_description: |
           Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
           built-in `ceph` profile. The MGR module refreshes its enabled metric cache every 15 seconds by default, and standalone
@@ -4640,7 +4630,7 @@ modules:
       - name: ceph_nvmeof_gateway_cpu_10m
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.gateways.time_accumulation
-        info: 'Internal helper holding the lowest local reactor busy-rate sample observed over ten minutes; it does not notify.'
+        info: 'Holds the lowest local reactor busy-rate sample observed over ten minutes for the gateway CPU policy.'
       - name: ceph_nvmeof_gateway_cpu
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.gateways.time_accumulation
@@ -4648,11 +4638,11 @@ modules:
       - name: ceph_nvmeof_read_latency_1m
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
-        info: 'Internal helper holding the local one-minute per-block-device read service-time rate; it does not notify.'
+        info: 'Holds the local one-minute per-block-device read service-time rate.'
       - name: ceph_nvmeof_read_operations_1m
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.operations
-        info: 'Internal helper holding the local one-minute per-block-device completed-read rate; it does not notify.'
+        info: 'Holds the local one-minute per-block-device completed-read rate.'
       - name: ceph_nvmeof_high_read_latency
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
@@ -4660,11 +4650,11 @@ modules:
       - name: ceph_nvmeof_write_latency_1m
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
-        info: 'Internal helper holding the local one-minute per-block-device write service-time rate; it does not notify.'
+        info: 'Holds the local one-minute per-block-device write service-time rate.'
       - name: ceph_nvmeof_write_operations_1m
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.operations
-        info: 'Internal helper holding the local one-minute per-block-device completed-write rate; it does not notify.'
+        info: 'Holds the local one-minute per-block-device completed-write rate.'
       - name: ceph_nvmeof_high_write_latency
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
@@ -4680,7 +4670,7 @@ modules:
       - name: ceph_nvmeof_gateway_namespaces
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.gateways.namespace_count
-        info: 'Internal helper summing subsystem namespace counts inside the local exporter endpoint; it does not notify.'
+        info: 'Sums subsystem namespace counts inside the local exporter endpoint.'
       - name: ceph_nvmeof_too_many_namespaces
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.nvme_of.gateways.namespace_count
@@ -4896,7 +4886,7 @@ modules:
       - name: ceph_osd_all_up
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
-        info: 'Internal helper holding the current all-configured-OSDs-up state; it does not notify.'
+        info: 'Holds the current all-configured-OSDs-up state.'
       - name: ceph_object_missing
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
@@ -4920,7 +4910,7 @@ modules:
       - name: ceph_osd_down_current
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
-        info: 'Internal helper holding the current OSD-down health state; it does not notify.'
+        info: 'Holds the current OSD-down health state.'
       - name: ceph_pg_unavailable_blocking_io
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: prometheus.ceph.health.health_checks.state
