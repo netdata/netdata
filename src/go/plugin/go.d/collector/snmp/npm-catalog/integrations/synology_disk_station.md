@@ -24,7 +24,7 @@ Module: snmp
 
 ## Overview
 
-Monitor Synology Disk Station (storage) with Netdata over SNMP. Netdata recognizes the device automatically by its `sysObjectID` (recognized across 1 device identifiers) and collects the metrics this profile declares — on top of the generic SNMP baseline — with no manual OID configuration.
+Monitor Synology Disk Station (storage) with Netdata over SNMP. Netdata recognizes the device automatically by its `sysObjectID` (recognized across 2 device identifiers) and collects the metrics this profile declares — on top of the generic SNMP baseline — with no manual OID configuration.
 
 Netdata's SNMP collector matches the device to the **synology-disk-station.yaml** profile via `sysObjectID`/`sysDescr`, then polls the OIDs it declares.
 
@@ -128,7 +128,7 @@ There are no alerts configured by default for this integration.
 
 On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this Synology Disk Station profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.
 
-**33 metrics** in 14 groups; each row is a chart context usable in alerts.
+**34 metrics** in 15 groups; each row is a chart context usable in alerts.
 
 | Group | Metrics |
 |---|---|
@@ -142,6 +142,7 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 | Storage / Volume | 5 |
 | System / CPU | 1 |
 | System / GPU | 3 |
+| System / Memory | 1 |
 | System / Service | 1 |
 | System / Status | 1 |
 | System / Upgrade | 1 |
@@ -216,7 +217,7 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_cpu_usage` | `{load_average}` | device | The 1,5 and 15 minute load averages |
+| `snmp.device_prof_cpu_usage` | `%` | device | The current CPU utilization |
 
 ### System / GPU
 
@@ -225,6 +226,12 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 | `snmp.device_prof_synology_gpuMemoryUtilization` | `%` | device | GPU memory utilization |
 | `snmp.device_prof_synology_gpuUtilization` | `%` | device | GPU utilization |
 | `snmp.device_prof_synology_system_gpuInfoSupported` | `{status}` | device | GPU info support status |
+
+### System / Memory
+
+| Metric (chart context) | Unit | Scope | Description |
+|---|---|---|---|
+| `snmp.device_prof_memory_usage` | `%` | device | Memory utilization |
 
 ### System / Service
 
