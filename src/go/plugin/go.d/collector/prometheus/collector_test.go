@@ -1330,9 +1330,9 @@ func TestCollector_CephM04DerivedBoundaries(t *testing.T) {
 		{name: "availability with OSD down", availability: 1, osd: 1},
 		{name: "availability without OSD down", availability: 1, osd: 0, want: 1},
 		{name: "no availability", availability: 0, osd: 1},
-		{name: "inactive condition with withdrawn OSD chart", availability: 0},
-		{name: "invalid OSD state", availability: 1, osd: math.NaN(), undefined: true},
-		{name: "active condition with withdrawn OSD chart", availability: 1, osd: math.NaN(), undefined: true},
+		{name: "inactive condition clears without evaluating OSD state", availability: 0, osd: math.NaN()},
+		{name: "active condition with unresolved OSD state", availability: 1, osd: math.NaN(), undefined: true},
+		{name: "active condition with infinite OSD state", availability: 1, osd: math.Inf(1), undefined: true},
 	} {
 		t.Run("blocking I/O "+tc.name, func(t *testing.T) {
 			got := blockingIO(tc.availability, tc.osd)
@@ -2498,8 +2498,9 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 		}
 	}
 	assert.Equal(t, expected, actual)
+	templates := cephHealthAlertTemplates(t)
 	for name, metadataInfo := range info {
-		assert.Equalf(t, cephHealthAlertTemplates(t)[name]["info"], metadataInfo,
+		assert.Equalf(t, templates[name]["info"], metadataInfo,
 			"metadata alert %q does not exactly match its shipped health-template info", name)
 	}
 }
