@@ -119,6 +119,63 @@ func TestTopologyProductionPath_UniFiQBridgeRendersDefaultManagedFabric(t *testi
 	assert.GreaterOrEqual(t, testCountTopologyLinksByType(data.Links, "fdb"), 1)
 }
 
+func TestTopologyProductionPath_UniFiActorUsesSharedDynamicProfileMetadata(t *testing.T) {
+	device := ddsnmp.DeviceConnectionInfo{
+		Hostname:    "192.0.2.20",
+		SysObjectID: "1.3.6.1.4.1.41112",
+		SysName:     "unifi-ap",
+		SysDescr:    "Ubiquiti UniFi U6 Mesh",
+		Vendor:      "Unknown",
+		Model:       "UniFi UAP-FlexHD",
+	}
+	mainMetrics := collectMainProfileMetrics(t, device, topologyUniFiAPPDUs())
+	metadata := make(map[string]ddsnmp.MetaTag)
+	for _, pm := range mainMetrics {
+		ddsnmp.MergeDeviceIdentityMetadata(metadata, pm.DeviceMetadata)
+	}
+	require.Equal(t, ddsnmp.MetaTag{Value: "Ubiquiti", IsExactMatch: true}, metadata["vendor"])
+	require.Equal(t, ddsnmp.MetaTag{Value: "UniFi U6-Mesh", IsExactMatch: true}, metadata["model"])
+	device.Vendor, device.Model = ddsnmp.ResolveDeviceIdentity(device.Vendor, device.Model, metadata, nil)
+
+	metrics := collectTopologyProfileMetrics(t, device, topologyUniFiAPPDUs())
+	cache := newTestTopologyCache(device)
+	cache.updateTopologyProfileTags(metrics)
+	cache.ingestTopologyProfileMetrics(metrics)
+	cache.finalizeTopologyCache()
+
+	registry := newTopologyRegistry()
+	registry.register(cache)
+	data, ok := snapshotTopologyRegistryForTest(registry)
+	require.True(t, ok)
+
+	actor := findDeviceActorBySysName(data, "unifi-ap")
+	require.NotNil(t, actor)
+	assert.Equal(t, "Ubiquiti", actor.Detail.SNMP.Vendor)
+	assert.Equal(t, "UniFi U6-Mesh", actor.Detail.SNMP.Model)
+}
+
+func collectMainProfileMetrics(
+	t *testing.T,
+	device ddsnmp.DeviceConnectionInfo,
+	pdus []gosnmp.SnmpPDU,
+) []*ddsnmp.ProfileMetrics {
+	t.Helper()
+
+	profiles := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
+		SysObjectID: device.SysObjectID,
+		SysDescr:    device.SysDescr,
+	}).Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP).Profiles()
+	require.NotEmpty(t, profiles)
+	metrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		SnmpClient:  newTopologySNMPHandler(pdus),
+		Profiles:    profiles,
+		Log:         newTestSNMPTopologyCollector().Logger,
+		SysObjectID: device.SysObjectID,
+	}).Collect()
+	require.NoError(t, err)
+	return metrics
+}
+
 func collectTopologyProfileMetrics(
 	t *testing.T,
 	device ddsnmp.DeviceConnectionInfo,
@@ -171,6 +228,7 @@ func topologyUniFiSwitchPDUs() []gosnmp.SnmpPDU {
 
 func topologyUniFiAPPDUs() []gosnmp.SnmpPDU {
 	return []gosnmp.SnmpPDU{
+		topologyOctetStringPDU("1.3.6.1.4.1.41112.1.6.3.3.0", "U6-Mesh"),
 		topologyOctetPDU("1.3.6.1.2.1.4.22.1.2.17.192.0.2.1", 0x02, 0, 0, 0, 0, 1),
 		topologyIntegerPDU("1.3.6.1.2.1.4.22.1.4.17.192.0.2.1", 3),
 	}

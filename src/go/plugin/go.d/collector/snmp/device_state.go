@@ -48,10 +48,18 @@ func (c *Collector) deviceStoreKey() string {
 
 // registerDeviceState exposes the already-configured SNMP job to SNMP-family
 // consumers without duplicating job configuration.
-func (c *Collector) registerDeviceState(si *snmputils.SysInfo) {
+func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata map[string]ddsnmp.MetaTag) {
 	if c.deviceStore == nil {
 		return
 	}
+	vnodeLabels := c.vnodeLabels()
+	vendor, model := ddsnmp.ResolveDeviceIdentity(
+		firstVendor(si.Vendor, si.Organization),
+		si.Model,
+		profileMetadata,
+		vnodeLabels,
+	)
+
 	c.deviceStore.Register(c.deviceStoreKey(), ddsnmp.DeviceConnectionInfo{
 		Hostname:        c.Hostname,
 		Port:            c.Options.Port,
@@ -73,13 +81,27 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo) {
 		SysName:         si.Name,
 		SysContact:      si.Contact,
 		SysLocation:     si.Location,
-		Vendor:          firstVendor(si.Vendor, si.Organization),
-		Model:           si.Model,
+		Vendor:          vendor,
+		Model:           model,
 
 		DisableBulkWalk: c.disableBulkWalk,
 		ManualProfiles:  c.ManualProfiles,
 		VnodeGUID:       c.vnodeGUID(),
 		VnodeHostname:   c.vnodeHostname(),
-		VnodeLabels:     c.vnodeLabels(),
+		VnodeLabels:     vnodeLabels,
 	})
+}
+
+func (c *Collector) syncDeviceMetadata(pms []*ddsnmp.ProfileMetrics) {
+	if c.deviceMetadataSynced || c.vnode != nil || c.sysInfo == nil {
+		return
+	}
+
+	metadata := make(map[string]ddsnmp.MetaTag, 2)
+	for _, pm := range pms {
+		ddsnmp.MergeDeviceIdentityMetadata(metadata, pm.DeviceMetadata)
+	}
+
+	c.registerDeviceState(c.sysInfo, metadata)
+	c.deviceMetadataSynced = true
 }
