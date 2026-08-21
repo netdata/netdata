@@ -402,7 +402,7 @@ jobs:
                      -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
                      -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e NETDATA_SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
                      -e NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/netdata/.topology-ip-intel-stock \
-                     -e GOOS=$(echo ${{ matrix.platform }} | cut -f 1 -d '/') -e GOARCH=$(echo ${{ matrix.platform }} | cut -f 2 -d '/') \
+                     -e GOOS="$(echo "${{ matrix.platform }}" | cut -f 1 -d '/')" -e GOARCH="$(echo "${{ matrix.platform }}" | cut -f 2 -d '/')" \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Save Packages
         id: artifacts
