@@ -15,6 +15,50 @@ Netdata gives you a complete operational view of Ceph by collecting three comple
 - Dashboard API component integrity and on-demand Ceph investigation Functions.
 - Per-node disks, filesystems, network interfaces, processes, and logs through Netdata's host collectors.
 
+## Operational coverage map
+
+Use this map to identify the Netdata surface that owns the operational question you are investigating.
+
+| Operational need | What Netdata monitors | Primary owner | Operator behavior |
+|---|---|---|---|
+| Cluster health | Overall health, named Ceph health checks, daemon crashes, slow operations | MGR Prometheus | Categorical failures notify; workload-specific checks can be tuned |
+| Monitor availability | MON quorum and quorum risk | MGR Prometheus | Investigate monitor membership and elections |
+| Data integrity | Unfound objects, damaged PGs, scrub errors | MGR Prometheus | Treat as priority data-safety conditions |
+| Placement groups | Active/clean PG counts, scrub status, PG density, recovery blockers | MGR Prometheus | Inspect affected pool and recovery progress |
+| Capacity | Cluster physical capacity plus OSD/pool thresholds | Ceph Dashboard API and MGR Prometheus | Dashboard provides physical utilization; MGR exposes Ceph threshold states |
+| OSD availability | Down OSDs, down OSD hosts, and down-OSD percentage | MGR Prometheus | Identify the affected daemon or host |
+| Recovery and rebalance | Backfill/recovery blockers and recovery work | MGR Prometheus | Watch conditions that prevent repair or rebalance |
+| CephFS | MDS damage, degradation, standby availability, and rank health | MGR Prometheus | Investigate the affected filesystem and MDS rank |
+| RBD mirroring | Local/remote snapshot timestamp synchronization | MGR Prometheus | Identify mirrored images that have diverged |
+| RGW service health | Notifications, Lua execution, queue pressure, retries, aborted requests | MGR Prometheus | Inspect aggregate gateway behavior |
+| RGW request outcomes | Status classes, bytes, clients, and request duration | `web_log` | Analyze complete RGW access logs |
+| RGW endpoint reachability | Unauthenticated HTTP liveness | `httpcheck` | Verify the selected endpoint is reachable |
+| RGW certificates | Certificate expiration and revocation | `x509check` | Track certificate lifecycle independently of RGW traffic |
+| Node health | CPU, memory, disk I/O, filesystems, network interfaces, and processes | Standard Netdata collectors | Continue using normal Agent monitoring for each Ceph node |
+| API component integrity | Dashboard API collection status | Ceph Dashboard API | Detect component-specific collection failures |
+| Incident investigation | Detailed health, OSD, pool, and daemon inventory | Ceph Dashboard Functions | Run on demand during an investigation |
+
+### How Netdata maps Ceph health directives
+
+Ceph publishes its own health-check directives. Netdata maps the directives that have a stable public metric signal to named alerts and charts, so operators can use Ceph's operational vocabulary while working in Netdata.
+
+Examples:
+
+| Ceph directive | Netdata operator view |
+|---|---|
+| `RECENT_CRASH` | Recent Ceph daemon crash |
+| `RECENT_MGR_MODULE_CRASH` | Recent manager-module crash |
+| `MON_DOWN` | Monitor down and monitor-quorum summaries |
+| `OSD_DOWN` | Down OSD and OSD-host conditions |
+| `OBJECT_UNFOUND` | Unfound object condition |
+| `PG_DAMAGED` | Damaged placement-group condition |
+| `PG_NOT_SCRUBBED` | Placement groups overdue for scrub |
+| `POOL_FULL` | Full pool condition |
+| `MDS_ALL_DOWN` | CephFS unavailable |
+| `FS_WITH_FAILED_MDS` | CephFS MDS rank has failed with no standby |
+
+Netdata's standard system alerts remain the owners of node-level conditions such as filesystem usage and packet drops. Ceph-specific alerts do not duplicate those incidents; they add cluster, daemon, and storage-service state that Ceph itself publishes.
+
 ## Deployment model
 
 Run one Agent on each Ceph node. Each Agent monitors the Ceph services and host resources on its own node, preserving local admin-socket, disk, interface, process, and log context.
