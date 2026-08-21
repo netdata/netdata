@@ -228,31 +228,17 @@ func addEndpointIDIdentity(acc *endpointActorAccumulator, endpointID string) {
 }
 
 func discoveredDeviceCount(devices []model.Device, localDeviceID string) int {
-	if len(devices) == 0 {
-		return 0
-	}
-
 	localDeviceID = strings.TrimSpace(localDeviceID)
-	if localDeviceID == "" {
-		return maxIntValue(len(devices)-1, 0)
-	}
-
 	count := 0
 	for _, dev := range devices {
-		if strings.TrimSpace(dev.ID) == "" {
+		deviceID := strings.TrimSpace(dev.ID)
+		if deviceID == "" {
 			continue
 		}
-		if dev.ID == localDeviceID {
+		if deviceID == localDeviceID {
 			continue
 		}
 		count++
 	}
 	return count
-}
-
-func maxIntValue(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

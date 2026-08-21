@@ -36,7 +36,6 @@ func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate
 	data, err := projectSNMPL2TopologyData(
 		result,
 		aggregate.AgentID,
-		aggregate.LocalDeviceID,
 		aggregate.CollectedAt,
 		options,
 	)
@@ -64,7 +63,6 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 	strictData, err := projectSNMPL2TopologyData(
 		result,
 		aggregate.AgentID,
-		aggregate.LocalDeviceID,
 		aggregate.CollectedAt,
 		strictOptions,
 	)
@@ -79,7 +77,6 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 	probableData, err := projectSNMPL2TopologyData(
 		result,
 		aggregate.AgentID,
-		aggregate.LocalDeviceID,
 		aggregate.CollectedAt,
 		probableOptions,
 	)
@@ -147,7 +144,6 @@ func buildSNMPL2TopologyResult(observations []topologyengine.L2Observation) (top
 func projectSNMPL2TopologyData(
 	result topologyengine.Result,
 	agentID string,
-	localDeviceID string,
 	collectedAt time.Time,
 	options topologyoptions.QueryOptions,
 ) (topologymodel.Data, error) {
@@ -157,7 +153,6 @@ func projectSNMPL2TopologyData(
 		Layer:                     "2",
 		View:                      "summary",
 		AgentID:                   agentID,
-		LocalDeviceID:             localDeviceID,
 		CollectedAt:               collectedAt,
 		ResolveDNSName:            options.ResolveDNSName,
 		CollapseActorsByIP:        options.CollapseActorsByIP,
