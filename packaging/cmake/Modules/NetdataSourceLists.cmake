@@ -738,11 +738,6 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/hw-sensors-function.h
 )
 
-set(INTERCOMMUNICATION_COLLECTORS_FILES
-        src/collectors/collectors-ipc/ebpf-ipc.c
-        src/collectors/collectors-ipc/ebpf-ipc.h
-        )
-
 set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/plugins_d.c
         src/plugins.d/plugins_d.h
@@ -1507,48 +1502,6 @@ set(NETIPC_WINDOWS_SERVICE_FILES
         src/libnetdata/netipc/src/service/netipc_service_win_server.c
         src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
 )
-
-# ebpf.plugin
-set(EBPF_PLUGIN_FILES
-        src/collectors/ebpf.plugin/ebpf.c
-        src/collectors/ebpf.plugin/ebpf.h
-        src/collectors/ebpf.plugin/ebpf_disk.c
-        src/collectors/ebpf.plugin/ebpf_disk.h
-        src/collectors/ebpf.plugin/ebpf_fd.c
-        src/collectors/ebpf.plugin/ebpf_fd.h
-        src/collectors/ebpf.plugin/ebpf_hardirq.c
-        src/collectors/ebpf.plugin/ebpf_hardirq.h
-        src/collectors/ebpf.plugin/ebpf_mdflush.c
-        src/collectors/ebpf.plugin/ebpf_mdflush.h
-        src/collectors/ebpf.plugin/ebpf_mount.c
-        src/collectors/ebpf.plugin/ebpf_mount.h
-        src/collectors/ebpf.plugin/ebpf_filesystem.c
-        src/collectors/ebpf.plugin/ebpf_filesystem.h
-        src/collectors/ebpf.plugin/ebpf_oomkill.c
-        src/collectors/ebpf.plugin/ebpf_oomkill.h
-        src/collectors/ebpf.plugin/ebpf_process.c
-        src/collectors/ebpf.plugin/ebpf_process.h
-        src/collectors/ebpf.plugin/ebpf_shm.c
-        src/collectors/ebpf.plugin/ebpf_shm.h
-        src/collectors/ebpf.plugin/ebpf_softirq.c
-        src/collectors/ebpf.plugin/ebpf_softirq.h
-        src/collectors/ebpf.plugin/ebpf_sync.c
-        src/collectors/ebpf.plugin/ebpf_sync.h
-        src/collectors/ebpf.plugin/ebpf_swap.c
-        src/collectors/ebpf.plugin/ebpf_swap.h
-        src/collectors/ebpf.plugin/ebpf_vfs.c
-        src/collectors/ebpf.plugin/ebpf_vfs.h
-        src/collectors/ebpf.plugin/ebpf_apps.c
-        src/collectors/ebpf.plugin/ebpf_apps.h
-        src/collectors/ebpf.plugin/ebpf_cgroup.c
-        src/collectors/ebpf.plugin/ebpf_cgroup.h
-        src/collectors/ebpf.plugin/ebpf_unittest.c
-        src/collectors/ebpf.plugin/ebpf_unittest.h
-         src/collectors/ebpf.plugin/libbpf_api/ebpf.c
-         src/collectors/ebpf.plugin/libbpf_api/ebpf.h
-         src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
-         src/collectors/ebpf.plugin/libbpf_api/ebpf_library.h
- )
 
 # local-listeners
 set(LOCAL_LISTENERS_FILES
