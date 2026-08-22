@@ -8,7 +8,18 @@ from pathlib import Path
 INTEGRATIONS_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INTEGRATIONS_DIR))
 
-from gen_doc_collector_page import _render_tech_navigation  # noqa: E402
+from gen_doc_collector_page import (  # noqa: E402
+    _render_tech_navigation,
+    collect_integrations_by_section,
+    load_catalog,
+    render_header,
+    render_tables,
+)
+
+
+def _heading_anchor(title):
+    slug = re.sub(r"[^a-z0-9\s-]", "", title.lower())
+    return "#" + re.sub(r"[\s-]+", "-", slug).strip("-")
 
 
 class CollectorPageNavigationTest(unittest.TestCase):
@@ -50,6 +61,18 @@ class CollectorPageNavigationTest(unittest.TestCase):
                 ("custom data sources", "#beyond-the-850-integrations"),
             ],
         )
+
+        categories, integrations = load_catalog()
+        sections = collect_integrations_by_section(categories, integrations)
+        page = render_header() + render_tables(sections)
+        headings = {
+            _heading_anchor(title)
+            for title in re.findall(r"^#{2,3} (.+)$", page, flags=re.MULTILINE)
+        }
+
+        for label, target in links:
+            with self.subTest(label=label, target=target):
+                self.assertIn(target, headings)
 
 
 if __name__ == "__main__":
