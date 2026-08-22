@@ -96,6 +96,12 @@ typedef void (*nrpc_progress_hook_cb_t)(const char *call_id, void *data);
 typedef void (*nrpc_register_progress_hook_cb_t)(void *register_progress_hook_cb_data, nrpc_progress_hook_cb_t progress_hook_cb, void *progress_hook_cb_data);
 
 struct nrpc_request {
+    // call_id, function, payload and source are BORROWED from the in-flight
+    // call record and stay valid only while the handler runs. An async handler
+    // that queues work and returns must copy every one it still needs -
+    // strdupz() for the strings, buffer_dup() for the payload - because the
+    // record is retired by the handler's own result callback, which the queued
+    // work is what eventually fires.
     nd_uuid_t *call_id;
     const char *function;
     BUFFER *payload;

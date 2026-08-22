@@ -169,6 +169,7 @@ static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
 
     buffer_free(a->payload);
     freez((void *)a->add_name);
+    freez((void *)a->source);
     freez(a);
 
     __atomic_store_n(&t->finished, true, __ATOMIC_RELAXED);
@@ -263,7 +264,7 @@ static int dyncfg_unittest_execute_cb(struct nrpc_request *req, void *data) {
     struct dyncfg_unittest_action *a = callocz(1, sizeof(*a));
     a->t = t;
     a->add_name = add_name ? strdupz(add_name) : NULL;
-    a->source = req->source;
+    a->source = req->source ? strdupz(req->source) : NULL;
     a->result = req->result.wb;
     a->payload = buffer_dup(req->payload);
     a->cmd = cmd;
