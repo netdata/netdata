@@ -21,21 +21,21 @@ Learn more about [how collectors work](/src/collectors/README.md), and then lear
 **Select your primary infrastructure to jump directly to relevant integrations:**
 
 **Cloud & Infrastructure:**
-[AWS](#cloud-provider-managed) • [Azure](#cloud-provider-managed) • [GCP](#cloud-provider-managed) • [Kubernetes](#kubernetes) • [Docker](#containers-and-vms) • [VMware](#containers-and-vms)
+[AWS](#cloud-and-devops) • [Azure](#cloud-and-devops) • [GCP](#cloud-and-devops) • [Kubernetes](#containers-and-vms) • [Docker](#containers-and-vms) • [VMware](#containers-and-vms)
 
 **Databases & Caching:**
-[MySQL](#databases) • [PostgreSQL](#databases) • [MongoDB](#databases) • [Redis](#databases) • [Elasticsearch](#search-engines) • [Oracle](#databases)
+[MySQL](#databases) • [PostgreSQL](#databases) • [MongoDB](#databases) • [Redis](#databases) • [Elasticsearch](#databases) • [Oracle](#databases)
 
 **Web & Application:**
-[NGINX](#web-servers-and-web-proxies) • [Apache](#web-servers-and-web-proxies) • [HAProxy](#web-servers-and-web-proxies) • [Tomcat](#web-servers-and-web-proxies) • [PHP-FPM](#web-servers-and-web-proxies)
+[NGINX](#web-servers-and-proxies) • [Apache](#web-servers-and-proxies) • [HAProxy](#web-servers-and-proxies) • [Tomcat](#web-servers-and-proxies) • [PHP-FPM](#web-servers-and-proxies)
 
 **Message Queues:**
-[Kafka](#message-brokers) • [RabbitMQ](#message-brokers) • [ActiveMQ](#message-brokers) • [NATS](#message-brokers) • [Pulsar](#message-brokers)
+[Kafka](#databases) • [RabbitMQ](#databases) • [ActiveMQ](#databases) • [NATS](#databases) • [Pulsar](#databases)
 
 **Operating Systems:**
-[Linux](#linux-systems) • [Windows](#windows-systems) • [macOS](#macos-systems) • [FreeBSD](#freebsd)
+[Linux](#operating-systems) • [Windows](#operating-systems) • [macOS](#operating-systems) • [FreeBSD](#operating-systems)
 
-**Don't see what you need?** We support [Prometheus endpoints](#generic-data-collection), [SNMP devices](#generic-data-collection), [StatsD](#beyond-the-850-integrations), and [custom data sources](#generic-data-collection).
+**Don't see what you need?** We support [Prometheus endpoints](#beyond-the-850-integrations), [SNMP devices](#networking), [StatsD](#beyond-the-850-integrations), and [custom data sources](#beyond-the-850-integrations).
 
 
 ## Beyond the 850+ integrations
