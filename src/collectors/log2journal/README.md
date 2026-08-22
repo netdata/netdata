@@ -480,7 +480,7 @@ tail -F /var/log/nginx/access.log |\
 
 ## Best practices
 
-**Create a systemd service unit**: Add the above commands to a systemd unit file. When you run it in a systemd unit file you will be able to start/stop it and also see its status. Furthermore you can use the `LogNamespace=` directive of systemd service units to isolate your nginx logs from the logs of the rest of the system. Here is how to do it:
+**Create a systemd service unit**: On systems running systemd 245 or later, add the above commands to a systemd unit file. When you run it in a systemd unit file you will be able to start/stop it and also see its status. Furthermore you can use the `LogNamespace=` directive of systemd service units to isolate your nginx logs from the logs of the rest of the system. Here is how to do it:
 
 Create the file `/etc/systemd/system/nginx-logs.service` (change `/path/to/nginx.yaml` to the right path):
 
@@ -490,7 +490,7 @@ Description=NGINX Log to Systemd Journal
 After=network.target
 
 [Service]
-ExecStart=/bin/sh -c 'tail -F /var/log/nginx/access.log | log2journal -f /path/to/nginx.yaml' | systemd-cat-native
+ExecStart=/bin/sh -c 'tail -F /var/log/nginx/access.log | log2journal -f /path/to/nginx.yaml | systemd-cat-native'
 LogNamespace=nginx-logs
 Restart=always
 RestartSec=3
