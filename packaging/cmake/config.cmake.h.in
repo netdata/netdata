@@ -72,7 +72,6 @@
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
 
-#cmakedefine HAVE_LIBCURL
 #cmakedefine HAVE_LIBICONV
 
 #cmakedefine HAVE_SETRESUID

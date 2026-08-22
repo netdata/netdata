@@ -419,8 +419,6 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_fetch_ebpf_co_re()
 endif()
 
-set(HAVE_LIBCURL TRUE)
-
 #
 # Custom Modules
 #
@@ -1138,7 +1136,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${OS_MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
-        "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+        PkgConfig::CURL
         "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
 
@@ -1151,7 +1149,7 @@ netdata_add_protobuf(netdata)
 add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
 target_link_libraries(systemd-cat-native
         libnetdata
-        "$<$<BOOL:${CURL_FOUND}>:PkgConfig::CURL>"
+        PkgConfig::CURL
 )
 
 install(TARGETS systemd-cat-native
