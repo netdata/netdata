@@ -11,11 +11,18 @@
 # keep their original position relative to each other and to the rest of the
 # file.
 #
-# Its source list moved here from NetdataSourceLists.cmake per D27, and stays
-# above the guards so it is still defined unconditionally.
+# The source list lives here rather than in the shared
+# NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It
+# sits above the guards, so it is defined unconditionally.
 #
-# FINDINGS.md F25: the fallback below fires after the crate import it depends
-# on. Pre-existing, preserved unchanged by this move, not fixed here.
+# Known defect, pre-existing and deliberately left alone here: the fallback
+# below sets ENABLE_NETDATA_JOURNAL_FILE_READER too late to matter. The root
+# file decides whether to import the journal_reader_ffi crate long before
+# detect_systemd() runs, so SYSTEMD_FOUND is not yet known at that point. On a
+# host with the journal plugin enabled but no libsystemd, the crate is never
+# imported and this module then links a target that was never created. Fixing
+# it means reordering the detection, which belongs in a change where the
+# journal reader is the subject.
 
 set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-fstat.c

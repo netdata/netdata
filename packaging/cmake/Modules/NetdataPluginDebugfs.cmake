@@ -10,9 +10,10 @@
 # repository and build roots, which include() preserves. This is the only
 # block in the root file that used either.
 #
-# Its source list moved here from NetdataSourceLists.cmake per D27: a plugin
-# module owns its own inventory. It stays above the guard so it is still
-# defined unconditionally, exactly as before.
+# The source list lives here rather than in the shared
+# NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It
+# sits above the guard, so it is defined unconditionally; nothing outside this
+# file reads it.
 
 # debugfs.plugin
 set(DEBUGFS_PLUGIN_FILES

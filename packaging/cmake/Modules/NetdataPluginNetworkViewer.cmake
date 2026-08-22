@@ -7,12 +7,13 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# All five per-OS source lists moved here from NetdataSourceLists.cmake per
-# D27, as one contiguous run so their order and their comments are unchanged.
-# They stay above the guard, so they are still defined unconditionally.
+# All five per-OS source lists live here rather than in the shared
+# NetdataSourceLists.cmake, so the plugin's whole definition is in one place,
+# next to the per-OS list(APPEND) block that assembles them. They sit above
+# the guard, so they are defined unconditionally.
 #
-# The two test targets travel with the plugin per D29; they already sat inside
-# its guard, so they move for free.
+# The two test targets sit inside the plugin's own guard, so they stay with
+# it rather than moving to NetdataTests.cmake.
 #
 # The i386 fat-LTO workaround below reaches out to judy, libnetdata, netipc
 # and json-c. Those targets are created earlier in the root file and include()

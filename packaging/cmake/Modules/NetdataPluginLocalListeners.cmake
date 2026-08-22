@@ -6,14 +6,14 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# The test target travels with the plugin per D29. It is not installed and is
-# EXCLUDE_FROM_ALL, but it exercises the same local-sockets code, so it
-# belongs beside it rather than in NetdataTests.cmake - which would have meant
-# re-creating its OS_LINUX AND MNL_FOUND guard at a new location, turning a
-# provable move into a rewrite.
+# The mnl test target lives here rather than in NetdataTests.cmake with the
+# other test binaries. It is EXCLUDE_FROM_ALL and never installed, but it
+# exercises the same local-sockets code this module builds, and it carries its
+# own OS_LINUX AND MNL_FOUND guard rather than the plugin option.
 #
-# Its source list moved here from NetdataSourceLists.cmake per D27, and stays
-# above the guards so it is still defined unconditionally.
+# The source list lives here rather than in the shared
+# NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It
+# sits above the guards, so it is defined unconditionally.
 
 # local-listeners
 set(LOCAL_LISTENERS_FILES

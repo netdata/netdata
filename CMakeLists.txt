@@ -561,7 +561,10 @@ if(OS_LINUX)
         detect_systemd()
 endif()
 
-# source file inventory; every operation on these lists stays in this file
+# source file inventory for everything defined in this file; every operation on
+# those lists - the conditional list(APPEND ...) calls and the NETDATA_FILES
+# aggregation - stays here. A plugin with its own NetdataPlugin*.cmake module
+# keeps its source list in that module instead.
 include(NetdataSourceLists)
 
 if(OS_WINDOWS)

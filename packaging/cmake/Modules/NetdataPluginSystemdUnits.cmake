@@ -6,8 +6,9 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# Its source list moved here from NetdataSourceLists.cmake per D27, and stays
-# above the guard so it is still defined unconditionally.
+# The source list lives here rather than in the shared
+# NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It
+# sits above the guard, so it is defined unconditionally.
 
 set(SYSTEMD_UNITS_PLUGIN_FILES
         src/collectors/systemd-units.plugin/plugin_systemd_units.c

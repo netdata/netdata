@@ -7,12 +7,12 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# Two source lists moved here from NetdataSourceLists.cmake per D27, in their
-# original relative order. INTERCOMMUNICATION_COLLECTORS_FILES has a generic
-# name but ebpf.plugin is its only consumer; moving it here asserts that, and
-# the assertion was disclosed with D27.
-#
-# Both stay above the guard, so they are still defined unconditionally.
+# Both source lists live here rather than in the shared
+# NetdataSourceLists.cmake, so the plugin's whole definition is in one place,
+# and both sit above the guard so they are defined unconditionally.
+# INTERCOMMUNICATION_COLLECTORS_FILES has a generic name, but ebpf.plugin is
+# its only consumer anywhere in the tree; keeping it here asserts that stays
+# true. Move it back out if a second target ever needs it.
 #
 # The GLOB_RECURSE for the Go plugin below uses CMAKE_SOURCE_DIR, not
 # CMAKE_CURRENT_LIST_DIR, so include() leaves it resolving exactly as before.

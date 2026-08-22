@@ -11,6 +11,11 @@
 # list(APPEND ...) calls and the NETDATA_FILES aggregation - stays in the
 # root file, because three of the aggregated lists are appended to after
 # this point and expanding them here would silently drop sources.
+#
+# This file does not hold every source list in the build. A plugin that has
+# its own packaging/cmake/Modules/NetdataPlugin*.cmake module keeps its list
+# in that module, beside the target and install rule that consume it. Add a
+# new plugin's list there, not here.
 
 #
 # source files

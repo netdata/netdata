@@ -6,13 +6,13 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# Its source list moved here from NetdataSourceLists.cmake per D27, and stays
-# above the guard so it is still defined unconditionally.
+# The source list lives here rather than in the shared
+# NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It
+# sits above the guard, so it is defined unconditionally.
 #
-# Unreachable on this workstation: no local configuration takes the OS_WINDOWS
-# branch, so the configure matrix cannot cover this block. The statement-
-# stream comparison with guard stacks is what covers it, plus the Build
-# Windows CI job.
+# This block only configures on Windows, so a Linux or macOS build never
+# evaluates it. Verify any change to it against the Build Windows CI job; a
+# local configure will not exercise it.
 
 set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events.c
