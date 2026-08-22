@@ -53,6 +53,7 @@ jobs:
             **/*.patch
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             .github/data/distros.yml
             .github/workflows/packaging.yml
             .github/scripts/gen-matrix-packaging.py

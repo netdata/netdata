@@ -70,6 +70,8 @@ jobs:
           files: |
             .dockerignore
             CMakeLists.txt
+            **/CMakeLists.txt
+            **/*.cmake
             netdata-installer.sh
             .github/data/distros.yml
             .github/workflows/docker.yml

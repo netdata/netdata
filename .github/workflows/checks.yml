@@ -48,6 +48,7 @@ jobs:
           files: |
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             .gitignore
             .github/data/distros.yml
             .github/workflows/build.yml

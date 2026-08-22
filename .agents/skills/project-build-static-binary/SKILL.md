@@ -190,7 +190,7 @@ Sets `NETDATA_BUILD_WITH_DEBUG=1` (`packaging/makeself/build.sh:9-22`), which di
 | `No cached copy of build directory for X found, fetching sources instead.` (every run) | any third-party | `artifacts/cache/` removed or arch dir missing | Normal on first build; persists for the next run |
 | `Could not find a usable OCI runtime` | n/a | Neither docker nor podman in `$PATH` | Install one |
 | `Waiting for netdata on localhost:19999 ...` hangs forever | 81 (runtime check) | Built binary segfaulted at startup | Read end of `81-netdata-runtime-check.sh` log; reproduce locally with the install path |
-| `not statically linked` warning | 80 (static check) | A new dep introduced a dynamic link | Audit `ldd` of the built binary; grep `target_link_libraries` in `CMakeLists.txt` **and** `packaging/cmake/Modules/*.cmake` for a new shared lib -- the per-plugin definitions live in the modules |
+| `not statically linked` warning | 80 (static check) | A new dep introduced a dynamic link | Audit `ldd` of the built binary; grep `target_link_libraries` in `CMakeLists.txt`, `packaging/cmake/Modules/*.cmake` **and** `src/libnetdata/CMakeLists.txt` for a new shared lib -- the per-plugin definitions live in the modules and libnetdata's own links live in its directory |
 | OOM kill mid-Rust compile under QEMU | 70 | QEMU + Rust LTO is memory-hungry | Add swap; reduce `-j` via `PROCESSORS` env |
 
 The build script exits with `Build failed.` on any job failure (`packaging/makeself/build.sh:44-52`). If `DEBUG_BUILD_INFRA=1` is set in the environment, the container drops to a `bash` shell instead of exiting — useful when you want to inspect the in-progress install tree.
