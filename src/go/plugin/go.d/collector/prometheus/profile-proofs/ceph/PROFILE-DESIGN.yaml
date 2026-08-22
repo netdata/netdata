@@ -39,13 +39,13 @@ entities:
     grain: Ceph application and compression mode and description and name and pool id and type
     identity:
       required:
-      - application
       - compression_mode
       - description
       - name
       - pool_id
       - type
-      optional: []
+      optional:
+      - application
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
@@ -104,12 +104,12 @@ entities:
       required:
       - ceph_daemon
       - ceph_instance
-      - db_device
       - device
       - device_ids
       - devices
+      optional:
+      - db_device
       - wal_device
-      optional: []
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
@@ -260,13 +260,14 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_ceph_daemon_and_id_and_instance_id:
-    grain: Ceph ceph daemon and id and instance id
+  by_id_and_daemon_owner_alternative:
+    grain: Ceph labeled worker ID with exactly one daemon-owner identity
     identity:
       required:
-      - ceph_daemon
       - id
-      - instance_id
+      alternatives:
+        - - ceph_daemon
+        - - instance_id
       optional: []
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
@@ -545,6 +546,51 @@ entities:
       - instance_id
       optional:
       - source_zone
+    high_cardinality_acceptance:
+      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
+        Netdata aggregation.
+  by_instance_id_and_user_and_tenant:
+    grain: Ceph instance id and user and tenant
+    identity:
+      required:
+      - instance_id
+      - user
+      optional:
+      - tenant
+    high_cardinality_acceptance:
+      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
+        Netdata aggregation.
+  by_instance_id_and_bucket_and_tenant:
+    grain: Ceph instance id and bucket and tenant
+    identity:
+      required:
+      - instance_id
+      - bucket
+      optional:
+      - tenant
+    high_cardinality_acceptance:
+      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
+        Netdata aggregation.
+  by_instance_id_and_local_zone_id_and_source_zone_id_and_shard_id_and_sync_shard:
+    grain: Ceph instance id, zone identities, shard id, and dynamic grammar identity
+    identity:
+      required:
+      - instance_id
+      - local_zone_id
+      - source_zone_id
+      - shard_id
+      optional:
+      - sync_shard
+    high_cardinality_acceptance:
+      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
+        Netdata aggregation.
+  by_instance_id_and_topic:
+    grain: Ceph instance id and topic
+    identity:
+      required:
+      - instance_id
+      optional:
+      - topic
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
@@ -857,6 +903,38 @@ normalizations:
       - label_objecter_handle
     evidence:
     - normalization_objecter_identity
+  rgw_topic_identity:
+    kind: embedded_identity_extract
+    registry_grammar: rgw_topic
+    target_label: topic
+    retain:
+      family: canonical_branch
+      captured_identity: true
+    output:
+      meaning: Persistent notification topic identity.
+      endpoint_cardinality:
+        kind: operational_population
+      stability: stable
+      evidence:
+      - labels_rgw_topic_persistent_topic_len
+    evidence:
+    - normalization_rgw_topic_identity
+  rgw_sync_delta_identity:
+    kind: embedded_identity_extract
+    registry_grammar: rgw_sync_delta
+    target_label: sync_shard
+    retain:
+      family: canonical_branch
+      captured_identity: true
+    output:
+      meaning: Dynamic multisite data-log shard identity.
+      endpoint_cardinality:
+        kind: operational_population
+      stability: dynamic
+      evidence:
+      - labels_rgw_sync_delta_sync_delta
+    evidence:
+    - normalization_rgw_sync_delta_identity
   rdma_worker_identity:
     kind: embedded_identity_extract
     registry_grammar: rdma_worker
@@ -5634,8 +5712,8 @@ views:
       omit: {}
   messenger.connection_timeouts:
     family: Ceph/Messenger
-    question: What is the connection timeouts for each ceph daemon and id and instance id?
-    entity: by_ceph_daemon_and_id_and_instance_id
+    question: What is the connection timeout rate for each worker and its daemon-owner alternative?
+    entity: by_id_and_daemon_owner_alternative
     inputs:
       worker_msgr_connection_idle_timeouts:
         signal: asyncmessenger_worker_msgr_connection_idle_timeouts
@@ -6878,6 +6956,513 @@ views:
       dimensions: {}
       promote: []
       omit: {}
+  object_gateway.global_operations.operations:
+    family: Ceph/Object Gateway/Global Operations
+    question: What is the operations for each instance id?
+    entity: by_instance_id
+    inputs:
+      copy_obj:
+        signal: rgw_op_copy_obj_ops
+        components:
+        - value
+      del_bucket:
+        signal: rgw_op_del_bucket_ops
+        components:
+        - value
+      del_obj:
+        signal: rgw_op_del_obj_ops
+        components:
+        - value
+      get_obj:
+        signal: rgw_op_get_obj_ops
+        components:
+        - value
+      list_buckets:
+        signal: rgw_op_list_buckets_ops
+        components:
+        - value
+      list_obj:
+        signal: rgw_op_list_obj_ops
+        components:
+        - value
+      put_obj:
+        signal: rgw_op_put_obj_ops
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.global_operations.object_bytes:
+    family: Ceph/Object Gateway/Global Operations
+    question: What is the object bytes for each instance id?
+    entity: by_instance_id
+    inputs:
+      copy_obj:
+        signal: rgw_op_copy_obj_bytes
+        components:
+        - value
+      del_obj:
+        signal: rgw_op_del_obj_bytes
+        components:
+        - value
+      get_obj:
+        signal: rgw_op_get_obj_bytes
+        components:
+        - value
+      put_obj:
+        signal: rgw_op_put_obj_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.global_operations.latency_measurements:
+    family: Ceph/Object Gateway/Global Operations
+    question: What is the latency measurements for each instance id?
+    entity: by_instance_id
+    inputs:
+      copy_obj:
+        signal: rgw_op_copy_obj_lat
+        components:
+        - value
+      del_bucket:
+        signal: rgw_op_del_bucket_lat
+        components:
+        - value
+      del_obj:
+        signal: rgw_op_del_obj_lat
+        components:
+        - value
+      get_obj:
+        signal: rgw_op_get_obj_lat
+        components:
+        - value
+      list_buckets:
+        signal: rgw_op_list_buckets_lat
+        components:
+        - value
+      list_obj:
+        signal: rgw_op_list_obj_lat
+        components:
+        - value
+      put_obj:
+        signal: rgw_op_put_obj_lat
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.global_operations.accumulated_latency:
+    family: Ceph/Object Gateway/Global Operations
+    question: What is the accumulated latency for each instance id?
+    entity: by_instance_id
+    inputs:
+      copy_obj:
+        signal: rgw_op_copy_obj_lat_sum
+        components:
+        - value
+      del_bucket:
+        signal: rgw_op_del_bucket_lat_sum
+        components:
+        - value
+      del_obj:
+        signal: rgw_op_del_obj_lat_sum
+        components:
+        - value
+      get_obj:
+        signal: rgw_op_get_obj_lat_sum
+        components:
+        - value
+      list_buckets:
+        signal: rgw_op_list_buckets_lat_sum
+        components:
+        - value
+      list_obj:
+        signal: rgw_op_list_obj_lat_sum
+        components:
+        - value
+      put_obj:
+        signal: rgw_op_put_obj_lat_sum
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.user_operations.operations:
+    family: Ceph/Object Gateway/User Operations
+    question: What is the operations for each instance id and user and tenant?
+    entity: by_instance_id_and_user_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_user_op_copy_obj_ops
+        components:
+        - value
+      del_bucket:
+        signal: rgw_user_op_del_bucket_ops
+        components:
+        - value
+      del_obj:
+        signal: rgw_user_op_del_obj_ops
+        components:
+        - value
+      get_obj:
+        signal: rgw_user_op_get_obj_ops
+        components:
+        - value
+      list_buckets:
+        signal: rgw_user_op_list_buckets_ops
+        components:
+        - value
+      list_obj:
+        signal: rgw_user_op_list_obj_ops
+        components:
+        - value
+      put_obj:
+        signal: rgw_user_op_put_obj_ops
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.user_operations.object_bytes:
+    family: Ceph/Object Gateway/User Operations
+    question: What is the object bytes for each instance id and user and tenant?
+    entity: by_instance_id_and_user_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_user_op_copy_obj_bytes
+        components:
+        - value
+      del_obj:
+        signal: rgw_user_op_del_obj_bytes
+        components:
+        - value
+      get_obj:
+        signal: rgw_user_op_get_obj_bytes
+        components:
+        - value
+      put_obj:
+        signal: rgw_user_op_put_obj_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.user_operations.latency_measurements:
+    family: Ceph/Object Gateway/User Operations
+    question: What is the latency measurements for each instance id and user and tenant?
+    entity: by_instance_id_and_user_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_user_op_copy_obj_lat
+        components:
+        - value
+      del_bucket:
+        signal: rgw_user_op_del_bucket_lat
+        components:
+        - value
+      del_obj:
+        signal: rgw_user_op_del_obj_lat
+        components:
+        - value
+      get_obj:
+        signal: rgw_user_op_get_obj_lat
+        components:
+        - value
+      list_buckets:
+        signal: rgw_user_op_list_buckets_lat
+        components:
+        - value
+      list_obj:
+        signal: rgw_user_op_list_obj_lat
+        components:
+        - value
+      put_obj:
+        signal: rgw_user_op_put_obj_lat
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.user_operations.accumulated_latency:
+    family: Ceph/Object Gateway/User Operations
+    question: What is the accumulated latency for each instance id and user and tenant?
+    entity: by_instance_id_and_user_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_user_op_copy_obj_lat_sum
+        components:
+        - value
+      del_bucket:
+        signal: rgw_user_op_del_bucket_lat_sum
+        components:
+        - value
+      del_obj:
+        signal: rgw_user_op_del_obj_lat_sum
+        components:
+        - value
+      get_obj:
+        signal: rgw_user_op_get_obj_lat_sum
+        components:
+        - value
+      list_buckets:
+        signal: rgw_user_op_list_buckets_lat_sum
+        components:
+        - value
+      list_obj:
+        signal: rgw_user_op_list_obj_lat_sum
+        components:
+        - value
+      put_obj:
+        signal: rgw_user_op_put_obj_lat_sum
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.bucket_operations.operations:
+    family: Ceph/Object Gateway/Bucket Operations
+    question: What is the operations for each instance id and bucket and tenant?
+    entity: by_instance_id_and_bucket_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_bucket_op_copy_obj_ops
+        components:
+        - value
+      del_bucket:
+        signal: rgw_bucket_op_del_bucket_ops
+        components:
+        - value
+      del_obj:
+        signal: rgw_bucket_op_del_obj_ops
+        components:
+        - value
+      get_obj:
+        signal: rgw_bucket_op_get_obj_ops
+        components:
+        - value
+      list_buckets:
+        signal: rgw_bucket_op_list_buckets_ops
+        components:
+        - value
+      list_obj:
+        signal: rgw_bucket_op_list_obj_ops
+        components:
+        - value
+      put_obj:
+        signal: rgw_bucket_op_put_obj_ops
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.bucket_operations.object_bytes:
+    family: Ceph/Object Gateway/Bucket Operations
+    question: What is the object bytes for each instance id and bucket and tenant?
+    entity: by_instance_id_and_bucket_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_bucket_op_copy_obj_bytes
+        components:
+        - value
+      del_obj:
+        signal: rgw_bucket_op_del_obj_bytes
+        components:
+        - value
+      get_obj:
+        signal: rgw_bucket_op_get_obj_bytes
+        components:
+        - value
+      put_obj:
+        signal: rgw_bucket_op_put_obj_bytes
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.bucket_operations.latency_measurements:
+    family: Ceph/Object Gateway/Bucket Operations
+    question: What is the latency measurements for each instance id and bucket and tenant?
+    entity: by_instance_id_and_bucket_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_bucket_op_copy_obj_lat
+        components:
+        - value
+      del_bucket:
+        signal: rgw_bucket_op_del_bucket_lat
+        components:
+        - value
+      del_obj:
+        signal: rgw_bucket_op_del_obj_lat
+        components:
+        - value
+      get_obj:
+        signal: rgw_bucket_op_get_obj_lat
+        components:
+        - value
+      list_buckets:
+        signal: rgw_bucket_op_list_buckets_lat
+        components:
+        - value
+      list_obj:
+        signal: rgw_bucket_op_list_obj_lat
+        components:
+        - value
+      put_obj:
+        signal: rgw_bucket_op_put_obj_lat
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.bucket_operations.accumulated_latency:
+    family: Ceph/Object Gateway/Bucket Operations
+    question: What is the accumulated latency for each instance id and bucket and tenant?
+    entity: by_instance_id_and_bucket_and_tenant
+    inputs:
+      copy_obj:
+        signal: rgw_bucket_op_copy_obj_lat_sum
+        components:
+        - value
+      del_bucket:
+        signal: rgw_bucket_op_del_bucket_lat_sum
+        components:
+        - value
+      del_obj:
+        signal: rgw_bucket_op_del_obj_lat_sum
+        components:
+        - value
+      get_obj:
+        signal: rgw_bucket_op_get_obj_lat_sum
+        components:
+        - value
+      list_buckets:
+        signal: rgw_bucket_op_list_buckets_lat_sum
+        components:
+        - value
+      list_obj:
+        signal: rgw_bucket_op_list_obj_lat_sum
+        components:
+        - value
+      put_obj:
+        signal: rgw_bucket_op_put_obj_lat_sum
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway_multisite.data_log_shard_delay:
+    family: Ceph/Object Gateway/Multisite
+    question: What is the current data-log shard delay for each instance id and dynamic sync shard?
+    entity: by_instance_id_and_local_zone_id_and_source_zone_id_and_shard_id_and_sync_shard
+    inputs:
+      sync_delta:
+        signal: rgw_sync_delta_sync_delta
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+
+  object_gateway.persistent_topics.queue_length:
+    family: Ceph/Object Gateway/Persistent Topics
+    question: What is the persistent topic queue length for each instance id and topic?
+    entity: by_instance_id_and_topic
+    inputs:
+      entries:
+        signal: rgw_topic_persistent_topic_len
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway.persistent_topics.queue_size:
+    family: Ceph/Object Gateway/Persistent Topics
+    question: What is the persistent topic queue size for each instance id and topic?
+    entity: by_instance_id_and_topic
+    inputs:
+      bytes:
+        signal: rgw_topic_persistent_topic_size
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+
+  object_gateway_cache.d4n_lookup_outcomes:
+    family: Ceph/Object Gateway/Cache
+    question: What are the D4N cache lookup outcomes for each instance id?
+    entity: by_instance_id
+    inputs:
+      hit:
+        signal: rgw_d4n_cache_hits
+        components:
+        - value
+      miss:
+        signal: rgw_d4n_cache_misses
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway_cache.d4n_cache_evictions:
+    family: Ceph/Object Gateway/Cache
+    question: What is the D4N cache eviction rate for each instance id?
+    entity: by_instance_id
+    inputs:
+      eviction:
+        signal: rgw_d4n_cache_evictions
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+
+  object_gateway_scheduling.simple_throttler_outstanding:
+    family: Ceph/Object Gateway/Scheduling
+    question: What is the current simple throttler outstanding requests for each instance id?
+    entity: by_instance_id
+    inputs:
+      outstanding:
+        signal: simple_throttler_outstanding
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  object_gateway_scheduling.simple_throttler_rejections:
+    family: Ceph/Object Gateway/Scheduling
+    question: What is the cumulative simple throttler request rejections for each instance id?
+    entity: by_instance_id
+    inputs:
+      throttled:
+        signal: simple_throttler_throttle
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+
   objecter.accumulated_latency:
     family: Ceph/Runtime and Clients/Objecter
     question: What is the accumulated latency for each ceph daemon and instance id?

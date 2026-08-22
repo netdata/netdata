@@ -36,6 +36,42 @@ relabeling:
         replacement: ceph_instance
       - regex: instance
         action: labeldrop
+  - match: ceph_rgw_topic_*_persistent_topic_len
+    metric_relabel_configs:
+      - source_labels:
+          - __name__
+        regex: ceph_rgw_topic_(.+?)_persistent_topic_len
+        target_label: topic
+        replacement: ${1}
+      - source_labels:
+          - __name__
+        regex: ceph_rgw_topic_(.+?)_persistent_topic_len
+        target_label: __name__
+        replacement: ceph_rgw_topic_persistent_topic_len
+  - match: ceph_rgw_topic_*_persistent_topic_size
+    metric_relabel_configs:
+      - source_labels:
+          - __name__
+        regex: ceph_rgw_topic_(.+?)_persistent_topic_size
+        target_label: topic
+        replacement: ${1}
+      - source_labels:
+          - __name__
+        regex: ceph_rgw_topic_(.+?)_persistent_topic_size
+        target_label: __name__
+        replacement: ceph_rgw_topic_persistent_topic_size
+  - match: ceph_rgw_sync_delta_*_sync_delta
+    metric_relabel_configs:
+      - source_labels:
+          - __name__
+        regex: ceph_rgw_sync_delta_(.+?)_sync_delta
+        target_label: sync_shard
+        replacement: ${1}
+      - source_labels:
+          - __name__
+        regex: ceph_rgw_sync_delta_(.+?)_sync_delta
+        target_label: __name__
+        replacement: ceph_rgw_sync_delta_sync_delta
   - match: '!ceph_data_sync_from_zone_* ceph_data_sync_from_*'
     metric_relabel_configs:
       - source_labels:
@@ -398,12 +434,12 @@ template:
             by_labels:
               - ceph_daemon
               - ceph_instance
-              - db_device
               - device
               - device_ids
               - devices
+            optional_by_labels:
+              - db_device
               - wal_device
-            optional_by_labels: []
         - title: State and Metadata — Human
           context: state_human
           units: '{status}'
@@ -1414,13 +1450,13 @@ template:
                   name: value
               instances:
                 by_labels:
-                  - application
                   - compression_mode
                   - description
                   - name
                   - pool_id
                   - type
-                optional_by_labels: []
+                optional_by_labels:
+                  - application
         - family: Objects
           context_namespace: objects
           metrics:
@@ -4925,10 +4961,10 @@ template:
               name: worker_msgr_connection_ready_timeouts
           instances:
             by_labels:
-              - ceph_daemon
               - id
+            optional_by_labels:
+              - ceph_daemon
               - instance_id
-            optional_by_labels: []
         - title: Active Queue Pairs
           context: active_queue_pairs
           units: queue pairs
@@ -6641,6 +6677,370 @@ template:
     - family: Object Gateway
       context_namespace: object_gateway
       groups:
+        - family: Global Operations
+          context_namespace: global_operations
+          metrics:
+            - ceph_rgw_op_copy_obj_bytes
+            - ceph_rgw_op_copy_obj_lat_count
+            - ceph_rgw_op_copy_obj_lat_sum
+            - ceph_rgw_op_copy_obj_ops
+            - ceph_rgw_op_del_bucket_lat_count
+            - ceph_rgw_op_del_bucket_lat_sum
+            - ceph_rgw_op_del_bucket_ops
+            - ceph_rgw_op_del_obj_bytes
+            - ceph_rgw_op_del_obj_lat_count
+            - ceph_rgw_op_del_obj_lat_sum
+            - ceph_rgw_op_del_obj_ops
+            - ceph_rgw_op_get_obj_bytes
+            - ceph_rgw_op_get_obj_lat_count
+            - ceph_rgw_op_get_obj_lat_sum
+            - ceph_rgw_op_get_obj_ops
+            - ceph_rgw_op_list_buckets_lat_count
+            - ceph_rgw_op_list_buckets_lat_sum
+            - ceph_rgw_op_list_buckets_ops
+            - ceph_rgw_op_list_obj_lat_count
+            - ceph_rgw_op_list_obj_lat_sum
+            - ceph_rgw_op_list_obj_ops
+            - ceph_rgw_op_put_obj_bytes
+            - ceph_rgw_op_put_obj_lat_count
+            - ceph_rgw_op_put_obj_lat_sum
+            - ceph_rgw_op_put_obj_ops
+          charts:
+            - title: Operations
+              context: operations
+              units: operations/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_copy_obj_ops
+                  name: copy_obj
+                - selector: ceph_rgw_op_del_bucket_ops
+                  name: del_bucket
+                - selector: ceph_rgw_op_del_obj_ops
+                  name: del_obj
+                - selector: ceph_rgw_op_get_obj_ops
+                  name: get_obj
+                - selector: ceph_rgw_op_list_buckets_ops
+                  name: list_buckets
+                - selector: ceph_rgw_op_list_obj_ops
+                  name: list_obj
+                - selector: ceph_rgw_op_put_obj_ops
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                optional_by_labels:
+            - title: Object Bytes
+              context: object_bytes
+              units: bytes/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_copy_obj_bytes
+                  name: copy_obj
+                - selector: ceph_rgw_op_del_obj_bytes
+                  name: del_obj
+                - selector: ceph_rgw_op_get_obj_bytes
+                  name: get_obj
+                - selector: ceph_rgw_op_put_obj_bytes
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                optional_by_labels:
+            - title: Latency Measurements
+              context: latency_measurements
+              units: operations/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_copy_obj_lat_count
+                  name: copy_obj
+                - selector: ceph_rgw_op_del_bucket_lat_count
+                  name: del_bucket
+                - selector: ceph_rgw_op_del_obj_lat_count
+                  name: del_obj
+                - selector: ceph_rgw_op_get_obj_lat_count
+                  name: get_obj
+                - selector: ceph_rgw_op_list_buckets_lat_count
+                  name: list_buckets
+                - selector: ceph_rgw_op_list_obj_lat_count
+                  name: list_obj
+                - selector: ceph_rgw_op_put_obj_lat_count
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                optional_by_labels:
+            - title: Accumulated Latency
+              context: accumulated_latency
+              units: seconds/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_copy_obj_lat_sum
+                  name: copy_obj
+                - selector: ceph_rgw_op_del_bucket_lat_sum
+                  name: del_bucket
+                - selector: ceph_rgw_op_del_obj_lat_sum
+                  name: del_obj
+                - selector: ceph_rgw_op_get_obj_lat_sum
+                  name: get_obj
+                - selector: ceph_rgw_op_list_buckets_lat_sum
+                  name: list_buckets
+                - selector: ceph_rgw_op_list_obj_lat_sum
+                  name: list_obj
+                - selector: ceph_rgw_op_put_obj_lat_sum
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                optional_by_labels:
+              algorithm: incremental
+        - family: User Operations
+          context_namespace: user_operations
+          metrics:
+            - ceph_rgw_op_per_user_copy_obj_bytes
+            - ceph_rgw_op_per_user_copy_obj_lat_count
+            - ceph_rgw_op_per_user_copy_obj_lat_sum
+            - ceph_rgw_op_per_user_copy_obj_ops
+            - ceph_rgw_op_per_user_del_bucket_lat_count
+            - ceph_rgw_op_per_user_del_bucket_lat_sum
+            - ceph_rgw_op_per_user_del_bucket_ops
+            - ceph_rgw_op_per_user_del_obj_bytes
+            - ceph_rgw_op_per_user_del_obj_lat_count
+            - ceph_rgw_op_per_user_del_obj_lat_sum
+            - ceph_rgw_op_per_user_del_obj_ops
+            - ceph_rgw_op_per_user_get_obj_bytes
+            - ceph_rgw_op_per_user_get_obj_lat_count
+            - ceph_rgw_op_per_user_get_obj_lat_sum
+            - ceph_rgw_op_per_user_get_obj_ops
+            - ceph_rgw_op_per_user_list_buckets_lat_count
+            - ceph_rgw_op_per_user_list_buckets_lat_sum
+            - ceph_rgw_op_per_user_list_buckets_ops
+            - ceph_rgw_op_per_user_list_obj_lat_count
+            - ceph_rgw_op_per_user_list_obj_lat_sum
+            - ceph_rgw_op_per_user_list_obj_ops
+            - ceph_rgw_op_per_user_put_obj_bytes
+            - ceph_rgw_op_per_user_put_obj_lat_count
+            - ceph_rgw_op_per_user_put_obj_lat_sum
+            - ceph_rgw_op_per_user_put_obj_ops
+          charts:
+            - title: Operations
+              context: operations
+              units: operations/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_user_copy_obj_ops
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_user_del_bucket_ops
+                  name: del_bucket
+                - selector: ceph_rgw_op_per_user_del_obj_ops
+                  name: del_obj
+                - selector: ceph_rgw_op_per_user_get_obj_ops
+                  name: get_obj
+                - selector: ceph_rgw_op_per_user_list_buckets_ops
+                  name: list_buckets
+                - selector: ceph_rgw_op_per_user_list_obj_ops
+                  name: list_obj
+                - selector: ceph_rgw_op_per_user_put_obj_ops
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - user
+                optional_by_labels:
+                  - tenant
+            - title: Object Bytes
+              context: object_bytes
+              units: bytes/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_user_copy_obj_bytes
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_user_del_obj_bytes
+                  name: del_obj
+                - selector: ceph_rgw_op_per_user_get_obj_bytes
+                  name: get_obj
+                - selector: ceph_rgw_op_per_user_put_obj_bytes
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - user
+                optional_by_labels:
+                  - tenant
+            - title: Latency Measurements
+              context: latency_measurements
+              units: operations/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_user_copy_obj_lat_count
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_user_del_bucket_lat_count
+                  name: del_bucket
+                - selector: ceph_rgw_op_per_user_del_obj_lat_count
+                  name: del_obj
+                - selector: ceph_rgw_op_per_user_get_obj_lat_count
+                  name: get_obj
+                - selector: ceph_rgw_op_per_user_list_buckets_lat_count
+                  name: list_buckets
+                - selector: ceph_rgw_op_per_user_list_obj_lat_count
+                  name: list_obj
+                - selector: ceph_rgw_op_per_user_put_obj_lat_count
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - user
+                optional_by_labels:
+                  - tenant
+            - title: Accumulated Latency
+              context: accumulated_latency
+              units: seconds/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_user_copy_obj_lat_sum
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_user_del_bucket_lat_sum
+                  name: del_bucket
+                - selector: ceph_rgw_op_per_user_del_obj_lat_sum
+                  name: del_obj
+                - selector: ceph_rgw_op_per_user_get_obj_lat_sum
+                  name: get_obj
+                - selector: ceph_rgw_op_per_user_list_buckets_lat_sum
+                  name: list_buckets
+                - selector: ceph_rgw_op_per_user_list_obj_lat_sum
+                  name: list_obj
+                - selector: ceph_rgw_op_per_user_put_obj_lat_sum
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - user
+                optional_by_labels:
+                  - tenant
+              algorithm: incremental
+        - family: Bucket Operations
+          context_namespace: bucket_operations
+          metrics:
+            - ceph_rgw_op_per_bucket_copy_obj_bytes
+            - ceph_rgw_op_per_bucket_copy_obj_lat_count
+            - ceph_rgw_op_per_bucket_copy_obj_lat_sum
+            - ceph_rgw_op_per_bucket_copy_obj_ops
+            - ceph_rgw_op_per_bucket_del_bucket_lat_count
+            - ceph_rgw_op_per_bucket_del_bucket_lat_sum
+            - ceph_rgw_op_per_bucket_del_bucket_ops
+            - ceph_rgw_op_per_bucket_del_obj_bytes
+            - ceph_rgw_op_per_bucket_del_obj_lat_count
+            - ceph_rgw_op_per_bucket_del_obj_lat_sum
+            - ceph_rgw_op_per_bucket_del_obj_ops
+            - ceph_rgw_op_per_bucket_get_obj_bytes
+            - ceph_rgw_op_per_bucket_get_obj_lat_count
+            - ceph_rgw_op_per_bucket_get_obj_lat_sum
+            - ceph_rgw_op_per_bucket_get_obj_ops
+            - ceph_rgw_op_per_bucket_list_buckets_lat_count
+            - ceph_rgw_op_per_bucket_list_buckets_lat_sum
+            - ceph_rgw_op_per_bucket_list_buckets_ops
+            - ceph_rgw_op_per_bucket_list_obj_lat_count
+            - ceph_rgw_op_per_bucket_list_obj_lat_sum
+            - ceph_rgw_op_per_bucket_list_obj_ops
+            - ceph_rgw_op_per_bucket_put_obj_bytes
+            - ceph_rgw_op_per_bucket_put_obj_lat_count
+            - ceph_rgw_op_per_bucket_put_obj_lat_sum
+            - ceph_rgw_op_per_bucket_put_obj_ops
+          charts:
+            - title: Operations
+              context: operations
+              units: operations/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_bucket_copy_obj_ops
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_bucket_del_bucket_ops
+                  name: del_bucket
+                - selector: ceph_rgw_op_per_bucket_del_obj_ops
+                  name: del_obj
+                - selector: ceph_rgw_op_per_bucket_get_obj_ops
+                  name: get_obj
+                - selector: ceph_rgw_op_per_bucket_list_buckets_ops
+                  name: list_buckets
+                - selector: ceph_rgw_op_per_bucket_list_obj_ops
+                  name: list_obj
+                - selector: ceph_rgw_op_per_bucket_put_obj_ops
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - bucket
+                optional_by_labels:
+                  - tenant
+            - title: Object Bytes
+              context: object_bytes
+              units: bytes/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_bucket_copy_obj_bytes
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_bucket_del_obj_bytes
+                  name: del_obj
+                - selector: ceph_rgw_op_per_bucket_get_obj_bytes
+                  name: get_obj
+                - selector: ceph_rgw_op_per_bucket_put_obj_bytes
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - bucket
+                optional_by_labels:
+                  - tenant
+            - title: Latency Measurements
+              context: latency_measurements
+              units: operations/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_bucket_copy_obj_lat_count
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_bucket_del_bucket_lat_count
+                  name: del_bucket
+                - selector: ceph_rgw_op_per_bucket_del_obj_lat_count
+                  name: del_obj
+                - selector: ceph_rgw_op_per_bucket_get_obj_lat_count
+                  name: get_obj
+                - selector: ceph_rgw_op_per_bucket_list_buckets_lat_count
+                  name: list_buckets
+                - selector: ceph_rgw_op_per_bucket_list_obj_lat_count
+                  name: list_obj
+                - selector: ceph_rgw_op_per_bucket_put_obj_lat_count
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - bucket
+                optional_by_labels:
+                  - tenant
+            - title: Accumulated Latency
+              context: accumulated_latency
+              units: seconds/s
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_op_per_bucket_copy_obj_lat_sum
+                  name: copy_obj
+                - selector: ceph_rgw_op_per_bucket_del_bucket_lat_sum
+                  name: del_bucket
+                - selector: ceph_rgw_op_per_bucket_del_obj_lat_sum
+                  name: del_obj
+                - selector: ceph_rgw_op_per_bucket_get_obj_lat_sum
+                  name: get_obj
+                - selector: ceph_rgw_op_per_bucket_list_buckets_lat_sum
+                  name: list_buckets
+                - selector: ceph_rgw_op_per_bucket_list_obj_lat_sum
+                  name: list_obj
+                - selector: ceph_rgw_op_per_bucket_put_obj_lat_sum
+                  name: put_obj
+              instances:
+                by_labels:
+                  - instance_id
+                  - bucket
+                optional_by_labels:
+                  - tenant
+              algorithm: incremental
         - family: Lifecycle
           context_namespace: lifecycle
           metrics:
@@ -6788,6 +7188,36 @@ template:
                 by_labels:
                   - instance_id
                 optional_by_labels: []
+        - family: Persistent Topics
+          context_namespace: persistent_topics
+          metrics:
+            - ceph_rgw_topic_persistent_topic_len
+            - ceph_rgw_topic_persistent_topic_size
+          charts:
+            - title: Persistent Topic Queue Length
+              context: queue_length
+              units: entries
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_topic_persistent_topic_len
+                  name: entries
+              instances:
+                by_labels:
+                  - instance_id
+                optional_by_labels:
+                  - topic
+            - title: Persistent Topic Queue Size
+              context: queue_size
+              units: bytes
+              label_promotion: []
+              dimensions:
+                - selector: ceph_rgw_topic_persistent_topic_size
+                  name: bytes
+              instances:
+                by_labels:
+                  - instance_id
+                optional_by_labels:
+                  - topic
         - family: Requests and Queue
           context_namespace: requests_and_queue
           metrics:
@@ -6898,6 +7328,9 @@ template:
     - family: Object Gateway/Cache
       context_namespace: object_gateway_cache
       metrics:
+        - ceph_rgw_d4n_cache_evictions
+        - ceph_rgw_d4n_cache_hits
+        - ceph_rgw_d4n_cache_misses
         - ceph_rgw_cache_hit
         - ceph_rgw_cache_miss
         - ceph_rgw_keystone_token_cache_hit
@@ -6912,6 +7345,30 @@ template:
               name: hit
             - selector: ceph_rgw_keystone_token_cache_miss
               name: miss
+          instances:
+            by_labels:
+              - instance_id
+            optional_by_labels: []
+        - title: D4N Cache Lookup Outcomes
+          context: d4n_lookup_outcomes
+          units: lookups/s
+          label_promotion: []
+          dimensions:
+            - selector: ceph_rgw_d4n_cache_hits
+              name: hit
+            - selector: ceph_rgw_d4n_cache_misses
+              name: miss
+          instances:
+            by_labels:
+              - instance_id
+            optional_by_labels: []
+        - title: D4N Cache Evictions
+          context: d4n_cache_evictions
+          units: evictions/s
+          label_promotion: []
+          dimensions:
+            - selector: ceph_rgw_d4n_cache_evictions
+              name: eviction
           instances:
             by_labels:
               - instance_id
@@ -6932,6 +7389,7 @@ template:
     - family: Object Gateway/Multisite
       context_namespace: object_gateway_multisite
       metrics:
+        - ceph_rgw_sync_delta_sync_delta
         - ceph_data_sync_from_zone_fetch_bytes_count
         - ceph_data_sync_from_zone_fetch_bytes_sum
         - ceph_data_sync_from_zone_fetch_errors
@@ -6954,6 +7412,21 @@ template:
               - instance_id
             optional_by_labels:
               - source_zone
+        - title: Data Log Shard Delay
+          context: data_log_shard_delay
+          units: seconds
+          label_promotion: []
+          dimensions:
+            - selector: ceph_rgw_sync_delta_sync_delta
+              name: sync_delta
+          instances:
+            by_labels:
+              - instance_id
+              - local_zone_id
+              - source_zone_id
+              - shard_id
+            optional_by_labels:
+              - sync_shard
         - title: Accumulated Byte Measurement
           context: accumulated_bytes
           units: bytes/s
@@ -10659,6 +11132,8 @@ template:
     - family: Object Gateway/Scheduling
       context_namespace: object_gateway_scheduling
       metrics:
+        - ceph_simple_throttler_outstanding
+        - ceph_simple_throttler_throttle
         - ceph_dmclock_admin_cancel
         - ceph_dmclock_admin_cancel_cost
         - ceph_dmclock_admin_cost
@@ -10735,6 +11210,29 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
+        - title: Simple Throttler Outstanding Requests
+          context: simple_throttler_outstanding
+          units: requests
+          label_promotion: []
+          dimensions:
+            - selector: ceph_simple_throttler_outstanding
+              name: outstanding
+          instances:
+            by_labels:
+              - instance_id
+            optional_by_labels: []
+        - title: Simple Throttler Rejections
+          context: simple_throttler_rejections
+          units: requests/s
+          label_promotion: []
+          dimensions:
+            - selector: ceph_simple_throttler_throttle
+              name: throttled
+          instances:
+            by_labels:
+              - instance_id
+            optional_by_labels: []
+          algorithm: incremental
         - title: Queued Request Cost
           context: queue_cost
           units: cost
