@@ -1501,26 +1501,6 @@ set(NETIPC_WINDOWS_SERVICE_FILES
         src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
 )
 
-# log2journal
-set(LOG2JOURNAL_FILES
-        ${CONFIG_H}
-        src/collectors/log2journal/log2journal.h
-        src/collectors/log2journal/log2journal.c
-        src/collectors/log2journal/log2journal-help.c
-        src/collectors/log2journal/log2journal-yaml.c
-        src/collectors/log2journal/log2journal-json.c
-        src/collectors/log2journal/log2journal-logfmt.c
-        src/collectors/log2journal/log2journal-pcre2.c
-        src/collectors/log2journal/log2journal-params.c
-        src/collectors/log2journal/log2journal-inject.c
-        src/collectors/log2journal/log2journal-pattern.c
-        src/collectors/log2journal/log2journal-replace.c
-        src/collectors/log2journal/log2journal-rename.c
-        src/collectors/log2journal/log2journal-rewrite.c
-        src/collectors/log2journal/log2journal-txt.h
-        src/collectors/log2journal/log2journal-hashed-key.h
-)
-
 # windows: the netdata-claim resource script
 set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
 

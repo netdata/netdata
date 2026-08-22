@@ -1150,26 +1150,10 @@ install(TARGETS systemd-cat-native
         DESTINATION "${BINDIR}")
 
 #
-# build log2journal
+# log2journal: converts structured text logs into systemd Journal Export Format.
 #
 
-if(PCRE2_FOUND)
-        add_executable(log2journal ${LOG2JOURNAL_FILES})
-        target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
-        target_compile_options(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
-
-        target_link_libraries(log2journal PUBLIC libnetdata)
-        target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
-        netdata_add_libyaml_to_target(log2journal)
-
-        install(TARGETS log2journal
-                COMPONENT netdata
-                DESTINATION "${BINDIR}")
-
-        install(DIRECTORY src/collectors/log2journal/log2journal.d
-                COMPONENT netdata
-                DESTINATION ${LIBCONFIG_DEST})
-endif()
+include(NetdataLog2Journal)
 
 #
 # netdatacli: the command-line client for the running agent.
