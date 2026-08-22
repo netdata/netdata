@@ -1172,15 +1172,10 @@ if(PCRE2_FOUND)
 endif()
 
 #
-# build netdatacli
+# netdatacli: the command-line client for the running agent.
 #
 
-add_executable(netdatacli ${NETDATACLI_FILES} "$<$<BOOL:${OS_WINDOWS}>:${NETDATACLI_RES_FILES}>")
-target_link_libraries(netdatacli libnetdata)
-
-install(TARGETS netdatacli
-        COMPONENT netdata
-        DESTINATION "${BINDIR}")
+include(NetdataCli)
 
 #
 # Build go.d.plugin

@@ -1330,13 +1330,6 @@ set(NDRUN_FILES src/collectors/utils/nd-run.c)
 set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
                              src/libnetdata/log/systemd-cat-native.h)
 
-set(NETDATACLI_FILES
-        src/daemon/commands.h
-        src/daemon/pipename.c
-        src/daemon/pipename.h
-        src/cli/cli.c
-)
-
 #
 # Guarded inventory. The root file keeps the guard and selects
 # from here; only the file lists live below.
@@ -1530,9 +1523,6 @@ set(LOG2JOURNAL_FILES
 
 # windows: the netdata-claim resource script
 set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
-
-# windows: the netdatacli resource script
-set(NETDATACLI_RES_FILES "packaging/windows/resources/netdatacli.rc")
 
 # windows: the netdata resource script
 set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
