@@ -1067,7 +1067,7 @@ func TestCollector_CephProfileFamilySegments(t *testing.T) {
 	require.NotEmpty(t, families)
 
 	for _, family := range families {
-		for _, segment := range strings.Split(family, "/") {
+		for segment := range strings.SplitSeq(family, "/") {
 			require.NotContains(t, []string{"I", "O"}, segment,
 				"family %q uses the reserved path segment %q", family, segment)
 		}

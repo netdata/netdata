@@ -306,7 +306,7 @@ template:
                 by_labels:
                   - device_class
                 optional_by_labels: []
-    - family: CephFS Metadata
+    - family: CephFS/Metadata
       context_namespace: cephfs_metadata
       groups:
         - family: Filesystem Metadata
@@ -829,7 +829,7 @@ template:
               dimensions:
                 - selector: ceph_healthcheck_slow_ops
                   name: value
-    - family: OSD Capacity and State
+    - family: OSDs/Capacity and State
       context_namespace: osd_capacity_and_state
       groups:
         - family: Cluster Flags
@@ -943,7 +943,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-    - family: Node Hardware
+    - family: Hardware
       context_namespace: node_hardware
       groups:
         - family: Processors
@@ -1058,7 +1058,7 @@ template:
                   - hostname
                   - sensor_name
                 optional_by_labels: []
-    - family: OSD Overview
+    - family: OSDs/Overview
       context_namespace: osd_overview
       metrics:
         - ceph_osd_apply_latency_ms
@@ -1077,7 +1077,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: Object Gateway Metadata
+    - family: Object Gateway/Metadata
       context_namespace: object_gateway_metadata
       metrics:
         - ceph_rgw_metadata
@@ -1096,7 +1096,7 @@ template:
               - hostname
               - instance_id
             optional_by_labels: []
-    - family: Placement Groups and Recovery
+    - family: Placement Groups
       context_namespace: placement_groups_and_recovery
       groups:
         - family: Backfill
@@ -1632,7 +1632,7 @@ template:
                   - id
                   - instance_id
                 optional_by_labels: []
-    - family: SMB Metadata
+    - family: CephFS/SMB/Metadata
       context_namespace: smb_metadata
       metrics:
         - ceph_smb_metadata
@@ -3158,7 +3158,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-    - family: CephFS MDS
+    - family: CephFS/MDS
       context_namespace: cephfs_mds
       groups:
         - family: Attribute and Layout Mutation Latency
@@ -4385,7 +4385,7 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
               algorithm: incremental
-    - family: CephFS MDS Memory
+    - family: CephFS/MDS/Memory
       context_namespace: cephfs_mds_memory
       metrics:
         - ceph_mds_mem_cap
@@ -4512,7 +4512,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: CephFS MDS Sessions
+    - family: CephFS/MDS/Sessions
       context_namespace: cephfs_mds_sessions
       metrics:
         - ceph_mds_sessions_average_load
@@ -4598,7 +4598,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: CephFS MDS Clients
+    - family: CephFS/MDS/Clients
       context_namespace: cephfs_mds_clients
       metrics:
         - ceph_mds_per_client_avg_metadata_latency
@@ -4747,7 +4747,7 @@ template:
             optional_by_labels:
               - mds_filesystem_key
           algorithm: incremental
-    - family: Exporter and Process Runtime
+    - family: Exporter and Process
       context_namespace: exporter_and_process_runtime
       groups:
         - family: Collection
@@ -4854,7 +4854,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-    - family: Manager Daemons
+    - family: Managers/Daemons
       context_namespace: manager_daemons
       metrics:
         - ceph_mgr_cache_hit
@@ -5027,7 +5027,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: Monitor Daemons
+    - family: Monitors/Daemons
       context_namespace: monitor_daemons
       metrics:
         - ceph_mon_election_call
@@ -5082,7 +5082,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: OSD Client IO
+    - family: OSDs/Client IO
       context_namespace: osd_client_i_o
       metrics:
         - ceph_osd_op
@@ -5357,7 +5357,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: OSD Recovery
+    - family: OSDs/Recovery
       context_namespace: osd_recovery
       metrics:
         - ceph_osd_l_osd_recovery_backfill_queue_latency_count
@@ -5492,7 +5492,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: OSD Runtime
+    - family: OSDs/Runtime
       context_namespace: osd_runtime
       metrics:
         - ceph_osd_agent_evict
@@ -5907,7 +5907,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: OSD Scrubbing - Ceph 19
+    - family: OSDs/Scrubbing/Ceph 19
       context_namespace: osd_scrubbing_ceph_19
       groups:
         - family: Elapsed Time
@@ -6204,7 +6204,7 @@ template:
                   - level
                   - pooltype
                 optional_by_labels: []
-    - family: OSD Scrubbing - Ceph 20
+    - family: OSDs/Scrubbing/Ceph 20
       context_namespace: osd_scrubbing_ceph_20
       groups:
         - family: Elapsed Time
@@ -6466,7 +6466,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-    - family: OSD Scrubbing - Common Work
+    - family: OSDs/Scrubbing/Common Work
       context_namespace: osd_scrubbing_common_work
       groups:
         - family: Interference and Scheduling
@@ -6895,7 +6895,7 @@ template:
                 by_labels:
                   - instance_id
                 optional_by_labels: []
-    - family: Object Gateway Cache
+    - family: Object Gateway/Cache
       context_namespace: object_gateway_cache
       metrics:
         - ceph_rgw_cache_hit
@@ -6929,7 +6929,7 @@ template:
             by_labels:
               - instance_id
             optional_by_labels: []
-    - family: Object Gateway Multisite
+    - family: Object Gateway/Multisite
       context_namespace: object_gateway_multisite
       metrics:
         - ceph_data_sync_from_zone_fetch_bytes_count
@@ -7022,7 +7022,7 @@ template:
               - instance_id
             optional_by_labels:
               - source_zone
-    - family: Objecter
+    - family: Runtime and Clients/Objecter
       context_namespace: objecter
       metrics:
         - ceph_objecter_command_active
@@ -7469,7 +7469,7 @@ template:
               - ceph_daemon
               - instance_id
           aggregation: sum
-    - family: RBD Client Images
+    - family: RBD Images/Client Images
       context_namespace: rbd_client_images
       metrics:
         - ceph_rbd_librbd_image_cmp
@@ -7728,7 +7728,7 @@ template:
               - ceph_daemon
             optional_by_labels:
               - librbd_image_key
-    - family: RBD Mirror
+    - family: RBD Images/Mirror
       context_namespace: rbd_mirror
       groups:
         - family: Journal
@@ -9064,7 +9064,7 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
               algorithm: incremental
-    - family: Runtime and Client Components
+    - family: Runtime and Clients
       context_namespace: runtime_and_client_components
       groups:
         - family: RBD Persistent Write Log
@@ -10465,7 +10465,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-    - family: CephFS Mirror
+    - family: CephFS/Mirror
       context_namespace: cephfs_mirror
       groups:
         - family: Service
@@ -10656,7 +10656,7 @@ template:
                   - source_fscid
                 optional_by_labels: []
               algorithm: absolute
-    - family: Object Gateway Scheduling
+    - family: Object Gateway/Scheduling
       context_namespace: object_gateway_scheduling
       metrics:
         - ceph_dmclock_admin_cancel
@@ -10917,7 +10917,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: Storage Engine Extensions
+    - family: Storage Engine/Extensions
       context_namespace: storage_engine_extensions
       groups:
         - family: RocksDB Binned Cache
@@ -11068,7 +11068,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-    - family: Ceph Clients
+    - family: Clients
       context_namespace: ceph_clients
       metrics:
         - ceph_client_mdops
