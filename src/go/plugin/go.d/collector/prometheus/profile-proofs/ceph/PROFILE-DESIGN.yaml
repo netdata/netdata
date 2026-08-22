@@ -8,12 +8,11 @@ namespace: ceph
 composition:
   supports: {}
 entities:
-  by_allow_any_host_and_ceph_instance_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number:
-    grain: Ceph allow any host and ceph instance and group and ha enabled and model number and nqn and serial number
+  by_allow_any_host_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number:
+    grain: Ceph NVMe-oF subsystem security/group/HA/model/NQN/serial metadata
     identity:
       required:
       - allow_any_host
-      - ceph_instance
       - group
       - ha_enabled
       - model_number
@@ -23,13 +22,12 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_anagrpid_and_bdev_name_and_ceph_instance_and_nqn_and_nsid_and_rados_namespace_name:
-    grain: Ceph anagrpid and bdev name and ceph instance and nqn and nsid and rados namespace name
+  by_anagrpid_and_bdev_name_and_nqn_and_nsid_and_rados_namespace_name:
+    grain: Ceph NVMe-oF namespace metadata identity
     identity:
       required:
       - anagrpid
       - bdev_name
-      - ceph_instance
       - nqn
       - nsid
       - rados_namespace_name
@@ -78,26 +76,15 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_bdev_name_and_block_size_and_ceph_instance_and_namespace_and_pool_name_and_rbd_name:
-    grain: Ceph bdev name and block size and ceph instance and namespace and pool name and rbd name
+  by_bdev_name_and_block_size_and_namespace_and_pool_name_and_rbd_name:
+    grain: Ceph NVMe-oF bdev name, block size, namespace, pool name, and RBD name
     identity:
       required:
       - bdev_name
       - block_size
-      - ceph_instance
       - namespace
       - pool_name
       - rbd_name
-      optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
-  by_bdev_name_and_ceph_instance:
-    grain: Ceph bdev name and ceph instance
-    identity:
-      required:
-      - bdev_name
-      - ceph_instance
       optional: []
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
@@ -441,11 +428,10 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_ceph_instance_and_gw_name_and_host_nqn_and_nqn:
-    grain: Ceph ceph instance and gw name and host nqn and nqn
+  by_gw_name_and_host_nqn_and_nqn:
+    grain: Ceph NVMe-oF gateway name, host NQN, and subsystem NQN
     identity:
       required:
-      - ceph_instance
       - gw_name
       - host_nqn
       - nqn
@@ -453,27 +439,11 @@ entities:
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
         Netdata aggregation.
-  by_ceph_instance_and_mode_and_name:
-    grain: Ceph ceph instance and mode and name
+  local_gateway_endpoint:
+    grain: One direct NVMe-oF exporter endpoint selected by the collector job
     identity:
-      required:
-      - ceph_instance
-      - mode
-      - name
+      required: []
       optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
-  by_ceph_instance_and_nqn:
-    grain: Ceph ceph instance and nqn
-    identity:
-      required:
-      - ceph_instance
-      - nqn
-      optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
   by_daemon_name_and_hostname_and_service_name_and_service_type:
     grain: Ceph daemon name and hostname and service name and service type
     identity:
@@ -592,16 +562,6 @@ entities:
     identity:
       required:
       - name
-      optional: []
-    high_cardinality_acceptance:
-      operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
-        Netdata aggregation.
-  by_name_and_severity:
-    grain: Ceph name and severity
-    identity:
-      required:
-      - name
-      - severity
       optional: []
     high_cardinality_acceptance:
       operator_value: This draft preserves the source's finest existing chart grain for explicit operator review and broader
@@ -992,7 +952,11 @@ normalizations:
       - label_throttle_key
     evidence:
     - normalization_throttle_identity
+# `hardware_firmware_info` is a source-declared info family. The writer rejects it as
+# `writer_ineligible/info_family` before authored or autogen output, so it has no
+# exclusion. A future inventory presentation requires a deliberate writer-policy decision.
 exclusions: {}
+
 limitations:
   objecter.accumulated_latency#value:
     contributor_variant: objecter_handles
@@ -1498,7 +1462,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.accumulated_latency:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1531,7 +1495,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.byte_throughput:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1592,7 +1556,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.latency_measurements:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1625,7 +1589,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.operations:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1678,7 +1642,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.zero_read_outcomes:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the zero-read outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1953,7 +1917,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.accumulated_latency:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1986,7 +1950,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.byte_throughput:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2023,7 +1987,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.latency_measurements:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2056,7 +2020,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.penalty_reads:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the penalty reads for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2069,7 +2033,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.read_outcomes:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the read outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2086,7 +2050,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.skipped_blobs:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the skipped blobs for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2099,7 +2063,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.skipped_writes:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the skipped writes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2112,7 +2076,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.slow_aio_waits:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the slow aio waits for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2125,7 +2089,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.slow_reads:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the slow reads for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2142,7 +2106,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.write_operations:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the write operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2183,7 +2147,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.written_blobs:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the written blobs for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3107,7 +3071,7 @@ views:
       promote: []
       omit: {}
   ceph_clients.io_operations:
-    family: Ceph/Ceph Clients
+    family: Ceph/Clients
     question: What is the client i/o operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3128,7 +3092,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.attribute_and_layout_mutation_latency.accumulated_latency:
-    family: Ceph/CephFS MDS/Attribute and Layout Mutation Latency
+    family: Ceph/CephFS/MDS/Attribute and Layout Mutation Latency
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3161,7 +3125,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.attribute_and_layout_mutation_latency.latency_measurements:
-    family: Ceph/CephFS MDS/Attribute and Layout Mutation Latency
+    family: Ceph/CephFS/MDS/Attribute and Layout Mutation Latency
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3194,7 +3158,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.capabilities.capability_messages:
-    family: Ceph/CephFS MDS/Capabilities
+    family: Ceph/CephFS/MDS/Capabilities
     question: What is the capability messages for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3215,7 +3179,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.capabilities.capability_state:
-    family: Ceph/CephFS MDS/Capabilities
+    family: Ceph/CephFS/MDS/Capabilities
     question: What is the capabilities for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3228,7 +3192,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.capabilities.evicted_clients:
-    family: Ceph/CephFS MDS/Capabilities
+    family: Ceph/CephFS/MDS/Capabilities
     question: What is the capability-revoke evictions for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3241,7 +3205,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.capabilities.inode_state:
-    family: Ceph/CephFS MDS/Capabilities
+    family: Ceph/CephFS/MDS/Capabilities
     question: What is the inodes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3254,7 +3218,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.capabilities.inode_work:
-    family: Ceph/CephFS MDS/Capabilities
+    family: Ceph/CephFS/MDS/Capabilities
     question: What is the inode work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3267,7 +3231,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.capabilities.operations:
-    family: Ceph/CephFS MDS/Capabilities
+    family: Ceph/CephFS/MDS/Capabilities
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3300,7 +3264,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.capabilities.throttled_requests:
-    family: Ceph/CephFS MDS/Capabilities
+    family: Ceph/CephFS/MDS/Capabilities
     question: What is the capability-throttled requests for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3313,7 +3277,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.accumulated_latency:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3326,7 +3290,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.events_current:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the current journal events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3347,7 +3311,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.journal_events:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the journal events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3372,7 +3336,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.journal_positions:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the journal positions for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3393,7 +3357,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.journal_segments:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the journal segments for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3414,7 +3378,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.large_events:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the large journal events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3427,7 +3391,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.latency_measurements:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3440,7 +3404,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.journal.segments_current:
-    family: Ceph/CephFS MDS/Journal
+    family: Ceph/CephFS/MDS/Journal
     question: What is the journal segments for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3465,7 +3429,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_directory.discovery_attempts:
-    family: Ceph/CephFS MDS/Metadata Cache Directory
+    family: Ceph/CephFS/MDS/Metadata Cache Directory
     question: What is the discovery attempts for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3478,7 +3442,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_directory.discovery_messages:
-    family: Ceph/CephFS MDS/Metadata Cache Directory
+    family: Ceph/CephFS/MDS/Metadata Cache Directory
     question: What is the discovery messages for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3495,7 +3459,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_directory.replication_directives:
-    family: Ceph/CephFS MDS/Metadata Cache Directory
+    family: Ceph/CephFS/MDS/Metadata Cache Directory
     question: What is the replication directives for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3512,7 +3476,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_internal_requests.inode_work:
-    family: Ceph/CephFS MDS/Metadata Cache Internal Requests
+    family: Ceph/CephFS/MDS/Metadata Cache Internal Requests
     question: What is the inode work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3529,7 +3493,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_internal_requests.operations:
-    family: Ceph/CephFS MDS/Metadata Cache Internal Requests
+    family: Ceph/CephFS/MDS/Metadata Cache Internal Requests
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3558,7 +3522,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_internal_requests.scrub_work:
-    family: Ceph/CephFS MDS/Metadata Cache Internal Requests
+    family: Ceph/CephFS/MDS/Metadata Cache Internal Requests
     question: What is the scrub work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3571,7 +3535,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_recovery.current_work:
-    family: Ceph/CephFS MDS/Metadata Cache Recovery
+    family: Ceph/CephFS/MDS/Metadata Cache Recovery
     question: What is the current work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3592,7 +3556,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_recovery.events:
-    family: Ceph/CephFS MDS/Metadata Cache Recovery
+    family: Ceph/CephFS/MDS/Metadata Cache Recovery
     question: What is the events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3617,7 +3581,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_recovery.file_state:
-    family: Ceph/CephFS MDS/Metadata Cache Recovery
+    family: Ceph/CephFS/MDS/Metadata Cache Recovery
     question: What is the files for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3638,7 +3602,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_recovery.file_work:
-    family: Ceph/CephFS MDS/Metadata Cache Recovery
+    family: Ceph/CephFS/MDS/Metadata Cache Recovery
     question: What is the file work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3655,7 +3619,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_uninline.events:
-    family: Ceph/CephFS MDS/Metadata Cache Uninline
+    family: Ceph/CephFS/MDS/Metadata Cache Uninline
     question: What is the events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3672,7 +3636,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.metadata_cache_uninline.failure_outcomes:
-    family: Ceph/CephFS MDS/Metadata Cache Uninline
+    family: Ceph/CephFS/MDS/Metadata Cache Uninline
     question: What is the failure and delay outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3685,7 +3649,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_mutation_latency.accumulated_latency:
-    family: Ceph/CephFS MDS/Namespace Mutation Latency
+    family: Ceph/CephFS/MDS/Namespace Mutation Latency
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3726,7 +3690,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_mutation_latency.latency_measurements:
-    family: Ceph/CephFS MDS/Namespace Mutation Latency
+    family: Ceph/CephFS/MDS/Namespace Mutation Latency
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3767,7 +3731,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_traversal.dirfrag_lifecycle:
-    family: Ceph/CephFS MDS/Namespace Traversal
+    family: Ceph/CephFS/MDS/Namespace Traversal
     question: What is the directory-fragment lifecycle for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3788,7 +3752,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_traversal.inode_work:
-    family: Ceph/CephFS MDS/Namespace Traversal
+    family: Ceph/CephFS/MDS/Namespace Traversal
     question: What is the inode work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3801,7 +3765,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_traversal.key_work:
-    family: Ceph/CephFS MDS/Namespace Traversal
+    family: Ceph/CephFS/MDS/Namespace Traversal
     question: What is the key work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3814,7 +3778,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_traversal.lookup_outcomes:
-    family: Ceph/CephFS MDS/Namespace Traversal
+    family: Ceph/CephFS/MDS/Namespace Traversal
     question: What is the lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3827,7 +3791,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_traversal.operations:
-    family: Ceph/CephFS MDS/Namespace Traversal
+    family: Ceph/CephFS/MDS/Namespace Traversal
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3848,7 +3812,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.namespace_traversal.traversals:
-    family: Ceph/CephFS MDS/Namespace Traversal
+    family: Ceph/CephFS/MDS/Namespace Traversal
     question: What is the namespace traversals for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3881,7 +3845,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.purge_queue.current_work:
-    family: Ceph/CephFS MDS/Purge Queue
+    family: Ceph/CephFS/MDS/Purge Queue
     question: What is the current work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3894,7 +3858,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.purge_queue.purge_operations:
-    family: Ceph/CephFS MDS/Purge Queue
+    family: Ceph/CephFS/MDS/Purge Queue
     question: What is the executed purge operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3907,7 +3871,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.purge_queue.purge_operations_state:
-    family: Ceph/CephFS MDS/Purge Queue
+    family: Ceph/CephFS/MDS/Purge Queue
     question: What is the purge operations in flight for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3924,7 +3888,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.purge_queue.purge_tasks:
-    family: Ceph/CephFS MDS/Purge Queue
+    family: Ceph/CephFS/MDS/Purge Queue
     question: What is the executed purge tasks for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3937,7 +3901,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.purge_queue.purge_tasks_state:
-    family: Ceph/CephFS MDS/Purge Queue
+    family: Ceph/CephFS/MDS/Purge Queue
     question: What is the purge tasks in flight for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3954,7 +3918,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.rank_migration.events:
-    family: Ceph/CephFS MDS/Rank Migration
+    family: Ceph/CephFS/MDS/Rank Migration
     question: What is the events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3971,7 +3935,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.rank_migration.inode_work:
-    family: Ceph/CephFS MDS/Rank Migration
+    family: Ceph/CephFS/MDS/Rank Migration
     question: What is the inode work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -3988,7 +3952,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.read_request_latency.accumulated_latency:
-    family: Ceph/CephFS MDS/Read Request Latency
+    family: Ceph/CephFS/MDS/Read Request Latency
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4045,7 +4009,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.read_request_latency.latency_measurements:
-    family: Ceph/CephFS MDS/Read Request Latency
+    family: Ceph/CephFS/MDS/Read Request Latency
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4102,7 +4066,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.accumulated_latency:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4115,7 +4079,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.connected_clients:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the connected clients for each ceph daemon and fs name and id?
     entity: by_ceph_daemon_and_fs_name_and_id
     inputs:
@@ -4128,7 +4092,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.events:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4145,7 +4109,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.expired_inodes:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the expired inodes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4158,7 +4122,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.failure_outcomes:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the failure and delay outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4171,7 +4135,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.file_state:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the files for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4184,7 +4148,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.inode_state:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the inodes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4213,7 +4177,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.latency_measurements:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4226,7 +4190,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.load:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the load for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4239,7 +4203,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.operations:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4272,7 +4236,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.queued_requests:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the queued requests for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4285,7 +4249,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.snapshot_state:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the snapshots for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4298,7 +4262,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.space:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the space and memory for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4311,7 +4275,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.request_handling_and_state.subtrees:
-    family: Ceph/CephFS MDS/Request Handling and State
+    family: Ceph/CephFS/MDS/Request Handling and State
     question: What is the subtrees for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4324,7 +4288,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.scrubbing.applied_tags:
-    family: Ceph/CephFS MDS/Scrubbing
+    family: Ceph/CephFS/MDS/Scrubbing
     question: What is the applied scrub tags for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4337,7 +4301,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.scrubbing.backtrace_work:
-    family: Ceph/CephFS MDS/Scrubbing
+    family: Ceph/CephFS/MDS/Scrubbing
     question: What is the backtrace work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4354,7 +4318,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.scrubbing.dirfrag_rstat_updates:
-    family: Ceph/CephFS MDS/Scrubbing
+    family: Ceph/CephFS/MDS/Scrubbing
     question: What is the directory-fragment recursive-stat updates for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4367,7 +4331,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.scrubbing.repaired_inotables:
-    family: Ceph/CephFS MDS/Scrubbing
+    family: Ceph/CephFS/MDS/Scrubbing
     question: What is the repaired inotables for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4380,7 +4344,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.scrubbing.scrubbed_inodes:
-    family: Ceph/CephFS MDS/Scrubbing
+    family: Ceph/CephFS/MDS/Scrubbing
     question: What is the scrubbed inodes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4401,7 +4365,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.snapshot_mutation_latency.accumulated_latency:
-    family: Ceph/CephFS MDS/Snapshot Mutation Latency
+    family: Ceph/CephFS/MDS/Snapshot Mutation Latency
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4430,7 +4394,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds.snapshot_mutation_latency.latency_measurements:
-    family: Ceph/CephFS MDS/Snapshot Mutation Latency
+    family: Ceph/CephFS/MDS/Snapshot Mutation Latency
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4459,7 +4423,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.average_operation_latency:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the average operation latency for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4480,7 +4444,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.capability_outcomes:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the capability access outcomes for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4497,7 +4461,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.dentry_lease_outcomes:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the dentry lease lookup outcomes for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4514,7 +4478,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.inode_state:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the inode state for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4531,7 +4495,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.open_files:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the open files for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4544,7 +4508,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.pinned_inode_capabilities:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the pinned inode capabilities for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4557,7 +4521,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.reported_io_operations:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the reported i/o operations for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4574,7 +4538,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_clients.reported_io_volume:
-    family: Ceph/CephFS MDS Clients
+    family: Ceph/CephFS/MDS/Clients
     question: What is the reported i/o volume for each ceph daemon and client and rank and mds filesystem key?
     entity: by_ceph_daemon_and_client_and_rank_and_mds_filesystem_key
     inputs:
@@ -4591,7 +4555,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.capability_state:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the capabilities for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4604,7 +4568,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.capability_work:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the capability work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4621,7 +4585,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.dentry_state:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the dentries for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4634,7 +4598,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.dentry_work:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the dentry cache churn for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4651,7 +4615,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.directory_state:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the directories for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4664,7 +4628,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.directory_work:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the directory cache churn for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4681,7 +4645,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.inode_state:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the inodes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4694,7 +4658,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.inode_work:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the inode work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4711,7 +4675,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_memory.space:
-    family: Ceph/CephFS MDS Memory
+    family: Ceph/CephFS/MDS/Memory
     question: What is the space and memory for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4728,7 +4692,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_sessions.average_load:
-    family: Ceph/CephFS MDS Sessions
+    family: Ceph/CephFS/MDS/Sessions
     question: What is the average session load for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4741,7 +4705,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_sessions.duration:
-    family: Ceph/CephFS MDS Sessions
+    family: Ceph/CephFS/MDS/Sessions
     question: What is the duration and time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4754,7 +4718,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_sessions.events:
-    family: Ceph/CephFS MDS Sessions
+    family: Ceph/CephFS/MDS/Sessions
     question: What is the events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4771,7 +4735,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_sessions.metadata_threshold_evictions:
-    family: Ceph/CephFS MDS Sessions
+    family: Ceph/CephFS/MDS/Sessions
     question: What is the metadata-threshold evictions for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4784,7 +4748,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_sessions.session_state:
-    family: Ceph/CephFS MDS Sessions
+    family: Ceph/CephFS/MDS/Sessions
     question: What is the sessions for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4805,7 +4769,7 @@ views:
       promote: []
       omit: {}
   cephfs_mds_sessions.total_load:
-    family: Ceph/CephFS MDS Sessions
+    family: Ceph/CephFS/MDS/Sessions
     question: What is the total session load for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4818,7 +4782,7 @@ views:
       promote: []
       omit: {}
   cephfs_metadata.filesystem_metadata.state:
-    family: Ceph/CephFS Metadata/Filesystem Metadata
+    family: Ceph/CephFS/Metadata/Filesystem Metadata
     question: What is the state and metadata for each data pools and fs id and metadata pool and name?
     entity: by_data_pools_and_fs_id_and_metadata_pool_and_name
     inputs:
@@ -4831,7 +4795,7 @@ views:
       promote: []
       omit: {}
   cephfs_metadata.mds_metadata.state:
-    family: Ceph/CephFS Metadata/MDS Metadata
+    family: Ceph/CephFS/Metadata/MDS Metadata
     question: What is the state and metadata for each ceph daemon and ceph version and fs id and hostname and public addr
       and rank?
     entity: by_ceph_daemon_and_ceph_version_and_fs_id_and_hostname_and_public_addr_and_rank
@@ -4845,7 +4809,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.filesystems.directories:
-    family: Ceph/CephFS Mirror/Filesystems
+    family: Ceph/CephFS/Mirror/Filesystems
     question: What is the mirrored directories for each ceph daemon and filesystem?
     entity: by_ceph_daemon_and_filesystem
     inputs:
@@ -4858,7 +4822,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.filesystems.peers:
-    family: Ceph/CephFS Mirror/Filesystems
+    family: Ceph/CephFS/Mirror/Filesystems
     question: What is the mirroring peers for each ceph daemon and filesystem?
     entity: by_ceph_daemon_and_filesystem
     inputs:
@@ -4871,7 +4835,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.peers.accumulated_sync_time:
-    family: Ceph/CephFS Mirror/Peers
+    family: Ceph/CephFS/Mirror/Peers
     question: What is the accumulated sync time for each ceph daemon and peer cluster filesystem and peer cluster name and
       source filesystem and source fscid?
     entity: by_ceph_daemon_and_peer_cluster_filesystem_and_peer_cluster_name_and_source_filesystem_and_source_fscid
@@ -4885,7 +4849,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.peers.last_sync_duration:
-    family: Ceph/CephFS Mirror/Peers
+    family: Ceph/CephFS/Mirror/Peers
     question: What is the last sync duration for each ceph daemon and peer cluster filesystem and peer cluster name and source
       filesystem and source fscid?
     entity: by_ceph_daemon_and_peer_cluster_filesystem_and_peer_cluster_name_and_source_filesystem_and_source_fscid
@@ -4899,7 +4863,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.peers.last_sync_size:
-    family: Ceph/CephFS Mirror/Peers
+    family: Ceph/CephFS/Mirror/Peers
     question: What is the last sync size for each ceph daemon and peer cluster filesystem and peer cluster name and source
       filesystem and source fscid?
     entity: by_ceph_daemon_and_peer_cluster_filesystem_and_peer_cluster_name_and_source_filesystem_and_source_fscid
@@ -4913,7 +4877,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.peers.last_sync_timestamps:
-    family: Ceph/CephFS Mirror/Peers
+    family: Ceph/CephFS/Mirror/Peers
     question: What is the last sync timestamps for each ceph daemon and peer cluster filesystem and peer cluster name and
       source filesystem and source fscid?
     entity: by_ceph_daemon_and_peer_cluster_filesystem_and_peer_cluster_name_and_source_filesystem_and_source_fscid
@@ -4931,7 +4895,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.peers.snapshot_outcomes:
-    family: Ceph/CephFS Mirror/Peers
+    family: Ceph/CephFS/Mirror/Peers
     question: What is the snapshot outcomes for each ceph daemon and peer cluster filesystem and peer cluster name and source
       filesystem and source fscid?
     entity: by_ceph_daemon_and_peer_cluster_filesystem_and_peer_cluster_name_and_source_filesystem_and_source_fscid
@@ -4957,7 +4921,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.peers.sync_throughput:
-    family: Ceph/CephFS Mirror/Peers
+    family: Ceph/CephFS/Mirror/Peers
     question: What is the sync throughput for each ceph daemon and peer cluster filesystem and peer cluster name and source
       filesystem and source fscid?
     entity: by_ceph_daemon_and_peer_cluster_filesystem_and_peer_cluster_name_and_source_filesystem_and_source_fscid
@@ -4971,7 +4935,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.peers.sync_time_measurements:
-    family: Ceph/CephFS Mirror/Peers
+    family: Ceph/CephFS/Mirror/Peers
     question: What is the sync-time measurements for each ceph daemon and peer cluster filesystem and peer cluster name and
       source filesystem and source fscid?
     entity: by_ceph_daemon_and_peer_cluster_filesystem_and_peer_cluster_name_and_source_filesystem_and_source_fscid
@@ -4985,7 +4949,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.service.enable_failures:
-    family: Ceph/CephFS Mirror/Service
+    family: Ceph/CephFS/Mirror/Service
     question: What is the mirroring enable failures for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -4998,7 +4962,7 @@ views:
       promote: []
       omit: {}
   cephfs_mirror.service.filesystems:
-    family: Ceph/CephFS Mirror/Service
+    family: Ceph/CephFS/Mirror/Service
     question: What is the mirrored filesystems for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5146,6 +5110,31 @@ views:
       dimensions: {}
       promote: []
       omit: {}
+  control_plane.monitor.cluster_summary:
+    family: Ceph/Control Plane/Monitor
+    question: How many monitors exist and are currently in quorum for this cluster endpoint?
+    entity: cluster
+    inputs:
+      total:
+        signal: mon_metadata
+        components:
+          - value
+      in_quorum:
+        signal: mon_quorum_status
+        components:
+          - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        ceph_daemon: Member identity is reduced into the cluster population.
+        ceph_version: Member metadata is not meaningful on the cluster population chart.
+        hostname: Member metadata is not meaningful on the cluster population chart.
+        public_addr: Member metadata is not meaningful on the cluster population chart.
+        rank: Member metadata is not meaningful on the cluster population chart.
+    reduction:
+      reducer: sum
+      lost_comparison: Individual monitor rows remain available in the member charts; this view is the additive population for one MGR job.
   control_plane.monitor.state_quorum_status:
     family: Ceph/Control Plane/Monitor
     question: What is the state and metadata — quorum status for each ceph daemon?
@@ -5438,7 +5427,7 @@ views:
       promote: []
       omit: {}
   exporter_and_process_runtime.collection.duration:
-    family: Ceph/Exporter and Process Runtime/Collection
+    family: Ceph/Exporter and Process/Collection
     question: What is the collection duration for each function and host?
     entity: by_function_and_host
     inputs:
@@ -5451,7 +5440,7 @@ views:
       promote: []
       omit: {}
   exporter_and_process_runtime.daemon_availability.state:
-    family: Ceph/Exporter and Process Runtime/Daemon Availability
+    family: Ceph/Exporter and Process/Daemon Availability
     question: What is the daemon socket state for each ceph daemon and hostname?
     entity: by_ceph_daemon_and_hostname
     inputs:
@@ -5464,7 +5453,7 @@ views:
       promote: []
       omit: {}
   exporter_and_process_runtime.daemon_processes.cpu_time:
-    family: Ceph/Exporter and Process Runtime/Daemon Processes
+    family: Ceph/Exporter and Process/Daemon Processes
     question: What is the cpu time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5479,7 +5468,7 @@ views:
       promote: []
       omit: {}
   exporter_and_process_runtime.daemon_processes.cpu_utilization:
-    family: Ceph/Exporter and Process Runtime/Daemon Processes
+    family: Ceph/Exporter and Process/Daemon Processes
     question: What is the cpu utilization for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5497,7 +5486,7 @@ views:
       evidence:
       - ceph_display_conventions
   exporter_and_process_runtime.daemon_processes.memory:
-    family: Ceph/Exporter and Process Runtime/Daemon Processes
+    family: Ceph/Exporter and Process/Daemon Processes
     question: What is the memory for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5514,7 +5503,7 @@ views:
       promote: []
       omit: {}
   exporter_and_process_runtime.daemon_processes.page_faults:
-    family: Ceph/Exporter and Process Runtime/Daemon Processes
+    family: Ceph/Exporter and Process/Daemon Processes
     question: What is the page faults for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5531,7 +5520,7 @@ views:
       promote: []
       omit: {}
   exporter_and_process_runtime.daemon_processes.threads:
-    family: Ceph/Exporter and Process Runtime/Daemon Processes
+    family: Ceph/Exporter and Process/Daemon Processes
     question: What is the threads for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5556,9 +5545,9 @@ views:
       dimensions: {}
       promote: []
       omit: {}
-  health.daemon_health.state:
+  health.daemon_health.item_count:
     family: Ceph/Health/Daemon Health
-    question: What is the state and metadata for each ceph daemon and type?
+    question: How many items does each Ceph daemon health metric currently report?
     entity: by_ceph_daemon_and_type
     inputs:
       value:
@@ -5571,8 +5560,8 @@ views:
       omit: {}
   health.health_checks.state:
     family: Ceph/Health/Health Checks
-    question: What is the state and metadata for each name and severity?
-    entity: by_name_and_severity
+    question: What are the state and source-recorded severity of each health check?
+    entity: by_name
     inputs:
       value:
         signal: health_detail
@@ -5580,11 +5569,12 @@ views:
         - value
     labels:
       dimensions: {}
-      promote: []
+      promote:
+        - severity
       omit: {}
-  health.slow_operations.state:
+  health.slow_operations.current_operations:
     family: Ceph/Health/Slow Operations
-    question: What is the state and metadata?
+    question: How many slow operations does the cluster currently report?
     entity: cluster
     inputs:
       value:
@@ -5596,7 +5586,7 @@ views:
       promote: []
       omit: {}
   manager_daemons.lookup_outcomes:
-    family: Ceph/Manager Daemons
+    family: Ceph/Managers/Daemons
     question: What is the lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5775,7 +5765,7 @@ views:
       promote: []
       omit: {}
   monitor_daemons.elections:
-    family: Ceph/Monitor Daemons
+    family: Ceph/Monitors/Daemons
     question: What is the elections for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5800,7 +5790,7 @@ views:
       promote: []
       omit: {}
   monitor_daemons.session_state:
-    family: Ceph/Monitor Daemons
+    family: Ceph/Monitors/Daemons
     question: What is the sessions for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5813,7 +5803,7 @@ views:
       promote: []
       omit: {}
   monitor_daemons.session_work:
-    family: Ceph/Monitor Daemons
+    family: Ceph/Monitors/Daemons
     question: What is the session churn for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -5833,21 +5823,8 @@ views:
       dimensions: {}
       promote: []
       omit: {}
-  node_hardware.cooling.fan_speed:
-    family: Ceph/Node Hardware/Cooling
-    question: What is the current speed of each reported fan?
-    entity: node_hardware_fan
-    inputs:
-      value:
-        signal: hardware_fan_rpm
-        components:
-        - value
-    labels:
-      dimensions: {}
-      promote: []
-      omit: {}
   node_hardware.health.state:
-    family: Ceph/Node Hardware/Health
+    family: Ceph/Hardware/Health
     question: What is the current health state of each reported hardware component?
     entity: node_hardware_component
     inputs:
@@ -5859,8 +5836,39 @@ views:
       dimensions: {}
       promote: []
       omit: {}
+  node_hardware.temperature.temperature:
+    family: Ceph/Hardware/Temperature
+    question: What temperature does each reported hardware sensor observe?
+    entity: node_hardware_temperature_sensor
+    inputs:
+      value:
+        signal: hardware_temperature_celsius
+        components:
+          - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
+  node_hardware.cooling.fan_speed:
+    display:
+      convention: fan_revolutions_per_minute
+      reason: Preserve the source's rotations-per-minute operator unit while normalizing the semantic axis to revolutions per second.
+      evidence:
+        - ceph_display_conventions
+    family: Ceph/Hardware/Cooling
+    question: What is the current speed of each reported fan?
+    entity: node_hardware_fan
+    inputs:
+      value:
+        signal: hardware_fan_rpm
+        components:
+        - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit: {}
   node_hardware.memory.capacity:
-    family: Ceph/Node Hardware/Memory
+    family: Ceph/Hardware/Memory
     question: What capacity does each reported memory module provide?
     entity: node_hardware_memory_module
     inputs:
@@ -5873,7 +5881,7 @@ views:
       promote: []
       omit: {}
   node_hardware.processors.cpu_cores:
-    family: Ceph/Node Hardware/Processors
+    family: Ceph/Hardware/Processors
     question: How many cores does each reported CPU provide?
     entity: node_hardware_cpu
     inputs:
@@ -5886,25 +5894,12 @@ views:
       promote: []
       omit: {}
   node_hardware.storage.capacity:
-    family: Ceph/Node Hardware/Storage
+    family: Ceph/Hardware/Storage
     question: What capacity does each reported storage device provide?
     entity: node_hardware_storage_device
     inputs:
       value:
         signal: hardware_storage_capacity_bytes
-        components:
-        - value
-    labels:
-      dimensions: {}
-      promote: []
-      omit: {}
-  node_hardware.temperature.temperature:
-    family: Ceph/Node Hardware/Temperature
-    question: What temperature does each reported hardware sensor observe?
-    entity: node_hardware_temperature_sensor
-    inputs:
-      value:
-        signal: hardware_temperature_celsius
         components:
         - value
     labels:
@@ -5930,8 +5925,8 @@ views:
       omit: {}
   nvme_of.block_devices.operations:
     family: Ceph/NVMe-oF/Block Devices
-    question: What is the operations for each bdev name and ceph instance?
-    entity: by_bdev_name_and_ceph_instance
+    question: What is the operations for each bdev name?
+    entity: by_bdev_name
     inputs:
       reads_completed:
         signal: nvmeof_bdev_reads_completed_total
@@ -5960,9 +5955,8 @@ views:
       omit: {}
   nvme_of.block_devices.state:
     family: Ceph/NVMe-oF/Block Devices
-    question: What is the state and metadata for each bdev name and block size and ceph instance and namespace and pool name
-      and rbd name?
-    entity: by_bdev_name_and_block_size_and_ceph_instance_and_namespace_and_pool_name_and_rbd_name
+    question: What is the state and metadata for each bdev name and block size and namespace and pool name and rbd name?
+    entity: by_bdev_name_and_block_size_and_namespace_and_pool_name_and_rbd_name
     inputs:
       value:
         signal: nvmeof_bdev_metadata
@@ -5974,8 +5968,8 @@ views:
       omit: {}
   nvme_of.block_devices.time_accumulation:
     family: Ceph/NVMe-oF/Block Devices
-    question: What is the accumulated time for each bdev name and ceph instance?
-    entity: by_bdev_name_and_ceph_instance
+    question: What is the accumulated time for each bdev name?
+    entity: by_bdev_name
     inputs:
       read_seconds:
         signal: nvmeof_bdev_read_seconds_total
@@ -6004,15 +5998,16 @@ views:
       omit: {}
   nvme_of.gateways.time_accumulation:
     family: Ceph/NVMe-oF/Gateways
-    question: What is the accumulated time for each ceph instance and mode and name?
-    entity: by_ceph_instance_and_mode_and_name
+    question: What is the accumulated busy and idle reactor time for each local gateway reactor thread?
+    entity: by_name
     inputs:
       value:
         signal: nvmeof_reactor_seconds_total
         components:
         - value
     labels:
-      dimensions: {}
+      dimensions:
+        mode: {render: label_value}
       promote: []
       omit: {}
   nvme_of.hosts.connection_state:
@@ -6030,8 +6025,8 @@ views:
       omit: {}
   nvme_of.hosts.keepalive_timeout_state:
     family: Ceph/NVMe-oF/Hosts
-    question: What is the keepalive timeout state for each ceph instance and gw name and host nqn and nqn?
-    entity: by_ceph_instance_and_gw_name_and_host_nqn_and_nqn
+    question: What is the keepalive timeout state for each gw name and host nqn and nqn?
+    entity: by_gw_name_and_host_nqn_and_nqn
     inputs:
       value:
         signal: nvmeof_host_keepalive_timeout
@@ -6074,8 +6069,8 @@ views:
       - nvmeof_display_conventions
   nvme_of.subsystems.listener_state:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the listener addresses for each ceph instance and nqn?
-    entity: by_ceph_instance_and_nqn
+    question: What is the listener addresses for each nqn?
+    entity: by_nqn
     inputs:
       value:
         signal: nvmeof_subsystem_listener_count
@@ -6087,8 +6082,8 @@ views:
       omit: {}
   nvme_of.subsystems.namespace_count:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the namespaces for each ceph instance and nqn?
-    entity: by_ceph_instance_and_nqn
+    question: What is the namespaces for each nqn?
+    entity: by_nqn
     inputs:
       nvmeof_subsystem_namespace_count:
         signal: nvmeof_subsystem_namespace_count
@@ -6098,11 +6093,32 @@ views:
       dimensions: {}
       promote: []
       omit: {}
-  nvme_of.subsystems.namespace_limit:
+  nvme_of.gateways.namespace_count:
+    family: Ceph/NVMe-oF/Gateways
+    question: How many namespaces does this local exporter endpoint serve?
+    entity: local_gateway_endpoint
+    inputs:
+      namespace_count:
+        signal: nvmeof_subsystem_namespace_count
+        components:
+          - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        nqn: Subsystem identity is intentionally summed to the local gateway endpoint.
+    reduction:
+      reducer: sum
+      lost_comparison: Individual subsystem namespace counts remain available in the Subsystems/Namespaces chart.
+  nvme_of.subsystems.namespace_capacity:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the namespace limit for each nqn?
+    question: How does each subsystem namespace population compare with its configured limit?
     entity: by_nqn
     inputs:
+      count:
+        signal: nvmeof_subsystem_namespace_count
+        components:
+          - value
       limit:
         signal: nvmeof_subsystem_namespace_limit
         components:
@@ -6113,9 +6129,9 @@ views:
       omit: {}
   nvme_of.subsystems.state_metadata:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the state and metadata — metadata for each allow any host and ceph instance and group and ha enabled
-      and model number and nqn and serial number?
-    entity: by_allow_any_host_and_ceph_instance_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number
+    question: What is the state and metadata — metadata for each allow any host and group and ha enabled and model number and nqn
+      and serial number?
+    entity: by_allow_any_host_and_group_and_ha_enabled_and_model_number_and_nqn_and_serial_number
     inputs:
       metadata:
         signal: nvmeof_subsystem_metadata
@@ -6127,9 +6143,9 @@ views:
       omit: {}
   nvme_of.subsystems.state_namespace_metadata:
     family: Ceph/NVMe-oF/Subsystems
-    question: What is the state and metadata — namespace metadata for each anagrpid and bdev name and ceph instance and nqn
-      and nsid and rados namespace name?
-    entity: by_anagrpid_and_bdev_name_and_ceph_instance_and_nqn_and_nsid_and_rados_namespace_name
+    question: What is the state and metadata — namespace metadata for each anagrpid and bdev name and nqn and nsid and rados
+      namespace name?
+    entity: by_anagrpid_and_bdev_name_and_nqn_and_nsid_and_rados_namespace_name
     inputs:
       namespace_metadata:
         signal: nvmeof_subsystem_namespace_metadata
@@ -6413,7 +6429,7 @@ views:
       promote: []
       omit: {}
   object_gateway_cache.keystone_lookup_outcomes:
-    family: Ceph/Object Gateway Cache
+    family: Ceph/Object Gateway/Cache
     question: What is the keystone token cache lookup outcomes for each instance id?
     entity: by_instance_id
     inputs:
@@ -6430,7 +6446,7 @@ views:
       promote: []
       omit: {}
   object_gateway_cache.lookup_outcomes:
-    family: Ceph/Object Gateway Cache
+    family: Ceph/Object Gateway/Cache
     question: What is the lookup outcomes for each instance id?
     entity: by_instance_id
     inputs:
@@ -6447,7 +6463,7 @@ views:
       promote: []
       omit: {}
   object_gateway_metadata.state:
-    family: Ceph/Object Gateway Metadata
+    family: Ceph/Object Gateway/Metadata
     question: What is the state and metadata for each ceph daemon and ceph version and hostname and instance id?
     entity: by_ceph_daemon_and_ceph_version_and_hostname_and_instance_id
     inputs:
@@ -6460,7 +6476,7 @@ views:
       promote: []
       omit: {}
   object_gateway_multisite.accumulated_bytes:
-    family: Ceph/Object Gateway Multisite
+    family: Ceph/Object Gateway/Multisite
     question: What is the accumulated byte measurement for each instance id and source zone?
     entity: by_instance_id_and_source_zone
     inputs:
@@ -6473,7 +6489,7 @@ views:
       promote: []
       omit: {}
   object_gateway_multisite.accumulated_latency:
-    family: Ceph/Object Gateway Multisite
+    family: Ceph/Object Gateway/Multisite
     question: What is the accumulated latency for each instance id and source zone?
     entity: by_instance_id_and_source_zone
     inputs:
@@ -6490,7 +6506,7 @@ views:
       promote: []
       omit: {}
   object_gateway_multisite.latency_measurements:
-    family: Ceph/Object Gateway Multisite
+    family: Ceph/Object Gateway/Multisite
     question: What is the latency measurements for each instance id and source zone?
     entity: by_instance_id_and_source_zone
     inputs:
@@ -6507,7 +6523,7 @@ views:
       promote: []
       omit: {}
   object_gateway_multisite.object_work:
-    family: Ceph/Object Gateway Multisite
+    family: Ceph/Object Gateway/Multisite
     question: What is the object work for each instance id and source zone?
     entity: by_instance_id_and_source_zone
     inputs:
@@ -6524,7 +6540,7 @@ views:
       promote: []
       omit: {}
   object_gateway_multisite.replicated_objects:
-    family: Ceph/Object Gateway Multisite
+    family: Ceph/Object Gateway/Multisite
     question: What is the replicated objects for each instance id and source zone?
     entity: by_instance_id_and_source_zone
     inputs:
@@ -6537,7 +6553,7 @@ views:
       promote: []
       omit: {}
   object_gateway_multisite.replication_log_request_errors:
-    family: Ceph/Object Gateway Multisite
+    family: Ceph/Object Gateway/Multisite
     question: What is the replication-log request errors for each instance id and source zone?
     entity: by_instance_id_and_source_zone
     inputs:
@@ -6550,7 +6566,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.accumulated_latency:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the accumulated scheduling latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6591,7 +6607,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.latency_measurements:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the scheduling-latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6632,7 +6648,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.outstanding_requests:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the outstanding requests for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6645,7 +6661,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.queue_cost:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the queued request cost for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6670,7 +6686,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.queue_depth:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the queue depth for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6695,7 +6711,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.rejected_and_cancelled_requests:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the rejected and cancelled requests for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6736,7 +6752,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.scheduled_and_rejected_cost:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the scheduled and rejected cost for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6809,7 +6825,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.scheduled_requests:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the scheduled requests for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6850,7 +6866,7 @@ views:
       promote: []
       omit: {}
   object_gateway_scheduling.throttled_requests:
-    family: Ceph/Object Gateway Scheduling
+    family: Ceph/Object Gateway/Scheduling
     question: What is the throttled requests for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -6863,7 +6879,7 @@ views:
       promote: []
       omit: {}
   objecter.accumulated_latency:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the accumulated latency for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -6880,7 +6896,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.active_commands:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the active commands for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -6897,7 +6913,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.active_lingering_operations:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the active lingering operations for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -6914,7 +6930,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.active_operations:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the objecter operations for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -6939,7 +6955,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.active_pool_operations:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the active pool operations for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -6956,7 +6972,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.active_poolstat_requests:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the active pool-stat requests for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -6973,7 +6989,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.active_statfs_requests:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the active statfs requests for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -6990,7 +7006,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.byte_throughput:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the byte throughput for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7007,7 +7023,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.commands:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the commands for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7028,7 +7044,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.latency_measurements:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the latency measurements for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7045,7 +7061,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.lingering_operations:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the lingering operations for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7070,7 +7086,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.map_epoch:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the osd-map epoch for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7087,7 +7103,7 @@ views:
       reducer: min
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.maps:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the osd maps for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7108,7 +7124,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.operation_vector_entries:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the operation-vector entries for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7125,7 +7141,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.operations:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the object operations for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7282,7 +7298,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.osd_sessions:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the osd sessions for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7303,7 +7319,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.pool_operations:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the pool operations for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7324,7 +7340,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.replica_reads:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the replica reads for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7349,7 +7365,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.session_state:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the sessions for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7370,7 +7386,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.stat_requests:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the pool-stat and statfs requests for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7399,7 +7415,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   objecter.submitted_operations:
-    family: Ceph/Objecter
+    family: Ceph/Runtime and Clients/Objecter
     question: What is the submitted top-level operations for each ceph daemon and instance id?
     entity: by_ceph_daemon_and_instance_id
     inputs:
@@ -7416,7 +7432,7 @@ views:
       reducer: sum
       lost_comparison: Individual internal Objecter handles are intentionally not comparable in this view.
   osd_capacity_and_state.cluster_flags.state:
-    family: Ceph/OSD Capacity and State/Cluster Flags
+    family: Ceph/OSDs/Capacity and State/Cluster Flags
     question: What is the state and metadata?
     entity: cluster
     inputs:
@@ -7453,7 +7469,7 @@ views:
       promote: []
       omit: {}
   osd_capacity_and_state.fullness_thresholds.ratio:
-    family: Ceph/OSD Capacity and State/Fullness Thresholds
+    family: Ceph/OSDs/Capacity and State/Fullness Thresholds
     question: What is the ratios?
     entity: cluster
     inputs:
@@ -7470,7 +7486,12 @@ views:
       promote: []
       omit: {}
   osd_capacity_and_state.metadata.state:
-    family: Ceph/OSD Capacity and State/Metadata
+    display:
+      convention: osds
+      reason: Render the additive OSD population with the established operator-facing unit.
+      evidence:
+        - ceph_display_conventions
+    family: Ceph/OSDs/Capacity and State/Metadata
     question: What is the state and metadata for each back iface and ceph daemon and ceph version and cluster addr and device
       class and front iface and hostname and objectstore and public addr?
     entity: by_back_iface_and_ceph_daemon_and_ceph_version_and_cluster_addr_and_device_class_and_front_iface_and_hostname_and_objectstore_and_public_addr
@@ -7484,7 +7505,12 @@ views:
       promote: []
       omit: {}
   osd_capacity_and_state.osd_state.state:
-    family: Ceph/OSD Capacity and State/OSD State
+    display:
+      convention: osds
+      reason: Render the additive OSD population with the established operator-facing unit.
+      evidence:
+        - ceph_display_conventions
+    family: Ceph/OSDs/Capacity and State/OSD State
     question: What is the osd state for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7500,8 +7526,42 @@ views:
       dimensions: {}
       promote: []
       omit: {}
+  osd_capacity_and_state.osd_state.cluster_summary:
+    display:
+      convention: osds
+      reason: Render the additive OSD population with the established operator-facing unit.
+      evidence:
+        - ceph_display_conventions
+    family: Ceph/OSDs/Capacity and State/OSD State
+    question: How many OSDs exist and are currently up for this cluster endpoint?
+    entity: cluster
+    inputs:
+      total:
+        signal: osd_metadata
+        components:
+          - value
+      up:
+        signal: osd_up
+        components:
+          - value
+    labels:
+      dimensions: {}
+      promote: []
+      omit:
+        back_iface: Member metadata is not meaningful on the cluster population chart.
+        ceph_daemon: Member identity is reduced into the cluster population.
+        ceph_version: Member metadata is not meaningful on the cluster population chart.
+        cluster_addr: Member metadata is not meaningful on the cluster population chart.
+        device_class: Member metadata is not meaningful on the cluster population chart.
+        front_iface: Member metadata is not meaningful on the cluster population chart.
+        hostname: Member metadata is not meaningful on the cluster population chart.
+        objectstore: Member metadata is not meaningful on the cluster population chart.
+        public_addr: Member metadata is not meaningful on the cluster population chart.
+    reduction:
+      reducer: sum
+      lost_comparison: Individual OSD rows remain available in the member charts; this view is the additive population for one MGR job.
   osd_capacity_and_state.osd_state.weight:
-    family: Ceph/OSD Capacity and State/OSD State
+    family: Ceph/OSDs/Capacity and State/OSD State
     question: What is the osd weight for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7514,7 +7574,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.accumulated_latency:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7595,7 +7655,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.byte_throughput:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7640,7 +7700,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.current_operations:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the operations in progress for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7653,7 +7713,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.events:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7666,7 +7726,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.failure_outcomes:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the failure and delay outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7679,7 +7739,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.latency_measurements:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7760,7 +7820,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.lookup_outcomes:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7773,7 +7833,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.object_work:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the object work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7794,7 +7854,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.operations:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSDs/Client IO
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7847,7 +7907,7 @@ views:
       promote: []
       omit: {}
   osd_overview.latency:
-    family: Ceph/OSD Overview
+    family: Ceph/OSDs/Overview
     question: What is the latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7869,7 +7929,7 @@ views:
       evidence:
       - ceph_display_conventions
   osd_recovery.accumulated_latency:
-    family: Ceph/OSD Recovery
+    family: Ceph/OSDs/Recovery
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7910,7 +7970,7 @@ views:
       promote: []
       omit: {}
   osd_recovery.byte_throughput:
-    family: Ceph/OSD Recovery
+    family: Ceph/OSDs/Recovery
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7923,7 +7983,7 @@ views:
       promote: []
       omit: {}
   osd_recovery.latency_measurements:
-    family: Ceph/OSD Recovery
+    family: Ceph/OSDs/Recovery
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7964,7 +8024,7 @@ views:
       promote: []
       omit: {}
   osd_recovery.operations:
-    family: Ceph/OSD Recovery
+    family: Ceph/OSDs/Recovery
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7977,7 +8037,7 @@ views:
       promote: []
       omit: {}
   osd_recovery.pg_rebuild_accumulated_duration:
-    family: Ceph/OSD Recovery
+    family: Ceph/OSDs/Recovery
     question: At what rate is primary-OSD PG-rebuild duration accumulating for each Ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7990,7 +8050,7 @@ views:
       promote: []
       omit: {}
   osd_recovery.pg_rebuild_duration_measurements:
-    family: Ceph/OSD Recovery
+    family: Ceph/OSDs/Recovery
     question: At what rate are primary-OSD PG-rebuild duration measurements recorded for each Ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8003,7 +8063,7 @@ views:
       promote: []
       omit: {}
   osd_recovery.pg_rebuild_duration_range:
-    family: Ceph/OSD Recovery
+    family: Ceph/OSDs/Recovery
     question: What minimum and maximum PG-rebuild durations does each primary OSD currently report?
     entity: by_ceph_daemon
     inputs:
@@ -8020,7 +8080,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.accumulated_latency:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8041,7 +8101,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.accumulated_value:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the accumulated value measurement for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8054,7 +8114,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.byte_throughput:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8067,7 +8127,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.copyfrom_operations:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the copy-from operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8080,7 +8140,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.crc_lookup_outcomes:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the crc cache lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8101,7 +8161,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.failed_tier_flush_attempts:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the failed tier flush attempts for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8118,7 +8178,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.heartbeat_peers:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the heartbeat peers for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8131,7 +8191,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.latency_measurements:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8152,7 +8212,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.load_average:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the osd load average for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8165,7 +8225,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.map_buffer_cache_lookup_outcomes:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the osd-map buffer-cache lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8182,7 +8242,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.map_cache_lookup_outcomes:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the decoded osd-map cache lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8203,7 +8263,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.map_epochs:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the osd-map epochs for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8220,7 +8280,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.map_messages:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the osd-map messages for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8237,7 +8297,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.object_context_cache_lookup_outcomes:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the object-context cache lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8254,7 +8314,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.pg_state:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the placement groups for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8288,7 +8348,7 @@ views:
       evidence:
       - ceph_display_conventions
   osd_runtime.pg_updates:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the placement-group updates for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8305,7 +8365,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.pg_updates_total:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the total placement-group updates for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8318,7 +8378,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.pulls:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the pulls for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8331,7 +8391,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.pushes:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the pushes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8344,7 +8404,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.skipped_objects:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the skipped objects for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8357,7 +8417,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.space:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the space and memory for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8378,7 +8438,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.suboperations:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the suboperations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8391,7 +8451,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.tier_agent_actions:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the tier-agent actions for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8428,7 +8488,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.tier_flush_attempts:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the tier flush attempts for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8449,7 +8509,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.tier_whiteouts:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the tier whiteouts for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8462,7 +8522,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.value_measurements:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the value measurement measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8475,7 +8535,7 @@ views:
       promote: []
       omit: {}
   osd_runtime.watch_timeouts:
-    family: Ceph/OSD Runtime
+    family: Ceph/OSDs/Runtime
     question: What is the watch timeouts for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8488,7 +8548,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.accumulated_reservation_latency:
-    family: Ceph/OSD Scrubbing - Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
     question: What is the accumulated reservation elapsed time for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8529,7 +8589,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.accumulated_scrub_latency:
-    family: Ceph/OSD Scrubbing - Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
     question: What is the accumulated scrub elapsed time for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8570,7 +8630,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.reservation_latency_measurements:
-    family: Ceph/OSD Scrubbing - Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
     question: What is the reservation elapsed-time measurements for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8611,7 +8671,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.scrub_latency_measurements:
-    family: Ceph/OSD Scrubbing - Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
     question: What is the scrub elapsed-time measurements for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8652,7 +8712,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.outcomes.scrub_work:
-    family: Ceph/OSD Scrubbing - Ceph 19/Outcomes
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Outcomes
     question: What is the scrub work for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8709,7 +8769,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.reservations.replicas_in_reservation:
-    family: Ceph/OSD Scrubbing - Ceph 19/Reservations
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Reservations
     question: What is the replicas in reservation for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8734,7 +8794,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.reservations.reservation_process_outcomes:
-    family: Ceph/OSD Scrubbing - Ceph 19/Reservations
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Reservations
     question: What is the reservation process outcomes for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8791,7 +8851,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.reservations.scrubs_past_reservation:
-    family: Ceph/OSD Scrubbing - Ceph 19/Reservations
+    family: Ceph/OSDs/Scrubbing/Ceph 19/Reservations
     question: What is the scrubs past reservation for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -8816,7 +8876,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.accumulated_reservation_latency:
-    family: Ceph/OSD Scrubbing - Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
     question: What is the accumulated reservation elapsed time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8841,7 +8901,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.accumulated_scrub_latency:
-    family: Ceph/OSD Scrubbing - Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
     question: What is the accumulated scrub elapsed time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8866,7 +8926,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.reservation_latency_measurements:
-    family: Ceph/OSD Scrubbing - Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
     question: What is the reservation elapsed-time measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8891,7 +8951,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.scrub_latency_measurements:
-    family: Ceph/OSD Scrubbing - Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
     question: What is the scrub elapsed-time measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8916,7 +8976,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.interference_and_scheduling.client_write_interference:
-    family: Ceph/OSD Scrubbing - Ceph 20/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Interference and Scheduling
     question: What is the client write interference for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8941,7 +9001,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.outcomes.scrub_work:
-    family: Ceph/OSD Scrubbing - Ceph 20/Outcomes
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Outcomes
     question: What is the scrub work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8974,7 +9034,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.reservations.replicas_in_reservation:
-    family: Ceph/OSD Scrubbing - Ceph 20/Reservations
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Reservations
     question: What is the replicas in reservation for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -8991,7 +9051,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.reservations.reservation_process_outcomes:
-    family: Ceph/OSD Scrubbing - Ceph 20/Reservations
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Reservations
     question: What is the reservation process outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9032,7 +9092,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.reservations.scrubs_past_reservation:
-    family: Ceph/OSD Scrubbing - Ceph 20/Reservations
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Reservations
     question: What is the scrubs past reservation for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9049,7 +9109,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.scrub_work.byte_throughput:
-    family: Ceph/OSD Scrubbing - Ceph 20/Scrub Work
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Scrub Work
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9066,7 +9126,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.scrub_work.scrub_calls:
-    family: Ceph/OSD Scrubbing - Ceph 20/Scrub Work
+    family: Ceph/OSDs/Scrubbing/Ceph 20/Scrub Work
     question: What is the scrub calls for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9099,7 +9159,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.blocked_client_writes:
-    family: Ceph/OSD Scrubbing - Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
     question: What is the client writes blocked by scrub for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9124,7 +9184,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.chunk_selection_outcomes:
-    family: Ceph/OSD Scrubbing - Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
     question: What is the chunk selection outcomes for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9165,7 +9225,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.object_lock_waits:
-    family: Ceph/OSD Scrubbing - Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
     question: What is the object-lock waits for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9190,7 +9250,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.preemptions:
-    family: Ceph/OSD Scrubbing - Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
     question: What is the scrub preemptions for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9215,7 +9275,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.reservations.completed_reservations:
-    family: Ceph/OSD Scrubbing - Common Work/Reservations
+    family: Ceph/OSDs/Scrubbing/Common Work/Reservations
     question: What is the completed scrub reservations for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9240,7 +9300,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.scrub_work.byte_throughput:
-    family: Ceph/OSD Scrubbing - Common Work/Scrub Work
+    family: Ceph/OSDs/Scrubbing/Common Work/Scrub Work
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9257,7 +9317,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.scrub_work.omap_calls:
-    family: Ceph/OSD Scrubbing - Common Work/Scrub Work
+    family: Ceph/OSDs/Scrubbing/Common Work/Scrub Work
     question: What is the omap scrub calls for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9274,7 +9334,7 @@ views:
       promote: []
       omit: {}
   placement_groups_and_recovery.backfill.pg_state:
-    family: Ceph/Placement Groups and Recovery/Backfill
+    family: Ceph/Placement Groups/Backfill
     question: What is the placement groups for each pool id?
     entity: by_pool_id
     inputs:
@@ -9312,7 +9372,7 @@ views:
       evidence:
       - ceph_display_conventions
   placement_groups_and_recovery.healthy_state.pg_state:
-    family: Ceph/Placement Groups and Recovery/Healthy State
+    family: Ceph/Placement Groups/Healthy State
     question: What is the placement groups for each pool id?
     entity: by_pool_id
     inputs:
@@ -9342,7 +9402,7 @@ views:
       evidence:
       - ceph_display_conventions
   placement_groups_and_recovery.peering_and_availability.pg_state:
-    family: Ceph/Placement Groups and Recovery/Peering and Availability
+    family: Ceph/Placement Groups/Peering and Availability
     question: What is the placement groups for each pool id?
     entity: by_pool_id
     inputs:
@@ -9400,7 +9460,7 @@ views:
       evidence:
       - ceph_display_conventions
   placement_groups_and_recovery.recovery_and_degradation.pg_state:
-    family: Ceph/Placement Groups and Recovery/Recovery and Degradation
+    family: Ceph/Placement Groups/Recovery and Degradation
     question: What is the placement groups for each pool id?
     entity: by_pool_id
     inputs:
@@ -9442,7 +9502,7 @@ views:
       evidence:
       - ceph_display_conventions
   placement_groups_and_recovery.recovery_flags.state:
-    family: Ceph/Placement Groups and Recovery/Recovery Flags
+    family: Ceph/Placement Groups/Recovery Flags
     question: What is the state and metadata?
     entity: cluster
     inputs:
@@ -9459,7 +9519,7 @@ views:
       promote: []
       omit: {}
   placement_groups_and_recovery.scrub_and_repair_state.pg_state:
-    family: Ceph/Placement Groups and Recovery/Scrub and Repair State
+    family: Ceph/Placement Groups/Scrub and Repair State
     question: What is the placement groups for each pool id?
     entity: by_pool_id
     inputs:
@@ -9591,7 +9651,7 @@ views:
       evidence:
       - ceph_display_conventions
   pools.client_i_o.byte_throughput:
-    family: Ceph/Pools/Client I/O
+    family: Ceph/Pools/Client IO
     question: What is the byte throughput for each pool id?
     entity: by_pool_id
     inputs:
@@ -9608,7 +9668,7 @@ views:
       promote: []
       omit: {}
   pools.client_i_o.operations:
-    family: Ceph/Pools/Client I/O
+    family: Ceph/Pools/Client IO
     question: What is the operations for each pool id?
     entity: by_pool_id
     inputs:
@@ -9734,7 +9794,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.accumulated_data_operation_latency:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the accumulated data operation latency for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9755,7 +9815,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.accumulated_flush_latency:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the accumulated flush latency for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9768,7 +9828,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.accumulated_io_latency:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the accumulated i/o latency for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9785,7 +9845,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.data_operation_byte_throughput:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the data operation byte throughput for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9806,7 +9866,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.data_operation_latency_measurements:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the data operation latency measurements for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9827,7 +9887,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.data_operations:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the data operations for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9848,7 +9908,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.flush_latency_measurements:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the flush latency measurements for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9861,7 +9921,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.flush_operations:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the flush operations for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9874,7 +9934,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.io_byte_throughput:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the i/o byte throughput for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9891,7 +9951,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.io_latency_measurements:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the i/o latency measurements for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9908,7 +9968,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.io_operations:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the i/o operations for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9925,7 +9985,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.lifecycle_timestamps:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the lifecycle timestamps for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9942,7 +10002,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.maintenance_operations:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the maintenance operations for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9967,7 +10027,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.readahead_byte_throughput:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the readahead byte throughput for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -9980,7 +10040,7 @@ views:
       promote: []
       omit: {}
   rbd_client_images.snapshot_mutations:
-    family: Ceph/RBD Client Images
+    family: Ceph/RBD Images/Client Images
     question: What is the snapshot mutations for each ceph daemon and librbd image key?
     entity: by_ceph_daemon_and_librbd_image_key
     inputs:
@@ -10005,7 +10065,7 @@ views:
       promote: []
       omit: {}
   rbd_images.i_o.byte_throughput:
-    family: Ceph/RBD Images/I/O
+    family: Ceph/RBD Images/IO
     question: What is the byte throughput for each image and namespace and pool?
     entity: by_image_and_namespace_and_pool
     inputs:
@@ -10022,7 +10082,7 @@ views:
       promote: []
       omit: {}
   rbd_images.i_o.operations:
-    family: Ceph/RBD Images/I/O
+    family: Ceph/RBD Images/IO
     question: What is the operations for each image and namespace and pool?
     entity: by_image_and_namespace_and_pool
     inputs:
@@ -10099,7 +10159,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.accumulated_latency:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the accumulated latency for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10112,7 +10172,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.byte_throughput:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the byte throughput for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10125,7 +10185,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.image_accumulated_latency:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the accumulated image journal replay latency for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10138,7 +10198,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.image_byte_throughput:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the image journal replay byte throughput for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10151,7 +10211,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.image_journal_entries:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the journal entries queued for replay for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10164,7 +10224,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.image_latency_measurements:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the image journal replay latency measurements for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10177,7 +10237,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.journal_entries:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the journal entries for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10190,7 +10250,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.journal.latency_measurements:
-    family: Ceph/RBD Mirror/Journal
+    family: Ceph/RBD Images/Mirror/Journal
     question: What is the journal replay latency measurements for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10203,7 +10263,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.accumulated_latency_image_sync_time:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the accumulated latency — image sync time for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10216,7 +10276,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.accumulated_latency_sync_time:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the accumulated latency — sync time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -10229,7 +10289,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.byte_throughput_image_sync_bytes:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the byte throughput — image sync bytes for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10242,7 +10302,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.byte_throughput_sync_bytes:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the byte throughput — sync bytes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -10255,7 +10315,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.last_sync_duration:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the last snapshot sync duration for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10268,7 +10328,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.last_sync_size:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the last snapshot sync size for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10281,7 +10341,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.latency_measurements_image_sync_time:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the snapshot sync latency measurements — image sync time for each ceph daemon and image and namespace
       and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
@@ -10295,7 +10355,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.latency_measurements_sync_time:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the snapshot sync latency measurements — sync time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -10308,7 +10368,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.snapshot_work_image_snapshots:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the snapshot work — image snapshots for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -10321,7 +10381,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.snapshot_work_snapshots:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the snapshot work — snapshots for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -10334,7 +10394,7 @@ views:
       promote: []
       omit: {}
   rbd_mirror.snapshot_replication.timestamp:
-    family: Ceph/RBD Mirror/Snapshot Replication
+    family: Ceph/RBD Images/Mirror/Snapshot Replication
     question: What is the timestamps for each ceph daemon and image and namespace and pool?
     entity: by_ceph_daemon_and_image_and_namespace_and_pool
     inputs:
@@ -11200,7 +11260,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_ports.multicast_packets:
-    family: Ceph/Runtime and Client Components/DPDK Ports
+    family: Ceph/Runtime and Clients/DPDK Ports
     question: What is the multicast packets for each ceph daemon and dpdk port?
     entity: by_ceph_daemon_and_dpdk_port
     inputs:
@@ -11213,7 +11273,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_ports.receive_errors:
-    family: Ceph/Runtime and Client Components/DPDK Ports
+    family: Ceph/Runtime and Clients/DPDK Ports
     question: What is the receive errors for each ceph daemon and dpdk port?
     entity: by_ceph_daemon_and_dpdk_port
     inputs:
@@ -11238,7 +11298,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_ports.send_errors:
-    family: Ceph/Runtime and Client Components/DPDK Ports
+    family: Ceph/Runtime and Clients/DPDK Ports
     question: What is the send errors for each ceph daemon and dpdk port?
     entity: by_ceph_daemon_and_dpdk_port
     inputs:
@@ -11251,7 +11311,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_queues.byte_throughput:
-    family: Ceph/Runtime and Client Components/DPDK Queues
+    family: Ceph/Runtime and Clients/DPDK Queues
     question: What is the byte throughput for each ceph daemon and dpdk queue?
     entity: by_ceph_daemon_and_dpdk_queue
     inputs:
@@ -11276,7 +11336,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_queues.copy_linearize_operations:
-    family: Ceph/Runtime and Client Components/DPDK Queues
+    family: Ceph/Runtime and Clients/DPDK Queues
     question: What is the copy and linearize operations for each ceph daemon and dpdk queue?
     entity: by_ceph_daemon_and_dpdk_queue
     inputs:
@@ -11301,7 +11361,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_queues.last_batch_size:
-    family: Ceph/Runtime and Client Components/DPDK Queues
+    family: Ceph/Runtime and Clients/DPDK Queues
     question: What is the last batch size for each ceph daemon and dpdk queue?
     entity: by_ceph_daemon_and_dpdk_queue
     inputs:
@@ -11318,7 +11378,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_queues.packet_fragments:
-    family: Ceph/Runtime and Client Components/DPDK Queues
+    family: Ceph/Runtime and Clients/DPDK Queues
     question: What is the packet fragments for each ceph daemon and dpdk queue?
     entity: by_ceph_daemon_and_dpdk_queue
     inputs:
@@ -11335,7 +11395,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_queues.packets:
-    family: Ceph/Runtime and Client Components/DPDK Queues
+    family: Ceph/Runtime and Clients/DPDK Queues
     question: What is the packets for each ceph daemon and dpdk queue?
     entity: by_ceph_daemon_and_dpdk_queue
     inputs:
@@ -11352,7 +11412,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_queues.receive_errors:
-    family: Ceph/Runtime and Client Components/DPDK Queues
+    family: Ceph/Runtime and Clients/DPDK Queues
     question: What is the receive errors for each ceph daemon and dpdk queue?
     entity: by_ceph_daemon_and_dpdk_queue
     inputs:
@@ -11369,7 +11429,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.dpdk_queues.send_queue_depth:
-    family: Ceph/Runtime and Client Components/DPDK Queues
+    family: Ceph/Runtime and Clients/DPDK Queues
     question: What is the send queue depth for each ceph daemon and dpdk queue?
     entity: by_ceph_daemon_and_dpdk_queue
     inputs:
@@ -11382,7 +11442,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.finishers.accumulated_completion_latency:
-    family: Ceph/Runtime and Client Components/Finishers
+    family: Ceph/Runtime and Clients/Finishers
     question: What is the accumulated completion latency for each ceph daemon and finisher key?
     entity: by_ceph_daemon_and_finisher_key
     inputs:
@@ -11395,7 +11455,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.finishers.completions:
-    family: Ceph/Runtime and Client Components/Finishers
+    family: Ceph/Runtime and Clients/Finishers
     question: What is the drained completion batches for each ceph daemon and finisher key?
     entity: by_ceph_daemon_and_finisher_key
     inputs:
@@ -11408,7 +11468,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.finishers.queue_depth:
-    family: Ceph/Runtime and Client Components/Finishers
+    family: Ceph/Runtime and Clients/Finishers
     question: What is the queued callbacks for each ceph daemon and finisher key?
     entity: by_ceph_daemon_and_finisher_key
     inputs:
@@ -11421,7 +11481,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.kernel_devices.discard_operations:
-    family: Ceph/Runtime and Client Components/Kernel Devices
+    family: Ceph/Runtime and Clients/Kernel Devices
     question: What is the discard operations for each ceph daemon and kernel device key?
     entity: by_ceph_daemon_and_kernel_device_key
     inputs:
@@ -11434,7 +11494,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.kernel_devices.discard_threads:
-    family: Ceph/Runtime and Client Components/Kernel Devices
+    family: Ceph/Runtime and Clients/Kernel Devices
     question: What is the discard threads for each ceph daemon and kernel device key?
     entity: by_ceph_daemon_and_kernel_device_key
     inputs:
@@ -11447,7 +11507,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.mclock_shards.queue_depth:
-    family: Ceph/Runtime and Client Components/mClock Shards
+    family: Ceph/Runtime and Clients/mClock Shards
     question: What is the queue depth for each ceph daemon and mclock shard?
     entity: by_ceph_daemon_and_mclock_shard
     inputs:
@@ -11476,7 +11536,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.memory_pools.item_count:
-    family: Ceph/Runtime and Client Components/Memory Pools
+    family: Ceph/Runtime and Clients/Memory Pools
     question: What is the item count for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -11605,7 +11665,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.memory_pools.memory_use:
-    family: Ceph/Runtime and Client Components/Memory Pools
+    family: Ceph/Runtime and Clients/Memory Pools
     question: What is the memory use for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -11734,7 +11794,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.accumulated_ack_latency:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the accumulated acknowledgement latency for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11747,7 +11807,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.accumulated_send_queue_latency:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the accumulated send-queue latency for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11760,7 +11820,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.accumulated_worker_time:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the accumulated worker time for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11785,7 +11845,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.ack_latency_measurements:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the acknowledgement latency measurements for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11798,7 +11858,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.byte_throughput:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the byte throughput for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11823,7 +11883,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.connections:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the connections for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11836,7 +11896,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.created_connections:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the created connections for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11849,7 +11909,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.messages:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the messages for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11866,7 +11926,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.messenger_workers.send_queue_latency_measurements:
-    family: Ceph/Runtime and Client Components/Messenger Workers
+    family: Ceph/Runtime and Clients/Messenger Workers
     question: What is the send-queue latency measurements for each ceph daemon and messenger worker?
     entity: by_ceph_daemon_and_messenger_worker
     inputs:
@@ -11879,7 +11939,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.object_caches.blocked_write_throughput:
-    family: Ceph/Runtime and Client Components/Object Caches
+    family: Ceph/Runtime and Clients/Object Caches
     question: What is the blocked write throughput for each ceph daemon and objectcacher key?
     entity: by_ceph_daemon_and_objectcacher_key
     inputs:
@@ -11892,7 +11952,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.object_caches.blocked_write_time:
-    family: Ceph/Runtime and Client Components/Object Caches
+    family: Ceph/Runtime and Clients/Object Caches
     question: What is the blocked write time for each ceph daemon and objectcacher key?
     entity: by_ceph_daemon_and_objectcacher_key
     inputs:
@@ -11905,7 +11965,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.object_caches.blocked_writes:
-    family: Ceph/Runtime and Client Components/Object Caches
+    family: Ceph/Runtime and Clients/Object Caches
     question: What is the blocked writes for each ceph daemon and objectcacher key?
     entity: by_ceph_daemon_and_objectcacher_key
     inputs:
@@ -11918,7 +11978,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.object_caches.cache_byte_outcomes:
-    family: Ceph/Runtime and Client Components/Object Caches
+    family: Ceph/Runtime and Clients/Object Caches
     question: What is the cache byte outcomes for each ceph daemon and objectcacher key?
     entity: by_ceph_daemon_and_objectcacher_key
     inputs:
@@ -11935,7 +11995,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.object_caches.cache_outcomes:
-    family: Ceph/Runtime and Client Components/Object Caches
+    family: Ceph/Runtime and Clients/Object Caches
     question: What is the cache outcomes for each ceph daemon and objectcacher key?
     entity: by_ceph_daemon_and_objectcacher_key
     inputs:
@@ -11952,7 +12012,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.object_caches.data_throughput:
-    family: Ceph/Runtime and Client Components/Object Caches
+    family: Ceph/Runtime and Clients/Object Caches
     question: What is the data throughput for each ceph daemon and objectcacher key?
     entity: by_ceph_daemon_and_objectcacher_key
     inputs:
@@ -11977,7 +12037,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rados_striper.metadata_and_lock_work:
-    family: Ceph/Runtime and Client Components/RADOS Striper
+    family: Ceph/Runtime and Clients/RADOS Striper
     question: What is the metadata and lock work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -12014,7 +12074,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rados_striper.shrink_throughput:
-    family: Ceph/Runtime and Client Components/RADOS Striper
+    family: Ceph/Runtime and Clients/RADOS Striper
     question: What is the shrink throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -12027,7 +12087,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.accumulated_data_operation_latency:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the accumulated data operation latency for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12056,7 +12116,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.accumulated_log_operation_latency:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the accumulated log operation latency for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12097,7 +12157,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.accumulated_read_latency:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the accumulated read request latency for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12114,7 +12174,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.accumulated_transaction_latency:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the accumulated transaction latency for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12131,7 +12191,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.accumulated_write_latency:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the accumulated write request latency for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12180,7 +12240,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.cache_image_operations:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the cache and image operations for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12221,7 +12281,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.data_operation_latency_measurements:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the data operation latency measurements for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12250,7 +12310,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.data_operation_throughput:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the data-operation throughput for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12271,7 +12331,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.log_append_size_measurements:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the log-append size measurements for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12284,7 +12344,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.log_append_throughput:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the log-append throughput for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12297,7 +12357,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.log_appends:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the log appends for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12310,7 +12370,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.log_operation_latency_measurements:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the log operation latency measurements for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12351,7 +12411,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.read_latency_measurements:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the read request latency measurements for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12368,7 +12428,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.read_throughput:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the read throughput for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12385,7 +12445,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.reads:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the reads for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12406,7 +12466,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.transaction_latency_measurements:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the transaction latency measurements for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12423,7 +12483,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.write_latency_measurements:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the write request latency measurements for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12472,7 +12532,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.write_throughput:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the write throughput for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12485,7 +12545,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rbd_persistent_write_log.writes:
-    family: Ceph/Runtime and Client Components/RBD Persistent Write Log
+    family: Ceph/Runtime and Clients/RBD Persistent Write Log
     question: What is the writes for each ceph daemon and librbd pwl key?
     entity: by_ceph_daemon_and_librbd_pwl_key
     inputs:
@@ -12522,7 +12582,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rdma_workers.byte_throughput:
-    family: Ceph/Runtime and Client Components/RDMA Workers
+    family: Ceph/Runtime and Clients/RDMA Workers
     question: What is the byte throughput for each ceph daemon and rdma worker?
     entity: by_ceph_daemon_and_rdma_worker
     inputs:
@@ -12539,7 +12599,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rdma_workers.chunk_throughput:
-    family: Ceph/Runtime and Client Components/RDMA Workers
+    family: Ceph/Runtime and Clients/RDMA Workers
     question: What is the chunk throughput for each ceph daemon and rdma worker?
     entity: by_ceph_daemon_and_rdma_worker
     inputs:
@@ -12556,7 +12616,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rdma_workers.pending_connections:
-    family: Ceph/Runtime and Client Components/RDMA Workers
+    family: Ceph/Runtime and Clients/RDMA Workers
     question: What is the pending connections for each ceph daemon and rdma worker?
     entity: by_ceph_daemon_and_rdma_worker
     inputs:
@@ -12569,7 +12629,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.rdma_workers.transfer_errors:
-    family: Ceph/Runtime and Client Components/RDMA Workers
+    family: Ceph/Runtime and Clients/RDMA Workers
     question: What is the rdma transfer errors for each ceph daemon and rdma worker?
     entity: by_ceph_daemon_and_rdma_worker
     inputs:
@@ -12590,7 +12650,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.service_identity.identity_metadata:
-    family: Ceph/Runtime and Client Components/Service Identity
+    family: Ceph/Runtime and Clients/Service Identity
     question: What is the service identity metadata sentinel for each ceph daemon and service unique id?
     entity: by_ceph_daemon_and_service_unique_id
     inputs:
@@ -12603,7 +12663,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.throttles.accumulated_wait_time:
-    family: Ceph/Runtime and Client Components/Throttles
+    family: Ceph/Runtime and Clients/Throttles
     question: What is the accumulated wait time for each ceph daemon and throttle key?
     entity: by_ceph_daemon_and_throttle_key
     inputs:
@@ -12616,7 +12676,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.throttles.operations:
-    family: Ceph/Runtime and Client Components/Throttles
+    family: Ceph/Runtime and Clients/Throttles
     question: What is the operations for each ceph daemon and throttle key?
     entity: by_ceph_daemon_and_throttle_key
     inputs:
@@ -12649,7 +12709,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.throttles.slot_throughput:
-    family: Ceph/Runtime and Client Components/Throttles
+    family: Ceph/Runtime and Clients/Throttles
     question: What is the slot throughput for each throttle key?
     entity: by_throttle_key
     inputs:
@@ -12670,7 +12730,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.throttles.utilization:
-    family: Ceph/Runtime and Client Components/Throttles
+    family: Ceph/Runtime and Clients/Throttles
     question: What is the utilization for each ceph daemon and throttle key?
     entity: by_ceph_daemon_and_throttle_key
     inputs:
@@ -12687,7 +12747,7 @@ views:
       promote: []
       omit: {}
   runtime_and_client_components.throttles.wait_measurements:
-    family: Ceph/Runtime and Client Components/Throttles
+    family: Ceph/Runtime and Clients/Throttles
     question: What is the waits for each ceph daemon and throttle key?
     entity: by_ceph_daemon_and_throttle_key
     inputs:
@@ -12700,7 +12760,7 @@ views:
       promote: []
       omit: {}
   smb_metadata.state:
-    family: Ceph/SMB Metadata
+    family: Ceph/CephFS/SMB/Metadata
     question: What is the state and metadata for each netbiosname and share and smb version and subvolume and subvolume group
       and volume?
     entity: by_netbiosname_and_share_and_smb_version_and_subvolume_and_subvolume_group_and_volume
@@ -13090,7 +13150,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.external_block_devices.device_size:
-    family: Ceph/Storage Engine Extensions/External Block Devices
+    family: Ceph/Storage Engine/Extensions/External Block Devices
     question: What is the device size for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -13107,7 +13167,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.external_block_devices.device_utilization:
-    family: Ceph/Storage Engine Extensions/External Block Devices
+    family: Ceph/Storage Engine/Extensions/External Block Devices
     question: What is the device utilization for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -13124,7 +13184,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.external_block_devices.partition_space:
-    family: Ceph/Storage Engine Extensions/External Block Devices
+    family: Ceph/Storage Engine/Extensions/External Block Devices
     question: What is the partition space for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -13149,7 +13209,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.external_block_devices.plugin_state:
-    family: Ceph/Storage Engine Extensions/External Block Devices
+    family: Ceph/Storage Engine/Extensions/External Block Devices
     question: What is the fcm plugin state for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -13162,7 +13222,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.rocksdb_binned_cache.entries:
-    family: Ceph/Storage Engine Extensions/RocksDB Binned Cache
+    family: Ceph/Storage Engine/Extensions/RocksDB Binned Cache
     question: What is the cache entries for each ceph daemon and rocksdb cache key?
     entity: by_ceph_daemon_and_rocksdb_cache_key
     inputs:
@@ -13175,7 +13235,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.rocksdb_binned_cache.insertions:
-    family: Ceph/Storage Engine Extensions/RocksDB Binned Cache
+    family: Ceph/Storage Engine/Extensions/RocksDB Binned Cache
     question: What is the cache insertions for each ceph daemon and rocksdb cache key?
     entity: by_ceph_daemon_and_rocksdb_cache_key
     inputs:
@@ -13188,7 +13248,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.rocksdb_binned_cache.lookup_outcomes:
-    family: Ceph/Storage Engine Extensions/RocksDB Binned Cache
+    family: Ceph/Storage Engine/Extensions/RocksDB Binned Cache
     question: What is the cache lookup outcomes for each ceph daemon and rocksdb cache key?
     entity: by_ceph_daemon_and_rocksdb_cache_key
     inputs:
@@ -13205,7 +13265,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.rocksdb_binned_cache.lookups:
-    family: Ceph/Storage Engine Extensions/RocksDB Binned Cache
+    family: Ceph/Storage Engine/Extensions/RocksDB Binned Cache
     question: What is the cache lookups for each ceph daemon and rocksdb cache key?
     entity: by_ceph_daemon_and_rocksdb_cache_key
     inputs:
@@ -13218,7 +13278,7 @@ views:
       promote: []
       omit: {}
   storage_engine_extensions.rocksdb_binned_cache.memory:
-    family: Ceph/Storage Engine Extensions/RocksDB Binned Cache
+    family: Ceph/Storage Engine/Extensions/RocksDB Binned Cache
     question: What is the cache memory for each ceph daemon and rocksdb cache key?
     entity: by_ceph_daemon_and_rocksdb_cache_key
     inputs:

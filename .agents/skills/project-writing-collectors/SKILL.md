@@ -727,7 +727,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | Topology library | topology producers in Go | `src/go/pkg/topology/v1` |
 | netipc cross-plugin enrichment | C / Go / Rust | `src/libnetdata/netipc/`, `src/go/pkg/netipc/`, `src/crates/netipc/` |
 | DYNCFG protocol | dynamic configuration | `src/plugins.d/DYNCFG.md`, `docs/developer-and-contributor-corner/dyncfg.md` |
-| Health alerts reference | alert template authoring | `src/health/REFERENCE.md`, `src/health/alert-configuration-ordering.md` |
+| Health alerts | adding, changing, or reviewing an alert/template | `.agents/skills/project-health-alert-authoring/SKILL.md` |
 | Integrations pipeline | doc generation from `metadata.yaml` | `integrations/README.md` |
 | Go framework changes | changing shared Go collector/runtime framework code | `src/go/plugin/framework/docs/changing-framework-code.md` |
 | go.d V1-to-V2 migration | migrating existing go.d collectors | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` |

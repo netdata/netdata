@@ -1,0 +1,4 @@
+interface:
+  display_name: "Health Alert Authoring"
+  short_description: "Author correct Netdata health alerts"
+  default_prompt: "Use $project-health-alert-authoring to add or review a Netdata health alert."

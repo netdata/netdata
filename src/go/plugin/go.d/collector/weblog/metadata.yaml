@@ -271,6 +271,66 @@ modules:
                     label1: field1
                     label2: field2
                 ```
+            - name: custom_fields
+              description: List of custom text fields to collect per request.
+              default_value: '[]'
+              required: false
+              group: Custom fields
+            - name: custom_fields.name
+              description: Field name used for lookup in the parsed log and chart dimensions.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_fields.patterns.name
+              description: Dimension name for a custom-field pattern.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_fields.patterns.match
+              description: Pattern matched against the custom-field value. Match syntax in [matcher](/src/go/pkg/matcher/README.md#supported-format).
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_time_fields
+              description: List of custom duration fields to collect per request.
+              default_value: '[]'
+              required: false
+              group: Custom fields
+            - name: custom_time_fields.name
+              description: Field name used for lookup in the parsed log.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_time_fields.histogram
+              description: Histogram buckets, in seconds. Summary charts always render milliseconds.
+              default_value: '[]'
+              required: false
+              group: Custom fields
+            - name: custom_numeric_fields
+              description: List of custom numeric fields to collect per request.
+              default_value: '[]'
+              required: false
+              group: Custom fields
+            - name: custom_numeric_fields.name
+              description: Field name used for lookup in the parsed log.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_numeric_fields.units
+              description: Units rendered on the custom numeric-field charts.
+              default_value: ''
+              required: true
+              group: Custom fields
+            - name: custom_numeric_fields.multiplier
+              description: Multiplier applied to the custom numeric field.
+              default_value: 1
+              required: false
+              group: Custom fields
+            - name: custom_numeric_fields.divisor
+              description: Divisor applied to the custom numeric field.
+              default_value: 1
+              required: false
+              group: Custom fields
             - name: regexp_config
               description: RegExp log parser config.
               default_value: ""
@@ -297,7 +357,23 @@ modules:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: Ceph RGW access log
+              description: Parse a Ceph RGW access log and expose its numeric total_time field explicitly as milliseconds.
+              config: |
+                jobs:
+                  - name: ceph_rgw_access_log
+                    path: /var/log/ceph/rgw/access.log
+                    log_type: json
+                    json_config:
+                      mapping:
+                        remote_addr: remote_addr
+                        uri: request
+                        http_status: status
+                        bytes_sent: bytes_sent
+                    custom_numeric_fields:
+                      - name: total_time
+                        units: milliseconds
     troubleshooting:
       problems:
         list:
