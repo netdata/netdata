@@ -148,6 +148,10 @@ Metrics:
 | cgroup.cachestat_dirties | Number of dirty pages | dirty | page/s |
 | cgroup.cachestat_hits | Number of accessed files | hit | hits/s |
 | cgroup.cachestat_misses | Files out of page cache | miss | misses/s |
+| cgroup.dc_ratio | Percentage of directory lookups resolved by the cache | ratio | % |
+| cgroup.dc_reference | Count file access | reference | files |
+| cgroup.dc_not_cache | Files not present inside directory cache | slow | files |
+| cgroup.dc_not_found | Files not found | miss | files |
 | cgroup.net_conn_ipv4 | TCP v4 outbound connections | connections | connections/s |
 | cgroup.net_conn_ipv6 | TCP v6 outbound connections | connections | connections/s |
 | cgroup.net_total_bandwidth | Bandwidth | received, sent | kilobits/s |
