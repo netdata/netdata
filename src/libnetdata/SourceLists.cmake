@@ -1,19 +1,23 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Source file inventory for the libnetdata targets.
 #
-# Relocated verbatim from packaging/cmake/Modules/NetdataSourceLists.cmake,
-# in the same relative order, with every path rebased from repository-relative
-# to directory-relative because this file is read from src/libnetdata rather
-# than from the repository root.
+# Relocated from packaging/cmake/Modules/NetdataSourceLists.cmake, in the same
+# relative order, with every path rebased from repository-relative to
+# directory-relative because this file is read from src/libnetdata rather than
+# from the repository root. One entry was dropped rather than moved:
+# LIBNETDATA_FILES opened with ${CONFIG_H}, naming the generated config.h. A
+# header in a source list produces no build edge and no compile flag, so it was
+# dropped along with the variable itself.
 #
 # Inventory only. The list(APPEND LIBNETDATA_FILES ...) composition lives in
 # CMakeLists.txt beside the targets that consume it.
 #
 # A list belongs here when the target that consumes it is defined in
 # CMakeLists.txt next to this file - not because its paths happen to sit under
-# src/libnetdata. Three lists of libnetdata sources stay in the shared module
-# for exactly that reason: SYSTEMD_CAT_NATIVE_FILES and the two
-# NETWORK_VIEWER_{FREEBSD,MACOS}_FILES lists feed root targets.
+# src/libnetdata. Three lists are wholly libnetdata sources and still live
+# elsewhere for exactly that reason, each beside the target that consumes it:
+# SYSTEMD_CAT_NATIVE_FILES in NetdataSystemdCatNative.cmake, and
+# NETWORK_VIEWER_{FREEBSD,MACOS}_FILES in NetdataPluginNetworkViewer.cmake.
 
 set(LIBJUDY_PREV_FILES
         libjudy/vendored/JudyL/JudyLPrev.c

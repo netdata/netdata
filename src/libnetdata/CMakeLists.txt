@@ -2,18 +2,32 @@
 # libnetdata: the foundation library, plus the two static libraries it is
 # built on - judy and netipc.
 #
-# Relocated verbatim from the root CMakeLists.txt, from the position the
-# add_subdirectory() call now occupies, so nothing changes order. Unlike the
-# packaging/cmake/Modules/*.cmake files this directory is add_subdirectory()d,
-# so CMAKE_CURRENT_SOURCE_DIR is src/libnetdata and every relative path below
-# is relative to it. The modules' rule is inverted here: SourceLists.cmake is
-# included through CMAKE_CURRENT_LIST_DIR, and paths must NOT carry a
-# src/libnetdata/ prefix.
+# Relocated from the root CMakeLists.txt, from the position the
+# add_subdirectory() call now occupies. Two blocks did change position and both
+# were checked: the LIBNETDATA_FILES composition moved later, from just after
+# include(NetdataSourceLists) down to here, and nothing between those two points
+# reads it or any list it appends; spawn-tester moved earlier, and no directory
+# property changes across the span it crossed. One statement was dropped rather
+# than moved - see the judy block.
+#
+# Unlike the packaging/cmake/Modules/*.cmake files this directory is
+# add_subdirectory()d, so CMAKE_CURRENT_SOURCE_DIR is src/libnetdata and every
+# relative path below is relative to it. The modules' rule is inverted here:
+# SourceLists.cmake is included through CMAKE_CURRENT_LIST_DIR, and a relative
+# path must NOT carry a src/libnetdata/ prefix. An absolute
+# ${CMAKE_SOURCE_DIR}/src/libnetdata/... still spells the prefix out and is
+# left alone. The vendored src/collectors/debugfs.plugin/libsensors directory
+# is the prior art for both conventions.
 #
 # Three targets rather than one. netipc is self-contained enough to justify a
 # nested directory of its own and deliberately does not get one: libnetdata is
 # the boundary the project recognises, and nested boundaries would invent a
 # distinction nobody makes.
+#
+# A subdirectory has its own scope, so NOTHING set below is visible to the root
+# unless the export block at the end of this file hands it back. That applies to
+# the source lists and the WEVT_* paths as much as to the six exported names: a
+# future root consumer of any of them reads an empty value and gets no error.
 
 include(${CMAKE_CURRENT_LIST_DIR}/SourceLists.cmake)
 
@@ -63,6 +77,9 @@ set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-D
 set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
 set_source_files_properties(libjudy/vendored/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
 set_source_files_properties(libjudy/vendored/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+# A fourth call, on a bare JudyLTables.c, was dropped in e72c68bca0 rather than
+# moved: the bare name resolved against the repository root and matched nothing,
+# and the -I it added pointed at a directory that does not exist.
 
 #
 # build netipc (standalone IPC library, no Netdata deps)
@@ -175,6 +192,13 @@ if(OS_WINDOWS)
 
                 # we compile ${WEVT_GEN_BIN_FILE}, which generates the manifest, the .mc,
                 # and the headers required for compiling libnetdata/logs
+                #
+                # WORKING_DIRECTORY is pinned on both arms below. A custom command
+                # with none runs in the build directory matching the current source
+                # directory, which this move changed from ${CMAKE_BINARY_DIR} to
+                # ${CMAKE_BINARY_DIR}/src/libnetdata. Every argument here is
+                # absolute so nothing observably depends on it today, but the WEL
+                # arm hands windres a .rc that names its inputs relatively.
 
                 if(HAVE_ETW)
                         # ETW method also supports WEL
@@ -185,6 +209,7 @@ if(OS_WINDOWS)
                                 COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                                 COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
                                 COMMAND "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
+                                WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
                                 DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
                                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                         )
@@ -199,6 +224,7 @@ if(OS_WINDOWS)
                                 COMMAND echo "1 2004" "wevt_netdata_manifest.xml" >> "${WEVT_RC_FILE}"
                                 COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
                                 COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
+                                WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
                                 DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
                                 COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                         )
