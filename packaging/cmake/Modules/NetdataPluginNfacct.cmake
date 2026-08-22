@@ -10,14 +10,6 @@
 # takes part in the NETDATA_FILES/LIBNETDATA_FILES composition.
 
 if(ENABLE_PLUGIN_NFACCT)
-    if (NOT MNL_FOUND)
-        message(FATAL_ERROR "Can not build nfacct.plugin because MNL library could not be found.")
-    endif()
-
-    if(NOT NFACCT_FOUND)
-        message(FATAL_ERROR "The nfacct plugin needs libnetfilter_acct, but it could not be found. Pass -DENABLE_PLUGIN_NFACCT=Off to build without it.")
-    endif()
-
     set(NFACCT_PLUGIN_FILES src/collectors/nfacct.plugin/plugin_nfacct.c)
 
     add_executable(nfacct.plugin ${NFACCT_PLUGIN_FILES})

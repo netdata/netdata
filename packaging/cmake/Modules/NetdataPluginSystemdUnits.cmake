@@ -15,14 +15,6 @@ set(SYSTEMD_UNITS_PLUGIN_FILES
 )
 
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
-        if(NOT SYSTEMD_FOUND)
-                message(FATAL_ERROR "Systemd units plugin requires systemd, but systemd was not found.")
-        endif()
-
-        if(SYSTEMD_VERSION LESS 221)
-            message(FATAL_ERROR "Systemd units plugin requires systemd 221 or newer, but only systemd ${SYSTEMD_VERSION} was found.")
-        endif()
-
         include(FetchContent)
 
         add_executable(systemd-units.plugin ${SYSTEMD_UNITS_PLUGIN_FILES})

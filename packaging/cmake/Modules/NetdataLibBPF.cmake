@@ -52,14 +52,6 @@ function(netdata_bundle_libbpf)
         message(FATAL_ERROR "GNU Make is required when building the eBPF plugin, but could not be found.")
     endif()
 
-    if(NOT ELF_FOUND)
-        message(FATAL_ERROR "The eBPF plugin needs libelf, but it could not be found. Pass -DENABLE_PLUGIN_EBPF=Off to build without it.")
-    endif()
-
-    if(NOT ZLIB_FOUND)
-        message(FATAL_ERROR "The eBPF plugin needs zlib, but it could not be found. Pass -DENABLE_PLUGIN_EBPF=Off to build without it.")
-    endif()
-
     set(_libbpf_lib_dir lib)
 
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")

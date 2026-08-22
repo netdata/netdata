@@ -10,14 +10,6 @@
 # takes part in the NETDATA_FILES/LIBNETDATA_FILES composition.
 
 if(ENABLE_PLUGIN_XENSTAT)
-    if(NOT XENSTAT_FOUND)
-        message(FATAL_ERROR "The xenstat plugin needs xenstat, but it could not be found. Pass -DENABLE_PLUGIN_XENSTAT=Off to build without it.")
-    endif()
-
-    if(NOT XENLIGHT_FOUND)
-        message(FATAL_ERROR "The xenstat plugin needs xenlight, but it could not be found. Pass -DENABLE_PLUGIN_XENSTAT=Off to build without it.")
-    endif()
-
     set(XENSTAT_PLUGIN_FILES src/collectors/xenstat.plugin/xenstat_plugin.c)
 
     add_executable(xenstat.plugin ${XENSTAT_PLUGIN_FILES})

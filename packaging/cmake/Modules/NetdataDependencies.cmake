@@ -2,17 +2,18 @@
 #
 # Every external library Netdata links against is looked up here, once.
 #
-# This file answers one question - "what does Netdata depend on?" - and only that
-# question. It performs no policy: it does not decide whether a missing library is
-# fatal, it does not set a HAVE_* or ENABLE_* macro, and it does not turn a feature
-# off. Those decisions belong to whoever uses the result, next to the target that
-# needs it, where the error message can name the feature and say how to build
-# without it.
+# It answers that in two halves. First every lookup: what we go and look for, with no
+# REQUIRED and no guard, because probing for a library a platform does not have is
+# harmless and it keeps "what do we depend on" free of "what are we building today".
+# Then every requirement: which of those results are mandatory, and under what
+# condition. Read together, the two halves are the whole dependency contract, and
+# reading them is not a grep across seven files.
 #
-# So no lookup here carries REQUIRED, and none carries the OS or feature guard its
-# consumer has. Probing for a library a platform does not have is harmless - the
-# result is simply not-found - and it keeps the answer to "what do we depend on"
-# free of the question "what are we building today".
+# What stays out of the second half is derivation. Whether a dependency is mandatory
+# is a fact about the dependency and belongs here; what a found dependency switches
+# on is a fact about the feature, so every HAVE_* and ENABLE_* is still set next to
+# the target it configures. ENABLE_SYSTEMD_DBUS could not move anyway - it depends on
+# five capability probes that run much later.
 #
 # pkg_check_modules and find_package write their results to the CACHE, so every
 # result below is readable from every scope, including inside a function and inside
@@ -112,3 +113,86 @@ pkg_check_modules(SNAPPY snappy)
 #
 
 pkg_check_modules(ELF libelf)
+
+#
+# Requirements.
+#
+# A missing library is fatal here or nowhere. Each check carries the condition under
+# which the dependency is actually needed, so it fires in exactly the cases it fired
+# in when it lived next to its target - and it aborts earlier, before any of the work
+# that was going to fail anyway.
+#
+# The message does the naming, not the location: it says which feature is affected
+# and which option turns that feature off.
+#
+
+if(NOT CURL_FOUND)
+  message(FATAL_ERROR "libcurl >= 7.21 is required for building Netdata, but could not be found.")
+endif()
+
+if(NOT TARGET PkgConfig::TLS)
+  message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
+endif()
+
+if(NOT TARGET PkgConfig::CRYPTO)
+  message(FATAL_ERROR "libcrypto is required for building Netdata, but could not be found.")
+endif()
+
+if(NOT ZLIB_FOUND)
+  message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
+endif()
+
+if(NOT LIBLZ4_FOUND)
+  message(FATAL_ERROR "liblz4 >= 1.7.1 is required for building Netdata, but could not be found.")
+endif()
+
+if(NOT LIBUV_FOUND)
+  message(FATAL_ERROR "libuv is required for building Netdata, but could not be found.")
+endif()
+
+# macOS and Windows provide the UUID functions in their system libraries, so the OS
+# condition is the requirement rather than an optimisation of the lookup.
+if(NOT (OS_MACOS OR OS_WINDOWS) AND NOT UUID_FOUND)
+  message(FATAL_ERROR "libuuid is required for building Netdata on this platform, but could not be found.")
+endif()
+
+if(ENABLE_LIBUNWIND AND NOT TARGET PkgConfig::LIBUNWIND)
+  message(FATAL_ERROR "Could not find libunwind for logging of stack traces")
+endif()
+
+if(ENABLE_PLUGIN_EBPF AND NOT ELF_FOUND)
+  message(FATAL_ERROR "The eBPF plugin needs libelf, but it could not be found. Pass -DENABLE_PLUGIN_EBPF=Off to build without it.")
+endif()
+
+if(ENABLE_PLUGIN_FREEIPMI AND NOT IPMI_FOUND)
+  message(FATAL_ERROR "The freeipmi plugin needs libipmimonitoring, but it could not be found. Pass -DENABLE_PLUGIN_FREEIPMI=Off to build without it.")
+endif()
+
+if(ENABLE_PLUGIN_IBM AND NOT ODBC_FOUND)
+  message(FATAL_ERROR "The IBM plugin needs unixODBC, but it could not be found. Pass -DENABLE_PLUGIN_IBM=Off to build without it.")
+endif()
+
+if(ENABLE_PLUGIN_NFACCT AND NOT MNL_FOUND)
+  message(FATAL_ERROR "Can not build nfacct.plugin because MNL library could not be found.")
+endif()
+
+if(ENABLE_PLUGIN_NFACCT AND NOT NFACCT_FOUND)
+  message(FATAL_ERROR "The nfacct plugin needs libnetfilter_acct, but it could not be found. Pass -DENABLE_PLUGIN_NFACCT=Off to build without it.")
+endif()
+
+if(ENABLE_PLUGIN_SYSTEMD_UNITS AND NOT SYSTEMD_FOUND)
+  message(FATAL_ERROR "Systemd units plugin requires systemd, but systemd was not found.")
+endif()
+
+# Reached only when the check above did not abort, so systemd is known to be present.
+if(ENABLE_PLUGIN_SYSTEMD_UNITS AND SYSTEMD_VERSION LESS 221)
+  message(FATAL_ERROR "Systemd units plugin requires systemd 221 or newer, but only systemd ${SYSTEMD_VERSION} was found.")
+endif()
+
+if(ENABLE_PLUGIN_XENSTAT AND NOT XENSTAT_FOUND)
+  message(FATAL_ERROR "The xenstat plugin needs xenstat, but it could not be found. Pass -DENABLE_PLUGIN_XENSTAT=Off to build without it.")
+endif()
+
+if(ENABLE_PLUGIN_XENSTAT AND NOT XENLIGHT_FOUND)
+  message(FATAL_ERROR "The xenstat plugin needs xenlight, but it could not be found. Pass -DENABLE_PLUGIN_XENSTAT=Off to build without it.")
+endif()

@@ -419,9 +419,6 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_fetch_ebpf_co_re()
 endif()
 
-if(NOT CURL_FOUND)
-        message(FATAL_ERROR "libcurl >= 7.21 is required for building Netdata, but could not be found.")
-endif()
 set(HAVE_LIBCURL TRUE)
 
 #
@@ -508,14 +505,6 @@ if(ENABLE_LIBBACKTRACE)
 endif()
 
 netdata_bundle_sqlite3()
-
-if(NOT TARGET PkgConfig::TLS)
-        message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
-endif()
-
-if(NOT TARGET PkgConfig::CRYPTO)
-        message(FATAL_ERROR "libcrypto is required for building Netdata, but could not be found.")
-endif()
 
 netdata_detect_protobuf()
 
@@ -835,7 +824,6 @@ netdata_add_libyaml_to_target(libnetdata)
 
 # libunwind
 if(ENABLE_LIBUNWIND)
-  if(TARGET PkgConfig::LIBUNWIND)
     set(HAVE_LIBUNWIND On)
 
     if(STATIC_BUILD)
@@ -860,16 +848,9 @@ if(ENABLE_LIBUNWIND)
       message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR} for libunwind. Stack traces may not work.")
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
     endif()
-  else()
-    message(FATAL_ERROR "Could not find libunwind for logging of stack traces")
-  endif()
 endif()
 
 # zlib
-if(NOT ZLIB_FOUND)
-        message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
-endif()
-
 target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
 
 # FindZLIB reports an imported target; pkg-config reports flags. Both arms are
@@ -882,10 +863,6 @@ else()
 endif()
 
 # lz4
-if(NOT LIBLZ4_FOUND)
-        message(FATAL_ERROR "liblz4 >= 1.7.1 is required for building Netdata, but could not be found.")
-endif()
-
 set(ENABLE_LZ4 On)
 
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
@@ -913,18 +890,12 @@ if(OS_MACOS OR OS_WINDOWS)
         # UUID functionality is part of the system libraries here, so no extra
         # stuff needed.
 else()
-        if(NOT UUID_FOUND)
-                message(FATAL_ERROR "libuuid is required for building Netdata on this platform, but could not be found.")
-        endif()
         target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
 endif()
 
 # uv
-if(NOT LIBUV_FOUND)
-        message(FATAL_ERROR "libuv is required for building Netdata, but could not be found.")
-endif()
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
@@ -1297,9 +1268,6 @@ endif()
 #
 
 if(ENABLE_PLUGIN_IBM)
-    if(NOT ODBC_FOUND)
-        message(FATAL_ERROR "The IBM plugin needs unixODBC, but it could not be found. Pass -DENABLE_PLUGIN_IBM=Off to build without it.")
-    endif()
     include(NetdataIBMPlugin)
     add_ibm_plugin_target()
 
