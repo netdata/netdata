@@ -146,7 +146,6 @@ endif()
 include(NetdataPlatformChecks)
 
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
-set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
 if(OS_WINDOWS)
   set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
