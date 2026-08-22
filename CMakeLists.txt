@@ -936,23 +936,10 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                        ${ACLK_PROTO_BUILT_HDRS})
 
 #
-# nd-run helper program
+# nd-run: runs a helper program with the capabilities it needs, if any.
 #
 
-# libcap is Linux-only, so the OS condition IS the requirement, not an
-# optimisation of the lookup.
-if(CAP_FOUND AND OS_LINUX)
-  set(HAVE_CAPABILITY True)
-endif()
-
-add_executable(nd-run ${NDRUN_FILES})
-if(HAVE_CAPABILITY)
-  target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
-endif()
-target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
-install(TARGETS nd-run
-        COMPONENT netdata
-        DESTINATION "${BINDIR}")
+include(NetdataNdRun)
 
 #
 # build plugins

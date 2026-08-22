@@ -1325,8 +1325,6 @@ set(NETIPC_SERVICE_COMMON_FILES
         src/libnetdata/netipc/src/service/netipc_service_apps_lookup.c
 )
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c)
-
 #
 # Guarded inventory. The root file keeps the guard and selects
 # from here; only the file lists live below.
