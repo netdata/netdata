@@ -10,7 +10,7 @@ This guide covers Netdata's advanced streaming and replication capabilities, whi
 
 If you're new to Netdata streaming or prefer a guided approach, [jump to our step-by-step guide](#step-by-step-setup-guide) at the end of this document. The guide will walk you through setting up a basic streaming configuration and then connecting to the comprehensive reference sections as needed.
 
-For a quick reference on setting up the Parent-Child relationship, see the [Configuration Examples](#complete-configuration-examples) or refer to our comprehensive [Parents: Your Centralization Points](https://learn.netdata.cloud/docs/deployment-guides/parents-your-centralization-points) documentation for more details.
+For a quick reference on setting up the Parent-Child relationship, see the [Configuration Examples](#complete-configuration-examples) or refer to our comprehensive [Parents: Your Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md) documentation for more details.
 
 :::
 
