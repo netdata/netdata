@@ -188,11 +188,9 @@ Python pipeline.
    `secrets.GITHUB_TOKEN`.
 2. SSH agent for `secrets.NETDATABOT_SSH_PRIVATE_KEY` (used to
    clone private repos like `.github`).
-3. Python 3.10, install
+3. Python 3.13, install the hash-locked
    `${NETDATA_REPOS_DIR}/learn/.learn_environment/ingest-requirements.txt`
-   (`pip`, `requests==2.33.0`, `Pillow`, `PyGithub`, `gitpython`,
-   `mergedeep`, `pandas`, `numpy`, `retrypy`, `pyyaml`,
-   `jsonschema`).
+   with `python -m pip install --require-hashes`.
 4. **Run `python ingest/ingest.py --fail-links 2>&1`** --
    captures output for issue creation, propagates exit code 1
    (broken links) into a workflow output but does NOT fail
@@ -259,8 +257,8 @@ From within the learn repo:
 
 ```bash
 # Install deps once.
-python3 -m venv venv && . venv/bin/activate
-pip install -r .learn_environment/ingest-requirements.txt
+python3.13 -m venv venv && . venv/bin/activate
+python -m pip install --require-hashes -r .learn_environment/ingest-requirements.txt
 
 # Test against your local netdata clone.
 python3 ingest/ingest.py --local-repo netdata:<repo> --ignore-on-prem-repo --fail-links-netdata
