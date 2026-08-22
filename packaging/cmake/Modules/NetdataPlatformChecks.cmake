@@ -1,16 +1,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Platform capability probes: header, symbol, function and source-compile checks, with the dependency bundling that is interleaved with them.
+# Platform capability probes: header, symbol, function and source-compile checks.
 #
-# Relocated verbatim from the root CMakeLists.txt. include()d rather than
-# add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
-# keep pointing at the repository and build roots, which every relative path
-# below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
+# Originally relocated from the root CMakeLists.txt, and since then reduced to the
+# probes alone - the netdata_bundle_* calls and the stack-trace flag block it used
+# to carry are back in the root file, where their order relative to each other is
+# explained. include()d rather than add_subdirectory()d so
+# CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR keep pointing at the
+# repository and build roots. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# Self-contained: every check_* command used below is made available by an include() in this file. It relies on nothing the including file happens to have done. The netdata_bundle_* calls stay interleaved with the probes on purpose - see the note below.
+# Self-contained: every check_* command used below is made available by an include() in this file. It relies on nothing the including file happens to have done, which is what lets it be included this early.
 #
-# The stack-trace add_compile_options/add_link_options block lives here, in the middle of the netdata_bundle_* calls. That position is load-bearing: add_compile_options sets a directory property that add_subdirectory - and so FetchContent_MakeAvailable - passes only to targets created AFTER it. dlib is bundled before the block and does not get the flags; sqlite3 is bundled after it and does. Moving the block, or gathering the bundle calls, changes shipped object code either way.
+# Nothing here creates a target or touches a directory property, so its position is free. It reads only CMAKE_SYSTEM_NAME (via the OS_* variables) and CMAKE_C_COMPILER_ID. The one thing it must stay ahead of is any consumer of the HAVE_* results, the earliest of which is the libnetdata link line.
 #
-# The block also feeds CONFIGURE_COMMAND, the accumulated-compile-options string that NetdataSystemFiles.cmake snapshots into config.h. That reaches users compiled into the binary, via netdata -W buildinfo and the info API - NOT through build-info-cmake-cache.gz, which is gzip of CMakeCache.txt and holds no such entry.
 
 #
 # Libm
@@ -39,10 +40,6 @@ if(NOT HAVE_LOG10)
         else()
                 message(FATAL_ERROR "Can not use log10 with/without libm.")
         endif()
-endif()
-
-if(ENABLE_ML)
-  netdata_bundle_dlib()
 endif()
 
 #
@@ -126,21 +123,6 @@ check_function_exists(timegm HAVE_TIMEGM)
 check_function_exists(tzalloc HAVE_TZALLOC)
 check_function_exists(localtime_rz HAVE_LOCALTIME_RZ)
 check_function_exists(tzfree HAVE_TZFREE)
-
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    # -fno-omit-frame-pointer = add frame pointers to all functions
-    # -funwind-tables = generate unwind tables for all functions
-    # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
-    add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
-    add_link_options(-rdynamic)
-    message(STATUS "Added compiler and linker flags for better stack trace support")
-endif()
-
-if(ENABLE_LIBBACKTRACE)
-    netdata_bundle_libbacktrace()
-endif()
-
-netdata_bundle_sqlite3()
 
 #
 # check source compilation

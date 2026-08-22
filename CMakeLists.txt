@@ -1,4 +1,35 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The order of this file, and why it is that order. Most of it is free to move;
+# the constraints below are the ones that are not, and each has been paid for.
+#
+#   1. version, module path, build type
+#   2. platform detection and compiler flags. Every directory-property mutation
+#      that applies to the whole tree happens here: the mold link option,
+#      NetdataPlatform's -D_GNU_SOURCE and include paths, NetdataCompilerFlags,
+#      and HAVE_OSLOG. One more sits far below, in phase 7, on purpose.
+#   3. platform capability probes (NetdataPlatformChecks). Free to move within
+#      this file - it creates no target and touches no directory property - but
+#      kept here, ahead of every subproject, so that our HAVE_* macros are
+#      answered by our own probes. check_* results share one cache namespace with
+#      every project configured as a subdirectory and the first writer wins, so a
+#      probe that runs after a vendor's silently inherits the vendor's answer to
+#      a question the vendor may have asked differently.
+#   4. install layout, build options, host integration paths
+#   5. toolchains and code generation: Go, Rust/corrosion
+#   6. dependency discovery, and the subprojects we bundle
+#   7. the stack-trace flag pair, wedged between three netdata_bundle_* calls.
+#      Load-bearing and explained in full at that point. Do not tidy it.
+#   8. source inventories, then targets: libraries, the daemon, the plugins
+#   9. tests, then packaging
+#  10. config.h and the other generated files, on the LAST line. Not because of
+#      the compile-option snapshot it takes - that only has to follow phase 7 -
+#      but because its inputs resolve during phase 8: HAVE_CAPABILITY,
+#      HAVE_MONGOC, HAVE_LIBUNWIND, HAVE_LIBMNL, HAVE_SYSTEMD and the HAVE_SD_*
+#      set, ENABLE_LZ4/ZSTD/BROTLI, and ENABLE_PROMETHEUS_REMOTE_WRITE, which
+#      binds latest of all. Moving it earlier fails SILENTLY: about fifteen
+#      #cmakedefine lines would emit as undefs, the build would succeed, and
+#      mongoc, brotli, zstd and systemd support would be quietly dropped.
 
 cmake_minimum_required(VERSION 3.16.0...3.30)
 
@@ -97,6 +128,19 @@ if(OS_MACOS)
     add_compile_definitions(HAVE_OSLOG)
   endif()
 endif()
+
+#
+# Platform capability probes. Placed here, immediately after the last of the four
+# directory-property mutations above (the mold link option, NetdataPlatform's
+# -D_GNU_SOURCE and include paths, NetdataCompilerFlags, and HAVE_OSLOG), and ahead of
+# every dependency lookup and every bundled subproject.
+#
+# Ahead of the subprojects matters: check_* results are cached in a namespace shared
+# with every project configured as a subdirectory, and the first writer wins. Running
+# our probes first means our HAVE_* macros are answered by our own probes rather than
+# inherited from whichever vendor happened to configure earlier.
+#
+include(NetdataPlatformChecks)
 
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
@@ -410,10 +454,56 @@ if(ENABLE_SENTRY)
 endif()
 
 #
-# Platform capability probes: header, symbol, function and source-compile checks, with the dependency bundling that is interleaved with them.
+# Bundled dependencies, and the stack-trace flags whose position between them is
+# load-bearing. This is a braid, not a design: do not tidy it.
 #
+# add_compile_options sets a DIRECTORY property, and add_subdirectory - so also
+# FetchContent_MakeAvailable - passes a directory property only to targets created
+# AFTER the mutation. So this block partitions every bundled target in the tree by
+# which side of it the target is created on:
+#
+#   uninstrumented, created before it: dlib (below), and Corrosion, libdatachannel,
+#                                      protobuf+absl, libbpf, json-c, libyaml and
+#                                      sentry, all bundled earlier in this file
+#   instrumented, created after it:    libbacktrace, sqlite3, and every netdata target
+#
+# Measured, not argued: dlib's 49 translation units carry none of the three flags and
+# sqlite3's 12 carry all three, in the same configure.
+#
+# Nothing explains why sqlite3 should be instrumented and dlib should not - it falls
+# out of one netdata_bundle_* call sitting nine lines below a statement and another
+# eighty-four lines above it. Moving the flags, or gathering the netdata_bundle_*
+# calls, changes shipped object code whichever side the new position lands on, so it
+# is a product decision about whether vendored code carries frame pointers, not a
+# refactor. Until that decision is taken, the order below is the contract:
+#
+#   dlib  <  the flags  <  libbacktrace  <  sqlite3
+#
+# The flags also feed CONFIGURE_COMMAND, the accumulated-compile-options string
+# that NetdataSystemFiles.cmake snapshots into config.h. That string reaches users
+# compiled into the binary, through netdata -W buildinfo and the info API - NOT
+# through build-info-cmake-cache.gz, which is gzip of CMakeCache.txt and holds no
+# such entry. So it is a user-visible build-info field, which raises the bar on
+# changing it.
+#
+if(ENABLE_ML)
+  netdata_bundle_dlib()
+endif()
 
-include(NetdataPlatformChecks)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    # -fno-omit-frame-pointer = add frame pointers to all functions
+    # -funwind-tables = generate unwind tables for all functions
+    # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
+    add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
+    add_link_options(-rdynamic)
+    message(STATUS "Added compiler and linker flags for better stack trace support")
+endif()
+
+if(ENABLE_LIBBACKTRACE)
+    netdata_bundle_libbacktrace()
+endif()
+
+netdata_bundle_sqlite3()
 
 # openssl/crypto
 pkg_check_modules(TLS IMPORTED_TARGET openssl)
