@@ -1395,7 +1395,7 @@ set(ML_ENABLED_FILES
         src/ml/ml-unittest.cc
 )
 
-# ml: the allocator shim used without mimalloc
+# ml: overrides global operator new/delete to feed the ML memory pulse counters
 set(ML_MEMORY_FILES
         src/ml/ml_memory.cc
 )

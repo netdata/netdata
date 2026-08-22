@@ -169,7 +169,6 @@
 #cmakedefine ENABLE_BUNDLED_JSONC
 #cmakedefine ENABLE_BUNDLED_YAML
 #cmakedefine ENABLE_BUNDLED_PROTOBUF
-#cmakedefine ENABLE_MIMALLOC
 
 // directory paths
 

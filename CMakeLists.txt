@@ -304,57 +304,6 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     endif()
 endif()
 
-option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
-
-if(ENABLE_MIMALLOC)
-    if(CMAKE_MINOR_VERSION LESS 18)
-        message(WARNING "Mimalloc disabled: Requires CMake version 3.18 or higher.")
-        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
-    elseif(CMAKE_SIZEOF_VOID_P LESS 8)
-        message(WARNING "Mimalloc disabled: Only supported on 64-bit platforms.")
-        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
-    elseif(OS_FREEBSD OR OS_MACOS OR OS_WINDOWS)
-        message(WARNING "Mimalloc disabled: Not supported on FreeBSD, macOS, or Windows.")
-        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
-    elseif(ENABLE_ADDRESS_SANITIZER)
-        message(WARNING "Mimalloc disabled: Cannot be used with Address Sanitizer.")
-        set(ENABLE_MIMALLOC OFF CACHE BOOL "Enable mimalloc allocator" FORCE)
-    else()
-        message(STATUS "Mimalloc is enabled.")
-    endif()
-else()
-    message(STATUS "Mimalloc is disabled.")
-endif()
-
-if(ENABLE_MIMALLOC)
-        function(netdata_add_mimalloc)
-                set(MI_BUILD_STATIC ON CACHE INTERNAL "")
-                set(MI_BUILD_SHARED OFF CACHE INTERNAL "")
-                set(MI_BUILD_OBJECT OFF CACHE INTERNAL "")
-                set(MI_BUILD_TESTS OFF CACHE INTERNAL "")
-
-                include(FetchContent)
-                include(NetdataFetchContentExtra)
-
-                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
-                        FetchContent_Declare(mimalloc
-                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
-                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
-                                EXCLUDE_FROM_ALL
-                        )
-                else()
-                        FetchContent_Declare(mimalloc
-                                GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
-                                GIT_TAG 8c532c32c3c96e5ba1f2283e032f69ead8add00f
-                        )
-                endif()
-
-                FetchContent_MakeAvailable_NoInstall(mimalloc)
-        endfunction()
-
-        netdata_add_mimalloc()
-endif()
-
 set(ENABLE_PLUGIN_EBPF_GO OFF)
 if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
     include(NetdataGoTools)
@@ -556,9 +505,7 @@ if(ENABLE_ML)
                 ${ML_ENABLED_FILES}
         )
 
-        if(NOT ENABLE_MIMALLOC)
-                list(APPEND ML_FILES ${ML_MEMORY_FILES})
-        endif()
+        list(APPEND ML_FILES ${ML_MEMORY_FILES})
         set_source_files_properties(${ML_FILES} PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 else()
         set(ML_FILES
@@ -729,7 +676,6 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 # target_link_libraries(test Threads::Threads)
 
 target_link_libraries(libnetdata PUBLIC
-        "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread>"
         "$<$<BOOL:${HAVE_LIBRT}>:rt>"
