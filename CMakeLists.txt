@@ -382,12 +382,18 @@ set(HAVE_LIBCURL TRUE)
 cmake_policy(SET CMP0075 NEW)
 
 include(CheckFunctionExists)
+include(CMakePushCheckState)
 
 check_function_exists(log10 HAVE_LOG10)
 if(NOT HAVE_LOG10)
         unset(HAVE_LOG10 CACHE)
+        # -lm is wanted for this probe only. CMAKE_REQUIRED_LIBRARIES is global to
+        # every later check_*, so restore it here rather than leaving the ~80 probes
+        # that follow - NetdataPlatformChecks among them - silently linking libm.
+        cmake_push_check_state()
         list(APPEND CMAKE_REQUIRED_LIBRARIES m)
         check_function_exists(log10 HAVE_LOG10)
+        cmake_pop_check_state()
         if(HAVE_LOG10)
                 set(LINK_LIBM True)
         else()
