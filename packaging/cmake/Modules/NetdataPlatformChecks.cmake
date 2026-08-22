@@ -14,6 +14,18 @@
 #
 
 #
+# librt
+#
+
+include(CheckLibraryExists)
+
+# clock_gettime / shm_open / sem_* live in librt on old glibc (< 2.34) and on
+# FreeBSD, but in libc on musl (Alpine) and modern glibc (>= 2.34). Every consumer -
+# netipc, libnetdata, netdata and CGO_LDFLAGS - keys off HAVE_LIBRT, so none of them
+# unconditionally links a library that may not exist.
+check_library_exists(rt clock_gettime "" HAVE_LIBRT)
+
+#
 # Libm
 #
 

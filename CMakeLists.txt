@@ -647,13 +647,6 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build netipc (standalone IPC library, no Netdata deps)
 #
 
-# clock_gettime / shm_open / sem_* live in librt on old glibc (< 2.34) and on
-# FreeBSD, but in libc on musl (Alpine) and modern glibc (>= 2.34).  Probe
-# once here; all targets below (netipc, libnetdata, netdata, CGO_LDFLAGS) use
-# HAVE_LIBRT so we never unconditionally link a library that may not exist.
-include(CheckLibraryExists)
-check_library_exists(rt clock_gettime "" HAVE_LIBRT)
-
 if(OS_LINUX)
     set(NETIPC_FILES
             ${NETIPC_PROTOCOL_FILES}
