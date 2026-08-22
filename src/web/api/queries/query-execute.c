@@ -37,22 +37,6 @@ static long rrdr_line_init(RRDR *r __maybe_unused, time_t t __maybe_unused, long
     return rrdr_line;
 }
 
-ALWAYS_INLINE
-static NETDATA_DOUBLE query_point_grouping_value(
-    QUERY_POINT point, QUERY_ENGINE_OPS *ops, RRDR_TIME_GROUPING add_flush) {
-    if(likely(add_flush != RRDR_GROUPING_SUM || !ops->qm->values_stored_as_rates))
-        return point.value;
-
-    if(unlikely(storage_point_is_unset(point.sp) || storage_point_is_gap(point.sp) || !point.sp.count))
-        return point.value;
-
-    time_t duration = point.sp.end_time_s - point.sp.start_time_s;
-    if(unlikely(duration <= 0))
-        return point.value;
-
-    return point.value * (NETDATA_DOUBLE)duration / (NETDATA_DOUBLE)point.sp.count;
-}
-
 // ----------------------------------------------------------------------------
 // dimension level query engine
 
@@ -74,6 +58,32 @@ static NETDATA_DOUBLE query_point_grouping_value(
         }                                                               \
 } while(0)
 
+ALWAYS_INLINE
+static NETDATA_DOUBLE query_point_total_projection(
+    const QUERY_POINT *point, time_t row_start_time, time_t row_end_time) {
+    time_t duration = point->sp.end_time_s - point->sp.start_time_s;
+    if(unlikely(duration <= 0))
+        return point->value;
+
+    time_t overlap_start = MAX(point->sp.start_time_s, row_start_time);
+    time_t overlap_end = MIN(point->sp.end_time_s, row_end_time);
+    if(unlikely(overlap_end <= overlap_start))
+        return NAN;
+
+    if(likely(overlap_start == point->sp.start_time_s && overlap_end == point->sp.end_time_s))
+        return point->value;
+
+    return point->value * (NETDATA_DOUBLE)(overlap_end - overlap_start) / (NETDATA_DOUBLE)duration;
+}
+
+#define query_project_point(point, previous, now, view_update_every, point_mode) do { \
+    if(likely((point_mode) == QUERY_POINT_MODE_LINEAR))                              \
+        query_interpolate_point(point, previous, now);                               \
+    else if(unlikely((point_mode) == QUERY_POINT_MODE_TOTAL))                        \
+        (point).value = query_point_total_projection(                                \
+            &(point), (now) - (view_update_every), (now));                           \
+} while(0)
+
 #define query_add_point_to_group(r, point, ops, add_flush)        do {  \
     if(likely(netdata_double_isnumber((point).value))) {                \
         if(likely(fpclassify((point).value) != FP_ZERO))                \
@@ -82,9 +92,7 @@ static NETDATA_DOUBLE query_point_grouping_value(
         if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
             (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
-        NETDATA_DOUBLE grouping_value =                                    \
-            query_point_grouping_value(point, ops, add_flush);             \
-        time_grouping_add(r, grouping_value, add_flush);                   \
+        time_grouping_add(r, (point).value, add_flush);                  \
                                                                         \
         storage_point_merge_to((ops)->group_point, (point).sp);         \
         if(!(point).added)                                              \
@@ -154,11 +162,11 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     }
 
     const RRDR_TIME_GROUPING add_flush = r->time_grouping.add_flush;
-
     ops->group_point = STORAGE_POINT_UNSET;
     ops->query_point = STORAGE_POINT_UNSET;
 
     RRDR_OPTIONS options = qt->window.options;
+    bool use_anomaly_bit_as_value = options & RRDR_OPTION_ANOMALY_BIT;
     size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
     time_t before_wanted = qt->window.before; (void)before_wanted;
@@ -170,8 +178,6 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     size_t points_added = 0;
 
     long rrdr_line = -1;
-    bool use_anomaly_bit_as_value = (r->internal.qt->window.options & RRDR_OPTION_ANOMALY_BIT) ? true : false;
-
     NETDATA_DOUBLE min = r->view.min, max = r->view.max;
 
     QUERY_POINT last2_point = QUERY_POINT_EMPTY;
@@ -182,6 +188,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     // when we switch plans, we read-ahead a point from the next plan
     // to join them smoothly at the exact time the next plan begins
     STORAGE_POINT next1_point = STORAGE_POINT_UNSET;
+    uint8_t next1_tier = 0;
 
     time_t now_start_time = after_wanted - ops->query_granularity;
     time_t now_end_time   = after_wanted + (ops->view_update_every - ops->query_granularity);
@@ -193,8 +200,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
-        if(unlikely(query_plan_should_switch_plan(ops, now_end_time))) {
-            query_planer_next_plan(ops, now_end_time, new_point.sp.end_time_s);
+        if(unlikely(query_result_plan_should_switch_plan(ops, now_end_time))) {
+            query_planer_next_plan(
+                ops, now_end_time - ops->plan_switch_time_offset, new_point.sp.end_time_s);
             db_points_read_since_plan_switch = 0;
         }
 
@@ -207,29 +215,30 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 last1_point = new_point;
             }
 
-            if(unlikely(storage_engine_query_is_finished(ops->seqh))) {
-                query_is_finished_counter++;
-
-                if(count_same_end_time != 0) {
-                    last2_point = last1_point;
-                    last1_point = new_point;
-                }
-                new_point = QUERY_POINT_EMPTY;
-                new_point.sp.start_time_s = last1_point.sp.end_time_s;
-                new_point.sp.end_time_s   = now_end_time;
-//
-//                if(debug_this) netdata_log_info("QUERY: is finished() returned true");
-//
-                break;
-            }
-            else
-                query_is_finished_counter = 0;
-
             // fetch the new point
             {
                 STORAGE_POINT sp;
+                uint8_t sp_tier;
                 if(likely(storage_point_is_unset(next1_point))) {
+                    if(unlikely(storage_engine_query_is_finished(ops->seqh))) {
+                        query_is_finished_counter++;
+
+                        if(count_same_end_time != 0) {
+                            last2_point = last1_point;
+                            last1_point = new_point;
+                        }
+                        new_point = QUERY_POINT_EMPTY;
+                        new_point.sp.start_time_s = last1_point.sp.end_time_s;
+                        new_point.sp.end_time_s   = now_end_time;
+//
+//                      if(debug_this) netdata_log_info("QUERY: is finished() returned true");
+//
+                        break;
+                    }
+
+                    query_is_finished_counter = 0;
                     db_points_read_since_plan_switch++;
+                    sp_tier = (uint8_t)ops->tier;
                     sp = storage_engine_query_next_metric(ops->seqh);
                     ops->db_points_read_per_tier[ops->tier]++;
                     ops->db_total_points_read++;
@@ -238,15 +247,21 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         storage_point_make_positive(sp);
                 }
                 else {
+                    query_is_finished_counter = 0;
+
                     // ONE POINT READ-AHEAD
                     sp = next1_point;
+                    sp_tier = next1_tier;
                     storage_point_unset(next1_point);
                     db_points_read_since_plan_switch = 1;
                 }
 
+                NETDATA_DOUBLE prepared_sum = sp.sum;
+
                 // ONE POINT READ-AHEAD
                 if(unlikely(query_plan_should_switch_plan(ops, sp.end_time_s) &&
-                    query_planer_next_plan(ops, now_end_time, new_point.sp.end_time_s))) {
+                    query_planer_next_plan(
+                        ops, now_end_time - ops->plan_switch_time_offset, new_point.sp.end_time_s))) {
 
                     // The end time of the current point, crosses our plans (tiers)
                     // so, we switched plan (tier)
@@ -257,23 +272,43 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     // B. part of the point of the previous plan overlaps with the point from the next plan
 
                     STORAGE_POINT sp2 = storage_engine_query_next_metric(ops->seqh);
+                    uint8_t sp2_tier = (uint8_t)ops->tier;
                     ops->db_points_read_per_tier[ops->tier]++;
                     ops->db_total_points_read++;
 
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
                         storage_point_make_positive(sp);
 
-                    if(sp.start_time_s > sp2.start_time_s)
+                    bool finer_total_overlap =
+                        ops->point_mode == QUERY_POINT_MODE_TOTAL &&
+                        sp2_tier < sp_tier && sp2.start_time_s < sp.end_time_s;
+
+                    if(sp.start_time_s > sp2.start_time_s ||
+                       (finer_total_overlap && sp2.start_time_s <= sp.start_time_s)) {
                         // the point from the previous plan is useless
                         sp = sp2;
-                    else
+                        sp_tier = sp2_tier;
+                        prepared_sum = sp2.sum;
+                    }
+                    else {
                         // let the query run from the previous plan
                         // but setting this will also cut off the interpolation
                         // of the point from the previous plan
                         next1_point = sp2;
+                        next1_tier = sp2_tier;
+
+                        if(unlikely(finer_total_overlap)) {
+                            time_t duration = sp.end_time_s - sp.start_time_s;
+                            time_t retained = sp2.start_time_s - sp.start_time_s;
+                            if(!qm->values_stored_as_rates && duration > 0)
+                                prepared_sum *= (NETDATA_DOUBLE)retained / (NETDATA_DOUBLE)duration;
+                            sp.end_time_s = sp2.start_time_s;
+                        }
+                    }
                 }
 
                 new_point.sp = sp;
+                new_point.tier = sp_tier;
                 new_point.added = false;
                 query_point_set_id(new_point, ops->db_total_points_read);
 
@@ -285,8 +320,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 if(likely(!storage_point_is_unset(sp) && !storage_point_is_gap(sp))) {
 
                     if(unlikely(use_anomaly_bit_as_value))
-                        new_point.value = storage_point_anomaly_rate(new_point.sp);
-
+                        new_point.value = storage_point_anomaly_rate(sp);
                     else {
                         switch (ops->tier_query_fetch) {
                             default:
@@ -303,7 +337,16 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                                 break;
 
                             case TIER_QUERY_FETCH_SUM:
-                                new_point.value = sp.sum;
+                                new_point.value = prepared_sum;
+                                if(unlikely(qm->values_stored_as_rates)) {
+                                    time_t duration = sp.end_time_s - sp.start_time_s;
+                                    if(likely(duration > 0))
+                                        new_point.value *=
+                                            (NETDATA_DOUBLE)duration / (NETDATA_DOUBLE)sp.count;
+                                }
+                                if(unlikely(sp.start_time_s < now_start_time && sp.end_time_s < now_end_time))
+                                    new_point.value = query_point_total_projection(
+                                        &new_point, now_start_time, now_end_time);
                                 break;
                         }
                     }
@@ -410,6 +453,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             "QUERY: first part of query provides invalid point to interpolate (now_end_time %ld, stop_time %ld",
             now_end_time, stop_time);
 
+        NETDATA_DOUBLE new_point_total_remaining = NAN;
+
         do {
             // now_start_time is wrong in this loop
             // but, we don't need it
@@ -420,7 +465,20 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 // it is time for our NEW point to be used
                 current_point = new_point;
                 new_point.added = true; // first copy, then set it, so that new_point will not be added again
-                query_interpolate_point(current_point, last1_point, now_end_time);
+                query_project_point(
+                    current_point, last1_point, now_end_time, ops->view_update_every, ops->point_mode);
+
+                if(unlikely(ops->point_mode == QUERY_POINT_MODE_TOTAL &&
+                            netdata_double_isnumber(current_point.value))) {
+                    if(unlikely(!netdata_double_isnumber(new_point_total_remaining))) {
+                        time_t duration = new_point.sp.end_time_s - new_point.sp.start_time_s;
+                        new_point_total_remaining = likely(duration > 0) ?
+                            new_point.value * (NETDATA_DOUBLE)(new_point.sp.end_time_s - now_end_time) /
+                                (NETDATA_DOUBLE)duration : 0.0;
+                    }
+                    else
+                        new_point_total_remaining -= current_point.value;
+                }
 
 //                internal_error(current_point.id > 0
 //                                && last1_point.id == 0
@@ -439,7 +497,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 // our LAST point is still valid
                 current_point = last1_point;
                 last1_point.added = true; // first copy, then set it, so that last1_point will not be added again
-                query_interpolate_point(current_point, last2_point, now_end_time);
+                query_project_point(
+                    current_point, last2_point, now_end_time, ops->view_update_every, ops->point_mode);
 
 //                internal_error(current_point.id > 0
 //                                && last2_point.id == 0
@@ -504,6 +563,49 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
         if(points_added >= points_wanted)
             break;
+
+        time_t next_row_start_time = now_end_time - ops->view_update_every;
+        if(unlikely(new_point.sp.end_time_s > next_row_start_time &&
+                    netdata_double_isnumber(new_point.value) &&
+                    ((new_point.added &&
+                      (ops->point_mode == QUERY_POINT_MODE_TOTAL ||
+                       (new_point.tier == 0 &&
+                        new_point.sp.start_time_s < next_row_start_time))) ||
+                     (!new_point.added &&
+                      ops->point_mode == QUERY_POINT_MODE_TOTAL &&
+                      storage_point_is_unset(next1_point))))) {
+            bool settle_value = ops->point_mode == QUERY_POINT_MODE_TOTAL ||
+                                new_point.sp.end_time_s >= qm->tiers[0].db_last_time_s;
+            NETDATA_DOUBLE carried_value = new_point.value;
+            if(ops->point_mode == QUERY_POINT_MODE_TOTAL && new_point.sp.end_time_s < now_end_time) {
+                if(likely(netdata_double_isnumber(new_point_total_remaining)))
+                    carried_value = new_point_total_remaining;
+                else
+                    carried_value = query_point_total_projection(
+                        &new_point, next_row_start_time, now_end_time);
+            }
+
+            if(likely(netdata_double_isnumber(carried_value))) {
+                if(settle_value) {
+                    if(likely(fpclassify(carried_value) != FP_ZERO))
+                        ops->group_points_non_zero++;
+
+                    if(unlikely(new_point.sp.flags & SN_FLAG_RESET))
+                        ops->group_value_flags |= RRDR_VALUE_RESET;
+
+                    r->time_grouping.add(r, carried_value);
+                    if(!new_point.added)
+                        storage_point_merge_to(ops->query_point, new_point.sp);
+                }
+
+                storage_point_merge_to(ops->group_point, new_point.sp);
+            }
+
+            if(settle_value) {
+                ops->group_points_added++;
+                new_point.added = true;
+            }
+        }
 
         // the loop above increased "now" by ops->view_update_every,
         // but the main loop will increase it too,
