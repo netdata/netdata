@@ -126,6 +126,6 @@ Execute the playbook from your administration system:
 ansible-playbook -i hosts tasks/main.yml
 ```
 
-Ansible connects to your node(s) via SSH, collects [facts](https://docs.ansible.com/ansible/latest/user_guide/playbooks_vars_facts.html#ansible-facts) about the system, and then applies the defined tasks.
+Ansible connects to your node(s) via SSH, collects [facts](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_vars_facts.html#ansible-facts) about the system, and then applies the defined tasks.
 
 The task to install Netdata may take a few minutes per node. Once the playbook reaches the "connect to Cloud" task, your nodes will start appearing in your Space in Netdata Cloud.

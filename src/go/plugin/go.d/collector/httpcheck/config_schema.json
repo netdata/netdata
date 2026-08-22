@@ -124,7 +124,7 @@
       },
       "cookie_file": {
         "title": "Cookie file",
-        "description": "Specifies the path to the file containing cookies. For more information about the cookie file format, see [cookie file format](https://everything.curl.dev/http/cookies/fileformat).",
+        "description": "Specifies the path to the file containing cookies. For more information about the cookie file format, see [cookie file format](https://everything.curl.dev/http/cookies/fileformat.html).",
         "type": "string"
       },
       "bearer_token_file": {

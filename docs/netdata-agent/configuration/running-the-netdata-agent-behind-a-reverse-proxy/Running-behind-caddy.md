@@ -28,7 +28,7 @@ If you use Netdata Cloud, [Bearer Token Protection](/docs/netdata-agent/configur
 
 :::
 
-For Caddy-based authentication, refer to the [Caddy documentation on authentication](https://caddyserver.com/docs/caddyfile/directives/basicauth).
+For Caddy-based authentication, refer to the [Caddy documentation on authentication](https://caddyserver.com/docs/caddyfile/directives/basic_auth).
 
 ## limit direct access to Netdata
 
