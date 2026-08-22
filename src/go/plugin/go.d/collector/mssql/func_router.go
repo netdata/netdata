@@ -4,11 +4,32 @@ package mssql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
+
+func mssqlFunctionContextError(ctx context.Context, err error) *funcapi.FunctionResponse {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return funcapi.ErrorResponse(504, "query timed out")
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+		return funcapi.ErrorResponse(499, "query canceled")
+	}
+	return nil
+}
+
+func (c *Collector) xeReadPermission() string {
+	if c.isAzureSQLDatabase() {
+		return "VIEW DATABASE PERFORMANCE STATE"
+	}
+	if c.currentMajorVersion() >= 16 {
+		return "VIEW SERVER PERFORMANCE STATE"
+	}
+	return "VIEW SERVER STATE"
+}
 
 // funcRouter routes method calls to appropriate function handlers.
 type funcRouter struct {

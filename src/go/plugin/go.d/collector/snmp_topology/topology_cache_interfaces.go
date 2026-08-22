@@ -100,7 +100,7 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 		}
 	}
 	if isEligibleManagementInterfaceAddress(ip, mask) {
-		c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
+		c.appendLocalManagementAddress(topologymodel.ManagementAddress{
 			Address:     ip,
 			AddressType: managementAddressTypeFromIP(ip),
 			Source:      "ip_mib",
@@ -109,8 +109,6 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 }
 
 func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
-	c.updateLocalBridgeIdentityFromTags(tags)
-
 	basePort := strings.TrimSpace(tags[tagBridgeBasePort])
 	if basePort == "" {
 		return

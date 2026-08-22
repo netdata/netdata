@@ -300,9 +300,8 @@ func (s *topologyScenario) topologyMetricsForDevice(dev *topologyScenarioDevice)
 		metrics = append(metrics,
 			topologyScenarioMetric(ddsnmp.KindIfName, topologyScenarioIfTags(port)),
 			topologyScenarioMetric(ddsnmp.KindBridgePortIfIndex, map[string]string{
-				tagBridgeBaseAddress: dev.chassisMAC,
-				tagBridgeBasePort:    port.bridgePort,
-				tagBridgeIfIndex:     strconv.Itoa(port.ifIndex),
+				tagBridgeBasePort: port.bridgePort,
+				tagBridgeIfIndex:  strconv.Itoa(port.ifIndex),
 			}),
 			topologyScenarioMetric(ddsnmp.KindLldpLocPort, map[string]string{
 				tagLldpLocPortNum:       topologyScenarioPortNum(port),
@@ -342,10 +341,9 @@ func (s *topologyScenario) topologyMetricsForDevice(dev *topologyScenarioDevice)
 	for _, attachment := range s.fdbARP {
 		if attachment.port.device == dev {
 			metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindFdbEntry, map[string]string{
-				tagBridgeBaseAddress: dev.chassisMAC,
-				tagFdbMac:            attachment.mac,
-				tagFdbBridgePort:     attachment.port.bridgePort,
-				tagFdbStatus:         "learned",
+				tagFdbMac:        attachment.mac,
+				tagFdbBridgePort: attachment.port.bridgePort,
+				tagFdbStatus:     "learned",
 			}))
 			if attachment.ip != "" {
 				metrics = append(metrics, topologyScenarioMetric(ddsnmp.KindArpEntry, map[string]string{
@@ -431,7 +429,6 @@ func topologyScenarioCDPRemoteTags(local, remote *topologyScenarioPort) map[stri
 
 func topologyScenarioSTPTags(local, designated *topologyScenarioPort) map[string]string {
 	return map[string]string{
-		tagBridgeBaseAddress:       local.device.chassisMAC,
 		tagStpPort:                 local.bridgePort,
 		tagStpPortState:            "forwarding",
 		tagStpPortEnable:           "enabled",

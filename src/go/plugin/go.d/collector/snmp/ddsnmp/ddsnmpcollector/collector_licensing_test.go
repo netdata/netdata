@@ -416,6 +416,10 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 	assert.EqualValues(t, 7200, vpn.Expiry.RemainingSeconds)
 	assert.EqualValues(t, 50, vpn.Usage.Used)
 	assert.EqualValues(t, 100, vpn.Usage.Capacity)
+	assert.Equal(t, map[string]string{
+		"license_vendor":  "test",
+		"license_feature": "2",
+	}, vpn.Tags)
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTableTags(t *testing.T) {
@@ -496,7 +500,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 	assert.Equal(t, map[string]string{"if_name": "eth2"}, rowsByID["2"].Tags)
 }
 
-func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_UsesTableCache(t *testing.T) {
+func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollection(t *testing.T) {
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
 
@@ -509,12 +513,9 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_UsesTableCache(t 
 			createIntegerPDU("1.3.6.1.4.1.99999.3.3.7", 0),
 		},
 	)
-	expectSNMPGet(mockHandler,
-		[]string{
-			"1.3.6.1.4.1.99999.3.1.7",
-			"1.3.6.1.4.1.99999.3.2.7",
-			"1.3.6.1.4.1.99999.3.3.7",
-		},
+	expectSNMPWalk(mockHandler,
+		gosnmp.Version2c,
+		"1.3.6.1.4.1.99999.3",
 		[]gosnmp.SnmpPDU{
 			createStringPDU("1.3.6.1.4.1.99999.3.1.7", "security"),
 			createStringPDU("1.3.6.1.4.1.99999.3.2.7", "Security subscription"),
@@ -571,17 +572,17 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_UsesTableCache(t 
 	require.Len(t, first, 1)
 	require.Len(t, first[0].LicenseRows, 1)
 	assert.EqualValues(t, 0, first[0].LicenseRows[0].State.Severity)
-	assert.EqualValues(t, 1, first[0].Stats.TableCache.Misses)
-	assert.EqualValues(t, 0, first[0].Stats.TableCache.Hits)
+	assert.Zero(t, first[0].Stats.TableCache.Misses, "licensing rows are not table-cache participants")
+	assert.EqualValues(t, 1, first[0].Stats.SNMP.TablesWalked)
 
 	second, err := collector.Collect()
 	require.NoError(t, err)
 	require.Len(t, second, 1)
 	require.Len(t, second[0].LicenseRows, 1)
 	assert.EqualValues(t, 1, second[0].LicenseRows[0].State.Severity)
-	assert.EqualValues(t, 0, second[0].Stats.TableCache.Misses)
-	assert.EqualValues(t, 1, second[0].Stats.TableCache.Hits)
-	assert.EqualValues(t, 1, second[0].Stats.SNMP.TablesCached)
+	assert.Zero(t, second[0].Stats.TableCache.Hits, "licensing rows are not table-cache participants")
+	assert.EqualValues(t, 1, second[0].Stats.SNMP.TablesWalked)
+	assert.Zero(t, second[0].Stats.SNMP.TablesCached)
 }
 
 func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {

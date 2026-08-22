@@ -127,7 +127,7 @@ static void manifest_publication_apply(RRDHOST *host, void *data)
 //
 // On the event loop, then, a lost race leaves the dropped manifest's key recorded as if it had been
 // sent, so that content is not re-sent until it changes again or the ACLK session does. That is the
-// original defect of this SOW, reduced to: an allocation failure that drops a manifest, on the one
+// whole residual exposure, reduced to: an allocation failure that drops a manifest, on the one
 // thread that cannot wait, while a teardown happens to hold rrd_wrlock(). At shutdown it is moot -
 // the next start is a new session, and every key carries the session.
 //
@@ -226,7 +226,7 @@ static bool build_node_manifest(RRDHOST *host, aclk_sync_cfg_t *aclk_host_config
         uint64_t token = manifest_publication_token_next();
         __atomic_store_n(&aclk_host_config->node_manifest_sent_key, key, __ATOMIC_RELEASE);
         __atomic_store_n(&aclk_host_config->node_manifest_sent_token, token, __ATOMIC_RELEASE);
-        aclk_update_node_instance_manifest(&manifest, host->machine_guid, key, token);
+        aclk_update_node_instance_manifest(&manifest, host->machine_guid, token);
     }
 
     dictionary_destroy(manifest.functions);

@@ -4,6 +4,8 @@ extends:
   - _system-base.yaml
   - _cisco-base.yaml
   - _cisco-bgp4-mib.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 
 metadata:

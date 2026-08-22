@@ -19,6 +19,21 @@ id_to_path = {}
 # -----------------------------
 # FS utilities
 # -----------------------------
+# Files to preserve across cleanup(). These remain on master so the netdata/learn
+# redirect catalog continues to resolve their custom_edit_url after the module
+# has migrated to a new plugin. The integration-regen PR that closes the migration
+# is the place to retire these: drop the entry from PRESERVE_FILES when the
+# LegacyLearnCorrelateLinksWithGHURLs.json catalog entry has been republished to
+# point at the new generated page.
+PRESERVE_FILES = [
+    # dcstat moved from ebpf.plugin (C) to ebpf.plugin/ebpfgo.plugin (Go).
+    # The netdata/learn redirect catalog still anchors three historical routes
+    # to this file's GitHub URL (netdata/learn/LegacyLearnCorrelateLinksWithGHURLs.json:1704,2780,3171)
+    # until the catalog is republished to point at the new ebpfgo file.
+    "src/collectors/ebpf.plugin/integrations/ebpf_dcstat.md",
+]
+
+
 def with_single_final_newline(md: str) -> str:
     return md.rstrip("\r\n") + "\n"
 
@@ -28,6 +43,10 @@ def cleanup(only_base_paths=None):
     Clean generated /integrations folders.
     - If only_base_paths is provided (list of base dirs), clean ONLY those.
     - Otherwise, do a full cleanup (legacy behavior).
+
+    Files listed in PRESERVE_FILES are saved before rmtree and rewritten after,
+    so a module whose migration is still in flight keeps its legacy integration
+    page on master until the catalog catches up.
     """
     targets = [
         "src/go/plugin/go.d/collector",
@@ -44,9 +63,21 @@ def cleanup(only_base_paths=None):
         "src/go/plugin/go.d/discovery/sdext/discoverer",
     ]
     bases = only_base_paths if only_base_paths else targets
+
+    preserved = {}
+    for preserve_path in PRESERVE_FILES:
+        p = Path(preserve_path)
+        if p.is_file():
+            preserved[preserve_path] = p.read_text(encoding="utf-8")
+
     for base in bases:
         for p in Path(base).glob("**/integrations"):
             shutil.rmtree(p, ignore_errors=True)
+
+    for preserve_path, content in preserved.items():
+        p = Path(preserve_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
 
 
 def clean_and_write(md: str, path: Path):

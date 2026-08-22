@@ -561,6 +561,24 @@ Lifecycle semantics: `Init()` is one-time setup (failure disables permanently); 
   running until the timeout stops it.
 - Rust: `cargo test -p <crate>`
 - Whole-project install: `./netdata-installer.sh`
+- ebpfgo (`src/collectors/ebpf.plugin/ebpfgo.plugin`) compiles in **two** configurations and you must
+  validate both; a passing run in one proves nothing about the other:
+  - The CO-RE code is gated on `__has_include("<name>.skel.h")` inside an outer
+    `LIBBPF_MAJOR_VERSION >= 1 && __has_include(<linux/btf.h>)` guard. When either fails, the skeleton
+    includes, the CO-RE-only runtime fields, and the `NETDATA_*_CORE_SUPPORTED` define all vanish and only
+    the legacy kprobe path is compiled.
+  - `.github/workflows/go-tests.yml` states outright that it leaves `NETDATA_*_HAS_SKELETON` absent, so the
+    libbpf-tagged CI job exercises the **legacy path only** — generating skeletons needs a BPF toolchain CI
+    does not have. The CMake packaging build, by contrast, passes `-I <build>/ebpf-co-re`. So CO-RE-only code
+    reaches release builds having never been compiled by the Go job.
+  - Legacy path (what CI runs):
+    `CGO_CFLAGS="-I<repo>/externaldeps/libbpf/include" go test -tags netdata_ebpf_libbpf -race -count=1 ./...`
+  - CO-RE path: add `-I<repo>/build/ebpf-co-re` to `CGO_CFLAGS` and repeat. Confirm the path actually
+    switched rather than silently repeating the legacy build — `__has_include("dc.skel.h")` must be true, or
+    `gcc -E` must show the CO-RE-only call sites surviving preprocessing.
+  - Failure mode this catches: a runtime field declared inside the CO-RE guard but referenced outside it.
+    It compiles wherever CO-RE is on and fails everywhere else with `has no member named '<field>'`, which
+    surfaces as a distro build break (EL8 ships libbpf 0.x) long after the Go job went green.
 
 ## 6. Dealing with data types
 

@@ -50,6 +50,18 @@ typedef struct cgroup_ebpfgo_publish_cachestat {
     cgroup_ebpfgo_cachestat_t prev;
 } cgroup_ebpfgo_publish_cachestat_t;
 
+/* Per-interval directory-cache totals for one cgroup.  Unlike cachestat, the
+ * raw cumulative counters are not mirrored here: the per-PID deltas are summed
+ * directly from shared memory, so nothing downstream needs them. */
+typedef struct cgroup_ebpfgo_publish_dcstat {
+    uint64_t ct;
+
+    long long ratio;
+    long long reference;
+    long long slow;
+    long long not_found;
+} cgroup_ebpfgo_publish_dcstat_t;
+
 typedef struct cgroup_ebpfgo_socket {
     uint64_t bytes_sent;
     uint64_t bytes_received;
@@ -246,6 +258,14 @@ struct cgroup {
     RRDSET *st_cachestat_dirties;
     RRDSET *st_cachestat_hits;
     RRDSET *st_cachestat_misses;
+
+    // eBPF dcstat (directory cache) snapshot from ebpfgo.plugin SHM.
+    cgroup_ebpfgo_publish_dcstat_t dcstat;
+
+    RRDSET *st_dcstat_ratio;
+    RRDSET *st_dcstat_reference;
+    RRDSET *st_dcstat_not_cache;
+    RRDSET *st_dcstat_not_found;
 
     // eBPF socket snapshot from ebpfgo.plugin SHM.
     cgroup_ebpfgo_socket_t net;
@@ -560,6 +580,11 @@ void cgroup_ebpfgo_cachestat_set_snapshot_ready(bool ready);
 void cgroup_ebpfgo_cachestat_update_locked(void);
 void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg);
 
+// Controls whether dcstat charts update this tick (set after reading SHM flags).
+void cgroup_ebpfgo_dcstat_set_snapshot_ready(bool ready);
+void cgroup_ebpfgo_dcstat_update_locked(void);
+void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg);
+
 void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready);
 void cgroup_ebpfgo_socket_update_locked(void);
 void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg);
@@ -571,6 +596,10 @@ static inline bool cgroup_ebpfgo_cachestat_refresh(void) { return false; }
 static inline void cgroup_ebpfgo_cachestat_set_snapshot_ready(bool ready) { (void)ready; }
 static inline void cgroup_ebpfgo_cachestat_update_locked(void) {}
 static inline void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg) { (void)cg; }
+
+static inline void cgroup_ebpfgo_dcstat_set_snapshot_ready(bool ready) { (void)ready; }
+static inline void cgroup_ebpfgo_dcstat_update_locked(void) {}
+static inline void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg) { (void)cg; }
 
 static inline void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready) { (void)ready; }
 static inline void cgroup_ebpfgo_socket_update_locked(void) {}

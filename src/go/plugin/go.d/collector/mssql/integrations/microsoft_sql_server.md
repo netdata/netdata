@@ -253,14 +253,14 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
-|  | functions.top_queries.time_window_days | Number of days of Query Store data to analyze. Set to 0 to include all available data. Smaller values improve query performance but show less history. | 7 | no |
+|  | functions.top_queries.time_window_days | Number of days of Query Store data to analyze. Set to 0 to use the default (7), or -1 to include all available data. Smaller positive values improve query performance but show less history. | 7 | no |
 |  | functions.deadlock_info.disabled | Disable the [deadlock-info](#deadlock-info) function. | no | no |
 |  | functions.deadlock_info.timeout | Query timeout for deadlock-info function (seconds). Uses collector timeout if not set. |  | no |
-|  | functions.deadlock_info.use_ring_buffer | Use ring_buffer instead of event_file for system_health session.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
+|  | functions.deadlock_info.use_ring_buffer | Use the ring_buffer target instead of event_file for the built-in system_health session on SQL Server or Azure SQL Managed Instance.<br/><br/>WARNING:<br/>• Data is cleared on failover/restart<br/>• Capacity is limited<br/>• XML parsing can increase query CPU<br/><br/>Azure SQL Database is not supported by deadlock-info because it has no built-in system_health session. | no | no |
 |  | functions.error_info.disabled | Disable the [error-info](#error-info) function. | no | no |
 |  | functions.error_info.timeout | Query timeout for error-info function (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.error_info.session_name | Extended Events session name capturing error_reported events.<br/>Must be created by administrator with event_file (recommended) or ring_buffer target. | netdata_errors | no |
-|  | functions.error_info.use_ring_buffer | Use ring_buffer instead of event_file for error events.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
+|  | functions.error_info.use_ring_buffer | Use ring_buffer instead of event_file for error events.<br/><br/>WARNING:<br/>• The session must remain running<br/>• Data is cleared on failover/restart<br/>• Capacity is limited<br/>• XML parsing can increase query CPU<br/><br/>Useful when persistent event_file storage is unavailable, including Azure SQL Database without Blob Storage. | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
@@ -370,7 +370,9 @@ jobs:
 
 ###### Azure SQL with service principal
 
-Use Microsoft Entra service principal authentication for Azure SQL.
+Use Microsoft Entra service principal authentication for Azure SQL. `top-queries` and `error-info`
+operate in the database selected in the DSN; `deadlock-info` is unavailable on Azure SQL Database.
+
 
 <details open><summary>Config</summary>
 
@@ -392,7 +394,9 @@ jobs:
 
 ###### Azure SQL with managed identity
 
-Use managed identity authentication (system-assigned by default).
+Use managed identity authentication (system-assigned by default). `top-queries` and `error-info`
+operate in the database selected in the DSN; `deadlock-info` is unavailable on Azure SQL Database.
+
 
 <details open><summary>Config</summary>
 
@@ -787,37 +791,58 @@ Query text is truncated at 4096 characters for display purposes. Columns are dyn
 |:-------|:------------|
 | Name | `Mssql:top-queries` |
 | Require Cloud | yes |
-| Performance | Executes dynamic SQL to aggregate Query Store data across all enabled databases:<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows balances completeness with performance |
+| Performance | On SQL Server and Azure SQL Managed Instance, executes dynamic SQL across all user databases with Query Store enabled.<br/>On Azure SQL Database, queries only the database selected in the DSN.<br/>• Execution time depends on Query Store workload, history window, and number of queried databases<br/>• Default limit of 500 rows balances completeness with performance |
 | Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available when:<br/>• The collector has successfully connected to an engine that exposes Query Store (SQL Server 2016 (13.x) and later, Azure SQL Managed Instance, or Azure SQL Database)<br/>• On SQL Server/Managed Instance, Query Store is enabled on at least one user database; on Azure SQL Database, it is enabled in the database selected in the DSN<br/>• Returns HTTP 403 when required permissions are missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 503 if the collector is still initializing, the server does not expose Query Store, or no applicable database has Query Store enabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
 ##### Enable Query Store
 
-Query Store must be enabled on each database you want to monitor.
+Query Store must be enabled on each database you want to inspect. SQL Server and Azure SQL Managed
+Instance query all enabled user databases. Azure SQL Database queries only the database selected in
+the collector DSN.
 
-1. Verify Query Store is enabled on your databases:
+1. Verify Query Store state:
 
    ```sql
+   -- SQL Server and Azure SQL Managed Instance
    SELECT name, is_query_store_on
    FROM sys.databases
    WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
+
+   -- Azure SQL Database (run in the database selected in the DSN)
+   SELECT actual_state_desc
+   FROM sys.database_query_store_options;
    ```
 
-2. Enable Query Store on databases where it is disabled:
+2. Enable Query Store where it is disabled:
 
    ```sql
    ALTER DATABASE [YourDatabaseName] SET QUERY_STORE = ON;
    ```
 
-3. Enable the function in Netdata collector config:
+3. Grant the monitoring account the permissions required by your engine:
 
-   ```yaml
-   jobs:
-     - name: local
-       dsn: "sqlserver://user:pass@localhost:1433"
-       query_store_function_enabled: true
+   On SQL Server/Managed Instance, map the login to a database user in every queried user database
+   before granting the database permission. On Azure SQL Database, grant the permission to the
+   database principal used by the collector connection.
+
+   ```sql
+   -- SQL Server 2022+ and Azure SQL Managed Instance 2022+
+   GRANT VIEW SERVER PERFORMANCE STATE TO [netdata_user];
+   USE [YourDatabaseName];
+   CREATE USER [netdata_user] FOR LOGIN [netdata_user]; -- once per database
+   GRANT VIEW DATABASE PERFORMANCE STATE TO [netdata_user];
+
+   -- SQL Server 2016-2019 and corresponding Managed Instance versions
+   GRANT VIEW SERVER STATE TO [netdata_user];
+   USE [YourDatabaseName];
+   CREATE USER [netdata_user] FOR LOGIN [netdata_user]; -- once per database
+   GRANT VIEW DATABASE STATE TO [netdata_user];
+
+   -- Azure SQL Database (run in the database selected in the DSN)
+   GRANT VIEW DATABASE PERFORMANCE STATE TO [netdata_user];
    ```
 
 :::info
@@ -825,6 +850,7 @@ Query Store must be enabled on each database you want to monitor.
 - Query Store is available in SQL Server 2016+ and Azure SQL Database
 - Requires ALTER DATABASE permission to enable Query Store
 - System databases (master, tempdb, model, msdb) are excluded from queries
+- `top-queries` is enabled by default; set `functions.top_queries.disabled: true` only to disable it
 
 :::
 
@@ -929,9 +955,9 @@ Query text and wait resource strings are truncated at 4096 characters for displa
 |:-------|:------------|
 | Name | `Mssql:deadlock-info` |
 | Require Cloud | yes |
-| Performance | Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
+| Performance | Executes on-demand queries against the selected `system_health` event_file or ring_buffer target:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
 | Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `deadlock_info_function_enabled` is true<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available on SQL Server and Azure SQL Managed Instance when:<br/>• The collector has successfully connected<br/>• `functions.deadlock_info.disabled` is false<br/>• SQL Server 2022+ has `VIEW SERVER PERFORMANCE STATE`; older versions have `VIEW SERVER STATE`<br/>• Azure SQL Database returns HTTP 503 because it has no built-in `system_health` session<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or the engine is Azure SQL Database<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
@@ -965,9 +991,10 @@ Parsed deadlock participants from the latest detected deadlock event. Each row r
 Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
 with both the `sql_text` and `query_hash` actions.
 
-The session must be created by an administrator and include an `event_file` target. Netdata reads the event file
-and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
-reliable mapping into `top-queries` (query text fallback is best-effort).
+The session must be created by an administrator and include either an `event_file` target (the default) or a
+`ring_buffer` target when `functions.error_info.use_ring_buffer` is enabled. Netdata returns recent error events
+with error number, message, and SQL text. The `query_hash` action is required for reliable mapping into
+`top-queries` (query text fallback is best-effort).
 
 Use cases:
 - Identify recent query errors and their messages
@@ -979,31 +1006,116 @@ Use cases:
 |:-------|:------------|
 | Name | `Mssql:error-info` |
 | Require Cloud | yes |
-| Performance | Executes on-demand queries against the configured Extended Events event file:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time |
+| Performance | Executes on-demand queries against the configured Extended Events target:<br/>• Not part of regular metric collection<br/>• event_file reads scan and parse all retained files before returning the newest rows<br/>• The recommended 6 MB file size and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• Existing operator-managed sessions keep their own retention settings; the collector does not alter or reject them |
 | Security | Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available on SQL Server, Azure SQL Managed Instance, and Azure SQL Database when:<br/>• The collector has successfully connected<br/>• `functions.error_info.disabled` is false<br/>• The session is server-scoped on SQL Server/Managed Instance and database-scoped in the Azure SQL Database selected in the DSN<br/>• When `functions.error_info.use_ring_buffer` is false, the session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the session is running and has a ring_buffer target<br/>• SQL Server 2022+/Managed Instance 2022+ has `VIEW SERVER PERFORMANCE STATE`; older SQL Server has `VIEW SERVER STATE`; Azure SQL Database event_file has `VIEW DATABASE PERFORMANCE STATE`, while ring_buffer has `VIEW DATABASE STATE`<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the selected target is unavailable or the function is disabled<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
 ##### Create Extended Events session for error capture
 
-Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions:
+Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and
+`query_hash` actions. Choose the engine scope and target that match your deployment and
+`functions.error_info.use_ring_buffer` setting.
+
+**SQL Server and Azure SQL Managed Instance — event_file (default):**
 
 ```sql
--- Create the Extended Events session with event_file target
 CREATE EVENT SESSION [netdata_errors] ON SERVER
 ADD EVENT sqlserver.error_reported(
   ACTION(sqlserver.sql_text, sqlserver.query_hash)
 )
-ADD TARGET package0.event_file(SET filename=N'netdata_errors');
+ADD TARGET package0.event_file(
+  SET filename=N'netdata_errors',
+      max_file_size=6,
+      max_rollover_files=3
+);
 GO
 
--- Start the session
 ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
 GO
+```
 
--- Grant required permission
+Netdata resolves the configured filename from catalog metadata and can read retained event files
+after the session stops. The 6 MB file size and three rollover files preserve recent history while
+bounding the amount of retained XML that one request must scan. These settings affect only a session
+created from this example; Netdata does not modify existing sessions.
+
+**SQL Server and Azure SQL Managed Instance — ring_buffer:**
+
+```sql
+CREATE EVENT SESSION [netdata_errors] ON SERVER
+ADD EVENT sqlserver.error_reported(
+  ACTION(sqlserver.sql_text, sqlserver.query_hash)
+)
+ADD TARGET package0.ring_buffer
+WITH (STARTUP_STATE = ON);
+GO
+
+ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
+GO
+```
+
+Set `functions.error_info.use_ring_buffer: true`. The session starts automatically after restart or
+failover, but events previously held in memory are lost.
+
+**Azure SQL Database — event_file (default):**
+
+Create the required database-scoped credential and grant the Database Engine access to an Azure
+Storage container first. See Microsoft's [event_file setup guide](https://learn.microsoft.com/en-us/azure/azure-sql/database/xevent-code-event-file).
+
+```sql
+-- Run in the database selected in the collector DSN.
+CREATE EVENT SESSION [netdata_errors] ON DATABASE
+ADD EVENT sqlserver.error_reported(
+  ACTION(sqlserver.sql_text, sqlserver.query_hash)
+)
+ADD TARGET package0.event_file(
+  SET filename=N'https://<storage-account>.blob.core.windows.net/<container>/netdata_errors.xel',
+      max_file_size=6,
+      max_rollover_files=3
+);
+GO
+
+ALTER EVENT SESSION [netdata_errors] ON DATABASE STATE = START;
+GO
+```
+
+Azure Storage rollover retention is currently a preview feature and requires creating a new event
+session with `max_rollover_files`. Existing sessions are not migrated automatically.
+
+**Azure SQL Database — ring_buffer:**
+
+```sql
+-- Run in the database selected in the collector DSN.
+CREATE EVENT SESSION [netdata_errors] ON DATABASE
+ADD EVENT sqlserver.error_reported(
+  ACTION(sqlserver.sql_text, sqlserver.query_hash)
+)
+ADD TARGET package0.ring_buffer
+WITH (STARTUP_STATE = ON);
+GO
+
+ALTER EVENT SESSION [netdata_errors] ON DATABASE STATE = START;
+GO
+```
+
+Set `functions.error_info.use_ring_buffer: true`. The database-scoped session starts automatically
+after restart, failover, or maintenance, but events previously held in memory are lost.
+
+```sql
+-- SQL Server 2022+ and Azure SQL Managed Instance 2022+
+GRANT VIEW SERVER PERFORMANCE STATE TO [netdata_user];
+
+-- SQL Server 2019 and earlier
 GRANT VIEW SERVER STATE TO [netdata_user];
+
+-- Azure SQL Database (run in the database selected in the DSN)
+-- event_file target
+GRANT VIEW DATABASE PERFORMANCE STATE TO [netdata_user];
+
+-- ring_buffer target (also satisfies the catalog permission)
+GRANT VIEW DATABASE STATE TO [netdata_user];
 ```
 
 If you use a different session name, set it in the collector config:
@@ -1012,7 +1124,9 @@ If you use a different session name, set it in the collector config:
 jobs:
   - name: local
     dsn: "sqlserver://user:pass@localhost:1433"
-    error_info_session_name: your_session_name
+    functions:
+      error_info:
+        session_name: your_session_name
 ```
 
 
@@ -1117,5 +1231,5 @@ Ensure SQL Server is configured for mixed mode authentication if using SQL login
 
 ### Permission denied
 
-The monitoring user needs VIEW SERVER STATE permission.
-Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
+Base metric collection needs `VIEW SERVER STATE`. Functions can require additional version-specific
+permissions; see each Function's prerequisites below.

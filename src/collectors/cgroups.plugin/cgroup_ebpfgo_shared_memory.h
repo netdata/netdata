@@ -14,6 +14,20 @@ const struct ebpf_pid_stat *cgroup_ebpfgo_shared_memory_lookup(pid_t pid);
 uint32_t cgroup_ebpfgo_shared_memory_flags(void);
 void cgroup_ebpfgo_shared_memory_close(void);
 
+struct cgroup;
+void cgroup_ebpfgo_update_single_chart(
+    struct cgroup *cg,
+    RRDSET **chart_ptr,
+    const char *chart_id,
+    const char *title,
+    const char *family,
+    const char *context,
+    const char *dimension,
+    const char *units,
+    int priority,
+    collected_number divisor,
+    collected_number value);
+
 #endif
 
 #endif

@@ -98,9 +98,6 @@ func aggregateTopologyObservationSnapshots(snapshots []topologymodel.Observation
 		aggregate.L3Interfaces = append(aggregate.L3Interfaces, snapshot.L3Interfaces...)
 		aggregate.OSPFNeighbors = append(aggregate.OSPFNeighbors, snapshot.OSPFNeighbors...)
 		aggregate.BGPPeers = append(aggregate.BGPPeers, snapshot.BGPPeers...)
-		if aggregate.LocalDeviceID == "" {
-			aggregate.LocalDeviceID = snapshot.LocalDeviceID
-		}
 		if aggregate.AgentID == "" && snapshot.AgentID != "" {
 			aggregate.AgentID = snapshot.AgentID
 		}

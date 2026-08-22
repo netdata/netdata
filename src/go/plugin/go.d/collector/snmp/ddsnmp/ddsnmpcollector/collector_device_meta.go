@@ -86,7 +86,7 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 	for name, field := range fields {
 		switch {
 		case field.Value != "":
-			mergeMetaTagIfAbsent(metadata, name, ddsnmp.MetaTag{Value: field.Value, IsExactMatch: isExactMatch})
+			ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: field.Value, IsExactMatch: isExactMatch})
 		case field.Symbol.OID != "":
 			if !dc.missingOIDs[trimOID(field.Symbol.OID)] {
 				oids = append(oids, field.Symbol.OID)
@@ -142,7 +142,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 				continue
 			}
 			if v != "" {
-				mergeMetaTagIfAbsent(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
+				ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
@@ -154,7 +154,7 @@ func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprof
 					continue
 				}
 				if v != "" {
-					mergeMetaTagIfAbsent(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
+					ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
 					break // Use first successful value
 				}
 			}

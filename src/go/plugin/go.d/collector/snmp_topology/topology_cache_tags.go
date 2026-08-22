@@ -96,10 +96,6 @@ const (
 	tagDot1qVlanID1            = "dot1q_vlan_id_idx1"
 	tagDot1qVlanFdbID          = "dot1q_vlan_fdb_id"
 	tagBridgeBaseAddress       = "bridge_base_address"
-	tagLegacyStpBaseBridgeAddr = "stp_base_bridge_address"
-	// Backward-compatibility alias for tests/older in-memory tag references.
-	tagStpBaseBridgeAddress    = tagLegacyStpBaseBridgeAddr
-	tagStpDesignatedRoot       = "stp_designated_root"
 	tagStpPort                 = "stp_port"
 	tagStpPortPriority         = "stp_port_priority"
 	tagStpPortState            = "stp_port_state"
@@ -109,7 +105,6 @@ const (
 	tagStpPortDesignatedCost   = "stp_port_designated_cost"
 	tagStpPortDesignatedBridge = "stp_port_designated_bridge"
 	tagStpPortDesignatedPort   = "stp_port_designated_port"
-	tagVtpVersion              = "vtp_version"
 	tagVtpVlanIndex            = "vtp_vlan_index"
 	tagVtpVlanState            = "vtp_vlan_state"
 	tagVtpVlanType             = "vtp_vlan_type"

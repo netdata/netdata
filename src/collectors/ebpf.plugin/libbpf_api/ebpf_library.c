@@ -522,11 +522,6 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
         ebpf_enable_chart(EBPF_MODULE_SYNC_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "dcstat", CONFIG_BOOLEAN_NO);
-    if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_DCSTAT_IDX, *disable_cgroups);
-    }
-
     enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "swap", CONFIG_BOOLEAN_NO);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SWAP_IDX, *disable_cgroups);
@@ -692,8 +687,6 @@ void ebpf_print_help()
         " [-]-global            Disable charts per application and cgroup.\n"
         "\n"
         " [-]-all               Enable all chart groups (global, apps, and cgroup), unless -g is also given.\n"
-        "\n"
-        " [-]-dcstat            Enable charts related to directory cache.\n"
         "\n"
         " [-]-disk              Enable charts related to disk monitoring.\n"
         "\n"
