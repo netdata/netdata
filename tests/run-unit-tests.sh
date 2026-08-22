@@ -25,6 +25,26 @@ c_unit_tests() {
   "$HOME"/netdata/usr/sbin/netdata -W unittest
 }
 
+rrddim_collection_test() {
+  echo "Running RRD dimension collection component test"
+
+  local build_dir="${NETDATA_BUILD_DIR:-./build}"
+  local config_h="${build_dir}/config.h"
+
+  if [[ ! -r "${config_h}" ]]; then
+    echo >&2 "Cannot read CMake configuration: ${config_h}"
+    return 1
+  fi
+
+  if ! grep -Fqx '#define OS_LINUX' "${config_h}"; then
+    echo "Skipping RRD dimension collection component test (requires Linux)"
+    return 0
+  fi
+
+  cmake --build "${build_dir}" --target rrddim-collection-test || return 1
+  "${build_dir}"/rrddim-collection-test
+}
+
 spawn_server_unit_tests() {
   echo "Running spawn-server unit tests"
 
@@ -43,5 +63,7 @@ spawn_server_unit_tests() {
 install_netdata || exit 1
 
 c_unit_tests || exit 1
+
+rrddim_collection_test || exit 1
 
 spawn_server_unit_tests || exit 1
