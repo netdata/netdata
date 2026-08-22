@@ -15,7 +15,7 @@ checkout because ingest cleans and regenerates `docs/`.
 - `${NETDATA_REPOS_DIR}/learn/ingest/ingest.py:2808` copies a local source repo
   into the ingest temp folder when `--local-repo netdata:<path>` is used.
 - `${NETDATA_REPOS_DIR}/learn/.learn_environment/ingest-requirements.txt:1`
-  lists the Python dependencies for ingest.
+  records the Python 3.13 compilation target and hashes every ingest dependency.
 - `${NETDATA_REPOS_DIR}/learn/package.json:8` defines the Docusaurus build
   script.
 - `${NETDATA_REPOS_DIR}/learn/netlify.toml:5` pins the Netlify runtime to
@@ -56,9 +56,9 @@ checkout because ingest cleans and regenerates `docs/`.
 4. Install ingest dependencies:
 
    ```bash
-   python3 -m venv "${PREVIEW_ROOT}/venv"
-   "${PREVIEW_ROOT}/venv/bin/python" -m pip install --upgrade pip
+   python3.13 -m venv "${PREVIEW_ROOT}/venv"
    "${PREVIEW_ROOT}/venv/bin/python" -m pip install \
+     --require-hashes \
      -r "${LEARN_COPY}/.learn_environment/ingest-requirements.txt"
    ```
 
