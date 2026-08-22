@@ -81,7 +81,6 @@ set(LIBNETDATA_CONFIG_FILES
 )
 
 set(LIBNETDATA_FILES
-        ${CONFIG_H}
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
         src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
         src/libnetdata/aral/aral.c

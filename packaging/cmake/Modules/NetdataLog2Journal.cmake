@@ -11,7 +11,6 @@
 
 # log2journal
 set(LOG2JOURNAL_FILES
-        ${CONFIG_H}
         src/collectors/log2journal/log2journal.h
         src/collectors/log2journal/log2journal.c
         src/collectors/log2journal/log2journal-help.c
