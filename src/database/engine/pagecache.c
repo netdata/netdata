@@ -611,6 +611,13 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                     .block = OFFSET_TO_BLOCK(extent_list[extent_index].datafile_offset),
                     .bytes = extent_list[extent_index].datafile_size,
                     .fileno = datafile->fileno,
+                    // Every open-cache page must carry its metric's id, so that
+                    // journal-v2 indexing can resolve the metric without
+                    // dereferencing page->metric_id. Pages added here are clean
+                    // rather than hot, so the indexer does not walk them today -
+                    // but leaving the identity field zero would make that an
+                    // invisible dependency on queue placement.
+                    .uuid_id = mrg_metric_uuidmap_id(main_mrg, metric),
                 };
 
                 if (datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) {
@@ -1076,6 +1083,7 @@ struct pgc_page *pg_cache_lookup_next(
 void pgc_open_add_hot_page(
     Word_t section,
     Word_t metric_id,
+    UUIDMAP_ID uuid_id,
     time_t start_time_s,
     time_t end_time_s,
     uint32_t update_every_s,
@@ -1104,6 +1112,7 @@ void pgc_open_add_hot_page(
             .fileno = datafile->fileno,
             .block = OFFSET_TO_BLOCK(extent_offset),
             .bytes = extent_size,
+            .uuid_id = uuid_id,
     };
 
     PGC_ENTRY page_entry = {

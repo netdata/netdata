@@ -2600,22 +2600,36 @@ void pgc_open_cache_to_journal_v2(
             continue;
         }
 
-        METRIC *metric = mrg_metric_dup(main_mrg, (METRIC *)page->metric_id);
+        // Resolve the metric by uuidmap id, NEVER by dereferencing
+        // page->metric_id.
+        //
+        // page->metric_id is a bare METRIC pointer with no reference behind it
+        // (see pgc_open_add_hot_page()), so it can outlive the METRIC. It must
+        // not be dereferenced, not even to validate it: ARAL writes its
+        // free-list header over the first 16 bytes of a freed element, which on
+        // 64bit overlays metric->uuid and metric->refcount with the halves of
+        // the free-list 'next' pointer. mrg_metric_dup() would CAS that
+        // refcount, so merely attempting the acquire corrupts the free list --
+        // and when 'next' is NULL the refcount reads 0, a legal
+        // unreferenced-but-alive value, so the acquire SUCCEEDS and returns a
+        // pointer into the free list.
+        //
+        // mrg_metric_get_and_acquire_by_id() is an indexed lookup under the
+        // partition read lock. It cannot touch freed memory, and a metric that
+        // has been deleted simply misses. uuidmap ids are unique for the
+        // lifetime of the uuidmap, so a stale id cannot alias a different
+        // metric either (see mrg_metric_get_and_acquire_by_uuid()).
+        METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, xio->uuid_id, section);
         if(!metric) {
-            // metric has been deleted, skip this page
+            // the metric is gone; this page's data is no longer referenced
             page_transition_unlock(cache, page);
             page_release(cache, page, false);
             continue;
         }
 
-        // Check UUID validity early, before any JudyL modifications
+        // The metric is alive and we hold a reference, so its uuid resolves by
+        // construction; no NULL check is needed or meaningful here.
         nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
-        if (unlikely(!uuid)) {
-            mrg_metric_release(main_mrg, metric);
-            page_transition_unlock(cache, page);
-            page_release(cache, page, false);
-            continue;
-        }
 
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
@@ -2648,11 +2662,22 @@ void pgc_open_cache_to_journal_v2(
         current_extent_index_id = ei->index;
 
         // update the metrics JudyL
-
-        PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
+        //
+        // Keyed by the uuidmap id, NOT by page->metric_id. The journal wants one
+        // entry per UUID: its reader bsearches the metric list by uuid and would
+        // only ever find one group, so two groups for the same uuid would make
+        // one group's pages invisible.
+        //
+        // page->metric_id cannot provide that guarantee. If a metric is deleted
+        // and recreated for the same uuid it gets a NEW pointer, so older pages
+        // can still carry the old one while newer pages carry the new one - two
+        // keys, one uuid. (Before metrics were resolved by id, such an old page
+        // failed to resolve and was skipped, which hid this; resolving by id
+        // makes both pages index successfully and exposes it.)
+        PValue = JudyLIns(&JudyL_metrics, (Word_t)xio->uuid_id, PJE0);
         if(!PValue || PValue == PJERR)
-            fatal("CACHE: JudyLIns(JudyL_metrics, 0x%lx) failed, JudyL_metrics = %p, result = %p",
-                  (long unsigned)page->metric_id, JudyL_metrics, PValue);
+            fatal("CACHE: JudyLIns(JudyL_metrics, uuid_id %" PRIu32 ") failed, JudyL_metrics = %p, result = %p",
+                  xio->uuid_id, JudyL_metrics, PValue);
 
         struct jv2_metrics_info *mi;
         if(!*PValue) {
@@ -2725,9 +2750,10 @@ void pgc_open_cache_to_journal_v2(
 
     {
         Pvoid_t *PValue1;
-        bool metric_id_first = true;
-        Word_t metric_id = 0;
-        while ((PValue1 = JudyLFirstThenNext(JudyL_metrics, &metric_id, &metric_id_first))) {
+        // the key is a uuidmap id, not a metric pointer - see the JudyLIns above
+        bool uuid_id_first = true;
+        Word_t uuid_id = 0;
+        while ((PValue1 = JudyLFirstThenNext(JudyL_metrics, &uuid_id, &uuid_id_first))) {
             struct jv2_metrics_info *mi = *PValue1;
 
             Pvoid_t *PValue2;
