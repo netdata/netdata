@@ -695,6 +695,18 @@ static int test_delay_parser_multiplier_boundaries(int *passed) {
         { "up 10s multiplier -2", 0, 10, 0, 10, 1.0f, "negative multiplier uses text default" },
         { "up 10s multiplier nan", 0, 10, 0, 10, 1.0f, "NaN multiplier uses text default" },
         { "up 10s multiplier inf", 0, 10, 0, 10, 1.0f, "infinite multiplier uses text default" },
+        // a repeated 'multiplier' token used to keep the rejected value, because the first valid one
+        // had already set the given-multiplier flag and suppressed the default below
+        { "up 10s multiplier 2 multiplier nan", 0, 10, 0, 10, 1.0f,
+          "NaN after a valid multiplier uses text default" },
+        { "up 10s multiplier 2 multiplier inf", 0, 10, 0, 10, 1.0f,
+          "infinite multiplier after a valid one uses text default" },
+        { "up 10s multiplier 2 multiplier -5", 0, 10, 0, 10, 1.0f,
+          "negative multiplier after a valid one uses text default" },
+        { "up 10s multiplier 2 multiplier 0", 0, 10, 0, 10, 1.0f,
+          "zero multiplier after a valid one uses text default" },
+        { "up 10s multiplier nan multiplier 2", 0, 10, 0, 20, 2.0f,
+          "valid multiplier after a rejected one is honoured" },
         { "max 7s", 0, 0, 0, 7, 1.0f, "explicit maximum with omitted delays" },
         { "up 2s", 5, 2, 0, 5, 1.0f, "prior larger maximum remains unchanged" },
         { "up 16777220s", 16777219, 16777220, 0, 16777219, 1.0f,
@@ -799,7 +811,7 @@ static int test_prototype_rejects_non_finite_delay_multiplier(int *passed) {
         int error = 0;
         ap.config.calculation = expression_parse("1", &failed_at, &error);
 
-        char *msg = NULL;
+        const char *msg = NULL;
         if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
            strcmp(msg, "non-finite delay multiplier") != 0) {
             fprintf(stderr,
@@ -824,13 +836,18 @@ static int test_prototype_rejects_non_finite_delay_multiplier(int *passed) {
     int error = 0;
     ap.config.calculation = expression_parse("1", &failed_at, &error);
 
+    // every rule of the chain is validated, so this one has to be valid apart from its multiplier
+    // for the test to still be about the multiplier
     RRD_ALERT_PROTOTYPE *second = callocz(1, sizeof(*second));
+    second->match.on.chart = string_strdupz("chart");
     second->config.name = string_strdupz("unittest");
     second->config.source = string_strdupz("unittest");
+    second->config.update_every = 1;
+    second->config.calculation = expression_parse("1", &failed_at, &error);
     second->config.delay_multiplier = NAN;
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap._internal.next, second, _internal.prev, _internal.next);
 
-    char *msg = NULL;
+    const char *msg = NULL;
     if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
        strcmp(msg, "non-finite delay multiplier") != 0) {
         fprintf(stderr, "FAILED [prototype rejects non-finite multiplier in later rule]: msg='%s'\n",
@@ -856,7 +873,7 @@ static int test_prototype_rejects_non_positive_update_every(int *passed) {
         ap.config.source = string_strdupz("unittest");
         ap.config.update_every = tests[i];
 
-        char *msg = NULL;
+        const char *msg = NULL;
         if(health_prototype_add(&ap, &msg) || !msg || strcmp(msg, "missing update frequency") != 0) {
             fprintf(stderr,
                     "FAILED [prototype rejects update_every=%d]: msg='%s'\n",
@@ -867,6 +884,173 @@ static int test_prototype_rejects_non_positive_update_every(int *passed) {
             (*passed)++;
 
         health_prototype_cleanup(&ap);
+    }
+
+    return failed;
+}
+
+// netdata/netdata#23483: a rule with no 'on' used to be accepted whenever it was not the head of
+// the same-name chain, and health_prototype_matches_rrdset() then attached it to every chart of the
+// host - e.g. the system.cpu 10min_cpu_usage template firing on service.*_cpu_utilization charts.
+static void unittest_prototype_fill_valid_rule(RRD_ALERT_PROTOTYPE *ap, bool is_template) {
+    ap->match.enabled = true;
+    ap->match.is_template = is_template;
+
+    if(is_template)
+        ap->match.on.context = string_strdupz("system.cpu");
+    else
+        ap->match.on.chart = string_strdupz("system.cpu");
+
+    ap->config.name = string_strdupz("unittest");
+    ap->config.source = string_strdupz("unittest");
+    ap->config.update_every = 1;
+    ap->config.delay_multiplier = 1.0f;
+
+    const char *failed_at = NULL;
+    int error = 0;
+    ap->config.calculation = expression_parse("1", &failed_at, &error);
+}
+
+static int test_prototype_rejects_missing_on(int *passed) {
+    struct {
+        bool is_template;
+        bool on_later_rule;
+        const char *expected_msg;
+        const char *description;
+    } tests[] = {
+        { true,  false, "missing match 'on' parameter for context",
+          "template head without a context" },
+        { false, false, "missing match 'on' parameter for instance",
+          "instance head without a chart" },
+        { true,  true,  "missing match 'on' parameter for context",
+          "template rule after the head without a context" },
+        { false, true,  "missing match 'on' parameter for instance",
+          "instance rule after the head without a chart" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        RRD_ALERT_PROTOTYPE ap = { 0 };
+        RRD_ALERT_PROTOTYPE *bad = &ap;
+
+        unittest_prototype_fill_valid_rule(&ap, tests[i].is_template);
+
+        if(tests[i].on_later_rule) {
+            bad = callocz(1, sizeof(*bad));
+            unittest_prototype_fill_valid_rule(bad, tests[i].is_template);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap._internal.next, bad, _internal.prev, _internal.next);
+        }
+
+        // drop the 'on' of the rule under test; both union members alias the same pointer
+        string_freez(bad->match.on.context);
+        bad->match.on.context = NULL;
+
+        const char *msg = NULL;
+        if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
+           strcmp(msg, tests[i].expected_msg) != 0) {
+            fprintf(stderr, "FAILED [prototype rejects %s]: msg='%s'\n",
+                    tests[i].description, msg ? msg : "");
+            failed++;
+        }
+        else
+            (*passed)++;
+
+        health_prototype_cleanup(&ap);
+    }
+
+    return failed;
+}
+
+static int test_prototype_without_on_matches_nothing(int *passed) {
+    // health_prototype_matches_rrdset() only reads these fields of the chart
+    RRDSET st = { 0 };
+    st.id = string_strdupz("service.not-services_cpu_utilization");
+    st.name = string_dup(st.id);
+    st.context = string_strdupz("service.cpu_utilization");
+
+    struct {
+        bool is_template;
+        const char *on;
+        bool expected_match;
+        const char *description;
+    } tests[] = {
+        { true,  NULL,                     false, "template without a context matches nothing" },
+        { false, NULL,                     false, "instance without a chart matches nothing" },
+        { true,  "system.cpu",             false, "template of another context does not match" },
+        { true,  "service.cpu_utilization", true, "template of this context matches" },
+        { false, "service.not-services_cpu_utilization", true, "instance of this chart matches" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        RRD_ALERT_PROTOTYPE ap = { 0 };
+        ap.match.enabled = true;
+        ap.match.is_template = tests[i].is_template;
+        ap.match.on.context = tests[i].on ? string_strdupz(tests[i].on) : NULL;
+
+        bool matched = health_prototype_matches_rrdset(&st, &ap);
+        if(matched != tests[i].expected_match) {
+            fprintf(stderr, "FAILED [%s]: expected=%s actual=%s\n",
+                    tests[i].description,
+                    tests[i].expected_match ? "match" : "no match",
+                    matched ? "match" : "no match");
+            failed++;
+        }
+        else
+            (*passed)++;
+
+        rrd_alert_match_cleanup(&ap.match);
+    }
+
+    string_freez(st.context);
+    string_freez(st.name);
+    string_freez(st.id);
+
+    return failed;
+}
+
+static int test_dyncfg_rejects_empty_on(int *passed) {
+    // string_strdupz("") returns NULL, so an empty 'on' must be refused at the payload boundary
+    // instead of silently becoming a rule that matches every chart
+    static const char *payloads[] = {
+        // empty 'on' on the only rule
+        "{\"format_version\":1,\"name\":\"unittest\",\"rules\":[{\"enabled\":true,\"type\":\"template\","
+        "\"config\":{\"match\":{\"on\":\"\",\"host_labels\":\"*\",\"instance_labels\":\"*\"},"
+        "\"value\":{\"database_lookup\":{\"after\":-600,\"before\":0,\"time_group\":\"average\","
+        "\"dims_group\":\"sum\",\"data_source\":\"samples\",\"options\":[],\"dimensions\":\"\"},"
+        "\"update_every\":60},\"conditions\":{\"warning_condition\":\"$this>1\",\"critical_condition\":\"\"}}}]}",
+
+        // valid first rule, empty 'on' on the second - the netdata/netdata#23483 shape
+        "{\"format_version\":1,\"name\":\"unittest\",\"rules\":[{\"enabled\":true,\"type\":\"template\","
+        "\"config\":{\"match\":{\"on\":\"system.cpu\",\"host_labels\":\"*\",\"instance_labels\":\"*\"},"
+        "\"value\":{\"database_lookup\":{\"after\":-600,\"before\":0,\"time_group\":\"average\","
+        "\"dims_group\":\"sum\",\"data_source\":\"samples\",\"options\":[],\"dimensions\":\"\"},"
+        "\"update_every\":60},\"conditions\":{\"warning_condition\":\"$this>1\",\"critical_condition\":\"\"}}},"
+        "{\"enabled\":true,\"type\":\"template\","
+        "\"config\":{\"match\":{\"on\":\"\",\"host_labels\":\"*\",\"instance_labels\":\"*\"},"
+        "\"value\":{\"database_lookup\":{\"after\":-600,\"before\":0,\"time_group\":\"average\","
+        "\"dims_group\":\"sum\",\"data_source\":\"samples\",\"options\":[],\"dimensions\":\"\"},"
+        "\"update_every\":60},\"conditions\":{\"warning_condition\":\"$this>1\",\"critical_condition\":\"\"}}}]}",
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(payloads) / sizeof(payloads[0]); i++) {
+        CLEAN_BUFFER *error = buffer_create(0, NULL);
+        RRD_ALERT_PROTOTYPE *ap =
+            health_prototype_payload_parse(payloads[i], strlen(payloads[i]), error, "unittest", JSONC_REQUIRED);
+
+        if(ap) {
+            fprintf(stderr, "FAILED [dyncfg rejects empty 'on', payload %zu]: payload was accepted\n", i);
+            health_prototype_free(ap);
+            failed++;
+        }
+        else if(!strstr(buffer_tostring(error), "cannot be empty")) {
+            fprintf(stderr, "FAILED [dyncfg rejects empty 'on', payload %zu]: error='%s'\n",
+                    i, buffer_tostring(error));
+            failed++;
+        }
+        else
+            (*passed)++;
     }
 
     return failed;
@@ -900,6 +1084,9 @@ int health_config_unittest(void) {
     failed += test_delay_multiplier_runtime_boundaries(&passed);
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
     failed += test_prototype_rejects_non_positive_update_every(&passed);
+    failed += test_prototype_rejects_missing_on(&passed);
+    failed += test_prototype_without_on_matches_nothing(&passed);
+    failed += test_dyncfg_rejects_empty_on(&passed);
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);
