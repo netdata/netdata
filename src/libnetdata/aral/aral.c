@@ -2507,6 +2507,16 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
 }
 
 int aral_unittest(size_t elements) {
+#if defined(FSANITIZE_ADDRESS)
+    // Under address sanitizer ARAL is bypassed entirely: aral_mallocz() and
+    // aral_freez() delegate straight to glibc, so there is no pool to stress.
+    // The stress loop below would still run and still report PASSED, but with
+    // "did 0 malloc, 0 free" - a green result that proves nothing. Skip
+    // explicitly instead, the same way aral_unittest_concurrency() does.
+    (void)elements;
+    fprintf(stderr, "ARAL unittest: SKIPPED (ARAL is disabled under FSANITIZE_ADDRESS)\n");
+    return 0;
+#else
     const char *cache_dir = "/tmp/";
 #ifdef NETDATA_INTERNAL_CHECKS
     int errors = aral_detect_acquire_to_page_lock_race();
@@ -2544,4 +2554,5 @@ int aral_unittest(size_t elements) {
     fprintf(stderr, "ARAL unittest: %s (%d errors)\n", total_errors ? "FAILED" : "PASSED", total_errors);
 
     return total_errors;
+#endif // FSANITIZE_ADDRESS
 }
