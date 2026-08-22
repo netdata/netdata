@@ -414,7 +414,8 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_fetch_ebpf_co_re()
 endif()
 
-pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
+include(NetdataDependencies)
+
 if(NOT CURL_FOUND)
         message(FATAL_ERROR "libcurl >= 7.21 is required for building Netdata, but could not be found.")
 endif()
@@ -504,11 +505,6 @@ if(ENABLE_LIBBACKTRACE)
 endif()
 
 netdata_bundle_sqlite3()
-
-# openssl/crypto
-pkg_check_modules(TLS IMPORTED_TARGET openssl)
-
-pkg_check_modules(CRYPTO IMPORTED_TARGET libcrypto)
 
 if(NOT TARGET PkgConfig::TLS)
         message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
@@ -886,7 +882,6 @@ else()
 endif()
 
 # lz4
-pkg_check_modules(LIBLZ4 liblz4>=1.7.1)
 if(NOT LIBLZ4_FOUND)
         message(FATAL_ERROR "liblz4 >= 1.7.1 is required for building Netdata, but could not be found.")
 endif()
@@ -898,7 +893,6 @@ target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
 
 # zstd
-pkg_check_modules(LIBZSTD libzstd)
 if(LIBZSTD_FOUND)
         set(ENABLE_ZSTD On)
         target_include_directories(libnetdata BEFORE PUBLIC ${LIBZSTD_INCLUDE_DIRS})
@@ -907,7 +901,6 @@ if(LIBZSTD_FOUND)
 endif()
 
 # brotli
-pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
 if(LIBBROTLI_FOUND)
         set(ENABLE_BROTLI On)
         target_include_directories(libnetdata PUBLIC ${LIBBROTLI_INCLUDE_DIRS})
@@ -930,7 +923,6 @@ else()
 endif()
 
 # uv
-pkg_check_modules(LIBUV libuv)
 if(NOT LIBUV_FOUND)
         message(FATAL_ERROR "libuv is required for building Netdata, but could not be found.")
 endif()
@@ -1209,8 +1201,6 @@ install(TARGETS systemd-cat-native
 #
 # build log2journal
 #
-
-pkg_check_modules(PCRE2 libpcre2-8)
 
 if(PCRE2_FOUND)
         add_executable(log2journal ${LOG2JOURNAL_FILES})
