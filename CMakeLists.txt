@@ -17,7 +17,10 @@
 #      a question the vendor may have asked differently.
 #   4. install layout, build options, host integration paths
 #   5. toolchains and code generation: Go, Rust/corrosion
-#   6. dependency discovery, and the subprojects we bundle
+#   6. dependency discovery, then the subprojects we bundle. Every external
+#      library is looked up once, in NetdataDependencies, with no REQUIRED and no
+#      guard; whether a missing one is fatal is decided next to the target that
+#      needs it, in phase 8.
 #   7. the stack-trace flag pair, wedged between three netdata_bundle_* calls.
 #      Load-bearing and explained in full at that point. Do not tidy it.
 #   8. source inventories, then targets: libraries, the daemon, the plugins

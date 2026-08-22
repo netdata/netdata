@@ -22,6 +22,35 @@
 # file, where STATIC_BUILD appends --static to PKG_CONFIG_EXECUTABLE on the line
 # after it; that append needs the variable the find_package defines, so the two
 # cannot be separated.
+#
+# Four groups of external resolution stay where they are, listed here so this file
+# answers "what do we depend on" by enumeration even where it does not by
+# execution:
+#
+#   json-c, libyaml, protobuf     NetdataJSONC.cmake, NetdataYAML.cmake,
+#                                 NetdataProtobuf.cmake. Each of those modules
+#                                 exists to choose between the system copy and a
+#                                 bundled one. The lookup is one branch of that
+#                                 choice, so extracting it would leave a module
+#                                 that bundles but cannot decide whether to.
+#
+#   CUPS                          NetdataPluginCups.cmake. Three mechanisms in
+#                                 sequence: pkg-config libcups, then pkg-config
+#                                 cups, then cups-config through find_program and
+#                                 execute_process, with an API-version floor. A
+#                                 host that resolves only by the last one would
+#                                 read CUPS_FOUND false from here and ship a
+#                                 package with no cups.plugin.
+#
+#   PkgConfig, Go, Python3, Git   Tools, not libraries. A missing tool switches a
+#                                 feature off or fails a build step; it is not a
+#                                 link error, and the resolution is find_program
+#                                 rather than a library search.
+#
+#   IOKit, Foundation, OSLog      NetdataPlatform.cmake, next to the platform
+#                                 detection that selects them. Part of being on
+#                                 macOS rather than part of what Netdata depends
+#                                 on.
 
 #
 # Linked into libnetdata, and through it into everything that links libnetdata.
