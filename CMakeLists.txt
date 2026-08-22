@@ -438,30 +438,7 @@ include(NetdataPlatformChecks)
 pkg_check_modules(TLS IMPORTED_TARGET openssl)
 
 if(NOT TARGET PkgConfig::TLS)
-        if(OS_MACOS)
-                execute_process(COMMAND
-                                brew --prefix --installed openssl
-                                RESULT_VARIABLE BREW_OPENSSL
-                                OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
-                                OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-                if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
-                        message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
-                endif()
-
-                add_library(PkgConfig::CRYPTO IMPORTED)
-                set_target_properties(PkgConfig::CRYPTO
-                        IMPORTED_LOCATION ${BREW_OPENSSL_PREFIX}/lib/libcrypto.dylib
-                        INTERFACE_INCLUDE_DIRECTORIES ${BREW_OPENSSL_PREFIX}/include)
-
-                add_library(PkgConfig::TLS IMPORTED)
-                set_target_properties(PkgConfig::TLS
-                        IMPORTED_LOCATION ${BREW_OPENSSL_PREFIX}/lib/libssl.dylib
-                        INTERFACE_LINK_LIBRARIES PkgConfig::CRYPTO
-                        INTERFACE_INCLUDE_DIRECTORIES ${BREW_OPENSSL_PREFIX}/include)
-        else()
-            message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
-        endif()
+        message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
 else()
         pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
 endif()
