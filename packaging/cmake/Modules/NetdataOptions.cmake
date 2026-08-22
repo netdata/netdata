@@ -8,6 +8,8 @@
 #
 # Kept as one unit: splitting the option() calls from the validation and the remap that consume them would manufacture modularity without providing any.
 
+include(CMakeDependentOption)
+
 # This is intended to make life easier for developers who are working on one
 # specific feature.
 #

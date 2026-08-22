@@ -17,7 +17,6 @@ project(netdata
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 include(CMakeDependentOption)
-include(CMakePushCheckState)
 include(NetdataUtil)
 netdata_fixup_system_processor()
 
@@ -375,33 +374,6 @@ pkg_check_modules(CURL libcurl>=7.21 REQUIRED IMPORTED_TARGET)
 set(HAVE_LIBCURL TRUE)
 
 #
-# Libm
-#
-
-# checks link with cmake required libs
-cmake_policy(SET CMP0075 NEW)
-
-include(CheckFunctionExists)
-include(CMakePushCheckState)
-
-check_function_exists(log10 HAVE_LOG10)
-if(NOT HAVE_LOG10)
-        unset(HAVE_LOG10 CACHE)
-        # -lm is wanted for this probe only. CMAKE_REQUIRED_LIBRARIES is global to
-        # every later check_*, so restore it here rather than leaving the ~80 probes
-        # that follow - NetdataPlatformChecks among them - silently linking libm.
-        cmake_push_check_state()
-        list(APPEND CMAKE_REQUIRED_LIBRARIES m)
-        check_function_exists(log10 HAVE_LOG10)
-        cmake_pop_check_state()
-        if(HAVE_LOG10)
-                set(LINK_LIBM True)
-        else()
-                message(FATAL_ERROR "Can not use log10 with/without libm.")
-        endif()
-endif()
-
-#
 # Custom Modules
 #
 
@@ -635,6 +607,8 @@ endif()
 #
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
+
+include(CheckCCompilerFlag)
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "(arm64)|(aarch64)|(ARM64)|(AARCH64)")
     check_c_compiler_flag("-mno-outline-atomics" HAVE_C_MNO_OUTLINE_ATOMICS)

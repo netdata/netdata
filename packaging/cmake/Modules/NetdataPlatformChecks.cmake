@@ -6,9 +6,40 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# Moved verbatim, including the include(Check*) calls, the netdata_bundle_* calls and the cmake_push_check_state/cmake_pop_check_state pair. Cherry-picking only the check_* lines would reorder the compile options that config.h records.
+# Self-contained: every check_* command used below is made available by an include() in this file. It relies on nothing the including file happens to have done. The netdata_bundle_* calls stay interleaved with the probes on purpose - see the note below.
 #
-# The stack-trace add_compile_options/add_link_options block lives here. Its position relative to the directory-property snapshot taken in NetdataSystemFiles.cmake decides what is baked into config.h and shipped as build-info-cmake-cache.gz, so this include() must not be moved.
+# The stack-trace add_compile_options/add_link_options block lives here, in the middle of the netdata_bundle_* calls. That position is load-bearing: add_compile_options sets a directory property that add_subdirectory - and so FetchContent_MakeAvailable - passes only to targets created AFTER it. dlib is bundled before the block and does not get the flags; sqlite3 is bundled after it and does. Moving the block, or gathering the bundle calls, changes shipped object code either way.
+#
+# The block also feeds CONFIGURE_COMMAND, the accumulated-compile-options string that NetdataSystemFiles.cmake snapshots into config.h. That reaches users compiled into the binary, via netdata -W buildinfo and the info API - NOT through build-info-cmake-cache.gz, which is gzip of CMakeCache.txt and holds no such entry.
+
+#
+# Libm
+#
+
+include(CheckFunctionExists)
+include(CMakePushCheckState)
+
+# CMP0075 (check_* honours CMAKE_REQUIRED_LIBRARIES) used to be set to NEW here
+# explicitly, which is redundant: cmake_minimum_required(VERSION 3.16.0...3.30)
+# already sets every policy up to 3.30 to NEW, and CMP0075 dates from 3.12.
+# Confirmed NEW before any explicit set on both CMakes this project builds with,
+# 3.30.3 and 4.1.6.
+check_function_exists(log10 HAVE_LOG10)
+if(NOT HAVE_LOG10)
+        unset(HAVE_LOG10 CACHE)
+        # -lm is wanted for this probe only. CMAKE_REQUIRED_LIBRARIES is global to
+        # every later check_*, so restore it here rather than leaving the ~76 probes
+        # in this file, and the ones in NetdataDetectSystemd, silently linking libm.
+        cmake_push_check_state()
+        list(APPEND CMAKE_REQUIRED_LIBRARIES m)
+        check_function_exists(log10 HAVE_LOG10)
+        cmake_pop_check_state()
+        if(HAVE_LOG10)
+                set(LINK_LIBM True)
+        else()
+                message(FATAL_ERROR "Can not use log10 with/without libm.")
+        endif()
+endif()
 
 if(ENABLE_ML)
   netdata_bundle_dlib()
