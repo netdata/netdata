@@ -119,39 +119,102 @@ func TestTopologyProductionPath_UniFiQBridgeRendersDefaultManagedFabric(t *testi
 	assert.GreaterOrEqual(t, testCountTopologyLinksByType(data.Links, "fdb"), 1)
 }
 
-func TestTopologyProductionPath_UniFiActorUsesSharedDynamicProfileMetadata(t *testing.T) {
-	device := ddsnmp.DeviceConnectionInfo{
-		Hostname:    "192.0.2.20",
-		SysObjectID: "1.3.6.1.4.1.41112",
-		SysName:     "unifi-ap",
-		SysDescr:    "Ubiquiti UniFi U6 Mesh",
-		Vendor:      "Unknown",
-		Model:       "UniFi UAP-FlexHD",
+func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
+	tests := map[string]struct {
+		device            ddsnmp.DeviceConnectionInfo
+		pdus              []gosnmp.SnmpPDU
+		wantProfileVendor bool
+		wantVendor        string
+		wantModel         string
+	}{
+		"access point uses dynamic Ubiquiti identity": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.20",
+				SysObjectID: "1.3.6.1.4.1.41112",
+				SysName:     "unifi-ap",
+				SysDescr:    "Ubiquiti UniFi U6 Mesh",
+				Vendor:      "Unknown",
+				Model:       "UniFi UAP-FlexHD",
+			},
+			pdus:              topologyUniFiAPPDUs(),
+			wantProfileVendor: true,
+			wantVendor:        "Ubiquiti",
+			wantModel:         "UniFi U6-Mesh",
+		},
+		"switch overrides generic Net-SNMP vendor": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.10",
+				SysObjectID: "1.3.6.1.4.1.8072.3.2.10",
+				SysName:     "unifi-switch",
+				SysDescr:    "Linux UBNT 4.4.153 mips",
+				Vendor:      "net-snmp",
+				Model:       "Linux",
+			},
+			pdus:              topologyUniFiSwitchPDUs(),
+			wantProfileVendor: true,
+			wantVendor:        "Ubiquiti",
+			wantModel:         "Linux",
+		},
+		"gateway overrides generic Net-SNMP vendor": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.1",
+				SysObjectID: "1.3.6.1.4.1.8072.3.2.10",
+				SysName:     "unifi-gateway",
+				SysDescr:    "Linux Router 6.6.43-ui-ipq9574 aarch64",
+				Vendor:      "net-snmp",
+				Model:       "Linux",
+			},
+			pdus:              topologyUniFiGatewayPDUs(),
+			wantProfileVendor: true,
+			wantVendor:        "Ubiquiti",
+			wantModel:         "Linux",
+		},
+		"unrelated generic Net-SNMP host keeps fallback identity": {
+			device: ddsnmp.DeviceConnectionInfo{
+				Hostname:    "192.0.2.30",
+				SysObjectID: "1.3.6.1.4.1.8072.3.2.10",
+				SysName:     "linux-host",
+				SysDescr:    "Linux generic Net-SNMP agent",
+				Vendor:      "net-snmp",
+				Model:       "Linux",
+			},
+			wantVendor: "net-snmp",
+			wantModel:  "Linux",
+		},
 	}
-	mainMetrics := collectMainProfileMetrics(t, device, topologyUniFiAPPDUs())
-	metadata := make(map[string]ddsnmp.MetaTag)
-	for _, pm := range mainMetrics {
-		ddsnmp.MergeDeviceIdentityMetadata(metadata, pm.DeviceMetadata)
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			device := tc.device
+			mainMetrics := collectMainProfileMetrics(t, device, tc.pdus)
+			metadata := make(map[string]ddsnmp.MetaTag)
+			for _, pm := range mainMetrics {
+				ddsnmp.MergeDeviceIdentityMetadata(metadata, pm.DeviceMetadata)
+			}
+			if tc.wantProfileVendor {
+				assert.Equal(t, ddsnmp.MetaTag{Value: "Ubiquiti", IsExactMatch: true}, metadata["vendor"])
+			} else {
+				assert.NotContains(t, metadata, "vendor")
+			}
+			device.Vendor, device.Model = ddsnmp.ResolveDeviceIdentity(device.Vendor, device.Model, metadata, nil)
+
+			metrics := collectTopologyProfileMetrics(t, device, tc.pdus)
+			cache := newTestTopologyCache(device)
+			cache.updateTopologyProfileTags(metrics)
+			cache.ingestTopologyProfileMetrics(metrics)
+			cache.finalizeTopologyCache()
+
+			registry := newTopologyRegistry()
+			registry.register(cache)
+			data, ok := snapshotTopologyRegistryForTest(registry)
+			require.True(t, ok)
+
+			actor := findDeviceActorBySysName(data, device.SysName)
+			require.NotNil(t, actor)
+			assert.Equal(t, tc.wantVendor, actor.Detail.SNMP.Vendor)
+			assert.Equal(t, tc.wantModel, actor.Detail.SNMP.Model)
+		})
 	}
-	require.Equal(t, ddsnmp.MetaTag{Value: "Ubiquiti", IsExactMatch: true}, metadata["vendor"])
-	require.Equal(t, ddsnmp.MetaTag{Value: "UniFi U6-Mesh", IsExactMatch: true}, metadata["model"])
-	device.Vendor, device.Model = ddsnmp.ResolveDeviceIdentity(device.Vendor, device.Model, metadata, nil)
-
-	metrics := collectTopologyProfileMetrics(t, device, topologyUniFiAPPDUs())
-	cache := newTestTopologyCache(device)
-	cache.updateTopologyProfileTags(metrics)
-	cache.ingestTopologyProfileMetrics(metrics)
-	cache.finalizeTopologyCache()
-
-	registry := newTopologyRegistry()
-	registry.register(cache)
-	data, ok := snapshotTopologyRegistryForTest(registry)
-	require.True(t, ok)
-
-	actor := findDeviceActorBySysName(data, "unifi-ap")
-	require.NotNil(t, actor)
-	assert.Equal(t, "Ubiquiti", actor.Detail.SNMP.Vendor)
-	assert.Equal(t, "UniFi U6-Mesh", actor.Detail.SNMP.Model)
 }
 
 func collectMainProfileMetrics(
