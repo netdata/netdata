@@ -799,17 +799,6 @@ newer_commit_date() {
   create_exec_tmp_directory
   commit_check_file="${ndtmpdir}/latest-commit.json"
   commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
-  python_version_check="
-from __future__ import print_function
-import sys, json
-
-try:
-    data = json.load(sys.stdin)
-except:
-    print('')
-else:
-    print(data[0]['commit']['committer']['date'] if isinstance(data, list) and data else '')
-"
 
   if ! _safe_download "${commit_check_url}" "${commit_check_file}"; then
     warning "Failed to check for an updated updater script, skipping self-update check."
@@ -817,12 +806,40 @@ else:
     return 1
   fi
 
-  if command -v jq > /dev/null 2>&1; then
-    commit_date="$(jq '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}" | tr -d '"')"
-  elif command -v python > /dev/null 2>&1;then
-    commit_date="$(python -c "${python_version_check}" < "${commit_check_file}")"
-  elif command -v python3 > /dev/null 2>&1;then
-    commit_date="$(python3 -c "${python_version_check}" < "${commit_check_file}")"
+  if command -v jq > /dev/null 2>&1 ; then
+    commit_date="$(jq -r -b '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}")"
+  elif command -v python > /dev/null 2>&1 || command -v python3 > /dev/null 2>&1 ; then
+    python="$(command -v python3 2>/dev/null)"
+    [ -z "${python}" ] && python="$(command -v python 2>/dev/null)"
+    cat > "${ndtmpdir}/parse_commit_date.py" <<-EOF
+	from __future__ import print_function
+	import sys, json
+	try:
+	    data = json.load(sys.stdin)
+	except:
+	    print('')
+	else:
+	    print(data[0]['commit']['committer']['date'] if isinstance(data, list) and data else '')
+	EOF
+    commit_date="$("${python}" "${ndtmpdir}/parse_commit_date.py" < "${commit_check_file}")"
+  elif command -v node > /dev/null 2>&1 || command -v deno > /dev/null 2>&1 ; then
+    cat > "${ndtmpdir}/parse_commit_date.js" <<-EOF
+	const fs = require('node:fs');
+	const data = fs.readFileSync(0, 'utf-8');
+	try {
+	  const json = JSON.parse(data);
+	  const date = json[0].commit.committer.date;
+	  process.stdout.write(String(date));
+	} catch (err) {
+	  process.stderr.write(err.message + '\\n');
+	  process.exit(1);
+	}
+	EOF
+    if command -v deno > /dev/null 2>&1 ; then
+      commit_date="$(deno run -A "${ndtmpdir}/parse_commit_date.js" < "${commit_check_file}")"
+    else
+      commit_date="$(node "${ndtmpdir}/parse_commit_date.js" < "${commit_check_file}")"
+    fi
   fi
 
   if [ -z "${NETDATA_TMPDIR_PATH}" ]; then
