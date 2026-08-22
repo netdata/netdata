@@ -24,7 +24,8 @@ modules:
         metrics_description: |
           Monitor processor performance statistics on Windows hosts through Perflib.
         method_description: |
-          It queries Processor object from Perflib in order to gather the metrics.
+          It queries the Processor Information object from Perflib in order to gather the metrics, falling back to the
+          legacy Processor object only when Processor Information is unavailable.
       supported_platforms:
         include: ["windows"]
         exclude: []
