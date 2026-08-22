@@ -25,10 +25,14 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-            if (rd->tiers[tier].sch)
+            if (rd->tiers[tier].sch) {
+                if(tier)
+                    store_metric_at_tier_flush_completed_on_frequency_change(rd, tier, &rd->tiers[tier]);
+
                 storage_engine_store_change_collection_frequency(
                     rd->tiers[tier].sch,
                     (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+            }
         }
     }
     rrddim_foreach_done(rd);
