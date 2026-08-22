@@ -370,7 +370,10 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_fetch_ebpf_co_re()
 endif()
 
-pkg_check_modules(CURL libcurl>=7.21 REQUIRED IMPORTED_TARGET)
+pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
+if(NOT CURL_FOUND)
+        message(FATAL_ERROR "libcurl >= 7.21 is required for building Netdata, but could not be found.")
+endif()
 set(HAVE_LIBCURL TRUE)
 
 #
@@ -415,10 +418,14 @@ include(NetdataPlatformChecks)
 # openssl/crypto
 pkg_check_modules(TLS IMPORTED_TARGET openssl)
 
+pkg_check_modules(CRYPTO IMPORTED_TARGET libcrypto)
+
 if(NOT TARGET PkgConfig::TLS)
         message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
-else()
-        pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
+endif()
+
+if(NOT TARGET PkgConfig::CRYPTO)
+        message(FATAL_ERROR "libcrypto is required for building Netdata, but could not be found.")
 endif()
 
 netdata_detect_protobuf()
@@ -772,25 +779,33 @@ endif()
 
 # zlib
 if(OS_MACOS)
-        find_package(ZLIB REQUIRED)
+        find_package(ZLIB)
+        if(NOT ZLIB_FOUND)
+                message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
+        endif()
         target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
         target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
 else()
-        pkg_check_modules(ZLIB REQUIRED zlib)
+        pkg_check_modules(ZLIB zlib)
+        if(NOT ZLIB_FOUND)
+                message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
+        endif()
         target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
 endif()
 
 # lz4
-pkg_check_modules(LIBLZ4 REQUIRED liblz4>=1.7.1)
-if(LIBLZ4_FOUND)
-  set(ENABLE_LZ4 On)
-
-  target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
-  target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
-  target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
+pkg_check_modules(LIBLZ4 liblz4>=1.7.1)
+if(NOT LIBLZ4_FOUND)
+        message(FATAL_ERROR "liblz4 >= 1.7.1 is required for building Netdata, but could not be found.")
 endif()
+
+set(ENABLE_LZ4 On)
+
+target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
+target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
+target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
 
 # zstd
 pkg_check_modules(LIBZSTD libzstd)
@@ -815,14 +830,20 @@ if(OS_MACOS OR OS_WINDOWS)
         # UUID functionality is part of the system libraries here, so no extra
         # stuff needed.
 else()
-        pkg_check_modules(UUID REQUIRED uuid)
+        pkg_check_modules(UUID uuid)
+        if(NOT UUID_FOUND)
+                message(FATAL_ERROR "libuuid is required for building Netdata on this platform, but could not be found.")
+        endif()
         target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
 endif()
 
 # uv
-pkg_check_modules(LIBUV REQUIRED libuv)
+pkg_check_modules(LIBUV libuv)
+if(NOT LIBUV_FOUND)
+        message(FATAL_ERROR "libuv is required for building Netdata, but could not be found.")
+endif()
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
@@ -1207,7 +1228,10 @@ endif()
 #
 
 if(ENABLE_PLUGIN_IBM)
-    pkg_check_modules(ODBC REQUIRED odbc)
+    pkg_check_modules(ODBC odbc)
+    if(NOT ODBC_FOUND)
+        message(FATAL_ERROR "The IBM plugin needs unixODBC, but it could not be found. Pass -DENABLE_PLUGIN_IBM=Off to build without it.")
+    endif()
     include(NetdataIBMPlugin)
     add_ibm_plugin_target()
 
