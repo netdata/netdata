@@ -792,7 +792,7 @@ if(ENABLE_LIBUNWIND)
       target_link_libraries(libnetdata PUBLIC PkgConfig::LIBUNWIND)
     endif()
   else()
-    message(FATAL "Could not find libunwind for logging of stack traces")
+    message(FATAL_ERROR "Could not find libunwind for logging of stack traces")
   endif()
 endif()
 
