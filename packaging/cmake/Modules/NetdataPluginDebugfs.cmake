@@ -7,8 +7,9 @@
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
 # add_subdirectory() and CMAKE_CURRENT_BINARY_DIR below are relative to the
-# repository and build roots, which include() preserves. This is the only
-# block in the root file that used either.
+# repository and build roots, which include() preserves. This was the only
+# block in the root file that used either until src/libnetdata got its own
+# CMakeLists.txt, which the root now add_subdirectory()s directly.
 #
 # The source list lives here rather than in the shared
 # NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It

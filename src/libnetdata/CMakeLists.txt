@@ -17,17 +17,25 @@
 # path must NOT carry a src/libnetdata/ prefix. An absolute
 # ${CMAKE_SOURCE_DIR}/src/libnetdata/... still spells the prefix out and is
 # left alone. The vendored src/collectors/debugfs.plugin/libsensors directory
-# is the prior art for both conventions.
+# is the prior art for the relative convention; it spells no absolute out.
 #
 # Three targets rather than one. netipc is self-contained enough to justify a
 # nested directory of its own and deliberately does not get one: libnetdata is
 # the boundary the project recognises, and nested boundaries would invent a
 # distinction nobody makes.
 #
-# A subdirectory has its own scope, so NOTHING set below is visible to the root
-# unless the export block at the end of this file hands it back. That applies to
-# the source lists and the WEVT_* paths as much as to the six exported names: a
-# future root consumer of any of them reads an empty value and gets no error.
+# A subdirectory has its own scope, so no VARIABLE set below is visible to the
+# root unless the export block at the end of this file hands it back. That
+# applies to the source lists and the WEVT_* paths as much as to the six
+# exported names: a future root consumer of any of them reads an empty value and
+# gets no error.
+#
+# Targets are the opposite - they are global, and the root relies on it.
+# NetdataPluginNetworkViewer.cmake, included well after this directory, adds
+# -ffat-lto-objects to judy, libnetdata and netipc by name through an
+# if(TARGET ...) guard. That guard is why the failure would be silent if these
+# ever stopped being visible, and its arm only runs on 32-bit GCC with LTO, so
+# no ordinary build exercises it.
 
 include(${CMAKE_CURRENT_LIST_DIR}/SourceLists.cmake)
 
@@ -196,9 +204,13 @@ if(OS_WINDOWS)
                 # WORKING_DIRECTORY is pinned on both arms below. A custom command
                 # with none runs in the build directory matching the current source
                 # directory, which this move changed from ${CMAKE_BINARY_DIR} to
-                # ${CMAKE_BINARY_DIR}/src/libnetdata. Every argument here is
-                # absolute so nothing observably depends on it today, but the WEL
-                # arm hands windres a .rc that names its inputs relatively.
+                # ${CMAKE_BINARY_DIR}/src/libnetdata. Neither arm actually depends
+                # on it: every argument is absolute, and windres resolves the names
+                # inside a .rc against the .rc's own directory rather than the
+                # working directory - tested against real binutils, with a negative
+                # control. The pin restores the pre-move value exactly, so it costs
+                # nothing and keeps a later cwd-relative edit here from going wrong
+                # on a platform none of us can build.
 
                 if(HAVE_ETW)
                         # ETW method also supports WEL
