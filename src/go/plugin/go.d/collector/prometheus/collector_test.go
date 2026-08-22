@@ -27,6 +27,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -1022,6 +1023,55 @@ ceph_healthcheck_slow_ops 1
 			"prometheus.ceph_healthcheck_slow_ops":  {"ceph_healthcheck_slow_ops"},
 		},
 	)
+}
+
+func TestCollector_CephProfileFamilySegments(t *testing.T) {
+	input, err := os.ReadFile(promtestutil.Require(t, "prometheus/profiles/ceph/fixtures/ceph_squid_mgr_limit11.prom"))
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(input)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	spec, _, err := charttpl.DecodeYAMLValidated([]byte(collr.ChartTemplateYAML()))
+	require.NoError(t, err)
+
+	var families []string
+	var collectFamilies func(charttpl.Group, []string)
+	collectFamilies = func(group charttpl.Group, parents []string) {
+		parts := parents
+		if family := strings.TrimSpace(group.Family); family != "" {
+			parts = append(append([]string(nil), parents...), family)
+		}
+		families = append(families, strings.Join(parts, "/"))
+		for _, chart := range group.Charts {
+			if family := strings.TrimSpace(chart.Family); family != "" {
+				families = append(families, strings.Join(append(append([]string(nil), parts...), family), "/"))
+			} else if len(parts) != 0 {
+				families = append(families, strings.Join(parts, "/"))
+			}
+		}
+		for _, child := range group.Groups {
+			collectFamilies(child, parts)
+		}
+	}
+	for _, group := range spec.Groups {
+		collectFamilies(group, nil)
+	}
+	require.NotEmpty(t, families)
+
+	for _, family := range families {
+		for _, segment := range strings.Split(family, "/") {
+			require.NotContains(t, []string{"I", "O"}, segment,
+				"family %q uses the reserved path segment %q", family, segment)
+		}
+	}
 }
 
 func TestCollector_CephMGRReleaseFixturesMaterializeM01AlertIdentities(t *testing.T) {

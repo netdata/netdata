@@ -1462,7 +1462,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.accumulated_latency:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1495,7 +1495,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.byte_throughput:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1556,7 +1556,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.latency_measurements:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1589,7 +1589,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.operations:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1642,7 +1642,7 @@ views:
       promote: []
       omit: {}
   bluefs.i_o_and_files.zero_read_outcomes:
-    family: Ceph/BlueFS/I/O and Files
+    family: Ceph/BlueFS/IO and Files
     question: What is the zero-read outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1917,7 +1917,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.accumulated_latency:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1950,7 +1950,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.byte_throughput:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -1987,7 +1987,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.latency_measurements:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2020,7 +2020,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.penalty_reads:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the penalty reads for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2033,7 +2033,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.read_outcomes:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the read outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2050,7 +2050,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.skipped_blobs:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the skipped blobs for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2063,7 +2063,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.skipped_writes:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the skipped writes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2076,7 +2076,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.slow_aio_waits:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the slow aio waits for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2089,7 +2089,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.slow_reads:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the slow reads for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2106,7 +2106,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.write_operations:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the write operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -2147,7 +2147,7 @@ views:
       promote: []
       omit: {}
   bluestore.i_o.written_blobs:
-    family: Ceph/BlueStore/I/O
+    family: Ceph/BlueStore/IO
     question: What is the written blobs for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7574,7 +7574,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.accumulated_latency:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the accumulated latency for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7655,7 +7655,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.byte_throughput:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7700,7 +7700,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.current_operations:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the operations in progress for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7713,7 +7713,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.events:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the events for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7726,7 +7726,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.failure_outcomes:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the failure and delay outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7739,7 +7739,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.latency_measurements:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the latency measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7820,7 +7820,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.lookup_outcomes:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the lookup outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7833,7 +7833,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.object_work:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the object work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -7854,7 +7854,7 @@ views:
       promote: []
       omit: {}
   osd_client_i_o.operations:
-    family: Ceph/OSD Client I/O
+    family: Ceph/OSD Client IO
     question: What is the operations for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9651,7 +9651,7 @@ views:
       evidence:
       - ceph_display_conventions
   pools.client_i_o.byte_throughput:
-    family: Ceph/Pools/Client I/O
+    family: Ceph/Pools/Client IO
     question: What is the byte throughput for each pool id?
     entity: by_pool_id
     inputs:
@@ -9668,7 +9668,7 @@ views:
       promote: []
       omit: {}
   pools.client_i_o.operations:
-    family: Ceph/Pools/Client I/O
+    family: Ceph/Pools/Client IO
     question: What is the operations for each pool id?
     entity: by_pool_id
     inputs:
@@ -10065,7 +10065,7 @@ views:
       promote: []
       omit: {}
   rbd_images.i_o.byte_throughput:
-    family: Ceph/RBD Images/I/O
+    family: Ceph/RBD Images/IO
     question: What is the byte throughput for each image and namespace and pool?
     entity: by_image_and_namespace_and_pool
     inputs:
@@ -10082,7 +10082,7 @@ views:
       promote: []
       omit: {}
   rbd_images.i_o.operations:
-    family: Ceph/RBD Images/I/O
+    family: Ceph/RBD Images/IO
     question: What is the operations for each image and namespace and pool?
     entity: by_image_and_namespace_and_pool
     inputs:

@@ -1366,7 +1366,7 @@ template:
                 by_labels:
                   - pool_id
                 optional_by_labels: []
-        - family: Client I/O
+        - family: Client IO
           context_namespace: client_i_o
           metrics:
             - ceph_pool_rd
@@ -1519,7 +1519,7 @@ template:
     - family: RBD Images
       context_namespace: rbd_images
       groups:
-        - family: I/O
+        - family: IO
           context_namespace: i_o
           metrics:
             - ceph_rbd_read_bytes
@@ -1796,7 +1796,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-        - family: I/O and Files
+        - family: IO and Files
           context_namespace: i_o_and_files
           metrics:
             - ceph_bluefs_flush_lat_count
@@ -2204,7 +2204,7 @@ template:
                 by_labels:
                   - ceph_daemon
                 optional_by_labels: []
-        - family: I/O
+        - family: IO
           context_namespace: i_o
           metrics:
             - ceph_bluestore_issued_deferred_write_bytes
@@ -5082,7 +5082,7 @@ template:
             by_labels:
               - ceph_daemon
             optional_by_labels: []
-    - family: OSD Client I/O
+    - family: OSD Client IO
       context_namespace: osd_client_i_o
       metrics:
         - ceph_osd_op
