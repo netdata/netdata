@@ -4,6 +4,7 @@
 #define NETDATA_RRDHOST_H
 
 #include "libnetdata/libnetdata.h"
+#include "nrpc/nrpc.h"   // NRPC_OWNER: the host doubles as the owner token of its function registry
 
 #define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
 #define NETDATA_VIRTUAL_HOST "Netdata Virtual Host 1.0"
@@ -364,10 +365,6 @@ struct rrdhost {
     RRDLABELS *rrdlabels;
 
     // ------------------------------------------------------------------------
-    // Support for functions
-    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
-
-    // ------------------------------------------------------------------------
     // indexes
 
     DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
@@ -519,6 +516,16 @@ RRDHOST *rrdhost_create(
 
 void rrdhost_init(void);
 #endif
+
+// The host as an nRPC owner: the token the component keys its function-
+// registry index on and hands back to the owner callbacks. The component never
+// dereferences it - these two lines are the only place that casts.
+static inline NRPC_OWNER rrdhost_nrpc_owner(RRDHOST *host) { return (NRPC_OWNER){ .ptr = host }; }
+static inline RRDHOST *rrdhost_from_nrpc_owner(NRPC_OWNER id) { return (RRDHOST *)id.ptr; }
+
+// fill the host's nRPC function-registry owner vtable (see rrdhost.c); also
+// used by the nRPC unittests to re-init localhost's registry identically
+void rrdhost_nrpc_registry_owner(RRDHOST *host, struct nrpc_registry_owner *owner);
 
 RRDHOST *rrdhost_find_or_create(
     const char *hostname,

@@ -80,7 +80,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
         if(strncmp(string2str(df->path), path, path_len) != 0)
             continue;
 
-        if(!rrd_function_available(host, string2str(df->function)))
+        if(!nrpc_method_available(rrdhost_nrpc_owner(host), string2str(df->function)))
             df->current.status = DYNCFG_STATUS_ORPHAN;
 
         if((id && strcmp(id, df_dfe.name) != 0) && (template && df->template != template))
@@ -154,11 +154,11 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
     freez(items);
 }
 
-static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data) {
+static int dyncfg_config_execute_cb(struct nrpc_request *req, void *data) {
     RRDHOST *host = data;
     int code;
 
-    CLEAN_CHAR_P *buf = strdupz(rfe->function);
+    CLEAN_CHAR_P *buf = strdupz(req->function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -170,15 +170,15 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
 
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0) {
         char *msg = "invalid function call, expected: config";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", rfe->function, msg);
-        code = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", req->function, msg);
+        code = dyncfg_default_response(req->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     if(!action || !*action) {
         char *msg = "invalid function call, expected: config tree";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", rfe->function, msg);
-        code = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", req->function, msg);
+        code = dyncfg_default_response(req->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
@@ -190,13 +190,13 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
             id = NULL;
         else if(!dyncfg_is_valid_id(id)) {
             char *msg = "invalid id given";
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", rfe->function, msg);
-            code = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", req->function, msg);
+            code = dyncfg_default_response(req->result.wb, HTTP_RESP_BAD_REQUEST, msg);
             goto cleanup;
         }
 
         code = HTTP_RESP_OK;
-        dyncfg_tree_for_host(host, rfe->result.wb, path, id, !(rfe->user_access & HTTP_ACCESS_SENSITIVE_DATA));
+        dyncfg_tree_for_host(host, req->result.wb, path, id, !(req->user_access & HTTP_ACCESS_SENSITIVE_DATA));
     }
     else {
         const char *name = id;
@@ -219,18 +219,18 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         if(item) {
             DYNCFG *df = dictionary_acquired_item_value(item);
 
-            if(!rrd_function_available(host, string2str(df->function)))
+            if(!nrpc_method_available(rrdhost_nrpc_owner(host), string2str(df->function)))
                 df->current.status = DYNCFG_STATUS_ORPHAN;
 
             if(cmd == DYNCFG_CMD_REMOVE) {
                 bool delete = (df->current.status == DYNCFG_STATUS_ORPHAN);
 
                 if(delete) {
-                    if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->edit_access)) {
+                    if(!http_access_user_has_enough_access_level_for_endpoint(req->user_access, df->edit_access)) {
                         dictionary_acquired_item_release(dyncfg_globals.nodes, item);
                         item = NULL;
                         code = dyncfg_default_response(
-                            rfe->result.wb, HTTP_RESP_FORBIDDEN,
+                            req->result.wb, HTTP_RESP_FORBIDDEN,
                             "dyncfg: you don't have enough edit permissions to execute this command");
                         goto cleanup;
                     }
@@ -240,22 +240,22 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
                     item = NULL;
                     dictionary_garbage_collect(dyncfg_globals.nodes);
                     dyncfg_file_delete(id);
-                    code = dyncfg_default_response(rfe->result.wb, 200, "");
+                    code = dyncfg_default_response(req->result.wb, 200, "");
                     goto cleanup;
                 }
             }
             else if((cmd == DYNCFG_CMD_USERCONFIG || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_GET) && df->current.status != DYNCFG_STATUS_ORPHAN)  {
-                const char *old_rfe_function = rfe->function;
+                const char *old_rfe_function = req->function;
                 char buf2[2048];
                 if(cmd == DYNCFG_CMD_GET)
                     snprintfz(buf2, sizeof(buf2), "config %s %s", dictionary_acquired_item_name(item), action);
                 else
                     snprintfz(buf2, sizeof(buf2), "config %s %s %s", dictionary_acquired_item_name(item), action, name?name:"");
-                rfe->function = buf2;
+                req->function = buf2;
                 dictionary_acquired_item_release(dyncfg_globals.nodes, item);
                 item = NULL;
-                code = dyncfg_function_intercept_cb(rfe, data);
-                rfe->function = old_rfe_function;
+                code = dyncfg_function_intercept_cb(req, data);
+                req->function = old_rfe_function;
                 return code;
             }
 
@@ -267,16 +267,16 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "DYNCFG: unknown config id '%s' in call: '%s'. "
                "This can happen if the plugin that registered the dynamic configuration is not running now.",
-               id, rfe->function);
+               id, req->function);
 
-        rrd_call_function_error(
-            rfe->result.wb,
+        nrpc_call_error(
+            req->result.wb,
             "Unknown config id given.", code);
     }
 
 cleanup:
-    if(rfe->result.cb)
-        rfe->result.cb(rfe->result.wb, code, rfe->result.data);
+    if(req->result.cb)
+        req->result.cb(req->result.wb, code, req->result.data);
 
     return code;
 }
@@ -291,7 +291,18 @@ void dyncfg_host_init(RRDHOST *host) {
     // This function needs to be async, although it is internal.
     // The reason is that it can call by itself another function that may or may not be internal (sync).
 
-    rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120, 1000, DYNCFG_FUNCTIONS_VERSION,
-                     "Dynamic configuration", "config", HTTP_ACCESS_ANONYMOUS_DATA,
-                     false, dyncfg_config_execute_cb, host);
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .owner = rrdhost_nrpc_owner(host),
+        .name = PLUGINSD_FUNCTION_CONFIG,
+        .help = "Dynamic configuration",
+        .tags = "config",
+        .timeout_s = 120,
+        .priority = 1000,
+        .version = DYNCFG_FUNCTIONS_VERSION,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = false,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = dyncfg_config_execute_cb,
+        .handler_data = host,
+    });
 }

@@ -227,6 +227,85 @@ void dictionary_garbage_collect(DICTIONARY *dict) {
     garbage_collect_pending_deletes(dict);
 }
 
+// Like dictionary_garbage_collect(), but the victims' delete callbacks run
+// OUTSIDE the dictionary locks: under the items write lock the
+// pending-deletion victims (already hashtable-unlinked) are DETACHED - removed
+// from the items list with their pending marks cleared - and their delete
+// callbacks are delivered only after the lock is released.
+//
+// Use this instead of dictionary_garbage_collect() whenever the delete
+// callback can deliver results to waiters (take mutexes, invoke arbitrary
+// code): the stock garbage collector fires delete callbacks under the items
+// WRITE lock, which deadlocks against any waiter that touches the dictionary
+// while holding the resources the callback needs.
+//
+// Returns the number of victims delivered. Not supported on views.
+size_t dictionary_garbage_collect_and_deliver(DICTIONARY *dict) {
+    if(!dict) return 0;
+
+    // hard API misuse, same class (and same handling) as the view check in
+    // dictionary_set_and_acquire_item_advanced(): a view here would scan
+    // master items with is_view=false and skip the index wrlock the view GC
+    // path requires - silent corruption in release builds if merely internal
+    if(unlikely(is_view_dictionary(dict)))
+        fatal("DICTIONARY: dictionary_garbage_collect_and_deliver() does not support views.");
+
+    // the happy path pays nothing
+    if(DICTIONARY_PENDING_DELETES_GET(dict) <= 0)
+        return 0;
+
+    DICTIONARY_ITEM *detached = NULL;
+
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+
+    __atomic_store_n(&dict->last_gc_run_us, now_realtime_usec(), __ATOMIC_RELAXED);
+    DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict);
+
+    size_t pending = 0;
+    DICTIONARY_ITEM *item = dict->items.list, *item_next;
+    while(item) {
+        item_next = item->next;
+        int rc = item_check_and_acquire_advanced(dict, item, false);
+
+        if(rc == RC_ITEM_MARKED_FOR_DELETION) {
+            // we didn't get a reference
+
+            if(item_is_not_referenced_and_can_be_removed(dict, item)) {
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+                pending = item_pending_deletion_clear(dict, item);
+
+                // chain the detached victim; prev/next are dead after the
+                // list removal, so ->next is free to reuse
+                item->next = detached;
+                detached = item;
+
+                if(!pending)
+                    break;
+            }
+        }
+        else if(rc == RC_ITEM_IS_CURRENTLY_BEING_DELETED)
+            ; // do not touch this item (we didn't get a reference)
+
+        else if(rc == RC_ITEM_OK)
+            item_release(dict, item);
+
+        item = item_next;
+    }
+
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    // deliver outside all dictionary locks
+    size_t delivered = 0;
+    while(detached) {
+        DICTIONARY_ITEM *next = detached->next;
+        dict_item_free_with_hooks(dict, detached); // runs the delete callback lock-free
+        detached = next;
+        delivered++;
+    }
+
+    return delivered;
+}
+
 // ----------------------------------------------------------------------------
 
 void dictionary_static_items_aral_init(void) {
