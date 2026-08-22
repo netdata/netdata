@@ -231,6 +231,11 @@ There are a few special keys that are used to define the system information of t
 - `_cloud_instance_region`
 - `_os_name`
 - `_os_version`
+- `_os_marketing_version`
+- `_os_release`
+- `_os_codename`
+- `_os_edition`
+- `_os_build`
 - `_kernel_version`
 - `_system_cores`
 - `_system_cpu_freq`
