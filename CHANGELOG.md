@@ -68,6 +68,14 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.36 to 1.32.37 in /src/go ([#23575](https://github.com/netdata/netdata/issues/23575))
 - Build(deps): bump github.com/stretchr/testify from 1.11.1 to 1.12.1 in /src/go ([#23574](https://github.com/netdata/netdata/issues/23574))
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.66.4 to 1.66.5 in /src/go ([#23571](https://github.com/netdata/netdata/issues/23571))
+- Fix(go.d/snmp): correct Synology profile detection and metrics ([#23577](https://github.com/netdata/netdata/issues/23577))
+- Regenerate integrations docs ([#23578](https://github.com/netdata/netdata/issues/23578))
+- Network-viewer: support topology:network-connections on Windows ([#23562](https://github.com/netdata/netdata/issues/23562))
+- Point the notifications README at the current Netdata AI troubleshooting page ([#23582](https://github.com/netdata/netdata/issues/23582))
+- Regenerate integrations docs ([#23581](https://github.com/netdata/netdata/issues/23581))
+- Fix(go.d/snmp_topology): report correct device metadata ([#23587](https://github.com/netdata/netdata/issues/23587))
+- Fix(go.d/snmp): count all managed topology devices as discovered ([#23588](https://github.com/netdata/netdata/issues/23588))
+- Convert DC algorithms to go (ebpf.plugin) ([#23451](https://github.com/netdata/netdata/issues/23451))
 
 ## [2.11.0] - 2026-08-12
 
