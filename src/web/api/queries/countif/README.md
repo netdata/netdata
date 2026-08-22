@@ -1,31 +1,60 @@
-# CountIf
+# Percentage of samples
 
-> This query is available as `countif`.
+> This query is available as `percentage-of-samples`, and as `countif`, its
+> historical name.
 
-CountIf returns the percentage of points in the database that satisfy the condition supplied.
+It returns the percentage (0 to 100) of the samples in the time-frame that
+satisfied a condition.
 
-The following conditions are available:
+The condition is an operator followed by a value, given in the
+`group_options` query parameter:
 
-- `!` or `!=` or `<>`, different than
-- `=` or `==` or `:`, equal to
-- `>`, greater than
-- `<`, less than
-- `>=`, greater or equal to
-- `<=`, less or equal to
+| operator | meaning |
+|---|---|
+| `!` or `!=` or `!:` or `<>` | different from |
+| `=` or `==` or `:` | equal to (also what a bare value means) |
+| `>` | greater than |
+| `>=` or `>:` | greater than or equal to |
+| `<` | less than |
+| `<=` or `<:` | less than or equal to |
 
-The target number and the desired condition can be set using the `group_options` query parameter, as a string, like in these examples:
+The value is one of:
 
-- `!0`, to match any number except zero.
-- `>=-3` to match any number bigger or equal to -3.
+- a **number**, e.g. `!0` matches anything except zero, `>=-3` matches
+  anything from -3 upwards.
+- a **gap token** - `gap`, `nan`, `null` or `empty` are synonyms for "no data
+  was collected here". `==gap` matches the uncollected slots and `!=gap` the
+  collected ones. Naming a gap token is what makes gaps count at all;
+  without one they are invisible to `percentage-of-samples`,
+  `number-of-flaps` and `number-of-times`. `percentage-of-time` always
+  includes uncollected time in its denominator, while only a condition naming
+  a gap can match it.
+- the **previous collected sample** - `previous` or `last`, e.g. `<previous`
+  matches every sample lower than the one before it, which is what counts
+  counter resets. Gaps are skipped, so a drop across a gap still counts, and
+  the first sample of a query never matches.
 
-. When an invalid condition is given, the web server can deliver a not accurate response.
+An omitted, empty or whitespace-only condition means `==0`. An operator
+without a value applies to zero, so `>` is shorthand for `>0`.
+
+There are no `and`/`or` compounds. An unreadable condition fails the query
+with HTTP 400 rather than silently changing what was asked. The same grammar is used by `percentage-of-time`,
+`number-of-flaps` and `number-of-times`, and by the `lookup` line of an
+[alert](/src/health/REFERENCE.md).
+
+Over a window long enough to be served from lower-resolution data this
+grouping evaluates each STORED point as one sample, rather than reasoning
+about the samples behind it. `percentage-of-time`, `number-of-flaps` and
+`number-of-times` estimate across stored windows; the counting groupings can
+report at most one event per stored interval. See
+[Accuracy over long windows](/src/web/api/queries/README.md#accuracy-over-long-windows).
 
 ## how to use
 
-This query cannot be used in alerts.
+This query is available in alerts, e.g. `lookup: percentage-of-samples(>10) -5m`.
 
-`countif` changes the units of charts. The result of the calculation is always from zero to 1, expressing the percentage of database points that matched the condition. 
+`countif` is an alias of `percentage-of-samples`, which is the canonical name; both behave identically. Using this
+grouping changes the chart units to a percentage. The result of the calculation is always from 0 to 100, expressing
+the percentage of database points that matched the condition.
 
 In APIs and badges can be used like this: `&group=countif&group_options=>10` in the URL.
-
-

@@ -1148,14 +1148,18 @@ AGENT_TOOLS: dict[str, dict[str, Any]] = {
                         "coefficient-of-variation",
                         "ema",
                         "des",
+                        "percentage-of-samples",
                         "countif",
+                        "percentage-of-time",
+                        "number-of-flaps",
+                        "number-of-times",
                         "extremes"
                     ]
                 },
                 "time_group_options": {
                     "type": "string",
                     "title": "Time Group Options",
-                    "description": "Additional options for time grouping.\nFor 'percentile', specify a percentage (0-100).\nFor 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10')."
+                    "description": "Additional options for time grouping.\nFor 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\nFor 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', 'number-of-flaps' and 'number-of-times', specify a CONDITION: an optional operator ('!', '!=', '!:', '<>', '=', '==', ':', '>', '>=', '>:', '<', '<=', '<:') followed by a number (e.g. '>0'), a gap token ('gap', 'nan', 'null' or 'empty', optionally with an operator such as '==gap' or '!=gap'), or the previous collected sample ('previous' or 'last', optionally with an operator such as '<previous'). Previous-sample comparisons skip gaps, and the first collected sample never matches. A bare value means equality; omitted or empty input means '==0'; an operator without a value applies to zero. For 'percentage-of-time', uncollected time always remains in the denominator and enters the numerator only when the condition matches gaps."
                 },
                 "tier": {
                     "type": "number",

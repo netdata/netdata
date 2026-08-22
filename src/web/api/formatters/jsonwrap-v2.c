@@ -73,20 +73,34 @@ void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
     buffer_json_object_close(wb);
 }
 
-static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t contexts, bool ignore_percentage) {
-    if(!ignore_percentage && query_target_has_percentage_units(qt)) {
-        buffer_json_member_add_string(wb, "units", "%");
+// `source_units` asks for the units the DATABASE stores: neither the
+// grouping's own units nor the rate integration a sum performs apply there,
+// because that section describes what is stored, not what was computed.
+static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t contexts, bool source_units) {
+    const char *units_override = source_units ? NULL : query_target_units_override(qt);
+    const bool rates = !source_units && query_target_all_metrics_stored_as_rates(qt);
+    if(units_override) {
+        buffer_json_member_add_string(wb, "units", units_override);
     }
     else if(contexts == 1) {
-        buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
+        char units_buf[64];
+        buffer_json_member_add_string(wb, "units",
+            query_target_rate_adjusted_units_for(
+                qt, rates, rrdcontext_acquired_units(qt->contexts.array[0].rca), units_buf, sizeof(units_buf)));
     }
     else if(contexts > 1) {
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-        for(size_t c = 0; c < qt->contexts.used ;c++)
-            dictionary_set(dict, rrdcontext_acquired_units(qt->contexts.array[c].rca), NULL, 0);
+        for(size_t c = 0; c < qt->contexts.used ;c++) {
+            char ub[64];
+            dictionary_set(dict, query_target_rate_adjusted_units_for(
+                qt, rates, rrdcontext_acquired_units(qt->contexts.array[c].rca), ub, sizeof(ub)), NULL, 0);
+        }
 
-        if(dictionary_entries(dict) == 1)
-            buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
+        if(dictionary_entries(dict) == 1) {
+            char ub[64];
+            buffer_json_member_add_string(wb, "units", query_target_rate_adjusted_units_for(
+                qt, rates, rrdcontext_acquired_units(qt->contexts.array[0].rca), ub, sizeof(ub)));
+        }
         else {
             buffer_json_member_add_array(wb, "units");
             const char *s;
@@ -252,21 +266,32 @@ static void rrdr_grouped_by_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_
     buffer_json_array_close(wb); // group_by_order
 }
 
-static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options, bool ignore_percentage) {
+static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options, bool source_units) {
     if(!r->du)
         return;
 
-    bool percentage = !ignore_percentage && query_target_has_percentage_units(r->internal.qt);
+    const char *units_override = source_units ? NULL : query_target_units_override(r->internal.qt);
 
     buffer_json_member_add_array(wb, key);
     for(size_t c = 0; c < r->d ; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        if(percentage)
-            buffer_json_add_array_item_string(wb, "%");
-        else
-            buffer_json_add_array_item_string(wb, string2str(r->du[c]));
+        if(units_override)
+            buffer_json_add_array_item_string(wb, units_override);
+        else {
+            // per RESULT dimension, because sum integrates per METRIC: in a
+            // query mixing counters and gauges the counter's volume must not
+            // keep the "/s" the sum just integrated away, and the gauge's
+            // must not lose one it never had. This is the same answer the
+            // group-by key is built from (query-group-by-init.c)
+            const bool rates = !source_units && !(r->od[c] & RRDR_DIMENSION_NOT_RATE);
+
+            char units_buf[64];
+            buffer_json_add_array_item_string(wb,
+                query_target_rate_adjusted_units_for(
+                    r->internal.qt, rates, string2str(r->du[c]), units_buf, sizeof(units_buf)));
+        }
     }
     buffer_json_array_close(wb);
 }

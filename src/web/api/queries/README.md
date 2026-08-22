@@ -20,7 +20,7 @@ Every data query accepts the following parameters:
 |`points`|no|The number of points to be returned. Netdata can reduce number of points by applying query grouping methods. If not given, the result will have the same granularity as the database (although this relates to `gtime`).|
 |`before`|no|The absolute timestamp or the relative (to now) time the query should finish evaluating data. If not given, it defaults to the timestamp of the latest point in the database.|
 |`after`|no|The absolute timestamp or the relative (to `before`) time the query should start evaluating data. if not given, it defaults to the timestamp of the oldest point in the database.|
-|`group`|no|The grouping method to use when reducing the points the database has. If not given, it defaults to `average`. See [Grouping methods](#grouping-methods) for the full list, including `trimmed-mean`, `trimmed-median`, `percentile`, `countif`, `extremes`, and `latest` variants.|
+|`group`|no|The grouping method to use when reducing the points the database has. If not given, it defaults to `average`. See [Grouping methods](#grouping-methods) for the full list, including `trimmed-mean`, `trimmed-median`, `percentile`, `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps`, `number-of-times`, `extremes`, and `latest`.|
 |`gtime`|no|A resampling period to change the units of the metrics (i.e. setting this to `60` will convert `per second` metrics to `per minute`. If not given it defaults to granularity of the database.|
 |`options`|no|A bitmap of options that can affect the operation of the query. Only 2 options are used by the query engine: `unaligned` and `percentage`. All the other options are used by the output formatters. The default is to return aligned data.|
 |`dimensions`|no|A simple pattern to filter the dimensions to be queried. The default is to return all the dimensions of the chart.|
@@ -119,7 +119,10 @@ and they group the values every `group points`.
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=ses&after=-60&label=ses&value_color=brown) finds the exponential weighted moving average of the values
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=des&after=-60&label=des&value_color=blue) applies Holt-Winters double exponential smoothing
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=incremental_sum&after=-60&label=incremental_sum&value_color=red) finds the difference of the last vs the first value
--   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=countif&after=-60&label=countif&value_color=purple) returns the percentage (0 to 100) of values matching a condition set via `group_options` (e.g., `&group=countif&group_options=>10`)
+-   ![percentage-of-samples badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentage-of-samples&after=-60&label=percentage-of-samples&value_color=purple) returns the percentage (0 to 100) of SAMPLES matching a condition set via `group_options` (e.g., `&group=percentage-of-samples&group_options=>10`); `countif` is an alias
+-   ![percentage-of-time badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=percentage-of-time&after=-60&label=percentage-of-time&value_color=purple) returns the percentage (0 to 100) of TIME the condition held — the two differ whenever the samples are not evenly spaced, which is what makes this the one to use for availability
+-   ![number-of-flaps badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=number-of-flaps&after=-60&label=number-of-flaps&value_color=purple) counts how many times the condition started holding, so a signal that keeps toggling is separated from one that changed once
+-   ![number-of-times badge](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=number-of-times&after=-60&label=number-of-times&value_color=purple) counts the occurrences of the condition; with `<previous` it counts a value going backwards, which is what counts reboots
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=ema&after=-60&label=ema&value_color=teal) alias for `ses`; finds the exponential weighted moving average of the values
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=extremes&after=-60&label=extremes&value_color=grey) returns the maximum of positive values and the minimum of negative values; when both are present, returns the one with the greater absolute magnitude
 -   ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=net.eth0&options=unaligned&dimensions=received&group=latest&after=-60&label=latest&value_color=cyan) returns the latest collected value of the group; groups without any collected value are empty (gaps stay visible); on higher tiers, where individual samples are no longer available, it returns the average of the most recent tier point
@@ -142,16 +145,63 @@ The following trimmed-median methods are available: `trimmed-median1`, `trimmed-
 #### group_options parameter
 
 Some grouping methods accept additional parameters via `group_options`:
-- `countif`: A comparison operator followed by a value (e.g., `>100`, `<=50`, `!=0`, `<:5`, `>:10`)
-- `percentile`: A number from 1-99 specifying the percentile
-- `trimmed-mean` / `trimmed-median`: A number specifying the percentage of values to trim from each end
+- `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps`, `number-of-times`: a CONDITION -
+  an operator followed by a value. Operators: `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`), `!=` (or
+  `!:`, `!` or `<>`); with no operator the value compares equal. The value is one of:
+  - a number, e.g. `>100`, `<=50`, `!=0`
+  - a gap token - `gap`, `nan`, `null`, `empty` all mean "no data was collected", e.g. `==gap` matches the empty slots
+    and `!=gap` the collected ones. For `percentage-of-samples`, `number-of-flaps` and `number-of-times`, naming a gap
+    token is what makes gaps count at all; without one they stay invisible. `percentage-of-time` always counts
+    uncollected time in its denominator, whatever the condition compares against - see
+    [Accuracy over long windows](#accuracy-over-long-windows).
+  - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one
+    before it, which counts counter resets. Gaps are skipped, so a drop across a gap still counts, and the first sample
+    of a query never matches.
 
-The examples shown above show live information from the `received` traffic on the `eth0` interface of the global Netdata Registry.
-Inspect any of the badges to see the parameters provided. You can directly issue the request to the Registry server's API yourself, e.g. by passing the following to get the value shown on the badge for the sum of the values within the period:
+  If the condition is omitted, empty or whitespace-only, it means `==0`. If the operator is present without a value,
+  the value defaults to zero, so `>` means `>0` and `!=` means `!=0`.
 
-```
-https://registry.my-netdata.io/api/v1/data?chart=net.eth0&options=unaligned&dimensions=received&group=sum&units=kilobits&after=-60&label=sum&points=1
-```
+  There are no and/or compounds.
+
+### Accuracy over long windows
+
+Netdata keeps per-second detail only for a limited time; older data is kept
+at lower resolution. Over a window long enough to read that older data,
+`percentage-of-time`, `number-of-flaps` and `number-of-times` return an
+**estimate**:
+
+- For `percentage-of-time`, a metric that is only ever 0 or 1 - an availability
+  signal - is exact when collected at a steady interval. If the collection
+  interval changed inside a stored interval, that one is weighted by samples
+  rather than by time; other signals and conditions are approximate.
+- `number-of-flaps` and `number-of-times` are exact only when each stored
+  interval contains at most one relevant transition or match. They count at
+  most one event per stored interval, so bursts of events are reported as one.
+- `number-of-times` with `previous` still detects a counter going backwards,
+  so reboot counting keeps working.
+- A gap inside a stored interval is not visible, so partially collected
+  intervals count as collected. This understates `percentage-of-time`
+  over long windows: uncollected time inside a stored interval cannot be
+  separated from collected time there.
+- When the requested resolution is finer than the stored one, every result
+  bucket covering the same stored interval reports that interval's estimate.
+
+`percentage-of-time` always measures against the **selected duration**, not
+against the part of it that was collected. For a condition that does not match
+gaps, uncollected time does not enter the numerator, so a metric with one
+matching sample and the rest of the window missing answers a small percentage,
+not 100%. A condition such as `==gap` or `==null` includes uncollected time in
+the numerator instead. That is what makes it usable for availability.
+
+`percentage-of-samples` does NOT estimate: it treats each stored point as one
+sample and evaluates the condition on it, which is what it has always done.
+Over lower-resolution data that means it answers about stored points rather
+than about the samples behind them.
+
+Use `tier=0` for the highest-resolution available result. When the response
+includes `db.per_tier`, such as with `format=json2`, inspect it to verify the
+selected tier; exactness still depends on the stored interval resolution. Tier
+0 retention is short on busy parents, so a long window will not always have it.
 
 ## Further processing
 
@@ -208,5 +258,3 @@ So, the proper way to query the database is to also set at least `after`. The fo
 <http://netdata.firehol.org/api/v1/data?chart=system.cpu&points=1&after=-10&options=seconds>
 
 When you keep calling this URL, you will see that it returns one new value every 10 seconds, and the timestamp always ends with zero. Similarly, if you say `points=1&after=-5` it will always return timestamps ending with 0 or 5.
-
-

@@ -612,7 +612,7 @@ static int query_plan_unittest_expect_best_tier(
 
 static bool query_plan_unittest_build_entries(
     QUERY_METRIC *qm, RRDR_OPTIONS options, size_t selected_tier,
-    time_t after, time_t before, size_t points) {
+    time_t after, time_t before, size_t points, bool wants_gaps) {
     RRDR r = {0};
     QUERY_TARGET qt = {0};
     QUERY_ENGINE_OPS ops = {
@@ -621,6 +621,7 @@ static bool query_plan_unittest_build_entries(
     };
 
     r.internal.qt = &qt;
+    r.time_grouping.wants_gaps = wants_gaps;
     qt.window.options = options;
     qt.window.tier = selected_tier;
 
@@ -631,7 +632,7 @@ static int query_plan_unittest_expect_plan(
     const char *name, QUERY_METRIC *qm, RRDR_OPTIONS options, size_t selected_tier,
     time_t after, time_t before, size_t points,
     const QUERY_PLAN_ENTRY *expected, size_t expected_used) {
-    if(!query_plan_unittest_build_entries(qm, options, selected_tier, after, before, points)) {
+    if(!query_plan_unittest_build_entries(qm, options, selected_tier, after, before, points, false)) {
         fprintf(stderr, "FAILED query plan entries: %s, planner returned false\n", name);
         return 1;
     }
@@ -663,8 +664,8 @@ static int query_plan_unittest_expect_plan(
 
 static int query_plan_unittest_expect_no_plan(
     const char *name, QUERY_METRIC *qm, RRDR_OPTIONS options, size_t selected_tier,
-    time_t after, time_t before, size_t points) {
-    if(!query_plan_unittest_build_entries(qm, options, selected_tier, after, before, points)) {
+    time_t after, time_t before, size_t points, bool wants_gaps) {
+    if(!query_plan_unittest_build_entries(qm, options, selected_tier, after, before, points, wants_gaps)) {
         fprintf(stderr, "OK query plan entries: %s\n", name);
         return 0;
     }
@@ -1005,7 +1006,9 @@ int query_plan_unittest(void) {
         query_plan_unittest_set_tier(&qm, 2, 100, 150, 60);
 
         errors += query_plan_unittest_expect_no_plan(
-            "no overlapping tier fails planning", &qm, 0, 0, 200, 250, 10);
+            "no overlapping tier fails planning", &qm, 0, 0, 200, 250, 10, false);
+        errors += query_plan_unittest_expect_no_plan(
+            "gap-aware grouping still requires retention overlap", &qm, 0, 0, 200, 250, 10, true);
     }
 
     {
