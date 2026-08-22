@@ -47,6 +47,12 @@ int health_parse_delay(
             if(isnan(*delay_multiplier) || isinf(*delay_multiplier) || islessequal(*delay_multiplier, 0)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, filename, value, key);
+
+                // strtof() has already written the rejected value, and unlike the duration keywords
+                // (duration_parse_seconds() writes nothing when it fails) there is no earlier value
+                // left to fall back to. Clearing the flag makes the default below apply, so a second
+                // 'multiplier' token cannot leave a non-finite or non-positive value behind.
+                given_multiplier = 0;
             }
             else given_multiplier = 1;
         }

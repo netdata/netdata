@@ -633,6 +633,20 @@ static void dyncfg_health_prototype_reapply(RRD_ALERT_PROTOTYPE *ap) {
     health_prototype_apply_to_all_hosts(ap);
 }
 
+// A saved configuration replayed at startup is echoed with no caller to read the response, so the
+// reason we refused it would otherwise be lost and only the status code would reach the log
+// (dyncfg_echo_cb()). Log it here rather than in the generic dyncfg layer: that layer handles every
+// module, including ones whose jobs hold credentials (SNMP communities, passwords, tokens), and their
+// rejection text may quote the offending value. An alert prototype has no credential-bearing field -
+// see the schema written by health_prototype_to_json() - so its rejection text is safe to log.
+static int health_dyncfg_reject(BUFFER *result, const char *cmd, const char *alert, const char *reason) {
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "HEALTH DYNCFG: rejected '%s' of alert prototype '%s': %s",
+           cmd, alert ? alert : "", reason ? reason : "");
+
+    return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, reason);
+}
+
 static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, const char *source __maybe_unused) {
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
     switch(cmd) {
@@ -640,7 +654,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
             CLEAN_BUFFER *error = buffer_create(0, NULL);
             RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, JSONC_REQUIRED);
             if(!nap)
-                code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
+                code = health_dyncfg_reject(result, "add", add_name, buffer_tostring(error));
             else {
                 const char *msg = "";
 
@@ -766,7 +780,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                 CLEAN_BUFFER *error = buffer_create(0, NULL);
                 RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, JSONC_REQUIRED);
                 if(!nap)
-                    code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
+                    code = health_dyncfg_reject(result, "update", alert_name, buffer_tostring(error));
                 else {
                     const char *msg = "";
                     nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;

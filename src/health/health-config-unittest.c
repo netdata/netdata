@@ -695,6 +695,18 @@ static int test_delay_parser_multiplier_boundaries(int *passed) {
         { "up 10s multiplier -2", 0, 10, 0, 10, 1.0f, "negative multiplier uses text default" },
         { "up 10s multiplier nan", 0, 10, 0, 10, 1.0f, "NaN multiplier uses text default" },
         { "up 10s multiplier inf", 0, 10, 0, 10, 1.0f, "infinite multiplier uses text default" },
+        // a repeated 'multiplier' token used to keep the rejected value, because the first valid one
+        // had already set the given-multiplier flag and suppressed the default below
+        { "up 10s multiplier 2 multiplier nan", 0, 10, 0, 10, 1.0f,
+          "NaN after a valid multiplier uses text default" },
+        { "up 10s multiplier 2 multiplier inf", 0, 10, 0, 10, 1.0f,
+          "infinite multiplier after a valid one uses text default" },
+        { "up 10s multiplier 2 multiplier -5", 0, 10, 0, 10, 1.0f,
+          "negative multiplier after a valid one uses text default" },
+        { "up 10s multiplier 2 multiplier 0", 0, 10, 0, 10, 1.0f,
+          "zero multiplier after a valid one uses text default" },
+        { "up 10s multiplier nan multiplier 2", 0, 10, 0, 20, 2.0f,
+          "valid multiplier after a rejected one is honoured" },
         { "max 7s", 0, 0, 0, 7, 1.0f, "explicit maximum with omitted delays" },
         { "up 2s", 5, 2, 0, 5, 1.0f, "prior larger maximum remains unchanged" },
         { "up 16777220s", 16777219, 16777220, 0, 16777219, 1.0f,
