@@ -14,9 +14,11 @@
 # found, so a Linux build never evaluates it. Verify any change to it against
 # the macOS CI jobs; a local configure will not exercise it.
 #
-# Known and pre-existing: the plugin-macos-logs CPack component installed
-# below is orphaned - no package definition consumes it, so the binary ships
-# in no package. Unchanged here.
+# The plugin-macos-logs CPack component tagged below is registered in
+# Packaging.cmake, alongside every other component, behind the same guard this
+# file uses. Keep the two in step: a component registered without its install
+# rule makes CPack emit an empty package, and an install rule whose component is
+# unregistered ships the binary in no package at all.
 
 set(MACOS_LOGS_PLUGIN_FILES
         src/collectors/macos-logs.plugin/macos-logs.c

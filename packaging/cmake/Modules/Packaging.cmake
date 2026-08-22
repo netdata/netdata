@@ -1308,5 +1308,13 @@ endif()
 if(ENABLE_PLUGIN_OTEL)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
 endif()
+# macos-logs.plugin has no ENABLE_PLUGIN_* option of its own, so this repeats the
+# guard its install rule uses in NetdataPluginMacosLogs.cmake rather than testing
+# an option. The guard matters: the component is registered only where the binary
+# is actually installed, so a DEB or RPM run cannot emit an empty package for a
+# macOS-only plugin.
+if(OS_MACOS AND OSLOG AND FOUNDATION)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-macos-logs")
+endif()
 
 include(CPack)
