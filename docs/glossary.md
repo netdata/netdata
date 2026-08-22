@@ -100,6 +100,8 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Netdata Functions** or **Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
+- [**Node**](/docs/learn/node-identities.md): Any system running a Netdata Agent — including physical servers, virtual machines, containers, cloud instances, and edge/IoT devices — each identified by a unique Machine GUID. [Virtual nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) are a special case that represent remote systems (such as SNMP devices) which do not run their own Agent.
+
 - [**Node States**](/docs/netdata-cloud/node-states-and-transitions.md): The connection status of nodes in Netdata Cloud. Nodes can be Live (actively streaming), Stale (not streaming but historical data available via Parent), Offline (disconnected, no data available), or Unseen (claimed but never connected). See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 
 ## O
