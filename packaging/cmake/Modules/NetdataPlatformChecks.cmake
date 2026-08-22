@@ -114,7 +114,12 @@ check_function_exists(backtrace HAVE_BACKTRACE)
 
 check_function_exists(arc4random_buf HAVE_ARC4RANDOM_BUF)
 check_function_exists(arc4random_uniform HAVE_ARC4RANDOM_UNIFORM)
-check_function_exists(getrandom HAVE_GETRANDOM)
+# Tests the DECLARATION, not just linkability, because the consumer in
+# src/libnetdata/os/random.c guards an #include <sys/random.h> with this macro. A
+# link-only test would say yes on a platform without the header and then fail to
+# compile. It also matches the test bundled json-c runs under the same cache name,
+# so whichever project configures first, the answer is the same one.
+check_symbol_exists(getrandom "sys/random.h" HAVE_GETRANDOM)
 check_function_exists(sysinfo HAVE_SYSINFO)
 
 check_function_exists(timegm HAVE_TIMEGM)
