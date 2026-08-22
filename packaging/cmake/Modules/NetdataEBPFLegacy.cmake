@@ -41,6 +41,6 @@ endfunction()
 
 function(netdata_install_legacy_ebpf_code)
     install(DIRECTORY ${ebpf-legacy_BUILD_DIR}/ebpf.d
-            DESTINATION usr/libexec/netdata/plugins.d
+            DESTINATION ${PLUGINS_DEST}
             COMPONENT ebpf-code-legacy)
 endfunction()

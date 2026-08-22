@@ -38,10 +38,10 @@ if(OS_LINUX)
   endif()
 endif()
 
-# RPM distro-family predicates mirroring the macro families netdata.spec.in
-# keys its conditionals on (%{suse_version}, %{centos_ver}/%{rhel},
-# %{fedora}, %{amazon_linux}). Order matters: Amazon Linux carries
-# ID_LIKE="centos rhel fedora" and must not be classified as EL.
+# RPM distro-family predicates. These are the families the RPM packaging
+# conditionals key on: SUSE, EL, Fedora and Amazon Linux. Order matters:
+# Amazon Linux carries ID_LIKE="centos rhel fedora" and must not be
+# classified as EL.
 set(NETDATA_DISTRO_SUSE FALSE)
 set(NETDATA_DISTRO_EL FALSE)
 set(NETDATA_DISTRO_FEDORA FALSE)

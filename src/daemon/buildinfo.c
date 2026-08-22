@@ -1245,13 +1245,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_FEATURE_ML, true);
 #endif
 
-#if defined(ENABLE_MIMALLOC)
-    build_info_set_status(BIB_FEATURE_ALLOCATOR, true);
-    build_info_set_value(BIB_FEATURE_ALLOCATOR, "mimalloc");
-#else
     build_info_set_status(BIB_FEATURE_ALLOCATOR, true);
     build_info_set_value(BIB_FEATURE_ALLOCATOR, "system");
-#endif
 
     build_info_set_value(BIB_DB_SQLITE, sqlite3_libversion());
 

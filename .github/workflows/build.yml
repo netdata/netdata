@@ -52,7 +52,6 @@ jobs:
             src/aclk/aclk-schemas/
             src/ml/dlib/
           files_ignore: |
-            netdata.spec.in
             src/go/otel-collector/release-config.yaml.in
             **/*.md
       - name: Check build files
@@ -63,6 +62,7 @@ jobs:
           files: |
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             netdata-installer.sh
             .github/data/distros.yml
             .github/workflows/build.yml

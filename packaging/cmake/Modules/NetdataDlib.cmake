@@ -7,8 +7,8 @@ function(netdata_bundle_dlib)
 
   message(STATUS "Preparing vendored copy of dlib")
 
-  if(NETDATA_DLIB_SOURCE_PATH)
-    set(FETCHCONTENT_SOURCE_DIR_DLIB "${NETDATA_DLIB_SOURCE_PATH}")
+  if(NETDATA_DLIB_SOURCE_DIR)
+    set(FETCHCONTENT_SOURCE_DIR_DLIB "${NETDATA_DLIB_SOURCE_DIR}")
     message(STATUS "Using local dlib source: ${NETDATA_DLIB_SOURCE_DIR}")
   endif()
 
@@ -47,7 +47,7 @@ function(netdata_bundle_dlib)
 
   FetchContent_MakeAvailable_NoInstall(dlib)
 
-  message(STATUS "Finished preparing vendored copy of JSON-C")
+  message(STATUS "Finished preparing vendored copy of dlib")
 endfunction()
 
 function(netdata_add_dlib_to_target _target)

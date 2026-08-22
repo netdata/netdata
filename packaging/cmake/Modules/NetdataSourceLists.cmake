@@ -1,0 +1,1036 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Source file inventory for the Netdata agent build.
+#
+# Relocated verbatim from the root CMakeLists.txt, in the same relative
+# order, and include()d rather than add_subdirectory()d so
+# CMAKE_CURRENT_SOURCE_DIR keeps pointing at the repository root, which
+# every relative path below depends on. Nothing here may use
+# CMAKE_CURRENT_LIST_DIR.
+#
+# Inventory only. Every operation on these lists - the conditional
+# list(APPEND ...) calls and the NETDATA_FILES aggregation - stays in the
+# root file, because three of the aggregated lists are appended to after
+# this point and expanding them here would silently drop sources.
+#
+# This file does not hold every source list in the build. A list lives beside
+# the target that consumes it: a plugin's in its own
+# packaging/cmake/Modules/NetdataPlugin*.cmake module, and libnetdata's in
+# src/libnetdata/SourceLists.cmake. Add a new list there, not here.
+
+#
+# source files
+#
+
+set(DAEMON_FILES
+        src/daemon/buildinfo.c
+        src/daemon/buildinfo.h
+        src/daemon/common.c
+        src/daemon/common.h
+        src/daemon/daemon.c
+        src/daemon/daemon.h
+        src/daemon/libuv_workers.c
+        src/daemon/libuv_workers.h
+        src/daemon/pulse/pulse.c
+        src/daemon/pulse/pulse.h
+        src/daemon/analytics.c
+        src/daemon/analytics.h
+        src/daemon/main.c
+        src/daemon/main.h
+        src/daemon/environment.c
+        src/daemon/win_system-info.c
+        src/daemon/win_system-info.h
+        src/daemon/signal-handler.c
+        src/daemon/signal-handler.h
+        src/daemon/service.c
+        src/daemon/daemon-shutdown-watcher.c
+        src/daemon/daemon-shutdown-watcher.h
+        src/daemon/static_threads.c
+        src/daemon/static_threads.h
+        src/daemon/commands.c
+        src/daemon/commands.h
+        src/daemon/pipename.c
+        src/daemon/pipename.h
+        src/daemon/unit_test.c
+        src/daemon/unit_test.h
+        src/daemon/dyncfg/dyncfg.c
+        src/daemon/dyncfg/dyncfg.h
+        src/daemon/dyncfg/dyncfg-files.c
+        src/daemon/dyncfg/dyncfg-unittest.c
+        src/daemon/dyncfg/dyncfg-inline.c
+        src/daemon/dyncfg/dyncfg-echo.c
+        src/daemon/dyncfg/dyncfg-internals.h
+        src/daemon/dyncfg/dyncfg-intercept.c
+        src/daemon/dyncfg/dyncfg-tree.c
+        src/daemon/pulse/pulse-http-api.c
+        src/daemon/pulse/pulse-http-api.h
+        src/daemon/pulse/pulse-queries.c
+        src/daemon/pulse/pulse-queries.h
+        src/daemon/pulse/pulse-ingestion.c
+        src/daemon/pulse/pulse-ingestion.h
+        src/daemon/pulse/pulse-ml.c
+        src/daemon/pulse/pulse-ml.h
+        src/daemon/pulse/pulse-gorilla.c
+        src/daemon/pulse/pulse-gorilla.h
+        src/daemon/pulse/pulse-daemon.c
+        src/daemon/pulse/pulse-daemon.h
+        src/daemon/pulse/pulse-daemon-memory.c
+        src/daemon/pulse/pulse-daemon-memory.h
+        src/daemon/pulse/pulse-sqlite3.c
+        src/daemon/pulse/pulse-sqlite3.h
+        src/daemon/pulse/pulse-db-dbengine.c
+        src/daemon/pulse/pulse-db-dbengine.h
+        src/daemon/pulse/pulse-string.c
+        src/daemon/pulse/pulse-string.h
+        src/daemon/pulse/pulse-heartbeat.c
+        src/daemon/pulse/pulse-heartbeat.h
+        src/daemon/pulse/pulse-dictionary.c
+        src/daemon/pulse/pulse-dictionary.h
+        src/daemon/pulse/pulse-workers.c
+        src/daemon/pulse/pulse-workers.h
+        src/daemon/pulse/pulse-trace-allocations.c
+        src/daemon/pulse/pulse-trace-allocations.h
+        src/daemon/pulse/pulse-aral.c
+        src/daemon/pulse/pulse-aral.h
+        src/daemon/config/netdata-conf-db.c
+        src/daemon/config/netdata-conf-db.h
+        src/daemon/config/netdata-conf.h
+        src/daemon/config/netdata-conf-backwards-compatibility.c
+        src/daemon/config/netdata-conf-backwards-compatibility.h
+        src/daemon/config/netdata-conf-web.c
+        src/daemon/config/netdata-conf-web.h
+        src/daemon/config/netdata-conf-directories.c
+        src/daemon/config/netdata-conf-directories.h
+        src/daemon/config/netdata-conf-logs.c
+        src/daemon/config/netdata-conf-logs.h
+        src/daemon/config/netdata-conf-global.c
+        src/daemon/config/netdata-conf-global.h
+        src/daemon/config/netdata-conf.c
+        src/daemon/daemon-shutdown.c
+        src/daemon/daemon-shutdown.h
+        src/daemon/daemon-service.c
+        src/daemon/daemon-service.h
+        src/daemon/pulse/pulse-db-rrd.c
+        src/daemon/pulse/pulse-db-rrd.h
+        src/daemon/config/netdata-conf-cloud.c
+        src/daemon/config/netdata-conf-cloud.h
+        src/daemon/config/netdata-conf-profile.c
+        src/daemon/config/netdata-conf-profile.h
+        src/daemon/pulse/pulse-daemon-memory-system.c
+        src/daemon/pulse/pulse-network.c
+        src/daemon/pulse/pulse-network.h
+        src/daemon/pulse/pulse-db-dbengine-retention.c
+        src/daemon/pulse/pulse-db-dbengine-retention.h
+        src/daemon/pulse/pulse-parents.c
+        src/daemon/pulse/pulse-parents.h
+        src/daemon/status-file.c
+        src/daemon/status-file.h
+        src/daemon/config/netdata-conf-ssl.c
+        src/daemon/config/netdata-conf-ssl.h
+        src/daemon/machine-guid.c
+        src/daemon/machine-guid.h
+        src/daemon/status-file-dedup.c
+        src/daemon/status-file-dedup.h
+        src/daemon/status-file-io.c
+        src/daemon/status-file-io.h
+        src/daemon/status-file-dmi.c
+        src/daemon/status-file-dmi.h
+        src/daemon/status-file-product.c
+        src/daemon/status-file-product.h
+        src/daemon/protected-access.c
+        src/daemon/protected-access.h
+)
+
+set(DAEMON_SYSTEMD_WATCHER_FILES
+    src/daemon/daemon-systemd-watcher.c
+    src/daemon/daemon-systemd-watcher.h
+)
+
+set(API_PLUGIN_FILES
+        src/web/api/web_api.c
+        src/web/api/web_api.h
+        src/web/api/web_api_v1.c
+        src/web/api/web_api_v1.h
+        src/web/api/web_api_v2.c
+        src/web/api/web_api_v2.h
+        src/web/api/web_api_v3.c
+        src/web/api/web_api_v3.h
+        src/web/api/http_auth.c
+        src/web/api/http_auth.h
+        src/web/api/http_header.c
+        src/web/api/http_header.h
+        src/web/api/maps/rrdr_options.c
+        src/web/api/maps/rrdr_options.h
+        src/web/api/maps/contexts_options.c
+        src/web/api/maps/contexts_options.h
+        src/web/api/maps/datasource_formats.c
+        src/web/api/maps/datasource_formats.h
+        src/web/api/maps/maps.h
+        src/web/api/maps/contexts_alert_statuses.c
+        src/web/api/maps/contexts_alert_statuses.h
+        src/web/api/v1/api_v1_allmetrics.c
+        src/web/api/v1/api_v1_badge/web_buffer_svg.c
+        src/web/api/v1/api_v1_function.c
+        src/web/api/v1/api_v1_manage.c
+        src/web/api/v1/api_v1_calls.h
+        src/web/api/v1/api_v1_dbengine.c
+        src/web/api/v1/api_v1_config.c
+        src/web/api/v1/api_v1_functions.c
+        src/web/api/v1/api_v1_weights.c
+        src/web/api/v1/api_v1_info.c
+        src/web/api/v1/api_v1_registry.c
+        src/web/api/v1/api_v1_data.c
+        src/web/api/v1/api_v1_contexts.c
+        src/web/api/v1/api_v1_ml_info.c
+        src/web/api/v1/api_v1_aclk.c
+        src/web/api/v1/api_v1_context.c
+        src/web/api/v1/api_v1_alarms.c
+        src/web/api/v1/api_v1_charts.c
+        src/web/api/v2/api_v2_info.c
+        src/web/api/v2/api_v2_nodes.c
+        src/web/api/v2/api_v2_node_instances.c
+        src/web/api/v2/api_v2_q.c
+        src/web/api/v2/api_v2_versions.c
+        src/web/api/v2/api_v2_functions.c
+        src/web/api/v2/api_v2_alerts.c
+        src/web/api/v2/api_v2_alert_transitions.c
+        src/web/api/v2/api_v2_bearer.c
+        src/web/api/v2/api_v2_calls.h
+        src/web/api/v2/api_v2_data.c
+        src/web/api/v2/api_v2_progress.c
+        src/web/api/v2/api_v2_weights.c
+        src/web/api/v2/api_v2_alert_config.c
+        src/web/api/v2/api_v2_contexts.c
+        src/web/api/v2/api_v2_claim.c
+        src/web/api/v2/api_v2_webrtc.c
+        src/web/api/v3/api_v3_calls.h
+        src/web/api/v3/api_v3_settings.c
+        src/web/api/functions/functions.c
+        src/web/api/functions/functions.h
+        src/web/api/functions/function-progress.c
+        src/web/api/functions/function-progress.h
+        src/web/api/functions/function-netdata-streaming.c
+        src/web/api/functions/function-netdata-streaming.h
+        src/web/api/functions/function-topology-streaming.c
+        src/web/api/functions/function-topology-streaming.h
+        src/web/api/queries/rrdr.c
+        src/web/api/queries/rrdr.h
+        src/web/api/queries/query.c
+        src/web/api/queries/query.h
+        src/web/api/queries/query-execute.c
+        src/web/api/queries/query-window.c
+        src/web/api/queries/query-group-by.c
+        src/web/api/queries/query-group-by-init.c
+        src/web/api/queries/query-group-by-finalize.c
+        src/web/api/queries/query-cardinality-limit.c
+        src/web/api/queries/query-group-over-time.c
+        src/web/api/queries/query-internal.h
+        src/web/api/queries/query-plan.c
+        src/web/api/queries/average/average.c
+        src/web/api/queries/average/average.h
+        src/web/api/queries/countif/countif.c
+        src/web/api/queries/countif/countif.h
+        src/web/api/queries/incremental_sum/incremental_sum.c
+        src/web/api/queries/incremental_sum/incremental_sum.h
+        src/web/api/queries/max/max.c
+        src/web/api/queries/max/max.h
+        src/web/api/queries/min/min.c
+        src/web/api/queries/min/min.h
+        src/web/api/queries/sum/sum.c
+        src/web/api/queries/sum/sum.h
+        src/web/api/queries/median/median.c
+        src/web/api/queries/median/median.h
+        src/web/api/queries/percentile/percentile.c
+        src/web/api/queries/percentile/percentile.h
+        src/web/api/queries/stddev/stddev.c
+        src/web/api/queries/stddev/stddev.h
+        src/web/api/queries/ses/ses.c
+        src/web/api/queries/ses/ses.h
+        src/web/api/queries/des/des.c
+        src/web/api/queries/des/des.h
+        src/web/api/queries/trimmed_mean/trimmed_mean.c
+        src/web/api/queries/trimmed_mean/trimmed_mean.h
+        src/web/api/queries/extremes/extremes.c
+        src/web/api/queries/extremes/extremes.h
+        src/web/api/queries/latest/latest.c
+        src/web/api/queries/latest/latest.h
+        src/web/api/queries/weights.c
+        src/web/api/queries/weights.h
+        src/web/api/formatters/rrd2json.c
+        src/web/api/formatters/rrd2json.h
+        src/web/api/formatters/csv/csv.c
+        src/web/api/formatters/csv/csv.h
+        src/web/api/formatters/json/json.c
+        src/web/api/formatters/json/json.h
+        src/web/api/formatters/ssv/ssv.c
+        src/web/api/formatters/ssv/ssv.h
+        src/web/api/formatters/value/value.c
+        src/web/api/formatters/value/value.h
+        src/web/api/formatters/jsonwrap.c
+        src/web/api/formatters/jsonwrap.h
+        src/web/api/formatters/jsonwrap-internal.h
+        src/web/api/formatters/jsonwrap-objects-tree.c
+        src/web/api/formatters/jsonwrap-query-plan.c
+        src/web/api/formatters/jsonwrap-summary-alerts.c
+        src/web/api/formatters/jsonwrap-summary-contexts.c
+        src/web/api/formatters/jsonwrap-summary-dimensions.c
+        src/web/api/formatters/jsonwrap-summary-instances.c
+        src/web/api/formatters/jsonwrap-summary-labels.c
+        src/web/api/formatters/jsonwrap-summary-nodes.c
+        src/web/api/formatters/jsonwrap-v1.c
+        src/web/api/formatters/jsonwrap-v2.c
+        src/web/api/formatters/charts2json.c
+        src/web/api/formatters/charts2json.h
+        src/web/api/formatters/rrdset2json.c
+        src/web/api/formatters/rrdset2json.h
+        src/web/rtc/webrtc.c
+        src/web/rtc/webrtc.h
+        src/web/api/functions/function-bearer_get_token.c
+        src/web/api/functions/function-bearer_get_token.h
+        src/web/api/v3/api_v3_me.c
+)
+
+set(EXPORTING_ENGINE_FILES
+        src/exporting/exporting_engine.c
+        src/exporting/exporting_engine.h
+        src/exporting/graphite/graphite.c
+        src/exporting/graphite/graphite.h
+        src/exporting/json/json.c
+        src/exporting/json/json.h
+        src/exporting/opentsdb/opentsdb.c
+        src/exporting/opentsdb/opentsdb.h
+        src/exporting/prometheus/prometheus.c
+        src/exporting/prometheus/prometheus.h
+        src/exporting/read_config.c
+        src/exporting/clean_connectors.c
+        src/exporting/init_connectors.c
+        src/exporting/process_data.c
+        src/exporting/check_filters.c
+        src/exporting/send_data.c
+        src/exporting/send_internal_metrics.c
+)
+
+set(HEALTH_PLUGIN_FILES
+        src/health/health.c
+        src/health/health.h
+        src/health/health_config.c
+        src/health/health-config-unittest.c
+        src/health/health-config-unittest.h
+        src/health/health_json.c
+        src/health/health_log.c
+        src/health/health_prototypes.c
+        src/health/health_prototypes.h
+        src/health/health_silencers.c
+        src/health/health_silencers.h
+        src/health/health_internals.h
+        src/health/health_notifications.c
+        src/health/health_event_loop.c
+        src/health/health_dyncfg.c
+        src/health/health_variable.c
+        src/health/rrdcalc.c
+        src/health/rrdcalc.h
+        src/health/rrdvar.c
+        src/health/rrdvar.h
+        src/health/health-alert-entry.h
+        src/health/health-alert-log.h
+)
+
+set(IDLEJITTER_PLUGIN_FILES src/collectors/idlejitter.plugin/plugin_idlejitter.c)
+
+set(INTERNAL_COLLECTORS_FILES
+        src/collectors/common-contexts/common-contexts.h
+        src/collectors/common-contexts/disk-await.h
+        src/collectors/common-contexts/disk-avgsz.h
+        src/collectors/common-contexts/disk-busy.h
+        src/collectors/common-contexts/disk-io.h
+        src/collectors/common-contexts/disk-iotime.h
+        src/collectors/common-contexts/disk-ops.h
+        src/collectors/common-contexts/disk-qops.h
+        src/collectors/common-contexts/disk-svctm.h
+        src/collectors/common-contexts/disk-util.h
+        src/collectors/common-contexts/system-io.h
+        src/collectors/common-contexts/system-interrupts.h
+        src/collectors/common-contexts/system-processes.h
+        src/collectors/common-contexts/system-ram.h
+        src/collectors/common-contexts/mem-swap.h
+        src/collectors/common-contexts/mem-pgfaults.h
+        src/collectors/common-contexts/mem-available.h
+        src/collectors/common-contexts/power-supply.h
+        src/collectors/common-contexts/hw-sensors.h
+        src/collectors/common-contexts/hw-sensors-function.h
+)
+
+set(PLUGINSD_PLUGIN_FILES
+        src/plugins.d/plugins_d.c
+        src/plugins.d/plugins_d.h
+        src/plugins.d/pluginsd_dyncfg.c
+        src/plugins.d/pluginsd_dyncfg.h
+        src/plugins.d/pluginsd_functions.c
+        src/plugins.d/pluginsd_functions.h
+        src/plugins.d/pluginsd_internals.c
+        src/plugins.d/pluginsd_internals.h
+        src/plugins.d/pluginsd_parser.c
+        src/plugins.d/pluginsd_parser.h
+        src/plugins.d/pluginsd_replication.c
+        src/plugins.d/pluginsd_replication.h
+)
+
+set(RRD_PLUGIN_FILES
+        src/database/contexts/api_v1_contexts.c
+        src/database/contexts/api_v2_contexts.c
+        src/database/contexts/api_v2_contexts.h
+        src/database/contexts/api_v2_contexts_agents.c
+        src/database/contexts/api_v2_contexts_alerts.c
+        src/database/contexts/api_v2_contexts_alerts.h
+        src/database/contexts/api_v2_contexts_alert_transitions.c
+        src/database/contexts/api_v2_contexts_alert_config.c
+        src/database/contexts/rrdcontext-context.c
+        src/database/contexts/rrdcontext-instance.c
+        src/database/contexts/rrdcontext-internal.h
+        src/database/contexts/rrdcontext-metric.c
+        src/database/contexts/query_scope.c
+        src/database/contexts/query_target.c
+        src/database/contexts/rrdcontext.c
+        src/database/contexts/rrdcontext.h
+        src/database/contexts/rrdcontext-worker.c
+        src/database/rrdcollector.c
+        src/database/rrdcollector.h
+        src/database/rrddim.c
+        src/database/rrdfunctions.c
+        src/database/rrdfunctions.h
+        src/database/rrdfunctions-inline.c
+        src/database/rrdfunctions-inline.h
+        src/database/rrdhost.c
+        src/database/rrdlabels.c
+        src/database/rrdlabels-aggregated.c
+        src/database/rrdlabels-aggregated.h
+        src/database/rrd.c
+        src/database/rrd.h
+        src/database/rrd-metadata.c
+        src/database/rrd-metadata.h
+        src/database/rrd-retention.c
+        src/database/rrd-retention.h
+        src/database/rrdset.c
+        src/database/storage-engine.c
+        src/database/storage-engine.h
+        src/database/ram/rrddim_mem.c
+        src/database/ram/rrddim_mem.h
+        src/database/sqlite/sqlite_metadata.c
+        src/database/sqlite/sqlite_metadata.h
+        src/database/sqlite/sqlite_functions.c
+        src/database/sqlite/sqlite_functions.h
+        src/database/sqlite/sqlite_context.c
+        src/database/sqlite/sqlite_context.h
+        src/database/sqlite/sqlite_db_migration.c
+        src/database/sqlite/sqlite_db_migration.h
+        src/database/sqlite/sqlite_aclk.c
+        src/database/sqlite/sqlite_aclk.h
+        src/database/sqlite/sqlite_health.c
+        src/database/sqlite/sqlite_health.h
+        src/database/sqlite/sqlite_aclk_node.c
+        src/database/sqlite/sqlite_aclk_node.h
+        src/database/sqlite/sqlite_aclk_alert.c
+        src/database/sqlite/sqlite_aclk_alert.h
+        src/web/api/queries/KolmogorovSmirnovDist.c
+        src/web/api/queries/KolmogorovSmirnovDist.h
+        src/database/rrdfunctions-inflight.c
+        src/database/rrdfunctions-inflight.h
+        src/database/rrdfunctions-exporters.c
+        src/database/rrdfunctions-exporters.h
+        src/database/rrdfunctions-unittest.c
+        src/database/rrdfunctions-internals.h
+        src/database/rrdcollector-internals.h
+        src/database/rrd-database-mode.h
+        src/database/rrd-database-mode.c
+        src/database/rrdhost-system-info.c
+        src/database/rrdhost-system-info.h
+        src/database/contexts/rrdcontext-loading.c
+        src/database/rrdset-index-id.c
+        src/database/rrdset-index-id.h
+        src/database/rrdset-index-name.c
+        src/database/rrdset-index-name.h
+        src/database/rrdset-slots.c
+        src/database/rrdset-slots.h
+        src/database/rrdset-collection.c
+        src/database/rrdset-collection.h
+        src/database/rrdset.h
+        src/database/rrdhost.h
+        src/database/rrdhost-status.c
+        src/database/rrdhost-status.h
+        src/database/rrddim.h
+        src/database/rrddim-backfill.c
+        src/database/rrddim-backfill.h
+        src/database/rrddim-collection.c
+        src/database/rrddim-collection.h
+        src/database/rrdset-type.c
+        src/database/rrdset-type.h
+        src/database/rrdhost-slots.c
+        src/database/rrdhost-slots.h
+        src/database/rrd-algorithm.c
+        src/database/rrd-algorithm.h
+        src/database/rrdhost-labels.c
+        src/database/rrdhost-labels.h
+        src/database/rrdhost-collection.c
+        src/database/rrdhost-collection.h
+        src/database/pattern-array.c
+        src/database/pattern-array.h
+        src/database/contexts/rrdcontext-queues.c
+        src/database/contexts/rrdcontext-context-registry.c
+        src/database/contexts/rrdcontext-context-registry.h
+)
+
+set(REGISTRY_PLUGIN_FILES
+        src/registry/registry.c
+        src/registry/registry.h
+        src/registry/registry_db.c
+        src/registry/registry_init.c
+        src/registry/registry_internals.c
+        src/registry/registry_internals.h
+        src/registry/registry_log.c
+        src/registry/registry_machine.c
+        src/registry/registry_machine.h
+        src/registry/registry_person.c
+        src/registry/registry_person.h
+)
+
+set(STATSD_PLUGIN_FILES
+        src/collectors/statsd.plugin/statsd.c
+)
+
+set(STREAMING_PLUGIN_FILES
+        src/streaming/stream.h
+        src/streaming/stream-trace.h
+        src/streaming/stream-compression/compression.c
+        src/streaming/stream-compression/compression.h
+        src/streaming/stream-compression/brotli.c
+        src/streaming/stream-compression/brotli.h
+        src/streaming/stream-compression/gzip.c
+        src/streaming/stream-compression/gzip.h
+        src/streaming/stream-compression/lz4.c
+        src/streaming/stream-compression/lz4.h
+        src/streaming/stream-compression/zstd.c
+        src/streaming/stream-compression/zstd.h
+        src/streaming/stream-receiver.c
+        src/streaming/stream-sender.c
+        src/streaming/stream-replication-sender.c
+        src/streaming/stream-replication-sender.h
+        src/streaming/protocol/command-nodeid.c
+        src/streaming/protocol/commands.c
+        src/streaming/protocol/commands.h
+        src/streaming/protocol/command-claimed_id.c
+        src/streaming/stream-path.c
+        src/streaming/stream-path.h
+        src/streaming/stream-capabilities.c
+        src/streaming/stream-capabilities.h
+        src/streaming/stream-connector.c
+        src/streaming/stream-sender-internals.h
+        src/streaming/stream-sender-execute.c
+        src/streaming/stream-sender-commit.c
+        src/streaming/stream-parents.c
+        src/streaming/stream-handshake.c
+        src/streaming/protocol/command-function.c
+        src/streaming/protocol/command-function-del.c
+        src/streaming/protocol/command-host-labels.c
+        src/streaming/protocol/command-chart-definition.c
+        src/streaming/protocol/command-begin-set-end-v2.c
+        src/streaming/protocol/command-host-variables.c
+        src/streaming/stream-conf.c
+        src/streaming/stream-conf.h
+        src/streaming/stream-handshake.h
+        src/streaming/stream-parents.h
+        src/streaming/stream-sender-api.c
+        src/streaming/stream-receiver-internals.h
+        src/streaming/stream-receiver-api.c
+        src/streaming/stream-thread.c
+        src/streaming/stream-thread.h
+        src/streaming/stream-receiver-connection.c
+        src/streaming/stream-sender-commit.h
+        src/streaming/stream-traffic-types.h
+        src/streaming/stream-circular-buffer.c
+        src/streaming/stream-circular-buffer.h
+        src/streaming/stream-control.c
+        src/streaming/stream-control.h
+        src/streaming/stream-waiting-list.c
+        src/streaming/stream-waiting-list.h
+        src/streaming/stream-replication-receiver.c
+        src/streaming/stream-replication-receiver.h
+        src/streaming/stream-replication-tracking.c
+        src/streaming/stream-replication-tracking.h
+        src/streaming/protocol/command-begin-set-end-v1.c
+        src/streaming/protocol/command-begin-set-end-init.c
+)
+
+set(WEB_PLUGIN_FILES
+        src/web/api/functions/function-metrics-cardinality.c
+        src/web/api/functions/function-metrics-cardinality.h
+        src/web/api/queries/backfill.c
+        src/web/api/queries/backfill.h
+        src/web/api/v3/api_v3_stream_info.c
+        src/web/api/v3/api_v3_stream_path.c
+        src/web/mcp/adapters/mcp-websocket.c
+        src/web/mcp/adapters/mcp-websocket.h
+        src/web/mcp/adapters/mcp-http.c
+        src/web/mcp/adapters/mcp-http.h
+        src/web/mcp/adapters/mcp-http-common.h
+        src/web/mcp/adapters/mcp-sse.c
+        src/web/mcp/adapters/mcp-sse.h
+        src/web/mcp/mcp-jsonrpc.c
+        src/web/mcp/mcp-jsonrpc.h
+        src/web/mcp/mcp-initialize.c
+        src/web/mcp/mcp-initialize.h
+        src/web/mcp/mcp-prompts.c
+        src/web/mcp/mcp-prompts.h
+        src/web/mcp/mcp-resources.c
+        src/web/mcp/mcp-resources.h
+        src/web/mcp/mcp-tools.c
+        src/web/mcp/mcp-tools.h
+        src/web/mcp/mcp-tools-list-metadata.c
+        src/web/mcp/mcp-tools-list-metadata.h
+        src/web/mcp/mcp-tools-execute-function.c
+        src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-execute-function-unittest.c
+        src/web/mcp/mcp-tools-execute-function-internal.h
+        src/web/mcp/mcp-tools-execute-function-registry.c
+        src/web/mcp/mcp-tools-execute-function-registry.h
+        src/web/mcp/mcp-tools-query-metrics.c
+        src/web/mcp/mcp-tools-query-metrics.h
+        src/web/mcp/mcp-tools-weights.c
+        src/web/mcp/mcp-tools-weights.h
+        src/web/mcp/mcp-tools-alert-transitions.c
+        src/web/mcp/mcp-tools-alert-transitions.h
+        src/web/mcp/mcp-tools-configured-alerts.c
+        src/web/mcp/mcp-tools-configured-alerts.h
+        src/web/mcp/mcp-params.c
+        src/web/mcp/mcp-params.h
+        src/web/mcp/mcp-ping.c
+        src/web/mcp/mcp-ping.h
+        src/web/mcp/mcp-logging.c
+        src/web/mcp/mcp-logging.h
+        src/web/mcp/mcp-completion.c
+        src/web/mcp/mcp-completion.h
+        src/web/api/mcp_auth.c
+        src/web/api/mcp_auth.h
+        src/web/mcp/mcp.c
+        src/web/mcp/mcp.h
+        src/web/server/static/static-threaded.c
+        src/web/server/static/static-threaded.h
+        src/web/server/web_client.c
+        src/web/server/web_client.h
+        src/web/server/web_client_cache.c
+        src/web/server/web_client_cache.h
+        src/web/server/web_server.c
+        src/web/server/web_server.h
+        src/web/websocket/websocket-buffer.h
+        src/web/websocket/websocket-compression.c
+        src/web/websocket/websocket-compression.h
+        src/web/websocket/websocket-echo.c
+        src/web/websocket/websocket-echo.h
+        src/web/websocket/websocket-handshake.c
+        src/web/websocket/websocket-internal.h
+        src/web/websocket/websocket-jsonrpc.c
+        src/web/websocket/websocket-jsonrpc.h
+        src/web/websocket/websocket-message.c
+        src/web/websocket/websocket-receive.c
+        src/web/websocket/websocket-send.c
+        src/web/websocket/websocket-thread.c
+        src/web/websocket/websocket-thread.h
+        src/web/websocket/websocket-utils.c
+        src/web/websocket/websocket.c
+        src/web/websocket/websocket.h
+)
+
+set(CLAIM_PLUGIN_FILES
+        src/claim/claim.c
+        src/claim/claim.h
+        src/claim/claim_id.c
+        src/claim/claim_id.h
+        src/claim/cloud-conf.c
+        src/claim/claim-with-api.c
+        src/claim/cloud-status.c
+        src/claim/cloud-status.h
+)
+
+set(CLAIM_WINDOWS_FILES
+        src/claim/main.c
+        src/claim/main.h
+        src/claim/ui.c
+        src/claim/ui.h
+)
+
+# Not named _FILES on purpose: the name records the policy, that these compile
+# whether or not ACLK is enabled.
+set(ACLK_ALWAYS_BUILD
+        src/aclk/aclk_proxy.c
+        src/aclk/aclk_proxy.h
+        src/aclk/aclk.c
+        src/aclk/aclk.h
+        src/aclk/aclk_capas.c
+        src/aclk/aclk_capas.h
+        src/aclk/aclk_util.c
+        src/aclk/aclk_util.h
+        src/aclk/https_client.c
+        src/aclk/https_client.h
+        src/libnetdata/c_rhash/c_rhash.c
+        src/libnetdata/c_rhash/c_rhash.h
+        src/libnetdata/c_rhash/c_rhash_internal.h
+)
+
+set(TIMEX_PLUGIN_FILES
+        src/collectors/timex.plugin/plugin_timex.c
+)
+
+set(PROFILE_PLUGIN_FILES
+        src/collectors/profile.plugin/plugin_profile.cc
+)
+
+set(CGROUPS_PLUGIN_FILES
+        src/collectors/cgroups.plugin/sys_fs_cgroup.c
+        src/collectors/cgroups.plugin/sys_fs_cgroup.h
+        src/collectors/cgroups.plugin/cgroup-internals.h
+        src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-name-config.c
+        src/collectors/cgroups.plugin/cgroup-name-config.h
+        src/collectors/cgroups.plugin/cgroup-name-labels.c
+        src/collectors/cgroups.plugin/cgroup-orchestrator.c
+        src/collectors/common-cgroups/cgroup-path.c
+        src/collectors/common-cgroups/cgroup-path.h
+        src/collectors/cgroups.plugin/cgroup-charts.c
+        src/collectors/cgroups.plugin/cgroup-top.c
+        src/collectors/cgroups.plugin/cgroup-netipc.c
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-netipc.c>"
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-resolver.c>"
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-resolver.h>"
+        src/collectors/cgroups.plugin/cgroup-netipc.h
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.h
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
+        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
+        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_shared_memory.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_shared_memory.h
+)
+
+set(DISKSPACE_PLUGIN_FILES
+        src/collectors/diskspace.plugin/plugin_diskspace.c
+)
+
+set(MACOS_PLUGIN_FILES
+        src/collectors/macos.plugin/plugin_macos.c
+        src/collectors/macos.plugin/plugin_macos.h
+        src/collectors/macos.plugin/macos_sysctl.c
+        src/collectors/macos.plugin/macos_mach_smi.c
+        src/collectors/macos.plugin/macos_fw.c
+        src/collectors/macos.plugin/macos_power.c
+        src/collectors/macos.plugin/macos_iohid.c
+        src/collectors/macos.plugin/macos_iohid.h
+        src/collectors/macos.plugin/macos_smc.c
+        src/collectors/macos.plugin/macos_smc.h
+        src/collectors/macos.plugin/macos_gpu.c
+        src/collectors/macos.plugin/macos_sensors.c
+        src/collectors/macos.plugin/macos_powermetrics.c
+        src/collectors/macos.plugin/macos_nvme.c
+)
+
+set(FREEBSD_PLUGIN_FILES
+        src/collectors/freebsd.plugin/plugin_freebsd.c
+        src/collectors/freebsd.plugin/plugin_freebsd.h
+        src/collectors/freebsd.plugin/freebsd_sysctl.c
+        src/collectors/freebsd.plugin/freebsd_getmntinfo.c
+        src/collectors/freebsd.plugin/freebsd_getifaddrs.c
+        src/collectors/freebsd.plugin/freebsd_devstat.c
+        src/collectors/freebsd.plugin/freebsd_kstat_zfs.c
+        src/collectors/freebsd.plugin/freebsd_ipfw.c
+        src/collectors/proc.plugin/zfs_common.c
+        src/collectors/proc.plugin/zfs_common.h
+)
+
+set(WINDOWS_PLUGIN_FILES
+        src/collectors/windows.plugin/windows_plugin.c
+        src/collectors/windows.plugin/windows_plugin.h
+        src/collectors/windows.plugin/GetSystemUptime.c
+        src/collectors/windows.plugin/GetSystemRAM.c
+        src/collectors/windows.plugin/GetSystemCPU.c
+        src/collectors/windows.plugin/GetPowerSupply.c
+        src/collectors/windows.plugin/GetServicesStatus.c
+        src/collectors/windows.plugin/GetSensors.c
+        src/collectors/windows.plugin/GetHardwareInfo.c
+        src/collectors/windows.plugin/perflib-adcs.c
+        src/collectors/windows.plugin/perflib-adfs.c
+        src/collectors/windows.plugin/perflib-rrd.c
+        src/collectors/windows.plugin/perflib-rrd.h
+        src/collectors/windows.plugin/perflib-ad.c
+        src/collectors/windows.plugin/perflib-storage.c
+        src/collectors/windows.plugin/perflib-processor.c
+        src/collectors/windows.plugin/perflib-thermalzone.c
+        src/collectors/windows.plugin/perflib-objects.c
+        src/collectors/windows.plugin/perflib-network.c
+        src/collectors/windows.plugin/perflib-smb.c
+        src/collectors/windows.plugin/perflib-netframework.c
+        src/collectors/windows.plugin/perflib-memory.c
+        src/collectors/windows.plugin/perflib-processes.c
+        src/collectors/windows.plugin/perflib-web-service.c
+        src/collectors/windows.plugin/perflib-hyperv.c
+        src/collectors/windows.plugin/perflib-exchange.c
+        src/collectors/windows.plugin/perflib-numa.c
+        src/collectors/windows.plugin/perflib-asp.c
+)
+
+set(WINDOWS_DRIVER_FILES
+        src/collectors/windows.plugin/driver/netdata_driver.c
+        src/collectors/windows.plugin/driver/netdata_driver.h
+)
+
+set(PROC_PLUGIN_FILES
+        src/collectors/proc.plugin/ipc.c
+        src/collectors/proc.plugin/plugin_proc.c
+        src/collectors/proc.plugin/plugin_proc.h
+        src/collectors/proc.plugin/proc_sys_fs_file_nr.c
+        src/collectors/proc.plugin/proc_diskstats.c
+        src/collectors/proc.plugin/proc_mdstat.c
+        src/collectors/proc.plugin/proc_interrupts.c
+        src/collectors/proc.plugin/proc_softirqs.c
+        src/collectors/proc.plugin/proc_loadavg.c
+        src/collectors/proc.plugin/proc_meminfo.c
+        src/collectors/proc.plugin/proc_pagetypeinfo.c
+        src/collectors/proc.plugin/proc_net_dev.c
+        src/collectors/proc.plugin/proc_net_dev_renames.c
+        src/collectors/proc.plugin/proc_net_dev_renames.h
+        src/collectors/proc.plugin/proc_net_wireless.c
+        src/collectors/proc.plugin/proc_net_ip_vs_stats.c
+        src/collectors/proc.plugin/proc_net_netstat.c
+        src/collectors/proc.plugin/proc_net_rpc_nfs.c
+        src/collectors/proc.plugin/proc_net_rpc_nfsd.c
+        src/collectors/proc.plugin/proc_net_sctp_snmp.c
+        src/collectors/proc.plugin/proc_net_sockstat.c
+        src/collectors/proc.plugin/proc_net_sockstat6.c
+        src/collectors/proc.plugin/proc_net_softnet_stat.c
+        src/collectors/proc.plugin/proc_net_stat_conntrack.c
+        src/collectors/proc.plugin/proc_net_stat_synproxy.c
+        src/collectors/proc.plugin/proc_self_mountinfo.c
+        src/collectors/proc.plugin/proc_self_mountinfo.h
+        src/collectors/proc.plugin/zfs_common.c
+        src/collectors/proc.plugin/zfs_common.h
+        src/collectors/proc.plugin/proc_spl_kstat_zfs.c
+        src/collectors/proc.plugin/proc_stat.c
+        src/collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
+        src/collectors/proc.plugin/proc_vmstat.c
+        src/collectors/proc.plugin/proc_uptime.c
+        src/collectors/proc.plugin/run_reboot_required.c
+        src/collectors/proc.plugin/proc_pressure.c
+        src/collectors/proc.plugin/proc_pressure.h
+        src/collectors/proc.plugin/sys_kernel_mm_ksm.c
+        src/collectors/proc.plugin/sys_block_zram.c
+        src/collectors/proc.plugin/sys_devices_system_edac_mc.c
+        src/collectors/proc.plugin/sys_devices_system_node.c
+        src/collectors/proc.plugin/sys_class_infiniband.c
+        src/collectors/proc.plugin/sys_fs_btrfs.c
+        src/collectors/proc.plugin/sys_class_power_supply.c
+        src/collectors/proc.plugin/sys_devices_pci_aer.c
+        src/collectors/proc.plugin/sys_class_drm.c
+)
+
+set(TC_PLUGIN_FILES
+        src/collectors/tc.plugin/plugin_tc.c
+)
+
+set(MQTT_WEBSOCKETS_FILES
+        src/aclk/mqtt_websockets/mqtt_wss_client.c
+        src/aclk/mqtt_websockets/mqtt_wss_client.h
+        src/aclk/mqtt_websockets/ws_client.c
+        src/aclk/mqtt_websockets/ws_client.h
+        src/aclk/mqtt_websockets/ws_client-unittest.c
+        src/aclk/mqtt_websockets/mqtt_ng.c
+        src/aclk/mqtt_websockets/mqtt_ng.h
+        src/aclk/mqtt_websockets/common_public.c
+        src/aclk/mqtt_websockets/common_public.h
+        src/aclk/mqtt_websockets/common_internal.h
+        src/aclk/mqtt_websockets/aclk_mqtt_workers.h
+)
+
+# Not named _FILES on purpose: these are .proto schema definitions handed to
+# protoc, not sources of any target. The sources protoc generates from them are
+# appended to ACLK_FILES.
+set(ACLK_PROTO_DEFS
+        src/aclk/aclk-schemas/proto/aclk/v1/lib.proto
+        src/aclk/aclk-schemas/proto/agent/v1/disconnect.proto
+        src/aclk/aclk-schemas/proto/agent/v1/connection.proto
+        src/aclk/aclk-schemas/proto/alarm/v1/config.proto
+        src/aclk/aclk-schemas/proto/alarm/v1/stream.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/manifest/v1/manifest.proto
+        src/aclk/aclk-schemas/proto/context/v1/context.proto
+        src/aclk/aclk-schemas/proto/context/v1/stream.proto
+        src/aclk/aclk-schemas/proto/agent/v1/cmds.proto
+)
+
+set(ACLK_FILES
+        src/aclk/aclk_query.c
+        src/aclk/aclk_query.h
+        src/aclk/aclk_query_queue.c
+        src/aclk/aclk_query_queue.h
+        src/aclk/aclk_otp.c
+        src/aclk/aclk_otp.h
+        src/aclk/aclk_tx_msgs.c
+        src/aclk/aclk_tx_msgs.h
+        src/aclk/aclk_rx_msgs.c
+        src/aclk/aclk_rx_msgs.h
+        src/aclk/aclk_alarm_api.c
+        src/aclk/aclk_alarm_api.h
+        src/aclk/aclk_contexts_api.c
+        src/aclk/aclk_contexts_api.h
+        src/aclk/schema-wrappers/connection.cc
+        src/aclk/schema-wrappers/connection.h
+        src/aclk/schema-wrappers/node_connection.cc
+        src/aclk/schema-wrappers/node_connection.h
+        src/aclk/schema-wrappers/node_creation.cc
+        src/aclk/schema-wrappers/node_creation.h
+        src/aclk/schema-wrappers/alarm_stream.cc
+        src/aclk/schema-wrappers/alarm_stream.h
+        src/aclk/schema-wrappers/alarm_config.cc
+        src/aclk/schema-wrappers/alarm_config.h
+        src/aclk/schema-wrappers/node_info.cc
+        src/aclk/schema-wrappers/node_info.h
+        src/aclk/schema-wrappers/node_manifest.cc
+        src/aclk/schema-wrappers/node_manifest.h
+        src/aclk/schema-wrappers/capability.cc
+        src/aclk/schema-wrappers/capability.h
+        src/aclk/schema-wrappers/proto_2_json.cc
+        src/aclk/schema-wrappers/proto_2_json.h
+        src/aclk/schema-wrappers/context_stream.cc
+        src/aclk/schema-wrappers/context_stream.h
+        src/aclk/schema-wrappers/context.cc
+        src/aclk/schema-wrappers/rrdcontext-context.h
+        src/aclk/schema-wrappers/schema_wrappers.h
+        src/aclk/schema-wrappers/schema_wrapper_utils.cc
+        src/aclk/schema-wrappers/schema_wrapper_utils.h
+        src/aclk/schema-wrappers/agent_cmds.cc
+        src/aclk/schema-wrappers/agent_cmds.h
+)
+
+set(MONGODB_EXPORTING_FILES
+        src/exporting/mongodb/mongodb.c
+        src/exporting/mongodb/mongodb.h
+)
+
+set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
+        src/exporting/prometheus/remote_write/remote_write.c
+        src/exporting/prometheus/remote_write/remote_write.h
+        src/exporting/prometheus/remote_write/remote_write_request.cc
+        src/exporting/prometheus/remote_write/remote_write_request.h
+)
+
+#
+# Guarded inventory. The root file keeps the guard and selects
+# from here; only the file lists live below.
+#
+
+# ml: the real implementation
+set(ML_ENABLED_FILES
+        src/ml/ad_charts.h
+        src/ml/ad_charts.cc
+        src/ml/ml.cc
+        src/ml/ml_calculated_number.h
+        src/ml/ml_host.h
+        src/ml/ml_config.h
+        src/ml/ml_config.cc
+        src/ml/ml_dimension.h
+        src/ml/ml_enums.h
+        src/ml/ml_enums.cc
+        src/ml/ml_features.h
+        src/ml/ml_features.cc
+        src/ml/ml_kmeans.h
+        src/ml/ml_kmeans.cc
+        src/ml/ml_queue.h
+        src/ml/ml_worker.h
+        src/ml/ml_string_wrapper.h
+        src/ml/ml_queue.cc
+        src/ml/ml_private.h
+        src/ml/ml_public.h
+        src/ml/ml_public.cc
+        src/ml/ml-unittest.cc
+)
+
+# ml: overrides global operator new/delete to feed the ML memory pulse counters
+set(ML_MEMORY_FILES
+        src/ml/ml_memory.cc
+)
+
+# ml: the stub used when ML is off
+set(ML_DISABLED_FILES
+        src/ml/ml_public.h
+        src/ml/ml-dummy.c
+)
+
+# rrd: the dbengine storage backend
+set(RRD_DBENGINE_FILES
+        src/database/engine/rrdengine.c
+        src/database/engine/rrdengine.h
+        src/database/engine/rrddiskprotocol.h
+        src/database/engine/datafile.c
+        src/database/engine/datafile.h
+        src/database/engine/journalfile.c
+        src/database/engine/journalfile.h
+        src/database/engine/rrdenginelib.c
+        src/database/engine/rrdenginelib.h
+        src/database/engine/rrdengineapi.c
+        src/database/engine/rrdengineapi.h
+        src/database/engine/pagecache.c
+        src/database/engine/pagecache.h
+        src/database/engine/page_test.cc
+        src/database/engine/page.c
+        src/database/engine/page.h
+        src/database/engine/cache.c
+        src/database/engine/cache.h
+        src/database/engine/mrg.c
+        src/database/engine/mrg.h
+        src/database/engine/mrg-internals.h
+        src/database/engine/mrg-unittest.c
+        src/database/engine/mrg-load.c
+        src/database/engine/pdc.c
+        src/database/engine/pdc.h
+        src/database/engine/dbengine-unittest.c
+        src/database/engine/dbengine-stresstest.c
+        src/database/engine/dbengine-compression.c
+        src/database/engine/dbengine-compression.h
+)
+
+# collectors: the shared header
+set(COLLECTORS_ALL_FILES
+        src/collectors/all.h
+)
+
+# daemon: the Linux static threads
+set(DAEMON_LINUX_FILES
+        src/daemon/static_threads_linux.c
+)
+
+# daemon: the Sentry crash reporter
+set(DAEMON_SENTRY_FILES
+        src/daemon/sentry-native/sentry-native.c
+        src/daemon/sentry-native/sentry-native.h
+)
+
+# daemon: the macOS static threads
+set(DAEMON_MACOS_FILES
+        src/daemon/static_threads_macos.c
+)
+
+# daemon: the FreeBSD static threads
+set(DAEMON_FREEBSD_FILES
+        src/daemon/static_threads_freebsd.c
+)
+
+# daemon: the Windows static threads and service
+set(DAEMON_WINDOWS_FILES
+        src/daemon/static_threads_windows.c
+        src/daemon/winsvc.cc
+)
+
+# windows: the netdata-claim resource script
+set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
+
+# windows: the netdata resource script
+set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")

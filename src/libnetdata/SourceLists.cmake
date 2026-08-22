@@ -1,0 +1,486 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Source file inventory for the libnetdata targets.
+#
+# Relocated from packaging/cmake/Modules/NetdataSourceLists.cmake, in the same
+# relative order, with every path rebased from repository-relative to
+# directory-relative because this file is read from src/libnetdata rather than
+# from the repository root. One entry was dropped rather than moved:
+# LIBNETDATA_FILES opened with ${CONFIG_H}, naming the generated config.h. A
+# header in a source list produces no build edge and no compile flag, so it was
+# dropped along with the variable itself.
+#
+# Inventory only. The list(APPEND LIBNETDATA_FILES ...) composition lives in
+# CMakeLists.txt beside the targets that consume it.
+#
+# A list belongs here when the target that consumes it is defined in
+# CMakeLists.txt next to this file - not because its paths happen to sit under
+# src/libnetdata. Three lists are wholly libnetdata sources and still live
+# elsewhere for exactly that reason, each beside the target that consumes it:
+# SYSTEMD_CAT_NATIVE_FILES in NetdataSystemdCatNative.cmake, and
+# NETWORK_VIEWER_{FREEBSD,MACOS}_FILES in NetdataPluginNetworkViewer.cmake.
+
+set(LIBJUDY_PREV_FILES
+        libjudy/vendored/JudyL/JudyLPrev.c
+        libjudy/vendored/JudyL/JudyLPrevEmpty.c
+)
+
+set(LIBJUDY_NEXT_FILES
+        libjudy/vendored/JudyL/JudyLNext.c
+        libjudy/vendored/JudyL/JudyLNextEmpty.c
+)
+
+set(LIBJUDY_FILES
+        libjudy/vendored/Judy.h
+        libjudy/vendored/JudyCommon/JudyMalloc.c
+        libjudy/vendored/JudyCommon/JudyPrivate.h
+        libjudy/vendored/JudyCommon/JudyPrivate1L.h
+        libjudy/vendored/JudyCommon/JudyPrivateBranch.h
+        libjudy/vendored/JudyL/JudyL.h
+        libjudy/vendored/JudyL/JudyLByCount.c
+        libjudy/vendored/JudyL/JudyLCascade.c
+        libjudy/vendored/JudyL/JudyLCount.c
+        libjudy/vendored/JudyL/JudyLCreateBranch.c
+        libjudy/vendored/JudyL/JudyLDecascade.c
+        libjudy/vendored/JudyL/JudyLDel.c
+        libjudy/vendored/JudyL/JudyLFirst.c
+        libjudy/vendored/JudyL/JudyLFreeArray.c
+        libjudy/vendored/JudyL/j__udyLGet.c
+        libjudy/vendored/JudyL/JudyLGet.c
+        libjudy/vendored/JudyL/JudyLInsArray.c
+        libjudy/vendored/JudyL/JudyLIns.c
+        libjudy/vendored/JudyL/JudyLInsertBranch.c
+        libjudy/vendored/JudyL/JudyLMallocIF.c
+        libjudy/vendored/JudyL/JudyLMemActive.c
+        libjudy/vendored/JudyL/JudyLMemUsed.c
+        libjudy/vendored/JudyL/JudyLTables.c
+        libjudy/vendored/JudyHS/JudyHS.c
+        ${LIBJUDY_PREV_FILES}
+        ${LIBJUDY_NEXT_FILES}
+)
+
+set(INICFG_FILES
+        inicfg/inicfg.c
+        inicfg/inicfg.h
+        inicfg/inicfg_internals.h
+        inicfg/inicfg_exporters.c
+        inicfg/inicfg_conf_file.c
+        inicfg/inicfg_cleanup.c
+        inicfg/inicfg_sections.c
+        inicfg/inicfg_options.c
+        inicfg/inicfg_migrate.c
+        inicfg/inicfg_traversal.c
+        inicfg/inicfg_api.c
+        inicfg/dyncfg.c
+        inicfg/dyncfg.h
+)
+
+set(LIBNETDATA_CONFIG_FILES
+        config/config.h
+)
+
+set(LIBNETDATA_FILES
+        adaptive_resortable_list/adaptive_resortable_list.c
+        adaptive_resortable_list/adaptive_resortable_list.h
+        aral/aral.c
+        aral/aral.h
+        avl/avl.c
+        avl/avl.h
+        avl/avl-types.h
+        buffer/buffer.c
+        buffer/buffer.h
+        buffer/functions_fields.c
+        buffer/functions_fields.h
+        ringbuffer/ringbuffer.c
+        ringbuffer/ringbuffer.h
+        ringbuffer/ringbuffer-unittest.c
+        circular_buffer/circular_buffer.c
+        circular_buffer/circular_buffer.h
+        clocks/clocks.c
+        clocks/clocks.h
+        clocks/clocks-internals.h
+        clocks/clocks-unittest.c
+        clocks/time_t_arithmetic.h
+        completion/completion.c
+        completion/completion.h
+        datetime/iso8601.c
+        datetime/iso8601.h
+        datetime/rfc7231.c
+        datetime/rfc7231.h
+        datetime/rfc3339.c
+        datetime/rfc3339.h
+        dictionary/dictionary.c
+        dictionary/dictionary-debug.c
+        dictionary/dictionary-debug.h
+        dictionary/dictionary.h
+        eval/eval-parser-legacy.c
+        eval/eval-evaluate.c
+        eval/eval-utils.c
+        eval/eval.h
+        eval/eval-internal.h
+        eval/eval-unittest.c
+        eval/eval-unittest-hardcoding.c
+        eval/re2c_lemon/lexer.c
+        eval/re2c_lemon/parser.c
+        eval/re2c_lemon/parser_wrapper.c
+        facets/facets.c
+        facets/facets.h
+        functions_evloop/functions_evloop.c
+        functions_evloop/functions_evloop.h
+        gorilla/gorilla.cc
+        gorilla/gorilla.h
+        inlined.h
+        json/json.c
+        json/json.h
+        json/json-keys.c
+        json/json-keys.h
+        json/vendored/jsmn.c
+        json/vendored/jsmn.h
+        yaml/yaml.c
+        yaml/yaml.h
+        yaml/yaml-unittest.c
+        yaml/yaml-comprehensive-unittest.c
+        libnetdata.c
+        libnetdata.h
+        line_splitter/line_splitter.c
+        line_splitter/line_splitter.h
+        libnetdata.h
+        linked_lists/linked_lists.h
+        locks/locks.c
+        locks/locks.h
+        log/systemd-journal-helpers.c
+        log/systemd-journal-helpers.h
+        log/nd_log.c
+        log/nd_log.h
+        os/os.c
+        os/os.h
+        os/ci.c
+        os/ci.h
+        os/byteorder.h
+        onewayalloc/onewayalloc.c
+        onewayalloc/onewayalloc.h
+        procfile/procfile.c
+        procfile/procfile.h
+        query_progress/progress.c
+        query_progress/progress.h
+        socket/security.c
+        socket/security.h
+        simple_hashtable/simple_hashtable.h
+        simple_hashtable/simple_hashtable_undef.h
+        simple_pattern/simple_pattern.c
+        simple_pattern/simple_pattern.h
+        socket/socket.c
+        socket/socket.h
+        statistical/statistical.c
+        statistical/statistical.h
+        storage_number/storage_number.c
+        storage_number/storage_number.h
+        string/string.c
+        string/string.h
+        threads/threads.c
+        threads/threads.h
+        url/url.c
+        url/url.h
+        uuid/uuid.c
+        uuid/uuid.h
+        string/utf8.h
+        worker_utilization/worker_utilization.c
+        worker_utilization/worker_utilization.h
+        user-auth/http-access.c
+        user-auth/http-access.h
+        user-auth/user-auth.c
+        user-auth/user-auth.h
+        http/http_defs.c
+        http/http_defs.h
+        http/content_type.c
+        http/content_type.h
+        json/json-c-parser-inline.h
+        template-enum.h
+        dictionary/dictionary-internals.h
+        dictionary/dictionary-unittest.c
+        dictionary/thread-cache.c
+        dictionary/thread-cache.h
+        dictionary/dictionary-traversal.c
+        dictionary/dictionary-statistics.h
+        dictionary/dictionary-locks.h
+        dictionary/dictionary-refcount.h
+        dictionary/dictionary-hashtable.h
+        dictionary/dictionary-item.h
+        dictionary/dictionary-callbacks.h
+        storage-point.h
+        parsers/parsers.h
+        parsers/duration.c
+        parsers/duration-unittest.c
+        os/gettid.c
+        os/gettid.h
+        os/adjtimex.c
+        os/adjtimex.h
+        os/setresuid.c
+        os/setresuid.h
+        os/setresgid.c
+        os/setresgid.h
+        os/getgrouplist.c
+        os/getgrouplist.h
+        os/get_pid_max.c
+        os/get_pid_max.h
+        os/os-freebsd-wrappers.c
+        os/os-freebsd-wrappers.h
+        os/os-macos-wrappers.c
+        os/os-macos-wrappers.h
+        os/os-windows-wrappers.c
+        os/os-windows-wrappers.h
+        os/get_system_cpus.c
+        os/get_system_cpus.h
+        os/sleep.c
+        os/sleep.h
+        os/uuid_generate.c
+        os/uuid_generate.h
+        os/setenv.c
+        os/setenv.h
+        os/strndup.c
+        os/strndup.h
+        os/windows-wmi/windows-wmi.c
+        os/windows-wmi/windows-wmi.h
+        os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
+        os/windows-wmi/windows-wmi-GetDiskDriveInfo.h
+        os/windows-wmi/windows-wmi-GetSystemInfo.c
+        os/windows-wmi/windows-wmi-GetSystemInfo.h
+        os/windows-perflib/perflib.c
+        os/windows-perflib/perflib.h
+        os/windows-perflib/perflib-names.c
+        os/windows-perflib/perflib-dump.c
+        os/system-maps/cached-uid-username.c
+        os/system-maps/cached-uid-username.h
+        os/system-maps/cached-sid-username.c
+        os/system-maps/cached-sid-username.h
+        os/system-maps/cached-gid-groupname.c
+        os/system-maps/cached-gid-groupname.h
+        os/system-maps/cache-host-users-and-groups.c
+        os/system-maps/cache-host-users-and-groups.h
+        spawn_server/spawn_server_nofork.c
+        spawn_server/spawn_server.h
+        spawn_server/spawn_popen.c
+        spawn_server/spawn_popen.h
+        spawn_server/spawn_server_windows.c
+        spawn_server/spawn_server_internals.h
+        spawn_server/spawn_server_libuv.c
+        spawn_server/spawn_server_posix.c
+        spawn_server/spawn_library.c
+        spawn_server/spawn_library.h
+        os/close_range.c
+        os/close_range.h
+        os/setproctitle.c
+        os/setproctitle.h
+        paths/paths.c
+        paths/paths.h
+        json/json-c-parser-inline.c
+        json/json-c-parser-unittest.c
+        parsers/duration.h
+        parsers/timeframe.c
+        parsers/timeframe.h
+        parsers/size.c
+        parsers/size.h
+        libjudy/judy-malloc.c
+        libjudy/judy-malloc.h
+        facets/logs_query_status.h
+        os/timestamps.c
+        os/timestamps.h
+        parsers/entries.c
+        parsers/entries.h
+        sanitizers/chart_id_and_name.c
+        sanitizers/chart_id_and_name.h
+        sanitizers/utf8-sanitizer.c
+        sanitizers/utf8-sanitizer.h
+        sanitizers/utf8-sanitizer-unittest.c
+        sanitizers/sanitizers.h
+        sanitizers/sanitizers-labels.c
+        sanitizers/sanitizers-labels.h
+        sanitizers/sanitizers-functions.c
+        sanitizers/sanitizers-functions.h
+        sanitizers/sanitizers-pluginsd.c
+        sanitizers/sanitizers-pluginsd.h
+        log/nd_log-internals.c
+        log/nd_log-internals.h
+        log/nd_log_limit.c
+        log/nd_log_limit.h
+        log/nd_log-config.c
+        log/nd_log-init.c
+        log/nd_log-to-syslog.c
+        log/nd_log-to-systemd-journal.c
+        log/nd_log-annotators.c
+        log/nd_log-field-formatters.c
+        log/nd_log-format-logfmt.c
+        log/nd_log-format-json.c
+        log/nd_log-to-file.c
+        log/nd_log-to-windows-events.c
+        string/utf8.c
+        spawn_server/log-forwarder.c
+        spawn_server/log-forwarder.h
+        log/nd_log-common.h
+        log/nd_log-to-windows-common.h
+        common.h
+        libnetdata-base.h
+        libnetdata-types.h
+        libnetdata-platform-fwd.h
+        xxHash/xxhash.h
+        os/random.c
+        os/random.h
+        socket/nd-sock.c
+        socket/nd-sock.h
+        socket/listen-sockets.c
+        socket/listen-sockets.h
+        socket/poll-events.c
+        socket/poll-events.h
+        socket/connect-to.c
+        socket/connect-to.h
+        socket/socket-peers.c
+        socket/socket-peers.h
+        libjudy/judyl-typed.h
+        os/system_memory.c
+        os/system_memory.h
+        socket/nd-poll.c
+        socket/nd-poll.h
+        locks/spinlock.c
+        locks/spinlock.h
+        locks/rw-spinlock.c
+        locks/rw-spinlock.h
+        locks/rw-spinlock-unittest.c
+        atomics/atomic_flags.h
+        atomics/atomics.h
+        atomics/single_writer.h
+        locks/waitq.c
+        locks/waitq.h
+        object-state/object-state.c
+        object-state/object-state.h
+        uuid/uuidmap.c
+        uuid/uuidmap.h
+        atomics/refcount.h
+        log/nd_log-fatal.h
+        locks/benchmark.c
+        locks/benchmark.h
+        locks/benchmark-rw.c
+        locks/benchmark-rw.h
+        memory/nd-mallocz.c
+        memory/nd-mallocz.h
+        memory/nd-mmap.c
+        memory/nd-mmap.h
+        memory/alignment.h
+        os/get_system_pagesize.c
+        os/get_system_pagesize.h
+        os/hostname.c
+        os/hostname.h
+        os/socket_egress_interface.c
+        os/socket_egress_interface.h
+        exit/exit_initiated.c
+        exit/exit_initiated.h
+        os/disk_space.c
+        os/disk_space.h
+        os/file_metadata.c
+        os/file_metadata.h
+        os/process_path.c
+        os/process_path.h
+        os/boottime.c
+        os/boottime.h
+        os/boot_id.c
+        os/boot_id.h
+        os/run_dir.c
+        os/run_dir.h
+        os/file_lock.c
+        os/file_lock.h
+        os/mmap_limit.c
+        os/mmap_limit.h
+        signals/signals.c
+        signals/signals.h
+        runtime-paths/runtime-paths.c
+        runtime-paths/runtime-paths.h
+        os/machine_id.c
+        os/machine_id.h
+        os/process_memory.c
+        os/process_memory.h
+        os/dir_size.c
+        os/dir_size.h
+        signals/signal-code.c
+        signals/signal-code.h
+)
+
+set(NETIPC_PROTOCOL_FILES
+        netipc/src/protocol/netipc_protocol.c
+        netipc/src/protocol/netipc_protocol_increment.c
+        netipc/src/protocol/netipc_protocol_string_reverse.c
+        netipc/src/protocol/netipc_protocol_cgroups_snapshot.c
+        netipc/src/protocol/netipc_protocol_lookup_common.c
+        netipc/src/protocol/netipc_protocol_cgroups_lookup.c
+        netipc/src/protocol/netipc_protocol_apps_lookup.c
+)
+
+set(NETIPC_SERVICE_COMMON_FILES
+        netipc/src/service/netipc_service_common.c
+        netipc/src/service/netipc_service_cgroups_cache_common.c
+        netipc/src/service/netipc_service_cgroups_cache.c
+        netipc/src/service/netipc_service_cgroups_snapshot.c
+        netipc/src/service/netipc_service_cgroups_lookup.c
+        netipc/src/service/netipc_service_apps_lookup.c
+)
+
+# libnetdata: the Windows API sources
+set(LIBNETDATA_WIN_FILES
+        os/windows-api/windows_api.c
+        os/windows-api/windows_api.h
+)
+
+# libnetdata: the netipc sources
+set(LIBNETDATA_NETIPC_FILES
+        netipc/netipc_netdata.c
+        netipc/netipc_netdata.h
+)
+
+# libnetdata: the stacktrace backends
+set(LIBNETDATA_STACKTRACE_FILES
+    stacktrace/stacktrace.h
+    stacktrace/stacktrace-common.h
+    stacktrace/stacktrace-common.c
+    stacktrace/stacktrace-array.h
+    stacktrace/stacktrace-array.c
+    stacktrace/stacktrace-libbacktrace.c
+    stacktrace/stacktrace-libunwind.c
+    stacktrace/stacktrace-backtrace.c
+    stacktrace/stacktrace-none.c
+    stacktrace/stacktrace-log.c
+    stacktrace/stacktrace-unittest.c
+)
+
+# netipc: the POSIX transport and service (transport)
+set(NETIPC_POSIX_TRANSPORT_FILES
+        netipc/src/transport/posix/netipc_uds.c
+        netipc/src/transport/posix/netipc_uds_handshake.c
+        netipc/src/transport/posix/netipc_uds_inflight.c
+        netipc/src/transport/posix/netipc_uds_lifecycle.c
+        netipc/src/transport/posix/netipc_uds_receive.c
+        netipc/src/transport/posix/netipc_uds_send.c
+        netipc/src/transport/posix/netipc_shm.c
+)
+
+# netipc: the POSIX transport and service (service)
+set(NETIPC_POSIX_SERVICE_FILES
+        netipc/src/service/netipc_service.c
+        netipc/src/service/netipc_service_posix_client.c
+        netipc/src/service/netipc_service_posix_client_connect.c
+        netipc/src/service/netipc_service_posix_client_call.c
+        netipc/src/service/netipc_service_posix_server.c
+        netipc/src/service/netipc_service_posix_server_session.c
+)
+
+# netipc: the Windows transport and service (transport)
+set(NETIPC_WINDOWS_TRANSPORT_FILES
+        netipc/src/transport/windows/netipc_named_pipe.c
+        netipc/src/transport/windows/netipc_win_shm.c
+)
+
+# netipc: the Windows transport and service (service)
+set(NETIPC_WINDOWS_SERVICE_FILES
+        netipc/src/service/netipc_service_win.c
+        netipc/src/service/netipc_service_win_client.c
+        netipc/src/service/netipc_service_win_client_connect.c
+        netipc/src/service/netipc_service_win_client_call.c
+        netipc/src/service/netipc_service_win_server.c
+        netipc/src/service/netipc_service_win_server_session.c
+)

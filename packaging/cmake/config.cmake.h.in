@@ -72,7 +72,6 @@
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
 
-#cmakedefine HAVE_LIBCURL
 #cmakedefine HAVE_LIBICONV
 
 #cmakedefine HAVE_SETRESUID
@@ -127,7 +126,6 @@
 #cmakedefine HAVE_FUNC_ATTRIBUTE_NORETURN
 #cmakedefine HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
 #cmakedefine HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
-#cmakedefine HAVE_JEMALLOC_ARENA_API
 
 // enabled features
 
@@ -170,7 +168,6 @@
 #cmakedefine ENABLE_BUNDLED_JSONC
 #cmakedefine ENABLE_BUNDLED_YAML
 #cmakedefine ENABLE_BUNDLED_PROTOBUF
-#cmakedefine ENABLE_MIMALLOC
 
 // directory paths
 
