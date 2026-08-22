@@ -1136,18 +1136,10 @@ target_link_libraries(netdata PRIVATE
 netdata_add_protobuf(netdata)
 
 #
-# build systemd-cat-native
+# systemd-cat-native: sends log entries to a local or remote systemd journal.
 #
 
-add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
-target_link_libraries(systemd-cat-native
-        libnetdata
-        PkgConfig::CURL
-)
-
-install(TARGETS systemd-cat-native
-        COMPONENT netdata
-        DESTINATION "${BINDIR}")
+include(NetdataSystemdCatNative)
 
 #
 # log2journal: converts structured text logs into systemd Journal Export Format.

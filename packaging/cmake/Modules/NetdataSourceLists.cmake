@@ -1327,9 +1327,6 @@ set(NETIPC_SERVICE_COMMON_FILES
 
 set(NDRUN_FILES src/collectors/utils/nd-run.c)
 
-set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
-                             src/libnetdata/log/systemd-cat-native.h)
-
 #
 # Guarded inventory. The root file keeps the guard and selects
 # from here; only the file lists live below.
