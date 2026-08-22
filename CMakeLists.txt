@@ -392,6 +392,8 @@ if(ENABLE_WEBRTC)
         FetchContent_MakeAvailable(libdatachannel)
 endif()
 
+include(NetdataDependencies)
+
 include(NetdataProtobuf)
 
 if(ENABLE_BUNDLED_PROTOBUF)
@@ -413,8 +415,6 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_bundle_libbpf()
         netdata_fetch_ebpf_co_re()
 endif()
-
-include(NetdataDependencies)
 
 if(NOT CURL_FOUND)
         message(FATAL_ERROR "libcurl >= 7.21 is required for building Netdata, but could not be found.")
@@ -832,7 +832,6 @@ netdata_add_libyaml_to_target(libnetdata)
 
 # libunwind
 if(ENABLE_LIBUNWIND)
-  pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
   if(TARGET PkgConfig::LIBUNWIND)
     set(HAVE_LIBUNWIND On)
 
@@ -864,19 +863,17 @@ if(ENABLE_LIBUNWIND)
 endif()
 
 # zlib
+if(NOT ZLIB_FOUND)
+        message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
+endif()
+
+target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
+
+# FindZLIB reports an imported target; pkg-config reports flags. Both arms are
+# reached, so both spellings of "link zlib" have to stay.
 if(OS_MACOS)
-        find_package(ZLIB)
-        if(NOT ZLIB_FOUND)
-                message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
-        endif()
-        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
         target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
 else()
-        pkg_check_modules(ZLIB zlib)
-        if(NOT ZLIB_FOUND)
-                message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
-        endif()
-        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
 endif()
@@ -913,7 +910,6 @@ if(OS_MACOS OR OS_WINDOWS)
         # UUID functionality is part of the system libraries here, so no extra
         # stuff needed.
 else()
-        pkg_check_modules(UUID uuid)
         if(NOT UUID_FOUND)
                 message(FATAL_ERROR "libuuid is required for building Netdata on this platform, but could not be found.")
         endif()
@@ -937,11 +933,8 @@ target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
 target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
 
 # mnl
-if(NOT OS_MACOS)
-    pkg_check_modules(MNL libmnl)
-    if(MNL_FOUND)
-        set(HAVE_LIBMNL True)
-    endif()
+if(MNL_FOUND AND NOT OS_MACOS)
+    set(HAVE_LIBMNL True)
 endif()
 
 #
@@ -981,18 +974,14 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
 # nd-run helper program
 #
 
-if(OS_LINUX)
-  pkg_check_modules(CAP IMPORTED_TARGET libcap)
-else()
-  set(CAP_FOUND False)
-endif()
-
-if(CAP_FOUND)
+# libcap is Linux-only, so the OS condition IS the requirement, not an
+# optimisation of the lookup.
+if(CAP_FOUND AND OS_LINUX)
   set(HAVE_CAPABILITY True)
 endif()
 
 add_executable(nd-run ${NDRUN_FILES})
-if(CAP_FOUND)
+if(HAVE_CAPABILITY)
   target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
 endif()
 target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
@@ -1049,8 +1038,6 @@ include(NetdataPluginNetworkViewer)
 #
 
 if(ENABLE_EXPORTER_MONGODB)
-        pkg_check_modules(MONGOC libmongoc-1.0>=1.7)
-
         if(MONGOC_FOUND)
                 SET(HAVE_MONGOC True)
         else()
@@ -1059,7 +1046,6 @@ if(ENABLE_EXPORTER_MONGODB)
 endif()
 
 if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
-        pkg_check_modules(SNAPPY snappy)
         if (NOT SNAPPY_FOUND)
                 include(CheckLibraryExists)
                 check_library_exists(snappy snappy_compress "" HAVE_SNAPPY_LIB)
@@ -1308,7 +1294,6 @@ endif()
 #
 
 if(ENABLE_PLUGIN_IBM)
-    pkg_check_modules(ODBC odbc)
     if(NOT ODBC_FOUND)
         message(FATAL_ERROR "The IBM plugin needs unixODBC, but it could not be found. Pass -DENABLE_PLUGIN_IBM=Off to build without it.")
     endif()

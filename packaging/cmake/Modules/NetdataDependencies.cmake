@@ -6,18 +6,25 @@
 # question. It performs no policy: it does not decide whether a missing library is
 # fatal, it does not set a HAVE_* or ENABLE_* macro, and it does not turn a feature
 # off. Those decisions belong to whoever uses the result, next to the target that
-# needs it, where the error message can say which feature is affected and how to
-# build without it.
+# needs it, where the error message can name the feature and say how to build
+# without it.
 #
-# So a lookup here carries no REQUIRED keyword. Read <PREFIX>_FOUND at the point of
-# use and act on it there. pkg_check_modules and find_package write their results to
-# the CACHE, so every result below is visible in every scope, including inside a
-# function or a bundled subproject's own directory.
+# So no lookup here carries REQUIRED, and none carries the OS or feature guard its
+# consumer has. Probing for a library a platform does not have is harmless - the
+# result is simply not-found - and it keeps the answer to "what do we depend on"
+# free of the question "what are we building today".
 #
-# The lookups are grouped by what consumes them, not by mechanism.
+# pkg_check_modules and find_package write their results to the CACHE, so every
+# result below is readable from every scope, including inside a function and inside
+# a bundled subproject's own directory.
+#
+# find_package(PkgConfig REQUIRED) is deliberately NOT here. It stays in the root
+# file, where STATIC_BUILD appends --static to PKG_CONFIG_EXECUTABLE on the line
+# after it; that append needs the variable the find_package defines, so the two
+# cannot be separated.
 
 #
-# Linked into libnetdata, and through it into everything else.
+# Linked into libnetdata, and through it into everything that links libnetdata.
 #
 
 pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
@@ -30,9 +37,49 @@ pkg_check_modules(LIBZSTD libzstd)
 pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
 
 pkg_check_modules(LIBUV libuv)
+pkg_check_modules(UUID uuid)
+pkg_check_modules(MNL libmnl)
+pkg_check_modules(SYSTEMD libsystemd)
+pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
+
+# zlib is the one dependency resolved by two mechanisms, and they are not
+# interchangeable. The macOS consumer links the ZLIB::ZLIB imported target, which
+# only FindZLIB creates - pkg-config does not. Trying a pkg-config lookup first
+# and falling back would therefore break every macOS host where pkg-config can
+# see zlib, and it would neuter CMAKE_DISABLE_FIND_PACKAGE_ZLIB as well. The OS
+# branch moves here intact instead: one place, one decision, two mechanisms.
+if(OS_MACOS)
+  find_package(ZLIB)
+else()
+  pkg_check_modules(ZLIB zlib)
+endif()
 
 #
 # Helper binaries.
 #
 
 pkg_check_modules(PCRE2 libpcre2-8)
+pkg_check_modules(CAP IMPORTED_TARGET libcap)
+
+#
+# Collector plugins.
+#
+
+pkg_check_modules(ODBC odbc)
+pkg_check_modules(IPMI libipmimonitoring)
+pkg_check_modules(NFACCT libnetfilter_acct)
+pkg_check_modules(XENSTAT xenstat)
+pkg_check_modules(XENLIGHT xenlight)
+
+#
+# Exporters.
+#
+
+pkg_check_modules(MONGOC libmongoc-1.0>=1.7)
+pkg_check_modules(SNAPPY snappy)
+
+#
+# Build inputs for a subproject we compile ourselves.
+#
+
+pkg_check_modules(ELF libelf)

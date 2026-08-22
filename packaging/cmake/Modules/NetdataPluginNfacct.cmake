@@ -14,7 +14,9 @@ if(ENABLE_PLUGIN_NFACCT)
         message(FATAL_ERROR "Can not build nfacct.plugin because MNL library could not be found.")
     endif()
 
-    pkg_check_modules(NFACCT REQUIRED libnetfilter_acct)
+    if(NOT NFACCT_FOUND)
+        message(FATAL_ERROR "The nfacct plugin needs libnetfilter_acct, but it could not be found. Pass -DENABLE_PLUGIN_NFACCT=Off to build without it.")
+    endif()
 
     set(NFACCT_PLUGIN_FILES src/collectors/nfacct.plugin/plugin_nfacct.c)
 

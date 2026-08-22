@@ -52,8 +52,13 @@ function(netdata_bundle_libbpf)
         message(FATAL_ERROR "GNU Make is required when building the eBPF plugin, but could not be found.")
     endif()
 
-    pkg_check_modules(ELF REQUIRED libelf)
-    pkg_check_modules(ZLIB REQUIRED zlib)
+    if(NOT ELF_FOUND)
+        message(FATAL_ERROR "The eBPF plugin needs libelf, but it could not be found. Pass -DENABLE_PLUGIN_EBPF=Off to build without it.")
+    endif()
+
+    if(NOT ZLIB_FOUND)
+        message(FATAL_ERROR "The eBPF plugin needs zlib, but it could not be found. Pass -DENABLE_PLUGIN_EBPF=Off to build without it.")
+    endif()
 
     set(_libbpf_lib_dir lib)
 
@@ -85,7 +90,7 @@ function(netdata_bundle_libbpf)
         TARGET libbpf_library
         PROPERTY INTERFACE_LINK_LIBRARIES "${ELF_LIBRARIES};${ZLIB_LIBRARIES}"
     )
-    set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRECTORIES};${ZLIB_INCLUDE_DIRECTORIES}" PARENT_SCOPE)
+    set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRS};${ZLIB_INCLUDE_DIRS}" PARENT_SCOPE)
     set(NETDATA_LIBBPF_COMPILE_OPTIONS "${ELF_CFLAGS_OTHER};${ZLIB_CFLAGS_OTHER}" PARENT_SCOPE)
 endfunction()
 

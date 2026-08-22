@@ -10,7 +10,9 @@
 # takes part in the NETDATA_FILES/LIBNETDATA_FILES composition.
 
 if(ENABLE_PLUGIN_FREEIPMI)
-    pkg_check_modules(IPMI REQUIRED libipmimonitoring)
+    if(NOT IPMI_FOUND)
+        message(FATAL_ERROR "The freeipmi plugin needs libipmimonitoring, but it could not be found. Pass -DENABLE_PLUGIN_FREEIPMI=Off to build without it.")
+    endif()
 
     set(FREEIPMI_PLUGIN_FILES src/collectors/freeipmi.plugin/freeipmi_plugin.c)
 

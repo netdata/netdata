@@ -9,7 +9,6 @@ macro(detect_systemd)
   find_library(SYSTEMD_LIBRARY NAMES systemd)
 
   set(ENABLE_DSYSTEMD_DBUS NO)
-  pkg_check_modules(SYSTEMD libsystemd)
 
   if(SYSTEMD_FOUND)
     cmake_push_check_state()
