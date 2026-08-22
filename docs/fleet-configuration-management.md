@@ -193,7 +193,7 @@ The go.d.plugin provides auto-discovery for 150+ applications through multiple m
 **Service discovery mechanisms**:
 - **Local network service discovery (netlistensd)** - Linux-only, uses `local-listeners` binary to detect listening services
 - **[Docker container discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/docker) (dockersd)** - Discovers applications running in Docker containers
-- **[Kubernetes service discovery](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) (k8ssd)** - Discovers services running in Kubernetes pods
+- **[Kubernetes service discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/kubernetes) (k8ssd)** - Discovers services running in Kubernetes pods
 - **[SNMP device discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/snmp) (snmpsd)** - Discovers and profiles SNMP-enabled network devices
 - **HTTP service discovery (http)** - Fetches JSON or YAML discovery items from an HTTP endpoint and creates collector jobs through service templates
 - **Configuration file scanning** - Detects applications based on their configuration files
