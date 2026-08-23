@@ -181,105 +181,113 @@ install(FILES
 # service files
 #
 
-configure_file(system/install-service.sh.in system/install-service.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/system/install-service.sh
-        COMPONENT netdata
-        DESTINATION ${LIBEXEC_DEST})
+# Windows has no POSIX service manager and never runs install-service.sh - the
+# script exits 5 on any platform it does not know (system/install-service.sh.in),
+# and the Windows service is registered by the installer itself. Staging the
+# toolbox there only enlarged the MSI with launchd plists and rc.d scripts.
+if(NOT OS_WINDOWS)
+  configure_file(system/install-service.sh.in system/install-service.sh @ONLY)
+  install(PROGRAMS
+          ${CMAKE_BINARY_DIR}/system/install-service.sh
+          COMPONENT netdata
+          DESTINATION ${LIBEXEC_DEST})
 
-configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/launchd)
+  configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/launchd)
 
-configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/freebsd/rc.d)
+  configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/freebsd/rc.d)
 
-configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/initd/init.d)
+  configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/initd/init.d)
 
-configure_file(system/logrotate/netdata.in system/logrotate/netdata @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/logrotate/netdata
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/logrotate)
+  configure_file(system/logrotate/netdata.in system/logrotate/netdata @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/logrotate/netdata
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/logrotate)
+endif()
 
 # The host copy, unlike the one above, lands in logrotate's own directory, so
 # only a platform that runs logrotate may receive it. Every other install path
 # takes the Netdata-owned copy at install time instead
 # (packaging/installer/functions.sh:1061), which is why this is safe to gate.
 if(OS_LINUX)
-        install(FILES
-                ${CMAKE_BINARY_DIR}/system/logrotate/netdata
-                COMPONENT netdata
-                DESTINATION ${HOST_LOGROTATE_DEST})
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/logrotate/netdata
+          COMPONENT netdata
+          DESTINATION ${HOST_LOGROTATE_DEST})
 endif()
 
-configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/lsb/init.d)
+if(NOT OS_WINDOWS)
+  configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/lsb/init.d)
 
-configure_file(system/openrc/conf.d/netdata.in system/openrc/conf.d/netdata @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/openrc/conf.d/netdata
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/openrc/conf.d)
+  configure_file(system/openrc/conf.d/netdata.in system/openrc/conf.d/netdata @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/openrc/conf.d/netdata
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/openrc/conf.d)
 
-configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/openrc/init.d)
+  configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/openrc/init.d)
 
-configure_file(system/runit/run.in system/runit/run @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/runit/run
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/runit)
+  configure_file(system/runit/run.in system/runit/run @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/runit/run
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/runit)
 
-configure_file(system/dinit/netdata.in system/dinit/netdata @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/dinit/netdata
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/dinit)
+  configure_file(system/dinit/netdata.in system/dinit/netdata @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/dinit/netdata
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/dinit)
 
-configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/systemd)
+  configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/systemd)
 
-install(FILES
-        system/systemd/journald@netdata.conf
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/systemd)
+  install(FILES
+          system/systemd/journald@netdata.conf
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/systemd)
 
-configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/systemd)
+  configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/systemd)
 
-configure_file(system/systemd/sysusers.conf.in system/systemd/sysusers/netdata.conf @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/systemd/sysusers)
+  configure_file(system/systemd/sysusers.conf.in system/systemd/sysusers/netdata.conf @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/systemd/sysusers)
 
-configure_file(system/systemd/tmpfiles.conf.in system/systemd/tmpfiles/netdata.conf @ONLY)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/systemd/tmpfiles/netdata.conf
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/systemd/tmpfiles)
+  configure_file(system/systemd/tmpfiles.conf.in system/systemd/tmpfiles/netdata.conf @ONLY)
+  install(FILES
+          ${CMAKE_BINARY_DIR}/system/systemd/tmpfiles/netdata.conf
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/systemd/tmpfiles)
+endif()
 
 # EL 7 and Amazon Linux 2 package the systemd-235-compatible unit variant,
 # because their systemd predates the directives the default unit uses.
@@ -321,10 +329,12 @@ if(OS_LINUX AND BUILD_FOR_PACKAGING)
         endif()
 endif()
 
-install(FILES
-        system/systemd/50-netdata.preset
-        COMPONENT netdata
-        DESTINATION ${SYSTEM_DEST}/systemd)
+if(NOT OS_WINDOWS)
+  install(FILES
+          system/systemd/50-netdata.preset
+          COMPONENT netdata
+          DESTINATION ${SYSTEM_DEST}/systemd)
+endif()
 
 install(FILES
         system/vnodes/vnodes.conf
