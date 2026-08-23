@@ -22,6 +22,11 @@ func TestValidateComposedProfilePropagatesSupportPriority(t *testing.T) {
 		1,
 	)
 	report := validateComposedProfiles(t, candidate, support, simpleOwnedDump())
+	for _, item := range report.Findings {
+		if item.Code == "priority_forbidden" {
+			t.Fatalf("explicit support priority must not be rejected: %#v", item)
+		}
+	}
 
 	var found bool
 	for _, item := range report.AuthoredMapping {

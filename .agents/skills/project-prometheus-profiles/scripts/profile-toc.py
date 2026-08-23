@@ -64,7 +64,10 @@ def build_tree(profile: dict) -> Node:
             context = ".".join(part for part in (*child_context_parts, normalize(chart.get("context"))) if part)
             if not context:
                 context = "(no context)"
-            node.charts.append(Chart(context, int(chart.get("priority") or DEFAULT_PRIORITY)))
+            priority = int(chart.get("priority") or DEFAULT_PRIORITY)
+            if priority <= 0:
+                priority = DEFAULT_PRIORITY
+            node.charts.append(Chart(context, priority))
 
         for child in group.get("groups") or []:
             add_group(child, node, child_context_parts)

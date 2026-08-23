@@ -14,10 +14,18 @@ func TestValidateProfileAcceptsAndPropagatesExplicitPriority(t *testing.T) {
 	if result.exitCode != 0 {
 		t.Fatalf("explicit chart priority must pass\nreport:\n%s", result.stdout)
 	}
+	found := false
 	for _, chart := range result.report.Charts {
-		if chart.Title == "Temperature" && chart.Priority != 100 {
+		if chart.Title != "Temperature" {
+			continue
+		}
+		found = true
+		if chart.Priority != 100 {
 			t.Fatalf("authored priority was not propagated: got %d, want 100: %#v", chart.Priority, chart)
 		}
+	}
+	if !found {
+		t.Fatal("Temperature chart was not reported")
 	}
 }
 
