@@ -131,6 +131,8 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         self.assertIn('Operator question:', clean)
         self.assertIn('Entity scope:', clean)
         self.assertIn('Source metric selectors', clean)
+        self.assertIn('Managers (1 chart)', clean)
+        self.assertNotIn('(1 charts)', clean)
         self.assertNotIn('| Metric |', clean)
 
     def test_generated_markdown_preserves_catalogue_hooks(self):

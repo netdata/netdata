@@ -21,10 +21,10 @@ every metric that the collector can render.
 [% for profile in entry.metrics.profile_coverage.profiles %]
 [% if clean %]
 <details[% if profile.open %] open[% endif %] data-prometheus-profile>
-<summary>[[ profile.title|e ]] — [[ profile.chart_count ]] charts</summary>
+<summary>[[ profile.title|e ]] — [[ profile.chart_count ]] chart[% if profile.chart_count != 1 %]s[% endif %]</summary>
 [% else %]
 <!-- prometheus-profile-profile -->
-{% details[% if profile.open %] open=true[% endif %] summary="[[ profile.title|e ]] — [[ profile.chart_count ]] charts" %}
+{% details[% if profile.open %] open=true[% endif %] summary="[[ profile.title|e ]] — [[ profile.chart_count ]] chart[% if profile.chart_count != 1 %]s[% endif %]" %}
 [% endif %]
 
 [[ profile.summary ]]
@@ -37,10 +37,10 @@ every metric that the collector can render.
 [% set family_loop = loop %]
 [% if clean %]
 <details data-prometheus-profile-family>
-<summary>[[ family.name|e ]] ([[ family.chart_count ]] charts)</summary>
+<summary>[[ family.name|e ]] ([[ family.chart_count ]] chart[% if family.chart_count != 1 %]s[% endif %])</summary>
 [% else %]
 <!-- prometheus-profile-family -->
-{% details summary="[[ family.name|e ]] ([[ family.chart_count ]] charts)" %}
+{% details summary="[[ family.name|e ]] ([[ family.chart_count ]] chart[% if family.chart_count != 1 %]s[% endif %])" %}
 [% endif %]
 
 [% for chart in family.charts %]
