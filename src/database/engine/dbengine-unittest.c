@@ -2,6 +2,7 @@
 
 #include "database/rrd.h"
 #include "database/rrddim-collection.h"
+#include "page_test.h"
 
 #ifdef ENABLE_DBENGINE
 
@@ -327,11 +328,17 @@ static size_t dbengine_test_rrdr_single_region(
                 RRDR_VALUE_FLAGS *co = &r->o[ p * r->d ];
                 NETDATA_DOUBLE *cn = &r->v[ p * r->d ];
 
+                time_t end_time_s = r->t[p];
+                time_t start_time_s = end_time_s - r->view.update_every;
                 STORAGE_POINT sp = STORAGE_POINT_UNSET;
-                sp.min = sp.max = sp.sum = (co[d] & RRDR_VALUE_EMPTY) ? NAN :cn[d];
-                sp.count = 1;
-                sp.end_time_s = r->t[p];
-                sp.start_time_s = sp.end_time_s - r->view.update_every;
+                if(co[d] & RRDR_VALUE_EMPTY)
+                    storage_point_empty(sp, start_time_s, end_time_s);
+                else {
+                    sp.min = sp.max = sp.sum = cn[d];
+                    sp.count = 1;
+                    sp.start_time_s = start_time_s;
+                    sp.end_time_s = end_time_s;
+                }
 
                 storage_point_check(current_region, c, d, p, time_now, update_every, sp, &value_errors, &time_errors, &update_every_errors);
                 d++;
@@ -470,6 +477,7 @@ int test_dbengine(void) {
     if(!host)
         fatal("Failed to initialize host");
 
+    errors += (size_t)pgd_storage_point_unittest();
     errors += test_dbengine_burst_retention(host);
 
     RRDSET *st[CHARTS] = { 0 };
