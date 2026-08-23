@@ -222,9 +222,12 @@ include(NetdataOptions)
 # they are deliberately NOT derived from NETDATA_RUNTIME_PREFIX - rebasing them
 # onto the Netdata layout would install our drop-ins where nothing reads them.
 #
-# All of these are Linux-only, and the rules that use them are currently
-# ungated, so a macOS or FreeBSD build stages them as well. Gating them is a
-# behaviour change and belongs with the platform work, not here.
+# All of these are Linux-only - systemd, logrotate and the LSB init system are
+# Linux concepts - so every rule that writes one is guarded on OS_LINUX. macOS
+# and FreeBSD reach their own service managers through the Netdata-owned copies
+# under SYSTEM_DEST, which system/install-service.sh selects at install time.
+# A native macOS package will add its launchd destination here under its own
+# guard; do not widen an existing one to cover it.
 set(HOST_LOGROTATE_DEST "etc/logrotate.d")
 set(HOST_INITD_DEST "etc/init.d")
 set(HOST_DEFAULT_DEST "etc/default")

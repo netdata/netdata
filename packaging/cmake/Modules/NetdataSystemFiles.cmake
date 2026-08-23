@@ -210,10 +210,17 @@ install(FILES
         ${CMAKE_BINARY_DIR}/system/logrotate/netdata
         COMPONENT netdata
         DESTINATION ${SYSTEM_DEST}/logrotate)
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/logrotate/netdata
-        COMPONENT netdata
-        DESTINATION ${HOST_LOGROTATE_DEST})
+
+# The host copy, unlike the one above, lands in logrotate's own directory, so
+# only a platform that runs logrotate may receive it. Every other install path
+# takes the Netdata-owned copy at install time instead
+# (packaging/installer/functions.sh:1061), which is why this is safe to gate.
+if(OS_LINUX)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/logrotate/netdata
+                COMPONENT netdata
+                DESTINATION ${HOST_LOGROTATE_DEST})
+endif()
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
 install(FILES
@@ -283,7 +290,7 @@ if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND
         set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235")
 endif()
 
-if(BUILD_FOR_PACKAGING)
+if(OS_LINUX AND BUILD_FOR_PACKAGING)
         install(FILES
                 ${NETDATA_PACKAGED_SYSTEMD_UNIT}
                 COMPONENT netdata
@@ -343,7 +350,7 @@ endif()
 #
 # misc files
 #
-if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+if(OS_LINUX AND BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         install(FILES
                 ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
                 COMPONENT netdata
@@ -431,7 +438,7 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION ${SYSTEM_DEST}/systemd)
 
-  if(BUILD_FOR_PACKAGING)
+  if(OS_LINUX AND BUILD_FOR_PACKAGING)
     install(FILES
             ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
             COMPONENT netdata
