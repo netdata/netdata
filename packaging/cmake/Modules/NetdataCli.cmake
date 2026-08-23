@@ -18,6 +18,10 @@ set(NETDATACLI_FILES
 # windows: the netdatacli resource script
 set(NETDATACLI_RES_FILES "packaging/windows/resources/netdatacli.rc")
 
+if(OS_WINDOWS)
+    configure_file(packaging/windows/resources/netdatacli.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdatacli.manifest @ONLY)
+endif()
+
 #
 # build netdatacli
 #

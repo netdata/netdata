@@ -651,13 +651,6 @@ set(CLAIM_PLUGIN_FILES
         src/claim/cloud-status.h
 )
 
-set(CLAIM_WINDOWS_FILES
-        src/claim/main.c
-        src/claim/main.h
-        src/claim/ui.c
-        src/claim/ui.h
-)
-
 # Not named _FILES on purpose: the name records the policy, that these compile
 # whether or not ACLK is enabled.
 set(ACLK_ALWAYS_BUILD
@@ -776,11 +769,6 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-exchange.c
         src/collectors/windows.plugin/perflib-numa.c
         src/collectors/windows.plugin/perflib-asp.c
-)
-
-set(WINDOWS_DRIVER_FILES
-        src/collectors/windows.plugin/driver/netdata_driver.c
-        src/collectors/windows.plugin/driver/netdata_driver.h
 )
 
 set(PROC_PLUGIN_FILES
@@ -1030,9 +1018,6 @@ set(DAEMON_WINDOWS_FILES
         src/daemon/static_threads_windows.c
         src/daemon/winsvc.cc
 )
-
-# windows: the netdata-claim resource script
-set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
 
 # windows: the netdata resource script
 set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
