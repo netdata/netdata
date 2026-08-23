@@ -16,6 +16,13 @@
 
 include(CMakeDependentOption)
 
+# Enforce the first half of the ordering contract. Without platform facts the
+# 23 dependent options below would not error - cmake_dependent_option reads an
+# undefined OS_* as false and silently forces every one of them off.
+if(NOT DEFINED OS_LINUX)
+  message(FATAL_ERROR "NetdataOptions.cmake must be included after NetdataPlatform.cmake")
+endif()
+
 # Toolchain and link knobs. Their readers sit in the root file a few lines below
 # this module's include, and in NetdataCompilerFlags, so they are declared first.
 option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
