@@ -17,13 +17,17 @@ function(add_extra_compiler_flag match flag result)
 
   string(MAKE_C_IDENTIFIER "${flag}" flag_name)
 
-  if(NOT ${CMAKE_C_FLAGS} MATCHES ${match})
+  # Both operands quoted: with an empty CMAKE_C_FLAGS the unquoted form used to
+  # hand if() the literal string "NOT" as the left operand of MATCHES, which
+  # consumed the negation and skipped every optional flag (including the whole
+  # hardening set) in any build that did not pass -DCMAKE_C_FLAGS=... itself.
+  if(NOT "${CMAKE_C_FLAGS}" MATCHES "${match}")
     check_c_compiler_flag("${flag}" HAVE_C_${flag_name})
   else()
     set(matched_c TRUE)
   endif()
 
-  if(NOT ${CMAKE_CXX_FLAGS} MATCHES ${match})
+  if(NOT "${CMAKE_CXX_FLAGS}" MATCHES "${match}")
     check_cxx_compiler_flag("${flag}" HAVE_CXX_${flag_name})
   else()
     set(matched_cxx TRUE)
