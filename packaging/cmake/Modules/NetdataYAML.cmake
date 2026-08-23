@@ -12,7 +12,7 @@ function(netdata_bundle_libyaml)
         include(FetchContent)
         include(NetdataFetchContentExtra)
 
-        if(ENABLE_BUNDLED_LIBYAML)
+        if(ENABLE_BUNDLED_YAML)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
 
@@ -50,11 +50,13 @@ endfunction()
 macro(netdata_detect_libyaml)
         set(HAVE_LIBYAML True)
 
-        pkg_check_modules(YAML yaml-0.1)
+        if(NOT ENABLE_BUNDLED_YAML)
+                pkg_check_modules(YAML yaml-0.1)
+        endif()
 
-        if(ENABLE_BUNDLED_LIBYAML OR NOT YAML_FOUND)
+        if(NOT YAML_FOUND)
+                set(ENABLE_BUNDLED_YAML True)
                 netdata_bundle_libyaml()
-                set(ENABLE_BUNDLED_LIBYAML True PARENT_SCOPE)
                 set(NETDATA_YAML_LDFLAGS yaml)
                 get_target_property(NETDATA_YAML_TARGET_INCLUDE_DIRS yaml INTERFACE_INCLUDE_DIRECTORIES)
                 # Pinned libyaml exposes yaml.h first and its generated config.h second.
@@ -73,7 +75,7 @@ endmacro()
 # The specified target must already exist, and the netdata_detect_libyaml
 # macro must have already been run at least once for this to work correctly.
 function(netdata_add_libyaml_to_target _target)
-        if(ENABLE_BUNDLED_LIBYAML OR NOT YAML_FOUND)
+        if(ENABLE_BUNDLED_YAML)
                 target_include_directories(${_target} BEFORE PUBLIC ${NETDATA_YAML_INCLUDE_DIRS})
                 target_compile_definitions(${_target} PUBLIC ${NETDATA_YAML_CFLAGS_OTHER})
         else()
