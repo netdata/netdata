@@ -5,12 +5,17 @@ profile: litellm
 match: litellm_*
 app: litellm
 namespace: litellm
+documentation:
+  title: LiteLLM
+  summary: Curated gateway, routing, provider, usage, cost, governance, dependency, and runtime metrics from LiteLLM.
 composition:
   supports:
     process_runtime:
       when: all_modes
+      activation: Included whenever the LiteLLM profile is active and the endpoint exports process runtime metrics.
     python_gc:
       when: all_modes
+      activation: Included whenever the LiteLLM profile is active and the endpoint exports Python garbage-collection metrics.
 entities:
   api_provider_model:
     grain: api_provider, model
