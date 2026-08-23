@@ -71,7 +71,12 @@ set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include(NetdataPlatform)
 include(NetdataOptions)
 
-set(BUILD_SHARED_LIBS "${STATIC_BUILD}")
+# Bundled subprojects read this as their default library type; netdata always
+# builds them static. It used to mirror STATIC_BUILD, which is the negation of
+# what the name means - a static build asked its subprojects for shared
+# libraries - and silently overrode the -DBUILD_SHARED_LIBS=Off the source
+# installer has passed since the inversion shipped.
+set(BUILD_SHARED_LIBS OFF)
 
 if(STATIC_BUILD)
   set(CMAKE_FIND_LIBRARY_PREFIXES "${CMAKE_STATIC_LIBRARY_PREFIX}")
