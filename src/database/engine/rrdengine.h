@@ -206,6 +206,7 @@ struct jv2_page_info {
 
     // private
     struct pgc_page *page;
+    struct jv2_extents_info *ei;    // the extent this page was counted into
 };
 
 typedef enum __attribute__ ((__packed__)) {
