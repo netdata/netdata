@@ -202,3 +202,33 @@ function(install_ibm_runtime component)
                          REGEX "(${_file_group_6})"
                          REGEX "(${_file_group_7})")
 endfunction()
+
+#
+# The plugin itself. The two helpers above have exactly one call site and it is
+# here, so ibm.d.plugin's whole build definition lives in this file rather than
+# being split between a helper module and a caller in the root.
+#
+if(ENABLE_PLUGIN_IBM)
+    add_ibm_plugin_target()
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/ibm.d.plugin
+            COMPONENT plugin-ibm
+            DESTINATION ${PLUGINS_DEST})
+
+    # Install IBM plugin configuration files
+    install(FILES src/go/plugin/ibm.d/config/ibm.d.conf
+            COMPONENT plugin-ibm
+            DESTINATION ${LIBCONFIG_DEST})
+
+    install(FILES
+            src/go/plugin/ibm.d/config/ibm.d/as400.conf
+            src/go/plugin/ibm.d/config/ibm.d/db2.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere_jmx.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere_mp.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere_pmi.conf
+            COMPONENT plugin-ibm
+            DESTINATION ${LIBCONFIG_DEST}/ibm.d
+    )
+
+    install_ibm_runtime(plugin-ibm-libs)
+endif()

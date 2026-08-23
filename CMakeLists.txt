@@ -870,189 +870,49 @@ include(NetdataCli)
 # Build go.d.plugin
 #
 
-if(ENABLE_PLUGIN_GO)
-    if (OS_WINDOWS)
-        set(GO_PLUGIN_BIN go.d.plugin.exe)
-    else()
-        set(GO_PLUGIN_BIN go.d.plugin)
-    endif()
+#
+# go.d.plugin, the snmp trap profile generator, and the nd-mcp bridge: every Go binary gated on ENABLE_PLUGIN_GO.
+#
 
-    add_go_target(go-plugin ${GO_PLUGIN_BIN} src/go cmd/godplugin)
-
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/${GO_PLUGIN_BIN}
-            COMPONENT plugin-go
-            DESTINATION ${PLUGINS_DEST})
-
-    if (OS_WINDOWS)
-        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen.exe)
-    else()
-        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen)
-    endif()
-
-    add_go_target(snmp_trap_profile_gen ${SNMP_TRAP_PROFILE_GEN_BIN} src/go cmd/snmptrapprofilegen)
-
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}
-            COMPONENT plugin-go
-            DESTINATION ${PLUGINS_DEST})
-
-    # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
-    if(ENABLE_ND_MCP)
-        if (OS_WINDOWS)
-            set(ND_MCP_NAME nd-mcp.exe)
-        else()
-            set(ND_MCP_NAME nd-mcp)
-        endif()
-
-        add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
-        install(PROGRAMS
-                ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
-                COMPONENT ${NETDATA_ND_MCP_COMPONENT}
-                DESTINATION "${BINDIR}")
-    endif()
-endif()
+include(NetdataPluginGo)
 
 #
 # Build scripts.d.plugin
 #
 
-if(ENABLE_PLUGIN_SCRIPTS)
-    if (OS_WINDOWS)
-        set(SCRIPTS_PLUGIN_BIN scripts.d.plugin.exe)
-    else()
-        set(SCRIPTS_PLUGIN_BIN scripts.d.plugin)
-    endif()
+#
+# scripts.d.plugin: the Go Nagios-compatibility plugin and its config tree.
+#
 
-    add_go_target(scripts-plugin ${SCRIPTS_PLUGIN_BIN} src/go cmd/scriptsdplugin)
-
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/${SCRIPTS_PLUGIN_BIN}
-            COMPONENT plugin-scripts
-            DESTINATION ${PLUGINS_DEST})
-
-    install(FILES src/go/plugin/scripts.d/config/scripts.d.conf
-            COMPONENT plugin-scripts
-            DESTINATION ${LIBCONFIG_DEST})
-
-    install(DIRECTORY src/go/plugin/scripts.d/config/scripts.d
-            COMPONENT plugin-scripts
-            DESTINATION ${LIBCONFIG_DEST}
-            FILES_MATCHING PATTERN "*.conf")
-endif()
+include(NetdataPluginScripts)
 
 #
 # Build ibm.d.plugin
 #
 
-if(ENABLE_PLUGIN_IBM)
-    include(NetdataIBMPlugin)
-    add_ibm_plugin_target()
-
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/ibm.d.plugin
-            COMPONENT plugin-ibm
-            DESTINATION ${PLUGINS_DEST})
-
-    # Install IBM plugin configuration files
-    install(FILES src/go/plugin/ibm.d/config/ibm.d.conf
-            COMPONENT plugin-ibm
-            DESTINATION ${LIBCONFIG_DEST})
-
-    install(FILES
-            src/go/plugin/ibm.d/config/ibm.d/as400.conf
-            src/go/plugin/ibm.d/config/ibm.d/db2.conf
-            src/go/plugin/ibm.d/config/ibm.d/websphere_jmx.conf
-            src/go/plugin/ibm.d/config/ibm.d/websphere_mp.conf
-            src/go/plugin/ibm.d/config/ibm.d/websphere_pmi.conf
-            COMPONENT plugin-ibm
-            DESTINATION ${LIBCONFIG_DEST}/ibm.d
-    )
-
-    install_ibm_runtime(plugin-ibm-libs)
-endif()
+include(NetdataIBMPlugin)
 
 #
 # otel.plugin
 #
 # Handle OTel Collector plugin
 #
-if(ENABLE_PLUGIN_OTEL)
-    corrosion_install(TARGETS otel-plugin
-                      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
-                      RUNTIME DESTINATION ${PLUGINS_DEST}
-                      COMPONENT plugin-otel)
+#
+# otel-plugin: installs the Rust OpenTelemetry plugin and its stock receiver config.
+#
 
-    install(FILES src/crates/otel-ingestor/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
-            COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
-            DESTINATION ${LIBCONFIG_DEST}/otel.d/v1/metrics)
-
-    install(DIRECTORY COMPONENT plugin-otel DESTINATION ${CONFIG_DEST}/otel.d/v1/metrics)
-endif()
+include(NetdataPluginOTel)
 
 
 #
 # netflow-plugin
 #
 # Handle NetFlow/IPFIX/sFlow flow analysis plugin
-if(ENABLE_PLUGIN_NETFLOW)
-    corrosion_install(TARGETS netflow-plugin
-                      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
-                      RUNTIME DESTINATION ${PLUGINS_DEST}
-                      COMPONENT plugin-netflow)
+#
+# netflow-plugin: the Rust flow-analysis plugin, its config, and the Go topology-ip-intel downloader that ships beside it.
+#
 
-    install(FILES src/crates/netflow-plugin/configs/netflow.yaml
-            COMPONENT plugin-netflow
-            DESTINATION ${LIBCONFIG_DEST})
-
-    if (OS_WINDOWS)
-        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader.exe)
-    else()
-        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader)
-    endif()
-
-    if(CMAKE_SIZEOF_VOID_P LESS 8)
-        message(STATUS
-                "plugin-netflow: skipping topology-ip-intel-downloader binary on 32-bit targets; "
-                "stock topology-ip-intel payload installation remains enabled")
-    else()
-        add_go_target(topology-ip-intel-downloader-target ${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN} src/go tools/topology-ip-intel-downloader)
-        install(PROGRAMS
-                ${CMAKE_BINARY_DIR}/${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN}
-                COMPONENT plugin-netflow
-                DESTINATION "${BINDIR}")
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader\")"
-                COMPONENT plugin-netflow)
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin\")"
-                COMPONENT plugin-netflow)
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.exe\")"
-                COMPONENT plugin-netflow)
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin.exe\")"
-                COMPONENT plugin-netflow)
-    endif()
-
-    install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
-            COMPONENT plugin-netflow
-            DESTINATION ${LIBCONFIG_DEST})
-
-    if(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
-        set(TOPOLOGY_IP_INTEL_STOCK_PAYLOAD
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/README.md"
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-asn.mmdb"
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-geo.mmdb"
-                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-intel.json")
-        foreach(stock_file IN LISTS TOPOLOGY_IP_INTEL_STOCK_PAYLOAD)
-            if(NOT EXISTS "${stock_file}")
-                message(FATAL_ERROR
-                        "Missing topology IP intelligence stock payload file: ${stock_file}")
-            endif()
-        endforeach()
-        install(FILES
-                ${TOPOLOGY_IP_INTEL_STOCK_PAYLOAD}
-                COMPONENT plugin-netflow
-                DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
-    else()
-        message(STATUS
-                "plugin-netflow: no staged topology IP intelligence stock payload provided; "
-                "skipping stock topology-ip-intel install")
-    endif()
-endif()
+include(NetdataPluginNetflow)
 
 #
 # Generated config header, system files, and packaging.
