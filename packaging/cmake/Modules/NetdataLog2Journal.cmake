@@ -13,6 +13,8 @@
 # Built only when libpcre2-8 was found. The lookup lives in NetdataDependencies, and
 # log2journal is optional, so this reads PCRE2_FOUND instead of requiring it.
 
+include_guard()
+
 # log2journal
 set(LOG2JOURNAL_FILES
         src/collectors/log2journal/log2journal.h

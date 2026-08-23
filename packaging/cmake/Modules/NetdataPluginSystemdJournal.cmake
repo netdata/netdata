@@ -24,6 +24,8 @@
 # it means reordering the detection, which belongs in a change where the
 # journal reader is the subject.
 
+include_guard()
+
 set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-internals.h

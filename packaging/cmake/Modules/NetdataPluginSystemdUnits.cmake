@@ -10,6 +10,8 @@
 # NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It
 # sits above the guard, so it is defined unconditionally.
 
+include_guard()
+
 set(SYSTEMD_UNITS_PLUGIN_FILES
         src/collectors/systemd-units.plugin/plugin_systemd_units.c
 )

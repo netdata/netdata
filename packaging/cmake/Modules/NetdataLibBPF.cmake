@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Handling for libbpf (used by the eBPF plugin)
 
+include_guard()
+
 include(ExternalProject)
 include(NetdataUtil)
 

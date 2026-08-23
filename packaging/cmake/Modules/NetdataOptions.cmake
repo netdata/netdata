@@ -14,6 +14,8 @@
 #
 # Kept as one unit: splitting the option() calls from the validation and the remap that consume them would manufacture modularity without providing any.
 
+include_guard()
+
 include(CMakeDependentOption)
 
 # Enforce the first half of the ordering contract. Without platform facts the

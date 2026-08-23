@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Handling for eBPF legacy programs
 
+include_guard()
+
 include(ExternalProject)
 include(NetdataUtil)
 

@@ -53,6 +53,8 @@
 #                                 macOS rather than part of what Netdata depends
 #                                 on.
 
+include_guard()
+
 #
 # Linked into libnetdata, and through it into everything that links libnetdata.
 #

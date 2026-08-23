@@ -5,6 +5,8 @@
 #
 # This clones and builds libbacktrace using ExternalProject functionality.
 
+include_guard()
+
 include(ExternalProject)
 
 function(netdata_bundle_libbacktrace)

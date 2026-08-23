@@ -19,6 +19,8 @@
 # and json-c. Those targets are created earlier in the root file and include()
 # does not change when this runs, so they exist here exactly as before.
 
+include_guard()
+
 # network-viewer: the OS-independent sources
 set(NETWORK_VIEWER_COMMON_FILES
         src/collectors/common-cgroups/cgroup-path.c

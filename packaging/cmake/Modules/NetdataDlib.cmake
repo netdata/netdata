@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of dlib
 
+include_guard()
+
 function(netdata_bundle_dlib)
   include(FetchContent)
   include(NetdataFetchContentExtra)

@@ -13,6 +13,8 @@
 # Nothing here creates a target or touches a directory property, so its position is free. It reads only CMAKE_SYSTEM_NAME (via the OS_* variables) and CMAKE_C_COMPILER_ID. The one thing it must stay ahead of is any consumer of the HAVE_* results, the earliest of which is the libnetdata link line.
 #
 
+include_guard()
+
 #
 # librt
 #

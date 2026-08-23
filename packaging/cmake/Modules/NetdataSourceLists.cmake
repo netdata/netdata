@@ -17,6 +17,8 @@
 # packaging/cmake/Modules/NetdataPlugin*.cmake module, and libnetdata's in
 # src/libnetdata/SourceLists.cmake. Add a new list there, not here.
 
+include_guard()
+
 #
 # source files
 #

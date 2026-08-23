@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of JSON-C
 
+include_guard()
+
 # Handle bundling of json-c.
 #
 # This pulls it in as a sub-project using FetchContent functionality.

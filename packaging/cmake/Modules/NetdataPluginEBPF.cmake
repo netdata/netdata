@@ -17,6 +17,8 @@
 # The GLOB_RECURSE for the Go plugin below uses CMAKE_SOURCE_DIR, not
 # CMAKE_CURRENT_LIST_DIR, so include() leaves it resolving exactly as before.
 
+include_guard()
+
 set(INTERCOMMUNICATION_COLLECTORS_FILES
         src/collectors/collectors-ipc/ebpf-ipc.c
         src/collectors/collectors-ipc/ebpf-ipc.h

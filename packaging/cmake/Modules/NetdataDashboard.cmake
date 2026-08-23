@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # CMake module to handle fetching and installing the dashboard code
 
+include_guard()
+
 include(NetdataUtil)
 
 function(handle_braindead_versioning_insanity prefix)

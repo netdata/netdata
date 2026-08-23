@@ -2,6 +2,8 @@
 # CPack options
 #
 
+include_guard()
+
 # CPACK_PACKAGE_VERSION is set by the version handling code.
 
 set(CPACK_THREADS 0)

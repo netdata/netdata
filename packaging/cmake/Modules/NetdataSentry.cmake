@@ -8,6 +8,8 @@
 # This needs to be a function and not a macro for variable scoping
 # reasons. All the things we care about from the sub-project are exposed
 # as targets, which are globally scoped and not function scoped.
+
+include_guard()
 function(netdata_bundle_sentry)
         include(FetchContent)
 

@@ -16,6 +16,8 @@
 # sits above the guard, so it is defined unconditionally; nothing outside this
 # file reads it.
 
+include_guard()
+
 # debugfs.plugin
 set(DEBUGFS_PLUGIN_FILES
         src/collectors/debugfs.plugin/debugfs_plugin.c

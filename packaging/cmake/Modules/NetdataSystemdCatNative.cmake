@@ -9,6 +9,8 @@
 # libcurl is a hard requirement of the build, checked in NetdataDependencies,
 # so this links PkgConfig::CURL unconditionally.
 
+include_guard()
+
 set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
                              src/libnetdata/log/systemd-cat-native.h)
 

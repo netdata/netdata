@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Build configuration for ibm.d.plugin which requires CGO
 
+include_guard()
+
 include(FetchContent)
 include(NetdataUtil)
 

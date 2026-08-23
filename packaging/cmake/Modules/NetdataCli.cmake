@@ -6,6 +6,8 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 
+include_guard()
+
 set(NETDATACLI_FILES
         src/daemon/commands.h
         src/daemon/pipename.c

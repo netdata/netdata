@@ -6,6 +6,8 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 
+include_guard()
+
 if(ENABLE_PLUGIN_SCRIPTS)
     if (OS_WINDOWS)
         set(SCRIPTS_PLUGIN_BIN scripts.d.plugin.exe)

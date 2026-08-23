@@ -8,6 +8,8 @@
 # so the parser supports UPDATE/DELETE ... LIMIT), then compiles it as
 # a separate static library that links into libnetdata.
 
+include_guard()
+
 include(ExternalProject)
 
 set(SQLITE_VERSION "3.53.4")

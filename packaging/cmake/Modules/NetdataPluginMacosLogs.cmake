@@ -20,6 +20,8 @@
 # rule makes CPack emit an empty package, and an install rule whose component is
 # unregistered ships the binary in no package at all.
 
+include_guard()
+
 set(MACOS_LOGS_PLUGIN_FILES
         src/collectors/macos-logs.plugin/macos-logs.c
         src/collectors/macos-logs.plugin/macos-logs.h

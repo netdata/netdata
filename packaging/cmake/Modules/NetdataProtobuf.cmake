@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Macros and functions for handling of Protobuf
 
+include_guard()
+
 # Prepare a vendored copy of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)
         include(FetchContent)

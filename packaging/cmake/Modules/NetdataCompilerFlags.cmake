@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions to simplify handling of extra compiler flags.
 
+include_guard()
+
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 include(CMakePushCheckState)

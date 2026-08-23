@@ -14,6 +14,8 @@
 # evaluates it. Verify any change to it against the Build Windows CI job; a
 # local configure will not exercise it.
 
+include_guard()
+
 set(WINDOWS_EVENTS_PLUGIN_FILES
         src/collectors/windows-events.plugin/windows-events.c
         src/collectors/windows-events.plugin/windows-events.h

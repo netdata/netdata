@@ -8,6 +8,8 @@
 #
 # Built on demand: all but cgroup-lookup-test are EXCLUDE_FROM_ALL, and that one is behind ENABLE_CGROUPS_LOOKUP_TEST_CLIENT, off by default.
 
+include_guard()
+
 if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
     add_executable(cgroup-lookup-test src/collectors/cgroups.plugin/cgroup-lookup-test/cgroup-lookup-test.c)
     target_link_libraries(cgroup-lookup-test libnetdata)

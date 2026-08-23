@@ -12,6 +12,8 @@
 # calls at the top snapshot the compile and link options accumulated so far, and
 # that snapshot reaches config.h and is shipped as build-info-cmake-cache.gz.
 
+include_guard()
+
 #
 # Generate config file
 #

@@ -15,6 +15,8 @@
 # NetdataSourceLists.cmake, so a plugin's whole definition is in one place. It
 # sits above the guards, so it is defined unconditionally.
 
+include_guard()
+
 # local-listeners
 set(LOCAL_LISTENERS_FILES
         src/collectors/utils/local_listeners.c

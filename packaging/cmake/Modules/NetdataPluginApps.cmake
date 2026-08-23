@@ -9,6 +9,8 @@
 # Its source list, executable and install rule move together, so nothing here
 # takes part in the NETDATA_FILES/LIBNETDATA_FILES composition.
 
+include_guard()
+
 if(ENABLE_PLUGIN_APPS)
     set(APPS_PLUGIN_FILES
             src/collectors/apps.plugin/apps_plugin.c

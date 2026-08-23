@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Extra tools for working with FetchContent on older CMake
 
+include_guard()
+
 # FetchContent_MakeAvailable_NoInstall
 #
 # Add a sub-project with FetchContent, but with the EXCLUDE_FROM_ALL

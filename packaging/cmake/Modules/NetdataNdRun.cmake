@@ -10,6 +10,8 @@
 # generates config.h on the root file's last line - so this include() must
 # stay ahead of that, which its ordinal position guarantees by 400-odd lines.
 
+include_guard()
+
 set(NDRUN_FILES src/collectors/utils/nd-run.c)
 
 #

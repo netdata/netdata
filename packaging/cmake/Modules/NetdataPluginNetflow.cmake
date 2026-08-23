@@ -6,6 +6,8 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 
+include_guard()
+
 if(ENABLE_PLUGIN_NETFLOW)
     corrosion_install(TARGETS netflow-plugin
                       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE

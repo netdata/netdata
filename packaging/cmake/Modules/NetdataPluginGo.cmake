@@ -6,6 +6,8 @@
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 
+include_guard()
+
 if(ENABLE_PLUGIN_GO)
     if (OS_WINDOWS)
         set(GO_PLUGIN_BIN go.d.plugin.exe)

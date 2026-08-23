@@ -9,6 +9,8 @@
 # Its source list, executable and install rule move together, so nothing here
 # takes part in the NETDATA_FILES/LIBNETDATA_FILES composition.
 
+include_guard()
+
 if(NEED_NDSUDO)
     set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 

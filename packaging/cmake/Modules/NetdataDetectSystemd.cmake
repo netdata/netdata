@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # CMake Module to handle all the systemd-related checks for Netdata.
 
+include_guard()
+
 include(CheckCSourceCompiles)
 include(CheckSymbolExists)
 include(CMakePushCheckState)
