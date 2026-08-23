@@ -97,7 +97,7 @@ def clean_and_write(md: str, path: Path):
 
         def _profile_details(match, attribute=attribute):
             opened = ' open' if match.group(1) else ''
-            return f'<details{opened} {attribute}><summary>{match.group(2)}</summary>\n'
+            return f'<details{opened} {attribute}>\n<summary>{match.group(2)}</summary>\n'
 
         md = re.sub(pattern, _profile_details, md)
 
