@@ -157,7 +157,7 @@ When Netdata is compiled with debugging enabled:
 - **Debug Logging**: Disabled by default. To enable logging for specific components:
     - Open `netdata.conf`.
     - Set the `debug flags` option to a hex value that corresponds to the components you want to trace.
-    - Debug flag options are defined in [log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/log.h) as `D_*` values. Use `0xffffffffffffffff` to enable all debug flags.
+    - Debug flag options are defined in [nd_log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/nd_log.h) as `D_*` values. Use `0xffffffffffffffff` to enable all debug flags.
 
 > **Important**
 >

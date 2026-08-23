@@ -182,7 +182,7 @@ modules:
               required: false
               group: Request
             - name: cookie_file
-              description: Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat).
+              description: Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat.html).
               default_value: ""
               required: false
               group: Request
