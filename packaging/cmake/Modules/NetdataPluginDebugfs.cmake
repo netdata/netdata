@@ -47,9 +47,8 @@ if(ENABLE_PLUGIN_DEBUGFS)
     )
 
     # Link against libnetdata and optionally libcap
-    target_link_libraries(debugfs.plugin PRIVATE libnetdata ${CAP_LIBRARIES})
-    target_include_directories(debugfs.plugin PRIVATE ${CAP_INCLUDE_DIRS})
-    target_compile_options(debugfs.plugin PRIVATE ${CAP_CFLAGS_OTHER})
+    target_link_libraries(debugfs.plugin PRIVATE libnetdata
+            "$<$<BOOL:${CAP_FOUND}>:PkgConfig::CAP>")
 
     # Install the debugfs.plugin binary
     install(TARGETS debugfs.plugin

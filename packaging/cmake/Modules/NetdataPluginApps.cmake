@@ -52,11 +52,9 @@ if(ENABLE_PLUGIN_APPS)
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
 
-    target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES}
+    target_link_libraries(apps.plugin libnetdata
+            "$<$<BOOL:${CAP_FOUND}>:PkgConfig::CAP>"
             "$<$<BOOL:${OS_WINDOWS}>:Version;ntdll>")
-
-    target_include_directories(apps.plugin PRIVATE ${CAP_INCLUDE_DIRS})
-    target_compile_options(apps.plugin PRIVATE ${CAP_CFLAGS_OTHER})
 
     install(TARGETS apps.plugin
             COMPONENT plugin-apps

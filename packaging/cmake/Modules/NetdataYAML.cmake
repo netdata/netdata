@@ -62,6 +62,10 @@ macro(netdata_detect_libyaml)
                 # Prepend only the public headers; the yaml target propagates the full interface.
                 list(GET NETDATA_YAML_TARGET_INCLUDE_DIRS 0 NETDATA_YAML_INCLUDE_DIRS)
                 get_target_property(NETDATA_YAML_CFLAGS_OTHER yaml INTERFACE_COMPILE_DEFINITIONS)
+
+                if(NETDATA_YAML_CFLAGS_OTHER STREQUAL NETDATA_YAML_CFLAGS_OTHER-NOTFOUND)
+                        set(NETDATA_YAML_CFLAGS_OTHER "")
+                endif()
         else()
                 set(NETDATA_YAML_LDFLAGS ${YAML_LDFLAGS})
                 set(NETDATA_YAML_CFLAGS_OTHER ${YAML_CFLAGS_OTHER})
