@@ -126,6 +126,14 @@ mark_as_advanced(ENABLE_WEBRTC)
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
 
+# Consumed by src/daemon/sentry-native/ through config.h; the release pipeline
+# passes all three from packaging/build-package.sh. Empty means unset: the
+# #cmakedefine lines they feed stay undefined and crash reporting stays off.
+set(NETDATA_SENTRY_ENVIRONMENT "" CACHE STRING "Sentry environment name reported with crash events")
+set(NETDATA_SENTRY_DIST "" CACHE STRING "Sentry distribution channel reported with crash events")
+set(NETDATA_SENTRY_DSN "" CACHE STRING "Sentry DSN crash events are submitted to")
+mark_as_advanced(NETDATA_SENTRY_ENVIRONMENT NETDATA_SENTRY_DIST NETDATA_SENTRY_DSN)
+
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
