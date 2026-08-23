@@ -17,8 +17,6 @@ set(SQLITE_VERSION_YEAR "2026")
 set(SQLITE_TARBALL_SHA256 "d18fa15aec74d8c17e1463f861095adc01b5ad190256acb4f91d22f0368d232b")
 set(SQLITE_GIT_SHA "b09c88c14082339b66c7b7158d609a771e64ca69") # tag is: version-${SQLITE_VERSION}
 
-option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)
-
 function(netdata_bundle_sqlite3)
         message(STATUS "Preparing SQLite ${SQLITE_VERSION}")
 

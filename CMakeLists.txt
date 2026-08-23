@@ -71,8 +71,6 @@ set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include(NetdataPlatform)
 include(NetdataOptions)
 
-option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
-mark_as_advanced(STATIC_BUILD)
 set(BUILD_SHARED_LIBS "${STATIC_BUILD}")
 
 if(STATIC_BUILD)
@@ -107,9 +105,6 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 
-option(USE_CXX_11 "Use C++11 instead of C++17 (should only be used on legacy systems that cannot support C++17, may disable some features)" False)
-mark_as_advanced(USE_CXX_11)
-
 if(USE_CXX_11)
     set(CMAKE_CXX_STANDARD 11)
 endif()
@@ -122,8 +117,6 @@ set(SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P})
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 # Check for the mold linker and try to use it if available
-option(USE_MOLD "If the MOLD linker is available on the system, use it instead of the default linker." TRUE)
-
 if(USE_MOLD)
         message(CHECK_START "Searching for MOLD linker")
         find_program(MOLD_LINKER NAMES ld.mold mold)
@@ -171,8 +164,6 @@ include(NetdataPlatformChecks)
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 
 if(OS_WINDOWS)
-  set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
-      "Native Windows install prefix used to derive runtime paths")
   string(REGEX REPLACE "[/\\\\]+$" "" NETDATA_WINDOWS_PATH_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
   string(REPLACE "\\" "\\\\" NETDATA_WINDOWS_PATH_PREFIX_ESCAPED "${NETDATA_WINDOWS_PATH_PREFIX}")
 
@@ -286,16 +277,6 @@ endif()
 # DEB policy requires a copyright file in every binary package, under that
 # package's own documentation directory.
 set(PKG_DOC_DEST "usr/share/doc")
-
-cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
-mark_as_advanced(ENABLE_LIBBACKTRACE)
-cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
-mark_as_advanced(ENABLE_LIBUNWIND)
-
-cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
-mark_as_advanced(FORCE_LEGACY_LIBBPF)
-
-cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
 # Setup Rust/Corrosion for plugins that need it
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)

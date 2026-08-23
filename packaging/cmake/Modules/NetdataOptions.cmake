@@ -1,14 +1,55 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Build options, the package-format validation they feed, and the per-format component remap.
 #
-# Relocated verbatim from the root CMakeLists.txt. include()d rather than
+# Every build option is declared here and nowhere else. include()d rather than
 # add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
 # keep pointing at the repository and build roots, which every relative path
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
+# Ordering contract, and it is the reason this file is included where it is:
+# everything here runs after NetdataPlatform, because the dependent options gate on
+# OS_*/CPU_*, and before every consumer, because an option read before its
+# declaration takes the unset value rather than the default. Do not move the
+# include() without checking both halves.
+#
 # Kept as one unit: splitting the option() calls from the validation and the remap that consume them would manufacture modularity without providing any.
 
 include(CMakeDependentOption)
+
+# Toolchain and link knobs. Their readers sit in the root file a few lines below
+# this module's include, and in NetdataCompilerFlags, so they are declared first.
+option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
+mark_as_advanced(STATIC_BUILD)
+
+option(USE_CXX_11 "Use C++11 instead of C++17 (should only be used on legacy systems that cannot support C++17, may disable some features)" False)
+mark_as_advanced(USE_CXX_11)
+
+option(USE_MOLD "If the MOLD linker is available on the system, use it instead of the default linker." TRUE)
+
+# Hardening is off and LTO is on for shipping builds; a Debug build inverts both.
+# CMAKE_BUILD_TYPE is settled before project(), so the fork is decided by the time
+# this runs. One declaration each: the two arms differed only in the default, and
+# keeping two copies of the same help string in step by hand was the older shape.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(_nd_hardening_default TRUE)
+  set(_nd_lto_default FALSE)
+else()
+  set(_nd_hardening_default FALSE)
+  set(_nd_lto_default TRUE)
+endif()
+option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" ${_nd_hardening_default})
+option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." ${_nd_lto_default})
+unset(_nd_hardening_default)
+unset(_nd_lto_default)
+
+option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
+mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
+
+# Declared under the platform that reads it, so no other platform gains the entry.
+if(OS_WINDOWS)
+  set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
+      "Native Windows install prefix used to derive runtime paths")
+endif()
 
 # This is intended to make life easier for developers who are working on one
 # specific feature.
@@ -115,3 +156,23 @@ else()
         set(NETDATA_OTEL_CONF_COMPONENT plugin-otel)
         set(NETDATA_SWAGGER_COMPONENT netdata)
 endif()
+
+
+# Stack-trace, eBPF and journal-reader knobs. Declared after the plugin options
+# above because their availability conditions read them.
+cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
+mark_as_advanced(ENABLE_LIBBACKTRACE)
+cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
+mark_as_advanced(ENABLE_LIBUNWIND)
+
+cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
+mark_as_advanced(FORCE_LEGACY_LIBBPF)
+
+cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
+
+# Knobs whose only readers live inside a single module. They are declared here
+# anyway: where a knob is read is a detail, where it is declared is the contract.
+option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)
+
+set(DASHBOARD_URL "https://app.netdata.cloud/agent.tar.gz" CACHE STRING
+    "URL used to fetch the local agent dashboard code")
