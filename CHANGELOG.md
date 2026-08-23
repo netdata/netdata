@@ -76,6 +76,12 @@
 - Fix(go.d/snmp_topology): report correct device metadata ([#23587](https://github.com/netdata/netdata/issues/23587))
 - Fix(go.d/snmp): count all managed topology devices as discovered ([#23588](https://github.com/netdata/netdata/issues/23588))
 - Convert DC algorithms to go (ebpf.plugin) ([#23451](https://github.com/netdata/netdata/issues/23451))
+- Fix(memory): reduce glibc mallinfo2 pulse overhead ([#23579](https://github.com/netdata/netdata/issues/23579))
+- Refactor(aclk): clean up manifest publication record ([#23580](https://github.com/netdata/netdata/issues/23580))
+- Regenerate integrations docs ([#23590](https://github.com/netdata/netdata/issues/23590))
+- Docs: repair generated Learn link sources ([#23591](https://github.com/netdata/netdata/issues/23591))
+- Align documentation checks with Learn runtime ([#23593](https://github.com/netdata/netdata/issues/23593))
+- Regenerate integrations docs ([#23592](https://github.com/netdata/netdata/issues/23592))
 
 ## [2.11.0] - 2026-08-12
 
