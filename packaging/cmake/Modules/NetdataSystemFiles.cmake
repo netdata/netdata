@@ -298,7 +298,7 @@ if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND
         set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235")
 endif()
 
-if(OS_LINUX AND BUILD_FOR_PACKAGING)
+if(NETDATA_STAGE_HOST_FILES)
         install(FILES
                 ${NETDATA_PACKAGED_SYSTEMD_UNIT}
                 COMPONENT netdata
@@ -360,7 +360,7 @@ endif()
 #
 # misc files
 #
-if(OS_LINUX AND BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+if(NETDATA_STAGE_HOST_FILES AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         install(FILES
                 ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
                 COMPONENT netdata
@@ -372,7 +372,7 @@ if(OS_LINUX AND BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "r
                 DESTINATION ${HOST_INITD_DEST})
 endif()
 
-if(OS_LINUX AND BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+if(NETDATA_STAGE_HOST_FILES AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         # RPM-only payloads; no other install rule covers them.
         install(PROGRAMS
                 packaging/installer/netdata-uninstaller.sh
@@ -448,7 +448,7 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION ${SYSTEM_DEST}/systemd)
 
-  if(OS_LINUX AND BUILD_FOR_PACKAGING)
+  if(NETDATA_STAGE_HOST_FILES)
     install(FILES
             ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
             COMPONENT netdata

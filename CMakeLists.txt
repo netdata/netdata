@@ -244,6 +244,21 @@ else()
         set(HOST_SYSTEMD_UNIT_DEST "lib/systemd/system")
 endif()
 
+# The one predicate every rule that writes a HOST_* destination is guarded on:
+# this platform owns those directories, and this artifact is a native package
+# that will claim them in its own manifest. Naming the intersection once keeps
+# the two questions - whose path is it, and are we packaging - out of eleven
+# separate conditions, and makes a new packaging target a change here rather
+# than at every site.
+#
+# The logrotate host copy is the deliberate exception; it is guarded on OS_LINUX
+# alone because a non-package Linux build has always staged it.
+if(OS_LINUX AND BUILD_FOR_PACKAGING)
+  set(NETDATA_STAGE_HOST_FILES TRUE)
+else()
+  set(NETDATA_STAGE_HOST_FILES FALSE)
+endif()
+
 # DEB policy requires a copyright file in every binary package, under that
 # package's own documentation directory.
 set(PKG_DOC_DEST "usr/share/doc")
