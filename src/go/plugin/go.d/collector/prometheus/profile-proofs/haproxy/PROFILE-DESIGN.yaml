@@ -104,7 +104,7 @@ exclusions:
 limitations: {}
 views:
   process_recv_logs_total:
-    family: HAProxy/Process/Activity
+    family: Process/Activity
     question: What per-second rate does HAProxy report for received logs?
     entity: process
     inputs:
@@ -117,7 +117,7 @@ views:
       promote: []
       omit: {}
   process_relative_process_id:
-    family: HAProxy/Process/Activity
+    family: Process/Activity
     question: What value does HAProxy currently report for relative process id?
     entity: process
     inputs:
@@ -130,7 +130,7 @@ views:
       promote: []
       omit: {}
   process_requests_total:
-    family: HAProxy/Process/Activity
+    family: Process/Activity
     question: What per-second rate does HAProxy report for requests?
     entity: process
     inputs:
@@ -143,7 +143,7 @@ views:
       promote: []
       omit: {}
   process_nbthread:
-    family: HAProxy/Process/Activity
+    family: Process/Activity
     question: What value does HAProxy currently report for threads?
     entity: process
     inputs:
@@ -156,7 +156,7 @@ views:
       promote: []
       omit: {}
   process_nbproc:
-    family: HAProxy/Process/Activity
+    family: Process/Activity
     question: What value does HAProxy currently report for worker processes?
     entity: process
     inputs:
@@ -169,7 +169,7 @@ views:
       promote: []
       omit: {}
   process_current_zlib_memory:
-    family: HAProxy/Process/Compression
+    family: Process/Compression
     question: What value does HAProxy currently report for zlib memory?
     entity: process
     inputs:
@@ -182,7 +182,7 @@ views:
       promote: []
       omit: {}
   process_limit_http_comp:
-    family: HAProxy/Process/Compression
+    family: Process/Compression
     question: What value does HAProxy currently report for http compression limit?
     entity: process
     inputs:
@@ -195,7 +195,7 @@ views:
       promote: []
       omit: {}
   process_max_zlib_memory:
-    family: HAProxy/Process/Compression
+    family: Process/Compression
     question: What value does HAProxy currently report for max zlib memory?
     entity: process
     inputs:
@@ -208,7 +208,7 @@ views:
       promote: []
       omit: {}
   process_connections_total:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What per-second rate does HAProxy report for connections?
     entity: process
     inputs:
@@ -221,7 +221,7 @@ views:
       promote: []
       omit: {}
   process_current_connection_rate:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for connection rate?
     entity: process
     inputs:
@@ -234,7 +234,7 @@ views:
       promote: []
       omit: {}
   process_current_connections:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for connections?
     entity: process
     inputs:
@@ -247,7 +247,7 @@ views:
       promote: []
       omit: {}
   process_hard_max_connections:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for hard max connections?
     entity: process
     inputs:
@@ -260,7 +260,7 @@ views:
       promote: []
       omit: {}
   process_limit_connection_rate:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for limit connection rate?
     entity: process
     inputs:
@@ -273,7 +273,7 @@ views:
       promote: []
       omit: {}
   process_max_connection_rate:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for max connection rate?
     entity: process
     inputs:
@@ -286,7 +286,7 @@ views:
       promote: []
       omit: {}
   process_max_connections:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for max connections?
     entity: process
     inputs:
@@ -299,7 +299,7 @@ views:
       promote: []
       omit: {}
   process_max_fds:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for max fds?
     entity: process
     inputs:
@@ -312,7 +312,7 @@ views:
       promote: []
       omit: {}
   process_max_pipes:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for max pipes?
     entity: process
     inputs:
@@ -325,7 +325,7 @@ views:
       promote: []
       omit: {}
   process_max_sockets:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for max sockets?
     entity: process
     inputs:
@@ -338,7 +338,7 @@ views:
       promote: []
       omit: {}
   process_pipes:
-    family: HAProxy/Process/Connections
+    family: Process/Connections
     question: What value does HAProxy currently report for pipes?
     entity: process
     inputs:
@@ -355,7 +355,7 @@ views:
       promote: []
       omit: {}
   process_dropped_logs_total:
-    family: HAProxy/Process/Errors
+    family: Process/Errors
     question: What per-second rate does HAProxy report for dropped logs?
     entity: process
     inputs:
@@ -368,7 +368,7 @@ views:
       promote: []
       omit: {}
   process_failed_resolutions:
-    family: HAProxy/Process/Errors
+    family: Process/Errors
     question: What per-second rate does HAProxy report for failed resolutions?
     entity: process
     inputs:
@@ -381,7 +381,7 @@ views:
       promote: []
       omit: {}
   process_total_warnings:
-    family: HAProxy/Process/Errors
+    family: Process/Errors
     question: What per-second rate does HAProxy report for warnings?
     entity: process
     inputs:
@@ -394,7 +394,7 @@ views:
       promote: []
       omit: {}
   process_active_peers:
-    family: HAProxy/Process/Health
+    family: Process/Health
     question: What value does HAProxy currently report for active peers?
     entity: process
     inputs:
@@ -407,7 +407,7 @@ views:
       promote: []
       omit: {}
   process_max_memory_bytes:
-    family: HAProxy/Process/Memory
+    family: Process/Memory
     question: What value does HAProxy currently report for max memory bytes?
     entity: process
     inputs:
@@ -420,7 +420,7 @@ views:
       promote: []
       omit: {}
   process_pool_allocated_bytes:
-    family: HAProxy/Process/Memory
+    family: Process/Memory
     question: What value does HAProxy currently report for pool allocated bytes?
     entity: process
     inputs:
@@ -433,7 +433,7 @@ views:
       promote: []
       omit: {}
   process_pool_failures_total:
-    family: HAProxy/Process/Memory
+    family: Process/Memory
     question: What per-second rate does HAProxy report for pool failures?
     entity: process
     inputs:
@@ -446,7 +446,7 @@ views:
       promote: []
       omit: {}
   process_pool_used_bytes:
-    family: HAProxy/Process/Memory
+    family: Process/Memory
     question: What value does HAProxy currently report for pool used bytes?
     entity: process
     inputs:
@@ -459,7 +459,7 @@ views:
       promote: []
       omit: {}
   process_current_run_queue:
-    family: HAProxy/Process/Queue
+    family: Process/Queue
     question: What value does HAProxy currently report for run queue?
     entity: process
     inputs:
@@ -472,7 +472,7 @@ views:
       promote: []
       omit: {}
   process_current_backend_ssl_key_rate:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for backend ssl key rate?
     entity: process
     inputs:
@@ -485,7 +485,7 @@ views:
       promote: []
       omit: {}
   process_current_frontend_ssl_key_rate:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for frontend ssl key rate?
     entity: process
     inputs:
@@ -498,7 +498,7 @@ views:
       promote: []
       omit: {}
   process_current_ssl_connections:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for ssl connections?
     entity: process
     inputs:
@@ -511,7 +511,7 @@ views:
       promote: []
       omit: {}
   process_current_ssl_rate:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for ssl rate?
     entity: process
     inputs:
@@ -524,7 +524,7 @@ views:
       promote: []
       omit: {}
   process_frontend_ssl_reuse:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for frontend ssl reuse?
     entity: process
     inputs:
@@ -542,7 +542,7 @@ views:
       evidence:
       - percentage_display
   process_limit_ssl_rate:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for limit ssl rate?
     entity: process
     inputs:
@@ -555,7 +555,7 @@ views:
       promote: []
       omit: {}
   process_max_backend_ssl_key_rate:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for max backend ssl key rate?
     entity: process
     inputs:
@@ -568,7 +568,7 @@ views:
       promote: []
       omit: {}
   process_max_frontend_ssl_key_rate:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for max frontend ssl key rate?
     entity: process
     inputs:
@@ -581,7 +581,7 @@ views:
       promote: []
       omit: {}
   process_max_ssl_connections:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for max ssl connections?
     entity: process
     inputs:
@@ -594,7 +594,7 @@ views:
       promote: []
       omit: {}
   process_max_ssl_rate:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What value does HAProxy currently report for max ssl rate?
     entity: process
     inputs:
@@ -607,7 +607,7 @@ views:
       promote: []
       omit: {}
   process_ssl_cache_lookups_total:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What per-second rate does HAProxy report for ssl cache lookups?
     entity: process
     inputs:
@@ -620,7 +620,7 @@ views:
       promote: []
       omit: {}
   process_ssl_cache_misses_total:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What per-second rate does HAProxy report for ssl cache misses?
     entity: process
     inputs:
@@ -633,7 +633,7 @@ views:
       promote: []
       omit: {}
   process_ssl_connections_total:
-    family: HAProxy/Process/SSL
+    family: Process/SSL
     question: What per-second rate does HAProxy report for ssl connections?
     entity: process
     inputs:
@@ -646,7 +646,7 @@ views:
       promote: []
       omit: {}
   process_connected_peers:
-    family: HAProxy/Process/Scheduler
+    family: Process/Scheduler
     question: What value does HAProxy currently report for connected peers?
     entity: process
     inputs:
@@ -659,7 +659,7 @@ views:
       promote: []
       omit: {}
   process_current_tasks:
-    family: HAProxy/Process/Scheduler
+    family: Process/Scheduler
     question: What value does HAProxy currently report for tasks?
     entity: process
     inputs:
@@ -672,7 +672,7 @@ views:
       promote: []
       omit: {}
   process_jobs:
-    family: HAProxy/Process/Scheduler
+    family: Process/Scheduler
     question: What value does HAProxy currently report for jobs?
     entity: process
     inputs:
@@ -685,7 +685,7 @@ views:
       promote: []
       omit: {}
   process_listeners:
-    family: HAProxy/Process/Scheduler
+    family: Process/Scheduler
     question: What value does HAProxy currently report for listeners?
     entity: process
     inputs:
@@ -698,7 +698,7 @@ views:
       promote: []
       omit: {}
   process_unstoppable_jobs:
-    family: HAProxy/Process/Scheduler
+    family: Process/Scheduler
     question: What value does HAProxy currently report for unstoppable jobs?
     entity: process
     inputs:
@@ -711,7 +711,7 @@ views:
       promote: []
       omit: {}
   process_current_session_rate:
-    family: HAProxy/Process/Sessions
+    family: Process/Sessions
     question: What value does HAProxy currently report for session rate?
     entity: process
     inputs:
@@ -724,7 +724,7 @@ views:
       promote: []
       omit: {}
   process_limit_session_rate:
-    family: HAProxy/Process/Sessions
+    family: Process/Sessions
     question: What value does HAProxy currently report for limit session rate?
     entity: process
     inputs:
@@ -737,7 +737,7 @@ views:
       promote: []
       omit: {}
   process_max_session_rate:
-    family: HAProxy/Process/Sessions
+    family: Process/Sessions
     question: What value does HAProxy currently report for max session rate?
     entity: process
     inputs:
@@ -750,7 +750,7 @@ views:
       promote: []
       omit: {}
   process_busy_polling_enabled:
-    family: HAProxy/Process/Status
+    family: Process/Status
     question: What value does HAProxy currently report for busy polling enabled?
     entity: process
     inputs:
@@ -763,7 +763,7 @@ views:
       promote: []
       omit: {}
   process_stopping:
-    family: HAProxy/Process/Status
+    family: Process/Status
     question: What value does HAProxy currently report for stopping?
     entity: process
     inputs:
@@ -776,7 +776,7 @@ views:
       promote: []
       omit: {}
   process_idle_time_percent:
-    family: HAProxy/Process/Timing
+    family: Process/Timing
     question: What value does HAProxy currently report for idle time percent?
     entity: process
     inputs:
@@ -794,7 +794,7 @@ views:
       evidence:
       - percentage_display
   process_uptime_seconds:
-    family: HAProxy/Process/Timing
+    family: Process/Timing
     question: What value does HAProxy currently report for uptime seconds?
     entity: process
     inputs:
@@ -807,7 +807,7 @@ views:
       promote: []
       omit: {}
   process_bytes_out_total:
-    family: HAProxy/Process/Traffic
+    family: Process/Traffic
     question: What per-second rate does HAProxy report for bytes out?
     entity: process
     inputs:
@@ -820,7 +820,7 @@ views:
       promote: []
       omit: {}
   process_bytes_out_rate:
-    family: HAProxy/Process/Traffic
+    family: Process/Traffic
     question: What value does HAProxy currently report for bytes out rate?
     entity: process
     inputs:
@@ -833,7 +833,7 @@ views:
       promote: []
       omit: {}
   process_http_comp_bytes_in_total:
-    family: HAProxy/Process/Traffic
+    family: Process/Traffic
     question: What value does HAProxy currently report for http compression bytes in?
     entity: process
     inputs:
@@ -846,7 +846,7 @@ views:
       promote: []
       omit: {}
   process_http_comp_bytes_out_total:
-    family: HAProxy/Process/Traffic
+    family: Process/Traffic
     question: What value does HAProxy currently report for http compression bytes out?
     entity: process
     inputs:
@@ -859,7 +859,7 @@ views:
       promote: []
       omit: {}
   process_spliced_bytes_out_total:
-    family: HAProxy/Process/Traffic
+    family: Process/Traffic
     question: What per-second rate does HAProxy report for spliced bytes out?
     entity: process
     inputs:
@@ -872,7 +872,7 @@ views:
       promote: []
       omit: {}
   frontend_http_comp_responses_total:
-    family: HAProxy/Frontends/Compression
+    family: Frontends/Compression
     question: What per-second rate does HAProxy report for http compression responses?
     entity: frontend
     inputs:
@@ -885,7 +885,7 @@ views:
       promote: []
       omit: {}
   frontend_connections_total:
-    family: HAProxy/Frontends/Connections
+    family: Frontends/Connections
     question: What per-second rate does HAProxy report for connections?
     entity: frontend
     inputs:
@@ -898,7 +898,7 @@ views:
       promote: []
       omit: {}
   frontend_connections_rate_max:
-    family: HAProxy/Frontends/Connections
+    family: Frontends/Connections
     question: What value does HAProxy currently report for connections rate max?
     entity: frontend
     inputs:
@@ -911,7 +911,7 @@ views:
       promote: []
       omit: {}
   frontend_denied_connections_total:
-    family: HAProxy/Frontends/Connections
+    family: Frontends/Connections
     question: What per-second rate does HAProxy report for denied connections?
     entity: frontend
     inputs:
@@ -924,7 +924,7 @@ views:
       promote: []
       omit: {}
   frontend_errors:
-    family: HAProxy/Frontends/Errors
+    family: Frontends/Errors
     question: What per-second rate does HAProxy report for errors?
     entity: frontend
     inputs:
@@ -945,7 +945,7 @@ views:
       promote: []
       omit: {}
   frontend_requests_denied_total:
-    family: HAProxy/Frontends/Errors
+    family: Frontends/Errors
     question: What per-second rate does HAProxy report for requests denied?
     entity: frontend
     inputs:
@@ -958,7 +958,7 @@ views:
       promote: []
       omit: {}
   frontend_responses_denied_total:
-    family: HAProxy/Frontends/Errors
+    family: Frontends/Errors
     question: What per-second rate does HAProxy report for responses denied?
     entity: frontend
     inputs:
@@ -971,7 +971,7 @@ views:
       promote: []
       omit: {}
   frontend_http_cache_hits_total:
-    family: HAProxy/Frontends/HTTP
+    family: Frontends/HTTP
     question: What per-second rate does HAProxy report for http cache hits?
     entity: frontend
     inputs:
@@ -984,7 +984,7 @@ views:
       promote: []
       omit: {}
   frontend_http_cache_lookups_total:
-    family: HAProxy/Frontends/HTTP
+    family: Frontends/HTTP
     question: What per-second rate does HAProxy report for http cache lookups?
     entity: frontend
     inputs:
@@ -997,7 +997,7 @@ views:
       promote: []
       omit: {}
   frontend_http_requests_total:
-    family: HAProxy/Frontends/HTTP
+    family: Frontends/HTTP
     question: What per-second rate does HAProxy report for http requests?
     entity: frontend
     inputs:
@@ -1010,7 +1010,7 @@ views:
       promote: []
       omit: {}
   frontend_http_requests_rate_max:
-    family: HAProxy/Frontends/HTTP
+    family: Frontends/HTTP
     question: What value does HAProxy currently report for http requests rate max?
     entity: frontend
     inputs:
@@ -1023,7 +1023,7 @@ views:
       promote: []
       omit: {}
   frontend_http_responses_total:
-    family: HAProxy/Frontends/HTTP
+    family: Frontends/HTTP
     question: What per-second rate does HAProxy report for http responses?
     entity: frontend
     inputs:
@@ -1038,7 +1038,7 @@ views:
       promote: []
       omit: {}
   frontend_intercepted_requests_total:
-    family: HAProxy/Frontends/HTTP
+    family: Frontends/HTTP
     question: What per-second rate does HAProxy report for intercepted requests?
     entity: frontend
     inputs:
@@ -1051,7 +1051,7 @@ views:
       promote: []
       omit: {}
   frontend_current_session_rate:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What value does HAProxy currently report for session rate?
     entity: frontend
     inputs:
@@ -1064,7 +1064,7 @@ views:
       promote: []
       omit: {}
   frontend_current_sessions:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What value does HAProxy currently report for sessions?
     entity: frontend
     inputs:
@@ -1077,7 +1077,7 @@ views:
       promote: []
       omit: {}
   frontend_denied_sessions_total:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What per-second rate does HAProxy report for denied sessions?
     entity: frontend
     inputs:
@@ -1090,7 +1090,7 @@ views:
       promote: []
       omit: {}
   frontend_limit_session_rate:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What value does HAProxy currently report for limit session rate?
     entity: frontend
     inputs:
@@ -1103,7 +1103,7 @@ views:
       promote: []
       omit: {}
   frontend_limit_sessions:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What value does HAProxy currently report for limit sessions?
     entity: frontend
     inputs:
@@ -1116,7 +1116,7 @@ views:
       promote: []
       omit: {}
   frontend_max_session_rate:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What value does HAProxy currently report for max session rate?
     entity: frontend
     inputs:
@@ -1129,7 +1129,7 @@ views:
       promote: []
       omit: {}
   frontend_max_sessions:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What value does HAProxy currently report for max sessions?
     entity: frontend
     inputs:
@@ -1142,7 +1142,7 @@ views:
       promote: []
       omit: {}
   frontend_sessions_total:
-    family: HAProxy/Frontends/Sessions
+    family: Frontends/Sessions
     question: What per-second rate does HAProxy report for sessions?
     entity: frontend
     inputs:
@@ -1155,7 +1155,7 @@ views:
       promote: []
       omit: {}
   frontend_status:
-    family: HAProxy/Frontends/Status
+    family: Frontends/Status
     question: What values does HAProxy report across the source-defined status states?
     entity: frontend
     inputs:
@@ -1170,7 +1170,7 @@ views:
       promote: []
       omit: {}
   frontend_http_comp_bytes_bypassed_total:
-    family: HAProxy/Frontends/Traffic
+    family: Frontends/Traffic
     question: What per-second rate does HAProxy report for http compression bytes bypassed?
     entity: frontend
     inputs:
@@ -1183,7 +1183,7 @@ views:
       promote: []
       omit: {}
   frontend_http_comp_bytes_in_total:
-    family: HAProxy/Frontends/Traffic
+    family: Frontends/Traffic
     question: What per-second rate does HAProxy report for http compression bytes in?
     entity: frontend
     inputs:
@@ -1196,7 +1196,7 @@ views:
       promote: []
       omit: {}
   frontend_http_comp_bytes_out_total:
-    family: HAProxy/Frontends/Traffic
+    family: Frontends/Traffic
     question: What per-second rate does HAProxy report for http compression bytes out?
     entity: frontend
     inputs:
@@ -1209,7 +1209,7 @@ views:
       promote: []
       omit: {}
   frontend_traffic:
-    family: HAProxy/Frontends/Traffic
+    family: Frontends/Traffic
     question: What per-second rate does HAProxy report for traffic?
     entity: frontend
     inputs:
@@ -1226,7 +1226,7 @@ views:
       promote: []
       omit: {}
   listener_connections_total:
-    family: HAProxy/Listeners/Connections
+    family: Listeners/Connections
     question: What per-second rate does HAProxy report for connections?
     entity: listener
     inputs:
@@ -1239,7 +1239,7 @@ views:
       promote: []
       omit: {}
   listener_denied_connections_total:
-    family: HAProxy/Listeners/Connections
+    family: Listeners/Connections
     question: What per-second rate does HAProxy report for denied connections?
     entity: listener
     inputs:
@@ -1252,7 +1252,7 @@ views:
       promote: []
       omit: {}
   listener_errors:
-    family: HAProxy/Listeners/Errors
+    family: Listeners/Errors
     question: What per-second rate does HAProxy report for errors?
     entity: listener
     inputs:
@@ -1273,7 +1273,7 @@ views:
       promote: []
       omit: {}
   listener_requests_denied_total:
-    family: HAProxy/Listeners/Errors
+    family: Listeners/Errors
     question: What per-second rate does HAProxy report for requests denied?
     entity: listener
     inputs:
@@ -1286,7 +1286,7 @@ views:
       promote: []
       omit: {}
   listener_responses_denied_total:
-    family: HAProxy/Listeners/Errors
+    family: Listeners/Errors
     question: What per-second rate does HAProxy report for responses denied?
     entity: listener
     inputs:
@@ -1299,7 +1299,7 @@ views:
       promote: []
       omit: {}
   listener_current_sessions:
-    family: HAProxy/Listeners/Sessions
+    family: Listeners/Sessions
     question: What value does HAProxy currently report for sessions?
     entity: listener
     inputs:
@@ -1312,7 +1312,7 @@ views:
       promote: []
       omit: {}
   listener_denied_sessions_total:
-    family: HAProxy/Listeners/Sessions
+    family: Listeners/Sessions
     question: What per-second rate does HAProxy report for denied sessions?
     entity: listener
     inputs:
@@ -1325,7 +1325,7 @@ views:
       promote: []
       omit: {}
   listener_limit_sessions:
-    family: HAProxy/Listeners/Sessions
+    family: Listeners/Sessions
     question: What value does HAProxy currently report for limit sessions?
     entity: listener
     inputs:
@@ -1338,7 +1338,7 @@ views:
       promote: []
       omit: {}
   listener_max_sessions:
-    family: HAProxy/Listeners/Sessions
+    family: Listeners/Sessions
     question: What value does HAProxy currently report for max sessions?
     entity: listener
     inputs:
@@ -1351,7 +1351,7 @@ views:
       promote: []
       omit: {}
   listener_sessions_total:
-    family: HAProxy/Listeners/Sessions
+    family: Listeners/Sessions
     question: What per-second rate does HAProxy report for sessions?
     entity: listener
     inputs:
@@ -1364,7 +1364,7 @@ views:
       promote: []
       omit: {}
   listener_status:
-    family: HAProxy/Listeners/Status
+    family: Listeners/Status
     question: What values does HAProxy report across the source-defined status states?
     entity: listener
     inputs:
@@ -1379,7 +1379,7 @@ views:
       promote: []
       omit: {}
   listener_traffic:
-    family: HAProxy/Listeners/Traffic
+    family: Listeners/Traffic
     question: What per-second rate does HAProxy report for traffic?
     entity: listener
     inputs:
@@ -1396,7 +1396,7 @@ views:
       promote: []
       omit: {}
   backend_http_comp_responses_total:
-    family: HAProxy/Backends/Compression
+    family: Backends/Compression
     question: What per-second rate does HAProxy report for http compression responses?
     entity: backend
     inputs:
@@ -1409,7 +1409,7 @@ views:
       promote: []
       omit: {}
   backend_connection_attempts_total:
-    family: HAProxy/Backends/Connections
+    family: Backends/Connections
     question: What per-second rate does HAProxy report for connection attempts?
     entity: backend
     inputs:
@@ -1422,7 +1422,7 @@ views:
       promote: []
       omit: {}
   backend_connection_reuses_total:
-    family: HAProxy/Backends/Connections
+    family: Backends/Connections
     question: What per-second rate does HAProxy report for connection reuses?
     entity: backend
     inputs:
@@ -1435,7 +1435,7 @@ views:
       promote: []
       omit: {}
   backend_aborts:
-    family: HAProxy/Backends/Errors
+    family: Backends/Errors
     question: What per-second rate does HAProxy report for aborts?
     entity: backend
     inputs:
@@ -1452,7 +1452,7 @@ views:
       promote: []
       omit: {}
   backend_errors:
-    family: HAProxy/Backends/Errors
+    family: Backends/Errors
     question: What per-second rate does HAProxy report for errors?
     entity: backend
     inputs:
@@ -1477,7 +1477,7 @@ views:
       promote: []
       omit: {}
   backend_requests_denied_total:
-    family: HAProxy/Backends/Errors
+    family: Backends/Errors
     question: What per-second rate does HAProxy report for requests denied?
     entity: backend
     inputs:
@@ -1490,7 +1490,7 @@ views:
       promote: []
       omit: {}
   backend_responses_denied_total:
-    family: HAProxy/Backends/Errors
+    family: Backends/Errors
     question: What per-second rate does HAProxy report for responses denied?
     entity: backend
     inputs:
@@ -1503,7 +1503,7 @@ views:
       promote: []
       omit: {}
   backend_warnings:
-    family: HAProxy/Backends/Errors
+    family: Backends/Errors
     question: What per-second rate does HAProxy report for warnings?
     entity: backend
     inputs:
@@ -1520,7 +1520,7 @@ views:
       promote: []
       omit: {}
   backend_http_cache_hits_total:
-    family: HAProxy/Backends/HTTP
+    family: Backends/HTTP
     question: What per-second rate does HAProxy report for http cache hits?
     entity: backend
     inputs:
@@ -1533,7 +1533,7 @@ views:
       promote: []
       omit: {}
   backend_http_cache_lookups_total:
-    family: HAProxy/Backends/HTTP
+    family: Backends/HTTP
     question: What per-second rate does HAProxy report for http cache lookups?
     entity: backend
     inputs:
@@ -1546,7 +1546,7 @@ views:
       promote: []
       omit: {}
   backend_http_requests_total:
-    family: HAProxy/Backends/HTTP
+    family: Backends/HTTP
     question: What per-second rate does HAProxy report for http requests?
     entity: backend
     inputs:
@@ -1559,7 +1559,7 @@ views:
       promote: []
       omit: {}
   backend_http_responses_total:
-    family: HAProxy/Backends/HTTP
+    family: Backends/HTTP
     question: What per-second rate does HAProxy report for http responses?
     entity: backend
     inputs:
@@ -1574,7 +1574,7 @@ views:
       promote: []
       omit: {}
   backend_servers:
-    family: HAProxy/Backends/Health
+    family: Backends/Health
     question: What value does HAProxy currently report for available servers?
     entity: backend
     inputs:
@@ -1591,7 +1591,7 @@ views:
       promote: []
       omit: {}
   backend_check_last_change_seconds:
-    family: HAProxy/Backends/Health
+    family: Backends/Health
     question: What value does HAProxy currently report for check last change seconds?
     entity: backend
     inputs:
@@ -1604,7 +1604,7 @@ views:
       promote: []
       omit: {}
   backend_downtime_seconds_total:
-    family: HAProxy/Backends/Health
+    family: Backends/Health
     question: What per-second rate does HAProxy report for downtime seconds?
     entity: backend
     inputs:
@@ -1617,7 +1617,7 @@ views:
       promote: []
       omit: {}
   backend_check_up_down_total:
-    family: HAProxy/Backends/Health
+    family: Backends/Health
     question: What per-second rate does HAProxy report for failed check state transitions?
     entity: backend
     inputs:
@@ -1630,7 +1630,7 @@ views:
       promote: []
       omit: {}
   backend_loadbalanced_total:
-    family: HAProxy/Backends/Health
+    family: Backends/Health
     question: What per-second rate does HAProxy report for load-balanced requests?
     entity: backend
     inputs:
@@ -1643,7 +1643,7 @@ views:
       promote: []
       omit: {}
   backend_uweight:
-    family: HAProxy/Backends/Health
+    family: Backends/Health
     question: What value does HAProxy currently report for user weight?
     entity: backend
     inputs:
@@ -1656,7 +1656,7 @@ views:
       promote: []
       omit: {}
   backend_weight:
-    family: HAProxy/Backends/Health
+    family: Backends/Health
     question: What value does HAProxy currently report for weight?
     entity: backend
     inputs:
@@ -1669,7 +1669,7 @@ views:
       promote: []
       omit: {}
   backend_current_queue:
-    family: HAProxy/Backends/Queue
+    family: Backends/Queue
     question: What value does HAProxy currently report for queue?
     entity: backend
     inputs:
@@ -1682,7 +1682,7 @@ views:
       promote: []
       omit: {}
   backend_max_queue:
-    family: HAProxy/Backends/Queue
+    family: Backends/Queue
     question: What value does HAProxy currently report for max queue?
     entity: backend
     inputs:
@@ -1695,7 +1695,7 @@ views:
       promote: []
       omit: {}
   backend_max_queue_time_seconds:
-    family: HAProxy/Backends/Queue
+    family: Backends/Queue
     question: What value does HAProxy currently report for max queue time seconds?
     entity: backend
     inputs:
@@ -1708,7 +1708,7 @@ views:
       promote: []
       omit: {}
   backend_queue_time_average_seconds:
-    family: HAProxy/Backends/Queue
+    family: Backends/Queue
     question: What value does HAProxy currently report for queue time average seconds?
     entity: backend
     inputs:
@@ -1721,7 +1721,7 @@ views:
       promote: []
       omit: {}
   backend_current_session_rate:
-    family: HAProxy/Backends/Sessions
+    family: Backends/Sessions
     question: What value does HAProxy currently report for session rate?
     entity: backend
     inputs:
@@ -1734,7 +1734,7 @@ views:
       promote: []
       omit: {}
   backend_current_sessions:
-    family: HAProxy/Backends/Sessions
+    family: Backends/Sessions
     question: What value does HAProxy currently report for sessions?
     entity: backend
     inputs:
@@ -1747,7 +1747,7 @@ views:
       promote: []
       omit: {}
   backend_last_session_seconds:
-    family: HAProxy/Backends/Sessions
+    family: Backends/Sessions
     question: What value does HAProxy currently report for last session seconds?
     entity: backend
     inputs:
@@ -1760,7 +1760,7 @@ views:
       promote: []
       omit: {}
   backend_limit_sessions:
-    family: HAProxy/Backends/Sessions
+    family: Backends/Sessions
     question: What value does HAProxy currently report for limit sessions?
     entity: backend
     inputs:
@@ -1773,7 +1773,7 @@ views:
       promote: []
       omit: {}
   backend_max_session_rate:
-    family: HAProxy/Backends/Sessions
+    family: Backends/Sessions
     question: What value does HAProxy currently report for max session rate?
     entity: backend
     inputs:
@@ -1786,7 +1786,7 @@ views:
       promote: []
       omit: {}
   backend_max_sessions:
-    family: HAProxy/Backends/Sessions
+    family: Backends/Sessions
     question: What value does HAProxy currently report for max sessions?
     entity: backend
     inputs:
@@ -1799,7 +1799,7 @@ views:
       promote: []
       omit: {}
   backend_sessions_total:
-    family: HAProxy/Backends/Sessions
+    family: Backends/Sessions
     question: What per-second rate does HAProxy report for sessions?
     entity: backend
     inputs:
@@ -1812,7 +1812,7 @@ views:
       promote: []
       omit: {}
   backend_agg_check_status:
-    family: HAProxy/Backends/Status
+    family: Backends/Status
     question: What values does HAProxy report across the source-defined aggregated check status states?
     entity: backend
     inputs:
@@ -1827,7 +1827,7 @@ views:
       promote: []
       omit: {}
   backend_agg_server_status:
-    family: HAProxy/Backends/Status
+    family: Backends/Status
     question: What values does HAProxy report across the source-defined aggregated server status states?
     entity: backend
     inputs:
@@ -1842,7 +1842,7 @@ views:
       promote: []
       omit: {}
   backend_status:
-    family: HAProxy/Backends/Status
+    family: Backends/Status
     question: What values does HAProxy report across the source-defined status states?
     entity: backend
     inputs:
@@ -1857,7 +1857,7 @@ views:
       promote: []
       omit: {}
   backend_total_time_average_seconds:
-    family: HAProxy/Backends/Timing
+    family: Backends/Timing
     question: What value does HAProxy currently report for average total time?
     entity: backend
     inputs:
@@ -1870,7 +1870,7 @@ views:
       promote: []
       omit: {}
   backend_connect_time_average_seconds:
-    family: HAProxy/Backends/Timing
+    family: Backends/Timing
     question: What value does HAProxy currently report for connect time average seconds?
     entity: backend
     inputs:
@@ -1883,7 +1883,7 @@ views:
       promote: []
       omit: {}
   backend_max_connect_time_seconds:
-    family: HAProxy/Backends/Timing
+    family: Backends/Timing
     question: What value does HAProxy currently report for max connect time seconds?
     entity: backend
     inputs:
@@ -1896,7 +1896,7 @@ views:
       promote: []
       omit: {}
   backend_max_response_time_seconds:
-    family: HAProxy/Backends/Timing
+    family: Backends/Timing
     question: What value does HAProxy currently report for max response time seconds?
     entity: backend
     inputs:
@@ -1909,7 +1909,7 @@ views:
       promote: []
       omit: {}
   backend_max_total_time_seconds:
-    family: HAProxy/Backends/Timing
+    family: Backends/Timing
     question: What value does HAProxy currently report for maximum total time?
     entity: backend
     inputs:
@@ -1922,7 +1922,7 @@ views:
       promote: []
       omit: {}
   backend_response_time_average_seconds:
-    family: HAProxy/Backends/Timing
+    family: Backends/Timing
     question: What value does HAProxy currently report for response time average seconds?
     entity: backend
     inputs:
@@ -1935,7 +1935,7 @@ views:
       promote: []
       omit: {}
   backend_http_comp_bytes_bypassed_total:
-    family: HAProxy/Backends/Traffic
+    family: Backends/Traffic
     question: What per-second rate does HAProxy report for http compression bytes bypassed?
     entity: backend
     inputs:
@@ -1948,7 +1948,7 @@ views:
       promote: []
       omit: {}
   backend_http_comp_bytes_in_total:
-    family: HAProxy/Backends/Traffic
+    family: Backends/Traffic
     question: What per-second rate does HAProxy report for http compression bytes in?
     entity: backend
     inputs:
@@ -1961,7 +1961,7 @@ views:
       promote: []
       omit: {}
   backend_http_comp_bytes_out_total:
-    family: HAProxy/Backends/Traffic
+    family: Backends/Traffic
     question: What per-second rate does HAProxy report for http compression bytes out?
     entity: backend
     inputs:
@@ -1974,7 +1974,7 @@ views:
       promote: []
       omit: {}
   backend_traffic:
-    family: HAProxy/Backends/Traffic
+    family: Backends/Traffic
     question: What per-second rate does HAProxy report for traffic?
     entity: backend
     inputs:
@@ -1991,7 +1991,7 @@ views:
       promote: []
       omit: {}
   server_connection_attempts_total:
-    family: HAProxy/Servers/Connections
+    family: Servers/Connections
     question: What per-second rate does HAProxy report for connection attempts?
     entity: server
     inputs:
@@ -2004,7 +2004,7 @@ views:
       promote: []
       omit: {}
   server_connection_reuses_total:
-    family: HAProxy/Servers/Connections
+    family: Servers/Connections
     question: What per-second rate does HAProxy report for connection reuses?
     entity: server
     inputs:
@@ -2017,7 +2017,7 @@ views:
       promote: []
       omit: {}
   server_idle_connections_current:
-    family: HAProxy/Servers/Connections
+    family: Servers/Connections
     question: What value does HAProxy currently report for idle connections?
     entity: server
     inputs:
@@ -2030,7 +2030,7 @@ views:
       promote: []
       omit: {}
   server_used_connections_current:
-    family: HAProxy/Servers/Connections
+    family: Servers/Connections
     question: What value does HAProxy currently report for used connections?
     entity: server
     inputs:
@@ -2043,7 +2043,7 @@ views:
       promote: []
       omit: {}
   server_idle_connections_limit:
-    family: HAProxy/Servers/Connections
+    family: Servers/Connections
     question: What value does HAProxy currently report for idle connection limit?
     entity: server
     inputs:
@@ -2056,7 +2056,7 @@ views:
       promote: []
       omit: {}
   server_idle_connection_safety:
-    family: HAProxy/Servers/Connections
+    family: Servers/Connections
     question: What value does HAProxy currently report for idle connection safety?
     entity: server
     inputs:
@@ -2073,7 +2073,7 @@ views:
       promote: []
       omit: {}
   server_need_connections_current:
-    family: HAProxy/Servers/Connections
+    family: Servers/Connections
     question: What value does HAProxy currently report for needed connections?
     entity: server
     inputs:
@@ -2086,7 +2086,7 @@ views:
       promote: []
       omit: {}
   server_aborts:
-    family: HAProxy/Servers/Errors
+    family: Servers/Errors
     question: What per-second rate does HAProxy report for aborts?
     entity: server
     inputs:
@@ -2103,7 +2103,7 @@ views:
       promote: []
       omit: {}
   server_check_failures_total:
-    family: HAProxy/Servers/Errors
+    family: Servers/Errors
     question: What per-second rate does HAProxy report for check failures?
     entity: server
     inputs:
@@ -2116,7 +2116,7 @@ views:
       promote: []
       omit: {}
   server_errors:
-    family: HAProxy/Servers/Errors
+    family: Servers/Errors
     question: What per-second rate does HAProxy report for errors?
     entity: server
     inputs:
@@ -2141,7 +2141,7 @@ views:
       promote: []
       omit: {}
   server_responses_denied_total:
-    family: HAProxy/Servers/Errors
+    family: Servers/Errors
     question: What per-second rate does HAProxy report for responses denied?
     entity: server
     inputs:
@@ -2154,7 +2154,7 @@ views:
       promote: []
       omit: {}
   server_warnings:
-    family: HAProxy/Servers/Errors
+    family: Servers/Errors
     question: What per-second rate does HAProxy report for warnings?
     entity: server
     inputs:
@@ -2171,7 +2171,7 @@ views:
       promote: []
       omit: {}
   server_http_requests_total:
-    family: HAProxy/Servers/HTTP
+    family: Servers/HTTP
     question: What per-second rate does HAProxy report for http requests?
     entity: server
     inputs:
@@ -2184,7 +2184,7 @@ views:
       promote: []
       omit: {}
   server_http_responses_total:
-    family: HAProxy/Servers/HTTP
+    family: Servers/HTTP
     question: What per-second rate does HAProxy report for http responses?
     entity: server
     inputs:
@@ -2199,7 +2199,7 @@ views:
       promote: []
       omit: {}
   server_agent_code:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for agent code?
     entity: server
     inputs:
@@ -2212,7 +2212,7 @@ views:
       promote: []
       omit: {}
   server_agent_duration_seconds:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for agent duration seconds?
     entity: server
     inputs:
@@ -2225,7 +2225,7 @@ views:
       promote: []
       omit: {}
   server_check_code:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for check code?
     entity: server
     inputs:
@@ -2238,7 +2238,7 @@ views:
       promote: []
       omit: {}
   server_check_duration_seconds:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for check duration seconds?
     entity: server
     inputs:
@@ -2251,7 +2251,7 @@ views:
       promote: []
       omit: {}
   server_check_last_change_seconds:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for check last change seconds?
     entity: server
     inputs:
@@ -2264,7 +2264,7 @@ views:
       promote: []
       omit: {}
   server_current_throttle:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for throttle?
     entity: server
     inputs:
@@ -2282,7 +2282,7 @@ views:
       evidence:
       - percentage_display
   server_downtime_seconds_total:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What per-second rate does HAProxy report for downtime seconds?
     entity: server
     inputs:
@@ -2295,7 +2295,7 @@ views:
       promote: []
       omit: {}
   server_check_up_down_total:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What per-second rate does HAProxy report for failed check state transitions?
     entity: server
     inputs:
@@ -2308,7 +2308,7 @@ views:
       promote: []
       omit: {}
   server_loadbalanced_total:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What per-second rate does HAProxy report for load-balanced requests?
     entity: server
     inputs:
@@ -2321,7 +2321,7 @@ views:
       promote: []
       omit: {}
   server_role:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for server role?
     entity: server
     inputs:
@@ -2338,7 +2338,7 @@ views:
       promote: []
       omit: {}
   server_uweight:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for user weight?
     entity: server
     inputs:
@@ -2351,7 +2351,7 @@ views:
       promote: []
       omit: {}
   server_weight:
-    family: HAProxy/Servers/Health
+    family: Servers/Health
     question: What value does HAProxy currently report for weight?
     entity: server
     inputs:
@@ -2364,7 +2364,7 @@ views:
       promote: []
       omit: {}
   server_current_queue:
-    family: HAProxy/Servers/Queue
+    family: Servers/Queue
     question: What value does HAProxy currently report for queue?
     entity: server
     inputs:
@@ -2377,7 +2377,7 @@ views:
       promote: []
       omit: {}
   server_max_queue:
-    family: HAProxy/Servers/Queue
+    family: Servers/Queue
     question: What value does HAProxy currently report for max queue?
     entity: server
     inputs:
@@ -2390,7 +2390,7 @@ views:
       promote: []
       omit: {}
   server_max_queue_time_seconds:
-    family: HAProxy/Servers/Queue
+    family: Servers/Queue
     question: What value does HAProxy currently report for max queue time seconds?
     entity: server
     inputs:
@@ -2403,7 +2403,7 @@ views:
       promote: []
       omit: {}
   server_queue_limit:
-    family: HAProxy/Servers/Queue
+    family: Servers/Queue
     question: What value does HAProxy currently report for queue limit?
     entity: server
     inputs:
@@ -2416,7 +2416,7 @@ views:
       promote: []
       omit: {}
   server_queue_time_average_seconds:
-    family: HAProxy/Servers/Queue
+    family: Servers/Queue
     question: What value does HAProxy currently report for queue time average seconds?
     entity: server
     inputs:
@@ -2429,7 +2429,7 @@ views:
       promote: []
       omit: {}
   server_current_session_rate:
-    family: HAProxy/Servers/Sessions
+    family: Servers/Sessions
     question: What value does HAProxy currently report for session rate?
     entity: server
     inputs:
@@ -2442,7 +2442,7 @@ views:
       promote: []
       omit: {}
   server_current_sessions:
-    family: HAProxy/Servers/Sessions
+    family: Servers/Sessions
     question: What value does HAProxy currently report for sessions?
     entity: server
     inputs:
@@ -2455,7 +2455,7 @@ views:
       promote: []
       omit: {}
   server_last_session_seconds:
-    family: HAProxy/Servers/Sessions
+    family: Servers/Sessions
     question: What value does HAProxy currently report for last session seconds?
     entity: server
     inputs:
@@ -2468,7 +2468,7 @@ views:
       promote: []
       omit: {}
   server_limit_sessions:
-    family: HAProxy/Servers/Sessions
+    family: Servers/Sessions
     question: What value does HAProxy currently report for limit sessions?
     entity: server
     inputs:
@@ -2481,7 +2481,7 @@ views:
       promote: []
       omit: {}
   server_max_session_rate:
-    family: HAProxy/Servers/Sessions
+    family: Servers/Sessions
     question: What value does HAProxy currently report for max session rate?
     entity: server
     inputs:
@@ -2494,7 +2494,7 @@ views:
       promote: []
       omit: {}
   server_max_sessions:
-    family: HAProxy/Servers/Sessions
+    family: Servers/Sessions
     question: What value does HAProxy currently report for max sessions?
     entity: server
     inputs:
@@ -2507,7 +2507,7 @@ views:
       promote: []
       omit: {}
   server_sessions_total:
-    family: HAProxy/Servers/Sessions
+    family: Servers/Sessions
     question: What per-second rate does HAProxy report for sessions?
     entity: server
     inputs:
@@ -2520,7 +2520,7 @@ views:
       promote: []
       omit: {}
   server_agent_status:
-    family: HAProxy/Servers/Status
+    family: Servers/Status
     question: What values does HAProxy report across the source-defined agent status states?
     entity: server
     inputs:
@@ -2535,7 +2535,7 @@ views:
       promote: []
       omit: {}
   server_check_status:
-    family: HAProxy/Servers/Status
+    family: Servers/Status
     question: What values does HAProxy report across the source-defined check status states?
     entity: server
     inputs:
@@ -2550,7 +2550,7 @@ views:
       promote: []
       omit: {}
   server_status:
-    family: HAProxy/Servers/Status
+    family: Servers/Status
     question: What values does HAProxy report across the source-defined status states?
     entity: server
     inputs:
@@ -2565,7 +2565,7 @@ views:
       promote: []
       omit: {}
   server_total_time_average_seconds:
-    family: HAProxy/Servers/Timing
+    family: Servers/Timing
     question: What value does HAProxy currently report for average total time?
     entity: server
     inputs:
@@ -2578,7 +2578,7 @@ views:
       promote: []
       omit: {}
   server_connect_time_average_seconds:
-    family: HAProxy/Servers/Timing
+    family: Servers/Timing
     question: What value does HAProxy currently report for connect time average seconds?
     entity: server
     inputs:
@@ -2591,7 +2591,7 @@ views:
       promote: []
       omit: {}
   server_max_connect_time_seconds:
-    family: HAProxy/Servers/Timing
+    family: Servers/Timing
     question: What value does HAProxy currently report for max connect time seconds?
     entity: server
     inputs:
@@ -2604,7 +2604,7 @@ views:
       promote: []
       omit: {}
   server_max_response_time_seconds:
-    family: HAProxy/Servers/Timing
+    family: Servers/Timing
     question: What value does HAProxy currently report for max response time seconds?
     entity: server
     inputs:
@@ -2617,7 +2617,7 @@ views:
       promote: []
       omit: {}
   server_max_total_time_seconds:
-    family: HAProxy/Servers/Timing
+    family: Servers/Timing
     question: What value does HAProxy currently report for maximum total time?
     entity: server
     inputs:
@@ -2630,7 +2630,7 @@ views:
       promote: []
       omit: {}
   server_response_time_average_seconds:
-    family: HAProxy/Servers/Timing
+    family: Servers/Timing
     question: What value does HAProxy currently report for response time average seconds?
     entity: server
     inputs:
@@ -2643,7 +2643,7 @@ views:
       promote: []
       omit: {}
   server_traffic:
-    family: HAProxy/Servers/Traffic
+    family: Servers/Traffic
     question: What per-second rate does HAProxy report for traffic?
     entity: server
     inputs:
@@ -2660,7 +2660,7 @@ views:
       promote: []
       omit: {}
   resolver_any_err:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for any errors?
     entity: resolver
     inputs:
@@ -2673,7 +2673,7 @@ views:
       promote: []
       omit: {}
   resolver_cname:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for cname?
     entity: resolver
     inputs:
@@ -2686,7 +2686,7 @@ views:
       promote: []
       omit: {}
   resolver_cname_error:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for cname error?
     entity: resolver
     inputs:
@@ -2699,7 +2699,7 @@ views:
       promote: []
       omit: {}
   resolver_invalid:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for invalid?
     entity: resolver
     inputs:
@@ -2712,7 +2712,7 @@ views:
       promote: []
       omit: {}
   resolver_nx:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for nx?
     entity: resolver
     inputs:
@@ -2725,7 +2725,7 @@ views:
       promote: []
       omit: {}
   resolver_other:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for other?
     entity: resolver
     inputs:
@@ -2738,7 +2738,7 @@ views:
       promote: []
       omit: {}
   resolver_outdated:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for outdated?
     entity: resolver
     inputs:
@@ -2751,7 +2751,7 @@ views:
       promote: []
       omit: {}
   resolver_refused:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for refused?
     entity: resolver
     inputs:
@@ -2764,7 +2764,7 @@ views:
       promote: []
       omit: {}
   resolver_send_error:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for send error?
     entity: resolver
     inputs:
@@ -2777,7 +2777,7 @@ views:
       promote: []
       omit: {}
   resolver_sent:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for sent?
     entity: resolver
     inputs:
@@ -2790,7 +2790,7 @@ views:
       promote: []
       omit: {}
   resolver_timeout:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for timeout?
     entity: resolver
     inputs:
@@ -2803,7 +2803,7 @@ views:
       promote: []
       omit: {}
   resolver_too_big:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for too big?
     entity: resolver
     inputs:
@@ -2816,7 +2816,7 @@ views:
       promote: []
       omit: {}
   resolver_truncated:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for truncated?
     entity: resolver
     inputs:
@@ -2829,7 +2829,7 @@ views:
       promote: []
       omit: {}
   resolver_update:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for update?
     entity: resolver
     inputs:
@@ -2842,7 +2842,7 @@ views:
       promote: []
       omit: {}
   resolver_valid:
-    family: HAProxy/Resolvers/DNS
+    family: Resolvers/DNS
     question: What per-second rate does HAProxy report for valid?
     entity: resolver
     inputs:
@@ -2855,7 +2855,7 @@ views:
       promote: []
       omit: {}
   sticktable_size:
-    family: HAProxy/Stick Tables/Entries
+    family: Stick Tables/Entries
     question: What value does HAProxy currently report for size?
     entity: sticktable
     inputs:
@@ -2868,7 +2868,7 @@ views:
       promote: []
       omit: {}
   sticktable_used:
-    family: HAProxy/Stick Tables/Entries
+    family: Stick Tables/Entries
     question: What value does HAProxy currently report for used?
     entity: sticktable
     inputs:
