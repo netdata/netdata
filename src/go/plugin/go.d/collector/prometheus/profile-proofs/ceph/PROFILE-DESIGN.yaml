@@ -5,6 +5,9 @@ profile: ceph
 match: ceph_*
 app: ceph
 namespace: ceph
+documentation:
+  title: Ceph
+  summary: Curated cluster, daemon, service, storage, client, and protocol metrics from Ceph Prometheus endpoints.
 composition:
   supports: {}
 entities:

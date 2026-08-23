@@ -5,14 +5,20 @@ profile: vllm
 match: vllm:* ray_vllm_*
 app: vllm
 namespace: vllm
+documentation:
+  title: vLLM
+  summary: Curated inference, scheduling, latency, token, cache, connector, engine, HTTP, and runtime metrics from vLLM and Ray.
 composition:
   supports:
     fastapi:
       when: native_transport
+      activation: Included when the endpoint exposes vLLM's native HTTP transport metrics; Ray-only metrics do not activate it.
     process_runtime:
       when: native_transport
+      activation: Included when the endpoint exposes vLLM's native process metrics; Ray-only metrics do not activate it.
     python_gc:
       when: native_transport
+      activation: Included when the endpoint exposes vLLM's native Python garbage-collection metrics; Ray-only metrics do not activate it.
 entities:
   model_engine_ray:
     grain: model_name and engine

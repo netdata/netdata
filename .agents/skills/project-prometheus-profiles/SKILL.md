@@ -67,6 +67,12 @@ For each view, state:
 - the labels intentionally omitted and the reducer that makes the omission truthful;
 - the exact source signals, units, lifecycle, and relationship between dimensions.
 
+For every stock profile, also state the operator-facing profile `title` and
+`summary` in `PROFILE-DESIGN.yaml` `documentation`. Every
+`composition.supports` entry must include an `activation` sentence that explains
+when an operator will see that supporting profile. Machine condition IDs are not
+public explanations.
+
 Do not create duplicate aggregate and detailed views when Netdata can derive the aggregate by grouping the detailed
 charts. Choose the finest operator-useful grain whose cardinality and churn remain acceptable.
 
@@ -159,6 +165,12 @@ Contributed stock profiles MUST keep authored YAML minimal and predictable:
 - omit lifecycle caps; stock coverage must not depend on silently dropping observed or future entities;
 - omit redundant `options.float` when the runtime metric is already floating point;
 - omit redundant `algorithm`, `type`, multiplier, and divisor defaults.
+
+Stock profile work is incomplete until the profile is reachable from a
+Prometheus integration module through the owning metadata document's top-level
+`profile_coverage.modules` mapping. Do not repeat supporting profiles there;
+integration generation resolves the support closure from the design contract
+and fails on missing, duplicate, extra, or family-mismatched chart mappings.
 
 The runtime format permits those fields for user profiles. The restrictions above are stock contribution policy, not
 claims that the parser lacks the feature.

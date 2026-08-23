@@ -21,6 +21,7 @@ from _common import (
     make_validator,
     warn,
 )
+from prometheus_profile_docs import project_prometheus_profile_coverage
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
@@ -738,6 +739,8 @@ def dedupe_integrations(integrations, ids):
 
 
 def render_collectors(categories, collectors, ids):
+    project_prometheus_profile_coverage(collectors)
+
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)

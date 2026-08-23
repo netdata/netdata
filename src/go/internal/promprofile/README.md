@@ -91,7 +91,7 @@ and compiling disagreements into failures.
 | Claim | Authority | Enforcement |
 |---|---|---|
 | Exporter registrations, types, components, label domains, lifecycle, availability, units, and source relationships | `SOURCE-SEMANTICS.yaml`, plus the optional mechanical source registry and its pinned public upstream evidence | Strict semantic load and static compilation |
-| Operator questions, entity grain, identity, label treatment, reductions, exclusions, units, and presentation intent | `PROFILE-DESIGN.yaml` | Strict semantic load, static compilation, and production reconciliation |
+| Operator-facing profile documentation, questions, entity grain, identity, label treatment, reductions, exclusions, units, and presentation intent | `PROFILE-DESIGN.yaml` | Strict semantic load, static compilation, production reconciliation, and integration-documentation projection |
 | Human rationale for the design | `OPERATOR-MODEL.md` | Human review; exact machine claims belong in the YAML contracts |
 | Realizable input environments, fixtures, lifecycle sequences, expected verdicts/findings, and coverage participation | `proof.yaml` | Strict proof descriptor load and replay verification |
 | Profile parsing, selection, relabeling, assembly, writer behavior, chart routing, and public wire identities | Production Prometheus, metrix, chartengine, and chartemit packages | Real production execution with opt-in structured facts |
@@ -103,7 +103,8 @@ Important boundaries:
 - A fixture proves that a declared producer state is realizable; it does not define universal source semantics by itself.
 - A source registry is mechanical registration truth. Its generator groupings are extraction conveniences, not semantic
   signal or chart ownership.
-- `PROFILE-DESIGN.yaml` is research-backed design input, not a serialization of the resulting profile.
+- `PROFILE-DESIGN.yaml` is research-backed design input, not a serialization of the resulting profile. Its `documentation`
+  block owns the operator-facing profile title and summary used by generated integration documentation.
 - `proof.yaml` contains independent expectations, not generated snapshots, counts, or content digests.
 - Production code is authoritative for behavior. Semantic contracts state what that behavior must mean for the profile.
 
@@ -251,7 +252,8 @@ Support composition exists for metrics that are exported with the candidate but 
 such as language/runtime process metrics.
 
 - `PROFILE-DESIGN.yaml` is the single declaration owner through `composition.supports`.
-- A support entry includes the environment in which that profile is available.
+- A support entry includes the environment in which that profile is available and an operator-facing `activation`
+  explanation for generated integration documentation.
 - The catalog compiler resolves the complete closure and rejects missing bundles or cycles.
 - Each proof case declares environments for the candidate and every active support; the compiler derives the active set.
 - The production collector selects all active profiles automatically and applies them in normal profile order.

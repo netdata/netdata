@@ -1,4 +1,18 @@
 plugin_name: go.d.plugin
+profile_coverage:
+  modules:
+    collector-go.d.plugin-prometheus-generic:
+      - fastapi
+      - process_runtime
+      - python_gc
+    collector-go.d.plugin-prometheus-ceph:
+      - ceph
+    collector-go.d.plugin-prometheus-haproxy:
+      - haproxy
+    collector-go.d.plugin-prometheus-litellm:
+      - litellm
+    collector-go.d.plugin-prometheus-vllm:
+      - vllm
 modules:
   - &module
     meta: &meta
@@ -437,6 +451,60 @@ modules:
             Generic autogen and built-in profiles emit endpoint- and application-specific contexts under the prometheus
             namespace.
       scopes: []
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-haproxy
+      monitored_instance:
+        name: HAProxy Prometheus
+        link: https://www.haproxy.com/documentation/haproxy-configuration-tutorials/alerts-and-monitoring/prometheus/
+        icon_filename: haproxy.svg
+        categories:
+          - data-collection.web-servers-and-proxies
+      keywords:
+        - haproxy
+        - web
+        - proxy
+        - prometheus
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: go.d.plugin
+              module_name: haproxy
+      info_provided_to_referring_integrations:
+        description: Collects HAProxy's Prometheus endpoint through the generic Prometheus collector and its stock HAProxy profile.
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor HAProxy process, frontend, listener, backend, server, and stick-table behavior through its Prometheus endpoint.
+        method_description: |
+          Netdata periodically scrapes the HAProxy Prometheus endpoint with the generic Prometheus collector and applies the
+          built-in `haproxy` profile.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable the HAProxy Prometheus endpoint
+            description: |
+              Configure HAProxy's built-in Prometheus exporter as described in the
+              [HAProxy documentation](https://www.haproxy.com/documentation/haproxy-configuration-tutorials/alerts-and-monitoring/prometheus/).
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: HAProxy Prometheus
+              folding:
+                enabled: false
+              description: Collect HAProxy metrics with the automatically matched stock profile.
+              config: |
+                jobs:
+                  - name: haproxy
+                    url: http://127.0.0.1:8404/metrics
+                    expected_prefix: haproxy_
   - <<: *module
     meta:
       <<: *meta

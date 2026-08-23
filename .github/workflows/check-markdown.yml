@@ -11,6 +11,8 @@ on:
       - 'integrations/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/default/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.trap-profiles/**'
+      - 'src/go/plugin/go.d/config/go.d/prometheus.profiles/default/**'
+      - 'src/go/plugin/go.d/collector/prometheus/profile-proofs/**/PROFILE-DESIGN.yaml'
       - 'src/go/plugin/ibm.d/docgen/**'
       - 'src/go/plugin/ibm.d/metricgen/**'
       - 'src/go/plugin/ibm.d/modules/**/module.yaml'
@@ -105,6 +107,11 @@ jobs:
           cd netdata
           LEARN_INGEST_PATH=../learn/ingest/ingest.py \
             python3 -m unittest integrations.tests.test_descriptions
+
+      - name: Test Prometheus Profile Documentation
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 -m unittest integrations.tests.test_prometheus_profile_docs
 
       - name: Generate Integrations Documentation
         run: |
