@@ -64,7 +64,10 @@ def build_tree(profile: dict) -> Node:
             context = ".".join(part for part in (*child_context_parts, normalize(chart.get("context"))) if part)
             if not context:
                 context = "(no context)"
-            node.charts.append(Chart(context, int(chart.get("priority") or DEFAULT_PRIORITY)))
+            priority = int(chart.get("priority") or DEFAULT_PRIORITY)
+            if priority <= 0:
+                priority = DEFAULT_PRIORITY
+            node.charts.append(Chart(context, priority))
 
         for child in group.get("groups") or []:
             add_group(child, node, child_context_parts)
@@ -74,11 +77,21 @@ def build_tree(profile: dict) -> Node:
     return root
 
 
+def node_priority(node: Node) -> int:
+    priorities = [chart.priority for chart in descendant_charts(node)]
+    return min(priorities, default=DEFAULT_PRIORITY)
+
+
+def descendant_charts(node: Node) -> list[Chart]:
+    charts = list(node.charts)
+    for child in node.children.values():
+        charts.extend(descendant_charts(child))
+    return charts
+
+
 def sort_key(item: tuple[str, Node]) -> tuple[int, int, str]:
     name, node = item
-    priorities = [chart.priority for chart in node.charts]
-    minimum = min(priorities, default=DEFAULT_PRIORITY)
-    return (minimum, -len(name), name)
+    return (node_priority(node), -len(name), name)
 
 
 def render(node: Node, depth: int = 0) -> list[str]:

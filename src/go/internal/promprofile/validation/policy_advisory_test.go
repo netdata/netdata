@@ -8,10 +8,25 @@ import (
 	"testing"
 )
 
-func TestValidateProfileRejectsExplicitPriority(t *testing.T) {
+func TestValidateProfileAcceptsAndPropagatesExplicitPriority(t *testing.T) {
 	profile := strings.Replace(validProfile, "    - title: Temperature\n", "    - title: Temperature\n      priority: 100\n", 1)
 	result := runValidation(t, profile, validDump, "")
-	requireFinding(t, result, "priority_forbidden")
+	if result.exitCode != 0 {
+		t.Fatalf("explicit chart priority must pass\nreport:\n%s", result.stdout)
+	}
+	found := false
+	for _, chart := range result.report.Charts {
+		if chart.Title != "Temperature" {
+			continue
+		}
+		found = true
+		if chart.Priority != 100 {
+			t.Fatalf("authored priority was not propagated: got %d, want 100: %#v", chart.Priority, chart)
+		}
+	}
+	if !found {
+		t.Fatal("Temperature chart was not reported")
+	}
 }
 
 func TestValidateProfileUsesOneRuntimePriorityWhenPrioritiesAreOmitted(t *testing.T) {

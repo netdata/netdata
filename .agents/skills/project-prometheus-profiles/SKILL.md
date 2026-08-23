@@ -147,7 +147,7 @@ an explicit future input when the validator cannot derive it.
 
 Contributed stock profiles MUST keep authored YAML minimal and predictable:
 
-- omit chart `priority`; Netdata presents equal-priority charts predictably rather than preserving an author-only order;
+- set chart `priority` only when operator navigation requires deliberate section ordering; otherwise omit it so the chart uses the runtime default;
 - omit explicit chart `id` when the context-derived ID is sufficient;
 - avoid `instances.by_labels: ['*']`; use a source-backed explicit identity;
 - omit lifecycle caps; stock coverage must not depend on silently dropping observed or future entities;
