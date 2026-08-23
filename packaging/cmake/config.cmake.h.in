@@ -17,7 +17,6 @@
 
 // required compilation options
 
-#cmakedefine HAVE_FEXCEPTIONS
 
 // checked headers
 
@@ -116,7 +115,6 @@
 #cmakedefine HAVE_C_MALLINFO2
 #cmakedefine HAVE_SETNS
 #cmakedefine HAVE_STRNDUP
-#cmakedefine SSL_HAS_PENDING
 
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF
@@ -129,14 +127,11 @@
 // enabled features
 
 #cmakedefine ENABLE_ML
-#cmakedefine ENABLE_EXPORTING_MONGODB
 #cmakedefine ENABLE_DBENGINE
 #cmakedefine ENABLE_LZ4
 #cmakedefine ENABLE_ZSTD
 #cmakedefine ENABLE_BROTLI
 
-#cmakedefine ENABLE_LOGSMANAGEMENT
-#cmakedefine ENABLE_LOGSMANAGEMENT_TESTS
 #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 // enabled plugins
