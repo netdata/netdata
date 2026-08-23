@@ -402,6 +402,7 @@ groups:
     metrics:
       - <metric_name>
     chart_defaults:
+      priority: <int>
       label_promotion: [<label>, ...]
       instances:
         by_labels: [<label>, ...]
@@ -483,15 +484,20 @@ groups:
 
 #### chart_defaults
 
-Inheritable chart configuration applied to all descendant charts in the group subtree. Useful when many charts share the same instance identity or label promotion policy.
+Inheritable chart configuration applied to all descendant charts in the group subtree. Useful when a chart family shares
+one ordering priority, instance identity, or label promotion policy.
 
 | Field             | Type          | Description                              |
 |-------------------|---------------|------------------------------------------|
+| `priority`        | int           | Default chart ordering priority.         |
 | `label_promotion` | array[string] | Default non-identity chart-label policy. |
 | `instances`       | object        | Default instance identity policy.        |
 
 > [!NOTE]
 > **Inheritance rules**: nearest group default wins (child overrides parent), chart-local field overrides inherited default, and list/object fields replace the inherited field wholesale — there is no deep merge or append.
+
+Priority uses zero as its unset sentinel. An omitted or zero group/chart value inherits the nearest nonzero group default;
+use an explicit `70000` when a child subtree or chart must reset to engine-default ordering.
 
 `label_promotion` has three distinct states at either level:
 
@@ -508,11 +514,12 @@ groups:
   - family: Azure Key Vault
     context_namespace: key_vault
     chart_defaults:
+      priority: 100
       label_promotion: [resource_name, resource_group, region]
       instances:
         by_labels: [resource_uid]
     charts:
-      # Every chart below inherits instances and label_promotion
+      # Every chart below inherits priority, instances, and label_promotion
       # without repeating them.
       - id: availability
         title: Azure Key Vault Availability
@@ -530,7 +537,7 @@ groups:
             name: average
 ```
 
-Without `chart_defaults`, you would need to repeat `instances` and `label_promotion` on every chart.
+Without `chart_defaults`, you would need to repeat `priority`, `instances`, and `label_promotion` on every chart.
 
 ### 5. charts
 
@@ -571,7 +578,7 @@ charts:
 | `algorithm`       | string        | no       | runtime metric kind    | `absolute` or `incremental`. If omitted, resolved per dimension from the matched series kind. |
 | `aggregation`     | string        | no       | `sum`                  | Reducer applied to every dimension in the chart.                             |
 | `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`. Histogram bucket charts are forced to `heatmap`. |
-| `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
+| `priority`        | int           | no       | from `chart_defaults`, otherwise `70000` | Chart ordering priority. Zero is unset/inherit; use `70000` to reset an inherited priority. |
 | `label_promotion` | array[string] | no       | from `chart_defaults`  | Non-identity chart-label policy: omitted uses automatic intersection, a non-empty list is an explicit allowlist, and `[]` promotes none. Entries must be non-empty label keys. |
 | `instances`       | object        | no       | from `chart_defaults`  | Instance identity policy (see [instances](#instances)).                      |
 | `lifecycle`       | object        | no       |                        | Instance/dimension cap and expiry (see [lifecycle](#lifecycle)).             |
@@ -1072,13 +1079,14 @@ The resulting chart families are `Storage Engine/InnoDB/Buffer Pool` and `Storag
 
 ### chart_defaults: reducing repetition
 
-When monitoring a cloud resource that has many charts, all sharing the same instance identity.
+When monitoring a cloud resource that has many charts, all sharing the same ordering priority and instance identity.
 
 ```yaml
 groups:
   - family: Azure PostgreSQL
     context_namespace: postgres_flexible
     chart_defaults:
+      priority: 100
       label_promotion: [resource_name, resource_group, region]
       instances:
         by_labels: [resource_uid]
@@ -1103,7 +1111,7 @@ groups:
             name: average
 ```
 
-All three charts inherit `instances` and `label_promotion` from `chart_defaults` — no repetition needed.
+All three charts inherit `priority`, `instances`, and `label_promotion` from `chart_defaults` — no repetition needed.
 
 ### Autogeneration: handling unpredictable metrics
 
@@ -1195,7 +1203,7 @@ All rules below produce semantic validation errors unless noted:
 |-----------------------------------------|------------------------------------------------------------------------------------------|
 | Missing `chart.id`                      | `id` derived from `context` (`.` replaced with `_`).                                     |
 | Missing `chart.algorithm`               | Resolved per rendered dimension from runtime series kind: counter = `incremental`; every other kind = `absolute`. |
-| `chart.priority = 0`                    | Treated as `70000` (engine default).                                                     |
+| Effective `chart.priority <= 0` after group inheritance | Treated as `70000` (engine default).                                        |
 | Root/nested family hierarchy + `chart.family` | Nonblank segments compose into a `/`-separated chart family.                         |
 | `options.multiplier = 0`                | Treated as `1`.                                                                          |
 | `options.divisor = 0`                   | Treated as `1`.                                                                          |

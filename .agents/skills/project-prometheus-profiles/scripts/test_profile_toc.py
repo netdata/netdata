@@ -76,6 +76,59 @@ template:
 
 
 class ProfileTocOrderingTest(unittest.TestCase):
+    def test_root_chart_inherits_root_priority(self) -> None:
+        root = tree_from_yaml(
+            """
+template:
+  family: App
+  chart_defaults:
+    priority: 100
+  charts:
+  - title: direct
+    context: direct
+    units: x
+    dimensions: []
+"""
+        )
+
+        self.assertEqual([100], [chart.priority for chart in root.charts])
+
+    def test_profile_priority_inherits_nearest_group_default(self) -> None:
+        root = tree_from_yaml(
+            """
+template:
+  family: App
+  chart_defaults:
+    priority: 100
+  groups:
+  - family: Overview
+    charts:
+    - title: inherited
+      context: inherited
+      units: x
+      dimensions: []
+    groups:
+    - family: Detail
+      chart_defaults:
+        priority: 200
+      charts:
+      - title: child
+        context: child
+        units: x
+        dimensions: []
+      - title: chart override
+        context: override
+        units: x
+        priority: 300
+        dimensions: []
+"""
+        )
+
+        overview = root.children["Overview"]
+        self.assertEqual(100, overview.charts[0].priority)
+        detail = overview.children["Detail"]
+        self.assertEqual([200, 300], [chart.priority for chart in detail.charts])
+
     def test_parent_sort_uses_minimum_descendant_priority(self) -> None:
         root = profile_toc.Node("App")
         overview = profile_toc.Node("Overview")

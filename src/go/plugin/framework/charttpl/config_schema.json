@@ -306,6 +306,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "priority": {
+          "type": "integer"
+        },
         "label_promotion": {
           "type": "array",
           "items": {

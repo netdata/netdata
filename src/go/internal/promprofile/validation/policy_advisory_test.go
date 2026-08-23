@@ -9,7 +9,12 @@ import (
 )
 
 func TestValidateProfileAcceptsAndPropagatesExplicitPriority(t *testing.T) {
-	profile := strings.Replace(validProfile, "    - title: Temperature\n", "    - title: Temperature\n      priority: 100\n", 1)
+	profile := strings.Replace(
+		validProfile,
+		"    - title: Temperature\n",
+		"    - title: Temperature\n      priority: 100\n",
+		1,
+	)
 	result := runValidation(t, profile, validDump, "")
 	if result.exitCode != 0 {
 		t.Fatalf("explicit chart priority must pass\nreport:\n%s", result.stdout)
@@ -26,6 +31,19 @@ func TestValidateProfileAcceptsAndPropagatesExplicitPriority(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("Temperature chart was not reported")
+	}
+}
+
+func TestValidateProfileAcceptsAndPropagatesGroupDefaultPriority(t *testing.T) {
+	profile := strings.Replace(validProfile, "  chart_defaults:\n", "  chart_defaults:\n    priority: 100\n", 1)
+	result := runValidation(t, profile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("group default priority must pass\nreport:\n%s", result.stdout)
+	}
+	for _, chart := range result.report.Charts {
+		if chart.Priority != 100 {
+			t.Fatalf("inherited priority was not propagated: got %d, want 100: %#v", chart.Priority, chart)
+		}
 	}
 }
 
@@ -159,7 +177,10 @@ app_build_info{version="test"} 1
 	result := runValidation(t, validProfile, dump, "selector:\n  deny: ['*_info']\n")
 	requireFinding(t, result, "open_ended_job_selector_deny")
 	if hasFinding(result.report, "job_deny_review", "warning") {
-		t.Fatalf("writer-skipped info family should not be presented as lost chart surface: %#v", result.report.Findings)
+		t.Fatalf(
+			"writer-skipped info family should not be presented as lost chart surface: %#v",
+			result.report.Findings,
+		)
 	}
 }
 
