@@ -113,6 +113,22 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 include(NetdataCompilerFlags)
 
+# Stack-trace flags for EVERY target, ours and vendored alike. Placed here -
+# before any bundled subproject exists - because add_compile_options sets a
+# directory property that reaches only targets created after the mutation.
+# The flags used to sit between the bundling calls, splitting the vendored
+# code into an instrumented half and an uninstrumented half by accident of
+# statement order; instrumenting everything was decided deliberately, on the
+# measurement that it costs zero bytes of shipped .text on the default build
+# and keeps a crash inside vendored code (sqlite above all) readable.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    # -fno-omit-frame-pointer = add frame pointers to all functions
+    # -funwind-tables = generate unwind tables for all functions
+    # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
+    add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
+    add_link_options(-rdynamic)
+endif()
+
 if(OS_MACOS)
   enable_language(OBJC)
   if(OSLOG AND FOUNDATION)
@@ -182,50 +198,12 @@ if(ENABLE_SENTRY)
         netdata_bundle_sentry()
 endif()
 
-#
-# Bundled dependencies, and the stack-trace flags whose position between them is
-# load-bearing. This is a braid, not a design: do not tidy it.
-#
-# add_compile_options sets a DIRECTORY property, and add_subdirectory - so also
-# FetchContent_MakeAvailable - passes a directory property only to targets created
-# AFTER the mutation. So this block partitions every bundled target in the tree by
-# which side of it the target is created on:
-#
-#   uninstrumented, created before it: dlib (below), and Corrosion, libdatachannel,
-#                                      protobuf+absl, libbpf, json-c, libyaml and
-#                                      sentry, all bundled earlier in this file
-#   instrumented, created after it:    libbacktrace, sqlite3, and every netdata target
-#
-# Measured, not argued: dlib's 49 translation units carry none of the three flags and
-# sqlite3's 12 carry all three, in the same configure.
-#
-# Nothing explains why sqlite3 should be instrumented and dlib should not - it falls
-# out of one netdata_bundle_* call sitting nine lines below a statement and another
-# eighty-four lines above it. Moving the flags, or gathering the netdata_bundle_*
-# calls, changes shipped object code whichever side the new position lands on, so it
-# is a product decision about whether vendored code carries frame pointers, not a
-# refactor. Until that decision is taken, the order below is the contract:
-#
-#   dlib  <  the flags  <  libbacktrace  <  sqlite3
-#
-# The flags also feed CONFIGURE_COMMAND, the accumulated-compile-options string
-# that NetdataSystemFiles.cmake snapshots into config.h. That string reaches users
-# compiled into the binary, through netdata -W buildinfo and the info API - NOT
-# through build-info-cmake-cache.gz, which is gzip of CMakeCache.txt and holds no
-# such entry. So it is a user-visible build-info field, which raises the bar on
-# changing it.
-#
+# The remaining bundled dependencies. The stack-trace flags that used to sit
+# between these calls - making their order load-bearing - moved up to the
+# compiler-flags phase, so every bundled target below is instrumented and the
+# calls are free to move.
 if(ENABLE_ML)
   netdata_bundle_dlib()
-endif()
-
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    # -fno-omit-frame-pointer = add frame pointers to all functions
-    # -funwind-tables = generate unwind tables for all functions
-    # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
-    add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
-    add_link_options(-rdynamic)
-    message(STATUS "Added compiler and linker flags for better stack trace support")
 endif()
 
 if(ENABLE_LIBBACKTRACE)
