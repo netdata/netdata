@@ -149,6 +149,16 @@ if(NOT NETDATA_PACKAGE_KIND MATCHES "^(bundle|deb|rpm|msi)$")
         message(FATAL_ERROR "Invalid NETDATA_PACKAGE_KIND '${NETDATA_PACKAGE_KIND}' (expected bundle, deb, rpm, or msi)")
 endif()
 
+# The two names the enum replaced die loudly, not silently: CMake answers an
+# unused -D with a non-fatal end-of-configure notice that nothing fails on, and
+# netdata-installer.sh forwards NETDATA_CMAKE_OPTIONS verbatim, so an old
+# invocation would otherwise configure a bundle build while believing it asked
+# for a package. Only truthy/non-empty values trip - a stale build directory
+# whose cache carries the old defaults meant bundle anyway and passes.
+if(BUILD_FOR_PACKAGING OR NOT "${NETDATA_PACKAGING_FORMAT}" STREQUAL "")
+        message(FATAL_ERROR "BUILD_FOR_PACKAGING and NETDATA_PACKAGING_FORMAT were replaced by NETDATA_PACKAGE_KIND (bundle, deb, rpm, or msi). Update the invocation.")
+endif()
+
 # Derived, not settable: the one token for "this build stages a native package",
 # so consumers do not each spell out the disjunction of kinds.
 if(NETDATA_PACKAGE_KIND STREQUAL "bundle")
