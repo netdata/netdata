@@ -191,7 +191,9 @@ if(ENABLE_PLUGIN_SYSTEMD_UNITS AND NOT SYSTEMD_FOUND)
 endif()
 
 # Reached only when the check above did not abort, so systemd is known to be present.
-if(ENABLE_PLUGIN_SYSTEMD_UNITS AND SYSTEMD_VERSION LESS 221)
+# VERSION_LESS, not LESS: pkg-config can report shapes like 251.rc1, which a
+# numeric comparison parses as 0 and falsely rejects.
+if(ENABLE_PLUGIN_SYSTEMD_UNITS AND SYSTEMD_VERSION VERSION_LESS 221)
   message(FATAL_ERROR "Systemd units plugin requires systemd 221 or newer, but only systemd ${SYSTEMD_VERSION} was found.")
 endif()
 

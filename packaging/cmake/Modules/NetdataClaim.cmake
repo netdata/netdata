@@ -21,5 +21,8 @@ if(OS_WINDOWS)
 
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
-        target_compile_options(NetdataClaim PUBLIC -mwindows)
+        # A linker-driver flag: it selects the GUI subsystem (no console window)
+        # and the WinMain entry, so it belongs on the link step; at compile it
+        # did nothing.
+        target_link_options(NetdataClaim PRIVATE -mwindows)
 endif()
