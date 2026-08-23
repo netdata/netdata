@@ -161,6 +161,25 @@ sudo ./edit-config go.d/httpcheck.conf
 
 ##### Examples
 
+###### Ceph RGW endpoint liveness
+
+Basic unauthenticated liveness check for a Ceph RGW HTTP endpoint. This does not verify authenticated S3 operations.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph-rgw-local
+    url: http://127.0.0.1:8080
+    status_accepted:
+      - 200
+      - 204
+      - 403
+      - 405
+
+```
+</details>
+
 ###### Basic
 
 A basic example configuration.
