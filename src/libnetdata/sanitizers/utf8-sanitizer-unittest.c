@@ -1374,11 +1374,13 @@ static void test_rrd_string_allowed_chars_idempotency(void) {
 
     extern unsigned char rrd_string_allowed_chars[256];
 
-    // one pass of exactly what rrd_string_strdupz() does: dst_size = 2*len+1
+    // one pass of exactly what rrd_string_strdupz() does: dst_size = 2*len+1.
+    // The destination MUST be able to hold exactly that - clamping it instead
+    // would silently exercise a truncating sanitization production never does,
+    // so the invariant would stop being tested without anyone noticing.
     #define SANITIZE_ONCE(dst, dstcap, src) do {                                    \
-        size_t _len = strlen((const char *)(src));                                  \
-        size_t _cap = (_len * 2) + 1;                                               \
-        if(_cap > (dstcap)) _cap = (dstcap);                                        \
+        size_t _cap = (strlen((const char *)(src)) * 2) + 1;                        \
+        fatal_assert(_cap <= (dstcap));                                             \
         text_sanitize((unsigned char *)(dst), (const unsigned char *)(src), _cap,   \
                       rrd_string_allowed_chars, true, "", NULL);                    \
     } while(0)
@@ -1416,6 +1418,30 @@ static void test_rrd_string_allowed_chars_idempotency(void) {
     }
     TEST_ASSERT("rrd_idempotent_cases", all_ok,
                 "rrd_string_allowed_chars sanitization is not idempotent");
+
+    // exhaustive over every 1- and 2-byte string (NUL excluded, it terminates).
+    // This is the complete regression net for the table itself: all 255 single
+    // bytes, plus every start-byte/continuation pair - overlongs (c0, c1), the
+    // out-of-range start bytes (f5..ff), truncated sequences, and lone
+    // continuation bytes - none of which the random sweep below guarantees.
+    all_ok = true;
+    for(unsigned i = 1; i < 256 && all_ok; i++) {
+        for(unsigned j = 0; j < 256 && all_ok; j++) {
+            unsigned char src[3] = { (unsigned char)i, (unsigned char)j, '\0' };
+            char once[16], twice[64];
+
+            // j == 0 makes it the 1-byte string
+            SANITIZE_ONCE(once, sizeof(once), src);
+            SANITIZE_ONCE(twice, sizeof(twice), once);
+
+            if(strcmp(once, twice) != 0) {
+                all_ok = false;
+                fprintf(stderr, "  bytes %02x %02x: '%s' -> '%s'\n", i, j, once, twice);
+            }
+        }
+    }
+    TEST_ASSERT("rrd_idempotent_exhaustive_2bytes", all_ok,
+                "rrd_string_allowed_chars sanitization is not idempotent on all 1-2 byte strings");
 
     // deterministic randomized sweep over arbitrary byte strings
     all_ok = true;
