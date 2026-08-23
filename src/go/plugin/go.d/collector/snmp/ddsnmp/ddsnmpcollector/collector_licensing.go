@@ -108,7 +108,7 @@ func (c *Collector) collectScalarLicenseRows(configs []ddprofiledefinition.Licen
 func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.LicensingConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.LicenseRow, error) {
 	var rows []ddsnmp.LicenseRow
 	var errs []error
-	walkedData := make(map[string]map[string]gosnmp.SnmpPDU)
+	walkPass := newTableWalkPass()
 	tableNameToOID := licensingTableNameToOID(configs)
 
 	for _, cfg := range configs {
@@ -116,38 +116,18 @@ func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.Licens
 			continue
 		}
 		metricsCfg := licensingConfigAsMetricsConfig(cfg)
-		cachedRows, ok, err := c.collectTableLicenseRowsFromCache(cfg, metricsCfg, stats)
-		if err != nil {
-			c.log.Debugf("Cached licensing collection failed for table %s: %v", cfg.Table.Name, err)
-		}
-		if ok {
-			stats.TableCache.Hits++
-			stats.SNMP.TablesCached++
-			rows = append(rows, cachedRows...)
+
+		outcome := walkPass.walk(c.tableCollector, cfg.Table.OID, stats)
+		if outcome.err != nil {
+			errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), outcome.err))
 			continue
 		}
-		stats.TableCache.Misses++
-
-		tableOID := trimOID(cfg.Table.OID)
-		pdus := walkedData[tableOID]
-		if pdus == nil {
-			var err error
-			pdus, err = c.tableCollector.snmpWalk(cfg.Table.OID, stats)
-			if err != nil {
-				stats.Errors.SNMP++
-				errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), err))
-				continue
-			}
-			if len(pdus) > 0 {
-				stats.SNMP.TablesWalked++
-				walkedData[tableOID] = pdus
-			}
-		}
+		pdus := outcome.pdus
 		if len(pdus) == 0 {
 			continue
 		}
 
-		if err := c.walkLicenseTableDependencies(metricsCfg, tableNameToOID, walkedData, stats); err != nil {
+		if err := c.walkLicenseTableDependencies(metricsCfg, tableNameToOID, walkPass, stats); err != nil {
 			errs = append(errs, fmt.Errorf("licensing table %q dependencies: %w", licensingConfigDisplayName(cfg), err))
 			continue
 		}
@@ -155,15 +135,17 @@ func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.Licens
 		ctx := &tableProcessingContext{
 			config:         metricsCfg,
 			pdus:           pdus,
-			walkedData:     walkedData,
+			walkedData:     walkPass.walkedData,
 			tableNameToOID: tableNameToOID,
 		}
 		ctx.columnOIDs = buildColumnOIDs(metricsCfg)
 		ctx.orderedTags = buildOrderedTags(metricsCfg)
-		ctx.rows, ctx.oidCache, ctx.tagCache = c.tableCollector.organizePDUsByRow(ctx)
+		ctx.rows, _, _ = c.tableCollector.organizePDUsByRow(ctx)
+		crossTableCtx := newCrossTableContext(ctx.walkedData, ctx.tableNameToOID)
+		staticTags := parseStaticTags(cfg.StaticTags)
 
 		for rowIndex, rowPDUs := range ctx.rows {
-			row, ok, err := c.buildTableLicenseRow(cfg, rowIndex, rowPDUs, ctx)
+			row, ok, err := c.buildTableLicenseRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
 			if err != nil {
 				stats.Errors.Processing.Licensing++
 				errs = append(errs, fmt.Errorf("licensing table %q row %q: %w", licensingConfigDisplayName(cfg), rowIndex, err))
@@ -173,9 +155,6 @@ func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.Licens
 				rows = append(rows, row)
 			}
 		}
-
-		deps := extractTableDependencies(metricsCfg, ctx.tableNameToOID)
-		c.tableCollector.tableCache.cacheData(metricsCfg, ctx.oidCache, ctx.tagCache, deps)
 	}
 
 	if len(rows) == 0 && len(errs) > 0 {
@@ -187,75 +166,17 @@ func (c *Collector) collectTableLicenseRows(configs []ddprofiledefinition.Licens
 func (c *Collector) walkLicenseTableDependencies(
 	cfg ddprofiledefinition.MetricsConfig,
 	tableNameToOID map[string]string,
-	walkedData map[string]map[string]gosnmp.SnmpPDU,
+	walkPass *tableWalkPass,
 	stats *ddsnmp.CollectionStats,
 ) error {
 	var errs []error
 	for _, depOID := range extractTableDependencies(cfg, tableNameToOID) {
-		depOID = trimOID(depOID)
-		if walkedData[depOID] != nil {
-			continue
-		}
-		pdus, err := c.tableCollector.snmpWalk(depOID, stats)
-		if err != nil {
-			stats.Errors.SNMP++
-			errs = append(errs, fmt.Errorf("table OID %q: %w", depOID, err))
-			continue
-		}
-		if len(pdus) > 0 {
-			stats.SNMP.TablesWalked++
-			walkedData[depOID] = pdus
+		outcome := walkPass.walk(c.tableCollector, depOID, stats)
+		if outcome.err != nil {
+			errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
 		}
 	}
 	return errors.Join(errs...)
-}
-
-func (c *Collector) collectTableLicenseRowsFromCache(cfg ddprofiledefinition.LicensingConfig, metricsCfg ddprofiledefinition.MetricsConfig, stats *ddsnmp.CollectionStats) ([]ddsnmp.LicenseRow, bool, error) {
-	cachedOIDs, cachedTags, ok := c.tableCollector.tableCache.getCachedData(metricsCfg)
-	if !ok {
-		return nil, false, nil
-	}
-
-	columnOIDs := buildColumnOIDs(metricsCfg)
-	var oidsToGet []string
-	for _, columns := range cachedOIDs {
-		for columnOID, fullOID := range columns {
-			if _, ok := columnOIDs[columnOID]; ok {
-				oidsToGet = append(oidsToGet, fullOID)
-			}
-		}
-	}
-	if len(oidsToGet) == 0 {
-		return nil, true, nil
-	}
-
-	pdus, err := c.tableCollector.snmpGet(oidsToGet, stats)
-	if err != nil {
-		return nil, false, err
-	}
-	if len(pdus) < len(oidsToGet)/2 {
-		return nil, false, fmt.Errorf("table structure may have changed, got %d/%d PDUs", len(pdus), len(oidsToGet))
-	}
-
-	var rows []ddsnmp.LicenseRow
-	for rowIndex, columns := range cachedOIDs {
-		rowPDUs := make(map[string]gosnmp.SnmpPDU)
-		for columnOID, fullOID := range columns {
-			pdu, ok := pdus[trimOID(fullOID)]
-			if ok {
-				rowPDUs[columnOID] = pdu
-			}
-		}
-		rowTags := maps.Clone(cachedTags[rowIndex])
-		row, ok, err := c.buildTableLicenseRowWithTags(cfg, rowIndex, rowPDUs, rowTags)
-		if err != nil {
-			return nil, false, fmt.Errorf("row %q: %w", rowIndex, err)
-		}
-		if ok {
-			rows = append(rows, row)
-		}
-	}
-	return rows, true, nil
 }
 
 func (c *Collector) buildScalarLicenseRow(cfg ddprofiledefinition.LicensingConfig, pdus map[string]gosnmp.SnmpPDU) (ddsnmp.LicenseRow, bool, error) {
@@ -296,21 +217,23 @@ func (c *Collector) buildScalarLicenseRow(cfg ddprofiledefinition.LicensingConfi
 	return row, true, nil
 }
 
-func (c *Collector) buildTableLicenseRow(cfg ddprofiledefinition.LicensingConfig, rowIndex string, rowPDUs map[string]gosnmp.SnmpPDU, ctx *tableProcessingContext) (ddsnmp.LicenseRow, bool, error) {
+func (c *Collector) buildTableLicenseRow(
+	cfg ddprofiledefinition.LicensingConfig,
+	rowIndex string,
+	rowPDUs map[string]gosnmp.SnmpPDU,
+	ctx *tableProcessingContext,
+	crossTableCtx *crossTableContext,
+	staticTags map[string]string,
+) (ddsnmp.LicenseRow, bool, error) {
 	rowTags := make(map[string]string)
 	rowData := &tableRowData{
 		index:      rowIndex,
 		pdus:       rowPDUs,
 		tags:       rowTags,
-		staticTags: parseStaticTags(cfg.StaticTags),
+		staticTags: staticTags,
 		tableName:  cfg.Table.Name,
 	}
-	crossTableCtx := &crossTableContext{
-		walkedData:       ctx.walkedData,
-		tableNameToOID:   ctx.tableNameToOID,
-		lookupIndexCache: make(map[crossTableLookupKey]string),
-		rowTags:          rowData.tags,
-	}
+	crossTableCtx.rowTags = rowData.tags
 	rowCtx := &tableRowProcessingContext{
 		config:        ctx.config,
 		columnOIDs:    ctx.columnOIDs,
@@ -320,12 +243,7 @@ func (c *Collector) buildTableLicenseRow(cfg ddprofiledefinition.LicensingConfig
 	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
 		c.log.Debugf("Error processing licensing row tags for %s: %v", rowIndex, err)
 	}
-	maps.Copy(ctx.tagCache[rowIndex], rowData.tags)
 
-	return c.buildTableLicenseRowWithTags(cfg, rowIndex, rowPDUs, rowData.tags)
-}
-
-func (c *Collector) buildTableLicenseRowWithTags(cfg ddprofiledefinition.LicensingConfig, rowIndex string, rowPDUs map[string]gosnmp.SnmpPDU, rowTags map[string]string) (ddsnmp.LicenseRow, bool, error) {
 	rowKey := rowIndex
 	row := ddsnmp.LicenseRow{
 		OriginProfileID: cfg.OriginProfileID,
@@ -333,9 +251,9 @@ func (c *Collector) buildTableLicenseRowWithTags(cfg ddprofiledefinition.Licensi
 		Table:           cfg.Table.Name,
 		RowKey:          rowKey,
 		StructuralID:    licenseTableStructuralID(cfg.OriginProfileID, trimOID(cfg.Table.OID), rowKey),
-		Tags:            parseStaticTags(cfg.StaticTags),
+		Tags:            maps.Clone(staticTags),
 	}
-	mergeStringMaps(row.Tags, rowTags)
+	mergeStringMaps(row.Tags, rowData.tags)
 
 	licenseCtx := licenseValueContext{rowIndex: rowIndex, rowPDUs: rowPDUs}
 	if err := c.populateLicenseRow(&row, cfg, licenseCtx); err != nil {

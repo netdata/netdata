@@ -22,7 +22,7 @@ Module: nvme
 
 ## Overview
 
-This collector monitors the health of NVMe devices. It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool but avoids directly executing the binary. Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment. This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+This collector monitors the health of NVMe devices. It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli-and-libnvme) CLI tool but avoids directly executing the binary. Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment. This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
 
 
 
@@ -70,7 +70,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Install nvme-cli
 
-See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
+See [Quick start](https://github.com/linux-nvme/nvme-cli#quick-start). Install `nvme-cli` using your distribution's package manager.
 
 
 #### For Netdata running in a Docker container: grant NVMe device access

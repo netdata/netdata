@@ -1,6 +1,11 @@
 extends:
   - aruba.yaml
   - _std-host-resources-mib-feat-base.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-fdb-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
+  - _std-topology-stp-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 metadata:
   device:

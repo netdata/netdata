@@ -2137,6 +2137,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.c
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -3254,8 +3255,6 @@ if(ENABLE_PLUGIN_EBPF)
     set(EBPF_PLUGIN_FILES
             src/collectors/ebpf.plugin/ebpf.c
             src/collectors/ebpf.plugin/ebpf.h
-            src/collectors/ebpf.plugin/ebpf_dcstat.c
-            src/collectors/ebpf.plugin/ebpf_dcstat.h
             src/collectors/ebpf.plugin/ebpf_disk.c
             src/collectors/ebpf.plugin/ebpf_disk.h
             src/collectors/ebpf.plugin/ebpf_fd.c
@@ -3453,6 +3452,8 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
                 src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
                 src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                src/collectors/network-viewer.plugin/network-viewer-topology.c
+                src/collectors/network-viewer.plugin/network-viewer-topology.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 
@@ -3475,6 +3476,16 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_WINDOWS)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/collectors/network-viewer.plugin/network-viewer-windows.c
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-path.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology.h
+                        src/libnetdata/local-sockets/local-sockets-windows.h
                 )
         endif()
         if(OS_FREEBSD)

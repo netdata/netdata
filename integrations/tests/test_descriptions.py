@@ -46,7 +46,12 @@ from gen_docs_integrations import (  # noqa: E402
     read_integrations_js,
 )
 from gen_doc_collector_page import get_integration_description  # noqa: E402
-from gen_npm_catalog import PAGE_DESCRIPTIONS  # noqa: E402
+from gen_npm_catalog import (  # noqa: E402
+    PAGE_DESCRIPTIONS,
+    build_device_modules,
+    is_device_catalog_profile,
+    load_profiles,
+)
 
 
 MODE_BY_TYPE = {
@@ -61,6 +66,21 @@ MODE_BY_TYPE = {
     "secretstore": "secretstore",
     "service_discovery": "service_discovery",
 }
+
+
+class NPMCatalogProfileVisibilityTest(unittest.TestCase):
+    def test_internal_topology_roles_are_not_device_integrations(self):
+        self.assertFalse(is_device_catalog_profile("_std-topology-ip-mib.yaml"))
+        self.assertFalse(is_device_catalog_profile("topology-role-qbridge.yaml"))
+        self.assertTrue(is_device_catalog_profile("cisco-catalyst.yaml"))
+
+        modules = build_device_modules(load_profiles())
+        self.assertTrue(modules)
+        method_descriptions = [
+            module["overview"]["data_collection"]["method_description"]
+            for module in modules
+        ]
+        self.assertFalse(any("topology-role-" in value for value in method_descriptions))
 
 MARKDOWN_SPECIAL_CHARACTERS = "*_[]<>#`~"
 yaml = YAML(typ="safe")

@@ -41,18 +41,16 @@ void aclk_update_node_info(struct update_node_info *info, struct aclk_sync_compl
     QUEUE_IF_PAYLOAD_PRESENT(query);
 }
 
-// The caller has already recorded `suppression_key` under `token` on the host identified by
+// The caller has already recorded this enqueue under `token` on the host identified by
 // `machine_guid`. They are carried on the query so that a message which never reaches the mqtt layer
 // can have that record invalidated again - see aclk_node_manifest_publish_result().
 void aclk_update_node_instance_manifest(
     struct update_node_instance_manifest *manifest,
     const char *machine_guid,
-    uint64_t suppression_key,
     uint64_t token)
 {
     aclk_query_t *query = aclk_query_new(UPDATE_NODE_MANIFEST);
     strncpyz(query->manifest.machine_guid, machine_guid, sizeof(query->manifest.machine_guid) - 1);
-    query->manifest.key = suppression_key;
     query->manifest.token = token;
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_MANIFEST;
     query->data.bin_payload.payload =

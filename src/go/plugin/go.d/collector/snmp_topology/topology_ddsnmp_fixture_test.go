@@ -106,11 +106,58 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 		"the broadcast segment should resolve the real learned MAC to the synthetic managed peer")
 }
 
-type topologySNMPRecHandler struct {
-	gosnmp.Handler
-	entries           []gosnmp.SnmpPDU
-	byOID             map[string]gosnmp.SnmpPDU
-	hiddenOIDPrefixes []string
+func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
+	pdus := []gosnmp.SnmpPDU{
+		{
+			Name:  "1.3.6.1.2.1.4.22.1.2.17.192.0.2.18",
+			Type:  gosnmp.OctetString,
+			Value: []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef},
+		},
+		{
+			Name:  "1.3.6.1.2.1.4.22.1.4.17.192.0.2.18",
+			Type:  gosnmp.Integer,
+			Value: 3,
+		},
+	}
+	handler := &topologySNMPRecHandler{
+		Handler: gosnmp.NewHandler(),
+		entries: pdus,
+		byOID:   make(map[string]gosnmp.SnmpPDU, len(pdus)),
+	}
+	for _, pdu := range pdus {
+		handler.byOID[pdu.Name] = pdu
+	}
+
+	dev := ddsnmp.DeviceConnectionInfo{
+		Hostname:       "192.0.2.10",
+		Port:           161,
+		SNMPVersion:    gosnmp.Version2c.String(),
+		SysObjectID:    "1.3.6.1.4.1.9.1.403",
+		SysName:        "legacy-arp-fixture",
+		MaxOIDs:        60,
+		MaxRepetitions: 25,
+	}
+	profiles := (&Collector{}).findTopologyProfiles(dev)
+	require.NotEmpty(t, profiles)
+
+	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		SnmpClient:  handler,
+		Profiles:    profiles,
+		Log:         newTestSNMPTopologyCollector().Logger,
+		SysObjectID: dev.SysObjectID,
+	}).Collect()
+	require.NoError(t, err)
+
+	cache := newTestTopologyCache(dev)
+	cache.ingestTopologyProfileMetrics(profileMetrics)
+	cache.finalizeTopologyCache()
+
+	observation := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, observation.ARPNDEntries, 1)
+	require.Equal(t, 17, observation.ARPNDEntries[0].IfIndex)
+	require.Equal(t, "192.0.2.18", observation.ARPNDEntries[0].IP)
+	require.Equal(t, "00:50:56:ab:cd:ef", observation.ARPNDEntries[0].MAC)
+	require.Equal(t, "dynamic", observation.ARPNDEntries[0].State)
 }
 
 func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandler {
@@ -120,10 +167,7 @@ func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandl
 	require.NoError(t, err)
 	defer file.Close()
 
-	handler := &topologySNMPRecHandler{
-		Handler: gosnmp.NewHandler(),
-		byOID:   make(map[string]gosnmp.SnmpPDU),
-	}
+	var entries []gosnmp.SnmpPDU
 	scanner := bufio.NewScanner(file)
 	for lineNumber := 1; scanner.Scan(); lineNumber++ {
 		line := strings.TrimSpace(scanner.Text())
@@ -134,73 +178,11 @@ func loadTopologySNMPRecHandler(t *testing.T, path string) *topologySNMPRecHandl
 		require.Lenf(t, parts, 3, "invalid snmprec line %d", lineNumber)
 		pdu, err := topologySNMPRecPDU(parts[0], parts[1], parts[2])
 		require.NoErrorf(t, err, "invalid snmprec line %d", lineNumber)
-		handler.entries = append(handler.entries, pdu)
-		handler.byOID[strings.TrimPrefix(pdu.Name, ".")] = pdu
+		entries = append(entries, pdu)
 	}
 	require.NoError(t, scanner.Err())
-	return handler
+	return newTopologySNMPHandler(entries)
 }
-
-func (h *topologySNMPRecHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
-	variables := make([]gosnmp.SnmpPDU, 0, len(oids))
-	for _, oid := range oids {
-		key := strings.TrimPrefix(strings.TrimSpace(oid), ".")
-		if h.isHiddenOID(key) {
-			variables = append(variables, gosnmp.SnmpPDU{Name: key, Type: gosnmp.NoSuchObject})
-			continue
-		}
-		if pdu, ok := h.byOID[key]; ok {
-			variables = append(variables, pdu)
-			continue
-		}
-		variables = append(variables, gosnmp.SnmpPDU{Name: key, Type: gosnmp.NoSuchObject})
-	}
-	return &gosnmp.SnmpPacket{Variables: variables}, nil
-}
-
-func (h *topologySNMPRecHandler) WalkAll(root string) ([]gosnmp.SnmpPDU, error) {
-	return h.walkAll(root), nil
-}
-
-func (h *topologySNMPRecHandler) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
-	return h.walkAll(root), nil
-}
-
-func (h *topologySNMPRecHandler) walkAll(root string) []gosnmp.SnmpPDU {
-	root = strings.TrimPrefix(strings.TrimSpace(root), ".")
-	prefix := root + "."
-	var out []gosnmp.SnmpPDU
-	for _, pdu := range h.entries {
-		name := strings.TrimPrefix(pdu.Name, ".")
-		if h.isHiddenOID(name) {
-			continue
-		}
-		if name == root || strings.HasPrefix(name, prefix) {
-			out = append(out, pdu)
-		}
-	}
-	return out
-}
-
-func (h *topologySNMPRecHandler) hideOIDPrefix(prefix string) {
-	prefix = strings.TrimPrefix(strings.TrimSpace(prefix), ".")
-	if prefix != "" {
-		h.hiddenOIDPrefixes = append(h.hiddenOIDPrefixes, prefix)
-	}
-}
-
-func (h *topologySNMPRecHandler) isHiddenOID(oid string) bool {
-	oid = strings.TrimPrefix(strings.TrimSpace(oid), ".")
-	for _, prefix := range h.hiddenOIDPrefixes {
-		if oid == prefix || strings.HasPrefix(oid, prefix+".") {
-			return true
-		}
-	}
-	return false
-}
-
-func (h *topologySNMPRecHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (h *topologySNMPRecHandler) MaxOids() int                { return 60 }
 
 func TestTopologySNMPRecPDURejectsMalformedValues(t *testing.T) {
 	tests := map[string]struct {

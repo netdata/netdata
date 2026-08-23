@@ -20,7 +20,7 @@
       },
       "url": {
         "title": "URL",
-        "description": "The URL of the NATS [monitoring endpoint](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#enabling-monitoring).",
+        "description": "The URL of the NATS [monitoring endpoint](https://docs.nats.io/learn/monitoring/monitoring-endpoints).",
         "type": "string",
         "default": "http://127.0.0.1:8222",
         "format": "uri"
@@ -39,7 +39,7 @@
       },
       "healthz_check": {
         "title": "Health Check Mode",
-        "description": "Controls the behavior of the `/healthz` endpoint [health check](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#health).",
+        "description": "Controls the behavior of the `/healthz` endpoint [health check](https://docs.nats.io/reference/system/monitor/healthz).",
         "type": "string",
         "enum": [
           "default",

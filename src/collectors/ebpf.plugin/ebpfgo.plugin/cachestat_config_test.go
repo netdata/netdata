@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -28,45 +26,24 @@ func TestApplyPidTableSizeClamp(t *testing.T) {
 }
 
 func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
-	userRoot := t.TempDir()
-	stockRoot := t.TempDir()
-
-	t.Setenv("NETDATA_USER_CONFIG_DIR", userRoot)
-	t.Setenv("NETDATA_STOCK_CONFIG_DIR", stockRoot)
-
-	for _, rel := range []string{"ebpf.d", filepath.Join("ebpf.d", "cachestat.conf")} {
-		if err := os.MkdirAll(filepath.Join(userRoot, filepath.Dir(rel)), 0o755); err != nil {
-			t.Fatalf("mkdir user %q: %v", rel, err)
-		}
-		if err := os.MkdirAll(filepath.Join(stockRoot, filepath.Dir(rel)), 0o755); err != nil {
-			t.Fatalf("mkdir stock %q: %v", rel, err)
-		}
-	}
-
-	write := func(root, rel, content string) {
-		path := filepath.Join(root, rel)
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			t.Fatalf("write %s: %v", path, err)
-		}
-	}
-
-	write(stockRoot, "ebpf.d.conf", `
+	writeCollectorConfigFixture(t, "cachestat.conf",
+		`
 [global]
     update every = 11
     pid table size = 2048
     maps per core = yes
     btf path = /stock/btf
     ebpf object flavor = tracing
-`)
-	write(stockRoot, filepath.Join("ebpf.d", "cachestat.conf"), `
+`,
+		`
 [global]
     pid table size = 4096
-`)
-	write(userRoot, "ebpf.d.conf", `
+`,
+		`
 [global]
     update every = 23
-`)
-	write(userRoot, filepath.Join("ebpf.d", "cachestat.conf"), `
+`,
+		`
 [global]
     maps per core = no
     ebpf object flavor = buffer
@@ -98,8 +75,7 @@ func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 }
 
 func TestLoadCachestatConfigFilesMissingReturnsNotFound(t *testing.T) {
-	t.Setenv("NETDATA_USER_CONFIG_DIR", t.TempDir())
-	t.Setenv("NETDATA_STOCK_CONFIG_DIR", t.TempDir())
+	useEmptyConfigRoots(t)
 
 	cfg, found, err := loadCachestatConfigFiles()
 	if err != nil {

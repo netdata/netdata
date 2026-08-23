@@ -36,6 +36,7 @@ type (
 		columnOIDs    map[string][]ddprofiledefinition.SymbolConfig
 		crossTableCtx *crossTableContext
 		orderedTags   []orderedTagConfig
+		symbolMode    tableSymbolMode
 	}
 )
 
@@ -203,7 +204,7 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 		}
 
 		for _, sym := range syms {
-			metric, err := p.createMetric(sym, pdu, row)
+			metric, err := p.createMetric(sym, pdu, row, ctx.symbolMode)
 			if err != nil {
 				p.log.Debugf("Error creating metric %s: %v", sym.Name, err)
 				continue
@@ -219,7 +220,11 @@ func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowPr
 	return metrics, nil
 }
 
-func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, row *tableRowData) (*ddsnmp.Metric, error) {
+func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, row *tableRowData, mode tableSymbolMode) (*ddsnmp.Metric, error) {
+	if mode == tableSymbolModePresence {
+		return buildTableMetric(sym, pdu, 0, row.tags, row.staticTags, row.tableName)
+	}
+
 	value, err := p.valProc.processValue(sym, pdu)
 	if err != nil {
 		if errors.Is(err, errNoTextDateValue) {
@@ -232,11 +237,17 @@ func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, p
 }
 
 type (
-	crossTableLookupKey struct {
+	crossTableLookupValueIndexKey struct {
 		refTableOID     string
 		lookupColumnOID string
-		targetColumnOID string
-		lookupValue     string
+		format          string
+		extractPattern  string
+		matchPattern    string
+		matchValue      string
+	}
+	crossTableLookupValueIndex struct {
+		mapping     ddprofiledefinition.MappingConfig
+		rowsByValue map[string][]string
 	}
 	// crossTableResolver handles resolving tags from other tables
 	crossTableResolver struct {
@@ -245,10 +256,10 @@ type (
 	}
 	// crossTableContext contains all data needed for cross-table resolution
 	crossTableContext struct {
-		walkedData       map[string]map[string]gosnmp.SnmpPDU // tableOID -> PDUs
-		tableNameToOID   map[string]string                    // tableName -> tableOID
-		lookupIndexCache map[crossTableLookupKey]string       // cache key -> resolved row index
-		rowTags          map[string]string
+		walkedData         map[string]map[string]gosnmp.SnmpPDU                            // tableOID -> PDUs
+		tableNameToOID     map[string]string                                               // tableName -> tableOID
+		lookupValueIndexes map[crossTableLookupValueIndexKey][]*crossTableLookupValueIndex // lookup semantics -> normalized value index
+		rowTags            map[string]string
 	}
 )
 
@@ -256,6 +267,16 @@ func newCrossTableResolver(log *logger.Logger) *crossTableResolver {
 	return &crossTableResolver{
 		log:          log,
 		tagProcessor: newTableTagProcessor(),
+	}
+}
+
+func newCrossTableContext(
+	walkedData map[string]map[string]gosnmp.SnmpPDU,
+	tableNameToOID map[string]string,
+) *crossTableContext {
+	return &crossTableContext{
+		walkedData:     walkedData,
+		tableNameToOID: tableNameToOID,
 	}
 }
 

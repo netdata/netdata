@@ -43,6 +43,173 @@ func TestOptionalValueDistinguishesAbsentAndPresentZero(t *testing.T) {
 	}
 }
 
+func TestToGraph_ReusesResultWithoutMutationOrProjectionAliasing(t *testing.T) {
+	collectedAt := time.Date(2026, time.August, 19, 12, 0, 0, 0, time.UTC)
+	observations := []L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ManagementIP:      "192.0.2.1",
+			ManagementAliases: []string{"10.0.0.1", "192.0.2.1"},
+			SysObjectID:       "1.3.6.1.4.1.9.1.1",
+			ChassisID:         "00:11:22:33:44:55",
+			Labels:            map[string]string{"device_category": "Switch", "site": "lab-a"},
+			Interfaces: []ObservedInterface{{
+				IfIndex:     1,
+				IfName:      "Gi0/1",
+				IfDescr:     "uplink",
+				IfAlias:     "to-switch-b",
+				MAC:         "00:11:22:33:44:56",
+				SpeedBps:    1_000_000_000,
+				AdminStatus: "up",
+				OperStatus:  "up",
+			}},
+			BridgePorts: []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			LLDPRemotes: []LLDPRemoteObservation{{
+				LocalPortNum: "1",
+				LocalPortID:  "Gi0/1",
+				ChassisID:    "aa:bb:cc:dd:ee:ff",
+				SysName:      "switch-b",
+				PortID:       "Gi0/2",
+				ManagementIP: "192.0.2.2",
+			}},
+			FDBEntries: []FDBObservation{{
+				MAC:        "02:00:00:00:00:10",
+				BridgePort: "1",
+				IfIndex:    1,
+				Status:     "learned",
+				VLANID:     "10",
+				VLANName:   "users",
+			}},
+			ARPNDEntries: []ARPNDObservation{{
+				Protocol: "arp",
+				IfIndex:  1,
+				IfName:   "Gi0/1",
+				IP:       "198.51.100.10",
+				MAC:      "02:00:00:00:00:10",
+				State:    "reachable",
+				AddrType: "ipv4",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ManagementIP:      "192.0.2.2",
+			ManagementAliases: []string{"10.0.0.2", "192.0.2.2"},
+			ChassisID:         "aa:bb:cc:dd:ee:ff",
+			Labels:            map[string]string{"device_category": "Switch", "site": "lab-b"},
+			Interfaces: []ObservedInterface{{
+				IfIndex:     2,
+				IfName:      "Gi0/2",
+				IfDescr:     "downlink",
+				MAC:         "aa:bb:cc:dd:ee:fe",
+				SpeedBps:    1_000_000_000,
+				AdminStatus: "up",
+				OperStatus:  "up",
+			}},
+		},
+	}
+	discoverOptions := DiscoverOptions{
+		EnableLLDP:   true,
+		EnableBridge: true,
+		EnableARP:    true,
+		CollectedAt:  collectedAt,
+	}
+	strictOptions := GraphOptions{
+		SchemaVersion:          "1.0.0",
+		Source:                 "snmp",
+		Layer:                  "2",
+		AgentID:                "agent-1",
+		LocalDeviceID:          "switch-a",
+		CollectedAt:            collectedAt,
+		CollapseActorsByIP:     true,
+		EliminateNonIPInferred: true,
+	}
+	probableOptions := strictOptions
+	probableOptions.ProbabilisticConnectivity = true
+
+	mustBuild := func() Result {
+		result, err := BuildL2ResultFromObservations(observations, discoverOptions)
+		require.NoError(t, err)
+		return result
+	}
+	mustJSON := func(value any) []byte {
+		data, err := json.Marshal(value)
+		require.NoError(t, err)
+		return data
+	}
+
+	referenceStrict := ToGraph(mustBuild(), strictOptions)
+	referenceProbable := ToGraph(mustBuild(), probableOptions)
+	referenceStrictJSON := mustJSON(referenceStrict)
+	referenceProbableJSON := mustJSON(referenceProbable)
+
+	sharedResult := mustBuild()
+	sharedResultJSON := mustJSON(sharedResult)
+	assertResultUnchanged := func() {
+		require.Equal(t, sharedResultJSON, mustJSON(sharedResult))
+	}
+
+	sharedStrict := ToGraph(sharedResult, strictOptions)
+	assertResultUnchanged()
+	sharedProbable := ToGraph(sharedResult, probableOptions)
+	assertResultUnchanged()
+	sharedStrictAgain := ToGraph(sharedResult, strictOptions)
+	assertResultUnchanged()
+
+	require.Equal(t, referenceStrict, sharedStrict)
+	require.Equal(t, referenceProbable, sharedProbable)
+	require.Equal(t, referenceStrictJSON, mustJSON(sharedStrict))
+	require.Equal(t, referenceProbableJSON, mustJSON(sharedProbable))
+	require.Equal(t, referenceStrictJSON, mustJSON(sharedStrictAgain))
+
+	sharedProbableAgain := ToGraph(sharedResult, probableOptions)
+	assertResultUnchanged()
+	sharedStrictAfterProbable := ToGraph(sharedResult, strictOptions)
+	assertResultUnchanged()
+	sharedProbableAfterStrict := ToGraph(sharedResult, probableOptions)
+	assertResultUnchanged()
+	require.Equal(t, referenceProbableJSON, mustJSON(sharedProbableAgain))
+	require.Equal(t, referenceStrictJSON, mustJSON(sharedStrictAfterProbable))
+	require.Equal(t, referenceProbableJSON, mustJSON(sharedProbableAfterStrict))
+
+	mutatedLabels := false
+	mutatedIPs := false
+	for i := range sharedProbable.Graph.Actors {
+		actor := &sharedProbable.Graph.Actors[i]
+		if !mutatedLabels && len(actor.Labels) > 0 {
+			actor.Labels["mutation"] = "probable-only"
+			mutatedLabels = true
+		}
+		if !mutatedIPs && len(actor.Match.IPAddresses) > 0 {
+			actor.Match.IPAddresses[0] = "203.0.113.250"
+			mutatedIPs = true
+		}
+	}
+	mutatedManagementAddresses := false
+	mutatedPorts := false
+	for actorID, detail := range sharedProbable.ActorDetails {
+		if !mutatedManagementAddresses && len(detail.Device.ManagementAddresses) > 0 {
+			detail.Device.ManagementAddresses[0] = "203.0.113.251"
+			mutatedManagementAddresses = true
+		}
+		if !mutatedPorts && len(detail.Device.Ports) > 0 {
+			detail.Device.Ports[0].IfName = "mutated-port"
+			mutatedPorts = true
+		}
+		sharedProbable.ActorDetails[actorID] = detail
+	}
+	require.True(t, mutatedLabels)
+	require.True(t, mutatedIPs)
+	require.True(t, mutatedManagementAddresses)
+	require.True(t, mutatedPorts)
+
+	require.Equal(t, referenceStrictJSON, mustJSON(sharedStrict))
+	assertResultUnchanged()
+	require.Equal(t, referenceStrictJSON, mustJSON(ToGraph(sharedResult, strictOptions)))
+	require.Equal(t, referenceProbableJSON, mustJSON(ToGraph(sharedResult, probableOptions)))
+}
+
 func TestProjectionPreservesSelectedManagementIPAfterARPAliasReconciliation(t *testing.T) {
 	result, err := BuildL2ResultFromObservations([]L2Observation{
 		{

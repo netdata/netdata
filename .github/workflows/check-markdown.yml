@@ -43,7 +43,7 @@ jobs:
       - name: Init python env
         uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.13"
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -55,7 +55,7 @@ jobs:
         run: |
           python3 -m venv ./venv
           source ./venv/bin/activate
-          pip install -r learn/.learn_environment/ingest-requirements.txt
+          python -m pip install --require-hashes -r learn/.learn_environment/ingest-requirements.txt
           cd netdata && ./integrations/pip.sh
 
       - name: Generate Source Metadata
@@ -110,6 +110,21 @@ jobs:
         run: |
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_docs_integrations.py
+
+      - name: Remove new eBPF DCstat integration page when legacy is preserved
+        run: |
+          # The dc_go branch restores the legacy eBPF DCstat integration page
+          # so the netdata/learn redirect catalog (still anchored to the legacy
+          # GitHub URL) keeps resolving. The integration-regen step above produces
+          # the new ebpfgo page in parallel, which would cause a Learn URL
+          # collision when the Ingest runs against the still-unpatched catalog.
+          # Removing the new page here keeps the working tree in the single-file
+          # state the Ingest needs to resolve the stale catalog entries.
+          # The integration-regen PR (which closes the migration) does not have
+          # the legacy file in its working tree, so this step is a no-op there.
+          if [ -f netdata/src/collectors/ebpf.plugin/integrations/ebpf_dcstat.md ]; then
+            rm -f netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_dcstat.md
+          fi
 
       - name: Generate src/collectors/COLLECTORS.md
         run: |

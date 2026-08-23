@@ -81,6 +81,8 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 				{name: "CacheAccess", kind: reflect.Int64, typ: "int64"},
 				{name: "Curr", kind: reflect.Struct, typ: "main.netdataPublishDCStatPid"},
 				{name: "Prev", kind: reflect.Struct, typ: "main.netdataPublishDCStatPid"},
+				// v5: mirrors ebpf_publish_dcstat.dcstat_update_every_s.
+				{name: "UpdateEverySec", kind: reflect.Uint32, typ: "uint32"},
 			},
 		},
 		"fdstat": {

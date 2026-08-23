@@ -1302,6 +1302,7 @@ template: disk_full_percent
 <br/>
 </details>
 
+<a id="example-4-network-packet-drops"></a>
 <details>
 <summary><strong>Example 4: Network Packet Drops</strong></summary><br/>
 

@@ -61,7 +61,7 @@ func (c *topologyCache) updateLldpLocManAddr(tags map[string]string) {
 		Source:      "lldp_local",
 	}
 
-	c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, mgmt)
+	c.appendLocalManagementAddress(mgmt)
 }
 
 func (c *topologyCache) updateLldpRemote(tags map[string]string) {

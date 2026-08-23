@@ -74,20 +74,23 @@ Likely homes:
 
 `topology:network-connections`:
 
-- producer path: `src/collectors/network-viewer.plugin/network-viewer.c`;
+- producer path: `src/collectors/network-viewer.plugin/network-viewer.c` (Linux/FreeBSD/macOS) and `src/collectors/network-viewer.plugin/network-viewer-windows.c` (Windows);
 - the Function now emits `netdata.topology.v1` at
-  `src/collectors/network-viewer.plugin/network-viewer.c:2535`;
-- the Function parses `aggregated` / `mode:aggregated` and `detailed` /
-  `mode:detailed`, with aggregated as the default, at
-  `src/collectors/network-viewer.plugin/network-viewer.c:272`;
+  `src/collectors/network-viewer.plugin/network-viewer-topology.c:1674`;
+- POST requests select the view with `selections.group_by` (`process_name`,
+  `pid`, or `container`, `process_name` by default) and `selections.mode`
+  (`aggregated` or `detailed`, aggregated by default), parsed at
+  `src/collectors/network-viewer.plugin/network-viewer-topology.c:474`; the
+  `aggregated` / `mode:aggregated` and `detailed` / `mode:detailed` spellings
+  are retained as compatibility aliases;
 - response metadata exposes the `mode` selector at
-  `src/collectors/network-viewer.plugin/network-viewer.c:1451`;
+  `src/collectors/network-viewer.plugin/network-viewer-topology.c:5134`;
 - actors, graph links, and optional socket evidence rows are emitted as compact
-  columnar tables at `src/collectors/network-viewer.plugin/network-viewer.c:2568`;
+  columnar tables at `src/collectors/network-viewer.plugin/network-viewer-topology.c:4479`;
 - socket evidence is emitted only in detailed mode at
-  `src/collectors/network-viewer.plugin/network-viewer.c:2571`;
+  `src/collectors/network-viewer.plugin/network-viewer-topology.c:4614`;
 - repeated string columns use automatic dictionary encoding when it is smaller
-  than plain values at `src/collectors/network-viewer.plugin/network-viewer.c:2041`;
+  than plain values at `src/collectors/network-viewer.plugin/network-viewer-topology.c:3296`;
 - old-schema presentation metadata and actor-nested socket tables have been
   removed from the Agent producer. The v1 producer now emits compact
   graph-presentation metadata inside type definitions plus `data.presentation`.
@@ -179,7 +182,8 @@ schema rollout depends on it:
 
 Producer path:
 
-- `src/collectors/network-viewer.plugin/network-viewer.c`
+- `src/collectors/network-viewer.plugin/network-viewer.c` (Linux/FreeBSD/macOS)
+- `src/collectors/network-viewer.plugin/network-viewer-windows.c` (Windows)
 
 Required behavior:
 
@@ -208,7 +212,7 @@ Validation:
 
 Current state:
 
-- `src/collectors/network-viewer.plugin/network-viewer.c` now emits compact
+- `src/collectors/network-viewer.plugin/network-viewer-topology.c` (the shared renderer, also used by Windows) now emits compact
   actor rows, graph-link rows, and optional socket evidence rows directly in
   `netdata.topology.v1`;
 - aggregated mode is the default and omits socket evidence from the response;
