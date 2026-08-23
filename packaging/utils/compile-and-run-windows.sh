@@ -68,7 +68,7 @@ then
       -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
       -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
       -DCMAKE_C_FLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1" \
-      -DNETDATA_PACKAGE_KIND=${NETDATA_PACKAGE_KIND} \
+      -DNETDATA_PACKAGE_KIND="${NETDATA_PACKAGE_KIND}" \
       -DUSE_MOLD=Off \
       -DNETDATA_USER="${USER}" \
       -DDEFAULT_FEATURE_STATE=Off \
