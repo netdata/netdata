@@ -134,6 +134,10 @@ an explicit future input when the validator cannot derive it.
 
 - Use nested groups to express hierarchy. Child `context_namespace` segments join with `.` and child `family` segments
   join with `/`.
+- Omit the template root `family` when it would only repeat the resolved application; its named child groups then become
+  top-level families. Retain a meaningful root for reusable instrumentation profiles that compose into other
+  applications. Nested groups still require `family`, and a chart directly under a transparent root needs its own
+  chart-level `family`.
 - Use base units. Convert bytes to bits only when the operator convention is bandwidth in bits/s; otherwise multiplier and
   divisor are usually unnecessary.
 - Omit `algorithm` normally. Runtime counter kind resolves to `incremental`; gauges and other kinds resolve to `absolute`.

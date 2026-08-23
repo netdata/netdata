@@ -213,6 +213,11 @@ Each field affects a different part of the dashboard:
 
 - `family` composes with ancestor families using `/`. This is navigation, so use
   application functions and entity levels rather than metric types.
+- The profile template root MAY omit `family` when it is only a transparent
+  container and the application already provides that navigation level. Keep a
+  meaningful root for reusable instrumentation profiles. Nested groups MUST
+  provide `family`; a chart directly under a transparent root MUST provide its
+  own chart-level `family`.
 - `context_namespace` composes with `.` into chart contexts. It is identity, not
   merely display text.
 - `metrics` authorizes exact metric names for dimension selectors in the group

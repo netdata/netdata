@@ -22,7 +22,7 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "$ref": "#/$defs/group"
+        "$ref": "#/$defs/root_group"
       }
     }
   },
@@ -147,16 +147,13 @@
         }
       }
     },
-    "group": {
+    "root_group": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "family"
-      ],
       "properties": {
         "family": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^$|\\S"
         },
         "context_namespace": {
           "type": "string"
@@ -181,6 +178,37 @@
           "items": {
             "$ref": "#/$defs/chart"
           }
+        }
+      },
+      "if": {
+        "required": [
+          "family"
+        ],
+        "properties": {
+          "family": {
+            "pattern": "\\S"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "charts": {
+            "items": {
+              "$ref": "#/$defs/chart_with_family"
+            }
+          }
+        }
+      }
+    },
+    "group": {
+      "$ref": "#/$defs/root_group",
+      "required": [
+        "family"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "pattern": "\\S"
         }
       }
     },
@@ -259,6 +287,18 @@
           "items": {
             "$ref": "#/$defs/dimension"
           }
+        }
+      }
+    },
+    "chart_with_family": {
+      "$ref": "#/$defs/chart",
+      "required": [
+        "family"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "pattern": "\\S"
         }
       }
     },

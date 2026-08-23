@@ -57,7 +57,7 @@ type EngineAutogenRule struct {
 
 // Group is a recursive chart-group container.
 type Group struct {
-	Family           string         `yaml:"family" json:"family"`
+	Family           string         `yaml:"family,omitempty" json:"family,omitempty"`
 	ContextNamespace string         `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
 	Metrics          []string       `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	ChartDefaults    *ChartDefaults `yaml:"chart_defaults,omitempty" json:"chart_defaults,omitempty"`
