@@ -149,8 +149,19 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
             path = Path(directory) / 'integration.md'
             clean_and_write(markdown, path)
             rendered = path.read_text(encoding='utf-8')
-        self.assertIn('<details open data-prometheus-profile-catalog>', rendered)
-        self.assertIn('<details data-prometheus-profile-chart>', rendered)
+        self.assertIn(
+            '<details open data-prometheus-profile-catalog>\n<summary>Coverage</summary>\n',
+            rendered,
+        )
+        self.assertIn(
+            '<details data-prometheus-profile-chart>\n<summary>Requests</summary>\n',
+            rendered,
+        )
+        self.assertNotIn(
+            '<details open data-prometheus-profile-catalog><summary>',
+            rendered,
+        )
+        self.assertNotIn('<details data-prometheus-profile-chart><summary>', rendered)
         self.assertNotIn('prometheus-profile-catalog -->', rendered)
 
     def test_view_chart_mismatch_fails_closed(self):
