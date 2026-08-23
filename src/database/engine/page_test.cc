@@ -1,5 +1,252 @@
-#include "page.h"
+#include "page_test_bridge.h"
 #include "page_test.h"
+
+static size_t pgd_unittest_tier0(uint8_t page_type) {
+    size_t errors = 0;
+
+#define PGD_EXPECT(condition) do {                                                                                       \
+    if(!(condition)) {                                                                                                  \
+        fprintf(stderr, "PGD storage-point unittest failed at %s:%d: %s\n", __FILE__, __LINE__, #condition);           \
+        errors++;                                                                                                       \
+    }                                                                                                                   \
+} while(0)
+
+    PGD *pg = pgd_unittest_create(page_type, 4);
+    pgd_unittest_append_point(pg, 1, 42, 42, 42, 1, 0, SN_DEFAULT_FLAGS, 0);
+    pgd_unittest_append_point(pg, 2, NAN, NAN, NAN, 0, 0, SN_EMPTY_SLOT, 1);
+    pgd_unittest_append_point(pg, 3, -7, -7, -7, 1, 0, SN_FLAG_RESET, 2);
+
+    PGDC cursor = {};
+    pgd_unittest_cursor_reset(&cursor, pg, 0, 1);
+
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    sp.start_time_s = 0;
+    sp.end_time_s = 1;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 0, &sp));
+    PGD_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 1);
+    PGD_EXPECT(storage_point_is_complete(sp));
+    PGD_EXPECT(sp.min == 42 && sp.max == 42 && sp.sum == 42);
+    PGD_EXPECT(sp.count == 1 && sp.gap_count == 0 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags & SN_FLAG_NOT_ANOMALOUS);
+
+    sp.start_time_s = 1;
+    sp.end_time_s = 2;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 1, &sp));
+    PGD_EXPECT(sp.start_time_s == 1 && sp.end_time_s == 2);
+    PGD_EXPECT(storage_point_is_gap(sp));
+    PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+               !netdata_double_isnumber(sp.sum));
+    PGD_EXPECT(sp.count == 0 && sp.gap_count == 1 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    sp.start_time_s = 2;
+    sp.end_time_s = 3;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 2, &sp));
+    PGD_EXPECT(sp.start_time_s == 2 && sp.end_time_s == 3);
+    PGD_EXPECT(storage_point_is_complete(sp));
+    PGD_EXPECT(sp.min == -7 && sp.max == -7 && sp.sum == -7);
+    PGD_EXPECT(sp.count == 1 && sp.gap_count == 0 && sp.anomaly_count == 1);
+    PGD_EXPECT((sp.flags & SN_FLAG_RESET) && !(sp.flags & SN_FLAG_NOT_ANOMALOUS));
+
+    sp.start_time_s = 3;
+    sp.end_time_s = 4;
+    PGD_EXPECT(!pgd_unittest_cursor_next(&cursor, 3, &sp));
+    PGD_EXPECT(sp.start_time_s == 3 && sp.end_time_s == 4);
+    PGD_EXPECT(storage_point_is_gap(sp));
+    PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+               !netdata_double_isnumber(sp.sum));
+    PGD_EXPECT(sp.count == 0 && sp.gap_count == 1 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    pgd_unittest_free(pg);
+    return errors;
+}
+
+static size_t pgd_unittest_tier1(void) {
+    size_t errors = 0;
+
+    PGD *gap_pg = pgd_unittest_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 2);
+    pgd_unittest_append_point(gap_pg, 60, NAN, NAN, NAN, 0, 0, SN_FLAG_NONE, 0);
+    PGD_EXPECT(pgd_unittest_slots_used(gap_pg) == 1);
+    PGD_EXPECT(pgd_unittest_is_empty(gap_pg));
+    pgd_unittest_free(gap_pg);
+
+    PGD *pg = pgd_unittest_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 6);
+    pgd_unittest_append_point(pg, 60, 400, 9, 11, 40, 4, SN_DEFAULT_FLAGS, 0);
+    pgd_unittest_append_point(pg, 120, 800, 9, 11, 80, 0, SN_DEFAULT_FLAGS, 1);
+    pgd_unittest_append_point(pg, 180, 300, 9, 11, 0, 0, SN_DEFAULT_FLAGS, 2);
+    pgd_unittest_append_point(pg, 240, NAN, NAN, NAN, 7, 1, SN_DEFAULT_FLAGS, 3);
+    pgd_unittest_append_point(pg, 300, INFINITY, 9, 11, 7, 1, SN_DEFAULT_FLAGS, 4);
+
+    PGDC cursor = {};
+    pgd_unittest_cursor_reset(&cursor, pg, 0, 60);
+
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    sp.start_time_s = 0;
+    sp.end_time_s = 60;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 0, &sp));
+    PGD_EXPECT(storage_point_is_partial(sp));
+    PGD_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 60);
+    PGD_EXPECT(sp.min == 9 && sp.max == 11 && sp.sum == 400);
+    PGD_EXPECT(sp.count == 40 && sp.gap_count == 20 && sp.anomaly_count == 4);
+    PGD_EXPECT(!(sp.flags & SN_FLAG_NOT_ANOMALOUS));
+
+    sp.start_time_s = 60;
+    sp.end_time_s = 120;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 1, &sp));
+    PGD_EXPECT(storage_point_is_complete(sp));
+    PGD_EXPECT(sp.start_time_s == 60 && sp.end_time_s == 120);
+    PGD_EXPECT(sp.min == 9 && sp.max == 11 && sp.sum == 800);
+    PGD_EXPECT(sp.count == 80 && sp.gap_count == 0 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags & SN_FLAG_NOT_ANOMALOUS);
+
+    sp.start_time_s = 120;
+    sp.end_time_s = 180;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 2, &sp));
+    PGD_EXPECT(storage_point_is_gap(sp));
+    PGD_EXPECT(sp.start_time_s == 120 && sp.end_time_s == 180);
+    PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+               !netdata_double_isnumber(sp.sum));
+    PGD_EXPECT(sp.count == 0 && sp.gap_count == 60 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    sp.start_time_s = 180;
+    sp.end_time_s = 240;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 3, &sp));
+    PGD_EXPECT(storage_point_is_gap(sp));
+    PGD_EXPECT(sp.start_time_s == 180 && sp.end_time_s == 240);
+    PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+               !netdata_double_isnumber(sp.sum));
+    PGD_EXPECT(sp.count == 0 && sp.gap_count == 60 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    sp.start_time_s = 240;
+    sp.end_time_s = 300;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 4, &sp));
+    PGD_EXPECT(storage_point_is_gap(sp));
+    PGD_EXPECT(sp.start_time_s == 240 && sp.end_time_s == 300);
+    PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+               !netdata_double_isnumber(sp.sum));
+    PGD_EXPECT(sp.count == 0 && sp.gap_count == 60 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    sp.start_time_s = 300;
+    sp.end_time_s = 360;
+    PGD_EXPECT(!pgd_unittest_cursor_next(&cursor, 5, &sp));
+    PGD_EXPECT(storage_point_is_gap(sp));
+    PGD_EXPECT(sp.start_time_s == 300 && sp.end_time_s == 360);
+    PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+               !netdata_double_isnumber(sp.sum));
+    PGD_EXPECT(sp.count == 0 && sp.gap_count == 60 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    pgd_unittest_cursor_reset(&cursor, pg, 2, 64);
+    sp.start_time_s = 0;
+    sp.end_time_s = 64;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 2, &sp));
+    PGD_EXPECT(storage_point_is_gap(sp));
+    PGD_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 64);
+    PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+               !netdata_double_isnumber(sp.sum));
+    PGD_EXPECT(sp.count == 0 && sp.gap_count == 64);
+    PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+    PGD *wrapped_count_pg = pgd_unittest_create(RRDENG_PAGE_TYPE_ARRAY_TIER1, 2);
+    pgd_unittest_append_point(wrapped_count_pg, 65536, 65536, 1, 1, 0, 0, SN_DEFAULT_FLAGS, 0);
+    pgd_unittest_cursor_reset(&cursor, wrapped_count_pg, 0, 65536);
+    sp.start_time_s = 0;
+    sp.end_time_s = 65536;
+    PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 0, &sp));
+    PGD_EXPECT(storage_point_is_complete(sp));
+    PGD_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 65536);
+    PGD_EXPECT(sp.min == 1 && sp.max == 1 && sp.sum == 65536);
+    PGD_EXPECT(sp.count == 65536 && sp.gap_count == 0 && sp.anomaly_count == 0);
+    PGD_EXPECT(sp.flags & SN_FLAG_NOT_ANOMALOUS);
+    pgd_unittest_free(wrapped_count_pg);
+
+    pgd_unittest_free(pg);
+    return errors;
+}
+
+static size_t pgd_unittest_corrupt_gorilla_entries(void) {
+    size_t errors = 0;
+
+    PGD *pg_collector = pgd_unittest_create(RRDENG_PAGE_TYPE_GORILLA_32BIT, 2);
+    pgd_unittest_append_point(pg_collector, 1, 666, 666, 666, 1, 0, SN_DEFAULT_FLAGS, 0);
+
+    uint32_t size_in_bytes = pgd_unittest_disk_footprint(pg_collector);
+    auto *disk_buffer = static_cast<uint32_t *>(mallocz(size_in_bytes));
+    pgd_unittest_copy_to_extent(pg_collector, reinterpret_cast<uint8_t *>(disk_buffer), size_in_bytes);
+
+    auto *gbuf = reinterpret_cast<gorilla_buffer_t *>(disk_buffer);
+    gbuf->header.entries++;
+
+    PGD *pg_disk = pgd_unittest_create_from_disk_data(
+        RRDENG_PAGE_TYPE_GORILLA_32BIT, disk_buffer, size_in_bytes);
+    PGD_EXPECT(pg_disk != PGD_EMPTY);
+    PGD_EXPECT(pgd_unittest_slots_used(pg_disk) == 2);
+
+    if(pg_disk != PGD_EMPTY) {
+        PGDC cursor = {};
+        pgd_unittest_cursor_reset(&cursor, pg_disk, 0, 1);
+
+        STORAGE_POINT sp = STORAGE_POINT_UNSET;
+        sp.start_time_s = 0;
+        sp.end_time_s = 1;
+        PGD_EXPECT(pgd_unittest_cursor_next(&cursor, 0, &sp));
+        PGD_EXPECT(sp.start_time_s == 0 && sp.end_time_s == 1);
+        PGD_EXPECT(storage_point_is_complete(sp));
+        PGD_EXPECT(sp.min == 666 && sp.max == 666 && sp.sum == 666);
+        PGD_EXPECT(sp.count == 1 && sp.gap_count == 0 && sp.anomaly_count == 0);
+        PGD_EXPECT(sp.flags & SN_FLAG_NOT_ANOMALOUS);
+
+        sp.start_time_s = 1;
+        sp.end_time_s = 2;
+        PGD_EXPECT(!pgd_unittest_cursor_next(&cursor, 1, &sp));
+        PGD_EXPECT(sp.start_time_s == 1 && sp.end_time_s == 2);
+        PGD_EXPECT(storage_point_is_gap(sp));
+        PGD_EXPECT(!netdata_double_isnumber(sp.min) && !netdata_double_isnumber(sp.max) &&
+                   !netdata_double_isnumber(sp.sum));
+        PGD_EXPECT(sp.count == 0 && sp.gap_count == 1 && sp.anomaly_count == 0);
+        PGD_EXPECT(sp.flags == SN_FLAG_NONE);
+
+        pgd_unittest_free(pg_disk);
+    }
+
+    pgd_unittest_free(pg_collector);
+    freez(disk_buffer);
+    return errors;
+}
+
+int pgd_storage_point_unittest(void) {
+    size_t errors = 0;
+
+    PGDC cursor = {};
+    STORAGE_POINT sp = STORAGE_POINT_UNSET;
+    sp.start_time_s = 10;
+    sp.end_time_s = 11;
+    pgd_unittest_cursor_reset(&cursor, nullptr, UINT32_MAX, 0);
+    PGD_EXPECT(cursor.slots_per_point == 1);
+    PGD_EXPECT(!pgd_unittest_cursor_next(&cursor, 0, &sp));
+    PGD_EXPECT(storage_point_is_gap(sp) && sp.gap_count == 1);
+
+    sp.start_time_s = 10;
+    sp.end_time_s = 65546;
+    pgd_unittest_cursor_reset(&cursor, nullptr, UINT32_MAX, 65536);
+    PGD_EXPECT(cursor.slots_per_point == 65536);
+    PGD_EXPECT(!pgd_unittest_cursor_next(&cursor, 0, &sp));
+    PGD_EXPECT(storage_point_is_gap(sp) && sp.gap_count == 65536);
+
+    errors += pgd_unittest_tier0(RRDENG_PAGE_TYPE_GORILLA_32BIT);
+    errors += pgd_unittest_tier0(RRDENG_PAGE_TYPE_ARRAY_32BIT);
+    errors += pgd_unittest_tier1();
+    errors += pgd_unittest_corrupt_gorilla_entries();
+
+    fprintf(stderr, "PGD storage-point unittests: %s\n", errors ? "FAILED" : "PASSED");
+    return (int)errors;
+}
+
+#undef PGD_EXPECT
 
 #ifdef HAVE_GTEST
 
@@ -24,6 +271,12 @@ bool operator==(const STORAGE_POINT lhs, const STORAGE_POINT rhs) {
         return false;
 
     if (lhs.count != rhs.count)
+        return false;
+
+    if (lhs.gap_count != rhs.gap_count)
+        return false;
+
+    if (lhs.anomaly_count != rhs.anomaly_count)
         return false;
 
     if (lhs.flags != rhs.flags)
@@ -58,7 +311,7 @@ TEST(PGD, EmptyOrNull) {
     EXPECT_EQ(pgd_memory_footprint(pg), 0);
     EXPECT_EQ(pgd_disk_footprint(pg), 0);
 
-    pgdc_reset(&cursor, pg, 0);
+    pgdc_reset(&cursor, pg, 0, 1);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
     pgd_free(pg);
@@ -71,7 +324,7 @@ TEST(PGD, EmptyOrNull) {
     EXPECT_EQ(pgd_disk_footprint(pg), 0);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
-    pgdc_reset(&cursor, pg, 0);
+    pgdc_reset(&cursor, pg, 0, 1);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
     pgd_free(pg);
@@ -108,7 +361,7 @@ TEST(PGD, CursorFullPage) {
 
     for (size_t i = 0; i != 2; i++) {
         PGDC cursor;
-        pgdc_reset(&cursor, pg, 0);
+        pgdc_reset(&cursor, pg, 0, 1);
 
         STORAGE_POINT sp;
         for (size_t slot = 0; slot != slots; slot++) {
@@ -126,7 +379,7 @@ TEST(PGD, CursorFullPage) {
 
     for (size_t i = 0; i != 2; i++) {
         PGDC cursor;
-        pgdc_reset(&cursor, pg, slots / 2);
+        pgdc_reset(&cursor, pg, slots / 2, 1);
 
         STORAGE_POINT sp;
         for (size_t slot = slots / 2; slot != slots; slot++) {
@@ -145,7 +398,7 @@ TEST(PGD, CursorFullPage) {
     // out of bounds seek
     {
         PGDC cursor;
-        pgdc_reset(&cursor, pg, 2 * slots);
+        pgdc_reset(&cursor, pg, 2 * slots, 1);
 
         STORAGE_POINT sp;
         EXPECT_FALSE(pgdc_get_next_point(&cursor, 2 * slots, &sp));
@@ -165,7 +418,7 @@ TEST(PGD, CursorHalfPage) {
     for (size_t slot = 0; slot != slots / 2; slot++)
         pgd_append_point(pg, slot, slot, 0, 0, 1, 1, SN_DEFAULT_FLAGS, slot);
 
-    pgdc_reset(&cursor, pg, 0);
+    pgdc_reset(&cursor, pg, 0, 1);
 
     for (size_t slot = 0; slot != slots / 2; slot++) {
         EXPECT_TRUE(pgdc_get_next_point(&cursor, slot, &sp));
@@ -181,7 +434,7 @@ TEST(PGD, CursorHalfPage) {
     // reset pgdc to the end of the page, we should not be getting more
     // points even if the page has grown in between.
 
-    pgdc_reset(&cursor, pg, slots / 2);
+    pgdc_reset(&cursor, pg, slots / 2, 1);
 
     for (size_t slot = slots / 2; slot != slots; slot++)
         pgd_append_point(pg, slot, slot, 0, 0, 1, 1, SN_DEFAULT_FLAGS, slot);
@@ -356,8 +609,8 @@ TEST(PGD, Roundtrip) {
         PGDC cursor_collector;
         PGDC cursor_disk;
 
-        pgdc_reset(&cursor_collector, pg_collector, i * 1024);
-        pgdc_reset(&cursor_disk, pg_disk, i * 1024);
+        pgdc_reset(&cursor_collector, pg_collector, i * 1024, 1);
+        pgdc_reset(&cursor_disk, pg_disk, i * 1024, 1);
 
         STORAGE_POINT sp_collector = {};
         STORAGE_POINT sp_disk = {};
@@ -418,7 +671,7 @@ TEST(PGD, StopCorruptGorillaDiskEntriesAtEncodedBits) {
     EXPECT_EQ(pgd_slots_used(pg_disk), 2);
 
     PGDC cursor;
-    pgdc_reset(&cursor, pg_disk, 0);
+    pgdc_reset(&cursor, pg_disk, 0, 1);
 
     STORAGE_POINT sp = {};
     EXPECT_TRUE(pgdc_get_next_point(&cursor, 0, &sp));

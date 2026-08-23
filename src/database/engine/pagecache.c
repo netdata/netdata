@@ -345,7 +345,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
             .data = PGD_EMPTY,
     };
 
-    if(page_entry.start_time_s >= page_entry.end_time_s)
+    if(page_entry.start_time_s > page_entry.end_time_s)
         return;
 
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, NULL);
@@ -399,9 +399,63 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
         dt_s = nd_profile.update_every;
 
     size_t pages_pass2 = 0, pages_pass3 = 0;
-    while((pd = pdc_find_page_for_time(
-            JudyL_page_array, now_s, &gaps,
-            PDC_PAGE_PREPROCESSED, 0))) {
+    time_t covered_until_s = wanted_start_time_s;
+    bool have_page = false, last_page_is_empty = false, candidate_reached_end = false;
+
+    // Exhaustive selection must not weaken the supported metadata lookup the previous planner required.
+    time_t legacy_now_s = wanted_start_time_s;
+    uint32_t legacy_dt_s = dt_s;
+    bool legacy_done = false;
+
+    while(true) {
+        size_t ignored_lookup_gaps = 0;
+        pd = pdc_find_page_for_time(
+            JudyL_page_array, now_s, &ignored_lookup_gaps,
+            PDC_PAGE_PREPROCESSED, 0);
+        if(!pd)
+            break;
+
+        PDC_PAGE_STATUS status = __atomic_load_n(&pd->status, __ATOMIC_ACQUIRE);
+        uint32_t page_update_every_s = pd->update_every_s;
+        if(!page_update_every_s)
+            page_update_every_s = dt_s;
+
+        bool page_is_empty = status & PDC_PAGE_EMPTY;
+        bool candidate_gap = false;
+        if(have_page) {
+            if(page_is_empty) {
+                time_t expected_start_time_s = nd_time_t_add_saturating(covered_until_s, 1);
+                candidate_gap = pd->first_time_s > expected_start_time_s;
+            }
+            else {
+                candidate_gap = nd_time_t_add_compare(
+                    covered_until_s, page_update_every_s, pd->first_time_s) < 0;
+            }
+        }
+
+        bool legacy_gap = false;
+        if(!legacy_done && pd->last_time_s >= legacy_now_s) {
+            legacy_gap = pd->first_time_s > legacy_now_s;
+
+            if(pd->update_every_s)
+                legacy_dt_s = pd->update_every_s;
+
+            if(nd_time_t_add_compare(pd->last_time_s, legacy_dt_s, wanted_end_time_s) > 0)
+                legacy_done = true;
+            else
+                legacy_now_s = nd_time_t_add_saturating(pd->last_time_s, legacy_dt_s);
+        }
+
+        if(candidate_gap || legacy_gap) {
+            gaps++;
+
+            if(populate_gaps) {
+                time_t gap_start_time_s = have_page ?
+                    nd_time_t_add_saturating(covered_until_s, 1) : wanted_start_time_s;
+                time_t gap_end_time_s = nd_time_t_add_saturating(pd->first_time_s, -1);
+                pgc_inject_gap(ctx, metric, gap_start_time_s, gap_end_time_s);
+            }
+        }
 
         pd->status |= PDC_PAGE_PREPROCESSED;
         pages_pass2++;
@@ -409,18 +463,36 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
         if(pd->update_every_s)
             dt_s = pd->update_every_s;
 
-        if(populate_gaps && pd->first_time_s > now_s)
-            pgc_inject_gap(ctx, metric, now_s, pd->first_time_s);
+        covered_until_s = pd->last_time_s;
+        have_page = true;
+        last_page_is_empty = page_is_empty;
 
-        now_s = pd->last_time_s + dt_s;
-        if(now_s > wanted_end_time_s) {
+        if(covered_until_s >= wanted_end_time_s) {
             *optimal_end_time_s = pd->last_time_s;
+            candidate_reached_end = true;
             break;
         }
+
+        now_s = nd_time_t_add_saturating(covered_until_s, 1);
     }
 
-    if(populate_gaps && now_s < wanted_end_time_s)
-        pgc_inject_gap(ctx, metric, now_s, wanted_end_time_s);
+    if(!candidate_reached_end) {
+        bool candidate_terminal_gap =
+            last_page_is_empty ||
+            nd_time_t_add_compare(covered_until_s, dt_s, wanted_end_time_s) <= 0;
+
+        if(candidate_terminal_gap || !legacy_done) {
+            gaps++;
+
+            if(populate_gaps) {
+                time_t gap_start_time_s = have_page ?
+                    nd_time_t_add_saturating(covered_until_s, 1) : wanted_start_time_s;
+                pgc_inject_gap(ctx, metric, gap_start_time_s, wanted_end_time_s);
+            }
+        }
+        else
+            *optimal_end_time_s = covered_until_s;
+    }
 
     // ------------------------------------------------------------------------
     // PASS 3: mark as skipped all the pages not useful
@@ -1005,7 +1077,7 @@ struct pgc_page *pg_cache_lookup_next(
             continue;
         }
         else {
-            if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
+            if (unlikely(!page_update_every_s)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
                 page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
                 pd->update_every_s = page_update_every_s;
