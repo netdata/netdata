@@ -869,11 +869,12 @@ func TestSpecValidateRootGroupFamily(t *testing.T) {
 			},
 			wantErr: "groups[0].charts[0].family",
 		},
-		"nested group without family": {
+		"nested group without family under transparent root": {
 			mutate: func(spec *Spec) {
 				root := &spec.Groups[0]
 				child := root.Clone()
 				child.Family = ""
+				root.Family = ""
 				root.Charts = nil
 				root.Groups = []Group{child}
 			},

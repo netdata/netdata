@@ -611,8 +611,9 @@ func TestConfigSchemaRootGroupFamily(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		"nested group without family": {
+		"nested group without family under transparent root": {
 			mutate: func(root map[string]any) {
+				delete(root, "family")
 				child := map[string]any{"charts": root["charts"]}
 				delete(root, "charts")
 				root["groups"] = []any{child}
