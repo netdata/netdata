@@ -68,7 +68,11 @@ pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
 
 pkg_check_modules(LIBUV libuv)
 pkg_check_modules(UUID uuid)
-pkg_check_modules(MNL libmnl)
+# libmnl wraps Linux netlink; a Homebrew libmnl.pc on macOS is a false positive
+# that would hand network-viewer and local-listeners a dylib they never call.
+if(NOT OS_MACOS)
+  pkg_check_modules(MNL libmnl)
+endif()
 pkg_check_modules(SYSTEMD libsystemd)
 pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
 

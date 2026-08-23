@@ -634,8 +634,9 @@ set_source_files_properties(src/aclk/schema-wrappers/proto_2_json.cc PROPERTIES 
 #
 add_subdirectory(src/libnetdata)
 
-# mnl
-if(MNL_FOUND AND NOT OS_MACOS)
+# mnl. The probe itself is skipped on macOS, so MNL_FOUND carries the platform
+# exclusion already.
+if(MNL_FOUND)
     set(HAVE_LIBMNL True)
 endif()
 
