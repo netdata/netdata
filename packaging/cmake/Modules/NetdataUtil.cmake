@@ -9,14 +9,23 @@ function(netdata_fixup_system_processor)
     return()
   endif()
 
+  # CMAKE_C_FLAGS is a single space-separated string; passed unquoted it would
+  # reach the compiler as one argument ("-O2 -g") and fail the invocation, so
+  # any build with user flags silently kept CMake's default processor.
+  separate_arguments(c_flags NATIVE_COMMAND "${CMAKE_C_FLAGS}")
+
   execute_process(
-    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} -dumpmachine
-    COMMAND cut -f 1 -d -
+    COMMAND ${CMAKE_C_COMPILER} ${c_flags} -dumpmachine
     RESULT_VARIABLE return_code
     OUTPUT_VARIABLE output_data
+    OUTPUT_STRIP_TRAILING_WHITESPACE
   )
 
   if(return_code EQUAL 0)
+    # Keep only the machine part of the triple. Stripping the trailing newline
+    # matters: consumers that interpolate CMAKE_SYSTEM_PROCESSOR into a
+    # delimiter-anchored regex (dlib does) never match a value that ends in one.
+    string(REGEX REPLACE "-.*$" "" output_data "${output_data}")
     set(CMAKE_SYSTEM_PROCESSOR "${output_data}" PARENT_SCOPE)
   else()
     message(WARNING "Failed to detect target processor architecture, using CMake default")
