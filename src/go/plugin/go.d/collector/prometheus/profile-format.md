@@ -397,8 +397,9 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
 - **The template is a group, not a full spec.** The linked reference's examples show complete `charts.yaml` specs (a
   `version` plus a top-level `groups` list); a profile's `template` is one item of that `groups` list, written without
   the leading dash -- you author the *content of one group*: `family`, `context_namespace`, `metrics`, `charts`, nested
-  `groups`, and `chart_defaults`. `instances`, `lifecycle`, and `label_promotion` are per-chart fields, not group fields
-  (`instances` and `label_promotion` can also be set once for a whole group via `chart_defaults`). The spec-level
+  `groups`, and `chart_defaults`. `priority`, `instances`, `lifecycle`, and `label_promotion` are per-chart fields, not
+  group fields (`priority`, `instances`, and `label_promotion` can also be set once for a whole group via
+  `chart_defaults`). The spec-level
   `version` and `engine` fields are rejected. The collector wraps your group into its per-job spec, where autogeneration
   for uncovered metrics stays enabled. Configure conditional fallback through the profile-root `autogen.selector`, not
   a nested `engine`.

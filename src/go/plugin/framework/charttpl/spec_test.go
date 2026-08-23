@@ -112,12 +112,14 @@ groups:
     metrics:
       - mysql_queries_total
     chart_defaults:
+      priority: 100
       label_promotion: [resource_name, region]
       instances:
         by_labels: [resource_uid]
     groups:
       - family: Child
         chart_defaults:
+          priority: 200
           instances:
             by_labels: [resource_uid, region]
             optional_by_labels: [pid]
@@ -132,6 +134,7 @@ groups:
           - family: Leaf
             charts:
               - title: Overrides
+                priority: 300
                 context: overrides
                 units: queries/s
                 label_promotion: []
@@ -140,6 +143,15 @@ groups:
                 dimensions:
                   - selector: mysql_queries_total
                     name: total
+      - family: Sibling
+        charts:
+          - title: Inherits Root
+            priority: 0
+            context: inherits_root
+            units: queries/s
+            dimensions:
+              - selector: mysql_queries_total
+                name: total
 `,
 			assert: func(t *testing.T, spec *Spec) {
 				t.Helper()
@@ -151,6 +163,7 @@ groups:
 				require.NotNil(t, child.Charts[0].Instances)
 				assert.Equal(t, []string{"resource_uid", "region"}, child.Charts[0].Instances.ByLabels)
 				assert.Equal(t, []string{"pid"}, child.Charts[0].Instances.OptionalByLabels)
+				assert.Equal(t, 200, child.Charts[0].Priority)
 
 				leaf := child.Groups[0]
 				require.Len(t, leaf.Charts, 1)
@@ -160,6 +173,11 @@ groups:
 				require.NotNil(t, leaf.Charts[0].Instances)
 				assert.Equal(t, []string{"region"}, leaf.Charts[0].Instances.ByLabels)
 				assert.Empty(t, leaf.Charts[0].Instances.OptionalByLabels)
+				assert.Equal(t, 300, leaf.Charts[0].Priority)
+
+				sibling := root.Groups[1]
+				require.Len(t, sibling.Charts, 1)
+				assert.Equal(t, 100, sibling.Charts[0].Priority)
 			},
 		},
 		"explicit empty group label promotion is inherited without collapsing to omitted": {
@@ -330,8 +348,12 @@ groups:
 				rules := validation.AutogenRules()
 				require.Len(t, rules, 1)
 				assert.True(t, rules[0].ScopeMatches("μέτρο_total"))
-				assert.True(t, rules[0].Selects("μέτρο_total", testLabelView{"region": "west"}))
-				assert.False(t, rules[0].Selects("μέτρο_total", testLabelView{"region": "east"}))
+				assert.True(t, rules[0].Selects("μέτρο_total", testLabelView{
+					"region": "west",
+				}))
+				assert.False(t, rules[0].Selects("μέτρο_total", testLabelView{
+					"region": "east",
+				}))
 				rules[0] = ValidatedAutogenRule{}
 				fresh := validation.AutogenRules()
 				require.Len(t, fresh, 1)
@@ -428,6 +450,9 @@ func TestConfigSchemaJSON(t *testing.T) {
 	defaultLabelPromotionItems, ok := defaultLabelPromotion["items"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, `\S`, defaultLabelPromotionItems["pattern"])
+	defaultPriority, ok := defaultProps["priority"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "integer", defaultPriority["type"])
 }
 
 func TestConfigSchemaAutogenRuleEmptyValues(t *testing.T) {

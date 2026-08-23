@@ -39,6 +39,17 @@ def normalize(value: str | None) -> str:
     return (value or "").strip()
 
 
+def group_priority(group: dict, inherited: int) -> int:
+    defaults = group.get("chart_defaults")
+    if not isinstance(defaults, dict):
+        return inherited
+    value = defaults.get("priority")
+    if value is None:
+        return inherited
+    priority = int(value)
+    return inherited if priority == 0 else priority
+
+
 def build_tree(profile: dict) -> Node:
     template = profile.get("template")
     if not isinstance(template, dict):
@@ -49,7 +60,7 @@ def build_tree(profile: dict) -> Node:
     if not isinstance(groups, list):
         return root
 
-    def add_group(group: object, parent: Node, context_parts: list[str]) -> None:
+    def add_group(group: object, parent: Node, context_parts: list[str], inherited_priority: int) -> None:
         if not isinstance(group, dict):
             return
 
@@ -57,6 +68,7 @@ def build_tree(profile: dict) -> Node:
         node = parent.children.setdefault(family, Node(family))
         namespace = normalize(group.get("context_namespace"))
         child_context_parts = context_parts + ([namespace] if namespace else [])
+        effective_priority = group_priority(group, inherited_priority)
 
         for chart in group.get("charts") or []:
             if not isinstance(chart, dict):
@@ -64,16 +76,18 @@ def build_tree(profile: dict) -> Node:
             context = ".".join(part for part in (*child_context_parts, normalize(chart.get("context"))) if part)
             if not context:
                 context = "(no context)"
-            priority = int(chart.get("priority") or DEFAULT_PRIORITY)
+            value = chart.get("priority")
+            priority = effective_priority if value is None or int(value) == 0 else int(value)
             if priority <= 0:
                 priority = DEFAULT_PRIORITY
             node.charts.append(Chart(context, priority))
 
         for child in group.get("groups") or []:
-            add_group(child, node, child_context_parts)
+            add_group(child, node, child_context_parts, effective_priority)
 
+    inherited_priority = group_priority(template, 0)
     for group in groups:
-        add_group(group, root, [])
+        add_group(group, root, [], inherited_priority)
     return root
 
 

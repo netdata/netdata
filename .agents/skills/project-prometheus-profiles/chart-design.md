@@ -595,9 +595,9 @@ need unrelated scale manipulation, they probably do not belong on one axis.
 
 ## Order the operator journey
 
-Set chart `priority` deliberately when section order is part of the operator journey.
-Omit it for unrelated charts; the runtime default remains `70000`. YAML position is
-still not an ordering contract.
+Set `chart_defaults.priority` at the nearest group when one family subtree shares an ordering priority. Use chart-local
+`priority` only for a deliberate exception. Omit it for unrelated charts; the runtime default remains `70000`. YAML
+position is still not an ordering contract.
 
 At the application level, order domain capabilities by the operator's causal
 journey. Within each capability, a useful local order is health/workload →

@@ -282,6 +282,8 @@ template:
   context_namespace: ceph
   groups:
     - family: Capacity
+      chart_defaults:
+        priority: 1200
       context_namespace: capacity
       groups:
         - family: Object Health
@@ -292,7 +294,6 @@ template:
             - ceph_num_objects_unfound
           charts:
             - title: Objects
-              priority: 1200
               context: object_state
               units: objects
               label_promotion: []
@@ -311,7 +312,6 @@ template:
             - ceph_cluster_total_used_raw_bytes
           charts:
             - title: Space and Memory
-              priority: 1200
               context: space
               units: bytes
               label_promotion: []
@@ -330,7 +330,6 @@ template:
             - ceph_cluster_by_class_total_used_raw_bytes
           charts:
             - title: Space and Memory
-              priority: 1200
               context: space
               units: bytes
               label_promotion: []
@@ -346,6 +345,8 @@ template:
                   - device_class
                 optional_by_labels: []
     - family: CephFS/Metadata
+      chart_defaults:
+        priority: 1800
       context_namespace: cephfs_metadata
       groups:
         - family: Filesystem Metadata
@@ -354,7 +355,6 @@ template:
             - ceph_fs_metadata
           charts:
             - title: State and Metadata
-              priority: 1800
               context: state
               units: '{status}'
               label_promotion: []
@@ -374,7 +374,6 @@ template:
             - ceph_mds_metadata
           charts:
             - title: State and Metadata
-              priority: 1800
               context: state
               units: '{status}'
               label_promotion: []
@@ -391,6 +390,8 @@ template:
                   - rank
                 optional_by_labels: []
     - family: Cluster Overview
+      chart_defaults:
+        priority: 1000
       context_namespace: cluster_overview
       metrics:
         - ceph_cluster_osd_blocklist_count
@@ -400,7 +401,6 @@ template:
         - ceph_prometheus_collect_duration_seconds_sum
       charts:
         - title: Latency Measurements
-          priority: 1000
           context: latency_measurements
           units: operations/s
           label_promotion: []
@@ -412,7 +412,6 @@ template:
               - method
             optional_by_labels: []
         - title: Accumulated Latency
-          priority: 1000
           context: accumulated_latency
           units: seconds/s
           label_promotion: []
@@ -424,7 +423,6 @@ template:
               - method
             optional_by_labels: []
         - title: Current Work
-          priority: 1000
           context: current_work
           units: items
           label_promotion: []
@@ -432,7 +430,6 @@ template:
             - selector: ceph_cluster_osd_blocklist_count
               name: value
         - title: State and Metadata — Occupation
-          priority: 1000
           context: state_occupation
           units: '{status}'
           label_promotion: []
@@ -450,7 +447,6 @@ template:
               - db_device
               - wal_device
         - title: State and Metadata — Human
-          priority: 1000
           context: state_human
           units: '{status}'
           label_promotion: []
@@ -464,6 +460,8 @@ template:
               - device
             optional_by_labels: []
     - family: Control Plane
+      chart_defaults:
+        priority: 1300
       context_namespace: control_plane
       groups:
         - family: Cephadm
@@ -472,7 +470,6 @@ template:
             - ceph_cephadm_daemon_status
           charts:
             - title: State and Metadata
-              priority: 1300
               context: state
               units: '{status}'
               label_promotion: []
@@ -493,7 +490,6 @@ template:
             - ceph_mgr_status
           charts:
             - title: State and Metadata — Metadata
-              priority: 1300
               context: state_metadata
               units: '{status}'
               label_promotion: []
@@ -507,7 +503,6 @@ template:
                   - hostname
                 optional_by_labels: []
             - title: State and Metadata — Status
-              priority: 1300
               context: state_status
               units: '{status}'
               label_promotion: []
@@ -525,7 +520,6 @@ template:
             - ceph_mgr_module_status
           charts:
             - title: State and Metadata
-              priority: 1300
               context: state
               units: '{status}'
               label_promotion: []
@@ -545,7 +539,6 @@ template:
             - ceph_mon_quorum_status
           charts:
             - title: Cluster Summary
-              priority: 1300
               context: cluster_summary
               units: monitors
               label_promotion: []
@@ -556,7 +549,6 @@ template:
                   name: in_quorum
               aggregation: sum
             - title: State and Metadata — Metadata
-              priority: 1300
               context: state_metadata
               units: monitors
               label_promotion: []
@@ -572,7 +564,6 @@ template:
                   - rank
                 optional_by_labels: []
             - title: State and Metadata — Quorum Status
-              priority: 1300
               context: state_quorum_status
               units: monitors
               label_promotion: []
@@ -635,7 +626,6 @@ template:
             - ceph_paxos_store_state_latency_sum
           charts:
             - title: Byte Measurement Measurements
-              priority: 1300
               context: bytes_measurements
               units: measurements/s
               label_promotion: []
@@ -655,7 +645,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Byte Measurement
-              priority: 1300
               context: accumulated_bytes
               units: bytes/s
               label_promotion: []
@@ -676,7 +665,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Key Measurement Measurements
-              priority: 1300
               context: keys_measurements
               units: measurements/s
               label_promotion: []
@@ -696,7 +684,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Key Measurement
-              priority: 1300
               context: accumulated_keys
               units: keys/s
               label_promotion: []
@@ -717,7 +704,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Latency Measurements
-              priority: 1300
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -739,7 +725,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1300
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -762,7 +747,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Events
-              priority: 1300
               context: events
               units: events/s
               label_promotion: []
@@ -786,7 +770,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Failure and Delay Outcomes
-              priority: 1300
               context: failure_outcomes
               units: events/s
               label_promotion: []
@@ -804,7 +787,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Paxos Operations
-              priority: 1300
               context: operations
               units: operations/s
               label_promotion: []
@@ -820,7 +802,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Collected Uncommitted Values
-              priority: 1300
               context: collected_uncommitted_values
               units: values/s
               label_promotion: []
@@ -832,6 +813,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: Health
+      chart_defaults:
+        priority: 1100
       context_namespace: health
       groups:
         - family: Cluster Status
@@ -840,7 +823,6 @@ template:
             - ceph_health_status
           charts:
             - title: State and Metadata
-              priority: 1100
               context: state
               units: '{status}'
               label_promotion: []
@@ -853,7 +835,6 @@ template:
             - ceph_daemon_health_metrics
           charts:
             - title: Health Metric Count
-              priority: 1100
               context: item_count
               units: items
               label_promotion: []
@@ -871,7 +852,6 @@ template:
             - ceph_health_detail
           charts:
             - title: State and Metadata
-              priority: 1100
               context: state
               units: '{status}'
               label_promotion:
@@ -889,7 +869,6 @@ template:
             - ceph_healthcheck_slow_ops
           charts:
             - title: Slow Operations
-              priority: 1100
               context: current_operations
               units: operations
               label_promotion: []
@@ -897,6 +876,8 @@ template:
                 - selector: ceph_healthcheck_slow_ops
                   name: value
     - family: OSDs/Capacity and State
+      chart_defaults:
+        priority: 1400
       context_namespace: osd_capacity_and_state
       groups:
         - family: Cluster Flags
@@ -911,7 +892,6 @@ template:
             - ceph_osd_flag_noup
           charts:
             - title: State and Metadata
-              priority: 1400
               context: state
               units: '{status}'
               label_promotion: []
@@ -937,7 +917,6 @@ template:
             - ceph_osd_nearfull_ratio
           charts:
             - title: Ratios
-              priority: 1400
               context: ratio
               units: ratio
               label_promotion: []
@@ -952,7 +931,6 @@ template:
             - ceph_osd_metadata
           charts:
             - title: State and Metadata
-              priority: 1400
               context: state
               units: OSDs
               label_promotion: []
@@ -980,7 +958,6 @@ template:
             - ceph_osd_weight
           charts:
             - title: Cluster Summary
-              priority: 1400
               context: cluster_summary
               units: OSDs
               label_promotion: []
@@ -991,7 +968,6 @@ template:
                   name: up
               aggregation: sum
             - title: OSD State
-              priority: 1400
               context: state
               units: OSDs
               label_promotion: []
@@ -1005,7 +981,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: OSD Weight
-              priority: 1400
               context: weight
               units: ratio
               label_promotion: []
@@ -1017,6 +992,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: Hardware
+      chart_defaults:
+        priority: 2400
       context_namespace: node_hardware
       groups:
         - family: Processors
@@ -1025,7 +1002,6 @@ template:
             - ceph_hardware_cpu_cores
           charts:
             - title: CPU Cores
-              priority: 2400
               context: cpu_cores
               units: cpu cores
               label_promotion: []
@@ -1046,7 +1022,6 @@ template:
             - ceph_hardware_fan_rpm
           charts:
             - title: Fan Speed
-              priority: 2400
               context: fan_speed
               units: fan revolutions per minute
               label_promotion: []
@@ -1064,7 +1039,6 @@ template:
             - ceph_hardware_health
           charts:
             - title: Hardware Health
-              priority: 2400
               context: state
               units: '{status}'
               label_promotion: []
@@ -1083,7 +1057,6 @@ template:
             - ceph_hardware_memory_capacity_bytes
           charts:
             - title: Memory Module Capacity
-              priority: 2400
               context: capacity
               units: bytes
               label_promotion: []
@@ -1102,7 +1075,6 @@ template:
             - ceph_hardware_storage_capacity_bytes
           charts:
             - title: Storage Device Capacity
-              priority: 2400
               context: capacity
               units: bytes
               label_promotion: []
@@ -1125,7 +1097,6 @@ template:
             - ceph_hardware_temperature_celsius
           charts:
             - title: Sensor Temperature
-              priority: 2400
               context: temperature
               units: Celsius
               label_promotion: []
@@ -1138,13 +1109,14 @@ template:
                   - sensor_name
                 optional_by_labels: []
     - family: OSDs/Overview
+      chart_defaults:
+        priority: 1400
       context_namespace: osd_overview
       metrics:
         - ceph_osd_apply_latency_ms
         - ceph_osd_commit_latency_ms
       charts:
         - title: Latency
-          priority: 1400
           context: latency
           units: milliseconds
           label_promotion: []
@@ -1158,12 +1130,13 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: Object Gateway/Metadata
+      chart_defaults:
+        priority: 1700
       context_namespace: object_gateway_metadata
       metrics:
         - ceph_rgw_metadata
       charts:
         - title: State and Metadata
-          priority: 1700
           context: state
           units: '{status}'
           label_promotion: []
@@ -1178,6 +1151,8 @@ template:
               - instance_id
             optional_by_labels: []
     - family: Placement Groups
+      chart_defaults:
+        priority: 1500
       context_namespace: placement_groups_and_recovery
       groups:
         - family: Backfill
@@ -1191,7 +1166,6 @@ template:
             - ceph_pg_remapped
           charts:
             - title: Placement Groups
-              priority: 1500
               context: pg_state
               units: PGs
               label_promotion: []
@@ -1221,7 +1195,6 @@ template:
             - ceph_pg_total
           charts:
             - title: Placement Groups
-              priority: 1500
               context: pg_state
               units: PGs
               label_promotion: []
@@ -1254,7 +1227,6 @@ template:
             - ceph_pg_wait
           charts:
             - title: Placement Groups
-              priority: 1500
               context: pg_state
               units: PGs
               label_promotion: []
@@ -1292,7 +1264,6 @@ template:
             - ceph_osd_flag_norecover
           charts:
             - title: State and Metadata
-              priority: 1500
               context: state
               units: '{status}'
               label_promotion: []
@@ -1313,7 +1284,6 @@ template:
             - ceph_pg_undersized
           charts:
             - title: Placement Groups
-              priority: 1500
               context: pg_state
               units: PGs
               label_promotion: []
@@ -1348,7 +1318,6 @@ template:
             - ceph_pg_snaptrim_wait
           charts:
             - title: Placement Groups
-              priority: 1500
               context: pg_state
               units: PGs
               label_promotion: []
@@ -1372,6 +1341,8 @@ template:
                   - pool_id
                 optional_by_labels: []
     - family: Pools
+      chart_defaults:
+        priority: 1600
       context_namespace: pools
       groups:
         - family: Capacity and Quotas
@@ -1389,7 +1360,6 @@ template:
             - ceph_pool_stored_raw
           charts:
             - title: Objects
-              priority: 1600
               context: object_state
               units: objects
               label_promotion: []
@@ -1401,7 +1371,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Logical Pool Capacity
-              priority: 1600
               context: logical_space
               units: bytes
               label_promotion: []
@@ -1417,7 +1386,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Raw Pool Capacity
-              priority: 1600
               context: raw_space
               units: bytes
               label_promotion: []
@@ -1433,7 +1401,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Compression Space
-              priority: 1600
               context: compression_space
               units: bytes
               label_promotion: []
@@ -1447,7 +1414,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Utilization
-              priority: 1600
               context: utilization
               units: percentage
               label_promotion: []
@@ -1467,7 +1433,6 @@ template:
             - ceph_pool_wr_bytes
           charts:
             - title: Byte Throughput
-              priority: 1600
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -1481,7 +1446,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Operations
-              priority: 1600
               context: operations
               units: operations/s
               label_promotion: []
@@ -1500,7 +1464,6 @@ template:
             - ceph_pool_metadata
           charts:
             - title: State and Metadata
-              priority: 1600
               context: state
               units: '{status}'
               label_promotion: []
@@ -1523,7 +1486,6 @@ template:
             - ceph_pool_objects
           charts:
             - title: Objects
-              priority: 1600
               context: object_state
               units: objects
               label_promotion: []
@@ -1547,7 +1509,6 @@ template:
             - ceph_pool_recovering_objects_per_sec
           charts:
             - title: Current Throughput
-              priority: 1600
               context: current_throughput_bytes_s
               units: bytes/s
               label_promotion: []
@@ -1559,7 +1520,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Current Throughput
-              priority: 1600
               context: current_throughput_keys_s
               units: keys/s
               label_promotion: []
@@ -1571,7 +1531,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Current Throughput
-              priority: 1600
               context: current_throughput_objects_s
               units: objects/s
               label_promotion: []
@@ -1583,7 +1542,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Objects
-              priority: 1600
               context: object_state
               units: objects
               label_promotion: []
@@ -1595,7 +1553,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Object Work
-              priority: 1600
               context: object_work
               units: objects/s
               label_promotion: []
@@ -1607,7 +1564,6 @@ template:
                   - pool_id
                 optional_by_labels: []
             - title: Pool Capacity and Data Volume
-              priority: 1600
               context: space
               units: bytes
               label_promotion: []
@@ -1619,6 +1575,8 @@ template:
                   - pool_id
                 optional_by_labels: []
     - family: RBD Images
+      chart_defaults:
+        priority: 1900
       context_namespace: rbd_images
       groups:
         - family: IO
@@ -1630,7 +1588,6 @@ template:
             - ceph_rbd_write_ops
           charts:
             - title: Byte Throughput
-              priority: 1900
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -1646,7 +1603,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Operations
-              priority: 1900
               context: operations
               units: operations/s
               label_promotion: []
@@ -1667,7 +1623,6 @@ template:
             - ceph_rbd_image_metadata
           charts:
             - title: State and Metadata
-              priority: 1900
               context: state
               units: '{status}'
               label_promotion: []
@@ -1688,7 +1643,6 @@ template:
             - ceph_rbd_write_latency_sum
           charts:
             - title: Latency Measurements
-              priority: 1900
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -1704,7 +1658,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1900
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -1725,7 +1678,6 @@ template:
             - ceph_rbd_mirror_metadata
           charts:
             - title: State and Metadata
-              priority: 1900
               context: state
               units: '{status}'
               label_promotion: []
@@ -1741,12 +1693,13 @@ template:
                   - instance_id
                 optional_by_labels: []
     - family: CephFS/SMB/Metadata
+      chart_defaults:
+        priority: 1830
       context_namespace: smb_metadata
       metrics:
         - ceph_smb_metadata
       charts:
         - title: State and Metadata
-          priority: 1830
           context: state
           units: '{status}'
           label_promotion: []
@@ -1763,6 +1716,8 @@ template:
               - volume
             optional_by_labels: []
     - family: BlueFS
+      chart_defaults:
+        priority: 2100
       context_namespace: bluefs
       groups:
         - family: Allocation
@@ -1784,7 +1739,6 @@ template:
             - ceph_bluefs_wal_alloc_lat_sum
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -1800,7 +1754,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -1817,7 +1770,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Allocation Sizes and High-Water Marks
-              priority: 2100
               context: allocation_high_water
               units: bytes
               label_promotion: []
@@ -1834,7 +1786,6 @@ template:
                 optional_by_labels: []
               algorithm: absolute
             - title: Duration and Time
-              priority: 2100
               context: duration
               units: seconds
               label_promotion: []
@@ -1850,7 +1801,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Failure and Delay Outcomes
-              priority: 2100
               context: failure_outcomes
               units: events/s
               label_promotion: []
@@ -1873,7 +1823,6 @@ template:
             - ceph_bluefs_log_compactions
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -1887,7 +1836,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -1902,7 +1850,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Events
-              priority: 2100
               context: events
               units: events/s
               label_promotion: []
@@ -1956,7 +1903,6 @@ template:
             - ceph_bluefs_write_disk_count
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -1978,7 +1924,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -2001,7 +1946,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Byte Throughput
-              priority: 2100
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -2037,7 +1981,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Operations
-              priority: 2100
               context: operations
               units: operations/s
               label_promotion: []
@@ -2069,7 +2012,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Zero-Read Outcomes
-              priority: 2100
               context: zero_read_outcomes
               units: reads/s
               label_promotion: []
@@ -2105,7 +2047,6 @@ template:
             - ceph_bluefs_wal_used_bytes
           charts:
             - title: Allocation Sizes and High-Water Marks
-              priority: 2100
               context: allocation_high_water
               units: bytes
               label_promotion: []
@@ -2122,7 +2063,6 @@ template:
                 optional_by_labels: []
               algorithm: absolute
             - title: Byte Throughput
-              priority: 2100
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -2140,7 +2080,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Files
-              priority: 2100
               context: file_state
               units: files
               label_promotion: []
@@ -2152,7 +2091,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: File Work
-              priority: 2100
               context: file_work
               units: files/s
               label_promotion: []
@@ -2166,7 +2104,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -2190,6 +2127,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: BlueStore
+      chart_defaults:
+        priority: 2100
       context_namespace: bluestore
       groups:
         - family: Allocation
@@ -2201,7 +2140,6 @@ template:
             - ceph_bluestore_allocator_lat_sum
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -2213,7 +2151,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -2226,7 +2163,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Allocation Unit
-              priority: 2100
               context: allocation_unit
               units: bytes
               label_promotion: []
@@ -2238,7 +2174,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Allocated Space
-              priority: 2100
               context: allocated_space
               units: bytes
               label_promotion: []
@@ -2266,7 +2201,6 @@ template:
             - ceph_bluestore_extent_compress
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -2282,7 +2216,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -2299,7 +2232,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Compression Operations
-              priority: 2100
               context: compression_operations
               units: operations/s
               label_promotion: []
@@ -2313,7 +2245,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Compressed Extents
-              priority: 2100
               context: compressed_extents
               units: extents/s
               label_promotion: []
@@ -2325,7 +2256,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -2381,7 +2311,6 @@ template:
             - ceph_bluestore_write_small_unused
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -2403,7 +2332,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -2426,7 +2354,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Byte Throughput
-              priority: 2100
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -2450,7 +2377,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Read Outcomes
-              priority: 2100
               context: read_outcomes
               units: reads/s
               label_promotion: []
@@ -2464,7 +2390,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Slow Reads
-              priority: 2100
               context: slow_reads
               units: reads/s
               label_promotion: []
@@ -2478,7 +2403,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Slow AIO Waits
-              priority: 2100
               context: slow_aio_waits
               units: waits/s
               label_promotion: []
@@ -2490,7 +2414,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Skipped Blobs
-              priority: 2100
               context: skipped_blobs
               units: blobs/s
               label_promotion: []
@@ -2502,7 +2425,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Skipped Writes
-              priority: 2100
               context: skipped_writes
               units: writes/s
               label_promotion: []
@@ -2514,7 +2436,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Write Operations
-              priority: 2100
               context: write_operations
               units: writes/s
               label_promotion: []
@@ -2540,7 +2461,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Written Blobs
-              priority: 2100
               context: written_blobs
               units: blobs/s
               label_promotion: []
@@ -2552,7 +2472,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Penalty Reads
-              priority: 2100
               context: penalty_reads
               units: reads/s
               label_promotion: []
@@ -2590,7 +2509,6 @@ template:
             - ceph_bluestore_omap_upper_bound_lat_sum
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -2614,7 +2532,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -2639,7 +2556,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Byte Throughput
-              priority: 2100
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -2653,7 +2569,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Open Iterators
-              priority: 2100
               context: open_iterators
               units: iterators
               label_promotion: []
@@ -2666,7 +2581,6 @@ template:
                 optional_by_labels: []
               algorithm: absolute
             - title: Mutation Calls
-              priority: 2100
               context: mutation_calls
               units: calls/s
               label_promotion: []
@@ -2680,7 +2594,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Removed Key Ranges
-              priority: 2100
               context: removed_key_ranges
               units: ranges/s
               label_promotion: []
@@ -2692,7 +2605,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Key Mutations
-              priority: 2100
               context: key_mutations
               units: keys/s
               label_promotion: []
@@ -2720,7 +2632,6 @@ template:
             - ceph_bluestore_onodes_pinned
           charts:
             - title: Onode Blobs
-              priority: 2100
               context: blob_state
               units: blobs
               label_promotion: []
@@ -2734,7 +2645,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Onode Extents
-              priority: 2100
               context: extent_state
               units: extents
               label_promotion: []
@@ -2746,7 +2656,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Onodes
-              priority: 2100
               context: onode_state
               units: onodes
               label_promotion: []
@@ -2760,7 +2669,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Events
-              priority: 2100
               context: events
               units: events/s
               label_promotion: []
@@ -2772,7 +2680,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Onode Lookup Outcomes
-              priority: 2100
               context: onode_lookup_outcomes
               units: lookups/s
               label_promotion: []
@@ -2786,7 +2693,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Onode Shard Lookup Outcomes
-              priority: 2100
               context: shard_lookup_outcomes
               units: lookups/s
               label_promotion: []
@@ -2818,7 +2724,6 @@ template:
             - ceph_bluestore_pricache:data_reserved_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -2874,7 +2779,6 @@ template:
             - ceph_bluestore_pricache:kv_reserved_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -2930,7 +2834,6 @@ template:
             - ceph_bluestore_pricache:kv_onode_reserved_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -2986,7 +2889,6 @@ template:
             - ceph_bluestore_pricache:meta_reserved_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -3033,7 +2935,6 @@ template:
             - ceph_bluestore_pricache_unmapped_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -3076,7 +2977,6 @@ template:
             - ceph_bluestore_stored
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -3096,7 +2996,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -3117,7 +3016,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Byte Throughput
-              priority: 2100
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -3131,7 +3029,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Current Work
-              priority: 2100
               context: current_work
               units: items
               label_promotion: []
@@ -3143,7 +3040,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Blob Splits
-              priority: 2100
               context: blob_splits
               units: blobs/s
               label_promotion: []
@@ -3155,7 +3051,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Garbage-Collection Merge Throughput
-              priority: 2100
               context: gc_merge_throughput
               units: bytes/s
               label_promotion: []
@@ -3167,7 +3062,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Failure and Delay Outcomes
-              priority: 2100
               context: failure_outcomes
               units: events/s
               label_promotion: []
@@ -3179,7 +3073,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Fragmentation
-              priority: 2100
               context: fragmentation
               units: per mille
               label_promotion: []
@@ -3191,7 +3084,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Buffer Cache Residency
-              priority: 2100
               context: buffer_cache_residency
               units: bytes
               label_promotion: []
@@ -3203,7 +3095,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Logical Stored Data
-              priority: 2100
               context: logical_stored_data
               units: bytes
               label_promotion: []
@@ -3248,7 +3139,6 @@ template:
             - ceph_bluestore_txc_throttle_lat_sum
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -3286,7 +3176,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -3325,7 +3214,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Operations
-              priority: 2100
               context: operations
               units: operations/s
               label_promotion: []
@@ -3337,6 +3225,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: CephFS/MDS
+      chart_defaults:
+        priority: 1810
       context_namespace: cephfs_mds
       groups:
         - family: Attribute and Layout Mutation Latency
@@ -3356,7 +3246,6 @@ template:
             - ceph_mds_server_req_setxattr_latency_sum
           charts:
             - title: Latency Measurements
-              priority: 1810
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -3378,7 +3267,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1810
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -3419,7 +3307,6 @@ template:
             - ceph_mds_server_cap_revoke_eviction
           charts:
             - title: Capabilities
-              priority: 1810
               context: capability_state
               units: capabilities
               label_promotion: []
@@ -3431,7 +3318,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Capability Messages
-              priority: 1810
               context: capability_messages
               units: messages/s
               label_promotion: []
@@ -3447,7 +3333,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Capability-Throttled Requests
-              priority: 1810
               context: throttled_requests
               units: requests/s
               label_promotion: []
@@ -3459,7 +3344,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Capability-Revoke Evictions
-              priority: 1810
               context: evicted_clients
               units: clients/s
               label_promotion: []
@@ -3471,7 +3355,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Inodes
-              priority: 1810
               context: inode_state
               units: inodes
               label_promotion: []
@@ -3483,7 +3366,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Inode Work
-              priority: 1810
               context: inode_work
               units: inodes/s
               label_promotion: []
@@ -3495,7 +3377,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Operations
-              priority: 1810
               context: operations
               units: operations/s
               label_promotion: []
@@ -3541,7 +3422,6 @@ template:
             - ceph_mds_log_wrpos
           charts:
             - title: Latency Measurements
-              priority: 1810
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -3553,7 +3433,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1810
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -3566,7 +3445,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Current Journal Events
-              priority: 1810
               context: events_current
               units: events
               label_promotion: []
@@ -3582,7 +3460,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Large Journal Events
-              priority: 1810
               context: large_events
               units: events/s
               label_promotion: []
@@ -3595,7 +3472,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Journal Events
-              priority: 1810
               context: journal_events
               units: events/s
               label_promotion: []
@@ -3613,7 +3489,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Journal Positions
-              priority: 1810
               context: journal_positions
               units: position
               label_promotion: []
@@ -3629,7 +3504,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Journal Segments
-              priority: 1810
               context: journal_segments
               units: segments/s
               label_promotion: []
@@ -3645,7 +3519,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Journal Segments
-              priority: 1810
               context: segments_current
               units: segments
               label_promotion: []
@@ -3672,7 +3545,6 @@ template:
             - ceph_mds_cache_dir_update_receipt
           charts:
             - title: Discovery Messages
-              priority: 1810
               context: discovery_messages
               units: messages/s
               label_promotion: []
@@ -3686,7 +3558,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Discovery Attempts
-              priority: 1810
               context: discovery_attempts
               units: attempts/s
               label_promotion: []
@@ -3698,7 +3569,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Replication Directives
-              priority: 1810
               context: replication_directives
               units: directives/s
               label_promotion: []
@@ -3724,7 +3594,6 @@ template:
             - ceph_mds_cache_ireq_quiesce_path
           charts:
             - title: Inode Work
-              priority: 1810
               context: inode_work
               units: inodes/s
               label_promotion: []
@@ -3738,7 +3607,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Operations
-              priority: 1810
               context: operations
               units: operations/s
               label_promotion: []
@@ -3758,7 +3626,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Scrub Work
-              priority: 1810
               context: scrub_work
               units: scrubs/s
               label_promotion: []
@@ -3786,7 +3653,6 @@ template:
             - ceph_mds_cache_strays_reintegrated
           charts:
             - title: Current Work
-              priority: 1810
               context: current_work
               units: items
               label_promotion: []
@@ -3802,7 +3668,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Events
-              priority: 1810
               context: events
               units: events/s
               label_promotion: []
@@ -3820,7 +3685,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Files
-              priority: 1810
               context: file_state
               units: files
               label_promotion: []
@@ -3836,7 +3700,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: File Work
-              priority: 1810
               context: file_work
               units: files/s
               label_promotion: []
@@ -3857,7 +3720,6 @@ template:
             - ceph_mds_cache_uninline_write_failed
           charts:
             - title: Events
-              priority: 1810
               context: events
               units: events/s
               label_promotion: []
@@ -3871,7 +3733,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Failure and Delay Outcomes
-              priority: 1810
               context: failure_outcomes
               units: events/s
               label_promotion: []
@@ -3903,7 +3764,6 @@ template:
             - ceph_mds_server_req_unlink_latency_sum
           charts:
             - title: Latency Measurements
-              priority: 1810
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -3929,7 +3789,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1810
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -3975,7 +3834,6 @@ template:
             - ceph_mds_traverse_remote_ino
           charts:
             - title: Directory-Fragment Lifecycle
-              priority: 1810
               context: dirfrag_lifecycle
               units: dirfrags/s
               label_promotion: []
@@ -3991,7 +3849,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Namespace Traversals
-              priority: 1810
               context: traversals
               units: traversals/s
               label_promotion: []
@@ -4013,7 +3870,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Inode Work
-              priority: 1810
               context: inode_work
               units: inodes/s
               label_promotion: []
@@ -4025,7 +3881,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Key Work
-              priority: 1810
               context: key_work
               units: keys/s
               label_promotion: []
@@ -4037,7 +3892,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Lookup Outcomes
-              priority: 1810
               context: lookup_outcomes
               units: lookups/s
               label_promotion: []
@@ -4049,7 +3903,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Operations
-              priority: 1810
               context: operations
               units: operations/s
               label_promotion: []
@@ -4076,7 +3929,6 @@ template:
             - ceph_purge_queue_pq_item_in_journal
           charts:
             - title: Current Work
-              priority: 1810
               context: current_work
               units: items
               label_promotion: []
@@ -4088,7 +3940,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Executed Purge Operations
-              priority: 1810
               context: purge_operations
               units: operations/s
               label_promotion: []
@@ -4100,7 +3951,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Purge Operations in Flight
-              priority: 1810
               context: purge_operations_state
               units: operations
               label_promotion: []
@@ -4114,7 +3964,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Executed Purge Tasks
-              priority: 1810
               context: purge_tasks
               units: tasks/s
               label_promotion: []
@@ -4126,7 +3975,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Purge Tasks in Flight
-              priority: 1810
               context: purge_tasks_state
               units: tasks
               label_promotion: []
@@ -4148,7 +3996,6 @@ template:
             - ceph_mds_imported_inodes
           charts:
             - title: Events
-              priority: 1810
               context: events
               units: events/s
               label_promotion: []
@@ -4162,7 +4009,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Inode Work
-              priority: 1810
               context: inode_work
               units: inodes/s
               label_promotion: []
@@ -4204,7 +4050,6 @@ template:
             - ceph_mds_server_req_readdir_latency_sum
           charts:
             - title: Latency Measurements
-              priority: 1810
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -4238,7 +4083,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1810
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -4301,7 +4145,6 @@ template:
             - ceph_mds_subtrees
           charts:
             - title: Latency Measurements
-              priority: 1810
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -4313,7 +4156,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1810
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -4326,7 +4168,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Connected Clients
-              priority: 1810
               context: connected_clients
               units: clients
               label_promotion: []
@@ -4340,7 +4181,6 @@ template:
                   - id
                 optional_by_labels: []
             - title: Queued Requests
-              priority: 1810
               context: queued_requests
               units: requests
               label_promotion: []
@@ -4352,7 +4192,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Events
-              priority: 1810
               context: events
               units: events/s
               label_promotion: []
@@ -4366,7 +4205,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Failure and Delay Outcomes
-              priority: 1810
               context: failure_outcomes
               units: events/s
               label_promotion: []
@@ -4378,7 +4216,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Files
-              priority: 1810
               context: file_state
               units: files
               label_promotion: []
@@ -4390,7 +4227,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Inodes
-              priority: 1810
               context: inode_state
               units: inodes
               label_promotion: []
@@ -4410,7 +4246,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Expired Inodes
-              priority: 1810
               context: expired_inodes
               units: inodes/s
               label_promotion: []
@@ -4423,7 +4258,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Load
-              priority: 1810
               context: load
               units: load
               label_promotion: []
@@ -4435,7 +4269,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Operations
-              priority: 1810
               context: operations
               units: operations/s
               label_promotion: []
@@ -4457,7 +4290,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Snapshots
-              priority: 1810
               context: snapshot_state
               units: snapshots
               label_promotion: []
@@ -4469,7 +4301,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Space and Memory
-              priority: 1810
               context: space
               units: bytes
               label_promotion: []
@@ -4481,7 +4312,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Subtrees
-              priority: 1810
               context: subtrees
               units: subtrees
               label_promotion: []
@@ -4505,7 +4335,6 @@ template:
             - ceph_mds_scrub_set_tag
           charts:
             - title: Scrubbed Inodes
-              priority: 1810
               context: scrubbed_inodes
               units: inodes/s
               label_promotion: []
@@ -4522,7 +4351,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Backtrace Work
-              priority: 1810
               context: backtrace_work
               units: backtraces/s
               label_promotion: []
@@ -4537,7 +4365,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Repaired Inotables
-              priority: 1810
               context: repaired_inotables
               units: inotables/s
               label_promotion: []
@@ -4550,7 +4377,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Applied Scrub Tags
-              priority: 1810
               context: applied_tags
               units: tags/s
               label_promotion: []
@@ -4563,7 +4389,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Directory-Fragment Recursive-Stat Updates
-              priority: 1810
               context: dirfrag_rstat_updates
               units: dirfrags/s
               label_promotion: []
@@ -4590,7 +4415,6 @@ template:
             - ceph_mds_server_req_snapdiff_latency_sum
           charts:
             - title: Latency Measurements
-              priority: 1810
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -4610,7 +4434,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1810
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -4631,6 +4454,8 @@ template:
                 optional_by_labels: []
               algorithm: incremental
     - family: CephFS/MDS/Memory
+      chart_defaults:
+        priority: 1810
       context_namespace: cephfs_mds_memory
       metrics:
         - ceph_mds_mem_cap
@@ -4649,7 +4474,6 @@ template:
         - ceph_mds_mem_rss
       charts:
         - title: Capabilities
-          priority: 1810
           context: capability_state
           units: capabilities
           label_promotion: []
@@ -4661,7 +4485,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Capability Work
-          priority: 1810
           context: capability_work
           units: capabilities/s
           label_promotion: []
@@ -4675,7 +4498,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Dentries
-          priority: 1810
           context: dentry_state
           units: dentries
           label_promotion: []
@@ -4687,7 +4509,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Dentry Cache Churn
-          priority: 1810
           context: dentry_work
           units: dentries/s
           label_promotion: []
@@ -4701,7 +4522,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Directories
-          priority: 1810
           context: directory_state
           units: directories
           label_promotion: []
@@ -4713,7 +4533,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Directory Cache Churn
-          priority: 1810
           context: directory_work
           units: directories/s
           label_promotion: []
@@ -4727,7 +4546,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Inodes
-          priority: 1810
           context: inode_state
           units: inodes
           label_promotion: []
@@ -4739,7 +4557,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Inode Work
-          priority: 1810
           context: inode_work
           units: inodes/s
           label_promotion: []
@@ -4753,7 +4570,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Space and Memory
-          priority: 1810
           context: space
           units: bytes
           label_promotion: []
@@ -4767,6 +4583,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: CephFS/MDS/Sessions
+      chart_defaults:
+        priority: 1810
       context_namespace: cephfs_mds_sessions
       metrics:
         - ceph_mds_sessions_average_load
@@ -4780,7 +4598,6 @@ template:
         - ceph_mds_sessions_total_load
       charts:
         - title: Duration and Time
-          priority: 1810
           context: duration
           units: seconds
           label_promotion: []
@@ -4792,7 +4609,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Events
-          priority: 1810
           context: events
           units: events/s
           label_promotion: []
@@ -4806,7 +4622,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Average Session Load
-          priority: 1810
           context: average_load
           units: load
           label_promotion: []
@@ -4818,7 +4633,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Total Session Load
-          priority: 1810
           context: total_load
           units: load
           label_promotion: []
@@ -4830,7 +4644,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Metadata-Threshold Evictions
-          priority: 1810
           context: metadata_threshold_evictions
           units: sessions/s
           label_promotion: []
@@ -4843,7 +4656,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Sessions
-          priority: 1810
           context: session_state
           units: sessions
           label_promotion: []
@@ -4859,6 +4671,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: CephFS/MDS/Clients
+      chart_defaults:
+        priority: 1810
       context_namespace: cephfs_mds_clients
       metrics:
         - ceph_mds_per_client_avg_metadata_latency
@@ -4878,7 +4692,6 @@ template:
         - ceph_mds_per_client_total_write_size
       charts:
         - title: Capability Access Outcomes
-          priority: 1810
           context: capability_outcomes
           units: accesses/s
           label_promotion: []
@@ -4896,7 +4709,6 @@ template:
               - mds_filesystem_key
           algorithm: incremental
         - title: Dentry Lease Lookup Outcomes
-          priority: 1810
           context: dentry_lease_outcomes
           units: lookups/s
           label_promotion: []
@@ -4914,7 +4726,6 @@ template:
               - mds_filesystem_key
           algorithm: incremental
         - title: Average Operation Latency
-          priority: 1810
           context: average_operation_latency
           units: seconds
           label_promotion: []
@@ -4933,7 +4744,6 @@ template:
             optional_by_labels:
               - mds_filesystem_key
         - title: Open Files
-          priority: 1810
           context: open_files
           units: files
           label_promotion: []
@@ -4948,7 +4758,6 @@ template:
             optional_by_labels:
               - mds_filesystem_key
         - title: Inode State
-          priority: 1810
           context: inode_state
           units: inodes
           label_promotion: []
@@ -4965,7 +4774,6 @@ template:
             optional_by_labels:
               - mds_filesystem_key
         - title: Pinned Inode Capabilities
-          priority: 1810
           context: pinned_inode_capabilities
           units: capabilities
           label_promotion: []
@@ -4980,7 +4788,6 @@ template:
             optional_by_labels:
               - mds_filesystem_key
         - title: Reported I/O Operations
-          priority: 1810
           context: reported_io_operations
           units: operations/s
           label_promotion: []
@@ -4998,7 +4805,6 @@ template:
               - mds_filesystem_key
           algorithm: incremental
         - title: Reported I/O Volume
-          priority: 1810
           context: reported_io_volume
           units: bytes/s
           label_promotion: []
@@ -5016,6 +4822,8 @@ template:
               - mds_filesystem_key
           algorithm: incremental
     - family: Exporter and Process
+      chart_defaults:
+        priority: 2300
       context_namespace: exporter_and_process_runtime
       groups:
         - family: Collection
@@ -5024,7 +4832,6 @@ template:
             - ceph_exporter_scrape_time
           charts:
             - title: Collection Duration
-              priority: 2300
               context: duration
               units: seconds
               label_promotion: []
@@ -5042,7 +4849,6 @@ template:
             - ceph_daemon_socket_up
           charts:
             - title: Daemon Socket State
-              priority: 2300
               context: state
               units: '{status}'
               label_promotion: []
@@ -5066,7 +4872,6 @@ template:
             - ceph_exporter_vm_size
           charts:
             - title: Page Faults
-              priority: 2300
               context: page_faults
               units: faults/s
               label_promotion: []
@@ -5080,7 +4885,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Threads
-              priority: 2300
               context: threads
               units: threads
               label_promotion: []
@@ -5092,7 +4896,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: CPU Utilization
-              priority: 2300
               context: cpu_utilization
               units: percentage
               label_promotion: []
@@ -5104,7 +4907,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: CPU Time
-              priority: 2300
               context: cpu_time
               units: seconds/s
               label_promotion: []
@@ -5116,7 +4918,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Memory
-              priority: 2300
               context: memory
               units: bytes
               label_promotion: []
@@ -5130,13 +4931,14 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: Managers/Daemons
+      chart_defaults:
+        priority: 1300
       context_namespace: manager_daemons
       metrics:
         - ceph_mgr_cache_hit
         - ceph_mgr_cache_miss
       charts:
         - title: Lookup Outcomes
-          priority: 1300
           context: lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -5150,6 +4952,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: Messenger
+      chart_defaults:
+        priority: 2310
       context_namespace: messenger
       metrics:
         - ceph_AsyncMessenger_RDMADispatcher_active_queue_pair
@@ -5172,7 +4976,6 @@ template:
         - ceph_AsyncMessenger_Worker_msgr_connection_ready_timeouts
       charts:
         - title: RDMA Errors
-          priority: 2310
           context: rdma_errors
           units: errors/s
           label_promotion: []
@@ -5192,7 +4995,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Connection Timeouts
-          priority: 2310
           context: connection_timeouts
           units: connections/s
           label_promotion: []
@@ -5208,7 +5010,6 @@ template:
               - ceph_daemon
               - instance_id
         - title: Active Queue Pairs
-          priority: 2310
           context: active_queue_pairs
           units: queue pairs
           label_promotion: []
@@ -5221,7 +5022,6 @@ template:
             optional_by_labels: []
           algorithm: absolute
         - title: Created Queue Pairs
-          priority: 2310
           context: created_queue_pairs
           units: queue pairs/s
           label_promotion: []
@@ -5233,7 +5033,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: In-Flight Transmit Chunks
-          priority: 2310
           context: inflight_tx_chunks
           units: chunks
           label_promotion: []
@@ -5246,7 +5045,6 @@ template:
             optional_by_labels: []
           algorithm: absolute
         - title: Polling State
-          priority: 2310
           context: polling_state
           units: '{status}'
           label_promotion: []
@@ -5259,7 +5057,6 @@ template:
             optional_by_labels: []
           algorithm: absolute
         - title: Receive Buffers
-          priority: 2310
           context: receive_buffers
           units: buffers
           label_promotion: []
@@ -5274,7 +5071,6 @@ template:
             optional_by_labels: []
           algorithm: absolute
         - title: Asynchronous Events
-          priority: 2310
           context: async_events
           units: events/s
           label_promotion: []
@@ -5288,7 +5084,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Work Completions
-          priority: 2310
           context: work_completions
           units: completions/s
           label_promotion: []
@@ -5302,7 +5097,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Received FIN Messages
-          priority: 2310
           context: received_fin_messages
           units: messages/s
           label_promotion: []
@@ -5314,6 +5108,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: Monitors/Daemons
+      chart_defaults:
+        priority: 1300
       context_namespace: monitor_daemons
       metrics:
         - ceph_mon_election_call
@@ -5326,7 +5122,6 @@ template:
         - ceph_mon_session_trim
       charts:
         - title: Elections
-          priority: 1300
           context: elections
           units: elections/s
           label_promotion: []
@@ -5344,7 +5139,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Sessions
-          priority: 1300
           context: session_state
           units: sessions
           label_promotion: []
@@ -5356,7 +5150,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Session Churn
-          priority: 1300
           context: session_work
           units: sessions/s
           label_promotion: []
@@ -5372,6 +5165,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: OSDs/Client IO
+      chart_defaults:
+        priority: 1410
       context_namespace: osd_client_i_o
       metrics:
         - ceph_osd_op
@@ -5439,7 +5234,6 @@ template:
         - ceph_osd_tier_proxy_write
       charts:
         - title: Latency Measurements
-          priority: 1410
           context: latency_measurements
           units: operations/s
           label_promotion: []
@@ -5485,7 +5279,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Accumulated Latency
-          priority: 1410
           context: accumulated_latency
           units: seconds/s
           label_promotion: []
@@ -5532,7 +5325,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Byte Throughput
-          priority: 1410
           context: byte_throughput
           units: bytes/s
           label_promotion: []
@@ -5560,7 +5352,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Operations in Progress
-          priority: 1410
           context: current_operations
           units: operations
           label_promotion: []
@@ -5572,7 +5363,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Events
-          priority: 1410
           context: events
           units: events/s
           label_promotion: []
@@ -5584,7 +5374,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Failure and Delay Outcomes
-          priority: 1410
           context: failure_outcomes
           units: events/s
           label_promotion: []
@@ -5596,7 +5385,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Lookup Outcomes
-          priority: 1410
           context: lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -5608,7 +5396,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Object Work
-          priority: 1410
           context: object_work
           units: objects/s
           label_promotion: []
@@ -5624,7 +5411,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Operations
-          priority: 1410
           context: operations
           units: operations/s
           label_promotion: []
@@ -5656,6 +5442,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: OSDs/Recovery
+      chart_defaults:
+        priority: 1420
       context_namespace: osd_recovery
       metrics:
         - ceph_osd_l_osd_recovery_backfill_queue_latency_count
@@ -5682,7 +5470,6 @@ template:
         - ceph_recoverystate_perf_pg_rebuild_min_secs
       charts:
         - title: Latency Measurements
-          priority: 1420
           context: latency_measurements
           units: operations/s
           label_promotion: []
@@ -5708,7 +5495,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Accumulated Latency
-          priority: 1420
           context: accumulated_latency
           units: seconds/s
           label_promotion: []
@@ -5735,7 +5521,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Byte Throughput
-          priority: 1420
           context: byte_throughput
           units: bytes/s
           label_promotion: []
@@ -5747,7 +5532,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Operations
-          priority: 1420
           context: operations
           units: operations/s
           label_promotion: []
@@ -5759,7 +5543,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: PG Rebuild Duration Measurements
-          priority: 1420
           context: pg_rebuild_duration_measurements
           units: duration measurements/s
           label_promotion: []
@@ -5771,7 +5554,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: PG Rebuild Accumulated Duration
-          priority: 1420
           context: pg_rebuild_accumulated_duration
           units: seconds/s
           label_promotion: []
@@ -5784,7 +5566,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: PG Rebuild Duration Range
-          priority: 1420
           context: pg_rebuild_duration_range
           units: seconds
           label_promotion: []
@@ -5798,6 +5579,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: OSDs/Runtime
+      chart_defaults:
+        priority: 1430
       context_namespace: osd_runtime
       metrics:
         - ceph_osd_agent_evict
@@ -5857,7 +5640,6 @@ template:
         - ceph_osd_watch_timeouts
       charts:
         - title: Latency Measurements
-          priority: 1430
           context: latency_measurements
           units: operations/s
           label_promotion: []
@@ -5873,7 +5655,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Accumulated Latency
-          priority: 1430
           context: accumulated_latency
           units: seconds/s
           label_promotion: []
@@ -5890,7 +5671,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Value Measurement Measurements
-          priority: 1430
           context: value_measurements
           units: measurements/s
           label_promotion: []
@@ -5902,7 +5682,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Accumulated Value Measurement
-          priority: 1430
           context: accumulated_value
           units: value/s
           label_promotion: []
@@ -5915,7 +5694,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Byte Throughput
-          priority: 1430
           context: byte_throughput
           units: bytes/s
           label_promotion: []
@@ -5927,7 +5705,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: CRC Cache Lookup Outcomes
-          priority: 1430
           context: crc_lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -5944,7 +5721,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Tier-Agent Actions
-          priority: 1430
           context: tier_agent_actions
           units: actions/s
           label_promotion: []
@@ -5968,7 +5744,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Copy-From Operations
-          priority: 1430
           context: copyfrom_operations
           units: operations/s
           label_promotion: []
@@ -5980,7 +5755,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: OSD-Map Messages
-          priority: 1430
           context: map_messages
           units: messages/s
           label_promotion: []
@@ -5994,7 +5768,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: OSD-Map Epochs
-          priority: 1430
           context: map_epochs
           units: epochs/s
           label_promotion: []
@@ -6008,7 +5781,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Placement-Group Updates
-          priority: 1430
           context: pg_updates
           units: updates/s
           label_promotion: []
@@ -6022,7 +5794,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Total Placement-Group Updates
-          priority: 1430
           context: pg_updates_total
           units: placement group updates/s
           label_promotion: []
@@ -6034,7 +5805,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Pushes
-          priority: 1430
           context: pushes
           units: pushes/s
           label_promotion: []
@@ -6046,7 +5816,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Suboperations
-          priority: 1430
           context: suboperations
           units: suboperations/s
           label_promotion: []
@@ -6058,7 +5827,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Failed Tier Flush Attempts
-          priority: 1430
           context: failed_tier_flush_attempts
           units: attempts/s
           label_promotion: []
@@ -6072,7 +5840,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Watch Timeouts
-          priority: 1430
           context: watch_timeouts
           units: watches/s
           label_promotion: []
@@ -6084,7 +5851,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: OSD-Map Buffer-Cache Lookup Outcomes
-          priority: 1430
           context: map_buffer_cache_lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -6098,7 +5864,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Decoded OSD-Map Cache Lookup Outcomes
-          priority: 1430
           context: map_cache_lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -6114,7 +5879,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Tier Whiteouts
-          priority: 1430
           context: tier_whiteouts
           units: whiteouts/s
           label_promotion: []
@@ -6126,7 +5890,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Skipped Objects
-          priority: 1430
           context: skipped_objects
           units: objects/s
           label_promotion: []
@@ -6138,7 +5901,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Object-Context Cache Lookup Outcomes
-          priority: 1430
           context: object_context_cache_lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -6152,7 +5914,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Tier Flush Attempts
-          priority: 1430
           context: tier_flush_attempts
           units: attempts/s
           label_promotion: []
@@ -6168,7 +5929,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Pulls
-          priority: 1430
           context: pulls
           units: pulls/s
           label_promotion: []
@@ -6180,7 +5940,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Placement Groups
-          priority: 1430
           context: pg_state
           units: PGs
           label_promotion: []
@@ -6200,7 +5959,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Space and Memory
-          priority: 1430
           context: space
           units: bytes
           label_promotion: []
@@ -6216,7 +5974,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Heartbeat Peers
-          priority: 1430
           context: heartbeat_peers
           units: peers
           label_promotion: []
@@ -6228,7 +5985,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: OSD Load Average
-          priority: 1430
           context: load_average
           units: load
           label_promotion: []
@@ -6240,6 +5996,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: OSDs/Scrubbing Ceph 19
+      chart_defaults:
+        priority: 1440
       context_namespace: osd_scrubbing_ceph_19
       groups:
         - family: Elapsed Time
@@ -6279,7 +6037,6 @@ template:
             - ceph_osd_scrub_sh_repl_successful_scrubs_elapsed_sum
           charts:
             - title: Scrub Elapsed-Time Measurements
-              priority: 1440
               context: scrub_latency_measurements
               units: scrubs/s
               label_promotion: []
@@ -6307,7 +6064,6 @@ template:
                   - pooltype
                 optional_by_labels: []
             - title: Reservation Elapsed-Time Measurements
-              priority: 1440
               context: reservation_latency_measurements
               units: reservations/s
               label_promotion: []
@@ -6335,7 +6091,6 @@ template:
                   - pooltype
                 optional_by_labels: []
             - title: Accumulated Scrub Elapsed Time
-              priority: 1440
               context: accumulated_scrub_latency
               units: seconds/s
               label_promotion: []
@@ -6364,7 +6119,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Accumulated Reservation Elapsed Time
-              priority: 1440
               context: accumulated_reservation_latency
               units: seconds/s
               label_promotion: []
@@ -6409,7 +6163,6 @@ template:
             - ceph_osd_scrub_sh_repl_successful_scrubs
           charts:
             - title: Scrub Work
-              priority: 1440
               context: scrub_work
               units: scrubs/s
               label_promotion: []
@@ -6469,7 +6222,6 @@ template:
             - ceph_osd_scrub_sh_repl_reservation_process_skipped
           charts:
             - title: Replicas in Reservation
-              priority: 1440
               context: replicas_in_reservation
               units: replicas
               label_promotion: []
@@ -6489,7 +6241,6 @@ template:
                   - pooltype
                 optional_by_labels: []
             - title: Scrubs Past Reservation
-              priority: 1440
               context: scrubs_past_reservation
               units: scrubs/s
               label_promotion: []
@@ -6509,7 +6260,6 @@ template:
                   - pooltype
                 optional_by_labels: []
             - title: Reservation Process Outcomes
-              priority: 1440
               context: reservation_process_outcomes
               units: reservations/s
               label_promotion: []
@@ -6545,6 +6295,8 @@ template:
                   - pooltype
                 optional_by_labels: []
     - family: OSDs/Scrubbing Ceph 20
+      chart_defaults:
+        priority: 1450
       context_namespace: osd_scrubbing_ceph_20
       groups:
         - family: Elapsed Time
@@ -6568,7 +6320,6 @@ template:
             - ceph_osd_successful_scrubs_replicated_elapsed_sum
           charts:
             - title: Scrub Elapsed-Time Measurements
-              priority: 1450
               context: scrub_latency_measurements
               units: scrubs/s
               label_promotion: []
@@ -6586,7 +6337,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Reservation Elapsed-Time Measurements
-              priority: 1450
               context: reservation_latency_measurements
               units: reservations/s
               label_promotion: []
@@ -6604,7 +6354,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Scrub Elapsed Time
-              priority: 1450
               context: accumulated_scrub_latency
               units: seconds/s
               label_promotion: []
@@ -6623,7 +6372,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Accumulated Reservation Elapsed Time
-              priority: 1450
               context: accumulated_reservation_latency
               units: seconds/s
               label_promotion: []
@@ -6650,7 +6398,6 @@ template:
             - ceph_osd_scrub_replicated_io_intersects
           charts:
             - title: Client Write Interference
-              priority: 1450
               context: client_write_interference
               units: writes/s
               label_promotion: []
@@ -6678,7 +6425,6 @@ template:
             - ceph_osd_successful_scrubs_replicated
           charts:
             - title: Scrub Work
-              priority: 1450
               context: scrub_work
               units: scrubs/s
               label_promotion: []
@@ -6716,7 +6462,6 @@ template:
             - ceph_osd_scrub_replicated_scrub_reservations_completed
           charts:
             - title: Replicas in Reservation
-              priority: 1450
               context: replicas_in_reservation
               units: replicas
               label_promotion: []
@@ -6730,7 +6475,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Scrubs Past Reservation
-              priority: 1450
               context: scrubs_past_reservation
               units: scrubs/s
               label_promotion: []
@@ -6744,7 +6488,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Reservation Process Outcomes
-              priority: 1450
               context: reservation_process_outcomes
               units: reservations/s
               label_promotion: []
@@ -6782,7 +6525,6 @@ template:
             - ceph_osd_scrub_replicated_stats_cnt
           charts:
             - title: Byte Throughput
-              priority: 1450
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -6796,7 +6538,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Scrub Calls
-              priority: 1450
               context: scrub_calls
               units: calls/s
               label_promotion: []
@@ -6818,6 +6559,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: OSDs/Scrubbing Common Work
+      chart_defaults:
+        priority: 1460
       context_namespace: osd_scrubbing_common_work
       groups:
         - family: Interference and Scheduling
@@ -6845,7 +6588,6 @@ template:
             - ceph_osd_scrub_sh_repl_write_blocked_by_scrub
           charts:
             - title: Object-Lock Waits
-              priority: 1460
               context: object_lock_waits
               units: waits/s
               label_promotion: []
@@ -6865,7 +6607,6 @@ template:
                   - pooltype
                 optional_by_labels: []
             - title: Chunk Selection Outcomes
-              priority: 1460
               context: chunk_selection_outcomes
               units: chunks/s
               label_promotion: []
@@ -6893,7 +6634,6 @@ template:
                   - pooltype
                 optional_by_labels: []
             - title: Scrub Preemptions
-              priority: 1460
               context: preemptions
               units: preemptions/s
               label_promotion: []
@@ -6913,7 +6653,6 @@ template:
                   - pooltype
                 optional_by_labels: []
             - title: Client Writes Blocked by Scrub
-              priority: 1460
               context: blocked_client_writes
               units: writes/s
               label_promotion: []
@@ -6941,7 +6680,6 @@ template:
             - ceph_osd_scrub_sh_repl_scrub_reservations_completed
           charts:
             - title: Completed Scrub Reservations
-              priority: 1460
               context: completed_reservations
               units: reservations/s
               label_promotion: []
@@ -6969,7 +6707,6 @@ template:
             - ceph_osd_scrub_omapgetheader_cnt
           charts:
             - title: Byte Throughput
-              priority: 1460
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -6983,7 +6720,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: OMAP Scrub Calls
-              priority: 1460
               context: omap_calls
               units: calls/s
               label_promotion: []
@@ -6997,6 +6733,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: Object Gateway
+      chart_defaults:
+        priority: 1700
       context_namespace: object_gateway
       groups:
         - family: Global Operations
@@ -7029,7 +6767,6 @@ template:
             - ceph_rgw_op_put_obj_ops
           charts:
             - title: Operations
-              priority: 1700
               context: operations
               units: operations/s
               label_promotion: []
@@ -7053,7 +6790,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Object Bytes
-              priority: 1700
               context: object_bytes
               units: bytes/s
               label_promotion: []
@@ -7071,7 +6807,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Latency Measurements
-              priority: 1700
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -7095,7 +6830,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1700
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -7149,7 +6883,6 @@ template:
             - ceph_rgw_op_per_user_put_obj_ops
           charts:
             - title: Operations
-              priority: 1700
               context: operations
               units: operations/s
               label_promotion: []
@@ -7175,7 +6908,6 @@ template:
                 optional_by_labels:
                   - tenant
             - title: Object Bytes
-              priority: 1700
               context: object_bytes
               units: bytes/s
               label_promotion: []
@@ -7195,7 +6927,6 @@ template:
                 optional_by_labels:
                   - tenant
             - title: Latency Measurements
-              priority: 1700
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -7221,7 +6952,6 @@ template:
                 optional_by_labels:
                   - tenant
             - title: Accumulated Latency
-              priority: 1700
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -7277,7 +7007,6 @@ template:
             - ceph_rgw_op_per_bucket_put_obj_ops
           charts:
             - title: Operations
-              priority: 1700
               context: operations
               units: operations/s
               label_promotion: []
@@ -7303,7 +7032,6 @@ template:
                 optional_by_labels:
                   - tenant
             - title: Object Bytes
-              priority: 1700
               context: object_bytes
               units: bytes/s
               label_promotion: []
@@ -7323,7 +7051,6 @@ template:
                 optional_by_labels:
                   - tenant
             - title: Latency Measurements
-              priority: 1700
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -7349,7 +7076,6 @@ template:
                 optional_by_labels:
                   - tenant
             - title: Accumulated Latency
-              priority: 1700
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -7386,7 +7112,6 @@ template:
             - ceph_rgw_lc_transition_noncurrent
           charts:
             - title: Lifecycle Actions
-              priority: 1700
               context: lifecycle_actions
               units: actions/s
               label_promotion: []
@@ -7406,7 +7131,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Aborted Multipart Uploads
-              priority: 1700
               context: aborted_multipart_uploads
               units: uploads/s
               label_promotion: []
@@ -7425,7 +7149,6 @@ template:
             - ceph_rgw_lua_script_ok
           charts:
             - title: Current Lua Virtual Machines
-              priority: 1700
               context: current_vms
               units: VMs
               label_promotion: []
@@ -7437,7 +7160,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Lua Script Executions
-              priority: 1700
               context: script_executions
               units: executions/s
               label_promotion: []
@@ -7464,7 +7186,6 @@ template:
             - ceph_rgw_pubsub_store_ok
           charts:
             - title: Pending Notification Events
-              priority: 1700
               context: pending_events
               units: events
               label_promotion: []
@@ -7476,7 +7197,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Stored Events
-              priority: 1700
               context: event_state
               units: events
               label_promotion: []
@@ -7488,7 +7208,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Events
-              priority: 1700
               context: events
               units: events/s
               label_promotion: []
@@ -7506,7 +7225,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Failure and Delay Outcomes
-              priority: 1700
               context: failure_outcomes
               units: events/s
               label_promotion: []
@@ -7520,7 +7238,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Missing Notification Configurations
-              priority: 1700
               context: missing_configurations
               units: events/s
               label_promotion: []
@@ -7538,7 +7255,6 @@ template:
             - ceph_rgw_topic_persistent_topic_size
           charts:
             - title: Persistent Topic Queue Length
-              priority: 1700
               context: queue_length
               units: entries
               label_promotion: []
@@ -7551,7 +7267,6 @@ template:
                 optional_by_labels:
                   - topic
             - title: Persistent Topic Queue Size
-              priority: 1700
               context: queue_size
               units: bytes
               label_promotion: []
@@ -7581,7 +7296,6 @@ template:
             - ceph_rgw_req
           charts:
             - title: Latency Measurements
-              priority: 1700
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -7595,7 +7309,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1700
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -7610,7 +7323,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Byte Throughput
-              priority: 1700
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -7624,7 +7336,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Queued and Active Requests
-              priority: 1700
               context: current_requests
               units: requests
               label_promotion: []
@@ -7638,7 +7349,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Failed Requests
-              priority: 1700
               context: failed_requests
               units: requests/s
               label_promotion: []
@@ -7650,7 +7360,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Object Work
-              priority: 1700
               context: object_work
               units: objects/s
               label_promotion: []
@@ -7662,7 +7371,6 @@ template:
                   - instance_id
                 optional_by_labels: []
             - title: Requests
-              priority: 1700
               context: requests
               units: requests/s
               label_promotion: []
@@ -7678,6 +7386,8 @@ template:
                   - instance_id
                 optional_by_labels: []
     - family: Object Gateway/Cache
+      chart_defaults:
+        priority: 1710
       context_namespace: object_gateway_cache
       metrics:
         - ceph_rgw_d4n_cache_evictions
@@ -7689,7 +7399,6 @@ template:
         - ceph_rgw_keystone_token_cache_miss
       charts:
         - title: Keystone Token Cache Lookup Outcomes
-          priority: 1710
           context: keystone_lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -7703,7 +7412,6 @@ template:
               - instance_id
             optional_by_labels: []
         - title: D4N Cache Lookup Outcomes
-          priority: 1710
           context: d4n_lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -7717,7 +7425,6 @@ template:
               - instance_id
             optional_by_labels: []
         - title: D4N Cache Evictions
-          priority: 1710
           context: d4n_cache_evictions
           units: evictions/s
           label_promotion: []
@@ -7729,7 +7436,6 @@ template:
               - instance_id
             optional_by_labels: []
         - title: Lookup Outcomes
-          priority: 1710
           context: lookup_outcomes
           units: lookups/s
           label_promotion: []
@@ -7743,6 +7449,8 @@ template:
               - instance_id
             optional_by_labels: []
     - family: Object Gateway/Multisite
+      chart_defaults:
+        priority: 1720
       context_namespace: object_gateway_multisite
       metrics:
         - ceph_rgw_sync_delta_sync_delta
@@ -7757,7 +7465,6 @@ template:
         - ceph_data_sync_from_zone_poll_latency_sum
       charts:
         - title: Replicated Objects
-          priority: 1720
           context: replicated_objects
           units: objects/s
           label_promotion: []
@@ -7770,7 +7477,6 @@ template:
             optional_by_labels:
               - source_zone
         - title: Data Log Shard Delay
-          priority: 1720
           context: data_log_shard_delay
           units: seconds
           label_promotion: []
@@ -7786,7 +7492,6 @@ template:
             optional_by_labels:
               - sync_shard
         - title: Accumulated Byte Measurement
-          priority: 1720
           context: accumulated_bytes
           units: bytes/s
           label_promotion: []
@@ -7800,7 +7505,6 @@ template:
               - source_zone
           algorithm: incremental
         - title: Latency Measurements
-          priority: 1720
           context: latency_measurements
           units: operations/s
           label_promotion: []
@@ -7815,7 +7519,6 @@ template:
             optional_by_labels:
               - source_zone
         - title: Accumulated Latency
-          priority: 1720
           context: accumulated_latency
           units: seconds/s
           label_promotion: []
@@ -7831,7 +7534,6 @@ template:
               - source_zone
           algorithm: incremental
         - title: Replication-Log Request Errors
-          priority: 1720
           context: replication_log_request_errors
           units: requests/s
           label_promotion: []
@@ -7844,7 +7546,6 @@ template:
             optional_by_labels:
               - source_zone
         - title: Object Work
-          priority: 1720
           context: object_work
           units: objects/s
           label_promotion: []
@@ -7859,6 +7560,8 @@ template:
             optional_by_labels:
               - source_zone
     - family: Runtime and Clients/Objecter
+      chart_defaults:
+        priority: 2200
       context_namespace: objecter
       metrics:
         - ceph_objecter_command_active
@@ -7933,7 +7636,6 @@ template:
         - ceph_objecter_statfs_send
       charts:
         - title: Latency Measurements
-          priority: 2200
           context: latency_measurements
           units: operations/s
           label_promotion: []
@@ -7947,7 +7649,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Accumulated Latency
-          priority: 2200
           context: accumulated_latency
           units: seconds/s
           label_promotion: []
@@ -7962,7 +7663,6 @@ template:
           algorithm: incremental
           aggregation: sum
         - title: Submitted Top-Level Operations
-          priority: 2200
           context: submitted_operations
           units: operations/s
           label_promotion: []
@@ -7976,7 +7676,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Operation-Vector Entries
-          priority: 2200
           context: operation_vector_entries
           units: entries/s
           label_promotion: []
@@ -7991,7 +7690,6 @@ template:
           algorithm: incremental
           aggregation: sum
         - title: Byte Throughput
-          priority: 2200
           context: byte_throughput
           units: bytes/s
           label_promotion: []
@@ -8005,7 +7703,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Active Commands
-          priority: 2200
           context: active_commands
           units: commands
           label_promotion: []
@@ -8019,7 +7716,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Active Lingering Operations
-          priority: 2200
           context: active_lingering_operations
           units: operations
           label_promotion: []
@@ -8033,7 +7729,6 @@ template:
               - instance_id
           aggregation: sum
         - title: OSD-Map Epoch
-          priority: 2200
           context: map_epoch
           units: epoch
           label_promotion: []
@@ -8047,7 +7742,6 @@ template:
               - instance_id
           aggregation: min
         - title: Objecter Operations
-          priority: 2200
           context: active_operations
           units: operations
           label_promotion: []
@@ -8065,7 +7759,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Active Pool Operations
-          priority: 2200
           context: active_pool_operations
           units: operations
           label_promotion: []
@@ -8079,7 +7772,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Active Pool-Stat Requests
-          priority: 2200
           context: active_poolstat_requests
           units: requests
           label_promotion: []
@@ -8093,7 +7785,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Active StatFS Requests
-          priority: 2200
           context: active_statfs_requests
           units: requests
           label_promotion: []
@@ -8107,7 +7798,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Commands
-          priority: 2200
           context: commands
           units: commands/s
           label_promotion: []
@@ -8123,7 +7813,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Lingering Operations
-          priority: 2200
           context: lingering_operations
           units: operations/s
           label_promotion: []
@@ -8141,7 +7830,6 @@ template:
               - instance_id
           aggregation: sum
         - title: OSD Maps
-          priority: 2200
           context: maps
           units: maps/s
           label_promotion: []
@@ -8157,7 +7845,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Object Operations
-          priority: 2200
           context: operations
           units: operations/s
           label_promotion: []
@@ -8241,7 +7928,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Replica Reads
-          priority: 2200
           context: replica_reads
           units: reads/s
           label_promotion: []
@@ -8259,7 +7945,6 @@ template:
               - instance_id
           aggregation: sum
         - title: OSD Sessions
-          priority: 2200
           context: osd_sessions
           units: sessions/s
           label_promotion: []
@@ -8275,7 +7960,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Pool Operations
-          priority: 2200
           context: pool_operations
           units: operations/s
           label_promotion: []
@@ -8291,7 +7975,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Pool-Stat and StatFS Requests
-          priority: 2200
           context: stat_requests
           units: requests/s
           label_promotion: []
@@ -8311,7 +7994,6 @@ template:
               - instance_id
           aggregation: sum
         - title: Sessions
-          priority: 2200
           context: session_state
           units: sessions
           label_promotion: []
@@ -8327,6 +8009,8 @@ template:
               - instance_id
           aggregation: sum
     - family: RBD Images/Client Images
+      chart_defaults:
+        priority: 1910
       context_namespace: rbd_client_images
       metrics:
         - ceph_rbd_librbd_image_cmp
@@ -8365,7 +8049,6 @@ template:
         - ceph_rbd_librbd_image_ws_latency_sum
       charts:
         - title: I/O Operations
-          priority: 1910
           context: io_operations
           units: operations/s
           label_promotion: []
@@ -8380,7 +8063,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: I/O Byte Throughput
-          priority: 1910
           context: io_byte_throughput
           units: bytes/s
           label_promotion: []
@@ -8395,7 +8077,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: I/O Latency Measurements
-          priority: 1910
           context: io_latency_measurements
           units: operations/s
           label_promotion: []
@@ -8410,7 +8091,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Accumulated I/O Latency
-          priority: 1910
           context: accumulated_io_latency
           units: seconds/s
           label_promotion: []
@@ -8426,7 +8106,6 @@ template:
               - librbd_image_key
           algorithm: incremental
         - title: Lifecycle Timestamps
-          priority: 1910
           context: lifecycle_timestamps
           units: seconds since epoch
           label_promotion: []
@@ -8441,7 +8120,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Data Operations
-          priority: 1910
           context: data_operations
           units: operations/s
           label_promotion: []
@@ -8458,7 +8136,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Data Operation Byte Throughput
-          priority: 1910
           context: data_operation_byte_throughput
           units: bytes/s
           label_promotion: []
@@ -8475,7 +8152,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Data Operation Latency Measurements
-          priority: 1910
           context: data_operation_latency_measurements
           units: operations/s
           label_promotion: []
@@ -8492,7 +8168,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Accumulated Data Operation Latency
-          priority: 1910
           context: accumulated_data_operation_latency
           units: seconds/s
           label_promotion: []
@@ -8510,7 +8185,6 @@ template:
               - librbd_image_key
           algorithm: incremental
         - title: Flush Operations
-          priority: 1910
           context: flush_operations
           units: operations/s
           label_promotion: []
@@ -8523,7 +8197,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Flush Latency Measurements
-          priority: 1910
           context: flush_latency_measurements
           units: operations/s
           label_promotion: []
@@ -8536,7 +8209,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Accumulated Flush Latency
-          priority: 1910
           context: accumulated_flush_latency
           units: seconds/s
           label_promotion: []
@@ -8550,7 +8222,6 @@ template:
               - librbd_image_key
           algorithm: incremental
         - title: Snapshot Mutations
-          priority: 1910
           context: snapshot_mutations
           units: operations/s
           label_promotion: []
@@ -8569,7 +8240,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Maintenance Operations
-          priority: 1910
           context: maintenance_operations
           units: operations/s
           label_promotion: []
@@ -8588,7 +8258,6 @@ template:
             optional_by_labels:
               - librbd_image_key
         - title: Readahead Byte Throughput
-          priority: 1910
           context: readahead_byte_throughput
           units: bytes/s
           label_promotion: []
@@ -8601,6 +8270,8 @@ template:
             optional_by_labels:
               - librbd_image_key
     - family: RBD Images/Mirror
+      chart_defaults:
+        priority: 1920
       context_namespace: rbd_mirror
       groups:
         - family: Journal
@@ -8616,7 +8287,6 @@ template:
             - ceph_rbd_mirror_journal_replay_latency_sum
           charts:
             - title: Journal Replay Latency Measurements
-              priority: 1920
               context: latency_measurements
               units: entries/s
               label_promotion: []
@@ -8631,7 +8301,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Image Journal Replay Latency Measurements
-              priority: 1920
               context: image_latency_measurements
               units: entries/s
               label_promotion: []
@@ -8646,7 +8315,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 1920
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -8662,7 +8330,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Accumulated Image Journal Replay Latency
-              priority: 1920
               context: image_accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -8678,7 +8345,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Byte Throughput
-              priority: 1920
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -8693,7 +8359,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Image Journal Replay Byte Throughput
-              priority: 1920
               context: image_byte_throughput
               units: bytes/s
               label_promotion: []
@@ -8708,7 +8373,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Journal Entries
-              priority: 1920
               context: journal_entries
               units: entries/s
               label_promotion: []
@@ -8723,7 +8387,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Journal Entries Queued for Replay
-              priority: 1920
               context: image_journal_entries
               units: entries/s
               label_promotion: []
@@ -8754,7 +8417,6 @@ template:
             - ceph_rbd_mirror_snapshot_sync_time_sum
           charts:
             - title: Snapshot Sync Latency Measurements — Image Sync Time
-              priority: 1920
               context: latency_measurements_image_sync_time
               units: snapshots/s
               label_promotion: []
@@ -8769,7 +8431,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Snapshot Sync Latency Measurements — Sync Time
-              priority: 1920
               context: latency_measurements_sync_time
               units: snapshots/s
               label_promotion: []
@@ -8781,7 +8442,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency — Image Sync Time
-              priority: 1920
               context: accumulated_latency_image_sync_time
               units: seconds/s
               label_promotion: []
@@ -8797,7 +8457,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Accumulated Latency — Sync Time
-              priority: 1920
               context: accumulated_latency_sync_time
               units: seconds/s
               label_promotion: []
@@ -8810,7 +8469,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Byte Throughput — Image Sync Bytes
-              priority: 1920
               context: byte_throughput_image_sync_bytes
               units: bytes/s
               label_promotion: []
@@ -8825,7 +8483,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Byte Throughput — Sync Bytes
-              priority: 1920
               context: byte_throughput_sync_bytes
               units: bytes/s
               label_promotion: []
@@ -8837,7 +8494,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Last Snapshot Sync Duration
-              priority: 1920
               context: last_sync_duration
               units: seconds
               label_promotion: []
@@ -8852,7 +8508,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Last Snapshot Sync Size
-              priority: 1920
               context: last_sync_size
               units: bytes
               label_promotion: []
@@ -8867,7 +8522,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Snapshot Work — Image Snapshots
-              priority: 1920
               context: snapshot_work_image_snapshots
               units: snapshots/s
               label_promotion: []
@@ -8882,7 +8536,6 @@ template:
                   - pool
                 optional_by_labels: []
             - title: Snapshot Work — Snapshots
-              priority: 1920
               context: snapshot_work_snapshots
               units: snapshots/s
               label_promotion: []
@@ -8894,7 +8547,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Timestamps
-              priority: 1920
               context: timestamp
               units: seconds since epoch
               label_promotion: []
@@ -8911,6 +8563,8 @@ template:
                   - pool
                 optional_by_labels: []
     - family: Runtime
+      chart_defaults:
+        priority: 2220
       context_namespace: runtime
       groups:
         - family: Shared Daemon
@@ -9067,7 +8721,6 @@ template:
             - ceph_recoverystate_perf_waitupthru_latency_sum
           charts:
             - title: KStore Transaction Latency Measurements
-              priority: 2220
               context: kstore_latency_measurements
               units: transactions/s
               label_promotion: []
@@ -9087,7 +8740,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Client Request Latency Measurements
-              priority: 2220
               context: client_latency_measurements
               units: requests/s
               label_promotion: []
@@ -9099,7 +8751,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Recovery-State Transition Latency Measurements
-              priority: 2220
               context: recovery_state_latency_measurements
               units: state transitions/s
               label_promotion: []
@@ -9171,7 +8822,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated KStore Transaction Latency
-              priority: 2220
               context: accumulated_kstore_latency
               units: seconds/s
               label_promotion: []
@@ -9192,7 +8842,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Accumulated Client Request Latency
-              priority: 2220
               context: accumulated_client_latency
               units: seconds/s
               label_promotion: []
@@ -9205,7 +8854,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Accumulated Recovery-State Transition Latency
-              priority: 2220
               context: accumulated_recovery_state_latency
               units: seconds/s
               label_promotion: []
@@ -9278,7 +8926,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Client Operation Latency Measurements
-              priority: 2220
               context: client_operation_latency_measurements
               units: operations/s
               label_promotion: []
@@ -9296,7 +8943,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: SQLite VFS Operation Latency Measurements
-              priority: 2220
               context: sqlite_vfs_latency_measurements
               units: operations/s
               label_promotion: []
@@ -9340,7 +8986,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Client Operation Latency
-              priority: 2220
               context: accumulated_client_operation_latency
               units: seconds/s
               label_promotion: []
@@ -9359,7 +9004,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Accumulated SQLite VFS Operation Latency
-              priority: 2220
               context: accumulated_sqlite_vfs_latency
               units: seconds/s
               label_promotion: []
@@ -9404,7 +9048,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Monitors
-              priority: 2220
               context: monitor_state
               units: monitors
               label_promotion: []
@@ -9418,7 +9061,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: OSDs
-              priority: 2220
               context: osd_state
               units: OSDs
               label_promotion: []
@@ -9434,7 +9076,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Pools
-              priority: 2220
               context: pool_state
               units: pools
               label_promotion: []
@@ -9446,7 +9087,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: OSD-Map Epoch
-              priority: 2220
               context: osd_map_epoch
               units: epoch
               label_promotion: []
@@ -9458,7 +9098,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Duration and Time
-              priority: 2220
               context: duration
               units: seconds
               label_promotion: []
@@ -9474,7 +9113,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Invalidated Recovery Statistics
-              priority: 2220
               context: invalidations
               units: invalidations/s
               label_promotion: []
@@ -9486,7 +9124,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Objects
-              priority: 2220
               context: object_state
               units: objects
               label_promotion: []
@@ -9504,7 +9141,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Operations
-              priority: 2220
               context: operations
               units: operations/s
               label_promotion: []
@@ -9516,7 +9152,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Space and Memory
-              priority: 2220
               context: space
               units: bytes
               label_promotion: []
@@ -9534,7 +9169,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Placement Groups
-              priority: 2220
               context: pg_state
               units: PGs
               label_promotion: []
@@ -9552,7 +9186,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Client Latency Squared-Deviation Accumulators
-              priority: 2220
               context: client_latency_sqsum
               units: microseconds²/s
               label_promotion: []
@@ -9569,7 +9202,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: OpenFileTable OMAP Mutations
-              priority: 2220
               context: oft_omap_mutations
               units: operations/s
               label_promotion: []
@@ -9584,7 +9216,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Context Workers
-              priority: 2220
               context: worker_state
               units: workers
               label_promotion: []
@@ -9598,7 +9229,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: OpenFileTable Objects
-              priority: 2220
               context: oft_object_state
               units: objects
               label_promotion: []
@@ -9610,7 +9240,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: OpenFileTable Key-Value Pairs
-              priority: 2220
               context: oft_entry_state
               units: entries
               label_promotion: []
@@ -9627,7 +9256,6 @@ template:
             - ceph_trackedop_slow_ops_count
           charts:
             - title: Slow Operations
-              priority: 2220
               context: slow_operations
               units: operations/s
               label_promotion: []
@@ -9639,6 +9267,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: Storage Engine
+      chart_defaults:
+        priority: 2100
       context_namespace: storage_engine
       groups:
         - family: Priority Cache Full
@@ -9660,7 +9290,6 @@ template:
             - ceph_prioritycache:full_reserved_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -9716,7 +9345,6 @@ template:
             - ceph_prioritycache:inc_reserved_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -9772,7 +9400,6 @@ template:
             - ceph_prioritycache:kv_reserved_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -9819,7 +9446,6 @@ template:
             - ceph_prioritycache_unmapped_bytes
           charts:
             - title: Space and Memory
-              priority: 2100
               context: space
               units: bytes
               label_promotion: []
@@ -9849,7 +9475,6 @@ template:
             - ceph_rocksdb_compact_running
           charts:
             - title: Compaction Work
-              priority: 2100
               context: compaction_state
               units: compactions
               label_promotion: []
@@ -9864,7 +9489,6 @@ template:
                 optional_by_labels: []
               algorithm: absolute
             - title: Duration and Time
-              priority: 2100
               context: duration
               units: seconds
               label_promotion: []
@@ -9876,7 +9500,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Compactions
-              priority: 2100
               context: compactions
               units: compactions/s
               label_promotion: []
@@ -9890,7 +9513,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Compaction Queue Merges
-              priority: 2100
               context: queue_merges
               units: merges/s
               label_promotion: []
@@ -9912,7 +9534,6 @@ template:
             - ceph_rocksdb_submit_sync_latency_sum
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -9928,7 +9549,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -9957,7 +9577,6 @@ template:
             - ceph_rocksdb_rocksdb_write_wal_time_sum
           charts:
             - title: Latency Measurements
-              priority: 2100
               context: latency_measurements
               units: operations/s
               label_promotion: []
@@ -9975,7 +9594,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Accumulated Latency
-              priority: 2100
               context: accumulated_latency
               units: seconds/s
               label_promotion: []
@@ -9994,6 +9612,8 @@ template:
                 optional_by_labels: []
               algorithm: incremental
     - family: Runtime and Clients
+      chart_defaults:
+        priority: 2210
       context_namespace: runtime_and_client_components
       groups:
         - family: RBD Persistent Write Log
@@ -10082,7 +9702,6 @@ template:
             - ceph_rbd_librbd_pwl_ws_lat_sum
           charts:
             - title: Reads
-              priority: 2210
               context: reads
               units: reads/s
               label_promotion: []
@@ -10099,7 +9718,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Writes
-              priority: 2210
               context: writes
               units: writes/s
               label_promotion: []
@@ -10124,7 +9742,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Log Appends
-              priority: 2210
               context: log_appends
               units: appends/s
               label_promotion: []
@@ -10137,7 +9754,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Cache and Image Operations
-              priority: 2210
               context: cache_image_operations
               units: operations/s
               label_promotion: []
@@ -10164,7 +9780,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Read Throughput
-              priority: 2210
               context: read_throughput
               units: bytes/s
               label_promotion: []
@@ -10179,7 +9794,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Write Throughput
-              priority: 2210
               context: write_throughput
               units: bytes/s
               label_promotion: []
@@ -10192,7 +9806,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Data-Operation Throughput
-              priority: 2210
               context: data_operation_throughput
               units: bytes/s
               label_promotion: []
@@ -10209,7 +9822,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Log-Append Throughput
-              priority: 2210
               context: log_append_throughput
               units: bytes/s
               label_promotion: []
@@ -10223,7 +9835,6 @@ template:
                   - librbd_pwl_key
               algorithm: incremental
             - title: Read Request Latency Measurements
-              priority: 2210
               context: read_latency_measurements
               units: requests/s
               label_promotion: []
@@ -10238,7 +9849,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Log-Append Size Measurements
-              priority: 2210
               context: log_append_size_measurements
               units: appends/s
               label_promotion: []
@@ -10251,7 +9861,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Write Request Latency Measurements
-              priority: 2210
               context: write_latency_measurements
               units: requests/s
               label_promotion: []
@@ -10282,7 +9891,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Log Operation Latency Measurements
-              priority: 2210
               context: log_operation_latency_measurements
               units: operations/s
               label_promotion: []
@@ -10309,7 +9917,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Data Operation Latency Measurements
-              priority: 2210
               context: data_operation_latency_measurements
               units: operations/s
               label_promotion: []
@@ -10330,7 +9937,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Transaction Latency Measurements
-              priority: 2210
               context: transaction_latency_measurements
               units: transactions/s
               label_promotion: []
@@ -10345,7 +9951,6 @@ template:
                 optional_by_labels:
                   - librbd_pwl_key
             - title: Accumulated Read Request Latency
-              priority: 2210
               context: accumulated_read_latency
               units: seconds/s
               label_promotion: []
@@ -10361,7 +9966,6 @@ template:
                   - librbd_pwl_key
               algorithm: incremental
             - title: Accumulated Write Request Latency
-              priority: 2210
               context: accumulated_write_latency
               units: seconds/s
               label_promotion: []
@@ -10393,7 +9997,6 @@ template:
                   - librbd_pwl_key
               algorithm: incremental
             - title: Accumulated Log Operation Latency
-              priority: 2210
               context: accumulated_log_operation_latency
               units: seconds/s
               label_promotion: []
@@ -10421,7 +10024,6 @@ template:
                   - librbd_pwl_key
               algorithm: incremental
             - title: Accumulated Data Operation Latency
-              priority: 2210
               context: accumulated_data_operation_latency
               units: seconds/s
               label_promotion: []
@@ -10443,7 +10045,6 @@ template:
                   - librbd_pwl_key
               algorithm: incremental
             - title: Accumulated Transaction Latency
-              priority: 2210
               context: accumulated_transaction_latency
               units: seconds/s
               label_promotion: []
@@ -10474,7 +10075,6 @@ template:
             - ceph_objectcacher_write_time_blocked
           charts:
             - title: Cache Outcomes
-              priority: 2210
               context: cache_outcomes
               units: operations/s
               label_promotion: []
@@ -10489,7 +10089,6 @@ template:
                 optional_by_labels:
                   - objectcacher_key
             - title: Cache Byte Outcomes
-              priority: 2210
               context: cache_byte_outcomes
               units: bytes/s
               label_promotion: []
@@ -10504,7 +10103,6 @@ template:
                 optional_by_labels:
                   - objectcacher_key
             - title: Data Throughput
-              priority: 2210
               context: data_throughput
               units: bytes/s
               label_promotion: []
@@ -10523,7 +10121,6 @@ template:
                 optional_by_labels:
                   - objectcacher_key
             - title: Blocked Writes
-              priority: 2210
               context: blocked_writes
               units: operations/s
               label_promotion: []
@@ -10536,7 +10133,6 @@ template:
                 optional_by_labels:
                   - objectcacher_key
             - title: Blocked Write Throughput
-              priority: 2210
               context: blocked_write_throughput
               units: bytes/s
               label_promotion: []
@@ -10549,7 +10145,6 @@ template:
                 optional_by_labels:
                   - objectcacher_key
             - title: Blocked Write Time
-              priority: 2210
               context: blocked_write_time
               units: seconds/s
               label_promotion: []
@@ -10570,7 +10165,6 @@ template:
             - ceph_finisher_queue_len
           charts:
             - title: Queued Callbacks
-              priority: 2210
               context: queue_depth
               units: callbacks
               label_promotion: []
@@ -10583,7 +10177,6 @@ template:
                 optional_by_labels:
                   - finisher_key
             - title: Drained Completion Batches
-              priority: 2210
               context: completions
               units: batches/s
               label_promotion: []
@@ -10596,7 +10189,6 @@ template:
                 optional_by_labels:
                   - finisher_key
             - title: Accumulated Completion Latency
-              priority: 2210
               context: accumulated_completion_latency
               units: seconds/s
               label_promotion: []
@@ -10627,7 +10219,6 @@ template:
             - ceph_throttle_wait_sum
           charts:
             - title: Utilization
-              priority: 2210
               context: utilization
               units: slots
               label_promotion: []
@@ -10642,7 +10233,6 @@ template:
                 optional_by_labels:
                   - throttle_key
             - title: Operations
-              priority: 2210
               context: operations
               units: operations/s
               label_promotion: []
@@ -10665,7 +10255,6 @@ template:
                 optional_by_labels:
                   - throttle_key
             - title: Slot Throughput
-              priority: 2210
               context: slot_throughput
               units: slots/s
               label_promotion: []
@@ -10681,7 +10270,6 @@ template:
                 optional_by_labels:
                   - throttle_key
             - title: Waits
-              priority: 2210
               context: wait_measurements
               units: waits/s
               label_promotion: []
@@ -10694,7 +10282,6 @@ template:
                 optional_by_labels:
                   - throttle_key
             - title: Accumulated Wait Time
-              priority: 2210
               context: accumulated_wait_time
               units: seconds/s
               label_promotion: []
@@ -10714,7 +10301,6 @@ template:
             - ceph_kernel_device_discard_threads
           charts:
             - title: Discard Operations
-              priority: 2210
               context: discard_operations
               units: operations/s
               label_promotion: []
@@ -10727,7 +10313,6 @@ template:
                 optional_by_labels:
                   - kernel_device_key
             - title: Discard Threads
-              priority: 2210
               context: discard_threads
               units: threads
               label_promotion: []
@@ -10750,7 +10335,6 @@ template:
             - ceph_mclock_shard_mclock_recovery_queue_len
           charts:
             - title: Queue Depth
-              priority: 2210
               context: queue_depth
               units: operations
               label_promotion: []
@@ -10792,7 +10376,6 @@ template:
             - ceph_async_messenger_worker_msgr_send_messages_queue_lat_sum
           charts:
             - title: Messages
-              priority: 2210
               context: messages
               units: messages/s
               label_promotion: []
@@ -10807,7 +10390,6 @@ template:
                 optional_by_labels:
                   - messenger_worker
             - title: Byte Throughput
-              priority: 2210
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -10826,7 +10408,6 @@ template:
                 optional_by_labels:
                   - messenger_worker
             - title: Connections
-              priority: 2210
               context: connections
               units: connections
               label_promotion: []
@@ -10840,7 +10421,6 @@ template:
                   - messenger_worker
               algorithm: absolute
             - title: Created Connections
-              priority: 2210
               context: created_connections
               units: connections/s
               label_promotion: []
@@ -10853,7 +10433,6 @@ template:
                 optional_by_labels:
                   - messenger_worker
             - title: Accumulated Worker Time
-              priority: 2210
               context: accumulated_worker_time
               units: seconds/s
               label_promotion: []
@@ -10873,7 +10452,6 @@ template:
                   - messenger_worker
               algorithm: incremental
             - title: Send-Queue Latency Measurements
-              priority: 2210
               context: send_queue_latency_measurements
               units: messages/s
               label_promotion: []
@@ -10886,7 +10464,6 @@ template:
                 optional_by_labels:
                   - messenger_worker
             - title: Acknowledgement Latency Measurements
-              priority: 2210
               context: ack_latency_measurements
               units: acknowledgements/s
               label_promotion: []
@@ -10899,7 +10476,6 @@ template:
                 optional_by_labels:
                   - messenger_worker
             - title: Accumulated Send-Queue Latency
-              priority: 2210
               context: accumulated_send_queue_latency
               units: seconds/s
               label_promotion: []
@@ -10913,7 +10489,6 @@ template:
                   - messenger_worker
               algorithm: incremental
             - title: Accumulated Acknowledgement Latency
-              priority: 2210
               context: accumulated_ack_latency
               units: seconds/s
               label_promotion: []
@@ -10939,7 +10514,6 @@ template:
             - ceph_async_messenger_rdma_worker_tx_parital_mem
           charts:
             - title: RDMA Transfer Errors
-              priority: 2210
               context: transfer_errors
               units: errors/s
               label_promotion: []
@@ -10956,7 +10530,6 @@ template:
                 optional_by_labels:
                   - rdma_worker
             - title: Chunk Throughput
-              priority: 2210
               context: chunk_throughput
               units: chunks/s
               label_promotion: []
@@ -10971,7 +10544,6 @@ template:
                 optional_by_labels:
                   - rdma_worker
             - title: Byte Throughput
-              priority: 2210
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -10986,7 +10558,6 @@ template:
                 optional_by_labels:
                   - rdma_worker
             - title: Pending Connections
-              priority: 2210
               context: pending_connections
               units: connections
               label_promotion: []
@@ -11021,7 +10592,6 @@ template:
             - ceph_dpdk_queue_dpdk_send_queue_length
           charts:
             - title: Packets
-              priority: 2210
               context: packets
               units: packets/s
               label_promotion: []
@@ -11036,7 +10606,6 @@ template:
                 optional_by_labels:
                   - dpdk_queue
             - title: Byte Throughput
-              priority: 2210
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -11055,7 +10624,6 @@ template:
                 optional_by_labels:
                   - dpdk_queue
             - title: Packet Fragments
-              priority: 2210
               context: packet_fragments
               units: fragments/s
               label_promotion: []
@@ -11070,7 +10638,6 @@ template:
                 optional_by_labels:
                   - dpdk_queue
             - title: Copy and Linearize Operations
-              priority: 2210
               context: copy_linearize_operations
               units: operations/s
               label_promotion: []
@@ -11089,7 +10656,6 @@ template:
                 optional_by_labels:
                   - dpdk_queue
             - title: Receive Errors
-              priority: 2210
               context: receive_errors
               units: errors/s
               label_promotion: []
@@ -11104,7 +10670,6 @@ template:
                 optional_by_labels:
                   - dpdk_queue
             - title: Last Batch Size
-              priority: 2210
               context: last_batch_size
               units: packets
               label_promotion: []
@@ -11120,7 +10685,6 @@ template:
                   - dpdk_queue
               algorithm: absolute
             - title: Send Queue Depth
-              priority: 2210
               context: send_queue_depth
               units: packets
               label_promotion: []
@@ -11144,7 +10708,6 @@ template:
             - ceph_dpdk_port_dpdk_device_send_total_errors
           charts:
             - title: Multicast Packets
-              priority: 2210
               context: multicast_packets
               units: packets/s
               label_promotion: []
@@ -11157,7 +10720,6 @@ template:
                 optional_by_labels:
                   - dpdk_port
             - title: Receive Errors
-              priority: 2210
               context: receive_errors
               units: errors/s
               label_promotion: []
@@ -11176,7 +10738,6 @@ template:
                 optional_by_labels:
                   - dpdk_port
             - title: Send Errors
-              priority: 2210
               context: send_errors
               units: errors/s
               label_promotion: []
@@ -11194,7 +10755,6 @@ template:
             - ceph_service_unique_id
           charts:
             - title: Service Identity Metadata Sentinel
-              priority: 2210
               context: identity_metadata
               units: identifier
               label_promotion: []
@@ -11219,7 +10779,6 @@ template:
             - ceph_libcephsqlite_striper_update_version
           charts:
             - title: Metadata and Lock Work
-              priority: 2210
               context: metadata_and_lock_work
               units: operations/s
               label_promotion: []
@@ -11243,7 +10802,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Shrink Throughput
-              priority: 2210
               context: shrink_throughput
               units: bytes/s
               label_promotion: []
@@ -11319,7 +10877,6 @@ template:
             - ceph_mempool_unittest_2_items
           charts:
             - title: Memory Use
-              priority: 2210
               context: memory_use
               units: bytes
               label_promotion: []
@@ -11389,7 +10946,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Item Count
-              priority: 2210
               context: item_count
               units: items
               label_promotion: []
@@ -11459,6 +11015,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: CephFS/Mirror
+      chart_defaults:
+        priority: 1820
       context_namespace: cephfs_mirror
       groups:
         - family: Service
@@ -11468,7 +11026,6 @@ template:
             - ceph_cephfs_mirror_mirrored_filesystems
           charts:
             - title: Mirrored Filesystems
-              priority: 1820
               context: filesystems
               units: filesystems
               label_promotion: []
@@ -11480,7 +11037,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Mirroring Enable Failures
-              priority: 1820
               context: enable_failures
               units: failures/s
               label_promotion: []
@@ -11498,7 +11054,6 @@ template:
             - ceph_cephfs_mirror_mirrored_filesystems_mirroring_peers
           charts:
             - title: Mirroring Peers
-              priority: 1820
               context: peers
               units: peers
               label_promotion: []
@@ -11511,7 +11066,6 @@ template:
                   - filesystem
                 optional_by_labels: []
             - title: Mirrored Directories
-              priority: 1820
               context: directories
               units: directories
               label_promotion: []
@@ -11539,7 +11093,6 @@ template:
             - ceph_cephfs_mirror_peers_sync_failures
           charts:
             - title: Snapshot Outcomes
-              priority: 1820
               context: snapshot_outcomes
               units: snapshots/s
               label_promotion: []
@@ -11561,7 +11114,6 @@ template:
                   - source_fscid
                 optional_by_labels: []
             - title: Sync-Time Measurements
-              priority: 1820
               context: sync_time_measurements
               units: snapshots/s
               label_promotion: []
@@ -11577,7 +11129,6 @@ template:
                   - source_fscid
                 optional_by_labels: []
             - title: Accumulated Sync Time
-              priority: 1820
               context: accumulated_sync_time
               units: seconds/s
               label_promotion: []
@@ -11594,7 +11145,6 @@ template:
                 optional_by_labels: []
               algorithm: incremental
             - title: Sync Throughput
-              priority: 1820
               context: sync_throughput
               units: bytes/s
               label_promotion: []
@@ -11610,7 +11160,6 @@ template:
                   - source_fscid
                 optional_by_labels: []
             - title: Last Sync Timestamps
-              priority: 1820
               context: last_sync_timestamps
               units: seconds since epoch
               label_promotion: []
@@ -11628,7 +11177,6 @@ template:
                   - source_fscid
                 optional_by_labels: []
             - title: Last Sync Duration
-              priority: 1820
               context: last_sync_duration
               units: seconds
               label_promotion: []
@@ -11644,7 +11192,6 @@ template:
                   - source_fscid
                 optional_by_labels: []
             - title: Last Sync Size
-              priority: 1820
               context: last_sync_size
               units: bytes
               label_promotion: []
@@ -11661,6 +11208,8 @@ template:
                 optional_by_labels: []
               algorithm: absolute
     - family: Object Gateway/Scheduling
+      chart_defaults:
+        priority: 1730
       context_namespace: object_gateway_scheduling
       metrics:
         - ceph_simple_throttler_outstanding
@@ -11725,7 +11274,6 @@ template:
         - ceph_dmclock_scheduler_throttle
       charts:
         - title: Queue Depth
-          priority: 1730
           context: queue_depth
           units: requests
           label_promotion: []
@@ -11743,7 +11291,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Simple Throttler Outstanding Requests
-          priority: 1730
           context: simple_throttler_outstanding
           units: requests
           label_promotion: []
@@ -11755,7 +11302,6 @@ template:
               - instance_id
             optional_by_labels: []
         - title: Simple Throttler Rejections
-          priority: 1730
           context: simple_throttler_rejections
           units: requests/s
           label_promotion: []
@@ -11768,7 +11314,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Queued Request Cost
-          priority: 1730
           context: queue_cost
           units: cost
           label_promotion: []
@@ -11786,7 +11331,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Scheduled Requests
-          priority: 1730
           context: scheduled_requests
           units: requests/s
           label_promotion: []
@@ -11812,7 +11356,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Rejected and Cancelled Requests
-          priority: 1730
           context: rejected_and_cancelled_requests
           units: requests/s
           label_promotion: []
@@ -11838,7 +11381,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Scheduled and Rejected Cost
-          priority: 1730
           context: scheduled_and_rejected_cost
           units: cost/s
           label_promotion: []
@@ -11880,7 +11422,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Scheduling-Latency Measurements
-          priority: 1730
           context: latency_measurements
           units: requests/s
           label_promotion: []
@@ -11906,7 +11447,6 @@ template:
               - ceph_daemon
             optional_by_labels: []
         - title: Accumulated Scheduling Latency
-          priority: 1730
           context: accumulated_latency
           units: seconds/s
           label_promotion: []
@@ -11933,7 +11473,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Throttled Requests
-          priority: 1730
           context: throttled_requests
           units: requests/s
           label_promotion: []
@@ -11946,7 +11485,6 @@ template:
             optional_by_labels: []
           algorithm: incremental
         - title: Outstanding Requests
-          priority: 1730
           context: outstanding_requests
           units: requests
           label_promotion: []
@@ -11958,6 +11496,8 @@ template:
               - ceph_daemon
             optional_by_labels: []
     - family: Storage Engine/Extensions
+      chart_defaults:
+        priority: 2110
       context_namespace: storage_engine_extensions
       groups:
         - family: RocksDB Binned Cache
@@ -11973,7 +11513,6 @@ template:
             - ceph_rocksdb_binned_cache_usage
           charts:
             - title: Cache Memory
-              priority: 2110
               context: memory
               units: bytes
               label_promotion: []
@@ -11990,7 +11529,6 @@ template:
                 optional_by_labels:
                   - rocksdb_cache_key
             - title: Cache Entries
-              priority: 2110
               context: entries
               units: entries
               label_promotion: []
@@ -12003,7 +11541,6 @@ template:
                 optional_by_labels:
                   - rocksdb_cache_key
             - title: Cache Insertions
-              priority: 2110
               context: insertions
               units: insertions/s
               label_promotion: []
@@ -12017,7 +11554,6 @@ template:
                   - rocksdb_cache_key
               algorithm: incremental
             - title: Cache Lookups
-              priority: 2110
               context: lookups
               units: lookups/s
               label_promotion: []
@@ -12031,7 +11567,6 @@ template:
                   - rocksdb_cache_key
               algorithm: incremental
             - title: Cache Lookup Outcomes
-              priority: 2110
               context: lookup_outcomes
               units: lookups/s
               label_promotion: []
@@ -12060,7 +11595,6 @@ template:
             - ceph_extblkdev_part_phy_size
           charts:
             - title: FCM Plugin State
-              priority: 2110
               context: plugin_state
               units: '{status}'
               label_promotion: []
@@ -12072,7 +11606,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Device Size
-              priority: 2110
               context: device_size
               units: bytes
               label_promotion: []
@@ -12086,7 +11619,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Device Utilization
-              priority: 2110
               context: device_utilization
               units: bytes
               label_promotion: []
@@ -12100,7 +11632,6 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
             - title: Partition Space
-              priority: 2110
               context: partition_space
               units: bytes
               label_promotion: []
@@ -12118,6 +11649,8 @@ template:
                   - ceph_daemon
                 optional_by_labels: []
     - family: Clients
+      chart_defaults:
+        priority: 2230
       context_namespace: ceph_clients
       metrics:
         - ceph_client_mdops
@@ -12125,7 +11658,6 @@ template:
         - ceph_client_wrops
       charts:
         - title: Client I/O Operations
-          priority: 2230
           context: io_operations
           units: operations/s
           label_promotion: []
@@ -12142,6 +11674,8 @@ template:
             optional_by_labels: []
           algorithm: incremental
     - family: NVMe-oF
+      chart_defaults:
+        priority: 2000
       context_namespace: nvme_of
       groups:
         - family: Block Devices
@@ -12157,7 +11691,6 @@ template:
             - ceph_nvmeof_bdev_written_bytes_total
           charts:
             - title: Byte Throughput
-              priority: 2000
               context: byte_throughput
               units: bytes/s
               label_promotion: []
@@ -12171,7 +11704,6 @@ template:
                   - bdev_name
                 optional_by_labels: []
             - title: Operations
-              priority: 2000
               context: operations
               units: operations/s
               label_promotion: []
@@ -12185,7 +11717,6 @@ template:
                   - bdev_name
                 optional_by_labels: []
             - title: Space and Memory
-              priority: 2000
               context: space
               units: bytes
               label_promotion: []
@@ -12197,7 +11728,6 @@ template:
                   - bdev_name
                 optional_by_labels: []
             - title: State and Metadata
-              priority: 2000
               context: state
               units: '{status}'
               label_promotion: []
@@ -12213,7 +11743,6 @@ template:
                   - rbd_name
                 optional_by_labels: []
             - title: Accumulated Time
-              priority: 2000
               context: time_accumulation
               units: seconds/s
               label_promotion: []
@@ -12234,7 +11763,6 @@ template:
             - ceph_nvmeof_subsystem_namespace_count
           charts:
             - title: Collection Duration
-              priority: 2000
               context: duration
               units: seconds
               label_promotion: []
@@ -12246,7 +11774,6 @@ template:
                   - method
                 optional_by_labels: []
             - title: Accumulated Time
-              priority: 2000
               context: time_accumulation
               units: seconds/s
               label_promotion: []
@@ -12258,7 +11785,6 @@ template:
                   - name
                 optional_by_labels: []
             - title: Namespace Count
-              priority: 2000
               context: namespace_count
               units: namespaces
               label_promotion: []
@@ -12273,7 +11799,6 @@ template:
             - ceph_nvmeof_host_keepalive_timeout
           charts:
             - title: Host Connection State
-              priority: 2000
               context: connection_state
               units: '{status}'
               label_promotion: []
@@ -12288,7 +11813,6 @@ template:
                   - nqn
                 optional_by_labels: []
             - title: Keepalive Timeout State
-              priority: 2000
               context: keepalive_timeout_state
               units: '{status}'
               label_promotion: []
@@ -12313,7 +11837,6 @@ template:
             - ceph_nvmeof_subsystem_namespace_metadata
           charts:
             - title: Configured Hosts
-              priority: 2000
               context: host_state
               units: hosts
               label_promotion: []
@@ -12325,7 +11848,6 @@ template:
                   - nqn
                 optional_by_labels: []
             - title: Listener Interface Link Speed
-              priority: 2000
               context: link_speed
               units: Mbps
               label_promotion: []
@@ -12337,7 +11859,6 @@ template:
                   - device
                 optional_by_labels: []
             - title: Listener Addresses
-              priority: 2000
               context: listener_state
               units: listeners
               label_promotion: []
@@ -12349,7 +11870,6 @@ template:
                   - nqn
                 optional_by_labels: []
             - title: Namespaces
-              priority: 2000
               context: namespace_count
               units: namespaces
               label_promotion: []
@@ -12361,7 +11881,6 @@ template:
                   - nqn
                 optional_by_labels: []
             - title: Namespace Capacity
-              priority: 2000
               context: namespace_capacity
               units: namespaces
               label_promotion: []
@@ -12375,7 +11894,6 @@ template:
                   - nqn
                 optional_by_labels: []
             - title: State and Metadata — Metadata
-              priority: 2000
               context: state_metadata
               units: '{status}'
               label_promotion: []
@@ -12392,7 +11910,6 @@ template:
                   - serial_number
                 optional_by_labels: []
             - title: State and Metadata — Namespace Metadata
-              priority: 2000
               context: state_namespace_metadata
               units: '{status}'
               label_promotion: []
