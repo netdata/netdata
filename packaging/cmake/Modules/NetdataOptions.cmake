@@ -136,25 +136,32 @@ set(NETDATA_SENTRY_DIST "" CACHE STRING "Sentry distribution channel reported wi
 set(NETDATA_SENTRY_DSN "" CACHE STRING "Sentry DSN crash events are submitted to")
 mark_as_advanced(NETDATA_SENTRY_ENVIRONMENT NETDATA_SENTRY_DIST NETDATA_SENTRY_DSN)
 
-option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
-mark_as_advanced(BUILD_FOR_PACKAGING)
+# One enum selects the install-tree layout: bundle (self-contained - the static
+# installer, kickstart-from-source, dev builds, plain cmake --install), or a
+# native package kind. A future macOS pkg is a new value here, not a scheme
+# change. packaging/build-package.sh passes deb/rpm; the Windows build scripts
+# pass msi.
+set(NETDATA_PACKAGE_KIND "bundle" CACHE STRING
+    "Install-tree layout: bundle (self-contained), deb, rpm, msi")
+set_property(CACHE NETDATA_PACKAGE_KIND PROPERTY STRINGS bundle deb rpm msi)
+mark_as_advanced(NETDATA_PACKAGE_KIND)
+if(NOT NETDATA_PACKAGE_KIND MATCHES "^(bundle|deb|rpm|msi)$")
+        message(FATAL_ERROR "Invalid NETDATA_PACKAGE_KIND '${NETDATA_PACKAGE_KIND}' (expected bundle, deb, rpm, or msi)")
+endif()
 
-# Selects which native package format the staged tree is shaped for. The empty
-# default preserves the historical (DEB-shaped) layout so existing builds are
-# unaffected; packaging/build-package.sh passes it explicitly.
-set(NETDATA_PACKAGING_FORMAT "" CACHE STRING "Native package format being built (deb, rpm, or empty)")
-mark_as_advanced(NETDATA_PACKAGING_FORMAT)
-if(NOT NETDATA_PACKAGING_FORMAT STREQUAL "" AND
-   NOT NETDATA_PACKAGING_FORMAT STREQUAL "deb" AND
-   NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
-        message(FATAL_ERROR "Invalid NETDATA_PACKAGING_FORMAT '${NETDATA_PACKAGING_FORMAT}' (expected deb, rpm, or empty)")
+# Derived, not settable: the one token for "this build stages a native package",
+# so consumers do not each spell out the disjunction of kinds.
+if(NETDATA_PACKAGE_KIND STREQUAL "bundle")
+        set(NETDATA_NATIVE_PACKAGE FALSE)
+else()
+        set(NETDATA_NATIVE_PACKAGE TRUE)
 endif()
 
 # CPack only emits Recommends: from CMake 4.1 on; older versions ignore the
 # variables silently, which would strip the weak dependencies from the RPMs
 # without any build failure. Checked here rather than in Packaging.cmake so
 # the configure fails fast.
-if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
+if(NETDATA_PACKAGE_KIND STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
         message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
 endif()
 
@@ -162,7 +169,10 @@ endif()
 # sensors3/otel stock configs and nd-mcp in the main package and the swagger
 # files in the dashboard package, while the DEB layout groups them with their
 # plugins (and swagger with the main package).
-if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+# The else arm is the historical DEB-shaped grouping; msi and bundle inherit it,
+# which is inert (CPack does not run for either). A third real package format
+# must turn this into an explicit dispatch, not lean on the else.
+if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
         set(NETDATA_SENSORS3_COMPONENT netdata)
         set(NETDATA_ND_MCP_COMPONENT netdata)
         set(NETDATA_OTEL_CONF_COMPONENT netdata)

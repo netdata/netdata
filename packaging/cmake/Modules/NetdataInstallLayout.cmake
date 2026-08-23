@@ -14,7 +14,7 @@ if(OS_WINDOWS)
   # owns the filesystem root and addresses everything from it; any other Windows
   # build is relocatable under the install prefix. NetdataPlatform used to set
   # the packaging arm, which made it read an option defined ninety lines later.
-  if(BUILD_FOR_PACKAGING)
+  if(NETDATA_NATIVE_PACKAGE)
     set(NETDATA_RUNTIME_PREFIX "/")
   else()
     netdata_windows_path_to_runtime_path(NETDATA_RUNTIME_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
@@ -90,7 +90,7 @@ set(HOST_SYSTEMD_PRESET_DEST "usr/lib/systemd/system-preset")
 
 # RPM distros ship systemd units in %{_unitdir} (/usr/lib/systemd/system); the
 # DEB layout (and the historical default) uses /lib/systemd/system.
-if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
         set(HOST_SYSTEMD_UNIT_DEST "usr/lib/systemd/system")
 else()
         set(HOST_SYSTEMD_UNIT_DEST "lib/systemd/system")
@@ -106,7 +106,7 @@ endif()
 # The logrotate host copy is the exception, guarded on OS_LINUX alone. It has
 # no packaging condition because a non-package Linux build has always staged
 # it, and adding one would change the static installer's payload.
-if(OS_LINUX AND BUILD_FOR_PACKAGING)
+if(OS_LINUX AND NETDATA_NATIVE_PACKAGE)
   set(NETDATA_STAGE_HOST_FILES TRUE)
 else()
   set(NETDATA_STAGE_HOST_FILES FALSE)

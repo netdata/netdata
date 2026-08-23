@@ -74,7 +74,7 @@ CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
     -B "${build}" \
     -G "${generator}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
-    -DBUILD_FOR_PACKAGING=On \
+    -DNETDATA_PACKAGE_KIND=msi \
     -DNETDATA_USER="${USER}" \
     -DENABLE_ML=On \
     -DENABLE_PLUGIN_GO=On \

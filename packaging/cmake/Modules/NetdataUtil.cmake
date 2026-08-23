@@ -323,7 +323,7 @@ endfunction()
 # DEB policy requires a copyright file in every binary package; RPMs
 # deliberately do not ship one.
 function(netdata_add_deb_copyright component package_name)
-        if(NETDATA_STAGE_HOST_FILES AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        if(NETDATA_STAGE_HOST_FILES AND NOT NETDATA_PACKAGE_KIND STREQUAL "rpm")
                 install(FILES
                         "${PKG_FILES_PATH}/copyright"
                         COMPONENT "${component}"

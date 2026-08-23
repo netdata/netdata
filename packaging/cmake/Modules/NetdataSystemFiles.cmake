@@ -294,7 +294,7 @@ endif()
 # EL 7 and Amazon Linux 2 package the systemd-235-compatible unit variant,
 # because their systemd predates the directives the default unit uses.
 set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service")
-if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND
+if(NETDATA_PACKAGE_KIND STREQUAL "rpm" AND
    ((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
     (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2)))
         set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235")
@@ -323,7 +323,7 @@ if(NETDATA_STAGE_HOST_FILES)
                 DESTINATION ${HOST_JOURNALD_CONF_DEST}
                 RENAME netdata.conf)
 
-        if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
                 install(FILES
                         system/systemd/50-netdata.preset
                         COMPONENT netdata
@@ -353,7 +353,7 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION ${CONFIG_DEST})
 
-if(BUILD_FOR_PACKAGING)
+if(NETDATA_NATIVE_PACKAGE)
         set(NETDATA_CONF_DEST "${CONFIG_DEST}")
 else()
         set(NETDATA_CONF_DEST "${LIBCONFIG_DEST}")
@@ -362,7 +362,7 @@ endif()
 #
 # misc files
 #
-if(NETDATA_STAGE_HOST_FILES AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+if(NETDATA_STAGE_HOST_FILES AND NOT NETDATA_PACKAGE_KIND STREQUAL "rpm")
         install(FILES
                 ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
                 COMPONENT netdata
@@ -374,7 +374,7 @@ if(NETDATA_STAGE_HOST_FILES AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
                 DESTINATION ${HOST_INITD_DEST})
 endif()
 
-if(NETDATA_STAGE_HOST_FILES AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+if(NETDATA_STAGE_HOST_FILES AND NETDATA_PACKAGE_KIND STREQUAL "rpm")
         # RPM-only payloads; no other install rule covers them.
         install(PROGRAMS
                 packaging/installer/netdata-uninstaller.sh
@@ -419,7 +419,7 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION ${NETDATA_CONF_DEST})
 
-  if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+  if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
     # RPMs ship the stock copies under /usr/lib/netdata/conf.d in addition to
     # the %config(noreplace) ones in /etc/netdata.
     install(FILES

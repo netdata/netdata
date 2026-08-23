@@ -78,7 +78,6 @@ add_cmake_option ENABLE_BUNDLED_YAML Off
 
 add_cmake_option ENABLE_LIBBACKTRACE On
 
-add_cmake_option BUILD_FOR_PACKAGING On
 
 [ -d "${SOURCE_DIR}/tmp/ibm_mq" ] && add_cmake_option FETCHCONTENT_SOURCE_DIR_IBM_MQ "${SOURCE_DIR}/tmp/ibm_mq"
 if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
@@ -91,7 +90,7 @@ fi
 
 case "${PKG_TYPE}" in
     DEB)
-        add_cmake_option NETDATA_PACKAGING_FORMAT deb
+        add_cmake_option NETDATA_PACKAGE_KIND deb
 
         case "$(dpkg-architecture -q DEB_TARGET_ARCH)" in
             amd64)
@@ -127,7 +126,7 @@ case "${PKG_TYPE}" in
         ;;
     RPM)
         # Per-distro build conditionals for the RPM family.
-        add_cmake_option NETDATA_PACKAGING_FORMAT rpm
+        add_cmake_option NETDATA_PACKAGE_KIND rpm
 
         arch="$(uname -m)"
         distro_major="$(printf '%s' "${VERSION_ID%%.*}" | tr -cd '0-9')"
