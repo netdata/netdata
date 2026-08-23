@@ -371,6 +371,7 @@ modules:
                         uri: request
                         http_status: status
                         bytes_sent: bytes_sent
+                        total_time: total_time
                     custom_numeric_fields:
                       - name: total_time
                         units: milliseconds

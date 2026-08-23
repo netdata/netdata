@@ -399,11 +399,12 @@ modules:
         list:
           - name: "Disappearing or sparse metrics not clearing alerts"
             description: |
-              The Prometheus collector detects metrics that disappear from a successful scrape response and profile-authored
-              charts expire after their configured successful-cycle lifetime. An expired chart makes its alerts `REMOVED`; it
-              is not a normal `CLEAR` transition and does not send a recovery notification. Export an explicit normal value
-              (for example `0`) whenever an alert needs a reliable recovery transition. A failed scrape does not advance the
-              expiry lifetime; use the generic collector collection-failure alert to detect that separate condition.
+              The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
+              and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or
+              dimension makes its alerts `REMOVED`; this is not a normal `CLEAR` transition and does not send a recovery
+              notification. Export an explicit normal value (for example `0`) whenever an alert needs a reliable recovery
+              transition. A failed scrape does not advance the expiry lifetime; use the generic collector collection-failure
+              alert to detect that separate condition.
     alerts: []
     metrics:
       folding:

@@ -2074,6 +2074,9 @@ func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
 					if tc.module == "x509check" {
 						assert.Contains(t, example.Config, "check_revocation_status: yes")
 					}
+					if tc.module == "weblog" {
+						assert.Contains(t, example.Config, "total_time: total_time")
+					}
 				}
 			}
 			require.Truef(t, found, "%s example %q not found", tc.module, tc.example)
@@ -2093,6 +2096,42 @@ func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
 	require.Equal(t, "httpcheck.status", httpcheckTemplates["httpcheck_web_service_up"]["on"])
 	weblogTemplates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "web_log.conf"))
 	require.Equal(t, "web_log.request_processing_time", weblogTemplates["web_log_web_slow"]["on"])
+}
+
+func TestCollector_SparseMetricGuidanceCoversChartAndDimensionExpiry(t *testing.T) {
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				ID string `yaml:"id"`
+			} `yaml:"meta"`
+			Troubleshooting struct {
+				Problems struct {
+					List []struct {
+						Name        string `yaml:"name"`
+						Description string `yaml:"description"`
+					} `yaml:"list"`
+				} `yaml:"problems"`
+			} `yaml:"troubleshooting"`
+		} `yaml:"modules"`
+	}
+	content, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(content, &metadata))
+
+	var guidance string
+	for _, module := range metadata.Modules {
+		if module.Meta.ID != "collector-go.d.plugin-prometheus-generic" {
+			continue
+		}
+		for _, problem := range module.Troubleshooting.Problems.List {
+			if problem.Name == "Disappearing or sparse metrics not clearing alerts" {
+				guidance = strings.Join(strings.Fields(problem.Description), " ")
+			}
+		}
+	}
+	require.NotEmpty(t, guidance)
+	assert.Contains(t, guidance, "Generated charts and individual dimensions expire")
+	assert.Contains(t, guidance, "An expired chart or dimension makes its alerts `REMOVED`")
 }
 
 func TestCollector_CephPhase1AlertMatrixComplete(t *testing.T) {
