@@ -835,7 +835,7 @@ exclusions:
 limitations: {}
 views:
   gateway.client_traffic.request_outcomes:
-    family: LiteLLM/Gateway/Client Traffic
+    family: Gateway/Client Traffic
     question: What does client request outcomes report for each route, status_class?
     entity: route_status_class
     inputs:
@@ -870,7 +870,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.client_traffic.failure_causes:
-    family: LiteLLM/Gateway/Client Traffic
+    family: Gateway/Client Traffic
     question: What does client failure causes report for each status_class, exception_class?
     entity: status_class_exception_class
     inputs:
@@ -905,7 +905,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.client_traffic.rate_limit_attribution:
-    family: LiteLLM/Gateway/Client Traffic
+    family: Gateway/Client Traffic
     question: What does client rate-limit attribution report for each rate_limit_category, rate_limit_type?
     entity: rate_limit_category_rate_limit_type
     inputs:
@@ -947,7 +947,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.client_traffic.in_flight_requests:
-    family: LiteLLM/Gateway/Client Traffic
+    family: Gateway/Client Traffic
     question: What does in-flight requests report for each collector job?
     entity: collector_job
     inputs:
@@ -960,7 +960,7 @@ views:
       promote: []
       omit: {}
   gateway.admission_queue.queue_time_distribution:
-    family: LiteLLM/Gateway/Admission Queue
+    family: Gateway/Admission Queue
     question: What does request queue-time distribution report for each model_id?
     entity: model_id
     inputs:
@@ -988,7 +988,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.admission_queue.queued_request_measurements:
-    family: LiteLLM/Gateway/Admission Queue
+    family: Gateway/Admission Queue
     question: What does queued request measurements report for each model_id?
     entity: model_id
     inputs:
@@ -1016,7 +1016,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.admission_queue.accumulated_queue_time:
-    family: LiteLLM/Gateway/Admission Queue
+    family: Gateway/Admission Queue
     question: What does accumulated request queue time report for each model_id?
     entity: model_id
     inputs:
@@ -1044,7 +1044,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.request_latency.distribution:
-    family: LiteLLM/Gateway/Request Latency
+    family: Gateway/Request Latency
     question: What does end-to-end request-latency distribution report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1072,7 +1072,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.request_latency.measurements:
-    family: LiteLLM/Gateway/Request Latency
+    family: Gateway/Request Latency
     question: What does end-to-end request measurements report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1100,7 +1100,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.request_latency.accumulated_time:
-    family: LiteLLM/Gateway/Request Latency
+    family: Gateway/Request Latency
     question: What does accumulated end-to-end request time report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1128,7 +1128,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.processing_overhead.distribution:
-    family: LiteLLM/Gateway/Processing Overhead
+    family: Gateway/Processing Overhead
     question: What does litellm overhead-latency distribution report for each model_id?
     entity: model_id
     inputs:
@@ -1151,7 +1151,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.processing_overhead.measurements:
-    family: LiteLLM/Gateway/Processing Overhead
+    family: Gateway/Processing Overhead
     question: What does litellm overhead measurements report for each model_id?
     entity: model_id
     inputs:
@@ -1174,7 +1174,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.processing_overhead.accumulated_time:
-    family: LiteLLM/Gateway/Processing Overhead
+    family: Gateway/Processing Overhead
     question: What does accumulated litellm overhead report for each model_id?
     entity: model_id
     inputs:
@@ -1197,7 +1197,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.processing_overhead.guardrail_inclusive_distribution:
-    family: LiteLLM/Gateway/Processing Overhead
+    family: Gateway/Processing Overhead
     question: What does guardrail-inclusive overhead distribution report for each model_id?
     entity: model_id
     inputs:
@@ -1220,7 +1220,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.processing_overhead.guardrail_inclusive_measurements:
-    family: LiteLLM/Gateway/Processing Overhead
+    family: Gateway/Processing Overhead
     question: What does guardrail-inclusive overhead measurements report for each model_id?
     entity: model_id
     inputs:
@@ -1243,7 +1243,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   gateway.processing_overhead.accumulated_guardrail_inclusive_time:
-    family: LiteLLM/Gateway/Processing Overhead
+    family: Gateway/Processing Overhead
     question: What does accumulated guardrail-inclusive overhead report for each model_id?
     entity: model_id
     inputs:
@@ -1266,7 +1266,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.deployment_requests.workload:
-    family: LiteLLM/Routing and Deployments/Deployment Requests
+    family: Routing and Deployments/Deployment Requests
     question: What does deployment request workload report for each model_id?
     entity: model_id
     inputs:
@@ -1293,7 +1293,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.deployment_requests.outcomes:
-    family: LiteLLM/Routing and Deployments/Deployment Requests
+    family: Routing and Deployments/Deployment Requests
     question: What does classified deployment outcomes report for each model_id?
     entity: model_id
     inputs:
@@ -1327,7 +1327,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.deployment_requests.failure_causes:
-    family: LiteLLM/Routing and Deployments/Deployment Requests
+    family: Routing and Deployments/Deployment Requests
     question: What does deployment failure causes report for each model_id, status_class, exception_class?
     entity: model_id_status_class_exception_class
     inputs:
@@ -1360,7 +1360,7 @@ views:
       evidence:
       - display_conventions
   routing.deployment_health.cooldowns:
-    family: LiteLLM/Routing and Deployments/Deployment Health
+    family: Routing and Deployments/Deployment Health
     question: What does deployment cooldowns report for each model_id, status_class?
     entity: model_id_status_class
     inputs:
@@ -1381,7 +1381,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.deployment_health.state:
-    family: LiteLLM/Routing and Deployments/Deployment Health
+    family: Routing and Deployments/Deployment Health
     question: What does deployment state report for each model_id?
     entity: model_id_with_pid
     inputs:
@@ -1401,7 +1401,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.deployment_capacity.request_limit:
-    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    family: Routing and Deployments/Deployment Capacity
     question: What does deployment request limit report for each model_id?
     entity: model_id_with_pid
     inputs:
@@ -1426,7 +1426,7 @@ views:
       evidence:
       - display_conventions
   routing.deployment_capacity.token_limit:
-    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    family: Routing and Deployments/Deployment Capacity
     question: What does deployment token limit report for each model_id?
     entity: model_id_with_pid
     inputs:
@@ -1451,7 +1451,7 @@ views:
       evidence:
       - display_conventions
   routing.deployment_capacity.remaining_requests:
-    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    family: Routing and Deployments/Deployment Capacity
     question: What does provider remaining requests report for each model_id?
     entity: model_id_with_pid
     inputs:
@@ -1476,7 +1476,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.deployment_capacity.remaining_tokens:
-    family: LiteLLM/Routing and Deployments/Deployment Capacity
+    family: Routing and Deployments/Deployment Capacity
     question: What does provider remaining tokens report for each model_id?
     entity: model_id_with_pid
     inputs:
@@ -1501,7 +1501,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.output_token_latency.distribution:
-    family: LiteLLM/Routing and Deployments/Output-Token Latency
+    family: Routing and Deployments/Output-Token Latency
     question: What does deployment output-token latency distribution report for each model_id?
     entity: model_id
     inputs:
@@ -1527,7 +1527,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.output_token_latency.measurements:
-    family: LiteLLM/Routing and Deployments/Output-Token Latency
+    family: Routing and Deployments/Output-Token Latency
     question: What does deployment output-token latency measurements report for each model_id?
     entity: model_id
     inputs:
@@ -1553,7 +1553,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.output_token_latency.accumulated_time:
-    family: LiteLLM/Routing and Deployments/Output-Token Latency
+    family: Routing and Deployments/Output-Token Latency
     question: What does accumulated deployment output-token latency report for each model_id?
     entity: model_id
     inputs:
@@ -1579,7 +1579,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   routing.fallbacks.outcomes:
-    family: LiteLLM/Routing and Deployments/Fallbacks
+    family: Routing and Deployments/Fallbacks
     question: What does fallback outcomes report for each requested_model, fallback_model?
     entity: requested_model_fallback_model
     inputs:
@@ -1607,7 +1607,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   provider_api.latency_distribution:
-    family: LiteLLM/Provider API
+    family: Provider API
     question: What does provider api latency distribution report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1635,7 +1635,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   provider_api.latency_measurements:
-    family: LiteLLM/Provider API
+    family: Provider API
     question: What does provider api latency measurements report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1663,7 +1663,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   provider_api.accumulated_latency:
-    family: LiteLLM/Provider API
+    family: Provider API
     question: What does accumulated provider api latency report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1691,7 +1691,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   provider_api.time_to_first_token_distribution:
-    family: LiteLLM/Provider API
+    family: Provider API
     question: What does provider time-to-first-token distribution report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1719,7 +1719,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   provider_api.time_to_first_token_measurements:
-    family: LiteLLM/Provider API
+    family: Provider API
     question: What does provider time-to-first-token measurements report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1747,7 +1747,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   provider_api.accumulated_time_to_first_token:
-    family: LiteLLM/Provider API
+    family: Provider API
     question: What does accumulated provider time-to-first-token report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1775,7 +1775,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.deployment.request_token_throughput:
-    family: LiteLLM/Usage and Cost/By Deployment
+    family: Usage and Cost/By Deployment
     question: What does request token throughput report for each model_id?
     entity: model_id
     inputs:
@@ -1808,7 +1808,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.deployment.total_token_throughput:
-    family: LiteLLM/Usage and Cost/By Deployment
+    family: Usage and Cost/By Deployment
     question: What does reported total token throughput report for each model_id?
     entity: model_id
     inputs:
@@ -1837,7 +1837,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.deployment.spend:
-    family: LiteLLM/Usage and Cost/By Deployment
+    family: Usage and Cost/By Deployment
     question: What does llm spend report for each model_id, service_tier?
     entity: model_id_service_tier
     inputs:
@@ -1870,7 +1870,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.deployment.specialized_token_throughput:
-    family: LiteLLM/Usage and Cost/By Deployment
+    family: Usage and Cost/By Deployment
     question: What does audio and reasoning token throughput report for each model_id?
     entity: model_id
     inputs:
@@ -1905,7 +1905,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.deployment.generated_images:
-    family: LiteLLM/Usage and Cost/By Deployment
+    family: Usage and Cost/By Deployment
     question: What does generated images report for each model_id?
     entity: model_id
     inputs:
@@ -1934,7 +1934,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.deployment.generated_video_duration:
-    family: LiteLLM/Usage and Cost/By Deployment
+    family: Usage and Cost/By Deployment
     question: What does generated video duration report for each model_id?
     entity: model_id
     inputs:
@@ -1963,7 +1963,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.api_key.request_token_throughput:
-    family: LiteLLM/Usage and Cost/By API Key
+    family: Usage and Cost/By API Key
     question: What does request token throughput by api key report for each hashed_api_key?
     entity: hashed_api_key
     inputs:
@@ -1996,7 +1996,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.api_key.total_token_throughput:
-    family: LiteLLM/Usage and Cost/By API Key
+    family: Usage and Cost/By API Key
     question: What does reported total token throughput by api key report for each hashed_api_key?
     entity: hashed_api_key
     inputs:
@@ -2025,7 +2025,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.api_key.spend:
-    family: LiteLLM/Usage and Cost/By API Key
+    family: Usage and Cost/By API Key
     question: What does llm spend by api key report for each hashed_api_key?
     entity: hashed_api_key
     inputs:
@@ -2059,7 +2059,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.team.request_token_throughput:
-    family: LiteLLM/Usage and Cost/By Team
+    family: Usage and Cost/By Team
     question: What does request token throughput by team report for each team?
     entity: team
     inputs:
@@ -2092,7 +2092,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.team.total_token_throughput:
-    family: LiteLLM/Usage and Cost/By Team
+    family: Usage and Cost/By Team
     question: What does reported total token throughput by team report for each team?
     entity: team
     inputs:
@@ -2121,7 +2121,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.team.spend:
-    family: LiteLLM/Usage and Cost/By Team
+    family: Usage and Cost/By Team
     question: What does llm spend by team report for each team?
     entity: team
     inputs:
@@ -2155,7 +2155,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.user.request_token_throughput:
-    family: LiteLLM/Usage and Cost/By User
+    family: Usage and Cost/By User
     question: What does request token throughput by user report for each user?
     entity: user
     inputs:
@@ -2188,7 +2188,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.user.total_token_throughput:
-    family: LiteLLM/Usage and Cost/By User
+    family: Usage and Cost/By User
     question: What does reported total token throughput by user report for each user?
     entity: user
     inputs:
@@ -2217,7 +2217,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.user.spend:
-    family: LiteLLM/Usage and Cost/By User
+    family: Usage and Cost/By User
     question: What does llm spend by user report for each user?
     entity: user
     inputs:
@@ -2251,7 +2251,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.organization.request_token_throughput:
-    family: LiteLLM/Usage and Cost/By Organization
+    family: Usage and Cost/By Organization
     question: What does request token throughput by organization report for each org_id?
     entity: org_id
     inputs:
@@ -2284,7 +2284,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.organization.total_token_throughput:
-    family: LiteLLM/Usage and Cost/By Organization
+    family: Usage and Cost/By Organization
     question: What does reported total token throughput by organization report for each org_id?
     entity: org_id
     inputs:
@@ -2313,7 +2313,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.organization.spend:
-    family: LiteLLM/Usage and Cost/By Organization
+    family: Usage and Cost/By Organization
     question: What does llm spend by organization report for each org_id?
     entity: org_id
     inputs:
@@ -2347,7 +2347,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.end_user.request_token_throughput:
-    family: LiteLLM/Usage and Cost/By End User
+    family: Usage and Cost/By End User
     question: What does request token throughput by end user report for each end_user?
     entity: end_user
     inputs:
@@ -2380,7 +2380,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.end_user.total_token_throughput:
-    family: LiteLLM/Usage and Cost/By End User
+    family: Usage and Cost/By End User
     question: What does reported total token throughput by end user report for each end_user?
     entity: end_user
     inputs:
@@ -2409,7 +2409,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.end_user.spend:
-    family: LiteLLM/Usage and Cost/By End User
+    family: Usage and Cost/By End User
     question: What does llm spend by end user report for each end_user?
     entity: end_user
     inputs:
@@ -2443,7 +2443,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.requested_model.request_token_throughput:
-    family: LiteLLM/Usage and Cost/By Requested Model
+    family: Usage and Cost/By Requested Model
     question: What does request token throughput by requested model report for each requested_model?
     entity: requested_model
     inputs:
@@ -2476,7 +2476,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.requested_model.total_token_throughput:
-    family: LiteLLM/Usage and Cost/By Requested Model
+    family: Usage and Cost/By Requested Model
     question: What does reported total token throughput by requested model report for each requested_model?
     entity: requested_model
     inputs:
@@ -2505,7 +2505,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   usage.requested_model.spend:
-    family: LiteLLM/Usage and Cost/By Requested Model
+    family: Usage and Cost/By Requested Model
     question: What does llm spend by requested model report for each requested_model?
     entity: requested_model
     inputs:
@@ -2539,7 +2539,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   caching.outcomes:
-    family: LiteLLM/Caching
+    family: Caching
     question: What does cache outcomes report for each model_id?
     entity: model_id
     inputs:
@@ -2568,7 +2568,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   caching.cached_token_throughput:
-    family: LiteLLM/Caching
+    family: Caching
     question: What does litellm cached token throughput report for each model_id?
     entity: model_id
     inputs:
@@ -2593,7 +2593,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   caching.request_cache_token_throughput:
-    family: LiteLLM/Caching
+    family: Caching
     question: What does request input-cache token throughput report for each model_id?
     entity: model_id
     inputs:
@@ -2624,7 +2624,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   caching.provider_cache_token_throughput:
-    family: LiteLLM/Caching
+    family: Caching
     question: What does provider cache token throughput report for each model_id?
     entity: model_id
     inputs:
@@ -2653,7 +2653,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   governance.api_keys.remaining_budget:
-    family: LiteLLM/Governance/API Keys
+    family: Governance/API Keys
     question: What does api-key remaining budget report for each hashed_api_key?
     entity: hashed_api_key_with_pid
     inputs:
@@ -2667,7 +2667,7 @@ views:
       - api_key_alias
       omit: {}
   governance.api_keys.budget_limit:
-    family: LiteLLM/Governance/API Keys
+    family: Governance/API Keys
     question: What does api-key budget limit report for each hashed_api_key?
     entity: hashed_api_key_with_pid
     inputs:
@@ -2681,7 +2681,7 @@ views:
       - api_key_alias
       omit: {}
   governance.api_keys.budget_reset_window:
-    family: LiteLLM/Governance/API Keys
+    family: Governance/API Keys
     question: What does api-key budget reset window report for each hashed_api_key?
     entity: hashed_api_key_with_pid
     inputs:
@@ -2700,7 +2700,7 @@ views:
       evidence:
       - display_conventions
   governance.api_keys.model_request_headroom:
-    family: LiteLLM/Governance/API Keys
+    family: Governance/API Keys
     question: What does api-key model request headroom report for each hashed_api_key, model?
     entity: hashed_api_key_model_with_pid
     inputs:
@@ -2721,7 +2721,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   governance.api_keys.model_token_headroom:
-    family: LiteLLM/Governance/API Keys
+    family: Governance/API Keys
     question: What does api-key model token headroom report for each hashed_api_key, model?
     entity: hashed_api_key_model_with_pid
     inputs:
@@ -2742,7 +2742,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   governance.organizations.remaining_budget:
-    family: LiteLLM/Governance/Organizations
+    family: Governance/Organizations
     question: What does organization remaining budget report for each org_id?
     entity: org_id_with_pid
     inputs:
@@ -2756,7 +2756,7 @@ views:
       - org_alias
       omit: {}
   governance.organizations.budget_limit:
-    family: LiteLLM/Governance/Organizations
+    family: Governance/Organizations
     question: What does organization budget limit report for each org_id?
     entity: org_id_with_pid
     inputs:
@@ -2770,7 +2770,7 @@ views:
       - org_alias
       omit: {}
   governance.organizations.budget_reset_window:
-    family: LiteLLM/Governance/Organizations
+    family: Governance/Organizations
     question: What does organization budget reset window report for each org_id?
     entity: org_id_with_pid
     inputs:
@@ -2789,7 +2789,7 @@ views:
       evidence:
       - display_conventions
   governance.teams.remaining_budget:
-    family: LiteLLM/Governance/Teams
+    family: Governance/Teams
     question: What does team remaining budget report for each team?
     entity: team_with_pid
     inputs:
@@ -2803,7 +2803,7 @@ views:
       - team_alias
       omit: {}
   governance.teams.budget_limit:
-    family: LiteLLM/Governance/Teams
+    family: Governance/Teams
     question: What does team budget limit report for each team?
     entity: team_with_pid
     inputs:
@@ -2817,7 +2817,7 @@ views:
       - team_alias
       omit: {}
   governance.teams.budget_reset_window:
-    family: LiteLLM/Governance/Teams
+    family: Governance/Teams
     question: What does team budget reset window report for each team?
     entity: team_with_pid
     inputs:
@@ -2836,7 +2836,7 @@ views:
       evidence:
       - display_conventions
   governance.teams.membership:
-    family: LiteLLM/Governance/Teams
+    family: Governance/Teams
     question: What does team membership report for each team?
     entity: team_with_pid
     inputs:
@@ -2850,7 +2850,7 @@ views:
       - team_alias
       omit: {}
   governance.users.remaining_budget:
-    family: LiteLLM/Governance/Users
+    family: Governance/Users
     question: What does user remaining budget report for each user?
     entity: user_with_pid
     inputs:
@@ -2869,7 +2869,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   governance.users.budget_limit:
-    family: LiteLLM/Governance/Users
+    family: Governance/Users
     question: What does user budget limit report for each user?
     entity: user_with_pid
     inputs:
@@ -2888,7 +2888,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   governance.users.budget_reset_window:
-    family: LiteLLM/Governance/Users
+    family: Governance/Users
     question: What does user budget reset window report for each user?
     entity: user_with_pid
     inputs:
@@ -2912,7 +2912,7 @@ views:
       evidence:
       - display_conventions
   governance.providers.remaining_budget:
-    family: LiteLLM/Governance/Providers
+    family: Governance/Providers
     question: What does provider remaining budget report for each api_provider?
     entity: api_provider_with_pid
     inputs:
@@ -2925,7 +2925,7 @@ views:
       promote: []
       omit: {}
   guardrails.invocations:
-    family: LiteLLM/Guardrails
+    family: Guardrails
     question: What does guardrail invocations report for each guardrail_name, hook_type, status?
     entity: guardrail_name_hook_type_status
     inputs:
@@ -2942,7 +2942,7 @@ views:
       reducer: sum
       lost_comparison: Per-error-type invocation comparison remains available in the guardrail error view.
   guardrails.errors:
-    family: LiteLLM/Guardrails
+    family: Guardrails
     question: What does guardrail errors report for each guardrail_name, hook_type, error_type?
     entity: guardrail_name_hook_type_error_type
     inputs:
@@ -2955,7 +2955,7 @@ views:
       promote: []
       omit: {}
   guardrails.latency_distribution:
-    family: LiteLLM/Guardrails
+    family: Guardrails
     question: What does guardrail latency distribution report for each guardrail_name, hook_type?
     entity: guardrail_name_hook_type
     inputs:
@@ -2974,7 +2974,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   guardrails.accumulated_latency:
-    family: LiteLLM/Guardrails
+    family: Guardrails
     question: What does accumulated guardrail latency report for each guardrail_name, hook_type?
     entity: guardrail_name_hook_type
     inputs:
@@ -2993,7 +2993,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   mcp.tool_calls:
-    family: LiteLLM/MCP Gateway
+    family: MCP Gateway
     question: What does mcp tool calls report for each mcp_server_name, mcp_tool_name?
     entity: mcp_server_name_mcp_tool_name
     inputs:
@@ -3016,7 +3016,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   mcp.tool_call_spend:
-    family: LiteLLM/MCP Gateway
+    family: MCP Gateway
     question: What does mcp tool-call spend report for each mcp_server_name, mcp_tool_name?
     entity: mcp_server_name_mcp_tool_name
     inputs:
@@ -3039,7 +3039,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   managed.batches_created:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does managed batches created report for each api_provider, model?
     entity: api_provider_model
     inputs:
@@ -3059,7 +3059,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   managed.batches_cost_tracked:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does successfully cost-tracked batches report for each api_provider, model?
     entity: api_provider_model
     inputs:
@@ -3072,7 +3072,7 @@ views:
       promote: []
       omit: {}
   managed.batch_cost_errors:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does batch-cost processing errors report for each collector job?
     entity: collector_job
     inputs:
@@ -3090,7 +3090,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   managed.files_created:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does managed files created report for each api_provider, model?
     entity: api_provider_model
     inputs:
@@ -3110,7 +3110,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   managed.file_deletions:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does managed file deletions report for each result?
     entity: result
     inputs:
@@ -3123,7 +3123,7 @@ views:
       promote: []
       omit: {}
   managed.batch_duration_distribution:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does managed batch duration distribution report for each api_provider, model?
     entity: api_provider_model
     inputs:
@@ -3136,7 +3136,7 @@ views:
       promote: []
       omit: {}
   managed.batches_completed:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does completed managed batches report for each api_provider, model?
     entity: api_provider_model
     inputs:
@@ -3149,7 +3149,7 @@ views:
       promote: []
       omit: {}
   managed.accumulated_batch_duration:
-    family: LiteLLM/Managed Batches and Files
+    family: Managed Batches and Files
     question: What does accumulated managed batch duration report for each api_provider, model?
     entity: api_provider_model
     inputs:
@@ -3162,7 +3162,7 @@ views:
       promote: []
       omit: {}
   inventory.total_users:
-    family: LiteLLM/Inventory and Callbacks
+    family: Inventory and Callbacks
     question: What does total users report for each collector job?
     entity: worker_with_pid
     inputs:
@@ -3175,7 +3175,7 @@ views:
       promote: []
       omit: {}
   inventory.billable_users:
-    family: LiteLLM/Inventory and Callbacks
+    family: Inventory and Callbacks
     question: What does billable users report for each collector job?
     entity: worker_with_pid
     inputs:
@@ -3188,7 +3188,7 @@ views:
       promote: []
       omit: {}
   inventory.teams:
-    family: LiteLLM/Inventory and Callbacks
+    family: Inventory and Callbacks
     question: What does teams report for each collector job?
     entity: worker_with_pid
     inputs:
@@ -3201,7 +3201,7 @@ views:
       promote: []
       omit: {}
   inventory.callback_logging_failures:
-    family: LiteLLM/Inventory and Callbacks
+    family: Inventory and Callbacks
     question: What does callback logging failures report for each callback_name?
     entity: callback_name
     inputs:
@@ -3214,7 +3214,7 @@ views:
       promote: []
       omit: {}
   internal_services.request_outcomes:
-    family: LiteLLM/Internal Services
+    family: Internal Services
     question: What does internal service request outcomes report for each service?
     entity: service
     inputs:
@@ -3254,7 +3254,7 @@ views:
       lost_comparison: Per-worker, per-request, caller-accounting, and custom-label comparisons are intentionally omitted
         from this view.
   internal_services.failure_causes:
-    family: LiteLLM/Internal Services
+    family: Internal Services
     question: What does internal service failure causes report for each function_name, error_class?
     entity: function_name_error_class
     inputs:
@@ -3289,7 +3289,7 @@ views:
       evidence:
       - display_conventions
   internal_services.latency_distribution:
-    family: LiteLLM/Internal Services
+    family: Internal Services
     question: What does internal service latency distribution report for each service?
     entity: service
     inputs:
@@ -3318,7 +3318,7 @@ views:
         router: This source label does not define the selected operator entity or a useful chart dimension/label.
         self: This source label does not define the selected operator entity or a useful chart dimension/label.
   internal_services.accumulated_latency:
-    family: LiteLLM/Internal Services
+    family: Internal Services
     question: What does accumulated internal service latency report for each service?
     entity: service
     inputs:

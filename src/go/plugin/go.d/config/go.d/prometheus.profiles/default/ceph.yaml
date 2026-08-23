@@ -278,7 +278,6 @@ relabeling:
         target_label: __name__
         replacement: ceph_throttle_${2}
 template:
-  family: Ceph
   context_namespace: ceph
   groups:
     - family: Capacity
