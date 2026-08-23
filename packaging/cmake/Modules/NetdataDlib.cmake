@@ -34,14 +34,12 @@ function(netdata_bundle_dlib)
     FetchContent_Declare(dlib
       GIT_REPOSITORY ${repo}
       GIT_TAG ${tag}
-      CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
       EXCLUDE_FROM_ALL
     )
   else()
     FetchContent_Declare(dlib
       GIT_REPOSITORY ${repo}
       GIT_TAG ${tag}
-      CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
     )
   endif()
 

@@ -41,7 +41,6 @@ function(netdata_bundle_protobuf)
                             PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
                                         ${absl_SOURCE_DIR}
                                         ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
-                            CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                             EXCLUDE_FROM_ALL
                     )
                 else()
@@ -52,7 +51,6 @@ function(netdata_bundle_protobuf)
                             PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
                                         ${absl_SOURCE_DIR}
                                         ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
-                            CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                     )
                 endif()
                 FetchContent_MakeAvailable_NoInstall(absl)
@@ -70,14 +68,12 @@ function(netdata_bundle_protobuf)
                 FetchContent_Declare(protobuf
                         GIT_REPOSITORY ${protobuf_repo}
                         GIT_TAG ${PROTOBUF_TAG}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                         EXCLUDE_FROM_ALL
                 )
         else()
                 FetchContent_Declare(protobuf
                         GIT_REPOSITORY ${protobuf_repo}
                         GIT_TAG ${PROTOBUF_TAG}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                 )
         endif()
         FetchContent_MakeAvailable_NoInstall(protobuf)

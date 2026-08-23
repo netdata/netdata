@@ -22,7 +22,6 @@ function(netdata_bundle_sentry)
                 sentry
                 GIT_REPOSITORY https://github.com/getsentry/sentry-native.git
                 GIT_TAG 6ebd29bd9742fd2f93b6770b5023e31a8efbc10e # v0.13.5
-                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
         )
         FetchContent_MakeAvailable(sentry)
 endfunction()
