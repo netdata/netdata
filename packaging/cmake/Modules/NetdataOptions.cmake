@@ -176,3 +176,15 @@ option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OF
 
 set(DASHBOARD_URL "https://app.netdata.cloud/agent.tar.gz" CACHE STRING
     "URL used to fetch the local agent dashboard code")
+
+# Both were settable from the command line and declared nowhere, so neither
+# appeared in ccmake and no search for the build's knobs could find them.
+set(WEB_DIR "usr/share/netdata/web" CACHE STRING
+    "Install-relative directory for the dashboard web files (Debian packages use var/lib/netdata/www)")
+
+# STRING rather than PATH on purpose: PATH resolves a relative value against the
+# directory cmake was invoked from, and the idiom this replaces passed any -D value
+# through untouched.
+set(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR "" CACHE STRING
+    "Directory holding prebuilt topology IP-intelligence stock data to ship")
+mark_as_advanced(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)

@@ -217,17 +217,12 @@ set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/${PLUGINS_DEST}")
 set(STOCK_DATA_DIR "${NETDATA_RUNTIME_PREFIX}/${STOCK_DATA_DEST}")
 set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/${VARLIB_DEST}")
 set(NETDATA_BIN_DIR "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
-if(NOT DEFINED NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
-  set(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR "")
-endif()
-
-# A non-default value is only used when building Debian packages (/var/lib/netdata/www)
-if(NOT DEFINED WEB_DIR)
-  set(WEB_DIR "usr/share/netdata/web")
-else()
-  string(REGEX REPLACE "^/" "" WEB_DIR "${WEB_DIR}")
-endif()
-set(WEB_DEST "${WEB_DIR}")
+# WEB_DIR arrives install-relative and is declared in the options module. A
+# leading slash is tolerated because the Debian packaging passes an absolute path.
+# From the last line on, the name means the runtime absolute path instead; that
+# second value is a plain variable and shadows the cache entry for every read
+# after it, which is also what happens today when -DWEB_DIR= is passed.
+string(REGEX REPLACE "^/" "" WEB_DEST "${WEB_DIR}")
 set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
 # Host integration paths. These directories belong to the platform, not to
