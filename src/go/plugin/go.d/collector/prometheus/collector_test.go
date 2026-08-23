@@ -2671,6 +2671,7 @@ func collectCephPlan(t *testing.T, body []byte) cephCollectorPlan {
 	collr := New()
 	collr.URL = srv.URL
 	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	collr.MaxTS = 20_000
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 	t.Cleanup(func() { collr.Cleanup(context.Background()) })
