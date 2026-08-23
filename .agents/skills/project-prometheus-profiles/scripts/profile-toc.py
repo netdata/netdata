@@ -56,6 +56,22 @@ def build_tree(profile: dict) -> Node:
         raise ValueError("profile has no template mapping")
 
     root = Node(normalize(template.get("family")) or "(root)")
+
+    def add_charts(group: dict, node: Node, context_parts: list[str], effective_priority: int) -> None:
+        for chart in group.get("charts") or []:
+            if not isinstance(chart, dict):
+                continue
+            context = ".".join(part for part in (*context_parts, normalize(chart.get("context"))) if part)
+            if not context:
+                context = "(no context)"
+            value = chart.get("priority")
+            priority = effective_priority if value is None or int(value) == 0 else int(value)
+            if priority <= 0:
+                priority = DEFAULT_PRIORITY
+            node.charts.append(Chart(context, priority))
+
+    root_priority = group_priority(template, 0)
+    add_charts(template, root, [], root_priority)
     groups = template.get("groups")
     if not isinstance(groups, list):
         return root
@@ -70,24 +86,13 @@ def build_tree(profile: dict) -> Node:
         child_context_parts = context_parts + ([namespace] if namespace else [])
         effective_priority = group_priority(group, inherited_priority)
 
-        for chart in group.get("charts") or []:
-            if not isinstance(chart, dict):
-                continue
-            context = ".".join(part for part in (*child_context_parts, normalize(chart.get("context"))) if part)
-            if not context:
-                context = "(no context)"
-            value = chart.get("priority")
-            priority = effective_priority if value is None or int(value) == 0 else int(value)
-            if priority <= 0:
-                priority = DEFAULT_PRIORITY
-            node.charts.append(Chart(context, priority))
+        add_charts(group, node, child_context_parts, effective_priority)
 
         for child in group.get("groups") or []:
             add_group(child, node, child_context_parts, effective_priority)
 
-    inherited_priority = group_priority(template, 0)
     for group in groups:
-        add_group(group, root, [], inherited_priority)
+        add_group(group, root, [], root_priority)
     return root
 
 

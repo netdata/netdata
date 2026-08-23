@@ -91,7 +91,7 @@ func buildSemanticSnapshot(
 	}
 	snapshot.PlanActions = planActions
 	for _, profile := range profiles {
-		fact, err := semanticProfileFact(profile, owners)
+		fact, err := semanticProfileFact(profile, refs, owners)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -304,6 +304,7 @@ func hasJobPolicyKey(policy jobPolicy, key string) bool {
 
 func semanticProfileFact(
 	profile promprofiles.Profile,
+	refs []chartRef,
 	owners map[string]semanticChartOwner,
 ) (promreplay.SemanticProfile, error) {
 	fact := promreplay.SemanticProfile{
@@ -339,7 +340,10 @@ func semanticProfileFact(
 		return fact, err
 	}
 	fact.ContextNamespace = template.ContextNamespace
-	fact.Charts = semanticChartPolicies(profile.Name, template, owners)
+	fact.Charts, err = semanticChartPolicies(profile.Name, template, refs, owners)
+	if err != nil {
+		return fact, err
+	}
 	return fact, nil
 }
 
@@ -367,48 +371,42 @@ func semanticChartOwners(refs []chartRef) (map[string]semanticChartOwner, error)
 func semanticChartPolicies(
 	profileName string,
 	root charttpl.Group,
+	refs []chartRef,
 	owners map[string]semanticChartOwner,
-) []promreplay.SemanticChartPolicy {
+) ([]promreplay.SemanticChartPolicy, error) {
 	idsByPath := make(map[string]string)
 	for id, owner := range owners {
 		if owner.profile == profileName {
 			idsByPath[owner.path] = id
 		}
 	}
-	var out []promreplay.SemanticChartPolicy
-	var walk func(charttpl.Group, []int, *charttpl.Instances, int)
-	walk = func(group charttpl.Group, groupPath []int, inherited *charttpl.Instances, inheritedPriority int) {
-		effective := inherited
-		effectivePriority := inheritedPriority
-		if group.ChartDefaults != nil {
-			if group.ChartDefaults.Instances != nil {
-				effective = group.ChartDefaults.Instances
-			}
-			if group.ChartDefaults.Priority != 0 {
-				effectivePriority = group.ChartDefaults.Priority
-			}
+	resolvedByPath := make(map[string]charttpl.Chart)
+	for _, ref := range refs {
+		if ref.profile == profileName {
+			resolvedByPath[ref.sourcePath] = ref.chart
 		}
+	}
+	var out []promreplay.SemanticChartPolicy
+	var walk func(charttpl.Group, []int) error
+	walk = func(group charttpl.Group, groupPath []int) error {
 		for index, chart := range group.Charts {
-			instances := effective
-			if chart.Instances != nil {
-				instances = chart.Instances
-			}
-			priority := effectivePriority
-			if chart.Priority != 0 {
-				priority = chart.Priority
-			}
 			path := profileChartPath(groupPath, index)
+			// Merged refs come from the authoritative decoder, so group defaults are already materialized.
+			resolved, ok := resolvedByPath[path]
+			if !ok {
+				return fmt.Errorf("profile %q chart %q has no resolved merged template", profileName, path)
+			}
 			policy := promreplay.SemanticChartPolicy{
 				RuntimePath:         path,
 				TemplateID:          idsByPath[path],
 				ExplicitID:          chart.ID,
-				Priority:            priority,
+				Priority:            resolved.Priority,
 				DeclaredAlgorithm:   chart.Algorithm,
 				DeclaredAggregation: string(chart.Aggregation),
 				DeclaredType:        chart.Type,
 			}
-			if instances != nil {
-				policy.WildcardIdentity = slices.Contains(instances.ByLabels, "*")
+			if resolved.Instances != nil {
+				policy.WildcardIdentity = slices.Contains(resolved.Instances.ByLabels, "*")
 			}
 			if chart.Lifecycle != nil {
 				policy.MaxInstances = chart.Lifecycle.MaxInstances
@@ -432,11 +430,16 @@ func semanticChartPolicies(
 			out = append(out, policy)
 		}
 		for index, child := range group.Groups {
-			walk(child, append(slices.Clone(groupPath), index), effective, effectivePriority)
+			if err := walk(child, append(slices.Clone(groupPath), index)); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
-	walk(root, nil, nil, 0)
-	return out
+	if err := walk(root, nil); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func semanticRelabelRulePath(stage promcollector.PipelineRelabelStage, block, rule int) string {

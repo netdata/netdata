@@ -152,6 +152,33 @@ groups:
             dimensions:
               - selector: mysql_queries_total
                 name: total
+          - title: Resets Chart
+            priority: 70000
+            context: resets_chart
+            units: queries/s
+            dimensions:
+              - selector: mysql_queries_total
+                name: total
+      - family: Zero Default
+        chart_defaults:
+          priority: 0
+        charts:
+          - title: Inherits Root Through Zero
+            context: inherits_root_through_zero
+            units: queries/s
+            dimensions:
+              - selector: mysql_queries_total
+                name: total
+      - family: Explicit Reset
+        chart_defaults:
+          priority: 70000
+        charts:
+          - title: Resets Subtree
+            context: resets_subtree
+            units: queries/s
+            dimensions:
+              - selector: mysql_queries_total
+                name: total
 `,
 			assert: func(t *testing.T, spec *Spec) {
 				t.Helper()
@@ -176,8 +203,17 @@ groups:
 				assert.Equal(t, 300, leaf.Charts[0].Priority)
 
 				sibling := root.Groups[1]
-				require.Len(t, sibling.Charts, 1)
+				require.Len(t, sibling.Charts, 2)
 				assert.Equal(t, 100, sibling.Charts[0].Priority)
+				assert.Equal(t, 70000, sibling.Charts[1].Priority)
+
+				zeroDefault := root.Groups[2]
+				require.Len(t, zeroDefault.Charts, 1)
+				assert.Equal(t, 100, zeroDefault.Charts[0].Priority)
+
+				explicitReset := root.Groups[3]
+				require.Len(t, explicitReset.Charts, 1)
+				assert.Equal(t, 70000, explicitReset.Charts[0].Priority)
 			},
 		},
 		"explicit empty group label promotion is inherited without collapsing to omitted": {
