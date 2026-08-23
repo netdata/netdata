@@ -142,7 +142,7 @@ function(netdata_identify_libc _libc_name)
                      NO_CMAKE_INSTALL_PREFIX
                      NO_CMAKE_FIND_ROOT_PATH)
 
-        if(NOT "${LIBC_PATH}" EQUAL "LIBC_PATH-NOTFOUND")
+        if(NOT "${LIBC_PATH}" STREQUAL "LIBC_PATH-NOTFOUND")
             message(CHECK_PASS "found")
             message(CHECK_START "Detecting libc implementation using libc.so.6")
 
@@ -230,7 +230,7 @@ endfunction()
 function(precompile_python dir component)
   find_package(Python3)
 
-  if(NOT ${Python3_Interpreter_FOUND})
+  if(NOT Python3_Interpreter_FOUND)
     message(STATUS "Could not find Python3, skipping precompilation of Python code.")
     return()
   endif()
@@ -242,7 +242,7 @@ function(precompile_python dir component)
     COMPONENT ${component}
   )
   install(
-    CODE "execute_process(COMMAND ${Python3_Interpreter} -O -m compileall -j0 -o2 ${prefix}/${dir} WORKING_DIRECTORY ${prefix}/${dir})"
+    CODE "execute_process(COMMAND ${Python3_EXECUTABLE} -O -m compileall -j0 -o2 ${prefix}/${dir} WORKING_DIRECTORY ${prefix}/${dir})"
     COMPONENT ${component}
   )
 endfunction()
