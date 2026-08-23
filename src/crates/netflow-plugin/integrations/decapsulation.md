@@ -130,7 +130,7 @@ Vendor support varies. Recommended exporter paths are:
   `services { inline-monitoring { ... } }` -- the template includes
   `datalink-frame-size` and a `maximum-clip-length` controls how much of the
   frame is captured. Reference recipe in the
-  [Akvorado documentation](https://demo.akvorado.net/docs/operations#ipfix-315).
+  [Akvorado documentation](https://demo.akvorado.net/docs/operations).
 - **sFlow** with header sampling -- supported by Juniper QFX, Arista EOS,
   Mellanox/NVIDIA, MikroTik, and others. Header sampling is the default for
   most agents; verify the agent emits `SampledHeader` rather than only
