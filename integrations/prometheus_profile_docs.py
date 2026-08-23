@@ -141,9 +141,7 @@ def _family_tree(charts):
     return roots
 
 
-def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_RUNTIME_PATH):
-    designs = _profile_files(Path(design_path), '*/PROFILE-DESIGN.yaml', 'profile')
-    runtimes = _profile_files(Path(runtime_path), '*.yaml', '_filename')
+def _validate_profile_file_sets(designs, runtimes):
     if set(designs) != set(runtimes):
         missing_design = sorted(set(runtimes) - set(designs))
         missing_runtime = sorted(set(designs) - set(runtimes))
@@ -152,72 +150,68 @@ def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_R
             f'missing designs={missing_design}, missing runtimes={missing_runtime}.'
         )
 
-    catalog = {}
-    for profile in sorted(designs):
-        design_file, design = designs[profile]
-        runtime_file, runtime = runtimes[profile]
-        for field in ('match', 'app'):
-            if design.get(field) != runtime.get(field):
-                raise ProfileCoverageError(
-                    f'Profile {profile!r} {field} differs between {design_file} and {runtime_file}.'
-                )
-        namespace = _require_text(design.get('namespace'), 'namespace', profile)
-        if namespace != runtime.get('template', {}).get('context_namespace'):
+
+def _validate_profile_identity(profile, design_file, design, runtime_file, runtime):
+    for field in ('match', 'app'):
+        if design.get(field) != runtime.get(field):
             raise ProfileCoverageError(
-                f'Profile {profile!r} namespace differs between {design_file} and {runtime_file}.'
+                f'Profile {profile!r} {field} differs between {design_file} and {runtime_file}.'
             )
+    namespace = _require_text(design.get('namespace'), 'namespace', profile)
+    if namespace != runtime.get('template', {}).get('context_namespace'):
+        raise ProfileCoverageError(
+            f'Profile {profile!r} namespace differs between {design_file} and {runtime_file}.'
+        )
 
-        documentation = design.get('documentation', {})
-        entities = design.get('entities', {})
-        views = design.get('views', {})
-        runtime_charts = _runtime_charts(profile, runtime)
-        runtime_by_context = {chart['context']: chart for chart in runtime_charts}
-        missing = sorted(set(views) - set(runtime_by_context))
-        extra = sorted(set(runtime_by_context) - set(views))
-        if missing or extra:
+
+def _join_profile_charts(profile, design, runtime):
+    entities = design.get('entities', {})
+    views = design.get('views', {})
+    runtime_charts = _runtime_charts(profile, runtime)
+    runtime_by_context = {chart['context']: chart for chart in runtime_charts}
+    missing = sorted(set(views) - set(runtime_by_context))
+    extra = sorted(set(runtime_by_context) - set(views))
+    if missing or extra:
+        raise ProfileCoverageError(
+            f'Profile {profile!r} view/chart mismatch: missing charts={missing}, extra charts={extra}.'
+        )
+
+    charts = []
+    for runtime_chart in runtime_charts:
+        context = runtime_chart['context']
+        view = views[context]
+        if view.get('family') != runtime_chart['family']:
             raise ProfileCoverageError(
-                f'Profile {profile!r} view/chart mismatch: missing charts={missing}, extra charts={extra}.'
+                f'Profile {profile!r} view {context!r} family {view.get("family")!r} '
+                f'does not match runtime family {runtime_chart["family"]!r}.'
             )
-
-        charts = []
-        for runtime_chart in runtime_charts:
-            context = runtime_chart['context']
-            view = views[context]
-            if view.get('family') != runtime_chart['family']:
-                raise ProfileCoverageError(
-                    f'Profile {profile!r} view {context!r} family {view.get("family")!r} '
-                    f'does not match runtime family {runtime_chart["family"]!r}.'
-                )
-            entity_id = view.get('entity')
-            if entity_id not in entities:
-                raise ProfileCoverageError(
-                    f'Profile {profile!r} view {context!r} references unknown entity {entity_id!r}.'
-                )
-            chart = deepcopy(runtime_chart)
-            chart['question'] = _require_text(view.get('question'), f'view {context!r} question', profile)
-            chart['entity_scope'] = _require_text(
-                entities[entity_id].get('grain'), f'entity {entity_id!r} grain', profile
+        entity_id = view.get('entity')
+        if entity_id not in entities:
+            raise ProfileCoverageError(
+                f'Profile {profile!r} view {context!r} references unknown entity {entity_id!r}.'
             )
-            charts.append(chart)
+        chart = deepcopy(runtime_chart)
+        chart['question'] = _require_text(view.get('question'), f'view {context!r} question', profile)
+        chart['entity_scope'] = _require_text(
+            entities[entity_id].get('grain'), f'entity {entity_id!r} grain', profile
+        )
+        charts.append(chart)
+    return charts
 
-        supports = []
-        for support_id, dependency in design.get('composition', {}).get('supports', {}).items():
-            supports.append({
-                'id': support_id,
-                'activation': _require_text(
-                    dependency.get('activation'), f'composition.supports.{support_id}.activation', profile
-                ),
-            })
 
-        catalog[profile] = {
-            'id': profile,
-            'title': _require_text(documentation.get('title'), 'documentation.title', profile),
-            'summary': _require_text(documentation.get('summary'), 'documentation.summary', profile),
-            'chart_count': len(charts),
-            'families': _family_tree(charts),
-            'supports': supports,
-        }
+def _profile_supports(profile, design):
+    supports = []
+    for support_id, dependency in design.get('composition', {}).get('supports', {}).items():
+        supports.append({
+            'id': support_id,
+            'activation': _require_text(
+                dependency.get('activation'), f'composition.supports.{support_id}.activation', profile
+            ),
+        })
+    return supports
 
+
+def _validate_support_graph(catalog):
     for profile, document in catalog.items():
         for support in document['supports']:
             if support['id'] not in catalog:
@@ -233,6 +227,30 @@ def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_R
 
     for profile in catalog:
         check_cycles(profile, [])
+
+
+def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_RUNTIME_PATH):
+    designs = _profile_files(Path(design_path), '*/PROFILE-DESIGN.yaml', 'profile')
+    runtimes = _profile_files(Path(runtime_path), '*.yaml', '_filename')
+    _validate_profile_file_sets(designs, runtimes)
+
+    catalog = {}
+    for profile in sorted(designs):
+        design_file, design = designs[profile]
+        runtime_file, runtime = runtimes[profile]
+        _validate_profile_identity(profile, design_file, design, runtime_file, runtime)
+        charts = _join_profile_charts(profile, design, runtime)
+        documentation = design.get('documentation', {})
+        catalog[profile] = {
+            'id': profile,
+            'title': _require_text(documentation.get('title'), 'documentation.title', profile),
+            'summary': _require_text(documentation.get('summary'), 'documentation.summary', profile),
+            'chart_count': len(charts),
+            'families': _family_tree(charts),
+            'supports': _profile_supports(profile, design),
+        }
+
+    _validate_support_graph(catalog)
     return catalog
 
 
