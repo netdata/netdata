@@ -34,8 +34,8 @@ an ASN database (`topology-ip-asn.mmdb`) and a geographic database
 `/usr/share/netdata/topology-ip-intel/`; the bundled refresh tool fetches updates
 into `/var/cache/netdata/topology-ip-intel/`.
 
-DB-IP publishes the Lite databases monthly under a Creative Commons Attribution 4.0
-International licence (https://db-ip.com/db/lite.php). The MMDB format is the MaxMind
+DB-IP publishes the Lite databases monthly under a [Creative Commons Attribution 4.0
+International licence](https://db-ip.com/db/lite.php). The MMDB format is the MaxMind
 binary database; lookups are in-process with no per-flow network call.
 
 Populates these flow record fields when a lookup succeeds:
@@ -109,8 +109,8 @@ cadence -- more frequent runs will not produce newer data.
 
 #### Licence acknowledgement
 
-DB-IP Lite databases are distributed under the Creative Commons Attribution 4.0
-International licence (https://db-ip.com/db/lite.php). Attribution is required
+DB-IP Lite databases are distributed under the [Creative Commons Attribution 4.0
+International licence](https://db-ip.com/db/lite.php). Attribution is required
 when redistributing the data or derivative dashboards.
 
 

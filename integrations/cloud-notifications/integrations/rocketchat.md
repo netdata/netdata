@@ -31,10 +31,10 @@ Steps to configure your RocketChat server to receive notifications from Netdata 
 
 1. In RocketChat, Navigate to Administration > Workspace > Integrations
 2. Click **+New** at the top right corner
-3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations#create-a-new-incoming-webhook)
+3. For more details about each parameter, check [Create a new incoming webhook](https://docs.rocket.chat/docs/integrations#create-an-incoming-integration)
 4. You will end up with a webhook endpoint that looks like `https://your-server.rocket.chat/hooks/YYYYYYYYYYYYYYYYYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`, copy it in order to add it to your integration configuration in the Netdata Cloud UI
 
-For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/use-rocket.chat/workspace-administration/integrations/).
+For more details please check [Incoming webhooks for RocketChat](https://docs.rocket.chat/docs/integrations).
 
 ### Netdata Configuration
 

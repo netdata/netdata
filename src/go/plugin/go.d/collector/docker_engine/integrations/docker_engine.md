@@ -25,7 +25,7 @@ Module: docker_engine
 This collector monitors the activity and health of Docker Engine and Docker Swarm.
 
 
-The [built-in](https://docs.docker.com/config/daemon/prometheus/) Prometheus exporter is used to get the metrics.
+The [built-in](https://docs.docker.com/engine/daemon/prometheus/) Prometheus exporter is used to get the metrics.
 
 
 This collector is supported on all platforms.
@@ -69,7 +69,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Enable built-in Prometheus exporter
 
-To enable built-in Prometheus exporter, follow the [official documentation](https://docs.docker.com/config/daemon/prometheus/#configure-docker).
+To enable built-in Prometheus exporter, follow the [official documentation](https://docs.docker.com/engine/daemon/prometheus/#configure-the-daemon).
 
 
 

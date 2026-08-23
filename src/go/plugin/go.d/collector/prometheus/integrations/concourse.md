@@ -68,7 +68,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Configure built-in Prometheus exporter
 
-To configure the built-in Prometheus exporter, follow the [official documentation](https://concourse-ci.org/metrics.html#configuring-metrics).
+To configure the built-in Prometheus exporter, follow the [official documentation](https://concourse-ci.org/docs/operation/metrics/#configuring-metrics).
 
 
 
