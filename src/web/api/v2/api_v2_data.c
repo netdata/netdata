@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "api_v2_calls.h"
+#include "../queries/tg-expression.h"
 
 #define GROUP_BY_KEY_MAX_LENGTH 30
 static struct {
@@ -217,6 +218,12 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
     size_t    points = (points_str && *points_str)?str2u(points_str):0;
     int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
+
+    if(!time_grouping_expression_options_valid(time_group, time_group_options)) {
+        buffer_no_cacheable(w->response.data);
+        buffer_sprintf(w->response.data, "Invalid time-group condition.");
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     QUERY_TARGET_REQUEST qtr = {
         .version = version,

@@ -2,6 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 #include "../../../server/web_client.h"
+#include "../../queries/tg-expression.h"
 
 #define BADGE_HORIZONTAL_PADDING 4
 #define VERDANA_KERNING 0.2
@@ -952,6 +953,12 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         else if(!strcmp(name, BADGE_URL_ARG_VAL_COLOR)) text_color_val_str = value;
     }
 
+    if(!time_grouping_expression_options_valid(group, group_options)) {
+        buffer_no_cacheable(w->response.data);
+        buffer_sprintf(w->response.data, "Invalid time-group condition.");
+        goto cleanup;
+    }
+
     int fixed_width_lbl = -1;
     int fixed_width_val = -1;
 
@@ -1046,8 +1053,67 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         }
         else if(options & RRDR_OPTION_PERCENTAGE)
             units = "%";
-        else
-            units = rrdset_units(st);
+        else {
+            // the groupings that answer a question ABOUT the samples report
+            // their own units, not the metric's
+            switch(group) {
+                case RRDR_GROUPING_CV:
+                case RRDR_GROUPING_COUNTIF:
+                case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+                    units = "%";
+                    break;
+
+                case RRDR_GROUPING_NUMBER_OF_FLAPS:
+                    units = "flaps";
+                    break;
+
+                case RRDR_GROUPING_NUMBER_OF_TIMES:
+                    units = "events";
+                    break;
+
+                default:
+                    units = rrdset_units(st);
+
+                    // summing a rate integrates it into a volume, so the
+                    // trailing "/s" no longer describes the number shown.
+                    // The badge picks its units before the query runs and
+                    // never sees the query target, so it asks the RRDSET.
+                    // Units belong to the whole RRDSET, not to a filtered
+                    // dimension: only a rate-only RRDSET has volume units
+                    // after SUM. A mixed-algorithm RRDSET keeps its common
+                    // units regardless of the dimension filter.
+                    static __thread char units_volume_buf[64];
+                    if(group == RRDR_GROUPING_SUM && units && *units) {
+                        bool all_rates = true, any = false;
+                        RRDDIM *rd;
+                        rrddim_foreach_read(rd, st) {
+                            any = true;
+                            // through the RRDMETRIC, which is where the query
+                            // reads the algorithm from (query_target.c) - the
+                            // RRDDIM field is written by the collector thread
+                            // and the badge would disagree with the number it
+                            // is labelling while a change is being published
+                            RRDMETRIC_ACQUIRED *rma = rd->rrdcontexts.rrdmetric;
+                            if(!rma || !rrdmetric_acquired_stored_as_rates(rma)) {
+                                all_rates = false;
+                                break;
+                            }
+                        }
+                        rrddim_foreach_done(rd);
+
+                        size_t ulen = strlen(units);
+                        // a units string too long to hold the volume form is
+                        // left alone rather than truncated - the same bound
+                        // query_target_rate_adjusted_units_for() applies
+                        if(any && all_rates && ulen > 2 && strcmp(units + ulen - 2, "/s") == 0 &&
+                           ulen - 2 < sizeof(units_volume_buf)) {
+                            snprintfz(units_volume_buf, sizeof(units_volume_buf), "%.*s", (int)(ulen - 2), units);
+                            units = units_volume_buf;
+                        }
+                    }
+                    break;
+            }
+        }
     }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"

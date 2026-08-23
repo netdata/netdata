@@ -293,6 +293,14 @@ static int unittest_run_with_rrd(int (*test_fn)(void)) {
     return rc;
 }
 
+static int health_config_unittest_with_dyncfg(void) {
+    rrd_functions_inflight_init();
+    dyncfg_init(false);
+    int rc = health_config_unittest();
+    dyncfg_shutdown();
+    return rc;
+}
+
 static void fatal_status_file_save(void) {
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
     exit(1);
@@ -734,10 +742,8 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return duration_unittest();
                         }
-                        else if(strcmp(optarg, "healthconfigtest") == 0) {
-                            unittest_running = true;
-                            return health_config_unittest();
-                        }
+                        else if(strcmp(optarg, "healthconfigtest") == 0)
+                            return unittest_run_with_rrd(health_config_unittest_with_dyncfg);
                         else if(strcmp(optarg, "dyncfgtest") == 0)
                             return unittest_run_with_rrd(dyncfg_unittest);
                         else if(strcmp(optarg, "functionsaccesstest") == 0)

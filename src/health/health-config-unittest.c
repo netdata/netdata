@@ -3,6 +3,8 @@
 #include "health_internals.h"
 #include "health-config-unittest.h"
 #include "web/api/queries/query.h"
+#include "web/api/queries/tg-expression.h"
+#include "database/sqlite/sqlite_health.h"
 
 // test case structure for db lookup parsing
 typedef struct {
@@ -16,9 +18,13 @@ typedef struct {
     const char *description;                        // test description
 } db_lookup_test_case_t;
 
-// mark value as "don't care" for tests that don't use it
+// mark value as "don't care" for tests that don't use it.
+//
+// DC_COND has to be OUTSIDE the enum: it used to be EQUAL, which is also
+// the value the parser defaults to, so every row that meant "and the
+// condition must come out EQUAL" was silently unchecked.
 #define DC_VALUE NAN
-#define DC_COND ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL
+#define DC_COND ((ALERT_LOOKUP_TIME_GROUP_CONDITION)0xFF)
 
 static const db_lookup_test_case_t test_cases[] = {
     // =========================================================================
@@ -241,7 +247,53 @@ static const db_lookup_test_case_t test_cases[] = {
     { "countif(<==5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "less double equals invalid" },
     { "countif(>::5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater invalid" },
     { "countif(>=:5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater-equal invalid" },
-    { "countif(<:5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after less invalid" },
+    // `<:`/`>:` are inclusive, the same as `<=`/`>=`: the query API has
+    // always read them that way and health now shares that grammar
+    { "countif(<:5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL, 5.0, -600, 0, "colon after less" },
+    { "countif(>:5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 5.0, -600, 0, "colon after greater" },
+
+    // the shared grammar: gap tokens and the predecessor keywords
+    { "percentage-of-time(==gap) -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, DC_VALUE, -600, 0, "percentage-of-time equals gap" },
+    { "percentage-of-time(!=nan) -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, DC_VALUE, -600, 0, "percentage-of-time not nan" },
+    { "number-of-times(<previous) -10m", true, RRDR_GROUPING_NUMBER_OF_TIMES, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, DC_VALUE, -600, 0, "number-of-times less than previous" },
+    { "number-of-times(<last) -10m", true, RRDR_GROUPING_NUMBER_OF_TIMES, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, DC_VALUE, -600, 0, "number-of-times less than last" },
+    { "number-of-flaps(>=10) -10m", true, RRDR_GROUPING_NUMBER_OF_FLAPS, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 10.0, -600, 0, "number-of-flaps threshold" },
+    { "percentage-of-samples(>0) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -600, 0, "percentage-of-samples canonical name" },
+    { "percentage-of-time(==bogus) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "unknown word operand invalid" },
+
+    // whitespace inside the parentheses is not part of the condition: it is
+    // trimmed off both ends before the condition is stored, so writing it
+    // out spaced cannot make a different alert out of the same rule
+    { "countif( >5 ) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5.0, -600, 0, "spaced condition" },
+    { "percentage-of-time( ==gap ) -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, DC_VALUE, -600, 0, "spaced gap token" },
+
+    // the condition grammar belongs to the four condition groupings ONLY.
+    // A numeric grouping takes a number, so a WORD operand there is a
+    // mistake - accepting it would turn percentile(gap) into percentile 95
+    // and average(previous) into a plain average, silently.
+    { "percentile(95) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95, -600, 0, "percentile still takes its number" },
+    { "percentile(gap) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects a gap token" },
+    { "percentile(previous) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects the predecessor" },
+    { "trimmed-mean(gap) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "trimmed-mean rejects a gap token" },
+    { "average(previous) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "average rejects the predecessor" },
+
+    // an operator in FRONT of the number is a different case: it means
+    // nothing to these groupings and this parser has always dropped it, so
+    // `percentile(>95)` has always run as percentile 95. Refusing it now
+    // would disable alerts that work today, so it is accepted and logged.
+    // and the condition it wrote is still recorded, exactly as upstream
+    // recorded it: it is hashed into the alert's identity, so dropping it
+    // would hand every such alert a new config hash on upgrade
+    { "percentile(>95) -10m", true, RRDR_GROUPING_PERCENTILE, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 95, -600, 0, "percentile ignores an operator, keeps the number" },
+    { "trimmed-mean(>=10) -10m", true, RRDR_GROUPING_TRIMMED_MEAN, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 10, -600, 0, "trimmed-mean ignores an operator, keeps the number" },
+
+    // an empty condition compares equal to zero, the way countif always
+    // has. It MUST NOT fall through to the unset legacy value: formatting
+    // that produces "nan", which the grammar reads as a GAP token, so the
+    // alert would silently become "the share of time with no data"
+    { "percentage-of-time() -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0, -600, 0, "empty condition compares equal to zero" },
+    { "number-of-flaps() -10m", true, RRDR_GROUPING_NUMBER_OF_FLAPS, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0, -600, 0, "empty flaps condition compares equal to zero" },
+    { "number-of-times() -10m", true, RRDR_GROUPING_NUMBER_OF_TIMES, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0, -600, 0, "empty times condition compares equal to zero" },
 
     // Operators with no value (should default to 0)
     { "countif(=) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "equals no value" },
@@ -279,18 +331,26 @@ static int run_db_lookup_test(const db_lookup_test_case_t *test) {
     int result = health_parse_db_lookup(1, "unittest", buffer, &ac);
     bool succeeded = (result != 0);
 
+    // every exit frees what the parser allocated, so a run under a leak
+    // checker reports only real leaks
+    #define run_db_lookup_test_return(rc) do {                              \
+        string_freez(ac.dimensions);                                        \
+        string_freez(ac.time_group_options);                                \
+        return (rc);                                                        \
+    } while(0)
+
     // check if success/failure matches expectation
     if(succeeded != test->should_succeed) {
         fprintf(stderr, "FAILED [%s]: expected %s but got %s\n",
                 test->description,
                 test->should_succeed ? "success" : "failure",
                 succeeded ? "success" : "failure");
-        return 1;
+        run_db_lookup_test_return(1);
     }
 
     // if test should fail, we're done
     if(!test->should_succeed)
-        return 0;
+        run_db_lookup_test_return(0);
 
     int errors = 0;
 
@@ -324,18 +384,15 @@ static int run_db_lookup_test(const db_lookup_test_case_t *test) {
 
     // verify value for countif/percentile/trimmed-mean if specified
     if(!isnan(test->expected_value)) {
-        NETDATA_DOUBLE actual_value = isnan(ac.time_group_value) ? 0.0 : ac.time_group_value;
-        if(fabsl(actual_value - test->expected_value) > 0.0001) {
+        if(isnan(ac.time_group_value) || fabsl(ac.time_group_value - test->expected_value) > 0.0001) {
             fprintf(stderr, "FAILED [%s]: expected value %f but got %f\n",
-                    test->description, test->expected_value, actual_value);
+                    test->description, test->expected_value, ac.time_group_value);
             errors++;
         }
     }
 
-    // cleanup
-    string_freez(ac.dimensions);
-
-    return errors;
+    run_db_lookup_test_return(errors);
+    #undef run_db_lookup_test_return
 }
 
 static int test_db_lookup_frequency_boundaries(int *passed) {
@@ -378,6 +435,155 @@ static int test_db_lookup_frequency_boundaries(int *passed) {
             (*passed)++;
 
         string_freez(ac.dimensions);
+        string_freez(ac.time_group_options);
+    }
+
+    return failed;
+}
+
+// The condition is STORED as written, and the alert's configuration hash is
+// computed over it, so the same rule spaced differently must not become a
+// different alert. Whitespace inside the parentheses is trimmed off both
+// ends; everything between the operator and the operand is the condition.
+static int test_db_lookup_condition_is_trimmed(int *passed) {
+    static const struct {
+        const char *input;
+        const char *expected_options;
+        const char *description;
+    } tests[] = {
+        { "countif( >5 ) -10m", ">5", "spaces on both sides" },
+        { "countif(>5) -10m", ">5", "no spaces at all" },
+        { "countif(\t>5\t) -10m", ">5", "tabs on both sides" },
+        { "percentage-of-time( ==gap ) -10m", "==gap", "a spaced gap token" },
+        { "number-of-times( <previous ) -10m", "<previous", "a spaced predecessor" },
+        { "countif(> 5) -10m", "> 5", "the space INSIDE the condition is kept" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        char buffer[128];
+        strncpyz(buffer, tests[i].input, sizeof(buffer) - 1);
+
+        struct rrd_alert_config ac = { 0 };
+        ac.time_group_value = NAN;
+
+        const char *got = NULL;
+        if(!health_parse_db_lookup(1, "unittest", buffer, &ac))
+            fprintf(stderr, "FAILED [%s]: '%s' did not parse\n", tests[i].description, tests[i].input);
+
+        else if(!(got = ac.time_group_options ? string2str(ac.time_group_options) : NULL) ||
+                strcmp(got, tests[i].expected_options) != 0)
+            fprintf(stderr, "FAILED [%s]: stored condition '%s', want '%s'\n",
+                    tests[i].description, got ? got : "(none)", tests[i].expected_options);
+
+        else {
+            (*passed)++;
+            string_freez(ac.dimensions);
+            string_freez(ac.time_group_options);
+            continue;
+        }
+
+        failed++;
+        string_freez(ac.dimensions);
+        string_freez(ac.time_group_options);
+    }
+
+    return failed;
+}
+
+// A condition the parser cannot read must leave the DEFAULT behind, never
+// the part of itself it managed to read. All public callers reject it, and
+// keeping a half-read `>=gap junk` would still be unsafe for an internal
+// caller that uses the parser defensively.
+static int test_expression_rejects_leave_the_default(int *passed) {
+    static const struct {
+        const char *condition;
+        bool valid;
+        const char *description;
+    } tests[] = {
+        { ">=gap junk", false, "a gap token followed by junk" },
+        { "<previous and >5", false, "there are no and/or compounds" },
+        { ">5 5", false, "a number followed by junk" },
+        { ">nonsense", false, "a word that is not an operand" },
+        { ".", false, "a lone dot is not a number" },
+        { ">=gap", true, "the same condition without the junk (control)" },
+        { "!:5", true, "the colon spellings countif has always accepted" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        TG_EXPRESSION e = {
+            .cmp = TG_EXPRESSION_GREATER,
+            .operand = TG_EXPRESSION_OPERAND_PREVIOUS,
+            .target = 123.0,
+            .has_previous = true,
+        };
+        bool ok = tg_expression_parse(&e, tests[i].condition);
+
+        if(ok != tests[i].valid) {
+            fprintf(stderr, "FAILED [%s]: '%s' parsed=%s, want %s\n",
+                    tests[i].description, tests[i].condition,
+                    ok ? "true" : "false", tests[i].valid ? "true" : "false");
+            failed++;
+            continue;
+        }
+
+        if(!ok && (e.cmp != TG_EXPRESSION_EQUAL ||
+                   e.operand != TG_EXPRESSION_OPERAND_NUMBER ||
+                   e.target != 0.0 ||
+                   tg_expression_wants_gaps(&e))) {
+            fprintf(stderr, "FAILED [%s]: rejected '%s' left cmp=%d operand=%d target=%f behind, want the ==0 default\n",
+                    tests[i].description, tests[i].condition,
+                    (int)e.cmp, (int)e.operand, (double)e.target);
+            failed++;
+            continue;
+        }
+
+        (*passed)++;
+    }
+
+    return failed;
+}
+
+// Missing expression text is the historical ==0 default. When the operator
+// is present but its operand is omitted, the operator itself is preserved and
+// still compares against numeric zero.
+static int test_expression_omitted_operand_defaults_to_zero(int *passed) {
+    static const struct {
+        const char *condition;
+        TG_EXPRESSION_CMP expected_cmp;
+        const char *description;
+    } tests[] = {
+        { NULL, TG_EXPRESSION_EQUAL, "an absent condition" },
+        { "", TG_EXPRESSION_EQUAL, "an empty condition" },
+        { "   ", TG_EXPRESSION_EQUAL, "a whitespace-only condition" },
+        { ">", TG_EXPRESSION_GREATER, "greater than with no operand" },
+        { "<=   ", TG_EXPRESSION_LESSEQUAL, "less-or-equal with no operand" },
+        { "!", TG_EXPRESSION_NOTEQUAL, "not-equal with no operand" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        TG_EXPRESSION e = {
+            .cmp = TG_EXPRESSION_GREATER,
+            .operand = TG_EXPRESSION_OPERAND_PREVIOUS,
+            .target = 123.0,
+            .has_previous = true,
+        };
+        bool ok = tg_expression_parse(&e, tests[i].condition);
+
+        if(!ok || e.cmp != tests[i].expected_cmp ||
+           e.operand != TG_EXPRESSION_OPERAND_NUMBER || e.target != 0.0 ||
+           tg_expression_wants_gaps(&e)) {
+            fprintf(stderr,
+                    "FAILED [%s]: parsed=%s cmp=%d operand=%d target=%f wants_gaps=%s\n",
+                    tests[i].description, ok ? "true" : "false", (int)e.cmp,
+                    (int)e.operand, (double)e.target,
+                    tg_expression_wants_gaps(&e) ? "true" : "false");
+            failed++;
+        }
+        else
+            (*passed)++;
     }
 
     return failed;
@@ -872,6 +1078,340 @@ static int test_prototype_rejects_non_positive_update_every(int *passed) {
     return failed;
 }
 
+// An alert reaches the agent as JSON (dyncfg) and leaves it as a `.conf`
+// line, so the condition has to survive that round trip byte for byte -
+// otherwise exporting and re-importing an alert silently rewrites it, and
+// its configuration hash churns on every restart.
+static int test_dyncfg_time_group_round_trip(int *passed) {
+    static const struct {
+        const char *time_group;
+        const char *members;             // condition members of database_lookup
+        const char *expected_lookup;     // the `lookup:` value the export must produce
+        RRDR_TIME_GROUPING expected_group;
+        const char *expected_options;    // NULL when the grouping keeps no expression
+        ALERT_LOOKUP_TIME_GROUP_CONDITION expected_condition;
+        NETDATA_DOUBLE expected_value;
+        const char *description;
+    } tests[] = {
+        { "percentage-of-time", "\"time_group_condition\":\">=\",\"time_group_value\":1,\"time_group_options\":\">=1\"",
+          "percentage-of-time(>=1) -1m", RRDR_GROUPING_PERCENTAGE_OF_TIME, ">=1",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 1,
+          "percentage-of-time keeps its threshold" },
+
+        { "number-of-flaps", "\"time_group_condition\":\"==\",\"time_group_value\":0,\"time_group_options\":\"==gap\"",
+          "number-of-flaps(==gap) -1m", RRDR_GROUPING_NUMBER_OF_FLAPS, "==gap",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, NAN,
+          "a gap token survives the round trip" },
+
+        { "number-of-times", "\"time_group_condition\":\"<\",\"time_group_value\":0,\"time_group_options\":\"<previous\"",
+          "number-of-times(<previous) -1m", RRDR_GROUPING_NUMBER_OF_TIMES, "<previous",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, NAN,
+          "the predecessor keyword survives the round trip" },
+
+        { "percentage-of-samples", "\"time_group_options\":\">\"",
+          "percentage-of-samples(>) -1m", RRDR_GROUPING_COUNTIF, ">",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0,
+          "an omitted operand keeps its operator and zero target" },
+
+        // the legacy shape: alerts written before the expression existed
+        // carry only the condition/value pair. The export normalises the
+        // name to the canonical one and writes the pair out as the
+        // equivalent expression; the alert MUST come back as the same
+        // grouping running the same condition
+        { "countif", "\"time_group_condition\":\"!=\",\"time_group_value\":0",
+          "percentage-of-samples(!=0.00) -1m", RRDR_GROUPING_COUNTIF, "!=0.00",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0,
+          "a legacy countif alert round trips on its condition pair" },
+
+        { "percentage-of-time", "\"time_group_condition\":\"!=\",\"time_group_value\":null",
+          "percentage-of-time(!=0.00) -1m", RRDR_GROUPING_PERCENTAGE_OF_TIME, "!=0.00",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0,
+          "a null legacy condition value keeps the omitted-operand zero default" },
+
+        // untouched by the expression grammar - proves we did not widen it.
+        // `percentile95` is the canonical echo of the percentile enum and
+        // predates this work
+        { "percentile", "\"time_group_value\":95",
+          "percentile95(95.00) -1m", RRDR_GROUPING_PERCENTILE, NULL,
+          DC_COND, 95,
+          "percentile still round trips on its numeric argument" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+
+        buffer_sprintf(payload,
+                       "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                       "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                       "\"after\":-60,\"time_group\":\"%s\",%s}},"
+                       "\"match\":{\"on\":\"chart\"}}}]}",
+                       tests[i].time_group, tests[i].members);
+
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                    payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "FAILED [%s]: export failed with code=%d response='%s'\n",
+                    tests[i].description, code, buffer_tostring(result));
+            failed++;
+            continue;
+        }
+
+        // pull the `lookup:` line back out of the exported configuration
+        const char *found = strstr(buffer_tostring(result), "lookup: ");
+        if(!found) {
+            fprintf(stderr, "FAILED [%s]: no lookup line in the exported config:\n%s\n",
+                    tests[i].description, buffer_tostring(result));
+            failed++;
+            continue;
+        }
+
+        char lookup[512];
+        found += strlen("lookup: ");
+        const char *eol = strchr(found, '\n');
+        size_t len = eol ? (size_t)(eol - found) : strlen(found);
+        if(len >= sizeof(lookup)) len = sizeof(lookup) - 1;
+        memcpy(lookup, found, len);
+        lookup[len] = '\0';
+
+        if(strcmp(lookup, tests[i].expected_lookup) != 0) {
+            fprintf(stderr, "FAILED [%s]: exported 'lookup: %s', want 'lookup: %s'\n",
+                    tests[i].description, lookup, tests[i].expected_lookup);
+            failed++;
+            continue;
+        }
+
+        // and feed it back through the config parser, the way a restart does
+        struct rrd_alert_config ac = { 0 };
+        ac.time_group_value = NAN;
+
+        if(!health_parse_db_lookup(1, "unittest", lookup, &ac)) {
+            fprintf(stderr, "FAILED [%s]: the exported lookup does not parse back: '%s'\n",
+                    tests[i].description, tests[i].expected_lookup);
+            failed++;
+        }
+        else {
+            int errors = 0;
+
+            if(ac.time_group != tests[i].expected_group) {
+                fprintf(stderr, "FAILED [%s]: re-parsed group %u, want %u\n",
+                        tests[i].description, (unsigned)ac.time_group, (unsigned)tests[i].expected_group);
+                errors++;
+            }
+
+            const char *options = ac.time_group_options ? string2str(ac.time_group_options) : NULL;
+            if((options == NULL) != (tests[i].expected_options == NULL) ||
+               (options && strcmp(options, tests[i].expected_options) != 0)) {
+                fprintf(stderr, "FAILED [%s]: re-parsed options '%s', want '%s'\n",
+                        tests[i].description, options ? options : "(none)",
+                        tests[i].expected_options ? tests[i].expected_options : "(none)");
+                errors++;
+            }
+
+            if(tests[i].expected_condition != DC_COND && ac.time_group_condition != tests[i].expected_condition) {
+                fprintf(stderr, "FAILED [%s]: re-parsed condition %d, want %d\n",
+                        tests[i].description, ac.time_group_condition, tests[i].expected_condition);
+                errors++;
+            }
+
+            if(isnan(tests[i].expected_value) && !isnan(ac.time_group_value)) {
+                fprintf(stderr, "FAILED [%s]: re-parsed value %f, want it unset\n",
+                        tests[i].description, (double)ac.time_group_value);
+                errors++;
+            }
+            else if(!isnan(tests[i].expected_value) &&
+                    (isnan(ac.time_group_value) || fabsl(ac.time_group_value - tests[i].expected_value) > 0.0001)) {
+                fprintf(stderr, "FAILED [%s]: re-parsed value %f, want %f\n",
+                        tests[i].description, (double)ac.time_group_value, (double)tests[i].expected_value);
+                errors++;
+            }
+
+            if(errors)
+                failed += errors;
+            else
+                (*passed)++;
+        }
+
+        string_freez(ac.dimensions);
+        string_freez(ac.time_group_options);
+    }
+
+    return failed;
+}
+
+static void dyncfg_required_condition_payload(BUFFER *payload, const char *condition_members) {
+    buffer_flush(payload);
+    buffer_sprintf(payload,
+                   "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                   "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                   "\"after\":-60,\"before\":0,\"time_group\":\"percentage-of-time\",%s%s"
+                   "\"dims_group\":\"sum\",\"data_source\":\"samples\",\"options\":[],\"dimensions\":\"*\"}},"
+                   "\"match\":{\"on\":\"chart\",\"host_labels\":\"*\",\"instance_labels\":\"*\"}}}]}",
+                   condition_members, *condition_members ? "," : "");
+}
+
+// ADD and UPDATE parse with JSONC_REQUIRED. They must accept the new
+// authoritative expression without making clients duplicate its derived
+// legacy condition/value pair, while old pair-only payloads remain valid.
+static int test_dyncfg_required_time_group_options(int *passed) {
+    static const char *name = "unittest-dyncfg-time-group-options";
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+    int failed = 0;
+    bool added = false;
+    bool initialized_prototypes = !health_globals.prototypes.dict;
+
+    if(initialized_prototypes) {
+        health_init_prototypes();
+        health_dyncfg_register_all_prototypes();
+    }
+
+    dyncfg_required_condition_payload(payload, "\"time_group_options\":\">\"");
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_ADD, name,
+                                payload, NULL, NULL, result, HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != DYNCFG_RESP_ACCEPTED) {
+        fprintf(stderr, "FAILED [DYNCFG ADD accepts options-only condition]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+        goto cleanup;
+    }
+    added = true;
+    (*passed)++;
+
+    buffer_flush(result);
+    dyncfg_required_condition_payload(payload, "\"time_group_options\":\"   \"");
+    code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                            DYNCFG_CMD_UPDATE, NULL, payload, NULL, NULL, result,
+                            HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != DYNCFG_RESP_ACCEPTED) {
+        fprintf(stderr, "FAILED [DYNCFG UPDATE accepts blank options-only zero condition]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    buffer_flush(result);
+    dyncfg_required_condition_payload(
+        payload, "\"time_group_condition\":\"!=\",\"time_group_value\":2");
+    code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                            DYNCFG_CMD_UPDATE, NULL, payload, NULL, NULL, result,
+                            HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != DYNCFG_RESP_ACCEPTED) {
+        fprintf(stderr, "FAILED [DYNCFG UPDATE keeps legacy condition pair]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    buffer_flush(result);
+    dyncfg_required_condition_payload(payload, "");
+    code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                            DYNCFG_CMD_UPDATE, NULL, payload, NULL, NULL, result,
+                            HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != HTTP_RESP_BAD_REQUEST ||
+       (!strstr(buffer_tostring(result), "time_group_condition") &&
+        !strstr(buffer_tostring(result), "time_group_value"))) {
+        fprintf(stderr, "FAILED [DYNCFG UPDATE still requires an old or new condition]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+cleanup:
+    if(added) {
+        buffer_flush(result);
+        code = dyncfg_health_cb(NULL, "health:alert:prototype:unittest-dyncfg-time-group-options",
+                                DYNCFG_CMD_REMOVE, NULL, NULL, NULL, NULL, result,
+                                HTTP_ACCESS_NONE, "unittest", NULL);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "FAILED [DYNCFG condition test cleanup]: code=%d response='%s'\n",
+                    code, buffer_tostring(result));
+            failed++;
+        }
+    }
+
+    if(initialized_prototypes) {
+        health_dyncfg_unregister_all_prototypes();
+        dictionary_destroy(health_globals.prototypes.dict);
+        health_globals.prototypes.dict = NULL;
+    }
+
+    return failed;
+}
+
+static int test_dyncfg_rejects_non_string_time_group_options(int *passed) {
+    static const char *invalid_values[] = { "{}", "[]", "1", "true", "null" };
+    int failed = 0;
+
+    for(size_t i = 0; i < sizeof(invalid_values) / sizeof(invalid_values[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+        buffer_sprintf(payload,
+                       "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                       "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                       "\"after\":-60,\"time_group\":\"percentage-of-time\","
+                       "\"time_group_options\":%s}},\"match\":{\"on\":\"chart\"}}}]}",
+                       invalid_values[i]);
+
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                    payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        if(code != HTTP_RESP_BAD_REQUEST || !strstr(buffer_tostring(result), "time_group_options")) {
+            fprintf(stderr,
+                    "FAILED [dyncfg rejects non-string time_group_options=%s]: code=%d response='%s'\n",
+                    invalid_values[i], code, buffer_tostring(result));
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    return failed;
+}
+
+// The written condition is trimmed before it is stored, and the trim must
+// not put a ceiling on how long it may be: a condition padded past a fixed
+// buffer used to come back empty, and the alert then ran the legacy
+// condition/value pair instead of what its author wrote.
+static int test_dyncfg_long_condition_is_not_truncated(int *passed) {
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+
+    // padding wide enough that any fixed buffer would have to cut it
+    char padding[512];
+    memset(padding, ' ', sizeof(padding) - 1);
+    padding[sizeof(padding) - 1] = '\0';
+
+    buffer_sprintf(payload,
+                   "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                   "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                   "\"after\":-60,\"time_group\":\"percentage-of-time\","
+                   "\"time_group_condition\":\">=\",\"time_group_value\":1,"
+                   "\"time_group_options\":\"%s>=1%s\"}},"
+                   "\"match\":{\"on\":\"chart\"}}}]}",
+                   padding, padding);
+
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+    if(code != HTTP_RESP_OK) {
+        fprintf(stderr, "FAILED [a long padded condition]: export failed with code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        return 1;
+    }
+
+    if(!strstr(buffer_tostring(result), "lookup: percentage-of-time(>=1) -1m")) {
+        fprintf(stderr, "FAILED [a long padded condition]: the exported config does not carry "
+                        "'lookup: percentage-of-time(>=1) -1m':\n%s\n", buffer_tostring(result));
+        return 1;
+    }
+
+    (*passed)++;
+    return 0;
+}
+
 int health_config_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -893,6 +1433,7 @@ int health_config_unittest(void) {
     }
 
     failed += test_db_lookup_frequency_boundaries(&passed);
+    failed += test_db_lookup_condition_is_trimmed(&passed);
     failed += test_dyncfg_update_every_boundaries(&passed);
     failed += test_dyncfg_integer_destination_boundaries(&passed);
     failed += test_dyncfg_delay_multiplier_boundaries(&passed);
@@ -900,6 +1441,17 @@ int health_config_unittest(void) {
     failed += test_delay_multiplier_runtime_boundaries(&passed);
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
     failed += test_prototype_rejects_non_positive_update_every(&passed);
+    failed += test_dyncfg_time_group_round_trip(&passed);
+    failed += test_dyncfg_required_time_group_options(&passed);
+    failed += test_dyncfg_rejects_non_string_time_group_options(&passed);
+    failed += test_dyncfg_long_condition_is_not_truncated(&passed);
+    failed += test_expression_rejects_leave_the_default(&passed);
+    failed += test_expression_omitted_operand_defaults_to_zero(&passed);
+
+    // the same alert configuration, taken through the metadata database
+    // instead of the parser - counted BEFORE the summary, or a failure here
+    // is printed above a line claiming nothing failed
+    failed += sql_alert_config_unittest();
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);

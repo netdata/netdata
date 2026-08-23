@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "api_v1_calls.h"
+#include "../queries/tg-expression.h"
 
 int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
@@ -135,6 +136,12 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     RRDSET_ACQUIRED *rsa = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
     QUERY_TARGET *qt = NULL;
+
+    if(!time_grouping_expression_options_valid(group, group_options)) {
+        buffer_no_cacheable(w->response.data);
+        buffer_sprintf(w->response.data, "Invalid time-group condition.");
+        goto cleanup;
+    }
 
     if(!is_valid_sp(chart) && !is_valid_sp(context)) {
         buffer_sprintf(w->response.data, "No chart or context is given.");

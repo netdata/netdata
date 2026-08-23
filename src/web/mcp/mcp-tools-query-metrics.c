@@ -33,8 +33,26 @@
 #include "mcp-tools-query-metrics.h"
 #include "mcp-tools.h"
 #include "mcp-params.h"
+#include "../api/queries/tg-expression.h"
 #include "web/api/formatters/rrd2json.h"
 
+static bool mcp_query_metrics_numeric_option_valid(struct json_object *option) {
+    if(!option || !json_object_is_type(option, json_type_string))
+        return false;
+
+    const char *value = json_object_get_string(option);
+    while(value && isspace((uint8_t)*value)) value++;
+
+    // The numeric group implementations consume a bare number with str2ndd(),
+    // not an expression operator followed by a number.
+    if(!value || !*value || *value == '=' || *value == ':')
+        return false;
+
+    TG_EXPRESSION parsed;
+    return tg_expression_parse(&parsed, value) &&
+           parsed.cmp == TG_EXPRESSION_EQUAL &&
+           parsed.operand == TG_EXPRESSION_OPERAND_NUMBER;
+}
 
 // JSON schema for the metrics query tool
 void mcp_tool_query_metrics_schema(BUFFER *buffer) {
@@ -152,7 +170,11 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_add_array_item_string(buffer, "coefficient-of-variation");    // relative standard deviation (cv)
         buffer_json_add_array_item_string(buffer, "ema");  // exponential moving average (alias "ses" or "ewma")
         buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
-        buffer_json_add_array_item_string(buffer, "countif");  // requires time_group_options parameter
+        buffer_json_add_array_item_string(buffer, "percentage-of-samples");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "countif");  // the historical name of percentage-of-samples, still accepted
+        buffer_json_add_array_item_string(buffer, "percentage-of-time");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "number-of-flaps");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "number-of-times");  // takes a condition
         buffer_json_add_array_item_string(buffer, "extremes");  // for each time frame, returns max for positive values and min for negative values
         buffer_json_add_array_item_string(buffer, "latest");  // for each time frame, returns the most recent collected value
         buffer_json_array_close(buffer);
@@ -166,8 +188,26 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_member_add_string(
             buffer, "description",
             "Additional options for time grouping.\n"
-            "For 'percentile', specify a percentage (0-100).\n"
-            "For 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+            "For 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\n"
+            "For 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times', specify a CONDITION: an optional operator "
+            "('!', '!=', '!:', '<>', '=', '==', ':', '>', '>=', '>:', '<', '<=', '<:') "
+            "followed by a value. The value is a number "
+            "(e.g. '>0'), a gap token ('==gap', '!=gap' - 'nan', 'null' and 'empty' are "
+            "synonyms. Naming a gap token makes uncollected samples participate for "
+            "'percentage-of-samples', 'number-of-flaps' and 'number-of-times'. For "
+            "'percentage-of-time', uncollected time is always in the denominator and enters "
+            "the numerator only when the condition matches gaps), or the "
+            "previous collected sample ('<previous' - 'last' is a synonym, so '<last' is the "
+            "same condition. Gaps are skipped, so comparisons span them, and the first collected "
+            "sample never matches; '<previous' counts counter resets such as reboots). There are no "
+            "and/or compounds. A bare number means '=N'; if the condition is omitted or blank it means '=0'; an operator "
+            "without a value applies to zero, so '>' means '>0'.\n"
+            "Over a window long enough to read lower-resolution data 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times' return an estimate, and the counting ones "
+            "report at most one event per stored interval; 'percentage-of-samples' does not "
+            "estimate - it evaluates each stored point as one sample. Request tier=0 for the "
+            "highest-resolution available data and verify db.per_tier when the raw sample sequence matters.");
     }
     buffer_json_object_close(buffer); // time_group_options
 
@@ -363,19 +403,54 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     if (json_object_is_type(time_group_obj, json_type_string)) {
         time_group_str = json_object_get_string(time_group_obj);
         
-        // Check if time_group_options is required based on time_group
-        if (time_group_str && (
-            strcmp(time_group_str, "percentile") == 0 || 
-            strcmp(time_group_str, "countif") == 0)) {
+        bool numeric_time_group = time_group_str && (
+            strcmp(time_group_str, "percentile") == 0 ||
+            strcmp(time_group_str, "trimmed-mean") == 0 ||
+            strcmp(time_group_str, "trimmed-median") == 0);
+        bool expression_time_group = time_group_str && (
+            strcmp(time_group_str, "countif") == 0 ||
+            strcmp(time_group_str, "percentage-of-samples") == 0 ||
+            strcmp(time_group_str, "percentage-of-time") == 0 ||
+            strcmp(time_group_str, "number-of-flaps") == 0 ||
+            strcmp(time_group_str, "number-of-times") == 0);
+
+        // Validate time_group_options according to the selected grouping.
+        if(numeric_time_group || expression_time_group) {
             
             struct json_object *time_group_options_obj = NULL;
-            if (!json_object_object_get_ex(params, "time_group_options", &time_group_options_obj) || !time_group_options_obj) {
+            bool has_time_group_options =
+                json_object_object_get_ex(params, "time_group_options", &time_group_options_obj);
+            if (!has_time_group_options || !time_group_options_obj) {
                 if (strcmp(time_group_str, "percentile") == 0) {
                     buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='percentile'. You must specify a percentage value between 0-100 (e.g., '95' for 95th percentile).");
-                } else {
-                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='countif'. You must specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+                    return MCP_RC_BAD_REQUEST;
                 }
-                return MCP_RC_BAD_REQUEST;
+            }
+
+            if(numeric_time_group && has_time_group_options) {
+                if(!mcp_query_metrics_numeric_option_valid(time_group_options_obj)) {
+                    buffer_sprintf(mcpc->error,
+                                   "Parameter 'time_group_options' must be a number when using time_group='%s'.",
+                                   time_group_str);
+                    return MCP_RC_INVALID_PARAMS;
+                }
+            }
+            else if(expression_time_group && has_time_group_options) {
+                if(!time_group_options_obj || !json_object_is_type(time_group_options_obj, json_type_string)) {
+                    buffer_sprintf(mcpc->error,
+                                   "Parameter 'time_group_options' must be a valid condition string when using time_group='%s'.",
+                                   time_group_str);
+                    return MCP_RC_INVALID_PARAMS;
+                }
+
+                const char *expression = json_object_get_string(time_group_options_obj);
+                TG_EXPRESSION parsed;
+                if(!expression || !tg_expression_parse(&parsed, expression)) {
+                    buffer_sprintf(mcpc->error,
+                                   "Invalid condition in parameter 'time_group_options' when using time_group='%s'.",
+                                   time_group_str);
+                    return MCP_RC_INVALID_PARAMS;
+                }
             }
         }
     }

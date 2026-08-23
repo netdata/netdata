@@ -350,6 +350,12 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         qm->status = options;
         qm->values_stored_as_rates = values_stored_as_rates;
 
+        // carried on the dimension flags so it survives group-by: the units
+        // a result dimension deserves depend on whether EVERY metric behind
+        // it was integrated from a rate into a volume
+        if(!values_stored_as_rates)
+            qm->status |= RRDR_DIMENSION_NOT_RATE;
+
         qm->link.query_node_id = qn->slot;
         qm->link.query_context_id = qc->slot;
         qm->link.query_instance_id = qi->slot;

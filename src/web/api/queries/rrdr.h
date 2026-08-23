@@ -37,6 +37,10 @@ typedef enum __attribute__ ((__packed__)) rrdr_dimension_flag {
     RRDR_DIMENSION_QUERIED  = (1 << 3), // the dimension has been queried
     RRDR_DIMENSION_FAILED   = (1 << 4), // the dimension failed to be queried
     RRDR_DIMENSION_GROUPED  = (1 << 5), // the dimension has been grouped in this RRDR
+    RRDR_DIMENSION_NOT_RATE = (1 << 6), // at least one metric behind it is NOT stored as a
+                                        // per-second rate. Stated negatively so it survives
+                                        // the OR that merges metrics into a group: "every
+                                        // contributor is a rate" is the absence of this flag
 } RRDR_DIMENSION_FLAGS;
 
 // RRDR result options
@@ -104,6 +108,11 @@ typedef struct rrdresult {
         NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
         TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
+
+        // set by create() when the parsed expression names a gap token:
+        // the ONLY way gap slots reach a grouping (they are filtered out
+        // of the hot path for everyone else)
+        bool wants_gaps;
 
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE

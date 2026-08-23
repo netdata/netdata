@@ -319,7 +319,10 @@ The query engine is a pipeline with two aggregation stages:
 | Average resource consumption (gauge metrics: memory, disk space, connections) | `average` or `max` | Gauges represent current state; max shows peak usage                  |
 | Find spikes or peaks (any metric type)                                        | `max`              | Captures the highest value within each interval                       |
 | Total volume transferred (counters: bytes, packets)                           | `sum`              | Sums the actual volume                                                |
-| Count events matching a condition                                             | `countif`          | Counts samples matching a threshold                                   |
+| Count events matching a condition                                             | `number-of-times`  | Counts the samples that matched (`<previous` counts counter resets)   |
+| Share of samples matching a condition                                         | `percentage-of-samples` | Alias `countif`                                                  |
+| Share of TIME matching a condition                                            | `percentage-of-time` | e.g. % of the window a node was down (an SLO)                       |
+| How many times a condition flipped on                                         | `number-of-flaps`  | Link flapping, a service bouncing                                     |
 
 #### Choosing aggregation Based on How to Combine Series
 
@@ -371,28 +374,38 @@ Controls how raw data points within each time interval are combined into one val
 | `ses`             |         | Single exponential smoothing                                                                              |
 | `des`             |         | Double exponential smoothing                                                                              |
 | `incremental-sum` |         | Difference between last and first value in interval                                                       |
-| `countif`         |         | Count values matching condition. Set condition in `time_group_options`: `">0"`, `"=0"`, `"!=0"`, `"<=10"` |
+| `percentage-of-samples` |   | Share of samples matching the condition in `time_group_options` (alias `countif`) |
+| `percentage-of-time`    |   | Share of TIME matching the condition |
+| `number-of-flaps`       |   | How many times the condition flipped from false to true |
+| `number-of-times`       |   | How many samples matched the condition |
 | `percentile`      |         | Percentile. Set percentile value in `time_group_options`: `"95"`, `"99"`                                  |
 | `trimmed-mean`    |         | Mean after trimming outliers. Set trim % in `time_group_options`                                          |
 | `trimmed-median`  |         | Median after trimming outliers. Set trim % in `time_group_options`                                        |
 
 :::important
 
-When using `time_group` values other than `min`, `max`, `average`, or
-`sum`, request `"tier": 0` in the `window` object and verify in
-`db.per_tier` that tier 0 actually supplied the data. Do not use the
-result if the planner fell back to a coarser tier: advanced functions
-such as `median`, `stddev`, `ses`, `des`, `percentile`, `countif`,
-`trimmed-mean`, `trimmed-median`, and `extremes` require native
-samples to work correctly.
+For exact results from advanced functions such as `median`, `stddev`,
+`ses`, `des`, `percentile`, `trimmed-mean`, `trimmed-median`, and
+`extremes`, request `"tier": 0` in the `window` object and verify in
+`db.per_tier` that tier 0 actually supplied the data. The four condition
+groupings can use coarser tiers: `percentage-of-samples` then treats each
+stored point as one sample, while `percentage-of-time`, `number-of-flaps`,
+and `number-of-times` return estimates. Request tier 0 when the raw sample
+sequence matters.
 
 :::
 
 #### time_group_options values
 
+For the four condition groupings, the operator is optional and a bare value means equality. Operators are `>`, `>=`
+(or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`), and `!=` (or `!:`, `!`, or `<>`). The value may be a number,
+a gap token (`gap`, `nan`, `null`, or `empty`), or the previous collected sample (`previous` or `last`). Omitted or
+empty input means `==0`; an operator without a value also applies to zero. `percentage-of-time` always includes
+uncollected time in its denominator and includes it in the numerator only when the condition matches gaps.
+
 | Used with        | Value format                | Example                            |
 |------------------|-----------------------------|------------------------------------|
-| `countif`        | Comparison operator + value | `">0"`, `"=0"`, `"!=0"`, `"<=100"` |
+| `percentage-of-samples`, `percentage-of-time`, `number-of-flaps`, `number-of-times` | Condition (see above) | `">0"`, `"=0"`, `"<=100"`, `"==gap"`, `"!=nan"`, `"<previous"` |
 | `percentile`     | Percentile value (0-100)    | `"95"`, `"99.5"`                   |
 | `trimmed-mean`   | Trim percentage             | `"5"`, `"10"`                      |
 | `trimmed-median` | Trim percentage             | `"5"`, `"10"`                      |
