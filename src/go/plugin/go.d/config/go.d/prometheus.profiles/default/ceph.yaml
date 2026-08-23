@@ -6728,7 +6728,7 @@ template:
               instances:
                 by_labels:
                   - instance_id
-                optional_by_labels:
+                optional_by_labels: []
             - title: Object Bytes
               context: object_bytes
               units: bytes/s
@@ -6745,7 +6745,7 @@ template:
               instances:
                 by_labels:
                   - instance_id
-                optional_by_labels:
+                optional_by_labels: []
             - title: Latency Measurements
               context: latency_measurements
               units: operations/s
@@ -6768,7 +6768,7 @@ template:
               instances:
                 by_labels:
                   - instance_id
-                optional_by_labels:
+                optional_by_labels: []
             - title: Accumulated Latency
               context: accumulated_latency
               units: seconds/s
@@ -6791,7 +6791,7 @@ template:
               instances:
                 by_labels:
                   - instance_id
-                optional_by_labels:
+                optional_by_labels: []
               algorithm: incremental
         - family: User Operations
           context_namespace: user_operations

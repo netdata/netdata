@@ -291,20 +291,20 @@ cases:
         mgr_rbd_stats: enabled
     coverage: false
     steps:
-    - fixture: fixtures/ceph_squid_mgr_limit11.prom
-      expected:
-        verdict: PASS
-      observations:
-        object_gateway_scheduling.simple_throttler_rejections#throttled:
-          state: current
-          predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
-    - fixture: fixtures/ceph_squid_mgr_simple_throttle_reset.prom
-      expected:
-        verdict: PASS
-      observations:
-        object_gateway_scheduling.simple_throttler_rejections#throttled:
-          state: current
-          predicates: {membership: unchanged, aggregate: decreased, identity: unchanged}
+      - fixture: fixtures/ceph_squid_mgr_limit11.prom
+        expected:
+          verdict: PASS
+        observations:
+          object_gateway_scheduling.simple_throttler_rejections#throttled:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+      - fixture: fixtures/ceph_squid_mgr_simple_throttle_reset.prom
+        expected:
+          verdict: PASS
+        observations:
+          object_gateway_scheduling.simple_throttler_rejections#throttled:
+            state: current
+            predicates: {membership: unchanged, aggregate: decreased, identity: unchanged}
   squid_ceph_exporter_connection_no_instance:
     environment:
       ceph:
