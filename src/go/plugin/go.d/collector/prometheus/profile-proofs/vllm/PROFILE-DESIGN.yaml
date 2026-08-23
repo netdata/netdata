@@ -792,7 +792,7 @@ limitations: {}
 views:
   request_lifecycle.corrupted_requests:
     family: Request Lifecycle
-    question: At what rate does corrupted requests change?
+    question: What is the rate of change for corrupted requests?
     entity: model_engine_ray
     inputs:
       corrupted:
@@ -840,7 +840,7 @@ views:
       omit: {}
   request_lifecycle.first_token_requests:
     family: Request Lifecycle
-    question: At what rate does requests reaching first token change?
+    question: What is the rate of change for requests reaching first token?
     entity: model_engine_ray
     inputs:
       requests:
@@ -904,7 +904,7 @@ views:
       omit: {}
   request_lifecycle.requested_sequence_volume:
     family: Request Lifecycle
-    question: At what rate does requested sequence volume change?
+    question: What is the rate of change for requested sequence volume?
     entity: model_engine_ray
     inputs:
       sequences:
@@ -936,7 +936,7 @@ views:
       omit: {}
   request_lifecycle.requested_token_limits_sum:
     family: Request Lifecycle
-    question: At what rate does requested token limits sum change?
+    question: What is the rate of change for requested token limits sum?
     entity: model_engine_ray
     inputs:
       token_limits:
@@ -952,7 +952,7 @@ views:
       omit: {}
   request_lifecycle.requests_with_explicit_token_limit:
     family: Request Lifecycle
-    question: At what rate does requests with explicit token limit change?
+    question: What is the rate of change for requests with explicit token limit?
     entity: model_engine_ray
     inputs:
       requests:
@@ -984,7 +984,7 @@ views:
       omit: {}
   request_lifecycle.maximum_generated_tokens_sum:
     family: Request Lifecycle
-    question: At what rate does maximum generated tokens sum change?
+    question: What is the rate of change for maximum generated tokens sum?
     entity: model_engine_ray
     inputs:
       maximums:
@@ -1000,7 +1000,7 @@ views:
       omit: {}
   request_lifecycle.parent_requests:
     family: Request Lifecycle
-    question: At what rate does parent requests change?
+    question: What is the rate of change for parent requests?
     entity: model_engine_ray
     inputs:
       requests:
@@ -1016,7 +1016,7 @@ views:
       omit: {}
   request_lifecycle.outcomes:
     family: Request Lifecycle/Outcomes
-    question: At what rate does request outcomes change?
+    question: What is the rate of change for request outcomes?
     entity: finished_request_ray
     inputs:
       requests:
@@ -1070,7 +1070,7 @@ views:
       omit: {}
   scheduler.preemptions:
     family: Scheduler
-    question: At what rate does request preemptions change?
+    question: What is the rate of change for request preemptions?
     entity: model_engine_ray
     inputs:
       preemptions:
@@ -1136,7 +1136,7 @@ views:
       omit: {}
   prefill.prompt_tokens_by_source:
     family: Prefill
-    question: At what rate does prompt tokens by source change?
+    question: What is the rate of change for prompt tokens by source?
     entity: model_engine_ray
     inputs:
       source:
@@ -1202,7 +1202,7 @@ views:
       omit: {}
   prefill.completed_request_prompt_volume:
     family: Prefill
-    question: At what rate does completed request prompt volume change?
+    question: What is the rate of change for completed request prompt volume?
     entity: model_engine_ray
     inputs:
       prompt_tokens:
@@ -1218,7 +1218,7 @@ views:
       omit: {}
   prefill.computed_kv_token_volume:
     family: Prefill
-    question: At what rate does computed kv token volume change?
+    question: What is the rate of change for computed kv token volume?
     entity: model_engine_ray
     inputs:
       computed_tokens:
@@ -1250,7 +1250,7 @@ views:
       omit: {}
   decode.generation_throughput:
     family: Decode
-    question: At what rate does generated tokens change?
+    question: What is the rate of change for generated tokens?
     entity: model_engine_ray
     inputs:
       generated:
@@ -1330,7 +1330,7 @@ views:
       omit: {}
   decode.output_token_volume:
     family: Decode
-    question: At what rate does output token volume change?
+    question: What is the rate of change for output token volume?
     entity: model_engine_ray
     inputs:
       output_tokens:
@@ -1362,7 +1362,7 @@ views:
       omit: {}
   decode.inter_token_intervals:
     family: Decode
-    question: At what rate does inter-token intervals change?
+    question: What is the rate of change for inter-token intervals?
     entity: model_engine_ray
     inputs:
       intervals:
@@ -1378,7 +1378,7 @@ views:
       omit: {}
   decode.inter_token_interval_time:
     family: Decode
-    question: At what rate does inter-token interval time change?
+    question: What is the rate of change for inter-token interval time?
     entity: model_engine_ray
     inputs:
       intervals:
@@ -1394,7 +1394,7 @@ views:
       omit: {}
   decode.accumulated_mean_output_token_time:
     family: Decode
-    question: At what rate does accumulated mean output-token time change?
+    question: What is the rate of change for accumulated mean output-token time?
     entity: model_engine_ray
     inputs:
       request_means:
@@ -1458,7 +1458,7 @@ views:
       omit: {}
   engine_execution.engine_steps:
     family: Engine Execution
-    question: At what rate does engine steps change?
+    question: What is the rate of change for engine steps?
     entity: model_engine_ray
     inputs:
       steps:
@@ -1474,7 +1474,7 @@ views:
       omit: {}
   engine_execution.step_token_volume:
     family: Engine Execution
-    question: At what rate does engine step token volume change?
+    question: What is the rate of change for engine step token volume?
     entity: model_engine_ray
     inputs:
       tokens:
@@ -1490,7 +1490,7 @@ views:
       omit: {}
   engine_execution.estimated_compute:
     family: Engine Execution
-    question: At what rate does estimated compute per gpu change?
+    question: What is the rate of change for estimated compute per gpu?
     entity: model_engine_ray
     inputs:
       compute:
@@ -1511,7 +1511,7 @@ views:
       - display_conventions
   engine_execution.estimated_memory_bandwidth:
     family: Engine Execution
-    question: At what rate does estimated memory bandwidth per gpu change?
+    question: What is the rate of change for estimated memory bandwidth per gpu?
     entity: model_engine_ray
     inputs:
       read:
@@ -1557,7 +1557,7 @@ views:
       - display_conventions
   kv_cache.local_prefix:
     family: KV Cache
-    question: At what rate does local prefix cache change?
+    question: What is the rate of change for local prefix cache?
     entity: model_engine_ray
     inputs:
       queries:
@@ -1577,7 +1577,7 @@ views:
       omit: {}
   kv_cache.external_prefix:
     family: KV Cache
-    question: At what rate does external prefix cache change?
+    question: What is the rate of change for external prefix cache?
     entity: model_engine_ray
     inputs:
       queries:
@@ -1597,7 +1597,7 @@ views:
       omit: {}
   kv_cache.multimodal:
     family: KV Cache
-    question: At what rate does multimodal cache change?
+    question: What is the rate of change for multimodal cache?
     entity: model_engine_ray
     inputs:
       queries:
@@ -1665,7 +1665,7 @@ views:
       omit: {}
   kv_cache_residency.events:
     family: KV Cache Residency
-    question: At what rate does kv cache events change?
+    question: What is the rate of change for kv cache events?
     entity: model_engine_ray
     inputs:
       evictions:
@@ -1685,7 +1685,7 @@ views:
       omit: {}
   kv_cache_residency.accumulated_time:
     family: KV Cache Residency
-    question: At what rate does accumulated kv residency time change?
+    question: What is the rate of change for accumulated kv residency time?
     entity: model_engine_ray
     inputs:
       lifetime:
@@ -1741,7 +1741,7 @@ views:
       omit: {}
   kv_offloading.transfer_operations:
     family: KV Offloading
-    question: At what rate does kv offload transfer operations change?
+    question: What is the rate of change for kv offload transfer operations?
     entity: model_engine_ray
     inputs:
       loads:
@@ -1761,7 +1761,7 @@ views:
       omit: {}
   kv_offloading.transfer_bytes:
     family: KV Offloading
-    question: At what rate does kv offload transfer throughput change?
+    question: What is the rate of change for kv offload transfer throughput?
     entity: model_engine_ray
     inputs:
       loaded:
@@ -1833,7 +1833,7 @@ views:
       omit: {}
   kv_offloading.lookup_measurements:
     family: KV Offloading
-    question: At what rate does kv offload lookup measurements change?
+    question: What is the rate of change for kv offload lookup measurements?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -1853,7 +1853,7 @@ views:
       omit: {}
   kv_offloading.lookup_delay_accumulation:
     family: KV Offloading
-    question: At what rate does kv offload lookup delay accumulation change?
+    question: What is the rate of change for kv offload lookup delay accumulation?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -1918,7 +1918,7 @@ views:
       omit: {}
   kv_offloading.cpu_allocation_measurements:
     family: KV Offloading
-    question: At what rate does cpu kv allocation measurements change?
+    question: What is the rate of change for cpu kv allocation measurements?
     entity: model_engine_ray
     inputs:
       allocations:
@@ -1934,7 +1934,7 @@ views:
       omit: {}
   kv_offloading.cpu_allocation_volume:
     family: KV Offloading
-    question: At what rate does cpu kv allocation volume change?
+    question: What is the rate of change for cpu kv allocation volume?
     entity: model_engine_ray
     inputs:
       blocks:
@@ -1950,7 +1950,7 @@ views:
       omit: {}
   kv_offloading.admission_outcomes:
     family: KV Offloading
-    question: At what rate does kv offload admission outcomes change?
+    question: What is the rate of change for kv offload admission outcomes?
     entity: model_engine_ray
     inputs:
       allocation_failures:
@@ -2002,7 +2002,7 @@ views:
       omit: {}
   kv_offloading.tiering_lookup_measurements:
     family: KV Offloading
-    question: At what rate does tiered kv offload lookup measurements change?
+    question: What is the rate of change for tiered kv offload lookup measurements?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -2022,7 +2022,7 @@ views:
       omit: {}
   kv_offloading.tiering_lookup_delay_accumulation:
     family: KV Offloading
-    question: At what rate does tiered kv offload lookup delay accumulation change?
+    question: What is the rate of change for tiered kv offload lookup delay accumulation?
     entity: model_engine_ray
     inputs:
       synchronous:
@@ -2106,7 +2106,7 @@ views:
       omit: {}
   nixl_connector.successful_transfers:
     family: NIXL Connector
-    question: At what rate does successful nixl transfers change?
+    question: What is the rate of change for successful nixl transfers?
     entity: model_engine_ray
     inputs:
       transfers:
@@ -2142,7 +2142,7 @@ views:
       omit: {}
   nixl_connector.transfer_throughput:
     family: NIXL Connector
-    question: At what rate does nixl transfer throughput change?
+    question: What is the rate of change for nixl transfer throughput?
     entity: model_engine_ray
     inputs:
       transferred:
@@ -2158,7 +2158,7 @@ views:
       omit: {}
   nixl_connector.descriptor_throughput:
     family: NIXL Connector
-    question: At what rate does nixl descriptor throughput change?
+    question: What is the rate of change for nixl descriptor throughput?
     entity: model_engine_ray
     inputs:
       descriptors:
@@ -2174,7 +2174,7 @@ views:
       omit: {}
   nixl_connector.failures:
     family: NIXL Connector
-    question: At what rate does nixl failures change?
+    question: What is the rate of change for nixl failures?
     entity: model_engine_ray
     inputs:
       transfers:
@@ -2194,7 +2194,7 @@ views:
       omit: {}
   nixl_connector.expired_requests:
     family: NIXL Connector
-    question: At what rate does nixl requests with expired kv change?
+    question: What is the rate of change for nixl requests with expired kv?
     entity: model_engine_ray
     inputs:
       expired:
@@ -2242,7 +2242,7 @@ views:
       omit: {}
   hf3fs_connector.transfer_measurements:
     family: HF3FS Connector
-    question: At what rate does hf3fs transfer measurements change?
+    question: What is the rate of change for hf3fs transfer measurements?
     entity: model_engine_ray
     inputs:
       saves:
@@ -2282,7 +2282,7 @@ views:
       omit: {}
   hf3fs_connector.failures:
     family: HF3FS Connector
-    question: At what rate does hf3fs transfer failures change?
+    question: What is the rate of change for hf3fs transfer failures?
     entity: model_engine_ray
     inputs:
       saves:
@@ -2318,7 +2318,7 @@ views:
       omit: {}
   mooncake_connector.timing.operations:
     family: Mooncake Connector/Operation Timing
-    question: At what rate does mooncake store operations change?
+    question: What is the rate of change for mooncake store operations?
     entity: connector_operation_status_ray
     inputs:
       operations:
@@ -2350,7 +2350,7 @@ views:
       omit: {}
   mooncake_connector.volume.keys:
     family: Mooncake Connector/Operation Volume
-    question: At what rate does mooncake store key throughput change?
+    question: What is the rate of change for mooncake store key throughput?
     entity: connector_operation_status_ray
     inputs:
       keys:
@@ -2366,7 +2366,7 @@ views:
       omit: {}
   mooncake_connector.volume.bytes:
     family: Mooncake Connector/Operation Volume
-    question: At what rate does mooncake store byte throughput change?
+    question: What is the rate of change for mooncake store byte throughput?
     entity: connector_operation_status_ray
     inputs:
       bytes:
@@ -2382,7 +2382,7 @@ views:
       omit: {}
   mooncake_connector.volume.failed_keys:
     family: Mooncake Connector/Operation Volume
-    question: At what rate does mooncake store failed keys change?
+    question: What is the rate of change for mooncake store failed keys?
     entity: connector_operation_status_ray
     inputs:
       failed:
@@ -2398,7 +2398,7 @@ views:
       omit: {}
   speculative_decoding.drafts:
     family: Speculative Decoding
-    question: At what rate does drafts change?
+    question: What is the rate of change for drafts?
     entity: model_engine_ray
     inputs:
       drafts:
@@ -2414,7 +2414,7 @@ views:
       omit: {}
   speculative_decoding.token_outcomes:
     family: Speculative Decoding
-    question: At what rate does draft token outcomes change?
+    question: What is the rate of change for draft token outcomes?
     entity: model_engine_ray
     inputs:
       proposed:
@@ -2434,7 +2434,7 @@ views:
       omit: {}
   speculative_decoding.accepted_by_position:
     family: Speculative Decoding
-    question: At what rate does accepted tokens by position change?
+    question: What is the rate of change for accepted tokens by position?
     entity: model_engine_ray
     inputs:
       position:
@@ -2452,7 +2452,7 @@ views:
       omit: {}
   diffusion_decoding.denoising_steps:
     family: Diffusion Decoding
-    question: At what rate does diffusion denoising steps change?
+    question: What is the rate of change for diffusion denoising steps?
     entity: model_engine_ray
     inputs:
       steps:
@@ -2468,7 +2468,7 @@ views:
       omit: {}
   diffusion_decoding.canvas_positions:
     family: Diffusion Decoding
-    question: At what rate does diffusion canvas positions change?
+    question: What is the rate of change for diffusion canvas positions?
     entity: model_engine_ray
     inputs:
       positions:
@@ -2484,7 +2484,7 @@ views:
       omit: {}
   diffusion_decoding.committed_tokens:
     family: Diffusion Decoding
-    question: At what rate does diffusion committed tokens change?
+    question: What is the rate of change for diffusion committed tokens?
     entity: model_engine_ray
     inputs:
       committed:
@@ -2513,7 +2513,7 @@ views:
       omit: {}
   websocket_service.connection_lifecycle:
     family: WebSocket Service
-    question: At what rate does websocket connection lifecycle change?
+    question: What is the rate of change for websocket connection lifecycle?
     entity: service
     inputs:
       opened:
@@ -2556,7 +2556,7 @@ views:
       omit: {}
   tool_parsing.invocations:
     family: Tool Parsing
-    question: At what rate does tool parser invocations change?
+    question: What is the rate of change for tool parser invocations?
     entity: parser_request
     inputs:
       invocations:

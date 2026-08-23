@@ -137,6 +137,58 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         self.assertNotIn('(1 charts)', rich)
         self.assertNotIn('| Metric |', clean)
 
+    def test_rendered_catalogue_deduplicates_dimension_names_not_selectors(self):
+        collectors = load_collectors([('netdata/netdata', PROMETHEUS_METADATA, False)])
+        project_prometheus_profile_coverage(collectors, self.catalog)
+        litellm = next(item for item in collectors if item['meta']['id'].endswith('-litellm'))
+        clean = get_jinja_env().get_template('metrics.md').render(entry=litellm, clean=True)
+        charts = _profile_charts(self.catalog['litellm'])
+
+        cases = {
+            'internal_services.request_outcomes': ('Internal Service Request Outcomes', 'values of label outcome', 22),
+            'internal_services.failure_causes': ('Internal Service Failure Causes', 'values of label service', 11),
+            'internal_services.latency_distribution': ('Internal Service Latency Distribution', 'matching series', 11),
+            'internal_services.accumulated_latency': (
+                'Accumulated Internal Service Latency',
+                'values of label measurement',
+                11,
+            ),
+        }
+        for context, (title, dimension_name, selector_count) in cases.items():
+            with self.subTest(context=context):
+                chart = charts[context]
+                self.assertEqual(len(chart['selectors']), selector_count)
+                self.assertEqual({dimension['name'] for dimension in chart['dimensions']}, {dimension_name})
+
+                start = clean.index(f'<summary>{title}</summary>')
+                end = clean.find('<details data-prometheus-profile-chart>', start + 1)
+                block = clean[start:end if end != -1 else None]
+                self.assertEqual(block.count(f'`{dimension_name}`'), 1)
+                self.assertIn(f'<summary>Source metric selectors ({selector_count})</summary>', block)
+
+    def test_operator_questions_avoid_repeated_or_fragile_grammar(self):
+        vllm = _profile_charts(self.catalog['vllm'])
+        litellm = _profile_charts(self.catalog['litellm'])
+
+        self.assertFalse([
+            chart['question']
+            for chart in vllm.values()
+            if chart['question'].startswith('At what rate does ')
+        ])
+        self.assertFalse([
+            chart['question']
+            for chart in litellm.values()
+            if ' by ' in chart['question'] and ' report for each ' in chart['question']
+        ])
+        self.assertEqual(
+            vllm['request_lifecycle.parent_requests']['question'],
+            'What is the rate of change for parent requests?',
+        )
+        self.assertEqual(
+            litellm['usage.end_user.spend']['question'],
+            'What is the LLM spend for each end user?',
+        )
+
     def test_generated_markdown_preserves_catalogue_hooks(self):
         markdown = (
             '<!-- prometheus-profile-catalog -->\n'
@@ -195,6 +247,14 @@ def _all_family_charts(family):
     yield from family['charts']
     for child in family['children']:
         yield from _all_family_charts(child)
+
+
+def _profile_charts(profile):
+    return {
+        chart['context']: chart
+        for family in profile['families']
+        for chart in _all_family_charts(family)
+    }
 
 
 def _write_minimal_catalog(root, contexts=('requests',), family='Service'):
