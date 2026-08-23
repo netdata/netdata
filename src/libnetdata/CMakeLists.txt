@@ -143,7 +143,7 @@ endif()
 
 set_source_files_properties(gorilla/gorilla.cc PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 
-target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(libnetdata BEFORE PUBLIC ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"

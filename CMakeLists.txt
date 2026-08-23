@@ -128,7 +128,6 @@ endif()
 #
 include(NetdataPlatformChecks)
 
-set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 
 #
 # The install layout: every Netdata-owned path once, as a *_DEST/*_DIR pair, plus the host-owned destinations and the staging predicate.
@@ -148,8 +147,6 @@ include(NetdataProtobuf)
 if(ENABLE_BUNDLED_PROTOBUF)
         netdata_bundle_protobuf()
 endif()
-
-set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
 include(NetdataOSRelease)
 

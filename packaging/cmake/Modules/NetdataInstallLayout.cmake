@@ -115,3 +115,7 @@ endif()
 # DEB policy requires a copyright file in every binary package, under that
 # package's own documentation directory.
 set(PKG_DOC_DEST "usr/share/doc")
+
+# The maintainer scripts, copyright file and service templates the packages
+# stage from the source tree.
+set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")

@@ -28,7 +28,7 @@ add_executable(nd-run ${NDRUN_FILES})
 if(HAVE_CAPABILITY)
   target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
 endif()
-target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
+target_include_directories(nd-run PRIVATE ${CMAKE_BINARY_DIR})
 install(TARGETS nd-run
         COMPONENT netdata
         DESTINATION "${BINDIR}")

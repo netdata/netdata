@@ -34,13 +34,13 @@ if(ENABLE_PLUGIN_NETFLOW)
                 ${CMAKE_BINARY_DIR}/${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN}
                 COMPONENT plugin-netflow
                 DESTINATION "${BINDIR}")
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader\")"
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${PLUGINS_DEST}/topology-ip-intel-downloader\")"
                 COMPONENT plugin-netflow)
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin\")"
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${PLUGINS_DEST}/topology-ip-intel-downloader.plugin\")"
                 COMPONENT plugin-netflow)
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.exe\")"
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${PLUGINS_DEST}/topology-ip-intel-downloader.exe\")"
                 COMPONENT plugin-netflow)
-        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin.exe\")"
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${PLUGINS_DEST}/topology-ip-intel-downloader.plugin.exe\")"
                 COMPONENT plugin-netflow)
     endif()
 

@@ -40,7 +40,7 @@ set(LOG2JOURNAL_FILES
 
 if(PCRE2_FOUND)
         add_executable(log2journal ${LOG2JOURNAL_FILES})
-        target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
+        target_include_directories(log2journal BEFORE PUBLIC ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
         target_compile_options(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
 
         target_link_libraries(log2journal PUBLIC libnetdata)
