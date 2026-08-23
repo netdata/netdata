@@ -283,6 +283,30 @@ set(PKG_DOC_DEST "usr/share/doc")
 
 # Setup Rust/Corrosion for plugins that need it
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)
+    # Check for the toolchain before fetching Corrosion: without this, a missing
+    # rustc surfaces as an error deep inside Corrosion's FindRust with no hint of
+    # which option to turn off (#23315). The floor is the workspace's declared
+    # rust-version, read from the manifest so the two cannot drift apart.
+    find_program(RUSTC_EXECUTABLE rustc)
+    if(NOT RUSTC_EXECUTABLE)
+        message(FATAL_ERROR "A Rust toolchain (rustc) is required by the enabled Rust-based features but was not found. Install one (e.g. via rustup), or pass -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_NETFLOW=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off to build without them.")
+    endif()
+
+    file(STRINGS src/crates/Cargo.toml _nd_rust_version_line REGEX "^rust-version = \"")
+    string(REGEX REPLACE "^rust-version = \"([0-9.]+)\".*$" "\\1" _nd_min_rust_version "${_nd_rust_version_line}")
+    execute_process(COMMAND "${RUSTC_EXECUTABLE}" --version
+                    RESULT_VARIABLE _nd_rustc_result
+                    OUTPUT_VARIABLE _nd_rustc_version
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string(REGEX REPLACE "^rustc ([0-9.]+).*$" "\\1" _nd_rustc_version "${_nd_rustc_version}")
+    if(_nd_rustc_result OR _nd_rustc_version VERSION_LESS _nd_min_rust_version)
+        message(FATAL_ERROR "The enabled Rust-based features need rustc >= ${_nd_min_rust_version}, but ${RUSTC_EXECUTABLE} reports '${_nd_rustc_version}'. Update the toolchain, or pass -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_NETFLOW=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off to build without them.")
+    endif()
+    unset(_nd_rust_version_line)
+    unset(_nd_min_rust_version)
+    unset(_nd_rustc_result)
+    unset(_nd_rustc_version)
+
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
