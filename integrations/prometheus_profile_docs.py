@@ -148,7 +148,8 @@ def load_profile_catalog(design_path=PROFILE_DESIGN_PATH, runtime_path=PROFILE_R
         missing_design = sorted(set(runtimes) - set(designs))
         missing_runtime = sorted(set(designs) - set(runtimes))
         raise ProfileCoverageError(
-            f'Profile design/runtime set mismatch: missing designs={missing_design}, missing runtimes={missing_runtime}.'
+            'Profile design/runtime set mismatch: '
+            f'missing designs={missing_design}, missing runtimes={missing_runtime}.'
         )
 
     catalog = {}
