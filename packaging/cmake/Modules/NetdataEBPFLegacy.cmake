@@ -43,4 +43,6 @@ function(netdata_install_legacy_ebpf_code)
     install(DIRECTORY ${ebpf-legacy_BUILD_DIR}/ebpf.d
             DESTINATION ${PLUGINS_DEST}
             COMPONENT ebpf-code-legacy)
+
+    netdata_add_deb_copyright(ebpf-code-legacy netdata-ebpf-code-legacy)
 endfunction()

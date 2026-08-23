@@ -67,4 +67,6 @@ if(ENABLE_PLUGIN_NETFLOW)
                 "plugin-netflow: no staged topology IP intelligence stock payload provided; "
                 "skipping stock topology-ip-intel install")
     endif()
+
+    netdata_add_deb_copyright(plugin-netflow netdata-plugin-netflow)
 endif()

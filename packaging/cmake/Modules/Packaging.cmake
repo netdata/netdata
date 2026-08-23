@@ -826,7 +826,8 @@ set(CPACK_RPM_PLUGIN-IBM_DEFAULT_GROUP "netdata")
 set(CPACK_RPM_PLUGIN-IBM_USER_FILELIST
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/ibm.d.plugin")
 
-set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_DESCRIPTION
+set(CPACK_COMPONENT_PLUGIN-IBM-LIBS_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-IBM-LIBS_DESCRIPTION
 		"IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.
  This package provides the IBM MQ client libraries needed by Netdata IBM
  ecosystem metrics collection plugin.")
@@ -1113,7 +1114,7 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-slabinfo/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SLABINFO-DEBUGINFO_PACKAGE On)
+set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE On)
 
 set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_NAME "netdata-plugin-slabinfo")
 set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_SUMMARY "The slabinfo metrics collector for the Netdata Agent")
@@ -1166,7 +1167,9 @@ set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
 
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_DEPENDS "netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_DEPENDS "netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION})")
+
+netdata_add_deb_copyright(plugin-journal-viewer netdata-plugin-journal-viewer)
 
 set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
 set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_SUMMARY "Transitional dummy package")
@@ -1188,7 +1191,7 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_PREDEPENDS "netdata-user")
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-units/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD_UNITS_DEBUGINFO_PACKAGE On)
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_DEBUGINFO_PACKAGE On)
 
 set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_NAME "netdata-plugin-systemd-units")
 set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_SUMMARY "The systemd units plugin for the Netdata Agent")
@@ -1242,7 +1245,12 @@ set(CPACK_RPM_PLUGIN-XENSTAT_USER_FILELIST
 #
 
 list(APPEND CPACK_COMPONENTS_ALL "netdata")
-list(APPEND CPACK_COMPONENTS_ALL "user")
+# The user component's whole payload (sysusers, copyright, maintainer scripts)
+# is host staging; registering it elsewhere would emit an empty package on any
+# future non-Linux cpack run.
+if(NETDATA_STAGE_HOST_FILES)
+  list(APPEND CPACK_COMPONENTS_ALL "user")
+endif()
 if(ENABLE_DASHBOARD)
   list(APPEND CPACK_COMPONENTS_ALL "dashboard")
 endif()
@@ -1315,6 +1323,14 @@ endif()
 # macOS-only plugin.
 if(OS_MACOS AND OSLOG AND FOUNDATION)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-macos-logs")
+endif()
+# The Windows-only components, registered under the same guards their install
+# rules use. CPack never runs on Windows today (the MSI is built by WiX), so
+# these are inert; they exist to keep the invariant that every install rule's
+# component is registered wherever the rule fires.
+if(OS_WINDOWS)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-windows-events")
+        list(APPEND CPACK_COMPONENTS_ALL "netdata_driver" "netdata_driver_inf" "wevt_netdata_dll")
 endif()
 
 include(CPack)

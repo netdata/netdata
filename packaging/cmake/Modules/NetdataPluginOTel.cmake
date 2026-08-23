@@ -17,4 +17,6 @@ if(ENABLE_PLUGIN_OTEL)
             DESTINATION ${LIBCONFIG_DEST}/otel.d/v1/metrics)
 
     install(DIRECTORY COMPONENT plugin-otel DESTINATION ${CONFIG_DEST}/otel.d/v1/metrics)
+
+    netdata_add_deb_copyright(plugin-otel netdata-plugin-otel)
 endif()

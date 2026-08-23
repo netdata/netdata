@@ -231,4 +231,7 @@ if(ENABLE_PLUGIN_IBM)
     )
 
     install_ibm_runtime(plugin-ibm-libs)
+
+    netdata_add_deb_copyright(plugin-ibm netdata-plugin-ibm)
+    netdata_add_deb_copyright(plugin-ibm-libs netdata-plugin-ibm-libs)
 endif()

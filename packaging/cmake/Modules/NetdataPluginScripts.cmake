@@ -27,4 +27,6 @@ if(ENABLE_PLUGIN_SCRIPTS)
             COMPONENT plugin-scripts
             DESTINATION ${LIBCONFIG_DEST}
             FILES_MATCHING PATTERN "*.conf")
+
+    netdata_add_deb_copyright(plugin-scripts netdata-plugin-scripts)
 endif()

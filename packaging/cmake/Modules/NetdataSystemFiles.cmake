@@ -788,10 +788,7 @@ if(ENABLE_DASHBOARD)
   include(NetdataDashboard)
   bundle_dashboard()
 
-  install(FILES
-          COMPONENT dashboard
-          DESTINATION ${WEB_DEST})
-
+  netdata_add_deb_copyright(dashboard netdata-dashboard)
 endif()
 
 #
@@ -838,6 +835,11 @@ endif()
 #
 
 include(NetdataRenderDocs)
+
+# DEB policy: every binary package carries a copyright file. The plugins add
+# theirs beside their install rules; these two components are defined here.
+netdata_add_deb_copyright(netdata netdata)
+netdata_add_deb_copyright(user netdata-user)
 
 #
 # Include packaging logic
