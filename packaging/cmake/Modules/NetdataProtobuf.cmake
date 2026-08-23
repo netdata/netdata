@@ -101,7 +101,7 @@ macro(netdata_detect_protobuf)
                 set(HAVE_PROTOBUF True)
         else()
                 if(NOT ENABLE_BUNDLED_PROTOBUF)
-                        if (NOT BUILD_SHARED_LIBS)
+                        if(STATIC_BUILD)
                                 set(Protobuf_USE_STATIC_LIBS On)
                         endif()
 
