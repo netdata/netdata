@@ -78,7 +78,11 @@ function(add_required_compiler_flag flag)
     add_compile_options("${flag}")
     add_link_options("${flag}")
   else()
-    message(FATAL_ERROR "${flag} support is required to build Netdata")
+    # The probe compiles with -Werror and inherits the user's CMAKE_<LANG>_FLAGS,
+    # so a flag the compiler does not recognise (a warning option from a newer
+    # compiler, a bad sanitizer combination) fails EVERY probe, and the flag
+    # named here is usually the innocent one (#19915).
+    message(FATAL_ERROR "${flag} support is required to build Netdata. If your compiler supports it, a flag already present in CMAKE_C_FLAGS/CMAKE_CXX_FLAGS ('${CMAKE_C_FLAGS}' / '${CMAKE_CXX_FLAGS}') may be failing the probe instead - see CMakeFiles/CMakeError.log for the actual compiler error.")
   endif()
 endfunction()
 
