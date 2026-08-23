@@ -1291,7 +1291,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
 #ifdef HAVE_PROTOBUF
     build_info_set_status(BIB_LIB_PROTOBUF, true);
-#ifdef BUNDLED_PROTOBUF
+#ifdef ENABLE_BUNDLED_PROTOBUF
     build_info_set_value(BIB_LIB_PROTOBUF, "bundled");
 #else
     build_info_set_value(BIB_LIB_PROTOBUF, "system");
