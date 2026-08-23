@@ -1354,6 +1354,101 @@ static void test_rrd_string_allowed_chars(void) {
 }
 
 // ============================================================================
+// TEST: rrd_string_allowed_chars IDEMPOTENCY
+//
+// rrdset_metadata_field_update() (src/database/rrdset-index-id.c) skips
+// re-interning a chart metadata field when the RAW incoming string compares
+// equal to the STORED one - and the stored one is always the output of
+// rrd_string_strdupz(), i.e. already sanitized with rrd_string_allowed_chars.
+// That fast path is correct ONLY IF this sanitizer is idempotent over its own
+// image: sanitize(sanitize(x)) == sanitize(x). If a future change to the table
+// or to text_sanitize() broke that, an equal-compare would no longer prove
+// "interning is a no-op", and charts would silently keep stale metadata.
+//
+// Pin the invariant here, with the REAL table (the generic stress_idempotent
+// case below uses identity_char_map, which cannot catch a table regression).
+// ============================================================================
+
+static void test_rrd_string_allowed_chars_idempotency(void) {
+    fprintf(stderr, "\n=== RRD String Allowed Chars Idempotency ===\n");
+
+    extern unsigned char rrd_string_allowed_chars[256];
+
+    // one pass of exactly what rrd_string_strdupz() does: dst_size = 2*len+1
+    #define SANITIZE_ONCE(dst, dstcap, src) do {                                    \
+        size_t _len = strlen((const char *)(src));                                  \
+        size_t _cap = (_len * 2) + 1;                                               \
+        if(_cap > (dstcap)) _cap = (dstcap);                                        \
+        text_sanitize((unsigned char *)(dst), (const unsigned char *)(src), _cap,   \
+                      rrd_string_allowed_chars, true, "", NULL);                    \
+    } while(0)
+
+    static const char * const inputs[] = {
+        "cpu.user",                     // plain ascii
+        "\"value\"",                    // double quote -> single quote
+        "path\\file",                   // backslash -> slash
+        "requests/s\xC2\xB2",           // valid 2-byte utf8
+        "\xC2\xB5s",                    // micro sign
+        "\xF0\x9F\x98\x80",             // valid 4-byte utf8
+        "bad\xFF" "byte",                // invalid byte -> hex encoded
+        "trunc\xC2",                    // truncated 2-byte sequence
+        "trunc\xE2\x82",                // truncated 3-byte sequence
+        "\x80\x81lone",                 // lone continuation bytes
+        "___",                          // all-underscore -> collapses to empty
+        "  a   b  ",                    // leading/trailing/repeated spaces
+        "a\x01\x02" "b",                // control characters
+        "test\xC0\x80test",             // overlong NUL, structurally valid
+        "\xC2\xB0" "C \xFF A",          // mixed valid utf8 + invalid + ascii
+        "",                             // empty
+    };
+
+    bool all_ok = true;
+    for(size_t i = 0; i < sizeof(inputs) / sizeof(inputs[0]); i++) {
+        char once[512], twice[512];
+
+        SANITIZE_ONCE(once, sizeof(once), inputs[i]);
+        SANITIZE_ONCE(twice, sizeof(twice), once);
+
+        if(strcmp(once, twice) != 0) {
+            all_ok = false;
+            fprintf(stderr, "  input %zu: '%s' -> '%s' -> '%s'\n", i, inputs[i], once, twice);
+        }
+    }
+    TEST_ASSERT("rrd_idempotent_cases", all_ok,
+                "rrd_string_allowed_chars sanitization is not idempotent");
+
+    // deterministic randomized sweep over arbitrary byte strings
+    all_ok = true;
+    uint32_t seed = 0x5eed1234;
+    for(size_t iter = 0; iter < 100000 && all_ok; iter++) {
+        unsigned char src[25];
+        char once[512], twice[512];
+
+        seed = seed * 1103515245 + 12345;
+        size_t len = 1 + (seed >> 16) % (sizeof(src) - 1);
+        for(size_t i = 0; i < len; i++) {
+            seed = seed * 1103515245 + 12345;
+            src[i] = (unsigned char)((seed >> 16) & 0xFF);
+            if(!src[i]) src[i] = 1; // keep it a single NUL-terminated string
+        }
+        src[len] = '\0';
+
+        SANITIZE_ONCE(once, sizeof(once), src);
+        SANITIZE_ONCE(twice, sizeof(twice), once);
+
+        if(strcmp(once, twice) != 0) {
+            all_ok = false;
+            fprintf(stderr, "  iter %zu: '%s' -> '%s' (len %zu)\n", iter, once, twice, len);
+        }
+    }
+    TEST_ASSERT("rrd_idempotent_random", all_ok,
+                "rrd_string_allowed_chars sanitization is not idempotent on random input");
+
+    #undef SANITIZE_ONCE
+}
+
+
+// ============================================================================
 // TEST: SECURITY-FOCUSED CASES
 // ============================================================================
 
@@ -2063,6 +2158,7 @@ int utf8_sanitizer_unittest(void) {
     test_utf_parameter();
     test_multibyte_length();
     test_rrd_string_allowed_chars();
+    test_rrd_string_allowed_chars_idempotency();
     test_security_cases();
     test_regression_fixed_bugs();
     test_all_control_characters();
