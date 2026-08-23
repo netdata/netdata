@@ -30,7 +30,7 @@ python3 integrations/gen_docs_integrations.py
 
 Inspect the collector's generated Markdown under its `integrations/` directory. The Agent workflow runs both generators and opens or updates the `integrations-regen` pull request (`.github/workflows/generate-integrations.yml:96-153`).
 
-Learn discovers files carrying the integration marker and reads their generated metadata (`netdata/learn ingest/ingest.py:1249-1298`). Published integration files are then copied and sanitized without reconstructing their body sections (`netdata/learn ingest/ingest.py:3977-3986`). Therefore:
+At `netdata/learn @ 6bde65e850454be8778013a583ee6c96d1feb178`, Learn discovers files carrying the integration marker and reads their generated metadata (`ingest/ingest.py:1249-1298`). Published integration files are then copied and sanitized without reconstructing their body sections (`ingest/ingest.py:3977-3986`). Therefore:
 
 - If the Agent Markdown is stale, merge or update the Agent regeneration pull request first.
 - If the Agent Markdown is correct but Learn is stale, run the normal Learn ingest workflow.
@@ -38,9 +38,9 @@ Learn discovers files carrying the integration marker and reads their generated 
 
 ### 3. Verify the Website data refresh
 
-Website does not consume the tracked Agent Markdown. Its update workflow checks out Agent `master`, runs `gen_integrations.py`, and copies `integrations.json` into Website data (`netdata/website .github/workflows/update-integrations.yml:27-64`). Website then creates integration page shells from that data (`netdata/website scripts/build_integrations_md_files.py:889-927`).
+At `netdata/website @ db6ed7b907a8d9f833450bfbbc24fc10eb4c9e8e`, Website does not consume the tracked Agent Markdown. Its update workflow checks out Agent `master`, runs `gen_integrations.py`, and copies `integrations.json` into Website data (`.github/workflows/update-integrations.yml:27-64`). Website then creates integration page shells from that data (`scripts/build_integrations_md_files.py:889-927`).
 
-The Website integration template already creates an Alerts tab whenever the integration object contains a non-empty `alerts` value (`netdata/website themes/tailwind/layouts/partials/integration-tabs.html:16-20`). Therefore:
+The Website integration template already creates an Alerts tab whenever the integration object contains a non-empty `alerts` value (`themes/tailwind/layouts/partials/integration-tabs.html:16-20`). Therefore:
 
 - If Agent JSON is correct but Website data is stale, run the normal Website integration update workflow.
 - If Website data contains the alert table but the rendered page omits it, then inspect the Website template and rendered HTML.
@@ -67,16 +67,14 @@ Files read:
 - `integrations/templates/alerts.md`
 - `integrations/gen_docs_integrations.py`
 - `.github/workflows/generate-integrations.yml`
-- `netdata/website/.github/workflows/update-integrations.yml`
-- `netdata/website/scripts/build_integrations_md_files.py`
-- `netdata/website/themes/tailwind/layouts/partials/integration-tabs.html`
-- `netdata/learn/ingest/ingest.py`
+- `netdata/website @ db6ed7b907a8d9f833450bfbbc24fc10eb4c9e8e`: `.github/workflows/update-integrations.yml`, `scripts/build_integrations_md_files.py`, and `themes/tailwind/layouts/partials/integration-tabs.html`
+- `netdata/learn @ 6bde65e850454be8778013a583ee6c96d1feb178`: `ingest/ingest.py`
 
 Commands used:
 
 ```bash
 rg -n "COLLECTOR_RENDER_KEYS|render_collectors|integration.get\(\"alerts\"\)" integrations
 rg -n "gen_integrations.py|gen_docs_integrations.py|integrations-regen" .github/workflows/generate-integrations.yml
-rg -n "populate_integrations|copy_doc|sanitize_page|INTEGRATION_MARKER" netdata/learn/ingest/ingest.py
-rg -n "gen_integrations.py|integration.alerts|render_integration" netdata/website/.github netdata/website/scripts netdata/website/themes
+rg -n "populate_integrations|copy_doc|sanitize_page|INTEGRATION_MARKER" <learn-repo>/ingest/ingest.py
+rg -n "gen_integrations.py|integration.alerts|render_integration" <website-repo>/.github <website-repo>/scripts <website-repo>/themes
 ```
