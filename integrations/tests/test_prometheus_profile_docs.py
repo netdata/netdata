@@ -132,7 +132,9 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         self.assertIn('Entity scope:', clean)
         self.assertIn('Source metric selectors', clean)
         self.assertIn('Managers (1 chart)', clean)
+        self.assertIn('Managers (1 chart)', rich)
         self.assertNotIn('(1 charts)', clean)
+        self.assertNotIn('(1 charts)', rich)
         self.assertNotIn('| Metric |', clean)
 
     def test_generated_markdown_preserves_catalogue_hooks(self):
@@ -168,6 +170,13 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             design, runtime = _write_minimal_catalog(Path(directory), family='Other')
             with self.assertRaisesRegex(ProfileCoverageError, 'does not match runtime family'):
+                load_profile_catalog(design, runtime)
+
+    def test_non_mapping_runtime_document_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            design, runtime = _write_minimal_catalog(Path(directory))
+            (runtime / 'example.yaml').write_text('- invalid\n', encoding='utf-8')
+            with self.assertRaisesRegex(ProfileCoverageError, 'runtime document must be a mapping'):
                 load_profile_catalog(design, runtime)
 
 

@@ -152,6 +152,8 @@ def _validate_profile_file_sets(designs, runtimes):
 
 
 def _validate_profile_identity(profile, design_file, design, runtime_file, runtime):
+    if not isinstance(runtime, dict):
+        raise ProfileCoverageError(f'Profile {profile!r} runtime document must be a mapping: {runtime_file}.')
     for field in ('match', 'app'):
         if design.get(field) != runtime.get(field):
             raise ProfileCoverageError(
