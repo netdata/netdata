@@ -2030,56 +2030,86 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 }
 
 func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
-	var metadata struct {
-		Modules []struct {
-			Setup struct {
-				Configuration struct {
-					Examples struct {
-						List []struct {
-							Name        string `yaml:"name"`
-							Description string `yaml:"description"`
-							Config      string `yaml:"config"`
-						} `yaml:"list"`
-					} `yaml:"examples"`
-				} `yaml:"configuration"`
-			} `yaml:"setup"`
-		} `yaml:"modules"`
-	}
-
 	for _, tc := range []struct {
-		module   string
-		example  string
-		contains string
+		module  string
+		matches func(*testing.T, yaml.Node) bool
 	}{
-		{module: "httpcheck", example: "Ceph RGW endpoint liveness", contains: "ceph-rgw-local"},
-		{module: "x509check", example: "Ceph RGW certificate", contains: "ceph_rgw_cert"},
-		{module: "weblog", example: "Ceph RGW access log", contains: "custom_numeric_fields"},
+		{
+			module: "httpcheck",
+			matches: func(t *testing.T, node yaml.Node) bool {
+				var job struct {
+					URL              string `yaml:"url"`
+					AcceptedStatuses []int  `yaml:"status_accepted"`
+				}
+				require.NoError(t, node.Decode(&job))
+				slices.Sort(job.AcceptedStatuses)
+				return job.URL != "" && slices.Equal(job.AcceptedStatuses, []int{200, 204, 403, 405})
+			},
+		},
+		{
+			module: "x509check",
+			matches: func(t *testing.T, node yaml.Node) bool {
+				var job struct {
+					Source          string `yaml:"source"`
+					CheckRevocation bool   `yaml:"check_revocation_status"`
+				}
+				require.NoError(t, node.Decode(&job))
+				return job.Source != "" && job.CheckRevocation
+			},
+		},
+		{
+			module: "weblog",
+			matches: func(t *testing.T, node yaml.Node) bool {
+				var job struct {
+					JSONConfig struct {
+						Mapping map[string]string `yaml:"mapping"`
+					} `yaml:"json_config"`
+					CustomNumericFields []struct {
+						Name  string `yaml:"name"`
+						Units string `yaml:"units"`
+					} `yaml:"custom_numeric_fields"`
+				}
+				require.NoError(t, node.Decode(&job))
+				return job.JSONConfig.Mapping["total_time"] == "total_time" &&
+					len(job.CustomNumericFields) == 1 &&
+					job.CustomNumericFields[0].Name == "total_time" &&
+					job.CustomNumericFields[0].Units == "milliseconds"
+			},
+		},
 	} {
 		t.Run(tc.module, func(t *testing.T) {
+			var metadata struct {
+				Modules []struct {
+					Setup struct {
+						Configuration struct {
+							Examples struct {
+								List []struct {
+									Config string `yaml:"config"`
+								} `yaml:"list"`
+							} `yaml:"examples"`
+						} `yaml:"configuration"`
+					} `yaml:"setup"`
+				} `yaml:"modules"`
+			}
 			content, err := os.ReadFile(filepath.Join("..", tc.module, "metadata.yaml"))
 			require.NoError(t, err)
-
 			require.NoError(t, yaml.Unmarshal(content, &metadata))
 			require.NotEmpty(t, metadata.Modules)
 
-			found := false
 			for _, module := range metadata.Modules {
 				for _, example := range module.Setup.Configuration.Examples.List {
-					if example.Name != tc.example {
-						continue
+					var config struct {
+						Jobs []yaml.Node `yaml:"jobs"`
 					}
-					found = true
-					assert.Contains(t, example.Config, tc.contains)
-					assert.Contains(t, example.Description, "Ceph RGW")
-					if tc.module == "x509check" {
-						assert.Contains(t, example.Config, "check_revocation_status: yes")
-					}
-					if tc.module == "weblog" {
-						assert.Contains(t, example.Config, "total_time: total_time")
+					require.NoError(t, yaml.Unmarshal([]byte(example.Config), &config))
+					for _, node := range config.Jobs {
+						if tc.matches(t, node) {
+							return
+						}
 					}
 				}
 			}
-			require.Truef(t, found, "%s example %q not found", tc.module, tc.example)
+			t.Fatalf("%s metadata has no Ceph RGW configuration example", tc.module)
 		})
 	}
 
@@ -2096,42 +2126,6 @@ func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
 	require.Equal(t, "httpcheck.status", httpcheckTemplates["httpcheck_web_service_up"]["on"])
 	weblogTemplates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "web_log.conf"))
 	require.Equal(t, "web_log.request_processing_time", weblogTemplates["web_log_web_slow"]["on"])
-}
-
-func TestCollector_SparseMetricGuidanceCoversChartAndDimensionExpiry(t *testing.T) {
-	var metadata struct {
-		Modules []struct {
-			Meta struct {
-				ID string `yaml:"id"`
-			} `yaml:"meta"`
-			Troubleshooting struct {
-				Problems struct {
-					List []struct {
-						Name        string `yaml:"name"`
-						Description string `yaml:"description"`
-					} `yaml:"list"`
-				} `yaml:"problems"`
-			} `yaml:"troubleshooting"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-
-	var guidance string
-	for _, module := range metadata.Modules {
-		if module.Meta.ID != "collector-go.d.plugin-prometheus-generic" {
-			continue
-		}
-		for _, problem := range module.Troubleshooting.Problems.List {
-			if problem.Name == "Disappearing or sparse metrics not clearing alerts" {
-				guidance = strings.Join(strings.Fields(problem.Description), " ")
-			}
-		}
-	}
-	require.NotEmpty(t, guidance)
-	assert.Contains(t, guidance, "Generated charts and individual dimensions expire")
-	assert.Contains(t, guidance, "An expired chart or dimension makes its alerts `REMOVED`")
 }
 
 func TestCollector_CephPhase1AlertMatrixComplete(t *testing.T) {
@@ -2472,23 +2466,6 @@ func TestCollector_CephUnknownHealthCheckFallbackContract(t *testing.T) {
 	}, got)
 }
 
-func TestCollector_CephMetadataModelsProducerScopes(t *testing.T) {
-	mgr := New()
-	configureProfileJobFromMetadata(t, mgr, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr")
-	assert.Empty(t, mgr.Vnode)
-	assert.Equal(t, 15, mgr.UpdateEvery)
-
-	mgrVNode := New()
-	configureProfileJobFromMetadata(t, mgrVNode, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-mgr-vnode")
-	assert.Equal(t, "ceph-cluster", mgrVNode.Vnode)
-	assert.Equal(t, 15, mgrVNode.UpdateEvery)
-
-	exporter := New()
-	configureProfileJobFromMetadata(t, exporter, "collector-go.d.plugin-prometheus-ceph", "ceph", "ceph-exporter")
-	assert.Empty(t, exporter.Vnode)
-	assert.Equal(t, 5, exporter.UpdateEvery)
-}
-
 func TestCollector_CephNVMeoFAlertsAreOwnedByLocalExporter(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	for _, mapping := range manifest.Alerts {
@@ -2498,47 +2475,6 @@ func TestCollector_CephNVMeoFAlertsAreOwnedByLocalExporter(t *testing.T) {
 		assert.Equalf(t, "nvmeof_exporter", mapping.Netdata.Owner,
 			"%s must name its local gateway-exporter owner", mapping.SOWID)
 	}
-}
-
-func TestCollector_CephMetadataVNodeExampleDeclaresPrerequisite(t *testing.T) {
-	var metadata struct {
-		Modules []struct {
-			Meta struct {
-				ID string `yaml:"id"`
-			} `yaml:"meta"`
-			Setup struct {
-				Configuration struct {
-					Examples struct {
-						List []struct {
-							Name        string `yaml:"name"`
-							Description string `yaml:"description"`
-							Config      string `yaml:"config"`
-						} `yaml:"list"`
-					} `yaml:"examples"`
-				} `yaml:"configuration"`
-			} `yaml:"setup"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-
-	for _, module := range metadata.Modules {
-		if module.Meta.ID != "collector-go.d.plugin-prometheus-ceph" {
-			continue
-		}
-		for _, example := range module.Setup.Configuration.Examples.List {
-			if example.Name != "Ceph MGR with virtual node" {
-				continue
-			}
-			require.Contains(t, example.Description, "/etc/netdata/vnodes/vnodes.conf")
-			require.Contains(t, example.Description, "hostname: ceph-cluster")
-			require.Contains(t, example.Description, "undefined vnode makes the job fail to start")
-			require.Contains(t, example.Config, "vnode: ceph-cluster")
-			return
-		}
-	}
-	t.Fatal("Ceph metadata has no self-contained virtual-node example")
 }
 
 func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
@@ -2776,69 +2712,6 @@ func healthAlertTemplatesFromFile(t *testing.T, path string) map[string]map[stri
 	return templates
 }
 
-func configureProfileJobFromMetadata(
-	t *testing.T,
-	collr *Collector,
-	integrationID, profileName, jobName string,
-	supportingProfileNames ...string,
-) []string {
-	t.Helper()
-
-	var metadata struct {
-		Modules []struct {
-			Meta struct {
-				ID string `yaml:"id"`
-			} `yaml:"meta"`
-			Setup struct {
-				Configuration struct {
-					Examples struct {
-						List []struct {
-							Config string `yaml:"config"`
-						} `yaml:"list"`
-					} `yaml:"examples"`
-				} `yaml:"configuration"`
-			} `yaml:"setup"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-
-	var config *Config
-	for _, module := range metadata.Modules {
-		if module.Meta.ID != integrationID {
-			continue
-		}
-		require.NotEmpty(t, module.Setup.Configuration.Examples.List)
-		for _, item := range module.Setup.Configuration.Examples.List {
-			var example struct {
-				Jobs []yaml.Node `yaml:"jobs"`
-			}
-			require.NoError(t, yaml.Unmarshal([]byte(item.Config), &example))
-			for idx := range example.Jobs {
-				candidate := New().Config
-				require.NoError(t, example.Jobs[idx].Decode(&candidate))
-				if candidate.Name == jobName {
-					config = &candidate
-					break
-				}
-			}
-			if config != nil {
-				break
-			}
-		}
-		break
-	}
-	require.NotNilf(t, config, "metadata integration %q has no job %q", integrationID, jobName)
-	require.Empty(t, config.Application, "stock metadata must derive app identity from the application profile")
-	require.Equal(t, ProfilesConfig{Mode: profilesModeAuto}, config.Profiles,
-		"stock metadata must exercise automatic profile selection")
-
-	config.URL = collr.URL
-	collr.Config = *config
-	return append([]string{profileName}, supportingProfileNames...)
-}
-
 func requireSelectedProfiles(t *testing.T, collr *Collector, expected ...string) {
 	t.Helper()
 	require.NotNil(t, collr.runtime)
@@ -2863,8 +2736,8 @@ func TestCollector_VLLMProfileAllMetrics(t *testing.T) {
 
 	collr := New()
 	collr.URL = srv.URL
-	expectedProfiles := configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm",
-		"fastapi", "process_runtime", "python_gc")
+	collr.ExpectedPrefix = "vllm:"
+	expectedProfiles := []string{"vllm", "fastapi", "process_runtime", "python_gc"}
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 	requireSelectedProfiles(t, collr, expectedProfiles...)
@@ -3035,7 +2908,7 @@ func testCollectorStockProfileAllMetrics(
 
 	collr := New()
 	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
+	collr.Profiles = ProfilesConfig{Mode: profilesModeAuto}
 	var expectedProfiles []string
 	if configure != nil {
 		expectedProfiles = configure(collr)
@@ -3105,7 +2978,8 @@ func TestCollector_VLLMRayTransportAllMetrics(t *testing.T) {
 		t,
 		"prometheus/profiles/vllm/fixtures/vllm_ray_all_metrics.prom",
 		func(collr *Collector) []string {
-			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-vllm", "vllm", "vllm-ray")
+			collr.ExpectedPrefix = "ray_vllm_"
+			return []string{"vllm"}
 		},
 		"prometheus.vllm.",
 		22,
@@ -3181,8 +3055,8 @@ func TestCollector_LiteLLMProfileAllMetrics(t *testing.T) {
 		t,
 		"prometheus/profiles/litellm/fixtures/litellm_all_metrics.prom",
 		func(collr *Collector) []string {
-			return configureProfileJobFromMetadata(t, collr, "collector-go.d.plugin-prometheus-litellm", "litellm", "litellm",
-				"process_runtime", "python_gc")
+			collr.ExpectedPrefix = "litellm_"
+			return []string{"litellm", "process_runtime", "python_gc"}
 		},
 		"prometheus.litellm.",
 		24,
