@@ -372,7 +372,7 @@ if(OS_LINUX AND BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "r
                 DESTINATION ${HOST_INITD_DEST})
 endif()
 
-if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+if(OS_LINUX AND BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         # RPM-only payloads; no other install rule covers them.
         install(PROGRAMS
                 packaging/installer/netdata-uninstaller.sh
