@@ -385,7 +385,9 @@ Explicitly defined charts (like `execution_state`) use the template. Any _other_
 
 ### 4. groups
 
-Groups organize charts into a hierarchy that can be nested to **any depth**. Each group defines a **family** segment, can declare **metrics** in scope, and contains **charts** and/or nested **groups**.
+Groups organize charts into a hierarchy that can be nested to **any depth**. A root group may be a transparent container
+without its own `family`; every nested group defines a **family** segment. Groups can also declare **metrics** in scope
+and contain **charts** and/or nested **groups**.
 
 Nesting serves three purposes:
 
@@ -412,7 +414,7 @@ groups:
 
 | Field               | Type          | Required | Description                                                                         |
 |---------------------|---------------|----------|-------------------------------------------------------------------------------------|
-| `family`            | string        | **yes**  | Family segment. Groups compose the chart family hierarchy.                          |
+| `family`            | string        | root: no; nested: **yes** | Family segment. An omitted root is transparent; nested groups compose the hierarchy. |
 | `context_namespace` | string        | no       | Context segment appended to inherited context namespace.                            |
 | `metrics`           | array[string] | no       | Metrics visible to dimension selectors in this group and descendants.               |
 | `chart_defaults`    | object        | no       | Inheritable defaults for descendant charts (see [chart_defaults](#chart_defaults)). |
@@ -427,6 +429,10 @@ groups:
 | Nested group         | `InnoDB`                                |
 | Nested group         | `Buffer Pool`                           |
 | **Resulting family** | **`Storage Engine/InnoDB/Buffer Pool`** |
+
+A root group may omit `family` when it exists only to share metric scope, context namespace, or chart defaults. Its
+children then become the top-level family sections. Nested groups must always provide a nonblank family. A chart directly
+under a transparent root must provide `chart.family`, so every emitted chart still has a nonblank effective family.
 
 Here is a real-world nesting example showing how family and context compose at each level:
 
@@ -1154,7 +1160,8 @@ All rules below produce semantic validation errors unless noted:
 |-----------------------------------------------------------------------------------------|---------------------------------|
 | `version` must be `v1`                                                                  | semantic                        |
 | `groups[]` must be non-empty                                                            | semantic                        |
-| `group.family` must not be empty or whitespace-only                                     | semantic                        |
+| Root `group.family` may be omitted; nested `group.family` must be nonblank               | semantic                        |
+| A chart directly under a transparent root must provide a nonblank `chart.family`         | semantic                        |
 | `group.metrics[]` entries must not be empty; no duplicates within same group            | semantic                        |
 | `chart.title`, `chart.context`, `chart.units` must be non-empty                         | semantic                        |
 | `chart.algorithm` must be `absolute` or `incremental` (when specified)                  | semantic                        |
@@ -1189,7 +1196,7 @@ All rules below produce semantic validation errors unless noted:
 | Missing `chart.id`                      | `id` derived from `context` (`.` replaced with `_`).                                     |
 | Missing `chart.algorithm`               | Resolved per rendered dimension from runtime series kind: counter = `incremental`; every other kind = `absolute`. |
 | `chart.priority = 0`                    | Treated as `70000` (engine default).                                                     |
-| Group family hierarchy + `chart.family` | Composed into `/`-separated chart family.                                                |
+| Root/nested family hierarchy + `chart.family` | Nonblank segments compose into a `/`-separated chart family.                         |
 | `options.multiplier = 0`                | Treated as `1`.                                                                          |
 | `options.divisor = 0`                   | Treated as `1`.                                                                          |
 

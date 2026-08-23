@@ -94,6 +94,30 @@ func TestSpecMarshalTemplate(t *testing.T) {
 				assert.Empty(t, promotion)
 			},
 		},
+		"omits transparent root family and round trips": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{{
+					Metrics: []string{"m"},
+					Groups: []Group{{
+						Family: "Service",
+						Charts: []Chart{{
+							Title:      "C",
+							Context:    "c",
+							Units:      "u",
+							Dimensions: []Dimension{{Selector: "m", Name: "d"}},
+						}},
+					}},
+				}},
+			},
+			check: func(t *testing.T, out string) {
+				assert.NotContains(t, out, "family: \"\"")
+				reDecoded, err := DecodeYAML([]byte(out))
+				require.NoError(t, err)
+				require.Len(t, reDecoded.Groups, 1)
+				assert.Empty(t, reDecoded.Groups[0].Family)
+			},
+		},
 		"errors when groups missing": {
 			spec:    Spec{Version: VersionV1},
 			wantErr: true,

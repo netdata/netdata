@@ -563,6 +563,87 @@ func TestConfigSchemaOptionalInstanceLabels(t *testing.T) {
 	}
 }
 
+func TestConfigSchemaRootGroupFamily(t *testing.T) {
+	var schemaDoc any
+	require.NoError(t, json.Unmarshal([]byte(ConfigSchemaJSON), &schemaDoc))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("charttpl.schema.json", schemaDoc))
+	schema, err := compiler.Compile("charttpl.schema.json")
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		mutate  func(root map[string]any)
+		wantErr bool
+	}{
+		"transparent root with named child": {
+			mutate: func(root map[string]any) {
+				delete(root, "family")
+				child := map[string]any{
+					"family": rootFamilyTestName,
+					"charts": root["charts"],
+				}
+				delete(root, "charts")
+				root["groups"] = []any{child}
+			},
+		},
+		"transparent root with chart family": {
+			mutate: func(root map[string]any) {
+				delete(root, "family")
+				charts := root["charts"].([]any)
+				charts[0].(map[string]any)["family"] = rootFamilyTestName
+			},
+		},
+		"transparent root rejects whitespace family": {
+			mutate: func(root map[string]any) {
+				root["family"] = " "
+				child := map[string]any{
+					"family": rootFamilyTestName,
+					"charts": root["charts"],
+				}
+				delete(root, "charts")
+				root["groups"] = []any{child}
+			},
+			wantErr: true,
+		},
+		"transparent root without effective chart family": {
+			mutate: func(root map[string]any) {
+				delete(root, "family")
+			},
+			wantErr: true,
+		},
+		"nested group without family under transparent root": {
+			mutate: func(root map[string]any) {
+				delete(root, "family")
+				child := map[string]any{"charts": root["charts"]}
+				delete(root, "charts")
+				root["groups"] = []any{child}
+			},
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(validationSpec())
+			require.NoError(t, err)
+			var instance map[string]any
+			require.NoError(t, json.Unmarshal(raw, &instance))
+			groups := instance["groups"].([]any)
+			root := groups[0].(map[string]any)
+			tc.mutate(root)
+
+			err = schema.Validate(instance)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+const rootFamilyTestName = "Service"
+
 func TestDecodeYAMLFileScenarios(t *testing.T) {
 	tests := map[string]struct {
 		prepare func(t *testing.T) string
