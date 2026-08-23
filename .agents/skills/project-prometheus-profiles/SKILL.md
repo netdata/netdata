@@ -30,8 +30,9 @@ Repository architecture and runtime documents are the final authority when the s
 - `src/go/plugin/go.d/collector/prometheus/relabel/README.md`
 - `src/go/plugin/framework/charttpl/README.md`
 
-Do not require the generic NIDL guide as an authoring prerequisite. Prometheus chart templates have a narrower identity,
-label, aggregation, and hierarchy contract described in the chart-template reference.
+Read `docs/NIDL-Framework.md` when choosing or reviewing a monitored component, instance grain, dimension set, or label
+role. Then use the chart-template reference for the Prometheus-specific identity, label-promotion, aggregation, and
+hierarchy contract that realizes that NIDL model.
 
 ## Authoring workflow
 
@@ -176,6 +177,26 @@ declared by its proof cases.
 source semantics, cardinality outside the evidence, or that a relationship is additive. Resolve warnings with evidence;
 do not mechanically silence them.
 
+Before semantic review, render the actual family table of contents:
+
+```bash
+.agents/skills/project-prometheus-profiles/scripts/profile-toc.py \
+  /path/to/profile.yaml \
+  --app application-name
+```
+
+The helper prints the operator-visible family tree with contexts and effective priorities, then emits advisory UX
+warnings. It is not a gate and does not make design decisions. Investigate each warning and either repair the hierarchy
+or record why the warning is intentional:
+
+- all top-level families sharing a prefix usually repeat the application/root;
+- a leaf with more than 15 contexts usually needs intermediate owner structure;
+- a one-context leaf may be unnecessary structure or a merge candidate;
+- a one-character family segment is often a slash-containing label such as `I/O` split accidentally into `I` and `O`.
+
+Do not remove structure solely to silence the warning when the parent is an operator entity, a module boundary, or a
+release contract; do not add structure solely to divide by metric type.
+
 ### 8. Perform semantic review
 
 After objective validation, review the result as an operator:
@@ -223,4 +244,5 @@ repository workflow. Integration files under `integrations/` are generated and s
 - `how-tos/build-synthetic-fixture.md` — public source-complete fixture construction.
 - `sqlite-metadata-reset.md` — destructive metadata-reset boundary.
 - `scripts/validate-profile.py` — compatibility launcher for the authoritative Go validator.
+- `scripts/profile-toc.py` — render the operator family ToC and report advisory hierarchy UX warnings.
 - `scripts/proof-bundle.py` — stock proof catalog and replay wrapper.
