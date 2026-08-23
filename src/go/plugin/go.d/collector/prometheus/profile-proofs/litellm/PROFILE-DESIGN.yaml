@@ -1969,7 +1969,7 @@ views:
         from this view.
   usage.api_key.request_token_throughput:
     family: Usage and Cost/By API Key
-    question: What does request token throughput by api key report for each hashed_api_key?
+    question: What is the request token throughput for each API key?
     entity: hashed_api_key
     inputs:
       input:
@@ -2002,7 +2002,7 @@ views:
         from this view.
   usage.api_key.total_token_throughput:
     family: Usage and Cost/By API Key
-    question: What does reported total token throughput by api key report for each hashed_api_key?
+    question: What is the reported total token throughput for each API key?
     entity: hashed_api_key
     inputs:
       total:
@@ -2031,7 +2031,7 @@ views:
         from this view.
   usage.api_key.spend:
     family: Usage and Cost/By API Key
-    question: What does llm spend by api key report for each hashed_api_key?
+    question: What is the LLM spend for each API key?
     entity: hashed_api_key
     inputs:
       spend:
@@ -2065,7 +2065,7 @@ views:
         from this view.
   usage.team.request_token_throughput:
     family: Usage and Cost/By Team
-    question: What does request token throughput by team report for each team?
+    question: What is the request token throughput for each team?
     entity: team
     inputs:
       input:
@@ -2098,7 +2098,7 @@ views:
         from this view.
   usage.team.total_token_throughput:
     family: Usage and Cost/By Team
-    question: What does reported total token throughput by team report for each team?
+    question: What is the reported total token throughput for each team?
     entity: team
     inputs:
       total:
@@ -2127,7 +2127,7 @@ views:
         from this view.
   usage.team.spend:
     family: Usage and Cost/By Team
-    question: What does llm spend by team report for each team?
+    question: What is the LLM spend for each team?
     entity: team
     inputs:
       spend:
@@ -2161,7 +2161,7 @@ views:
         from this view.
   usage.user.request_token_throughput:
     family: Usage and Cost/By User
-    question: What does request token throughput by user report for each user?
+    question: What is the request token throughput for each user?
     entity: user
     inputs:
       input:
@@ -2194,7 +2194,7 @@ views:
         from this view.
   usage.user.total_token_throughput:
     family: Usage and Cost/By User
-    question: What does reported total token throughput by user report for each user?
+    question: What is the reported total token throughput for each user?
     entity: user
     inputs:
       total:
@@ -2223,7 +2223,7 @@ views:
         from this view.
   usage.user.spend:
     family: Usage and Cost/By User
-    question: What does llm spend by user report for each user?
+    question: What is the LLM spend for each user?
     entity: user
     inputs:
       spend:
@@ -2257,7 +2257,7 @@ views:
         from this view.
   usage.organization.request_token_throughput:
     family: Usage and Cost/By Organization
-    question: What does request token throughput by organization report for each org_id?
+    question: What is the request token throughput for each organization?
     entity: org_id
     inputs:
       input:
@@ -2290,7 +2290,7 @@ views:
         from this view.
   usage.organization.total_token_throughput:
     family: Usage and Cost/By Organization
-    question: What does reported total token throughput by organization report for each org_id?
+    question: What is the reported total token throughput for each organization?
     entity: org_id
     inputs:
       total:
@@ -2319,7 +2319,7 @@ views:
         from this view.
   usage.organization.spend:
     family: Usage and Cost/By Organization
-    question: What does llm spend by organization report for each org_id?
+    question: What is the LLM spend for each organization?
     entity: org_id
     inputs:
       spend:
@@ -2353,7 +2353,7 @@ views:
         from this view.
   usage.end_user.request_token_throughput:
     family: Usage and Cost/By End User
-    question: What does request token throughput by end user report for each end_user?
+    question: What is the request token throughput for each end user?
     entity: end_user
     inputs:
       input:
@@ -2386,7 +2386,7 @@ views:
         from this view.
   usage.end_user.total_token_throughput:
     family: Usage and Cost/By End User
-    question: What does reported total token throughput by end user report for each end_user?
+    question: What is the reported total token throughput for each end user?
     entity: end_user
     inputs:
       total:
@@ -2415,7 +2415,7 @@ views:
         from this view.
   usage.end_user.spend:
     family: Usage and Cost/By End User
-    question: What does llm spend by end user report for each end_user?
+    question: What is the LLM spend for each end user?
     entity: end_user
     inputs:
       spend:
@@ -2449,7 +2449,7 @@ views:
         from this view.
   usage.requested_model.request_token_throughput:
     family: Usage and Cost/By Requested Model
-    question: What does request token throughput by requested model report for each requested_model?
+    question: What is the request token throughput for each requested model?
     entity: requested_model
     inputs:
       input:
@@ -2482,7 +2482,7 @@ views:
         from this view.
   usage.requested_model.total_token_throughput:
     family: Usage and Cost/By Requested Model
-    question: What does reported total token throughput by requested model report for each requested_model?
+    question: What is the reported total token throughput for each requested model?
     entity: requested_model
     inputs:
       total:
@@ -2511,7 +2511,7 @@ views:
         from this view.
   usage.requested_model.spend:
     family: Usage and Cost/By Requested Model
-    question: What does llm spend by requested model report for each requested_model?
+    question: What is the LLM spend for each requested model?
     entity: requested_model
     inputs:
       spend:
