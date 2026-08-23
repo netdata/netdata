@@ -427,9 +427,6 @@ if(ENABLE_WEBRTC)
         include(FetchContent)
         include(NetdataFetchContentExtra)
 
-        # ignore debhelper
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
-
         set(PREFER_SYSTEM_LIB True)
         set(NO_MEDIA True)
         set(NO_WEBSOCKET True)

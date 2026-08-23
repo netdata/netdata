@@ -28,7 +28,13 @@ function(netdata_bundle_sqlite3)
 
         file(MAKE_DIRECTORY "${sqlite_OUTPUT_DIR}")
 
-        if(SQLITE_USE_GIT)
+        if(NETDATA_SQLITE_SOURCE_DIR)
+                # Offline builds: an already-unpacked SQLite source tree replaces
+                # the download step entirely (#23510).
+                message(STATUS "Using local SQLite sources: ${NETDATA_SQLITE_SOURCE_DIR}")
+                set(sqlite_SOURCE_DIR "${NETDATA_SQLITE_SOURCE_DIR}")
+                set(SQLITE_FETCH_ARGS "")
+        elseif(SQLITE_USE_GIT)
                 message(STATUS "Fetching SQLite via git clone")
                 set(SQLITE_FETCH_ARGS
                         GIT_REPOSITORY https://github.com/sqlite/sqlite.git

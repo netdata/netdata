@@ -22,8 +22,6 @@ function(netdata_bundle_protobuf)
         string(REPLACE "-fsanitize=address" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
         string(REPLACE "-fsanitize=address" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-        # ignore debhelper
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
         if(NEED_ABSL)
                 set(ABSL_PROPAGATE_CXX_STD On)

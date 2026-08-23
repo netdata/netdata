@@ -18,7 +18,6 @@ function(netdata_bundle_libyaml)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
 
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
         set(repo https://github.com/yaml/libyaml)
         set(tag 2c891fc7a770e8ba2fec34fc6b545c672beb37e6) # v0.2.5
 

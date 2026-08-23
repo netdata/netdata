@@ -14,7 +14,6 @@ function(netdata_bundle_dlib)
     message(STATUS "Using local dlib source: ${NETDATA_DLIB_SOURCE_DIR}")
   endif()
 
-  set(FETCHCONTENT_FULLY_DISCONNECTED Off)
   set(repo https://github.com/davisking/dlib.git)
   set(tag 636c0bcd1e4f428d167699891bc12b404d2d1b41) # v19.24.8
 

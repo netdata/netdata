@@ -20,7 +20,6 @@ function(netdata_bundle_jsonc)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
 
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
         # JSON-C supports older versions of CMake than we do, so set
         # the correct values for the few policies we actually need.

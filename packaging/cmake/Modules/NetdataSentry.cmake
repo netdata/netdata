@@ -13,8 +13,6 @@ include_guard()
 function(netdata_bundle_sentry)
         include(FetchContent)
 
-        # ignore debhelper
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
         set(SENTRY_VERSION 0.13.5)
         set(SENTRY_BACKEND "breakpad")

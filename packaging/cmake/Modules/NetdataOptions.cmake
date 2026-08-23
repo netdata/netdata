@@ -191,6 +191,12 @@ cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's jour
 # anyway: where a knob is read is a detail, where it is declared is the contract.
 option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)
 
+# STRING rather than PATH on purpose: CACHE PATH resolves a relative value
+# against the invocation directory. Takes precedence over SQLITE_USE_GIT.
+set(NETDATA_SQLITE_SOURCE_DIR "" CACHE STRING
+    "Path to an unpacked SQLite source tree to use instead of downloading one")
+mark_as_advanced(NETDATA_SQLITE_SOURCE_DIR SQLITE_USE_GIT)
+
 set(DASHBOARD_URL "https://app.netdata.cloud/agent.tar.gz" CACHE STRING
     "URL used to fetch the local agent dashboard code")
 
