@@ -26,34 +26,47 @@ Monitor Ceph through its official Prometheus surfaces without narrowing the expo
 different Dashboard REST API.
 
 The built-in profile separates cluster-wide MGR health, quorum, capacity, placement groups, pools, and OSD metadata
-from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. Optional branches cover
+from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. You can monitor
 CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
 scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
-and Tentacle 20.2.2. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
+and Tentacle 20.2.3. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
 exposes cephadm node-proxy CPU, memory, storage, cooling, temperature, and per-component health metrics. Firmware
-remains source metadata and is not charted because Ceph exposes it as an info family. PG state flags and RGW
-global/user/bucket views are overlapping diagnostic populations and are not additive totals. Profile relabeling
-turns dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter, RocksDB cache, Finisher, Throttle, KernelDevice,
-mClock, messenger, RDMA, DPDK, and service-identity family names into stable profile inputs while preserving their
-source keys as identity labels. The source-complete profile materializes the entire declared release/producer union
-with zero generic fallback. Unknown future Ceph families remain visible through generic fallback until their source
-semantics can be curated; generic visibility is a forward-compatibility guard, not evidence that a known source
-family was fully modeled. The profile drops only the source-proven raw MGR RGW source-zone aliases because the stable
-normalized family is already charted.
+inventory remains available as metadata. PG state flags and RGW global/user/bucket views provide diagnostic detail
+rather than additive totals. The profile gives dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter,
+RocksDB cache, Finisher, Throttle, KernelDevice, mClock, messenger, RDMA, DPDK, and service-identity families stable
+chart identities while preserving their source keys.
 
-The chart model follows the producer's source lifecycle rather than relying on Prometheus wire type alone. Current
-populations that Ceph increments and decrements remain absolute, while cumulative work published through gauges is
-rendered incrementally so Netdata performs rate calculation and reset detection. Shared charts compare only the same
-counted or measured population: requests, objects, bytes, reservations, state transitions, and other unlike units
-remain separate even when their wire type or numeric scale is similar.
+Charts follow each producer's lifecycle. Current populations that Ceph increments and decrements remain absolute,
+while cumulative work published through gauges is rendered incrementally so Netdata performs rate calculation and
+reset detection. Shared charts compare only the same counted or measured population, keeping requests, objects,
+bytes, reservations, and state transitions separate even when their numeric scales are similar.
 
 The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
 `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
-NVMe-oF gateway's Python process runtime surface.
+NVMe-oF gateway's Python process runtime surface. On Tentacle, the optional MGR node-proxy hardware surface is
+charted per reported component and temperature sensor with its hostname, category, component, or sensor identity.
+These families are absent on Reef and Squid; their absence creates no chart or alert there.
+
+Configure one logical MGR job per Ceph cluster for cluster-health alerts and one native Ceph Dashboard job for
+API component integrity. The generic Prometheus collection alert reports a configured MGR job that cannot scrape;
+the native collector reports Dashboard API component failures. Monitor and OSD cluster-summary charts represent
+one cluster job or virtual node. Use one stable endpoint or failover target that follows the active MGR, and keep
+one stable job or virtual-node identity per cluster.
+
+Cluster-summary alerts evaluate the latest stored dimensions on each Netdata health beat. A failed scrape does not
+obsolete the chart or fabricate new values, so the data-state alert may continue evaluating the last stored state;
+the generic collection alert owns that scrape failure. When the collector knows the chart has disappeared and
+obsoletes it, its instance alerts are removed.
+
+Netdata's per-filesystem and per-interface host alerts monitor root-filesystem usage and packet drops on each Ceph
+node. These host-wide policies use Netdata's thresholds, windows, directionality, hysteresis, and routing.
 
 
 Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
-built-in `ceph` profile.
+built-in `ceph` profile. The MGR module refreshes its enabled metric cache every 15 seconds by default, and standalone
+`ceph-exporter` refreshes daemon metrics every 5 seconds by default. Scrapes read those producer caches; choosing a
+5-, 10-, 15-, or 60-second Netdata interval does not schedule Ceph producer refresh. Match the interval to the
+configured producer cache period to avoid redundant samples, unless the MGR cache is deliberately disabled.
 
 
 This collector is supported on all platforms.
@@ -97,8 +110,9 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Enable an official Ceph Prometheus endpoint
 
-Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics or
-deploy the official `ceph-exporter` for host-local daemon performance metrics. The stock profile supports the
+Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics,
+deploy the official `ceph-exporter` for host-local daemon performance metrics, or enable the Ceph NVMe-oF
+gateway exporter on each gateway endpoint. The stock profile supports the
 default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
 counters are required and size the job limits for the resulting series count. When cephadm node-proxy hardware
 reporting is enabled, hardware series scale with the cluster-wide component inventory; size both
@@ -308,31 +322,178 @@ sudo ./edit-config go.d/prometheus.conf
 
 ###### Ceph MGR and ceph-exporter
 
-Collect the cluster-wide MGR endpoint and a local official ceph-exporter endpoint with the automatically
-matched Ceph and process-runtime profiles. Repeat the exporter job for every exporter endpoint. The Ceph
-profile preserves source labels that collide with Netdata's Prometheus re-export labels under a `ceph_`
-prefix, retains opaque dynamic group keys, and normalizes only source families whose suffix grammar is
-unambiguous.
+Collect one logical MGR endpoint per Ceph cluster and each local official ceph-exporter endpoint with the
+automatically matched Ceph and process-runtime profiles. Configure one MGR job per cluster and do not scrape
+multiple active MGR endpoints into the same job. Repeat the exporter job for every exporter endpoint, using
+each host's own scope. The Ceph profile preserves source labels that collide with Netdata's Prometheus
+re-export labels under a `ceph_` prefix, retains opaque dynamic group keys, and normalizes only source families
+whose suffix grammar is unambiguous.
 
 
 ```yaml
 jobs:
-  - &ceph_job
-    name: ceph-mgr
+  - name: ceph-mgr
     url: http://127.0.0.1:9283/metrics
+    update_every: 15
     expected_prefix: ceph_
     max_time_series: 20000
     max_time_series_per_metric: 4000
-  - <<: *ceph_job
-    name: ceph-exporter
+  - name: ceph-exporter
     url: http://127.0.0.1:9926/metrics
+    update_every: 5
+    expected_prefix: ceph_
+    max_time_series: 20000
+    max_time_series_per_metric: 4000
 
 ```
+###### Ceph NVMe-oF gateway exporter
+
+Collect one local gateway endpoint per Ceph NVMe-oF gateway whose local state is required. The gateway
+exporter is independent of the MGR endpoint and normally listens on port 10008. Preserve one stable job
+identity for each gateway and size the local series limits independently.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph-nvmeof-gateway-a
+    url: http://127.0.0.1:10008/metrics
+    update_every: 5
+    expected_prefix: ceph_
+    max_time_series: 10000
+    max_time_series_per_metric: 2000
+
+```
+</details>
+
+###### Ceph MGR with virtual node
+
+Use a virtual node when the cluster identity should remain independent of the Agent currently scraping its
+active MGR. First define the vnode in `/etc/netdata/vnodes/vnodes.conf`:
+
+```yaml
+- hostname: ceph-cluster
+  guid: <your-uuid-here>
+```
+
+Then reference that exact hostname in the MGR job. An undefined vnode makes the job fail to start. Keep one
+logical MGR job and one stable vnode identity per Ceph cluster.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph-mgr-vnode
+    vnode: ceph-cluster
+    url: http://127.0.0.1:9283/metrics
+    update_every: 15
+    expected_prefix: ceph_
+    max_time_series: 20000
+    max_time_series_per_metric: 4000
+
+```
+</details>
+
 
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ceph_nvmeof_subsystem_open_security ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.state_metadata | Every available sample in the 5-minute observation window reports an NVMe-oF subsystem configured without host security. |
+| [ ceph_nvmeof_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.time_accumulation | The current lowest local reactor busy-rate sample in the 10-minute observation window is above 80 percent. |
+| [ ceph_nvmeof_high_read_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute read service-time ratio exceeds 10 milliseconds per completed read. |
+| [ ceph_nvmeof_high_write_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.block_devices.time_accumulation | The current local one-minute write service-time ratio exceeds 20 milliseconds per completed write. |
+| [ ceph_nvmeof_host_keepalive_timeout ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.hosts.keepalive_timeout_state | The gateway exporter currently reports host ${label:host_nqn} disconnected from subsystem ${label:nqn}. Inspect the initiator link and reconnect behavior. Exporter refresh reads and clears this one-shot state. |
+| [ ceph_nvmeof_subsystem_namespace_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.subsystems.namespace_capacity | The current subsystem namespace count is at or above its configured limit. |
+| [ ceph_nvmeof_too_many_namespaces ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.nvme_of.gateways.namespace_count | The current local exporter namespace inventory is at or above the supported maximum of 4096. |
+| [ rgw_notification_event_lost ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.events | One or more final notification-event losses occurred in the 1-minute observation window. Inspect the affected RGW instance and notification endpoint. |
+| [ rgw_notification_missing_configuration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.missing_configurations | One or more notifications were rejected for missing configuration in the 1-minute observation window. Inspect the affected RGW instance and notification configuration. |
+| [ rgw_lua_script_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.lua.script_executions | One or more configured Lua request scripts failed in the 1-minute observation window. Inspect the affected RGW instance and script error logs. |
+| [ rgw_failed_request_rate_fallback ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.failed_requests | Every available sample in the 5-minute observation window reports a non-zero aborted-request rate. This is a fallback signal and does not identify HTTP 5xx responses. |
+| [ rgw_notification_push_or_store_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.failure_outcomes | Every available sample in the 5-minute observation window reports non-zero retryable notification push or store failures. |
+| [ rgw_notification_inflight_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.pending_events | Every available sample in the 5-minute observation window reports at least 1000 notification events pending endpoint reply. Tune this policy threshold for the endpoint. |
+| [ rgw_notification_store_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.notifications.event_state | Every available sample in the 5-minute observation window reports at least 1000 events stored in the persistent notification store. Tune this policy threshold for the workload. |
+| [ rgw_request_queue_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway.requests_and_queue.current_requests | Every available sample in the 5-minute observation window reports at least 1000 queued requests. Tune this policy threshold for the RGW instance. |
+| [ rgw_multisite_fetch_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.object_work | Every available sample in the 5-minute observation window reports a non-zero multisite data-fetch error rate. |
+| [ rgw_multisite_poll_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.object_gateway_multisite.replication_log_request_errors | Every available sample in the 5-minute observation window reports a non-zero replication-log poll error rate. |
+| [ ceph_health_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.cluster_status.state | Every available Ceph MGR health sample in the 5-minute observation window is HEALTH_ERR. Review active cause-specific Ceph alerts and use `ceph health detail` for the current cause. |
+| [ ceph_health_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.cluster_status.state | Every available Ceph MGR health sample in the 15-minute observation window is HEALTH_WARN. Use `ceph health detail` for the current cause. |
+| [ ceph_daemon_crash ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a recent daemon crash. Use `ceph health detail` for the affected daemon and crash details. |
+| [ ceph_mgr_module_crash ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports a recent manager-module crash. Use `ceph health detail` for the affected module and crash details. |
+| [ ceph_daemon_slow_ops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.daemon_health.item_count | Every available sample in the 30-second observation window reports one or more slow operations for this daemon. |
+| [ ceph_slow_ops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.slow_operations.current_operations | Every available sample in the 30-second observation window reports one or more cluster slow operations. Use `ceph health detail` to identify the cause. |
+| [ cephadm_daemon_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a failed cephadm daemon. Use `ceph health detail` for the affected daemon and failure details. |
+| [ cephadm_paused ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports that cephadm is paused. Resume cephadm or use `ceph health detail` to determine why it was paused. |
+| [ cephadm_upgrade_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a cephadm upgrade exception. Use `ceph health detail` for the failed upgrade step. |
+| [ ceph_device_failure_predicted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a device predicted to fail. Use `ceph health detail` and `ceph device ls` to identify it. |
+| [ ceph_device_failure_prediction_too_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports that removing all predicted failures would compromise availability. Add capacity before relocating data. |
+| [ ceph_device_failure_relocation_incomplete ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports blocked relocation from a predicted device failure. Check free capacity and the balancer. |
+| [ ceph_cooling_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log. |
+| [ ceph_cooling_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log. |
+| [ ceph_dimm_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized DIMM temperature sensor above 80°C. |
+| [ ceph_hardware_fan_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph fan hardware error. |
+| [ ceph_hardware_memory_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph memory hardware error. |
+| [ ceph_hardware_network_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph network hardware error. |
+| [ ceph_hardware_power_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph power hardware error. |
+| [ ceph_hardware_processor_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph processor hardware error. |
+| [ ceph_hardware_storage_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports a Ceph storage hardware error. |
+| [ ceph_memory_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors. |
+| [ ceph_memory_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors. |
+| [ ceph_motherboard_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized motherboard temperature sensor above 60°C. |
+| [ ceph_nvme_drive_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs. |
+| [ ceph_nvme_drive_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs. |
+| [ ceph_nvme_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized NVMe temperature sensor above 70°C. |
+| [ ceph_network_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors. |
+| [ ceph_network_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors. |
+| [ ceph_power_supply_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log. |
+| [ ceph_power_supply_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log. |
+| [ ceph_processor_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect processor health and thermals. |
+| [ ceph_processor_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.health.state | Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect processor health and thermals. |
+| [ ceph_processor_temperature_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.node_hardware.temperature.temperature | Every available sample in the 1-minute observation window reports a recognized processor temperature sensor above 80°C. |
+| [ ceph_filesystem_damaged ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports filesystem metadata damage. |
+| [ ceph_filesystem_degraded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a degraded Ceph filesystem. |
+| [ ceph_filesystem_failure_no_standby ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a failed MDS rank with no standby. |
+| [ ceph_filesystem_insufficient_standby ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports insufficient CephFS standby daemons. |
+| [ ceph_filesystem_mds_ranks_low ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports fewer active MDS ranks than configured. |
+| [ ceph_filesystem_offline ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports all MDS ranks unavailable. |
+| [ ceph_filesystem_read_only ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a Ceph filesystem forced read-only. |
+| [ ceph_rbd_mirror_images_not_in_sync ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.rbd_mirror.snapshot_replication.timestamp | The current local and remote snapshot timestamps differ for this mirrored image. |
+| [ ceph_object_missing ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | The current unfound condition is active while every configured OSD is up; client I/O for affected objects can block. |
+| [ ceph_pg_backfill_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports placement-group backfill blocked by fullness. |
+| [ ceph_pg_not_deep_scrubbed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports placement groups overdue for deep scrub. |
+| [ ceph_pg_not_scrubbed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports placement groups overdue for scrub. |
+| [ ceph_pg_recovery_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports recovery blocked by OSD fullness. |
+| [ ceph_pg_unavailable_blocking_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | The current PG-unavailable condition is active while the separate OSD-down condition is not. |
+| [ ceph_pgs_damaged ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports damaged placement-group data. |
+| [ ceph_pgs_high_per_osd ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports excessive placement groups per OSD. |
+| [ ceph_pgs_inactive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state | The current per-pool count reports fewer active placement groups than the pool total. |
+| [ ceph_pgs_unclean ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state | The current per-pool count reports fewer clean placement groups than the pool total. |
+| [ ceph_pool_backfill_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 10-second observation window reports a pool at its backfill-full threshold. |
+| [ ceph_pool_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a full pool. |
+| [ ceph_pool_near_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports a near-full pool. |
+| [ ceph_mon_clock_skew ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports monitor clock skew. Use `ceph time-sync-status` and inspect the monitors' time synchronization services. |
+| [ ceph_mon_diskspace_critical ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports critically low monitor-store space. Use `ceph health detail` to identify the affected monitor. |
+| [ ceph_mon_diskspace_low ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports low monitor-store space. Use `ceph health detail` to identify the affected monitor. |
+| [ ceph_mon_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.control_plane.monitor.cluster_summary | The current MGR cluster summary reports fewer monitors in quorum than configured, while a majority still remains. |
+| [ ceph_mon_quorum_at_risk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.control_plane.monitor.cluster_summary | The current MGR cluster summary reports exactly the minimum surviving monitor majority; one more monitor loss would remove quorum. |
+| [ ceph_osd_backfill_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports that an OSD has reached its backfill-full threshold and rebalance cannot complete. |
+| [ ceph_osd_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports a down OSD. Use `ceph health detail` to identify affected OSDs and hosts. |
+| [ ceph_osd_down_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary | The current MGR cluster summary reports that at least 10% of configured OSDs are down. |
+| [ ceph_osd_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports an OSD at its full threshold. Use `ceph health detail` and `ceph osd df` to identify it. |
+| [ ceph_osd_host_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports an offline OSD host. Use `ceph health detail` to identify the host and its OSDs. |
+| [ ceph_osd_internal_disk_size_mismatch ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports a BlueStore device-size mismatch that can cause the affected OSD to crash. |
+| [ ceph_osd_near_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 5-minute observation window reports an OSD at its near-full threshold. Use `ceph health detail` and `ceph osd df` to identify it. |
+| [ ceph_osd_read_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports BlueStore read errors that succeeded only after retries. Inspect the affected hardware and kernel. |
+| [ ceph_osd_timeouts_cluster_network ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports slow backend OSD heartbeats. Inspect the cluster network for latency or loss. |
+| [ ceph_osd_timeouts_public_network ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports slow frontend OSD heartbeats. Inspect the public network for latency or loss. |
+| [ ceph_osd_too_many_repairs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 30-second observation window reports excessive repaired reads, which may indicate a failing drive. |
+| [ ceph_unknown_health_check ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | prometheus.ceph.health.health_checks.state | Every available sample in the 1-minute observation window reports the unclassified health check ${label:name}. Use `ceph health detail` for its recorded explanation. |
 
 
 
@@ -429,4 +590,9 @@ docker logs netdata 2>&1 | grep prometheus
 
 ### Disappearing or sparse metrics not clearing alerts
 
-When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
+The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
+and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or
+dimension makes its alerts `REMOVED`; this is not a normal `CLEAR` transition and does not send a recovery
+notification. Export an explicit normal value (for example `0`) whenever an alert needs a reliable recovery
+transition. A failed scrape does not advance the expiry lifetime; use the generic collector collection-failure
+alert to detect that separate condition.
