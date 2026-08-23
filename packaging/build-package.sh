@@ -78,7 +78,6 @@ add_cmake_option ENABLE_BUNDLED_YAML Off
 
 add_cmake_option ENABLE_LIBBACKTRACE On
 
-
 [ -d "${SOURCE_DIR}/tmp/ibm_mq" ] && add_cmake_option FETCHCONTENT_SOURCE_DIR_IBM_MQ "${SOURCE_DIR}/tmp/ibm_mq"
 if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
     if [ ! -d "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then

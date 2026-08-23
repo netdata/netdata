@@ -10,9 +10,9 @@
 # as targets, which are globally scoped and not function scoped.
 
 include_guard()
+
 function(netdata_bundle_sentry)
         include(FetchContent)
-
 
         set(SENTRY_VERSION 0.13.5)
         set(SENTRY_BACKEND "breakpad")

@@ -12,8 +12,9 @@
 #      reads one; that is a constraint, not a preference. Every directory
 #      property that applies to the whole tree is also set in this phase -
 #      -D_GNU_SOURCE, the compiler and linker flags, HAVE_OSLOG - because a
-#      directory property only reaches targets created after the mutation. One
-#      more property mutation sits far below, in phase 6, on purpose.
+#      directory property only reaches targets created after the mutation -
+#      which is also why the stack-trace flag pair lives here and not lower:
+#      every target, vendored included, is instrumented on purpose.
 #   3. platform capability probes (NetdataPlatformChecks), ahead of every
 #      bundled subproject so that our HAVE_* macros are answered by our own
 #      probes: check_* results share one cache namespace with every project
@@ -25,10 +26,7 @@
 #   6. dependency discovery (NetdataDependencies), then the subprojects we
 #      bundle. Every external library is looked up once, with no REQUIRED and
 #      no guard; whether a missing one is fatal is decided in that module's
-#      requirement half or next to the target that needs it. In the middle of
-#      the bundling sits the stack-trace flag pair, wedged between three
-#      netdata_bundle_* calls - load-bearing and explained in full at that
-#      point. Do not tidy it.
+#      requirement half or next to the target that needs it.
 #   7. targets: libnetdata and its libraries (add_subdirectory), the compiled
 #      plugins and helper binaries (one module each), then the daemon
 #      (NetdataDaemon) and the Windows artifacts beside it.
@@ -127,6 +125,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
     add_link_options(-rdynamic)
+    message(STATUS "Added compiler and linker flags for better stack trace support")
 endif()
 
 if(OS_MACOS)

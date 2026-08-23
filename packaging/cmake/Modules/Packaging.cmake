@@ -1326,10 +1326,12 @@ endif()
 if(OS_MACOS AND OSLOG AND FOUNDATION)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-macos-logs")
 endif()
-# The Windows-only components, registered under the same guards their install
-# rules use. CPack never runs on Windows today (the MSI is built by WiX), so
-# these are inert; they exist to keep the invariant that every install rule's
-# component is registered wherever the rule fires.
+# The Windows-only components. CPack never runs on Windows today (the MSI is
+# built by WiX), so these are inert; they exist to keep the invariant that every
+# install rule's component is registered wherever the rule fires.
+# wevt_netdata_dll's install rules carry an extra HAVE_WEL OR HAVE_ETW condition,
+# but src/libnetdata hardcodes both True under OS_WINDOWS, so OS_WINDOWS alone
+# is the same set.
 if(OS_WINDOWS)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-windows-events")
         list(APPEND CPACK_COMPONENTS_ALL "netdata_driver" "netdata_driver_inf" "wevt_netdata_dll")

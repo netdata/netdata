@@ -124,6 +124,12 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
 
+# The user account the installed agent runs as; reaches the service templates,
+# edit-config and config.h. The last -D-only knob of the settable-but-declared-
+# nowhere class this module was created to eliminate.
+set(NETDATA_USER "netdata" CACHE STRING "User account the Netdata Agent runs as")
+mark_as_advanced(NETDATA_USER)
+
 # Other optional functionality
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
@@ -154,7 +160,9 @@ endif()
 # netdata-installer.sh forwards NETDATA_CMAKE_OPTIONS verbatim, so an old
 # invocation would otherwise configure a bundle build while believing it asked
 # for a package. Only truthy/non-empty values trip - a stale build directory
-# whose cache carries the old defaults meant bundle anyway and passes.
+# whose cache carries the old defaults meant bundle anyway and passes. (A stale
+# WINDOWS dev tree last configured in service/package mode trips loudly and
+# needs one wipe - accepted; loud beats a silent bundle build.)
 if(BUILD_FOR_PACKAGING OR NOT "${NETDATA_PACKAGING_FORMAT}" STREQUAL "")
         message(FATAL_ERROR "BUILD_FOR_PACKAGING and NETDATA_PACKAGING_FORMAT were replaced by NETDATA_PACKAGE_KIND (bundle, deb, rpm, or msi). Update the invocation.")
 endif()

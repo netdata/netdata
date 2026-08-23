@@ -45,10 +45,6 @@ list(APPEND CONFIGURE_OPTIONS
 
 string(JOIN " " CONFIGURE_COMMAND "cmake" ${CONFIGURE_OPTIONS})
 
-if (NOT NETDATA_USER)
-        set(NETDATA_USER "netdata")
-endif()
-
 set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME "build-info-cmake-cache.gz")
 set(BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH "usr/share/netdata")
 

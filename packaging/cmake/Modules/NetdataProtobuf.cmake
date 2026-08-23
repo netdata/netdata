@@ -22,7 +22,6 @@ function(netdata_bundle_protobuf)
         string(REPLACE "-fsanitize=address" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
         string(REPLACE "-fsanitize=address" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
-
         if(NEED_ABSL)
                 set(ABSL_PROPAGATE_CXX_STD On)
                 set(ABSL_ENABLE_INSTALL Off)

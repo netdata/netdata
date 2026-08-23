@@ -9,19 +9,28 @@ include_guard()
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)
     # Check for the toolchain before fetching Corrosion: without this, a missing
     # rustc surfaces as an error deep inside Corrosion's FindRust with no hint of
-    # which option to turn off (#23315). The floor is the workspace's declared
-    # rust-version, read from the manifest so the two cannot drift apart. The
-    # rustup default location is searched explicitly because Corrosion's FindRust
-    # searches it too, and PATH cannot be trusted to carry it: the installer
-    # sources /etc/profile, which can reset PATH and hide a rustup toolchain the
-    # build is about to use (the Docker build hits exactly this).
-    find_program(RUSTC_EXECUTABLE rustc HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin")
+    # which option to turn off (#23315). Corrosion's own Rust_COMPILER knob wins
+    # when set, so the preflight can never reject a toolchain the build would
+    # use. The rustup default location is searched explicitly because Corrosion's
+    # FindRust searches it too, and PATH cannot be trusted to carry it: the
+    # installer sources /etc/profile, which can reset PATH and hide a rustup
+    # toolchain the build is about to use (the Docker build hits exactly this).
+    if(Rust_COMPILER)
+        set(RUSTC_EXECUTABLE "${Rust_COMPILER}")
+    else()
+        find_program(RUSTC_EXECUTABLE rustc HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin")
+    endif()
     if(NOT RUSTC_EXECUTABLE)
         message(FATAL_ERROR "A Rust toolchain (rustc) is required by the enabled Rust-based features but was not found. Install one (e.g. via rustup), or pass -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_NETFLOW=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off to build without them.")
     endif()
 
     file(STRINGS src/crates/Cargo.toml _nd_rust_version_line REGEX "^rust-version = \"")
     string(REGEX REPLACE "^rust-version = \"([0-9.]+)\".*$" "\\1" _nd_min_rust_version "${_nd_rust_version_line}")
+    if(NOT _nd_min_rust_version MATCHES "^[0-9.]+$")
+        # Fail closed: an unparsed manifest would otherwise compare against the
+        # empty string, which VERSION_LESS treats as 0, silently dropping the floor.
+        message(FATAL_ERROR "Could not read rust-version from src/crates/Cargo.toml; update the extraction in NetdataRust.cmake to match the manifest's current shape.")
+    endif()
     execute_process(COMMAND "${RUSTC_EXECUTABLE}" --version
                     RESULT_VARIABLE _nd_rustc_result
                     OUTPUT_VARIABLE _nd_rustc_version

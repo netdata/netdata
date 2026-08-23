@@ -72,6 +72,13 @@ macro(add_ibm_plugin_target)
     set(MQ_INSTALLATION_PATH "")
   endif()
 
+  # Spliced conditionally: a bare trailing ':' is an empty ld.so element, which
+  # glibc reads as the current working directory.
+  set(IBM_LD_LIBRARY_PATH_TAIL "")
+  if(NOT "$ENV{LD_LIBRARY_PATH}" STREQUAL "")
+    set(IBM_LD_LIBRARY_PATH_TAIL ":$ENV{LD_LIBRARY_PATH}")
+  endif()
+
   # Build with CGO enabled and multiple rpath entries for different installation methods
   add_custom_command(
     OUTPUT ibm.d.plugin
@@ -82,7 +89,7 @@ macro(add_ibm_plugin_target)
       CGO_LDFLAGS=${IBM_CGO_LDFLAGS}
       # VERBATIM means no shell: $LD_LIBRARY_PATH would pass through literally,
       # so the inherited value is spliced in at configure time instead.
-      LD_LIBRARY_PATH=${IBM_MQ_BUILD_DIR}/lib64:$ENV{LD_LIBRARY_PATH}
+      LD_LIBRARY_PATH=${IBM_MQ_BUILD_DIR}/lib64${IBM_LD_LIBRARY_PATH_TAIL}
       MQ_INSTALLATION_PATH=${MQ_INSTALLATION_PATH}
       GOPROXY=https://proxy.golang.org,direct
       "${GO_EXECUTABLE}" build
