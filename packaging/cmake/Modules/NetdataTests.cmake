@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Test executables. None is installed, referenced elsewhere, or registered with CTest; the project defines no add_test().
+# Test executables. None is installed or registered with CTest - the project
+# defines no add_test() - but they are NOT all orphans: the topology container
+# tests workflow (.github/workflows/topology-container-tests.yml) builds twelve
+# of these targets by name.
 #
-# Relocated verbatim from the root CMakeLists.txt. include()d rather than
-# add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
-# keep pointing at the repository and build roots, which every relative path
-# below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
+# include()d from the root file, so paths resolve against the repository and
+# build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
 # Built on demand: all but cgroup-lookup-test are EXCLUDE_FROM_ALL, and that one is behind ENABLE_CGROUPS_LOOKUP_TEST_CLIENT, off by default.
 

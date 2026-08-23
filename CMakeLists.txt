@@ -1,41 +1,46 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# The order of this file, and why it is that order. Most of it is free to move;
-# the constraints below are the ones that are not, and each has been paid for.
+# This file orchestrates. The work lives in packaging/cmake/Modules/ and in the
+# components' own directories; what this file fixes is the ORDER things happen
+# in. Most of it is free to move; the constraints below are the ones that are
+# not, and each has been paid for.
 #
-#   1. version, module path, build type
-#   2. platform detection, then every build option, then compiler flags. Detection
-#      and the options module come first so that every option is declared before
-#      anything reads one; that is a constraint, not a preference. Every
-#      directory-property mutation that applies to the whole tree also happens in
-#      this phase: NetdataPlatform's -D_GNU_SOURCE and include paths, the mold link
-#      option, NetdataCompilerFlags, and HAVE_OSLOG. One more sits far below, in
-#      phase 7, on purpose.
-#   3. platform capability probes (NetdataPlatformChecks). Free to move within
-#      this file - it creates no target and touches no directory property - but
-#      kept here, ahead of every subproject, so that our HAVE_* macros are
-#      answered by our own probes. check_* results share one cache namespace with
-#      every project configured as a subdirectory and the first writer wins, so a
-#      probe that runs after a vendor's silently inherits the vendor's answer to
-#      a question the vendor may have asked differently.
-#   4. install layout and host integration paths
-#   5. toolchains and code generation: Go, Rust/corrosion
-#   6. dependency discovery, then the subprojects we bundle. Every external
-#      library is looked up once, in NetdataDependencies, with no REQUIRED and no
-#      guard; whether a missing one is fatal is decided next to the target that
-#      needs it, in phase 8.
-#   7. the stack-trace flag pair, wedged between three netdata_bundle_* calls.
-#      Load-bearing and explained in full at that point. Do not tidy it.
-#   8. source inventories, then targets: libraries, the daemon, the plugins
-#   9. tests, then packaging
-#  10. config.h and the other generated files, on the LAST line. Not because of
-#      the compile-option snapshot it takes - that only has to follow phase 7 -
-#      but because its inputs resolve during phase 8: HAVE_CAPABILITY,
-#      HAVE_MONGOC, HAVE_LIBUNWIND, HAVE_LIBMNL, HAVE_SYSTEMD and the HAVE_SD_*
-#      set, ENABLE_LZ4/ZSTD/BROTLI, and ENABLE_PROMETHEUS_REMOTE_WRITE, which
-#      binds latest of all. Moving it earlier fails SILENTLY: about fifteen
-#      #cmakedefine lines would emit as undefs, the build would succeed, and
-#      mongoc, brotli, zstd and systemd support would be quietly dropped.
+#   1. version, module path, build type, project().
+#   2. platform detection (NetdataPlatform), then every build option
+#      (NetdataOptions), then compiler flags (NetdataCompilerFlags). Detection
+#      and options come first so that every option is declared before anything
+#      reads one; that is a constraint, not a preference. Every directory
+#      property that applies to the whole tree is also set in this phase -
+#      -D_GNU_SOURCE, the compiler and linker flags, HAVE_OSLOG - because a
+#      directory property only reaches targets created after the mutation. One
+#      more property mutation sits far below, in phase 6, on purpose.
+#   3. platform capability probes (NetdataPlatformChecks), ahead of every
+#      bundled subproject so that our HAVE_* macros are answered by our own
+#      probes: check_* results share one cache namespace with every project
+#      configured as a subdirectory, and the first writer wins.
+#   4. the install layout (NetdataInstallLayout): every path once, as a
+#      *_DEST/*_DIR pair, plus the host-owned destinations.
+#   5. toolchains and code generation: Rust/corrosion (NetdataRust) and Go
+#      (NetdataGo).
+#   6. dependency discovery (NetdataDependencies), then the subprojects we
+#      bundle. Every external library is looked up once, with no REQUIRED and
+#      no guard; whether a missing one is fatal is decided in that module's
+#      requirement half or next to the target that needs it. In the middle of
+#      the bundling sits the stack-trace flag pair, wedged between three
+#      netdata_bundle_* calls - load-bearing and explained in full at that
+#      point. Do not tidy it.
+#   7. targets: libnetdata and its libraries (add_subdirectory), the compiled
+#      plugins and helper binaries (one module each), then the daemon
+#      (NetdataDaemon) and the Windows artifacts beside it.
+#   8. config.h and the other generated files (NetdataSystemFiles), on the
+#      LAST line. Not because of the compile-option snapshot it takes - that
+#      only has to follow phase 6 - but because its inputs resolve during
+#      phase 7: HAVE_CAPABILITY, HAVE_MONGOC, HAVE_LIBUNWIND, HAVE_LIBMNL,
+#      HAVE_SYSTEMD and the HAVE_SD_* set, ENABLE_LZ4/ZSTD/BROTLI, and
+#      ENABLE_PROMETHEUS_REMOTE_WRITE, which binds latest of all. Moving it
+#      earlier fails SILENTLY: about fifteen #cmakedefine lines would emit as
+#      undefs, the build would succeed, and mongoc, brotli, zstd and systemd
+#      support would be quietly dropped.
 
 cmake_minimum_required(VERSION 3.16.0...3.30)
 
@@ -116,10 +121,10 @@ if(OS_MACOS)
 endif()
 
 #
-# Platform capability probes. Placed here, immediately after the last of the four
-# directory-property mutations above (NetdataPlatform's -D_GNU_SOURCE and include paths,
-# the mold link option, NetdataCompilerFlags, and HAVE_OSLOG), and ahead of every
-# dependency lookup and every bundled subproject.
+# Platform capability probes. Placed here, immediately after the last of the
+# directory-property mutations above (NetdataPlatform's -D_GNU_SOURCE and include
+# paths, NetdataCompilerFlags - which also carries the mold link option - and
+# HAVE_OSLOG), and ahead of every dependency lookup and every bundled subproject.
 #
 # Ahead of the subprojects matters: check_* results are cached in a namespace shared
 # with every project configured as a subdirectory, and the first writer wins. Running
@@ -128,20 +133,12 @@ endif()
 #
 include(NetdataPlatformChecks)
 
-
-#
-# The install layout: every Netdata-owned path once, as a *_DEST/*_DIR pair, plus the host-owned destinations and the staging predicate.
-#
-
+# The install layout, then the toolchains, then every external library lookup.
 include(NetdataInstallLayout)
-
 include(NetdataRust)
-
 include(NetdataGo)
-
 include(NetdataWebRTC)
 include(NetdataDependencies)
-
 include(NetdataProtobuf)
 
 if(ENABLE_BUNDLED_PROTOBUF)
@@ -158,10 +155,8 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_fetch_ebpf_co_re()
 endif()
 
-#
-# Custom Modules
-#
-
+# The bundled-or-system dependencies: each module owns the choice between the
+# system copy and its vendored fallback.
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
@@ -175,10 +170,6 @@ endif()
 if(ENABLE_SENTRY)
         include(NetdataSentry)
 endif()
-
-#
-# Checks from custom modules
-#
 
 netdata_detect_jsonc()
 netdata_detect_libyaml()
@@ -266,23 +257,11 @@ if(MNL_FOUND)
     set(HAVE_LIBMNL True)
 endif()
 
-#
-# nd-run: runs a helper program with the capabilities it needs, if any.
-#
-
+# The compiled collector plugins and helper binaries, one module each: a
+# module carries its own source list, executable, guards and install rule, so
+# a component's whole definition is in one place.
 include(NetdataNdRun)
-
-#
-# build plugins
-#
-
 include(NetdataPluginDebugfs)
-
-#
-# Compiled collector plugins and helpers, one module each. Each module
-# carries its own source list, executable and install rule, so a
-# plugin's whole definition is in one place.
-#
 include(NetdataPluginApps)
 include(NetdataPluginFreeipmi)
 include(NetdataPluginNfacct)
@@ -292,97 +271,34 @@ include(NetdataPluginSlabinfo)
 include(NetdataPluginCups)
 include(NetdataNdsudo)
 include(NetdataCgroupNetwork)
+include(NetdataPluginSystemdJournal)
+include(NetdataPluginSystemdUnits)
+include(NetdataPluginWindowsEvents)
+include(NetdataPluginMacosLogs)
+include(NetdataPluginEBPF)
+include(NetdataPluginLocalListeners)
+include(NetdataPluginNetworkViewer)
+include(NetdataSystemdCatNative)
+include(NetdataLog2Journal)
+include(NetdataCli)
 
-#
-# Test executables. None is installed, referenced elsewhere, or registered with CTest; the project defines no add_test().
-#
-
+# Test executables, built on demand and never installed.
 include(NetdataTests)
 
-include(NetdataPluginSystemdJournal)
-
-include(NetdataPluginSystemdUnits)
-
-include(NetdataPluginWindowsEvents)
-
-include(NetdataPluginMacosLogs)
-
-include(NetdataPluginEBPF)
-
-include(NetdataPluginLocalListeners)
-
-include(NetdataPluginNetworkViewer)
-
+# The daemon itself, and the Windows artifacts that ship beside it.
 include(NetdataDaemon)
-
 include(NetdataClaim)
 include(NetdataWindowsDriver)
 include(NetdataMSI)
 
-#
-# systemd-cat-native: sends log entries to a local or remote systemd journal.
-#
-
-include(NetdataSystemdCatNative)
-
-#
-# log2journal: converts structured text logs into systemd Journal Export Format.
-#
-
-include(NetdataLog2Journal)
-
-#
-# netdatacli: the command-line client for the running agent.
-#
-
-include(NetdataCli)
-
-#
-# Build go.d.plugin
-#
-
-#
-# go.d.plugin, the snmp trap profile generator, and the nd-mcp bridge: every Go binary gated on ENABLE_PLUGIN_GO.
-#
-
+# The Go and Rust plugins: go.d (with the snmp trap profile generator and the
+# nd-mcp bridge), scripts.d, ibm.d, the OTel collector, and the
+# NetFlow/IPFIX/sFlow analyser with the topology-ip-intel downloader that
+# ships beside it.
 include(NetdataPluginGo)
-
-#
-# Build scripts.d.plugin
-#
-
-#
-# scripts.d.plugin: the Go Nagios-compatibility plugin and its config tree.
-#
-
 include(NetdataPluginScripts)
-
-#
-# Build ibm.d.plugin
-#
-
 include(NetdataIBMPlugin)
-
-#
-# otel.plugin
-#
-# Handle OTel Collector plugin
-#
-#
-# otel-plugin: installs the Rust OpenTelemetry plugin and its stock receiver config.
-#
-
 include(NetdataPluginOTel)
-
-
-#
-# netflow-plugin
-#
-# Handle NetFlow/IPFIX/sFlow flow analysis plugin
-#
-# netflow-plugin: the Rust flow-analysis plugin, its config, and the Go topology-ip-intel downloader that ships beside it.
-#
-
 include(NetdataPluginNetflow)
 
 #

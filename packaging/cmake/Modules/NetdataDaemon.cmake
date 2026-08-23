@@ -1,18 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # The netdata daemon: source aggregation, the mqtt library, the ACLK protobuf schemas, the exporters, and the netdata target itself.
 #
-# Relocated verbatim from the root CMakeLists.txt. include()d rather than
-# add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
-# keep pointing at the repository and build roots, which every relative path
-# below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
+# include()d from the root file, so paths resolve against the repository and
+# build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 
 include_guard()
 
-# source file inventory for everything defined in this file; every operation on
-# those lists - the conditional list(APPEND ...) calls and the NETDATA_FILES
-# aggregation - stays here. A component that owns its own build definition
-# keeps its inventory beside it instead: a plugin in its
-# NetdataPlugin*.cmake module, libnetdata in src/libnetdata/SourceLists.cmake.
+# The daemon's source inventory, and every operation on those lists - the
+# conditional list(APPEND ...) calls and the NETDATA_FILES aggregation. A
+# component that owns its own build definition keeps its inventory beside it
+# instead: a plugin in its NetdataPlugin*.cmake module, libnetdata in
+# src/libnetdata/SourceLists.cmake.
 include(NetdataSourceLists)
 
 if(ENABLE_SYSTEMD_DBUS)

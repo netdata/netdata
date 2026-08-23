@@ -1,10 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # local-listeners: the listening-socket enumerator, and its mnl test binary.
 #
-# Relocated verbatim from the root CMakeLists.txt. include()d rather than
-# add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
-# keep pointing at the repository and build roots, which every relative path
-# below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
+# include()d from the root file, so paths resolve against the repository and
+# build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
 # The mnl test target lives here rather than in NetdataTests.cmake with the
 # other test binaries. It is EXCLUDE_FROM_ALL and never installed, but it

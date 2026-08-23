@@ -1,21 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # The Rust toolchain: the rustc preflight, Corrosion, crate imports and per-crate flags for every Rust-based feature.
 #
-# Relocated verbatim from the root CMakeLists.txt. include()d rather than
-# add_subdirectory()d so CMAKE_CURRENT_SOURCE_DIR and CMAKE_CURRENT_BINARY_DIR
-# keep pointing at the repository and build roots, which every relative path
-# below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
+# include()d from the root file, so paths resolve against the repository and
+# build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 
-# Setup Rust/Corrosion for plugins that need it
+include_guard()
+
 if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)
     # Check for the toolchain before fetching Corrosion: without this, a missing
     # rustc surfaces as an error deep inside Corrosion's FindRust with no hint of
     # which option to turn off (#23315). The floor is the workspace's declared
-    # rust-version, read from the manifest so the two cannot drift apart.
-    # The rustup default location is searched explicitly because Corrosion's
-    # FindRust searches it too, and PATH cannot be trusted to carry it: the
-    # installer sources /etc/profile, which can reset PATH and hide a rustup
-    # toolchain the build is about to use (the Docker build hits exactly this).
+    # rust-version, read from the manifest so the two cannot drift apart. The
+    # rustup default location is searched explicitly because Corrosion's FindRust
+    # searches it too, and PATH cannot be trusted to carry it: the installer
+    # sources /etc/profile, which can reset PATH and hide a rustup toolchain the
+    # build is about to use (the Docker build hits exactly this).
     find_program(RUSTC_EXECUTABLE rustc HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin")
     if(NOT RUSTC_EXECUTABLE)
         message(FATAL_ERROR "A Rust toolchain (rustc) is required by the enabled Rust-based features but was not found. Install one (e.g. via rustup), or pass -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_NETFLOW=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off to build without them.")
