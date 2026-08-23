@@ -15,8 +15,6 @@ set(SYSTEMD_UNITS_PLUGIN_FILES
 )
 
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
-        include(FetchContent)
-
         add_executable(systemd-units.plugin ${SYSTEMD_UNITS_PLUGIN_FILES})
         target_link_libraries(systemd-units.plugin libnetdata)
 

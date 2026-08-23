@@ -78,7 +78,9 @@ macro(add_ibm_plugin_target)
       CGO_ENABLED=1
       CGO_CFLAGS=${IBM_CGO_CFLAGS}
       CGO_LDFLAGS=${IBM_CGO_LDFLAGS}
-      LD_LIBRARY_PATH=${IBM_MQ_BUILD_DIR}/lib64:$LD_LIBRARY_PATH
+      # VERBATIM means no shell: $LD_LIBRARY_PATH would pass through literally,
+      # so the inherited value is spliced in at configure time instead.
+      LD_LIBRARY_PATH=${IBM_MQ_BUILD_DIR}/lib64:$ENV{LD_LIBRARY_PATH}
       MQ_INSTALLATION_PATH=${MQ_INSTALLATION_PATH}
       GOPROXY=https://proxy.golang.org,direct
       "${GO_EXECUTABLE}" build
