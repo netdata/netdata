@@ -111,7 +111,7 @@ if(ENABLE_PLUGIN_EBPF)
         string(APPEND EBPF_GO_CGO_LDFLAGS " -lrt")
     endif()
 
-    if(OS_LINUX AND ENABLE_PLUGIN_EBPF_GO)
+    if(ENABLE_PLUGIN_EBPF_GO)
         add_custom_command(
                 OUTPUT "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                 COMMAND "${CMAKE_COMMAND}" -E env

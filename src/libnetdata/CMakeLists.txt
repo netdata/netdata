@@ -145,15 +145,6 @@ set_source_files_properties(gorilla/gorilla.cc PROPERTIES COMPILE_OPTIONS "-Wno-
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
 
-# pthread (FIXME: use find_package for this)
-
-# set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-# set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-# find_package(Threads REQUIRED)
-
-# add_executable(test test.cpp)
-# target_link_libraries(test Threads::Threads)
-
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread>"

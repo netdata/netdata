@@ -157,10 +157,6 @@ if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
         include(NetdataEBPFCORE)
 
-        if(NOT OS_LINUX)
-            message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
-        endif()
-
         netdata_bundle_libbpf()
         netdata_fetch_ebpf_co_re()
 endif()
@@ -256,7 +252,6 @@ if(OS_LINUX)
         include(NetdataDetectSystemd)
         detect_systemd()
 endif()
-
 
 #
 # libnetdata, judy and netipc

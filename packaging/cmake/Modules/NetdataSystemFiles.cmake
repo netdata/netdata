@@ -587,7 +587,6 @@ if(ENABLE_PLUGIN_PYTHON)
           DESTINATION ${LIBEXEC_DEST}/python.d)
 
   if(OS_WINDOWS)
-    include(NetdataUtil)
     precompile_python(${LIBEXEC_DEST}/python.d plugin-pythond)
   endif()
 

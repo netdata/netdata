@@ -99,19 +99,15 @@ set_source_files_properties(src/aclk/schema-wrappers/proto_2_json.cc PROPERTIES 
 #
 # mqtt library
 #
-set(ENABLE_MQTTWEBSOCKETS True)
-if(ENABLE_MQTTWEBSOCKETS)
-        add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
+add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
 
-        target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
-                                                     -DRBUF_CUSTOM_MALLOC
-                                                     -DMQTT_WSS_CPUSTATS)
+target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
+                                             -DRBUF_CUSTOM_MALLOC
+                                             -DMQTT_WSS_CPUSTATS)
 
-        target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers)
+target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers)
 
-        target_link_libraries(mqttwebsockets PRIVATE libnetdata)
-
-endif()
+target_link_libraries(mqttwebsockets PRIVATE libnetdata)
 
 #
 # proto definitions
@@ -205,7 +201,7 @@ target_link_libraries(netdata PRIVATE
         m
         libnetdata
         "$<$<BOOL:${HAVE_LIBRT}>:rt>"
-        "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
+        mqttwebsockets
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${OS_MACOS}>:${IOKIT};${FOUNDATION}>"

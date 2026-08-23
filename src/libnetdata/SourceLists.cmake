@@ -143,7 +143,6 @@ set(LIBNETDATA_FILES
         libnetdata.h
         line_splitter/line_splitter.c
         line_splitter/line_splitter.h
-        libnetdata.h
         linked_lists/linked_lists.h
         locks/locks.c
         locks/locks.h
