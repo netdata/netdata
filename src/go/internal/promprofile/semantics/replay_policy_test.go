@@ -53,6 +53,24 @@ func TestReconcileProductionChartPoliciesRequiresAlgorithmWhenWireKindDiffersFro
 	}
 }
 
+func TestReconcileProductionChartPoliciesAcceptsExplicitPriority(t *testing.T) {
+	program := compileTestSemanticContract(t, validProfileDesignV1, validSourceSemanticsV1)
+	semanticCase, err := program.EvaluateCaseEnvironment(context.Background(), map[string]map[string]AxisValue{"example": {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot := validProductionRouteSnapshot()
+	snapshot.Profiles[0].Charts[0].Priority = 100
+	reconciled := reconcileTestProductionCase(t, semanticCase, snapshot)
+	if err := semanticCase.ReconcileProductionRoutes(context.Background(), snapshot, reconciled); err != nil {
+		t.Fatal(err)
+	}
+	if err := semanticCase.ReconcileProductionChartPolicies(context.Background(), snapshot, reconciled); err != nil {
+		t.Fatalf("explicit chart priority must be accepted: %v", err)
+	}
+}
+
 func TestReconcileProductionChartPoliciesRejectsStaticDebt(t *testing.T) {
 	program := compileTestSemanticContract(t, validProfileDesignV1, validSourceSemanticsV1)
 	semanticCase, err := program.EvaluateCaseEnvironment(context.Background(), map[string]map[string]AxisValue{"example": {}})
@@ -66,10 +84,6 @@ func TestReconcileProductionChartPoliciesRejectsStaticDebt(t *testing.T) {
 		"explicit id": {
 			mutate: func(policy *promreplay.SemanticChartPolicy) { policy.ExplicitID = "requests" },
 			want:   "redundant explicit ID",
-		},
-		"priority": {
-			mutate: func(policy *promreplay.SemanticChartPolicy) { policy.Priority = 100 },
-			want:   "declares priority",
 		},
 		"wildcard identity": {
 			mutate: func(policy *promreplay.SemanticChartPolicy) { policy.WildcardIdentity = true },

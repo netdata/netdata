@@ -74,11 +74,21 @@ def build_tree(profile: dict) -> Node:
     return root
 
 
+def node_priority(node: Node) -> int:
+    priorities = [chart.priority for chart in descendant_charts(node)]
+    return min(priorities, default=DEFAULT_PRIORITY)
+
+
+def descendant_charts(node: Node) -> list[Chart]:
+    charts = list(node.charts)
+    for child in node.children.values():
+        charts.extend(descendant_charts(child))
+    return charts
+
+
 def sort_key(item: tuple[str, Node]) -> tuple[int, int, str]:
     name, node = item
-    priorities = [chart.priority for chart in node.charts]
-    minimum = min(priorities, default=DEFAULT_PRIORITY)
-    return (minimum, -len(name), name)
+    return (node_priority(node), -len(name), name)
 
 
 def render(node: Node, depth: int = 0) -> list[str]:

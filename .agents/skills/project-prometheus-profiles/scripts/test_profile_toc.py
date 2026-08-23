@@ -75,5 +75,22 @@ template:
         self.assertTrue(any("contains one context" in warning for warning in profile_toc.warnings(root)))
 
 
+class ProfileTocOrderingTest(unittest.TestCase):
+    def test_parent_sort_uses_descendant_chart_priority(self) -> None:
+        root = profile_toc.Node("App")
+        overview = profile_toc.Node("Overview")
+        overview_child = profile_toc.Node("Health")
+        detail = profile_toc.Node("Details")
+        overview_child.charts.append(profile_toc.Chart("health", 100))
+        overview.children["Health"] = overview_child
+        detail.charts.append(profile_toc.Chart("detail", 200))
+        root.children["Overview"] = overview
+        root.children["Details"] = detail
+
+        ordered = [name for name, _ in sorted(root.children.items(), key=profile_toc.sort_key)]
+
+        self.assertEqual(["Overview", "Details"], ordered)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -595,9 +595,9 @@ need unrelated scale manipulation, they probably do not belong on one axis.
 
 ## Order the operator journey
 
-Prometheus profiles MUST omit `priority`. Every chart receives the same runtime
-default, and the UI owns presentation sorting. YAML order is useful for human
-review but does not promise runtime or UI order.
+Set chart `priority` deliberately when section order is part of the operator journey.
+Omit it for unrelated charts; the runtime default remains `70000`. YAML position is
+still not an ordering contract.
 
 At the application level, order domain capabilities by the operator's causal
 journey. Within each capability, a useful local order is health/workload →
@@ -645,8 +645,9 @@ contexts, and dimensions. Unseen future values remain a review risk.
   legend.
 - **Broad deny list:** makes validation pass by deleting diagnostic surface
   instead of designing it.
-- **Authored chart priority:** claims UI ordering authority the Prometheus
-  profile does not own and creates unnecessary maintenance.
+- **Priority on every chart:** obscures which few navigation boundaries truly
+  require ordering and creates unnecessary maintenance. Set it only where it
+  supports the operator journey.
 - **Titles derived mechanically from metric names:** repeat exporter syntax
   instead of explaining operational meaning.
 - **Passing the validator as definition of quality:** proves runtime behavior for

@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-func TestValidateComposedProfilePriorityFindingIdentifiesSupportOwner(t *testing.T) {
+func TestValidateComposedProfilePropagatesSupportPriority(t *testing.T) {
 	candidate := simpleOwnedProfile("app", "app_value", "")
 	support := strings.Replace(
 		simpleOwnedProfile("runtime", "runtime_value", ""),
@@ -23,9 +23,17 @@ func TestValidateComposedProfilePriorityFindingIdentifiesSupportOwner(t *testing
 	)
 	report := validateComposedProfiles(t, candidate, support, simpleOwnedDump())
 
-	finding := findFinding(t, report, "priority_forbidden")
-	if finding.Path != "profiles[runtime].template.charts[0]" {
-		t.Fatalf("support priority path: got %q", finding.Path)
+	var found bool
+	for _, item := range report.AuthoredMapping {
+		if item.Path == "profiles[runtime].template.charts[0]" {
+			found = true
+			if item.Priority != 100 {
+				t.Fatalf("support priority was not propagated: %#v", item)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("support authored mapping was not found: %#v", report.AuthoredMapping)
 	}
 }
 

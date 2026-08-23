@@ -9141,7 +9141,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.accumulated_reservation_latency:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 19/Elapsed Time
     question: What is the accumulated reservation elapsed time for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9182,7 +9182,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.accumulated_scrub_latency:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 19/Elapsed Time
     question: What is the accumulated scrub elapsed time for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9223,7 +9223,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.reservation_latency_measurements:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 19/Elapsed Time
     question: What is the reservation elapsed-time measurements for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9264,7 +9264,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.elapsed_time.scrub_latency_measurements:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 19/Elapsed Time
     question: What is the scrub elapsed-time measurements for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9305,7 +9305,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.outcomes.scrub_work:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Outcomes
+    family: Ceph/OSDs/Scrubbing Ceph 19/Outcomes
     question: What is the scrub work for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9362,7 +9362,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.reservations.replicas_in_reservation:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Reservations
+    family: Ceph/OSDs/Scrubbing Ceph 19/Reservations
     question: What is the replicas in reservation for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9387,7 +9387,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.reservations.reservation_process_outcomes:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Reservations
+    family: Ceph/OSDs/Scrubbing Ceph 19/Reservations
     question: What is the reservation process outcomes for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9444,7 +9444,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_19.reservations.scrubs_past_reservation:
-    family: Ceph/OSDs/Scrubbing/Ceph 19/Reservations
+    family: Ceph/OSDs/Scrubbing Ceph 19/Reservations
     question: What is the scrubs past reservation for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9469,7 +9469,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.accumulated_reservation_latency:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 20/Elapsed Time
     question: What is the accumulated reservation elapsed time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9494,7 +9494,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.accumulated_scrub_latency:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 20/Elapsed Time
     question: What is the accumulated scrub elapsed time for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9519,7 +9519,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.reservation_latency_measurements:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 20/Elapsed Time
     question: What is the reservation elapsed-time measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9544,7 +9544,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.elapsed_time.scrub_latency_measurements:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Elapsed Time
+    family: Ceph/OSDs/Scrubbing Ceph 20/Elapsed Time
     question: What is the scrub elapsed-time measurements for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9569,7 +9569,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.interference_and_scheduling.client_write_interference:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing Ceph 20/Interference and Scheduling
     question: What is the client write interference for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9594,7 +9594,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.outcomes.scrub_work:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Outcomes
+    family: Ceph/OSDs/Scrubbing Ceph 20/Outcomes
     question: What is the scrub work for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9627,7 +9627,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.reservations.replicas_in_reservation:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Reservations
+    family: Ceph/OSDs/Scrubbing Ceph 20/Reservations
     question: What is the replicas in reservation for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9644,7 +9644,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.reservations.reservation_process_outcomes:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Reservations
+    family: Ceph/OSDs/Scrubbing Ceph 20/Reservations
     question: What is the reservation process outcomes for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9685,7 +9685,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.reservations.scrubs_past_reservation:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Reservations
+    family: Ceph/OSDs/Scrubbing Ceph 20/Reservations
     question: What is the scrubs past reservation for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9702,7 +9702,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.scrub_work.byte_throughput:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Scrub Work
+    family: Ceph/OSDs/Scrubbing Ceph 20/Scrub Work
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9719,7 +9719,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_ceph_20.scrub_work.scrub_calls:
-    family: Ceph/OSDs/Scrubbing/Ceph 20/Scrub Work
+    family: Ceph/OSDs/Scrubbing Ceph 20/Scrub Work
     question: What is the scrub calls for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9752,7 +9752,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.blocked_client_writes:
-    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing Common Work/Interference and Scheduling
     question: What is the client writes blocked by scrub for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9777,7 +9777,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.chunk_selection_outcomes:
-    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing Common Work/Interference and Scheduling
     question: What is the chunk selection outcomes for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9818,7 +9818,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.object_lock_waits:
-    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing Common Work/Interference and Scheduling
     question: What is the object-lock waits for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9843,7 +9843,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.interference_and_scheduling.preemptions:
-    family: Ceph/OSDs/Scrubbing/Common Work/Interference and Scheduling
+    family: Ceph/OSDs/Scrubbing Common Work/Interference and Scheduling
     question: What is the scrub preemptions for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9868,7 +9868,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.reservations.completed_reservations:
-    family: Ceph/OSDs/Scrubbing/Common Work/Reservations
+    family: Ceph/OSDs/Scrubbing Common Work/Reservations
     question: What is the completed scrub reservations for each ceph daemon and level and pooltype?
     entity: by_ceph_daemon_and_level_and_pooltype
     inputs:
@@ -9893,7 +9893,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.scrub_work.byte_throughput:
-    family: Ceph/OSDs/Scrubbing/Common Work/Scrub Work
+    family: Ceph/OSDs/Scrubbing Common Work/Scrub Work
     question: What is the byte throughput for each ceph daemon?
     entity: by_ceph_daemon
     inputs:
@@ -9910,7 +9910,7 @@ views:
       promote: []
       omit: {}
   osd_scrubbing_common_work.scrub_work.omap_calls:
-    family: Ceph/OSDs/Scrubbing/Common Work/Scrub Work
+    family: Ceph/OSDs/Scrubbing Common Work/Scrub Work
     question: What is the omap scrub calls for each ceph daemon?
     entity: by_ceph_daemon
     inputs:

@@ -182,7 +182,7 @@ use a stricter minimal policy so intent is reviewable and defaults cannot drift:
 | Runtime field | Generic capability | Stock contribution policy |
 |---|---|---|
 | `id` | explicit stable base ID | omit when the context-derived ID is sufficient |
-| `priority` | numeric ordering hint | omit; every Prometheus chart uses the common default |
+| `priority` | numeric ordering hint | omit unless chart order is deliberately part of the operator journey |
 | `instances.by_labels: ['*']` | all current labels become identity | use explicit source-backed identity |
 | `lifecycle` | best-effort caps and expiry | omit; do not make coverage depend on silent caps |
 | `options.float` | force floating wire precision | omit when inherited runtime precision already does so |
@@ -233,7 +233,7 @@ make a stale or excluded family look intentionally covered.
 ## Charts control presentation and identity
 
 Required chart fields are `title`, `context`, `units`, and at least one
-`dimension`. Stock Prometheus profiles MUST omit `priority`.
+`dimension`. `priority` MAY be set deliberately to order charts in the operator journey.
 
 Optional fields include:
 
@@ -261,12 +261,11 @@ or semantics into one chart merely because a chart-wide algorithm compiles.
 Priority behavior:
 
 - omitted or non-positive priority becomes `70000`;
-- every Prometheus chart intentionally uses that same runtime value;
-- YAML position does not become runtime or UI presentation order;
-- UI sorting is outside the profile contract.
+- an explicit positive priority is preserved to the chart engine;
+- YAML position still does not become runtime or UI presentation order.
 
-Therefore omit `priority`. Keep source order coherent for review without
-claiming that it controls presentation.
+Omit `priority` for unrelated charts. Set it deliberately when a profile needs
+stable section ordering in the operator journey.
 
 Presentation rules checked by the profile-validation tool:
 

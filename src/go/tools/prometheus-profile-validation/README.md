@@ -200,7 +200,7 @@ For the supplied dump and job policy, a pass establishes that:
   and effective contexts do not normalize to empty;
 - observed dynamic dimension names do not collapse into duplicate emitted wire
   IDs or sanitize to an omitted empty ID;
-- every chart omits explicit priority so all use the common runtime default;
+- explicit chart priorities, when present, are preserved and verified; charts without priority use the common runtime default;
 - every chart has at least one visible dimension;
 - histogram bucket charts use observation-rate units and incremental semantics.
 
