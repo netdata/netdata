@@ -2,14 +2,6 @@
 # libnetdata: the foundation library, plus the two static libraries it is
 # built on - judy and netipc.
 #
-# Relocated from the root CMakeLists.txt, from the position the
-# add_subdirectory() call now occupies. Two blocks did change position and both
-# were checked: the LIBNETDATA_FILES composition moved later, from just after
-# include(NetdataSourceLists) down to here, and nothing between those two points
-# reads it or any list it appends; spawn-tester moved earlier, and no directory
-# property changes across the span it crossed. One statement was dropped rather
-# than moved - see the judy block.
-#
 # Unlike the packaging/cmake/Modules/*.cmake files this directory is
 # add_subdirectory()d, so CMAKE_CURRENT_SOURCE_DIR is src/libnetdata and every
 # relative path below is relative to it. The modules' rule is inverted here:

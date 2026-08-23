@@ -20,8 +20,8 @@
 #      configured as a subdirectory, and the first writer wins.
 #   4. the install layout (NetdataInstallLayout): every path once, as a
 #      *_DEST/*_DIR pair, plus the host-owned destinations.
-#   5. toolchains and code generation: Rust/corrosion (NetdataRust) and Go
-#      (NetdataGo).
+#   5. toolchains and code generation: Rust/corrosion (NetdataRust), Go
+#      (NetdataGo), and the optional WebRTC stack (NetdataWebRTC).
 #   6. dependency discovery (NetdataDependencies), then the subprojects we
 #      bundle. Every external library is looked up once, with no REQUIRED and
 #      no guard; whether a missing one is fatal is decided in that module's
