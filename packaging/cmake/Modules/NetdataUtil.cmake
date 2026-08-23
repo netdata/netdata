@@ -5,10 +5,6 @@ include_guard()
 
 # Fix up CMAKE_SYSTEM_PROCESSOR to actually match the build target
 function(netdata_fixup_system_processor)
-  if(OS_WINDOWS)
-    return()
-  endif()
-
   if(CMAKE_TOOLCHAIN_FILE)
     return()
   endif()
