@@ -16,10 +16,6 @@ macro(_nd_windows_config)
     message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
   endif()
 
-  if(BUILD_FOR_PACKAGING)
-    set(NETDATA_RUNTIME_PREFIX "/")
-  endif()
-
   set(BINDIR usr/bin)
   set(CMAKE_RC_COMPILER_INIT windres)
   ENABLE_LANGUAGE(RC)

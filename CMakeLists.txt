@@ -153,7 +153,13 @@ if(OS_WINDOWS)
   string(REGEX REPLACE "[/\\\\]+$" "" NETDATA_WINDOWS_PATH_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
   string(REPLACE "\\" "\\\\" NETDATA_WINDOWS_PATH_PREFIX_ESCAPED "${NETDATA_WINDOWS_PATH_PREFIX}")
 
-  if(NOT BUILD_FOR_PACKAGING)
+  # Both arms of the Windows prefix decision, in one place. A native package
+  # owns the filesystem root and addresses everything from it; any other Windows
+  # build is relocatable under the install prefix. NetdataPlatform used to set
+  # the packaging arm, which made it read an option defined ninety lines later.
+  if(BUILD_FOR_PACKAGING)
+    set(NETDATA_RUNTIME_PREFIX "/")
+  else()
     netdata_windows_path_to_runtime_path(NETDATA_RUNTIME_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
   endif()
 endif()
