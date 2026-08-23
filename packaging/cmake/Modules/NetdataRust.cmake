@@ -12,7 +12,11 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
     # rustc surfaces as an error deep inside Corrosion's FindRust with no hint of
     # which option to turn off (#23315). The floor is the workspace's declared
     # rust-version, read from the manifest so the two cannot drift apart.
-    find_program(RUSTC_EXECUTABLE rustc)
+    # The rustup default location is searched explicitly because Corrosion's
+    # FindRust searches it too, and PATH cannot be trusted to carry it: the
+    # installer sources /etc/profile, which can reset PATH and hide a rustup
+    # toolchain the build is about to use (the Docker build hits exactly this).
+    find_program(RUSTC_EXECUTABLE rustc HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin")
     if(NOT RUSTC_EXECUTABLE)
         message(FATAL_ERROR "A Rust toolchain (rustc) is required by the enabled Rust-based features but was not found. Install one (e.g. via rustup), or pass -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_NETFLOW=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off to build without them.")
     endif()
