@@ -97,7 +97,10 @@ endif()
 set(CMAKE_INSTALL_MESSAGE LAZY)
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "netdata")
 
-if("c_std_17" IN_LIST CMAKE_C_KNOWN_FEATURES)
+# CMAKE_C_COMPILE_FEATURES is what this compiler supports; the global property
+# CMAKE_C_KNOWN_FEATURES (read here as a variable until 2026, so always empty)
+# only lists what CMake itself knows about.
+if("c_std_17" IN_LIST CMAKE_C_COMPILE_FEATURES)
     set(CMAKE_C_STANDARD 17)
 else()
     set(CMAKE_C_STANDARD 11)
