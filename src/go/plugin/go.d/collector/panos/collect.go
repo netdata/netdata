@@ -42,11 +42,26 @@ func (c *Collector) collect(ctx context.Context) (bool, error) {
 
 	peers, err := c.collectBGPPeers(ctx)
 	result.add(false, err)
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return result.hasMetrics, errors.Join(result.errs...)
+	}
+	if result.addContextError(ctx) {
+		return result.hasMetrics, errors.Join(result.errs...)
+	}
 	if len(peers) > 0 {
-		c.enrichBGPPeerVRs(ctx, peers)
-		monitoredPeers := orderedBGPPeers(peers)
-		result.add(c.collectPeerMetrics(monitoredPeers), nil)
-		result.add(c.collectVRMetrics(peers), nil)
+		peers, err = c.enrichBGPPeerVRs(ctx, peers)
+		result.add(false, err)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return result.hasMetrics, errors.Join(result.errs...)
+		}
+		if result.addContextError(ctx) {
+			return result.hasMetrics, errors.Join(result.errs...)
+		}
+		if len(peers) > 0 {
+			monitoredPeers := orderedBGPPeers(peers)
+			result.add(c.collectPeerMetrics(monitoredPeers), nil)
+			result.add(c.collectVRMetrics(peers), nil)
+		}
 	}
 
 	return result.hasMetrics, errors.Join(result.errs...)
@@ -117,26 +132,42 @@ func (c *Collector) collectPeerMetrics(peers []bgpPeer) bool {
 		if peer.HasUptime {
 			c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(peer.Uptime))
 		}
-		c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesIn))
-		c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesOut))
-		c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesIn))
-		c.metrics.bgp.peerUpdatesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesOut))
-		c.metrics.bgp.peerFlaps.WithLabelValues(labels...).ObserveTotal(float64(peer.Flaps))
-		c.metrics.bgp.peerEstablishedTransitions.WithLabelValues(labels...).ObserveTotal(float64(peer.Established))
+		if peer.HasMessagesIn {
+			c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesIn))
+		}
+		if peer.HasMessagesOut {
+			c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesOut))
+		}
+		if peer.HasUpdatesIn {
+			c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesIn))
+		}
+		if peer.HasUpdatesOut {
+			c.metrics.bgp.peerUpdatesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesOut))
+		}
+		if peer.HasFlaps {
+			c.metrics.bgp.peerFlaps.WithLabelValues(labels...).ObserveTotal(float64(peer.Flaps))
+		}
+		if peer.HasEstablished {
+			c.metrics.bgp.peerEstablishedTransitions.WithLabelValues(labels...).ObserveTotal(float64(peer.Established))
+		}
 
 		for _, counter := range peer.PrefixCounters {
 			prefixLabels := prefixLabelValues(peer, counter)
 			if counter.HasIncomingTotal {
-				c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingTotal))
+				c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).
+					Observe(float64(counter.IncomingTotal))
 			}
 			if counter.HasIncomingAccepted {
-				c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingAccepted))
+				c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).
+					Observe(float64(counter.IncomingAccepted))
 			}
 			if counter.HasIncomingRejected {
-				c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).Observe(float64(counter.IncomingRejected))
+				c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).
+					Observe(float64(counter.IncomingRejected))
 			}
 			if counter.HasOutgoingAdvertised {
-				c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).Observe(float64(counter.OutgoingAdvertised))
+				c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).
+					Observe(float64(counter.OutgoingAdvertised))
 			}
 		}
 	}
@@ -155,7 +186,9 @@ func (c *Collector) collectVRMetrics(peers []bgpPeer) bool {
 	for _, peer := range peers {
 		st := stats[peer.VR]
 		if st == nil {
-			st = &vrStats{stateCounts: make(map[string]int64)}
+			st = &vrStats{
+				stateCounts: make(map[string]int64),
+			}
 			stats[peer.VR] = st
 		}
 

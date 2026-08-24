@@ -61,6 +61,12 @@ type bgpPeer struct {
 	Flaps          int64
 	Established    int64
 	HasUptime      bool
+	HasMessagesIn  bool
+	HasMessagesOut bool
+	HasUpdatesIn   bool
+	HasUpdatesOut  bool
+	HasFlaps       bool
+	HasEstablished bool
 	PrefixCounters []bgpPrefixCounter
 
 	// routerID is the ARE logical-router BGP router-id captured from the JSON
@@ -156,7 +162,10 @@ func (c *Collector) collectBGPPeers(ctx context.Context) ([]bgpPeer, error) {
 	}
 
 	if c.routingEngine == routingEngineNone && c.now().Sub(c.noBGPProbedAt) < noBGPReprobeInterval {
-		c.Debugf("PAN-OS BGP peers not found on previous probe; skipping routing-engine probe until %s", c.noBGPProbedAt.Add(noBGPReprobeInterval).Format(time.RFC3339))
+		c.Debugf(
+			"PAN-OS BGP peers not found on previous probe; skipping routing-engine probe until %s",
+			c.noBGPProbedAt.Add(noBGPReprobeInterval).Format(time.RFC3339),
+		)
 		return nil, nil
 	}
 
@@ -186,7 +195,11 @@ func (c *Collector) probeAndCollectBGPPeers(ctx context.Context) ([]bgpPeer, err
 	return c.probeAndCollectBGPPeersExcept(ctx, "", false)
 }
 
-func (c *Collector) probeAndCollectBGPPeersExcept(ctx context.Context, skipCommand string, emptySuccess bool) ([]bgpPeer, error) {
+func (c *Collector) probeAndCollectBGPPeersExcept(
+	ctx context.Context,
+	skipCommand string,
+	emptySuccess bool,
+) ([]bgpPeer, error) {
 	var errs []error
 
 	if legacyBGPPeerCommand != skipCommand {
@@ -341,7 +354,12 @@ type inheritedBGPPeerFields struct {
 	peerAddress string
 }
 
-func appendFlattenedBGPPeerEntries(entries []panosBGPPeerEntry, entry panosBGPPeerEntry, parent inheritedBGPPeerFields, depth int) []panosBGPPeerEntry {
+func appendFlattenedBGPPeerEntries(
+	entries []panosBGPPeerEntry,
+	entry panosBGPPeerEntry,
+	parent inheritedBGPPeerFields,
+	depth int,
+) []panosBGPPeerEntry {
 	if depth > maxBGPPeerEntryDepth {
 		return entries
 	}
@@ -392,7 +410,10 @@ func (e panosBGPPeerEntry) toBGPPeer() (bgpPeer, bool, error) {
 		return bgpPeer{}, false, nil
 	}
 
-	uptime, err := parseRequiredPANOSDurationField("BGP peer "+peerAddr+" uptime", firstNonEmpty(e.StatusDuration, e.UptimeSeconds, e.Uptime))
+	uptime, err := parseRequiredPANOSDurationField(
+		"BGP peer "+peerAddr+" uptime",
+		firstNonEmpty(e.StatusDuration, e.UptimeSeconds, e.Uptime),
+	)
 	if err != nil {
 		return bgpPeer{}, false, err
 	}
@@ -412,7 +433,10 @@ func (e panosBGPPeerEntry) toBGPPeer() (bgpPeer, bool, error) {
 	if err != nil {
 		return bgpPeer{}, false, err
 	}
-	flaps, err := parseRequiredPANOSIntField("BGP peer "+peerAddr+" flap-count", firstNonEmpty(e.StatusFlapCounts, e.FlapCount))
+	flaps, err := parseRequiredPANOSIntField(
+		"BGP peer "+peerAddr+" flap-count",
+		firstNonEmpty(e.StatusFlapCounts, e.FlapCount),
+	)
 	if err != nil {
 		return bgpPeer{}, false, err
 	}
@@ -436,6 +460,12 @@ func (e panosBGPPeerEntry) toBGPPeer() (bgpPeer, bool, error) {
 		Flaps:          flaps,
 		Established:    established,
 		HasUptime:      true,
+		HasMessagesIn:  true,
+		HasMessagesOut: true,
+		HasUpdatesIn:   true,
+		HasUpdatesOut:  true,
+		HasFlaps:       true,
+		HasEstablished: true,
 		PrefixCounters: prefixCounters,
 	}
 
@@ -527,15 +557,24 @@ func (e panosBGPPrefixEntry) toBGPPrefixCounter(peerAddr string) (bgpPrefixCount
 	if err != nil {
 		return bgpPrefixCounter{}, err
 	}
-	incomingAccepted, err := parseRequiredPANOSIntField("BGP peer "+peerAddr+" "+family+" incoming-accepted", e.IncomingAccepted)
+	incomingAccepted, err := parseRequiredPANOSIntField(
+		"BGP peer "+peerAddr+" "+family+" incoming-accepted",
+		e.IncomingAccepted,
+	)
 	if err != nil {
 		return bgpPrefixCounter{}, err
 	}
-	incomingRejected, err := parseRequiredPANOSIntField("BGP peer "+peerAddr+" "+family+" incoming-rejected", e.IncomingRejected)
+	incomingRejected, err := parseRequiredPANOSIntField(
+		"BGP peer "+peerAddr+" "+family+" incoming-rejected",
+		e.IncomingRejected,
+	)
 	if err != nil {
 		return bgpPrefixCounter{}, err
 	}
-	outgoingAdvertised, err := parseRequiredPANOSIntField("BGP peer "+peerAddr+" "+family+" outgoing-advertised", e.OutgoingAdvertised)
+	outgoingAdvertised, err := parseRequiredPANOSIntField(
+		"BGP peer "+peerAddr+" "+family+" outgoing-advertised",
+		e.OutgoingAdvertised,
+	)
 	if err != nil {
 		return bgpPrefixCounter{}, err
 	}
