@@ -187,9 +187,9 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 			},
 			pdus:              []gosnmp.SnmpPDU{topologySysDescrPDU("Linux appliance UniFi UDR7 5.1.19 ipq5322")},
 			wantProfileVendor: true,
-			wantProfileModel:  "UDR7",
+			wantProfileModel:  "UniFi UDR7",
 			wantVendor:        "Ubiquiti",
-			wantModel:         "UDR7",
+			wantModel:         "UniFi UDR7",
 		},
 		"U6 Mesh Pro access point falls back to the longest matching model": {
 			device: ddsnmp.DeviceConnectionInfo{
