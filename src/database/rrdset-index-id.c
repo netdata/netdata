@@ -191,6 +191,26 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     memset(st, 0, sizeof(RRDSET));
 }
 
+// Re-intern a chart metadata field only when the incoming raw value differs from the
+// already-stored one, and report whether it changed.
+//
+// *field holds the output of rrd_string_strdupz(), i.e. the sanitized form. So an exact
+// match against the raw incoming string means sanitizing it is a no-op and interning it
+// would hand back the very same STRING - the whole update is provably a no-op and can be
+// skipped. A mismatch (including one that only sanitizing would resolve) falls through to
+// the full path, so this is one-directional and cannot skip a real change.
+static inline bool rrdset_metadata_field_update(STRING **field, const char *value) {
+    if(!value || !*value || string_strcmp(*field, value) == 0)
+        return false;
+
+    STRING *old = *field;
+    *field = rrd_string_strdupz(value);
+    bool changed = (old != *field);
+    string_freez(old);
+
+    return changed;
+}
+
 // the item to be inserted, is already in the dictionary
 // this callback deals with the situation, migrating the existing object to the new values
 // the dictionary is write locked while this runs
@@ -212,53 +232,23 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
-    if(ctr->plugin && *ctr->plugin) {
-        STRING *old_plugin = st->plugin_name;
-        st->plugin_name = rrd_string_strdupz(ctr->plugin);
-        if (old_plugin != st->plugin_name)
-            ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
-        string_freez(old_plugin);
-    }
+    if(rrdset_metadata_field_update(&st->plugin_name, ctr->plugin))
+        ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
 
-    if(ctr->module && *ctr->module) {
-        STRING *old_module = st->module_name;
-        st->module_name = rrd_string_strdupz(ctr->module);
-        if (old_module != st->module_name)
-            ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
-        string_freez(old_module);
-    }
+    if(rrdset_metadata_field_update(&st->module_name, ctr->module))
+        ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
 
-    if(ctr->title && *ctr->title) {
-        STRING *old_title = st->title;
-        st->title = rrd_string_strdupz(ctr->title);
-        if(old_title != st->title)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_title);
-    }
+    if(rrdset_metadata_field_update(&st->title, ctr->title))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->units && *ctr->units) {
-        STRING *old_units = st->units;
-        st->units = rrd_string_strdupz(ctr->units);
-        if(old_units != st->units)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_units);
-    }
+    if(rrdset_metadata_field_update(&st->units, ctr->units))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->family && *ctr->family) {
-        STRING *old_family = st->family;
-        st->family = rrd_string_strdupz(ctr->family);
-        if(old_family != st->family)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_family);
-    }
+    if(rrdset_metadata_field_update(&st->family, ctr->family))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->context && *ctr->context) {
-        STRING *old_context = st->context;
-        st->context = rrd_string_strdupz(ctr->context);
-        if(old_context != st->context)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_context);
-    }
+    if(rrdset_metadata_field_update(&st->context, ctr->context))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
     if(st->chart_type != ctr->chart_type) {
         st->chart_type = ctr->chart_type;
