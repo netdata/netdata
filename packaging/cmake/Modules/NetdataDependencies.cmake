@@ -61,8 +61,6 @@ include_guard()
 
 pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
 
-pkg_check_modules(TLS IMPORTED_TARGET openssl)
-pkg_check_modules(CRYPTO IMPORTED_TARGET libcrypto)
 
 
 pkg_check_modules(UUID uuid)
@@ -139,14 +137,6 @@ pkg_check_modules(ELF libelf)
 
 if(NOT CURL_FOUND)
   message(FATAL_ERROR "libcurl >= 7.21 is required for building Netdata, but could not be found.")
-endif()
-
-if(NOT TARGET PkgConfig::TLS)
-  message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
-endif()
-
-if(NOT TARGET PkgConfig::CRYPTO)
-  message(FATAL_ERROR "libcrypto is required for building Netdata, but could not be found.")
 endif()
 
 if(NOT ZLIB_FOUND)
