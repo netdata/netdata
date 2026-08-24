@@ -13,6 +13,7 @@
 typedef struct query_point {
     STORAGE_POINT sp;
     NETDATA_DOUBLE value;
+    uint8_t tier;
     bool added;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
@@ -70,8 +71,8 @@ typedef struct query_engine_ops {
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
 
-    // the LATEST grouping with a single output point covering the metric's
-    // last stored sample is answered from the collector's cached value,
+    // the LATEST grouping with a single output point reached by the metric's
+    // latest collection interval is answered from the collector's cached value,
     // without querying the storage engine (no query plan is built)
     bool latest_fast_path;
     NETDATA_DOUBLE latest_fast_path_value;

@@ -328,7 +328,7 @@ This collector exposes real-time functions for interactive troubleshooting in th
 
 ### Top Queries
 
-Retrieves aggregated query statistics from ProxySQL's [stats_mysql_query_digest](https://proxysql.com/documentation/stats-statistics/#stats_mysql_query_digest) table.
+Retrieves aggregated query statistics from ProxySQL's [stats_mysql_query_digest](https://proxysql.com/documentation/the-admin-schemas/stats/stats-mysql/#stats_mysql_query_digest) table.
 
 This function queries the `stats_mysql_query_digest` table which stores runtime statistics for all queries proxied through ProxySQL, aggregated by query digest (normalized query pattern). It provides timing metrics, execution counts, and error statistics for each unique query pattern.
 

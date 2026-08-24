@@ -54,6 +54,8 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
+        src/daemon/unit_test_bridge.c
+        src/daemon/unit_test_bridge.h
         src/daemon/dyncfg/dyncfg.c
         src/daemon/dyncfg/dyncfg.h
         src/daemon/dyncfg/dyncfg-files.c

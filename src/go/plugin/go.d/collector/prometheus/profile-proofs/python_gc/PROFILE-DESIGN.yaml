@@ -4,6 +4,9 @@ version: v1
 profile: python_gc
 match: 'python_gc_*'
 namespace: process_runtime
+documentation:
+  title: Python garbage collection
+  summary: Curated collection, uncollectable-object, and collection-run metrics for each Python garbage-collector generation.
 composition:
   supports: {}
 entities:

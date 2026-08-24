@@ -19,9 +19,12 @@ modules:
         - proxy
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: go.d.plugin
+              module_name: prometheus
+              monitored_instance_name: HAProxy Prometheus
       info_provided_to_referring_integrations:
-        description: ""
+        description: Collects a fixed HAProxy metric set through the dedicated HAProxy collector.
     overview:
       data_collection:
         metrics_description: |

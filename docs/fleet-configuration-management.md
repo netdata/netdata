@@ -145,7 +145,7 @@ Through [Netdata Cloud and the Dynamic Configuration Manager](https://learn.netd
 When multiple configuration sources exist for the same component, Netdata applies them in the following priority order (highest to lowest):
 
 1. **[Dynamic Configuration (DynCfg)](https://learn.netdata.cloud/docs/netdata-agent/configuration/dynamic-configuration-manager)** - Runtime configurations via Netdata Cloud UI or API
-2. **[User Configuration](https://learn.netdata.cloud/docs/netdata-agent/configuration/configuration)** - Files in `/etc/netdata` or `/opt/netdata/etc/netdata`
+2. **[User Configuration](https://learn.netdata.cloud/docs/netdata-agent/configuration)** - Files in `/etc/netdata` or `/opt/netdata/etc/netdata`
 3. **Auto-discovered Configuration** - Settings from service discovery mechanisms
 4. **Stock Configuration** - Default configuration files shipped with Netdata
 5. **Internal Defaults** - Built-in defaults in the code
@@ -192,9 +192,9 @@ The go.d.plugin provides auto-discovery for 150+ applications through multiple m
 
 **Service discovery mechanisms**:
 - **Local network service discovery (netlistensd)** - Linux-only, uses `local-listeners` binary to detect listening services
-- **[Docker container discovery](https://learn.netdata.cloud/docs/collecting-metrics/container-services/docker) (dockersd)** - Discovers applications running in Docker containers
-- **[Kubernetes service discovery](https://learn.netdata.cloud/docs/netdata-agent/installation/kubernetes) (k8ssd)** - Discovers services running in Kubernetes pods
-- **[SNMP device discovery](https://learn.netdata.cloud/docs/collecting-metrics/network-devices/snmp) (snmpsd)** - Discovers and profiles SNMP-enabled network devices
+- **[Docker container discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/docker) (dockersd)** - Discovers applications running in Docker containers
+- **[Kubernetes service discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/kubernetes) (k8ssd)** - Discovers services running in Kubernetes pods
+- **[SNMP device discovery](https://learn.netdata.cloud/docs/collecting-metrics/service-discovery/discoverer/snmp) (snmpsd)** - Discovers and profiles SNMP-enabled network devices
 - **HTTP service discovery (http)** - Fetches JSON or YAML discovery items from an HTTP endpoint and creates collector jobs through service templates
 - **Configuration file scanning** - Detects applications based on their configuration files
 

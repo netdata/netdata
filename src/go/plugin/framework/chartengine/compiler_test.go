@@ -383,6 +383,32 @@ func TestCompileScenarios(t *testing.T) {
 				assert.False(t, charts[0].Dimensions[0].Selector.Matcher.Matches("mysql_queries", mapLabelView{}))
 			},
 		},
+		"transparent root does not shift nested family": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{{
+					Metrics: []string{"service_requests_total"},
+					Groups: []charttpl.Group{{
+						Family: "Requests",
+						Charts: []charttpl.Chart{{
+							Title:   "Requests",
+							Context: "requests",
+							Units:   "requests/s",
+							Dimensions: []charttpl.Dimension{{
+								Selector: "service_requests_total",
+								Name:     "requests",
+							}},
+						}},
+					}},
+				}},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, "Requests", charts[0].Meta.Family)
+			},
+		},
 		"infer histogram dimension name_from_label and parse instance selectors": {
 			rev: 7,
 			spec: charttpl.Spec{

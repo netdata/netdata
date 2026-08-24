@@ -336,7 +336,7 @@ modules:
               description: >
                 A list of SQL functions exposed as interactive table views in Netdata's Live tab.
                 Each function runs a SQL query and displays results in a filterable, sortable table.
-                See [Functions](#functions) for details.
+                See [Live Data](#live-data) for details.
               default_value: "[]"
               required: false
               group: Functions

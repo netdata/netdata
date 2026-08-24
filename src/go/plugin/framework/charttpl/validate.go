@@ -68,16 +68,28 @@ func Validate(s *Spec) (Validation, error) {
 	errs = append(errs, err)
 
 	for i := range s.Groups {
-		errs = append(errs, validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil))
+		errs = append(errs, validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil, false, false))
 	}
 	return Validation{autogenRules: rules}, errors.Join(errs...)
 }
 
-func validateGroup(group Group, path string, inheritedMetrics map[string]struct{}) error {
+func validateGroup(
+	group Group,
+	path string,
+	inheritedMetrics map[string]struct{},
+	inheritedFamily bool,
+	requireFamily bool,
+) error {
 	var errs []error
-	if strings.TrimSpace(group.Family) == "" {
-		errs = append(errs, semErr(path+".family", "must not be empty"))
+	family := strings.TrimSpace(group.Family)
+	if family == "" {
+		if requireFamily {
+			errs = append(errs, semErr(path+".family", "must not be empty"))
+		} else if group.Family != "" {
+			errs = append(errs, semErr(path+".family", "must not be whitespace-only"))
+		}
 	}
+	effectiveFamily := inheritedFamily || family != ""
 	errs = append(errs, validateChartDefaults(group.ChartDefaults, path))
 
 	ownMetrics := make(map[string]struct{}, len(group.Metrics))
@@ -102,10 +114,20 @@ func validateGroup(group Group, path string, inheritedMetrics map[string]struct{
 	}
 
 	for i := range group.Charts {
+		if !effectiveFamily && strings.TrimSpace(group.Charts[i].Family) == "" {
+			errs = append(errs, semErr(fmt.Sprintf("%s.charts[%d].family", path, i),
+				"must not be empty when no group family is set"))
+		}
 		errs = append(errs, validateChart(group.Charts[i], fmt.Sprintf("%s.charts[%d]", path, i), effective))
 	}
 	for i := range group.Groups {
-		errs = append(errs, validateGroup(group.Groups[i], fmt.Sprintf("%s.groups[%d]", path, i), effective))
+		errs = append(errs, validateGroup(
+			group.Groups[i],
+			fmt.Sprintf("%s.groups[%d]", path, i),
+			effective,
+			effectiveFamily,
+			true,
+		))
 	}
 	return errors.Join(errs...)
 }

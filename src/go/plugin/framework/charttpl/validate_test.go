@@ -831,6 +831,72 @@ func TestSpecValidateNilAndVersion(t *testing.T) {
 	assert.ErrorContains(t, err, "expected \"v1\"")
 }
 
+func TestSpecValidateRootGroupFamily(t *testing.T) {
+	tests := map[string]struct {
+		mutate  func(spec *Spec)
+		wantErr string
+	}{
+		"transparent root with named child": {
+			mutate: func(spec *Spec) {
+				root := &spec.Groups[0]
+				child := root.Clone()
+				child.Family = "Service"
+				root.Family = ""
+				root.Charts = nil
+				root.Groups = []Group{child}
+			},
+		},
+		"transparent root with chart family": {
+			mutate: func(spec *Spec) {
+				spec.Groups[0].Family = ""
+				spec.Groups[0].Charts[0].Family = "Service"
+			},
+		},
+		"transparent root rejects whitespace family": {
+			mutate: func(spec *Spec) {
+				root := &spec.Groups[0]
+				child := root.Clone()
+				child.Family = "Service"
+				root.Family = " "
+				root.Charts = nil
+				root.Groups = []Group{child}
+			},
+			wantErr: "groups[0].family",
+		},
+		"transparent root without effective chart family": {
+			mutate: func(spec *Spec) {
+				spec.Groups[0].Family = ""
+			},
+			wantErr: "groups[0].charts[0].family",
+		},
+		"nested group without family under transparent root": {
+			mutate: func(spec *Spec) {
+				root := &spec.Groups[0]
+				child := root.Clone()
+				child.Family = ""
+				root.Family = ""
+				root.Charts = nil
+				root.Groups = []Group{child}
+			},
+			wantErr: "groups[0].groups[0].family",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			spec := validationSpec()
+			tc.mutate(&spec)
+			err := spec.Validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
 func TestSpecValidateReportsAllSemanticErrors(t *testing.T) {
 	spec := Spec{
 		Version: VersionV1,

@@ -82,7 +82,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Enable Prometheus telemetry
 
-[Enable](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-prometheus_retention_time) telemetry on your Consul Agent, by increasing the value of `prometheus_retention_time` from `0`.
+[Enable](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/telemetry#telemetry-prometheus_retention_time) telemetry on your Consul Agent, by increasing the value of `prometheus_retention_time` from `0`.
 
 
 #### Add required ACLs to Token

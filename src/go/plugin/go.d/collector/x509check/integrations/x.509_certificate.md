@@ -133,6 +133,21 @@ sudo ./edit-config go.d/x509check.conf
 
 ##### Examples
 
+###### Ceph RGW certificate
+
+Check the certificate presented by a Ceph RGW HTTPS endpoint.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph_rgw_cert
+    source: https://rgw.example.org:443
+    check_revocation_status: yes
+
+```
+</details>
+
 ###### Website certificate
 
 Website certificate.

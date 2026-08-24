@@ -412,25 +412,406 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
+The built-in Prometheus profiles on this page define 17 curated charts across
+the primary and applicable supporting profiles.
+The catalogue is generated from the same profile design and runtime chart contracts used by the Agent.
 
-| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
-|---------------------------|-------------------------------------------|----------------------|-------------|
-| Gauge                     | for each label set                        | one, the metric name | absolute    |
-| Counter                   | for each label set                        | one, the metric name | incremental |
-| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
-| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
-| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
-| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
+Eligible metrics that are not covered by a curated chart, including future exporter metrics, can still be collected through
+the generic Prometheus autogeneration behavior. This catalogue describes curated profile coverage; it is not an allowlist of
+every metric that the collector can render.
 
-Untyped metrics (have no '# TYPE') processing:
+<details open data-prometheus-profile-catalog>
+<summary>Curated profile coverage (17 charts)</summary>
 
-- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
-- As Counter if it has suffix '_total'.
-- As Summary if it has 'quantile' label.
-- As Histogram if it has 'le' label.
 
-**The rest are ignored**.
+<details open data-prometheus-profile>
+<summary>FastAPI HTTP instrumentation — 9 charts</summary>
+
+
+Curated request outcomes, latency, in-progress work, measurements, and body traffic from instrumented FastAPI services.
+
+
+<details data-prometheus-profile-family>
+<summary>FastAPI (9 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>HTTP Endpoints (4 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Outcomes</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `requests/s`
+- **Dimensions:** `values of label status`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_requests_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Duration</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Measurements</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Completed Request Time</summary>
+
+
+- **Entity scope:** FastAPI HTTP endpoint and method
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>HTTP Service (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>High-Resolution HTTP Request Duration</summary>
+
+
+- **Entity scope:** instrumented FastAPI service
+- **Units:** `observations/s`
+- **Dimensions:** `matching series`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_highr_seconds_bucket`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Request Measurements</summary>
+
+
+- **Entity scope:** instrumented FastAPI service
+- **Units:** `requests/s`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_highr_seconds_count`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Completed Request Time</summary>
+
+
+- **Entity scope:** instrumented FastAPI service
+- **Units:** `seconds/s`
+- **Dimensions:** `time`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_request_duration_highr_seconds_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>HTTP In Progress (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Requests In Progress</summary>
+
+
+- **Entity scope:** FastAPI service, refined to HTTP endpoint and method when in-progress labels are enabled
+- **Units:** `requests`
+- **Dimensions:** `requests`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `http_requests_inprogress`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+<details data-prometheus-profile-family>
+<summary>HTTP Body Traffic (1 chart)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>HTTP Body Throughput</summary>
+
+
+- **Entity scope:** FastAPI HTTP route handler
+- **Units:** `bytes/s`
+- **Dimensions:** `request`, `response`
+<details><summary>Source metric selectors (2)</summary>
+
+
+- `http_request_size_bytes_sum`
+- `http_response_size_bytes_sum`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+<details open data-prometheus-profile>
+<summary>Process runtime — 5 charts</summary>
+
+
+Curated CPU, memory, file-descriptor, and lifecycle metrics exported by the monitored process.
+
+
+<details data-prometheus-profile-family>
+<summary>Process Runtime (5 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Process CPU Usage</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `cores`
+- **Dimensions:** `used`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_cpu_seconds_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Process Resident Memory</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `bytes`
+- **Dimensions:** `resident`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_resident_memory_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Process Virtual Memory</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `bytes`
+- **Dimensions:** `virtual`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_virtual_memory_bytes`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Open File Descriptors</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `fds`
+- **Dimensions:** `open`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_open_fds`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>File Descriptor Limit</summary>
+
+
+- **Entity scope:** collector job process
+- **Units:** `fds`
+- **Dimensions:** `limit`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `process_max_fds`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+<details open data-prometheus-profile>
+<summary>Python garbage collection — 3 charts</summary>
+
+
+Curated collection, uncollectable-object, and collection-run metrics for each Python garbage-collector generation.
+
+
+<details data-prometheus-profile-family>
+<summary>Process Runtime (3 charts)</summary>
+
+
+
+<details data-prometheus-profile-family>
+<summary>Python GC (3 charts)</summary>
+
+
+<details data-prometheus-profile-chart>
+<summary>Collected Objects</summary>
+
+
+- **Entity scope:** Python garbage-collector generation
+- **Units:** `objects/s`
+- **Dimensions:** `collected`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `python_gc_objects_collected_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Uncollectable Objects</summary>
+
+
+- **Entity scope:** Python garbage-collector generation
+- **Units:** `objects/s`
+- **Dimensions:** `uncollectable`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `python_gc_objects_uncollectable_total`
+
+</details>
+
+
+</details>
+
+<details data-prometheus-profile-chart>
+<summary>Collections</summary>
+
+
+- **Entity scope:** Python garbage-collector generation
+- **Units:** `collections/s`
+- **Dimensions:** `collections`
+<details><summary>Source metric selectors (1)</summary>
+
+
+- `python_gc_collections_total`
+
+</details>
+
+
+</details>
+
+
+
+</details>
+
+
+
+</details>
+
+
+</details>
+
+
+</details>
 
 
 
@@ -503,4 +884,9 @@ docker logs netdata 2>&1 | grep prometheus
 
 ### Disappearing or sparse metrics not clearing alerts
 
-When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
+The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
+and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or
+dimension makes its alerts `REMOVED`; this is not a normal `CLEAR` transition and does not send a recovery
+notification. Export an explicit normal value (for example `0`) whenever an alert needs a reliable recovery
+transition. A failed scrape does not advance the expiry lifetime; use the generic collector collection-failure
+alert to detect that separate condition.

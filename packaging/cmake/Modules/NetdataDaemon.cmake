@@ -172,6 +172,16 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 endif()
 
+if(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" AND
+   NOT CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set_property(
+                SOURCE src/daemon/unit_test_bridge.c
+                APPEND PROPERTY COMPILE_OPTIONS "-fno-lto" "-fvisibility=hidden")
+elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        message(WARNING
+                "Netdata test bridge cannot disable IPO for unsupported C compiler '${CMAKE_C_COMPILER_ID}'")
+endif()
+
 add_executable(netdata
         ${NETDATA_FILES}
         "${ACLK_FILES}"

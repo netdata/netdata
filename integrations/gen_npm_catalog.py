@@ -604,6 +604,7 @@ GENERIC_NAMES = {
     'net-snmp.yaml': 'Net-SNMP Host',
     'generic-ups.yaml': 'Generic UPS (UPS-MIB)',
     'meraki-cloud-controller.yaml': 'Cisco Meraki (Cloud Controller)',
+    'ubiquiti-net-snmp.yaml': 'Ubiquiti Net-SNMP Devices',
 }
 
 
