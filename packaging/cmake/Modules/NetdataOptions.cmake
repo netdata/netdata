@@ -203,6 +203,7 @@ if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
 
         set(ENABLE_BUNDLED_JSONC True)
         set(ENABLE_BUNDLED_YAML True)
+        set(ENABLE_BUNDLED_PROTOBUF True)
 endif()
 
 # A few payloads live in different packages per format: RPM keeps the
