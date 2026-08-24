@@ -13,6 +13,7 @@
 typedef struct query_point {
     STORAGE_POINT sp;
     NETDATA_DOUBLE value;
+    uint8_t tier;
     bool added;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
