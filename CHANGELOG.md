@@ -82,6 +82,23 @@
 - Docs: repair generated Learn link sources ([#23591](https://github.com/netdata/netdata/issues/23591))
 - Align documentation checks with Learn runtime ([#23593](https://github.com/netdata/netdata/issues/23593))
 - Regenerate integrations docs ([#23592](https://github.com/netdata/netdata/issues/23592))
+- Fix(go.d/snmp): identify qualified UniFi devices as Ubiquiti ([#23594](https://github.com/netdata/netdata/issues/23594))
+- Fix stale links in Agent documentation sources ([#23595](https://github.com/netdata/netdata/issues/23595))
+- Regenerate integrations docs ([#23596](https://github.com/netdata/netdata/issues/23596))
+- Add Ceph monitoring and alert coverage (Phase 1) ([#23551](https://github.com/netdata/netdata/issues/23551))
+- Order Ceph profile charts by operator priority ([#23599](https://github.com/netdata/netdata/issues/23599))
+- Correct Ceph integration examples and Prometheus expiry guidance ([#23601](https://github.com/netdata/netdata/issues/23601))
+- Regenerate integrations docs ([#23598](https://github.com/netdata/netdata/issues/23598))
+- Feat(go/charttpl): allow root groups without a family ([#23600](https://github.com/netdata/netdata/issues/23600))
+- Query contract corpus: layered black-box tests of the query engine ([#23130](https://github.com/netdata/netdata/issues/23130))
+- Feat(go/charttpl): inherit chart priority defaults ([#23602](https://github.com/netdata/netdata/issues/23602))
+- Fix(build): make AddressSanitizer detect pooled allocator use-after-free ([#23566](https://github.com/netdata/netdata/issues/23566))
+- Test(prometheus): clean up metadata-dependent tests ([#23605](https://github.com/netdata/netdata/issues/23605))
+- Chore(go.d/prometheus): flatten application profile families ([#23606](https://github.com/netdata/netdata/issues/23606))
+- Docs(prometheus): publish stock profile coverage ([#23607](https://github.com/netdata/netdata/issues/23607))
+- Docs(prometheus): emit MDX-safe profile details ([#23610](https://github.com/netdata/netdata/issues/23610))
+- Docs(prometheus): clarify generated profile catalogues ([#23611](https://github.com/netdata/netdata/issues/23611))
+- Docs(prometheus): clarify vLLM distribution questions ([#23613](https://github.com/netdata/netdata/issues/23613))
 
 ## [2.11.0] - 2026-08-12
 
