@@ -140,22 +140,27 @@ void dictionary_foreach_unlock(DICTFE *dfe) {
 void dictionary_foreach_done(DICTFE *dfe) {
     if(unlikely(!dfe || !dfe->dict)) return;
 
+    // work on a local copy: the dictionary of this traversal cannot change
+    // while we are tearing it down, and a single load keeps the null check
+    // above provably covering every use below
+    DICTIONARY *dict = dfe->dict;
+
     // the item we just did
     DICTIONARY_ITEM *item = dfe->item;
 
     // release it, so that it can possibly be deleted
     if(likely(item)) {
-        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dfe->dict, item, dfe->rw);
-        // item_release(dfe->dict, item);
+        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, dfe->rw);
+        // item_release(dict, item);
     }
 
     if(likely(dfe->rw != DICTIONARY_LOCK_REENTRANT) && dfe->locked) {
-        ll_recursive_unlock(dfe->dict, dfe->rw);
+        ll_recursive_unlock(dict, dfe->rw);
         dfe->locked = false;
     }
 
     // matches dictionary_api_enter() in dictionary_foreach_start_rw()
-    dictionary_api_exit(dfe->dict);
+    dictionary_api_exit(dict);
 
     dfe->dict = NULL;
     dfe->item = NULL;
