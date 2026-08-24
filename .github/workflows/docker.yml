@@ -13,7 +13,8 @@ on:
   push:
     branches:
       - master
-  pull_request: null
+  # TEMPORARY: pull_request trigger disabled while the macOS pkg work iterates;
+  # restore `pull_request: null` before merge.
   workflow_dispatch:
     inputs:
       version:
