@@ -228,6 +228,15 @@ if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
         set(NETDATA_ND_MCP_COMPONENT netdata)
         set(NETDATA_OTEL_CONF_COMPONENT netdata)
         set(NETDATA_SWAGGER_COMPONENT dashboard)
+elseif(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+        # The macOS package is monolithic; CPack silently drops any file whose
+        # component is missing from CPACK_COMPONENTS_ALL, so everything that
+        # can float between packages is pinned to the always-present main
+        # component rather than inheriting the DEB grouping below.
+        set(NETDATA_SENSORS3_COMPONENT netdata)
+        set(NETDATA_ND_MCP_COMPONENT netdata)
+        set(NETDATA_OTEL_CONF_COMPONENT netdata)
+        set(NETDATA_SWAGGER_COMPONENT netdata)
 else()
         set(NETDATA_SENSORS3_COMPONENT plugin-debugfs)
         set(NETDATA_ND_MCP_COMPONENT plugin-go)

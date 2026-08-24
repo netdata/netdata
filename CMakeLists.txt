@@ -327,4 +327,7 @@ if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
   include(NetdataBash)
   netdata_bundle_bash()
   netdata_add_macos_shebang_rewrite()
+
+  include(NetdataMacOSPackage)
+  netdata_add_macos_package_target()
 endif()

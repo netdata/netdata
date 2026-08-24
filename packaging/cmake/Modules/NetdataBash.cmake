@@ -69,10 +69,14 @@ endfunction()
 # package so it runs after every script has been staged; scripts then run
 # correctly however they are invoked, with no reliance on PATH ordering.
 function(netdata_add_macos_shebang_rewrite)
+        # CMAKE_INSTALL_PREFIX is expanded at install time on purpose: CPack
+        # re-runs the install rules with the prefix pointed into its staging
+        # area, while a direct `cmake --install` combines DESTDIR with the
+        # configured prefix. The interpreter path is the runtime one either way.
         install(CODE "
                 execute_process(
                         COMMAND \"${CMAKE_SOURCE_DIR}/packaging/macos/rewrite-shebangs.sh\"
-                                \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}\"
+                                \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}\"
                                 \"${NETDATA_RUNTIME_PREFIX}/bin/bash\"
                         RESULT_VARIABLE _rewrite_rc
                 )
