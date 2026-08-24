@@ -54,7 +54,6 @@ every metric that the collector can render.
 {% details summary="[[ chart.title|e ]]" %}
 [% endif %]
 
-- **Operator question:** [[ chart.question ]]
 - **Entity scope:** [[ chart.entity_scope ]]
 - **Units:** `[[ chart.units ]]`
 - **Dimensions:** [% for dimension in chart.dimensions|unique(case_sensitive=true, attribute='name') %]`[[ dimension.name ]]`[% if not loop.last %], [% endif %][% endfor %]

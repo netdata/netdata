@@ -192,11 +192,17 @@ def _join_profile_charts(profile, design, runtime):
             raise ProfileCoverageError(
                 f'Profile {profile!r} view {context!r} references unknown entity {entity_id!r}.'
             )
-        chart = deepcopy(runtime_chart)
-        chart['question'] = _require_text(view.get('question'), f'view {context!r} question', profile)
-        chart['entity_scope'] = _require_text(
-            entities[entity_id].get('grain'), f'entity {entity_id!r} grain', profile
-        )
+        chart = {
+            'context': runtime_chart['context'],
+            'title': runtime_chart['title'],
+            'family': runtime_chart['family'],
+            'units': runtime_chart['units'],
+            'dimensions': runtime_chart['dimensions'],
+            'selectors': runtime_chart['selectors'],
+            'entity_scope': _require_text(
+                entities[entity_id].get('grain'), f'entity {entity_id!r} grain', profile
+            ),
+        }
         charts.append(chart)
     return charts
 
