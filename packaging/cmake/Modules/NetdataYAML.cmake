@@ -18,6 +18,10 @@ function(netdata_bundle_libyaml)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
 
+        # libyaml 0.2.5 declares a CMake floor below 3.5, which CMake >= 4.0
+        # rejects outright instead of configuring in compatibility mode.
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
         set(repo https://github.com/yaml/libyaml)
         set(tag 2c891fc7a770e8ba2fec34fc6b545c672beb37e6) # v0.2.5
 

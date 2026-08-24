@@ -144,15 +144,14 @@ mark_as_advanced(NETDATA_SENTRY_ENVIRONMENT NETDATA_SENTRY_DIST NETDATA_SENTRY_D
 
 # One enum selects the install-tree layout: bundle (self-contained - the static
 # installer, kickstart-from-source, dev builds, plain cmake --install), or a
-# native package kind. A future macOS pkg is a new value here, not a scheme
-# change. packaging/build-package.sh passes deb/rpm; the Windows build scripts
-# pass msi.
+# native package kind. packaging/build-package.sh passes deb/rpm; the Windows
+# build scripts pass msi; pkg is the native macOS package.
 set(NETDATA_PACKAGE_KIND "bundle" CACHE STRING
-    "Install-tree layout: bundle (self-contained), deb, rpm, msi")
-set_property(CACHE NETDATA_PACKAGE_KIND PROPERTY STRINGS bundle deb rpm msi)
+    "Install-tree layout: bundle (self-contained), deb, rpm, msi, pkg")
+set_property(CACHE NETDATA_PACKAGE_KIND PROPERTY STRINGS bundle deb rpm msi pkg)
 mark_as_advanced(NETDATA_PACKAGE_KIND)
-if(NOT NETDATA_PACKAGE_KIND MATCHES "^(bundle|deb|rpm|msi)$")
-        message(FATAL_ERROR "Invalid NETDATA_PACKAGE_KIND '${NETDATA_PACKAGE_KIND}' (expected bundle, deb, rpm, or msi)")
+if(NOT NETDATA_PACKAGE_KIND MATCHES "^(bundle|deb|rpm|msi|pkg)$")
+        message(FATAL_ERROR "Invalid NETDATA_PACKAGE_KIND '${NETDATA_PACKAGE_KIND}' (expected bundle, deb, rpm, msi, or pkg)")
 endif()
 
 # The two names the enum replaced die loudly, not silently: CMake answers an
@@ -181,6 +180,22 @@ endif()
 # the configure fails fast.
 if(NETDATA_PACKAGE_KIND STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
         message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
+endif()
+
+# The native macOS package is Apple Silicon only, permanently, and its payload
+# must run on a clean machine: nothing outside /usr/lib, /System/Library and
+# the payload itself (packaging/macos/artifact-gate.sh enforces this). The
+# kind therefore forces vendored copies of every third-party library instead
+# of whatever pkg-config finds on the build host - there are no per-library
+# toggles for it, the set below IS the mode, and it grows as bundling support
+# for the remaining libraries lands.
+if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+        if(NOT OS_MACOS OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+                message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg builds the native macOS package and requires arm64 macOS; this is ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
+        endif()
+
+        set(ENABLE_BUNDLED_JSONC True)
+        set(ENABLE_BUNDLED_YAML True)
 endif()
 
 # A few payloads live in different packages per format: RPM keeps the
