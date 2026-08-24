@@ -1,0 +1,113 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Xquik collector configuration.",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 300
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "user": {
+        "title": "X user",
+        "description": "X username without @, or a numeric user ID.",
+        "type": "string",
+        "pattern": "^(?:[A-Za-z0-9_]{1,15}|[0-9]{16,20})$"
+      },
+      "url": {
+        "title": "Xquik API URL",
+        "description": "Xquik REST API base URL. Production endpoints must use HTTPS. HTTP is accepted only for loopback test endpoints.",
+        "type": "string",
+        "format": "uri",
+        "default": "https://xquik.com/api/v1"
+      },
+      "api_key": {
+        "title": "API key",
+        "description": "Xquik API key.",
+        "type": "string",
+        "sensitive": true,
+        "minLength": 1
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "HTTP request timeout.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "HTTP proxy URL. Empty value uses environment proxy variables.",
+        "type": "string"
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "user",
+      "api_key"
+    ]
+  },
+  "uiSchema": {
+    "api_key": {
+      "ui:widget": "password"
+    },
+    "user": {
+      "ui:placeholder": "netdata"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry"
+          ]
+        },
+        {
+          "title": "Target",
+          "fields": [
+            "user",
+            "url"
+          ]
+        },
+        {
+          "title": "Authentication",
+          "fields": [
+            "api_key"
+          ]
+        },
+        {
+          "title": "HTTP",
+          "fields": [
+            "timeout",
+            "proxy_url"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
+    }
+  }
+}

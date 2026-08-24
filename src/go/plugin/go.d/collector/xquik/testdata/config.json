@@ -1,0 +1,26 @@
+{
+  "vnode": "ok",
+  "update_every": 300,
+  "autodetection_retry": 5,
+  "user": "netdata",
+  "api_key": "ok",
+  "url": "https://xquik.com/api/v1",
+  "username": "netdata",
+  "password": "secret",
+  "bearer_token_file": "/tmp/xquik-token",
+  "proxy_username": "proxy-user",
+  "proxy_password": "proxy-secret",
+  "method": "POST",
+  "headers": {
+    "X-Test": "test"
+  },
+  "body": "test",
+  "timeout": 30,
+  "not_follow_redirects": true,
+  "proxy_url": "http://proxy.local:8080",
+  "tls_ca": "/tmp/ca.pem",
+  "tls_cert": "/tmp/cert.pem",
+  "tls_key": "/tmp/key.pem",
+  "tls_skip_verify": true,
+  "force_http2": true
+}

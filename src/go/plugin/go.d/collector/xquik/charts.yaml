@@ -1,0 +1,39 @@
+version: v1
+context_namespace: xquik
+groups:
+  - family: account
+    metrics:
+      - followers
+      - following
+      - statuses_total
+      - verification_status
+    chart_defaults:
+      instances:
+        by_labels: [user_id]
+      label_promotion: [username, name]
+    charts:
+      - id: account_audience
+        title: X account audience
+        context: account_audience
+        units: accounts
+        type: line
+        dimensions:
+          - selector: followers
+            name: followers
+          - selector: following
+            name: following
+      - id: account_posts
+        title: X account posting rate
+        context: account_posts
+        units: posts/s
+        type: line
+        dimensions:
+          - selector: statuses_total
+            name: posts
+      - id: account_verification_status
+        title: X account verification status
+        context: account_verification_status
+        units: status
+        type: line
+        dimensions:
+          - selector: verification_status
