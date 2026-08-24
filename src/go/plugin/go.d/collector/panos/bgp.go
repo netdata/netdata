@@ -29,6 +29,7 @@ const (
 	logKeyBGPLegacy      = "panos:bgp:legacy"
 	logKeyBGPAdvanced    = "panos:bgp:advanced"
 	logKeyBGPSummary     = "panos:bgp:summary"
+	logKeyBGPIdentity    = "panos:bgp:identity"
 )
 
 var advancedBGPPeerCommands = []string{
@@ -69,10 +70,10 @@ type bgpPeer struct {
 	HasEstablished bool
 	PrefixCounters []bgpPrefixCounter
 
-	// routerID is the ARE logical-router BGP router-id captured from the JSON
-	// path, used to resolve the vr label to the logical-router name via the
-	// summary lookup. Empty for legacy/XML peers, which already carry their vr.
-	routerID string
+	// ARE peers require summary-based VR resolution even when routerID is absent.
+	// XML peers already carry their final VR and leave needsVRResolve false.
+	needsVRResolve bool
+	routerID       string
 }
 
 type bgpPrefixCounter struct {

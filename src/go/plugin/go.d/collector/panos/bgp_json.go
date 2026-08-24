@@ -67,14 +67,21 @@ func parseAdvancedBGPPeersJSON(payload []byte) ([]bgpPeer, error) {
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return nil, fmt.Errorf("parse PAN-OS advanced-routing BGP JSON: %w", err)
 	}
+	if raw == nil {
+		return nil, errors.New("parse PAN-OS advanced-routing BGP JSON: must be a JSON object")
+	}
 
 	peers := make([]bgpPeer, 0, len(raw))
 	seen := make(map[string]bool, len(raw))
 	var errs []error
 	for name, data := range raw {
-		var f frrBGPPeer
+		var f *frrBGPPeer
 		if err := json.Unmarshal(data, &f); err != nil {
 			errs = append(errs, fmt.Errorf("BGP peer %q: %w", name, err))
+			continue
+		}
+		if f == nil {
+			errs = append(errs, fmt.Errorf("BGP peer %q: must be a JSON object", name))
 			continue
 		}
 		peer, ok := f.toBGPPeer(name)
@@ -98,12 +105,13 @@ func (f frrBGPPeer) toBGPPeer(name string) (bgpPeer, bool) {
 	}
 
 	peer := bgpPeer{
-		routerID:     strings.TrimSpace(f.Detail.LocalRouterID),
-		PeerAddress:  peerAddr,
-		LocalAddress: normalizeAddress(f.LocalIP),
-		RemoteAS:     strings.TrimSpace(f.RemoteAS.String()),
-		PeerGroup:    strings.TrimSpace(f.PeerGroupName),
-		State:        normalizeBGPState(firstNonEmpty(f.State, f.Detail.BGPState)),
+		needsVRResolve: true,
+		routerID:       strings.TrimSpace(f.Detail.LocalRouterID),
+		PeerAddress:    peerAddr,
+		LocalAddress:   normalizeAddress(f.LocalIP),
+		RemoteAS:       strings.TrimSpace(f.RemoteAS.String()),
+		PeerGroup:      strings.TrimSpace(f.PeerGroupName),
+		State:          normalizeBGPState(firstNonEmpty(f.State, f.Detail.BGPState)),
 	}
 
 	if f.Detail.BGPTimerUpMsec != nil {
@@ -172,51 +180,69 @@ func splitFRRAddressFamily(name string) (afi, safi string) {
 	}
 }
 
-func parseBGPSummary(body []byte) (map[string]string, error) {
+type bgpRouterSummary struct {
+	names     map[string]string
+	ambiguous map[string]bool
+}
+
+func parseBGPSummary(body []byte) (bgpRouterSummary, error) {
 	innerXML, err := decodePANOSResultInner(body, "PAN-OS BGP summary response")
 	if err != nil {
-		return nil, err
+		return bgpRouterSummary{}, err
 	}
 	payload, ok := extractResultJSON(innerXML)
 	if !ok {
-		return nil, errors.New("PAN-OS advanced-routing BGP summary response has no JSON payload")
+		return bgpRouterSummary{}, errors.New("PAN-OS advanced-routing BGP summary response has no JSON payload")
 	}
 
 	var raw map[string]struct {
 		RouterID string `json:"router-id"`
 	}
 	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
-		return nil, fmt.Errorf("parse PAN-OS advanced-routing BGP summary JSON: %w", err)
+		return bgpRouterSummary{}, fmt.Errorf("parse PAN-OS advanced-routing BGP summary JSON: %w", err)
+	}
+	if raw == nil {
+		return bgpRouterSummary{}, errors.New("parse PAN-OS advanced-routing BGP summary JSON: must be a JSON object")
 	}
 
-	byRouterID := make(map[string]string, len(raw))
-	ambiguous := make(map[string]bool)
+	summary := bgpRouterSummary{
+		names:     make(map[string]string, len(raw)),
+		ambiguous: make(map[string]bool),
+	}
 	for lrName, lr := range raw {
 		id := strings.TrimSpace(lr.RouterID)
 		name := strings.TrimSpace(lrName)
-		if id == "" || name == "" || ambiguous[id] {
+		if id == "" || name == "" || summary.ambiguous[id] {
 			continue
 		}
-		if _, ok := byRouterID[id]; ok {
-			delete(byRouterID, id)
-			ambiguous[id] = true
+		if _, ok := summary.names[id]; ok {
+			delete(summary.names, id)
+			summary.ambiguous[id] = true
 			continue
 		}
-		byRouterID[id] = name
+		summary.names[id] = name
 	}
-	return byRouterID, nil
+	return summary, nil
 }
 
 func (c *Collector) enrichBGPPeerVRs(ctx context.Context, peers []bgpPeer) ([]bgpPeer, error) {
-	needsResolve := false
+	needsSummary := false
 	for i := range peers {
-		if peers[i].routerID != "" {
-			needsResolve = true
+		if peers[i].needsVRResolve && peers[i].routerID != "" {
+			needsSummary = true
 			break
 		}
 	}
-	if !needsResolve {
-		return peers, nil
+	if !needsSummary {
+		c.bgpRouterNames = nil
+		resolved := resolveBGPPeerVRs(peers, nil)
+		c.logUnresolvedBGPPeers(
+			"PAN-OS Advanced Routing Engine BGP peer identities are incomplete",
+			len(peers)-len(resolved),
+			0,
+			0,
+		)
+		return resolved, nil
 	}
 	if err := contextError(ctx); err != nil {
 		return nil, err
@@ -227,31 +253,85 @@ func (c *Collector) enrichBGPPeerVRs(ctx context.Context, peers []bgpPeer) ([]bg
 		return nil, ctxErr
 	}
 	if err != nil {
+		c.bgpRouterNames, _, _ = mergeBGPRouterNames(peers, c.bgpRouterNames, bgpRouterSummary{})
+		resolved := resolveBGPPeerVRs(peers, c.bgpRouterNames)
 		c.Limit(logKeyBGPSummary, 1, recurringLogEvery).
-			Warningf("PAN-OS advanced-routing BGP summary query failed; retaining last successful logical-router mapping where available: %v", sanitizePANOSAPIError(err))
-		return resolveBGPPeerVRs(peers, c.bgpRouterNames), nil
+			Warningf("PAN-OS advanced-routing BGP summary query failed; retaining last successful logical-router mapping where available (withheld_peers=%d): %v", len(peers)-len(resolved), sanitizePANOSAPIError(err))
+		return resolved, nil
 	}
-	byRouterID, err := parseBGPSummary(body)
+	summary, err := parseBGPSummary(body)
 	if err != nil {
+		c.bgpRouterNames, _, _ = mergeBGPRouterNames(peers, c.bgpRouterNames, bgpRouterSummary{})
+		resolved := resolveBGPPeerVRs(peers, c.bgpRouterNames)
 		c.Limit(logKeyBGPSummary, 1, recurringLogEvery).
-			Warningf("PAN-OS advanced-routing BGP summary parse failed; retaining last successful logical-router mapping where available: %v", err)
-		return resolveBGPPeerVRs(peers, c.bgpRouterNames), nil
+			Warningf("PAN-OS advanced-routing BGP summary parse failed; retaining last successful logical-router mapping where available (withheld_peers=%d): %v", len(peers)-len(resolved), err)
+		return resolved, nil
 	}
-	c.bgpRouterNames = byRouterID
-	return resolveBGPPeerVRs(peers, c.bgpRouterNames), nil
+	var missingIDs, ambiguousIDs int
+	c.bgpRouterNames, missingIDs, ambiguousIDs = mergeBGPRouterNames(peers, c.bgpRouterNames, summary)
+	resolved := resolveBGPPeerVRs(peers, c.bgpRouterNames)
+	c.logUnresolvedBGPPeers(
+		"PAN-OS advanced-routing BGP summary is incomplete",
+		len(peers)-len(resolved),
+		missingIDs,
+		ambiguousIDs,
+	)
+	return resolved, nil
+}
+
+func mergeBGPRouterNames(
+	peers []bgpPeer,
+	previous map[string]string,
+	summary bgpRouterSummary,
+) (next map[string]string, missingIDs, ambiguousIDs int) {
+	current := make(map[string]bool)
+	for _, peer := range peers {
+		if peer.needsVRResolve && peer.routerID != "" {
+			current[peer.routerID] = true
+		}
+	}
+
+	next = make(map[string]string, len(current))
+	for id := range current {
+		if summary.ambiguous[id] {
+			ambiguousIDs++
+			continue
+		}
+		if name, ok := summary.names[id]; ok {
+			next[id] = name
+			continue
+		}
+		missingIDs++
+		if name, ok := previous[id]; ok {
+			next[id] = name
+		}
+	}
+	return next, missingIDs, ambiguousIDs
 }
 
 func resolveBGPPeerVRs(peers []bgpPeer, byRouterID map[string]string) []bgpPeer {
 	resolved := peers[:0]
 	for _, peer := range peers {
-		if peer.routerID == "" {
+		if !peer.needsVRResolve {
 			resolved = append(resolved, peer)
 			continue
 		}
-		if name, ok := byRouterID[peer.routerID]; ok {
+		if peer.routerID != "" {
+			name, ok := byRouterID[peer.routerID]
+			if !ok {
+				continue
+			}
 			peer.VR = name
 			resolved = append(resolved, peer)
 		}
 	}
 	return resolved
+}
+
+func (c *Collector) logUnresolvedBGPPeers(reason string, withheldPeers, missingIDs, ambiguousIDs int) {
+	if withheldPeers == 0 && missingIDs == 0 && ambiguousIDs == 0 {
+		return
+	}
+	c.Limit(logKeyBGPIdentity, 1, recurringLogEvery).
+		Warningf("%s (missing_router_ids=%d, ambiguous_router_ids=%d, withheld_peers=%d)", reason, missingIDs, ambiguousIDs, withheldPeers)
 }

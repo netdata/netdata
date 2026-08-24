@@ -483,7 +483,7 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
-		"advanced BGP fallback": {
+		"advanced-routing XML BGP fallback": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
 					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
@@ -494,7 +494,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			steps: []collectStep{
 				{
-					name: "collects ARE peers after legacy empty success",
+					name: "collects advanced-routing XML peers after legacy empty success",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "openconfirm", advancedPeerLabels()):                  1,
 						metricKey("bgp_peer_uptime", advancedPeerLabels()):                                     93784,
@@ -639,6 +639,153 @@ func TestCollector_Collect(t *testing.T) {
 						),
 					},
 					wantLog: []string{"summary unavailable"},
+				},
+				{
+					name: "null summary retains known logical-router identities",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.errors = nil
+						api.responses[advancedBGPSummaryCommand] = []byte(
+							`<response status="success"><result><json>null</json></result></response>`,
+						)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+				},
+				{
+					name: "empty summary retains known logical-router identities",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPSummaryCommand] = []byte(
+							`<response status="success"><result><json>{}</json></result></response>`,
+						)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("192.0.2.2", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+					wantLog: []string{"summary is incomplete"},
+				},
+				{
+					name: "partial summary updates present names and retains missing identities",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPSummaryCommand] = []byte(`<response status="success"><result><json>{
+                            "lr-a-renamed": {"router-id": "192.0.2.1"}
+                        }</json></result></response>`)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-a-renamed", "192.0.2.10", "192.0.2.9", "65010", "edge")): 1,
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")):   1,
+					},
+				},
+				{
+					name: "ambiguous current router ID is withheld instead of reusing its cache",
+					setup: func(_ *Collector, api *mockAPIClient) {
+						api.responses[advancedBGPSummaryCommand] = []byte(`<response status="success"><result><json>{
+                            "lr-a-renamed": {"router-id": "192.0.2.1"},
+                            "lr-b": {"router-id": "192.0.2.2"},
+                            "lr-c": {"router-id": "192.0.2.2"}
+                        }</json></result></response>`)
+					},
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-a-renamed", "192.0.2.10", "192.0.2.9", "65010", "edge")): 1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("192.0.2.2", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+					},
+				},
+			},
+		},
+		"ARE JSON peers without router IDs are withheld": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				payload := strings.Replace(
+					string(dataAdvancedBGPPeersARE),
+					`"remoteRouterId": "0.0.0.0",
+        "localRouterId": "192.0.2.2",`,
+					`"remoteRouterId": "0.0.0.0",
+        "localRouterId": null,`,
+					1,
+				)
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: []byte(payload),
+					advancedBGPSummaryCommand:  dataAdvancedBGPSummary,
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "mixed response keeps resolved peers and withholds null router ID",
+					wantMetrics: map[string]metrix.SampleValue{
+						stateMetricKey("bgp_peer_state", "established", arePeerLabels("lr-b", "198.51.100.10", "198.51.100.9", "65020", "core")): 1,
+					},
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"connect",
+							arePeerLabels("default", "203.0.113.10", "unknown", "65030", "core"),
+						),
+					},
+					wantLog: []string{"withheld_peers=1"},
+				},
+			},
+		},
+		"ARE JSON response with all router IDs missing is withheld": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				payload := strings.ReplaceAll(string(dataAdvancedBGPPeersARE), `        "localRouterId": "192.0.2.1",
+`, "")
+				payload = strings.ReplaceAll(payload, `        "localRouterId": "192.0.2.2",
+`, "")
+				api.responses = map[string][]byte{
+					legacyBGPPeerCommand:       []byte(`<response status="success"><result></result></response>`),
+					advancedBGPPeerCommands[0]: []byte(payload),
+				}
+			},
+			steps: []collectStep{
+				{
+					name: "does not publish fabricated default VR series",
+					wantMissing: []string{
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("default", "192.0.2.10", "192.0.2.9", "65010", "edge"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"established",
+							arePeerLabels("default", "198.51.100.10", "198.51.100.9", "65020", "core"),
+						),
+						stateMetricKey(
+							"bgp_peer_state",
+							"connect",
+							arePeerLabels("default", "203.0.113.10", "unknown", "65030", "core"),
+						),
+					},
+					wantLog: []string{"withheld_peers=3"},
+					check: func(t *testing.T, _ *Collector, api *mockAPIClient, _ map[string]metrix.SampleValue) {
+						assert.Equal(t, []string{
+							systemInfoCommand,
+							haStateCommand,
+							environmentCommand,
+							licenseInfoCommand,
+							ipsecSACommand,
+							legacyBGPPeerCommand,
+							advancedBGPPeerCommands[0],
+						}, api.commands)
+					},
 				},
 			},
 		},
@@ -933,7 +1080,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			steps: []collectStep{
 				{
-					name: "collects ARE peers from second supported command",
+					name: "collects advanced-routing XML peers from second supported command",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "openconfirm", advancedPeerLabels()): 1,
 					},
@@ -955,7 +1102,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			steps: []collectStep{
 				{
-					name: "collects ARE peers from third supported command",
+					name: "collects advanced-routing XML peers from third supported command",
 					wantMetrics: map[string]metrix.SampleValue{
 						stateMetricKey("bgp_peer_state", "openconfirm", advancedPeerLabels()): 1,
 					},
@@ -2064,6 +2211,7 @@ func TestParseBGPPeers(t *testing.T) {
 
 				est := byName["198.51.100.10"]
 				assert.Empty(t, est.VR, "unresolved router IDs must not become public vr labels")
+				assert.True(t, est.needsVRResolve)
 				assert.Equal(t, "192.0.2.2", est.routerID)
 				assert.Equal(t, "established", est.State)
 				assert.Equal(t, "65020", est.RemoteAS)
@@ -2099,6 +2247,10 @@ func TestParseBGPPeers(t *testing.T) {
 				assert.Equal(t, int64(0), con.PrefixCounters[0].IncomingAccepted)
 				assert.False(t, con.PrefixCounters[0].HasOutgoingAdvertised)
 			},
+		},
+		"advanced routing engine null peer entry": {
+			data:    []byte(`<response status="success"><result><json>{"peer-a": null}</json></result></response>`),
+			wantErr: `BGP peer "peer-a": must be a JSON object`,
 		},
 		"error response with nested lines": {
 			data: []byte(
@@ -2278,16 +2430,18 @@ func TestParseBGPPeers(t *testing.T) {
 
 func TestParseBGPSummary(t *testing.T) {
 	tests := map[string]struct {
-		data    []byte
-		want    map[string]string
-		wantErr string
+		data          []byte
+		wantNames     map[string]string
+		wantAmbiguous map[string]bool
+		wantErr       string
 	}{
 		"advanced routing engine summary": {
 			data: dataAdvancedBGPSummary,
-			want: map[string]string{
+			wantNames: map[string]string{
 				"192.0.2.1": "lr-a",
 				"192.0.2.2": "lr-b",
 			},
+			wantAmbiguous: map[string]bool{},
 		},
 		"non-json result yields no mapping": {
 			data:    []byte(`<response status="success"><result><entry/></result></response>`),
@@ -2298,7 +2452,12 @@ func TestParseBGPSummary(t *testing.T) {
                 "lr-a": {"router-id": "192.0.2.1"},
                 "lr-b": {"router-id": "192.0.2.1"}
             }</json></result></response>`),
-			want: map[string]string{},
+			wantNames:     map[string]string{},
+			wantAmbiguous: map[string]bool{"192.0.2.1": true},
+		},
+		"null summary is not an object": {
+			data:    []byte(`<response status="success"><result><json>null</json></result></response>`),
+			wantErr: "must be a JSON object",
 		},
 		"error response": {
 			data:    []byte(`<response status="error" code="16"><msg><line>Unauthorized</line></msg></response>`),
@@ -2314,7 +2473,8 @@ func TestParseBGPSummary(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, got)
+			assert.Equal(t, tc.wantNames, got.names)
+			assert.Equal(t, tc.wantAmbiguous, got.ambiguous)
 		})
 	}
 }
@@ -2322,15 +2482,16 @@ func TestParseBGPSummary(t *testing.T) {
 func TestCollector_enrichBGPPeerVRs(t *testing.T) {
 	t.Run("resolves logical-router names from summary", func(t *testing.T) {
 		collr := New()
+		collr.Logger = logger.NewWithWriter(&bytes.Buffer{})
 		api := &mockAPIClient{
 			responses: map[string][]byte{advancedBGPSummaryCommand: dataAdvancedBGPSummary},
 		}
 		collr.apiClient = api
 
 		peers := []bgpPeer{
-			{routerID: "192.0.2.1", PeerAddress: "192.0.2.10"},
-			{routerID: "192.0.2.2", PeerAddress: "198.51.100.10"},
-			{routerID: "192.0.2.9", PeerAddress: "203.0.113.10"},
+			{needsVRResolve: true, routerID: "192.0.2.1", PeerAddress: "192.0.2.10"},
+			{needsVRResolve: true, routerID: "192.0.2.2", PeerAddress: "198.51.100.10"},
+			{needsVRResolve: true, routerID: "192.0.2.9", PeerAddress: "203.0.113.10"},
 		}
 		resolved, err := collr.enrichBGPPeerVRs(context.Background(), peers)
 		require.NoError(t, err)
@@ -2341,7 +2502,7 @@ func TestCollector_enrichBGPPeerVRs(t *testing.T) {
 		assert.Equal(t, map[string]string{"192.0.2.1": "lr-a", "192.0.2.2": "lr-b"}, collr.bgpRouterNames)
 	})
 
-	t.Run("skips peers without a router-id", func(t *testing.T) {
+	t.Run("skips summary lookup for XML peers", func(t *testing.T) {
 		collr := New()
 		api := &mockAPIClient{
 			responses: map[string][]byte{advancedBGPSummaryCommand: dataAdvancedBGPSummary},
@@ -2367,7 +2528,7 @@ func TestCollector_enrichBGPPeerVRs(t *testing.T) {
 		}
 		collr.apiClient = api
 
-		peers := []bgpPeer{{routerID: "192.0.2.1", PeerAddress: "192.0.2.32"}}
+		peers := []bgpPeer{{needsVRResolve: true, routerID: "192.0.2.1", PeerAddress: "192.0.2.32"}}
 		resolved, err := collr.enrichBGPPeerVRs(context.Background(), peers)
 		require.NoError(t, err)
 		assert.Empty(t, resolved)
@@ -2384,11 +2545,52 @@ func TestCollector_enrichBGPPeerVRs(t *testing.T) {
 		}
 		collr.apiClient = api
 
-		peers := []bgpPeer{{routerID: "192.0.2.1", PeerAddress: "192.0.2.32"}}
+		peers := []bgpPeer{{needsVRResolve: true, routerID: "192.0.2.1", PeerAddress: "192.0.2.32"}}
 		resolved, err := collr.enrichBGPPeerVRs(context.Background(), peers)
 		require.NoError(t, err)
 		require.Len(t, resolved, 1)
 		assert.Equal(t, "lr-a", resolved[0].VR)
+	})
+}
+
+func TestMergeBGPRouterNames(t *testing.T) {
+	peers := []bgpPeer{
+		{needsVRResolve: true, routerID: "192.0.2.1"},
+		{needsVRResolve: true, routerID: "192.0.2.2"},
+		{needsVRResolve: true},
+		{VR: "legacy"},
+	}
+	previous := map[string]string{
+		"192.0.2.1": "lr-a-old",
+		"192.0.2.2": "lr-b",
+		"192.0.2.9": "stale",
+	}
+
+	t.Run("updates present IDs, retains missing IDs, and drops stale IDs", func(t *testing.T) {
+		summary := bgpRouterSummary{
+			names:     map[string]string{"192.0.2.1": "lr-a-new"},
+			ambiguous: map[string]bool{},
+		}
+		got, missing, ambiguous := mergeBGPRouterNames(peers, previous, summary)
+
+		assert.Equal(t, map[string]string{
+			"192.0.2.1": "lr-a-new",
+			"192.0.2.2": "lr-b",
+		}, got)
+		assert.Equal(t, 1, missing)
+		assert.Zero(t, ambiguous)
+	})
+
+	t.Run("evicts explicitly ambiguous current IDs", func(t *testing.T) {
+		summary := bgpRouterSummary{
+			names:     map[string]string{"192.0.2.1": "lr-a-new"},
+			ambiguous: map[string]bool{"192.0.2.2": true},
+		}
+		got, missing, ambiguous := mergeBGPRouterNames(peers, previous, summary)
+
+		assert.Equal(t, map[string]string{"192.0.2.1": "lr-a-new"}, got)
+		assert.Zero(t, missing)
+		assert.Equal(t, 1, ambiguous)
 	})
 }
 
