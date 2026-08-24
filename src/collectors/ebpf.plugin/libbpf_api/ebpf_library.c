@@ -547,11 +547,6 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
         ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd", CONFIG_BOOLEAN_YES);
-    if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_cgroups);
-    }
-
     enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_HARDIRQ_IDX, *disable_cgroups);

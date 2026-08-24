@@ -240,7 +240,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
 - `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
     [`apps.plugin`](/src/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
     for each application.
-- `fd` :  This eBPF program creates charts that show information about calls to open files.
+- `fd`: The eBPFGo program creates charts that show information about calls to open and close files. Its object
+    flavor instruments the kernel's open and close entry points; the error charts require `ebpf load mode = return`.
 - `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
 - `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
 - `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
@@ -283,7 +284,8 @@ To configure an eBPF thread:
       `[ebpf programs]` section of `ebpf.d.conf`.
     - `disk.conf`: Configuration for the `disk` thread.
     - `dns.conf`: Configuration for the `dns` thread.
-    - `fd.conf`: Configuration for the `file descriptor` thread.
+    - `fd.conf`: Legacy compatibility overlay for the eBPFGo `fd` program. Prefer enabling `fd` in the
+      `[ebpf programs]` section of `ebpf.d.conf`.
     - `filesystem.conf`: Configuration for the `filesystem` thread.
     - `hardirq.conf`: Configuration for the `hardirq` thread.
     - `mdflush.conf`: Configuration for the `mdflush` thread.
@@ -681,20 +683,25 @@ filesystem, the collector needs to attach `kprobes` and `kretprobes` for each of
 
 #### File descriptor
 
-To give metrics related to `open` and `close` events, instead of attaching kprobes for each syscall used to do these
-events, the collector attaches `kprobes` for the common function used for syscalls:
+To give metrics related to `open` and `close` events, instead of instrumenting each syscall used to do these events, the
+eBPFGo `fd` collector instruments the common kernel function behind them. The name of that function changed across kernel
+versions, so the collector resolves it from `/proc/kallsyms` at start-up, preferring the newer name:
 
-- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
-     open files.
 - [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162):
     Function called from `do_sys_open` since version `5.6.0`.
+- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
+     open files on older kernels.
 - [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
     descriptor since kernel `5.11.0`.
 - `__close_fd`: Function used to close files before version `5.11.0`.
 
+Both are instrumented as return probes, because the return value is what distinguishes a successful call from a failed
+one. The selected eBPF object flavor supplies the appropriate attachment method for the running kernel.
+
 #### File error
 
-This chart shows the number of times some software tried and failed to open or close a file descriptor.
+This chart shows the number of times some software tried and failed to open or close a file descriptor. It is published
+only with `ebpf load mode = return`; the counters behind it are collected in every mode.
 
 #### VFS
 

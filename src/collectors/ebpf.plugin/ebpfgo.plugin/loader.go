@@ -49,9 +49,14 @@ type LoadPlan struct {
 	IsRHF         int
 	Selector      uint32
 	Flavor        ObjectFlavor
-	ObjectPath    string
-	LoadMode      LoadMethod
-	ProgramMode   ProgramMode
+	// IsReturn selects the object-file prefix: 'r' for the return-probe family,
+	// 'p' otherwise.  It is carried on the plan (not just passed to the path
+	// builder) so buildFallbackPlans can keep the whole fallback chain in the
+	// same family as the primary plan.
+	IsReturn    bool
+	ObjectPath  string
+	LoadMode    LoadMethod
+	ProgramMode ProgramMode
 }
 
 type LoadPlanRequest struct {
@@ -505,7 +510,8 @@ type kprobePlanRequest struct {
 	HasBTF          bool
 	ObjectFlavor    string
 	Name            string
-	MaxBaseSelector int // highest selector index for which a base-flavor object exists
+	MaxBaseSelector int  // highest selector index for which a base-flavor object exists
+	IsReturn        bool // load the 'r'-prefixed (return-probe) object family
 }
 
 // buildKprobeLegacyPlan constructs the LoadPlan for kprobe/trampoline-based
@@ -525,7 +531,8 @@ func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
 		IsRHF:         req.IsRHF,
 		Selector:      selector,
 		Flavor:        flavor,
-		ObjectPath:    BuildObjectPathWithFlavor(req.PluginsDir, selector, req.Name, false, req.IsRHF, flavor),
+		IsReturn:      req.IsReturn,
+		ObjectPath:    BuildObjectPathWithFlavor(req.PluginsDir, selector, req.Name, req.IsReturn, req.IsRHF, flavor),
 		LoadMode:      loadMode,
 		ProgramMode:   LoadTrampoline,
 	}
@@ -547,7 +554,7 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 
 		generic := plan
 		generic.IsRHF = -1
-		generic.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, plan.Selector, name, false, -1, plan.Flavor)
+		generic.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, plan.Selector, name, plan.IsReturn, -1, plan.Flavor)
 		plans = append(plans, generic)
 	}
 
@@ -556,7 +563,7 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 	if primary.Flavor == ObjectFlavorArena {
 		fb := primary
 		fb.Flavor = ObjectFlavorBuffer
-		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, false, isRHF, ObjectFlavorBuffer)
+		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, primary.IsReturn, isRHF, ObjectFlavorBuffer)
 		addPlan(fb)
 	}
 
@@ -568,7 +575,7 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 			fbSelector = uint32(maxBaseSelector)
 		}
 		fb.Selector = fbSelector
-		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, fbSelector, name, false, isRHF, ObjectFlavorBase)
+		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, fbSelector, name, primary.IsReturn, isRHF, ObjectFlavorBase)
 		addPlan(fb)
 	}
 

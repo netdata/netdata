@@ -1110,6 +1110,7 @@ static void cgroup_update_io_pids_charts(struct cgroup *cg) {
         update_pids_current_chart(cg);
     cgroup_ebpfgo_cachestat_update_charts(cg);
     cgroup_ebpfgo_dcstat_update_charts(cg);
+    cgroup_ebpfgo_fd_update_charts(cg);
     cgroup_ebpfgo_socket_update_charts(cg);
 }
 
@@ -1455,9 +1456,11 @@ void cgroups_main(void *ptr) {
         uint32_t shm_flags = shm_ready ? cgroup_ebpfgo_shared_memory_flags() : 0;
         bool cachestat_ok = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_CACHESTAT);
         bool dcstat_ok    = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_DCSTAT);
+        bool fd_ok        = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_FD);
         bool socket_ok    = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_SOCKET);
         cgroup_ebpfgo_cachestat_set_snapshot_ready(cachestat_ok);
         cgroup_ebpfgo_dcstat_set_snapshot_ready(dcstat_ok);
+        cgroup_ebpfgo_fd_set_snapshot_ready(fd_ok, shm_flags & EBPFGO_SHM_FLAG_FD_ERRORS);
         cgroup_ebpfgo_socket_set_snapshot_ready(socket_ok);
 
         worker_is_busy(WORKER_CGROUPS_LOCK);
@@ -1471,17 +1474,19 @@ void cgroups_main(void *ptr) {
             break;
         }
 
-        if (cachestat_ok || dcstat_ok || socket_ok)
+        if (cachestat_ok || dcstat_ok || fd_ok || socket_ok)
             cgroup_ebpfgo_refresh_pid_lists();
 
         if (cachestat_ok)
             cgroup_ebpfgo_cachestat_update_locked();
         if (dcstat_ok)
             cgroup_ebpfgo_dcstat_update_locked();
+        if (fd_ok)
+            cgroup_ebpfgo_fd_update_locked();
         if (socket_ok)
             cgroup_ebpfgo_socket_update_locked();
 
-        if (cachestat_ok || dcstat_ok || socket_ok)
+        if (cachestat_ok || dcstat_ok || fd_ok || socket_ok)
             cgroup_ebpfgo_release_pid_lists();
 
         worker_is_busy(WORKER_CGROUPS_CHART);

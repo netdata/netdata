@@ -431,10 +431,20 @@ static inline void nd_ebpf_acc_free(struct nd_ebpf_acc_table *t)
  * ------------------------------------------------------------------------ */
 
 /* Event layout emitted by the buffer and arena BPF programs.  It is shared:
- * netdata_cachestat_event_t and netdata_dc_event_t are byte-identical (48
- * bytes), verified against the arena skeletons' _Static_assert on the state size
- * and against the field offsets in the compiled objects.  action is interpreted
- * per module. */
+ * netdata_cachestat_event_t, netdata_dc_event_t and netdata_fd_event_t are
+ * byte-identical (48 bytes), verified against the arena skeletons'
+ * _Static_assert on the state size and against the field offsets in the
+ * compiled objects.  action is interpreted per module.
+ *
+ * `error` is the one field that is NOT universal.  fd writes it (0 = the traced
+ * syscall succeeded, 1 = it returned < 0); cachestat, dcstat and dns have no
+ * error notion and explicitly zero the same byte as padding, so reading it is
+ * safe for every producer but only meaningful for fd.  Upstream keeps this
+ * deliberate:
+ *   ebpf-co-re src/fd_buffer.bpf.c: ev->pad[0] = ev->pad[1] = 0; ... ev->error = ...
+ *   ebpf-co-re src/dc_buffer.bpf.c: ev->pad[0] = ev->pad[1] = ev->pad[2] = 0;
+ * Do NOT give `error` a module-specific meaning: a second consumer would then
+ * disagree with the producers that treat it as padding. */
 struct nd_ebpf_pid_event {
     uint64_t ct;
     uint32_t pid;
@@ -443,7 +453,8 @@ struct nd_ebpf_pid_event {
     uint32_t gid;
     char     name[16]; /* TASK_COMM_LEN */
     uint8_t  action;
-    uint8_t  pad[3];
+    uint8_t  error;
+    uint8_t  pad[2];
 };
 
 _Static_assert(sizeof(struct nd_ebpf_pid_event) == 48, "nd_ebpf_pid_event must match the BPF-side event layout");

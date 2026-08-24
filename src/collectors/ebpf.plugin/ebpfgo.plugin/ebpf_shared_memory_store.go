@@ -17,6 +17,15 @@ const (
 	ebpfgoSHMFlagCachestat uint32 = 0x01
 	ebpfgoSHMFlagSocket    uint32 = 0x02
 	ebpfgoSHMFlagDCStat    uint32 = 0x04
+	ebpfgoSHMFlagFD        uint32 = 0x08
+	// ebpfgoSHMFlagFDErrors is set alongside ebpfgoSHMFlagFD when fd runs with
+	// `ebpf load mode = return`.  fd counts open/close errors on every mode (its
+	// probes always read the syscall return value), but the C module only created
+	// the error charts in `return` mode, and apps.plugin and cgroups.plugin are
+	// separate processes that cannot see fd's config.  This bit carries that one
+	// decision across the segment; it lives in the existing header `flags` word,
+	// so it is not a layout change.
+	ebpfgoSHMFlagFDErrors uint32 = 0x10
 )
 
 // Production POSIX names for the shared-memory segment and its semaphore.
@@ -26,6 +35,45 @@ const (
 	productionSHMName = "/netdata_shm_integration_ebpfgo_v5"
 	productionSEMName = "/netdata_sem_integration_ebpfgo_v5"
 )
+
+// ebpfFreshnessToken issues the synthetic `ct` stamp a module publishes for its
+// per-PID rows.  It replaces the raw BPF ct, which is unusable as a freshness
+// signal: only the buffer and arena objects stamp it per event, while the CO-RE
+// base and legacy objects write it once at map-entry creation (or never).
+//
+// Two properties are load-bearing:
+//
+//   - Store-wide, not per-PID.  apps.plugin keeps a watermark per PID and would
+//     not care, but the cgroups consumers keep ONE watermark per cgroup and
+//     compare every member PID against it.  With per-PID counters a long-lived
+//     PID's high value would sit above a freshly added PID's low value forever,
+//     so the new PID's activity would never be counted.
+//
+//   - Boot-relative, not a plain counter.  cgroups.plugin is compiled into the
+//     daemon and its watermark only ever moves forward, deliberately, so a PID
+//     leaving a cgroup cannot replay rows.  A counter restarting at 1 after an
+//     ebpf-go.plugin restart would sit below the watermark the daemon still
+//     holds and freeze the charts for as long as the previous instance ran.
+//     bootNanos() keeps rising across plugin restarts and resets only on reboot,
+//     which restarts the daemon too.  See bootNanos.
+//
+// Each publishing module owns its own instance: they collect on independent
+// intervals, and their consumers keep separate watermarks.
+type ebpfFreshnessToken struct {
+	last uint64
+}
+
+// next returns this cycle's token.  The clock reading is clamped to be strictly
+// increasing so two cycles landing in the same nanosecond still produce distinct
+// tokens, which is what the consumers' `ct > last_consumed_ct` gates require.
+func (t *ebpfFreshnessToken) next() uint64 {
+	token := bootNanos()
+	if token <= t.last {
+		token = t.last + 1
+	}
+	t.last = token
+	return token
+}
 
 // ebpfModuleIdentity carries the per-PID process attributes a module learned
 // from its BPF map.  Any module that reads comm/ppid can supply them; the row
@@ -81,16 +129,31 @@ type ebpfSharedMemoryStore struct {
 	// the BPF value cannot be used.
 	dcstatPrevCt map[uint32]uint64
 	nextDcstatCt map[uint32]uint64
-	// dcstatLastToken is the last freshness token stamped on an active PID.  A
-	// single store-wide token keeps values comparable ACROSS PIDs: cgroups.plugin
-	// holds one watermark per cgroup and compares every member PID against it, so a
-	// per-PID sequence would let a long-running PID's high value permanently mask a
-	// newly added one.  The token comes from bootNanos() rather than a counter so
-	// it also survives a plugin restart — see bootNanos.
-	dcstatLastToken uint64
-	dcstatMiss      map[uint32]int
-	nextDcstatMs    map[uint32]int
-	dcstatStale     []uint32
+	// dcstatToken issues the synthetic freshness stamp; see ebpfFreshnessToken.
+	dcstatToken  ebpfFreshnessToken
+	dcstatMiss   map[uint32]int
+	nextDcstatMs map[uint32]int
+	dcstatStale  []uint32
+
+	// ---- fd (file descriptor) ----
+	//
+	// fdData holds PER-INTERVAL deltas, not cumulative counters: struct
+	// ebpf_publish_fd_stat has a single counter set with no curr/prev pair, so the
+	// diff has to happen here.  apps.plugin accumulates them into monotonic
+	// totals for its `incremental` charts (the cachestat pattern); the cgroups
+	// consumer sums them per interval.
+	fdData  map[uint32]netdataPublishFDStat
+	fdIdent map[uint32]ebpfModuleIdentity
+	fdPIDs  []uint32 // ascending; drives the merge
+	fdPrev  map[uint32]fdCounters
+	nextFd  map[uint32]fdCounters
+	// fdPrevCt/nextFdCt hold the synthetic freshness token, not the BPF `ct`.
+	fdPrevCt map[uint32]uint64
+	nextFdCt map[uint32]uint64
+	fdToken  ebpfFreshnessToken
+	fdMiss   map[uint32]int
+	nextFdMs map[uint32]int
+	fdStale  []uint32
 
 	// ---- socket ----
 	socketData         map[uint32]ebpfSocketPublishApps // per-interval deltas written to SHM this cycle
@@ -118,6 +181,14 @@ func NewEbpfSharedMemoryStore() *ebpfSharedMemoryStore {
 		nextDcstatCt:       make(map[uint32]uint64),
 		dcstatMiss:         make(map[uint32]int),
 		nextDcstatMs:       make(map[uint32]int),
+		fdData:             make(map[uint32]netdataPublishFDStat),
+		fdIdent:            make(map[uint32]ebpfModuleIdentity),
+		fdPrev:             make(map[uint32]fdCounters),
+		nextFd:             make(map[uint32]fdCounters),
+		fdPrevCt:           make(map[uint32]uint64),
+		nextFdCt:           make(map[uint32]uint64),
+		fdMiss:             make(map[uint32]int),
+		nextFdMs:           make(map[uint32]int),
 		socketData:         make(map[uint32]ebpfSocketPublishApps),
 		prevSocketData:     make(map[uint32]ebpfSocketPublishApps),
 		nextPrevSocketData: make(map[uint32]ebpfSocketPublishApps),
@@ -179,6 +250,19 @@ func (s *ebpfSharedMemoryStore) MarkDCStatInactive() {
 	s.mu.Unlock()
 }
 
+// MarkFDInactive clears the FD flag from activeModules, so a consumer does not
+// treat stale rows as live.
+//
+// The only production caller is the fd goroutine's exit path (main.go).  A
+// per-cycle snapshot failure goes through ClearFDApps instead, which clears the
+// flag AND empties the rows; this entry point exists for shutdown, where the
+// rows are about to become unreachable anyway.
+func (s *ebpfSharedMemoryStore) MarkFDInactive() {
+	s.mu.Lock()
+	s.activeModules &^= ebpfgoSHMFlagFD | ebpfgoSHMFlagFDErrors
+	s.mu.Unlock()
+}
+
 // MarkSocketInactive clears the SOCKET flag from activeModules.  Called via
 // defer when the socket goroutine exits (permanent shutdown) and also per-cycle
 // when Snapshot or SnapshotPerPID fails so the consumer does not see
@@ -189,55 +273,70 @@ func (s *ebpfSharedMemoryStore) MarkSocketInactive() {
 	s.mu.Unlock()
 }
 
-// nextDCStatTokenLocked returns the freshness token for this cycle.  The clock
-// reading is clamped to be strictly increasing so two cycles that land in the
-// same nanosecond still produce distinct tokens, which is what the consumers'
-// `ct > last_consumed_ct` gates require.
-func (s *ebpfSharedMemoryStore) nextDCStatTokenLocked() uint64 {
-	token := bootNanos()
-	if token <= s.dcstatLastToken {
-		token = s.dcstatLastToken + 1
+// ebpfSortedPIDLists is the number of modules that contribute an ASCENDING
+// per-PID list to the row merge (cachestat, dcstat, fd).  Socket contributes a
+// map instead and is appended separately.
+const ebpfSortedPIDLists = 3
+
+// mergedPIDIterator walks several ascending PID lists as one ascending sequence
+// with duplicates collapsed.  It is a value type with fixed-size arrays so the
+// per-cycle rebuild allocates nothing.
+type mergedPIDIterator struct {
+	lists   [ebpfSortedPIDLists][]uint32
+	cursors [ebpfSortedPIDLists]int
+}
+
+// next returns the smallest PID not yet emitted, or false when every list is
+// exhausted.  Every cursor sitting on that PID advances, because PIDs are unique
+// within a single list.
+func (it *mergedPIDIterator) next() (uint32, bool) {
+	var pid uint32
+	found := false
+	for i := range it.lists {
+		if it.cursors[i] >= len(it.lists[i]) {
+			continue
+		}
+		if candidate := it.lists[i][it.cursors[i]]; !found || candidate < pid {
+			pid, found = candidate, true
+		}
 	}
-	s.dcstatLastToken = token
-	return token
+	if !found {
+		return 0, false
+	}
+
+	for i := range it.lists {
+		if it.cursors[i] < len(it.lists[i]) && it.lists[i][it.cursors[i]] == pid {
+			it.cursors[i]++
+		}
+	}
+
+	return pid, true
 }
 
 // rebuildEntriesLocked recomputes s.entries from every module's current-cycle
 // contribution.  Must be called with s.mu held for writing.
 func (s *ebpfSharedMemoryStore) rebuildEntriesLocked() {
 	nextEntries := s.nextEntries[:0]
-	upper := len(s.cachestatPIDs) + len(s.dcstatPIDs) + len(s.socketData)
+	upper := len(s.cachestatPIDs) + len(s.dcstatPIDs) + len(s.fdPIDs) + len(s.socketData)
 	if cap(nextEntries) < upper {
 		nextEntries = make([]ebpfPidStat, 0, upper)
 	}
 
-	// Two-way merge of the ascending cachestat and dcstat PID lists.
-	// Each iteration emits the smaller-or-equal PID and advances whichever
-	// cursor(s) hold it; equality advances both because PIDs are unique within
-	// each list.
-	i, j := 0, 0
-	for i < len(s.cachestatPIDs) || j < len(s.dcstatPIDs) {
-		var pid uint32
-		// Take from cachestat when it still has elements and (dcstat is empty or
-		// cachestat's current PID is smaller-or-equal).  Explicit length checks
-		// keep the indexed reads inside the loop invariant.  On equality the
-		// pid already came from cachestat, so the inner `if` advances j too.
-		if i < len(s.cachestatPIDs) && (j >= len(s.dcstatPIDs) || s.cachestatPIDs[i] <= s.dcstatPIDs[j]) {
-			pid = s.cachestatPIDs[i]
-			i++
-			if j < len(s.dcstatPIDs) && pid == s.dcstatPIDs[j] {
-				j++
-			}
-		} else {
-			// dcstat holds the smaller-or-only PID.
-			pid = s.dcstatPIDs[j]
-			j++
+	// k-way merge of the ascending per-module PID lists.
+	merge := mergedPIDIterator{lists: [ebpfSortedPIDLists][]uint32{
+		s.cachestatPIDs, s.dcstatPIDs, s.fdPIDs,
+	}}
+	for {
+		pid, ok := merge.next()
+		if !ok {
+			break
 		}
 		nextEntries = append(nextEntries, s.buildRowLocked(pid))
 	}
 
 	// Append PIDs seen only by socket, so services with network activity but no
-	// page-cache or directory-cache activity are still visible to consumers.
+	// page-cache, directory-cache or file-descriptor activity are still visible
+	// to consumers.
 	prevLen := len(nextEntries)
 	for pid := range s.socketData {
 		if !sortedEntriesContainPID(nextEntries[:prevLen], pid) {
@@ -254,40 +353,40 @@ func (s *ebpfSharedMemoryStore) rebuildEntriesLocked() {
 }
 
 // buildRowLocked assembles one shared-memory row from whichever modules have
-// data for pid.  Identity (comm/ppid) is taken from cachestat first, then
-// dcstat; socket rows carry no identity.
+// data for pid.  Identity (comm/ppid) is taken from cachestat first, then dcstat,
+// then fd; socket rows carry no identity.
 //
-// Presence in a module's identity map is not enough: a BPF entry created
-// between process start and the first bpf_get_current_comm() carries an empty
-// comm, and the upstream BPF sources skip that call entirely on kernels below
-// 4.11.  An empty identity from either module must therefore never shadow a
-// populated one from the other.
+// Presence in a module's identity map is not enough: a BPF entry created between
+// process start and the first bpf_get_current_comm() carries an empty comm, and
+// the upstream BPF sources skip that call entirely on kernels below 4.11.  An
+// empty identity from one module must therefore never shadow a populated one
+// from another.
 //
-// ppid is always 0 today — neither module's snapshot populates it — so isEmpty()
+// ppid is always 0 today — no module's snapshot populates it — so isEmpty()
 // effectively tests comm alone.  It still checks both fields so this stays
 // correct if a module starts reporting a parent.
 func (s *ebpfSharedMemoryStore) buildRowLocked(pid uint32) ebpfPidStat {
 	row := ebpfPidStat{pid: pid}
 
-	// Pick the identity to publish: cachestat wins when it actually learned
-	// something, then dcstat on the same terms.  Neither module may publish an
-	// empty identity while the other holds a populated one; when both are empty
-	// (or absent) the row stays at zero, which is what a single module with no
-	// identity produced before.
-	csIdent, csOK := s.cachestatIdent[pid]
-	dcIdent, dcOK := s.dcstatIdent[pid]
-	var ident ebpfModuleIdentity
-	switch {
-	case csOK && !csIdent.isEmpty():
-		ident = csIdent
-	case dcOK && !dcIdent.isEmpty():
-		ident = dcIdent
+	// Pick the identity to publish: the first module that actually learned
+	// something wins.  No module may publish an empty identity while another
+	// holds a populated one; when all are empty (or absent) the row stays at
+	// zero, which is what a single module with no identity produced before.
+	for _, ident := range [...]ebpfModuleIdentity{
+		s.cachestatIdent[pid],
+		s.dcstatIdent[pid],
+		s.fdIdent[pid],
+	} {
+		if !ident.isEmpty() {
+			row.comm = ident.comm
+			row.ppid = ident.ppid
+			break
+		}
 	}
-	row.comm = ident.comm
-	row.ppid = ident.ppid
 
 	row.cachestat = s.cachestatData[pid]
 	row.dc = s.dcstatData[pid]
+	row.fd = s.fdData[pid]
 	row.socket = s.socketData[pid]
 
 	return row
@@ -307,6 +406,39 @@ func sortedEntriesContainPID(entries []ebpfPidStat, pid uint32) bool {
 		}
 	}
 	return false
+}
+
+// removeFromSortedPIDs drops every pid in remove from an ascending list,
+// in place and order-preserving.
+//
+// Every Remove*PIDs entry point needs it: deleting a PID only from the module's
+// data maps leaves its entry in the module's PID list, so the next
+// rebuildEntriesLocked still emits an all-zero row for it and the PID keeps a
+// slot in the fixed-size shared-memory segment until the module's next snapshot
+// rebuilds the list.  Consumers ignore such a row (its ct is 0, which never
+// passes their `ct > last_consumed_ct` gate), but on a busy host the wasted slots
+// can crowd out live processes.
+//
+// remove is an eviction batch — a handful of PIDs confirmed dead — so a set
+// lookup per surviving element is cheaper than sorting and merging.
+func removeFromSortedPIDs(list []uint32, remove []uint32) []uint32 {
+	if len(list) == 0 || len(remove) == 0 {
+		return list
+	}
+
+	dead := make(map[uint32]struct{}, len(remove))
+	for _, pid := range remove {
+		dead[pid] = struct{}{}
+	}
+
+	kept := list[:0]
+	for _, pid := range list {
+		if _, ok := dead[pid]; !ok {
+			kept = append(kept, pid)
+		}
+	}
+
+	return kept
 }
 
 // appendAscending appends pid to dst, reporting whether dst stayed ascending.

@@ -112,6 +112,11 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_dcstat_not_cache)  rrdset_is_obsolete___safe_from_collector_thread(cg->st_dcstat_not_cache);
     if(cg->st_dcstat_not_found)  rrdset_is_obsolete___safe_from_collector_thread(cg->st_dcstat_not_found);
 
+    if(cg->st_fd_open)           rrdset_is_obsolete___safe_from_collector_thread(cg->st_fd_open);
+    if(cg->st_fd_open_error)     rrdset_is_obsolete___safe_from_collector_thread(cg->st_fd_open_error);
+    if(cg->st_fd_close)          rrdset_is_obsolete___safe_from_collector_thread(cg->st_fd_close);
+    if(cg->st_fd_close_error)    rrdset_is_obsolete___safe_from_collector_thread(cg->st_fd_close_error);
+
     if(cg->st_net_conn_ipv4)       rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_conn_ipv4);
     if(cg->st_net_conn_ipv6)       rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_conn_ipv6);
     if(cg->st_net_total_bandwidth) rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_total_bandwidth);

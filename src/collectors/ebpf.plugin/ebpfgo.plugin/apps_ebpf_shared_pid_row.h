@@ -41,6 +41,13 @@ struct ebpfgo_shm_header {
 #define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */
 #define EBPFGO_SHM_FLAG_SOCKET    0x02u /* socket per-PID fields are valid */
 #define EBPFGO_SHM_FLAG_DCSTAT    0x04u /* dcstat (directory cache) per-PID fields are valid */
+#define EBPFGO_SHM_FLAG_FD        0x08u /* fd (file descriptor) per-PID fields are valid */
+/* Set alongside EBPFGO_SHM_FLAG_FD when fd runs with `ebpf load mode = return`.
+ * fd counts open/close errors on every mode — its probes always read the syscall
+ * return value — but the collector only exposes the error charts in `return`
+ * mode.  Consumers are separate processes and cannot see fd's config, so this bit
+ * is what tells them whether the *_err fields may be charted. */
+#define EBPFGO_SHM_FLAG_FD_ERRORS 0x10u
 
 struct ebpf_cachestat {
     uint32_t add_to_page_cache_lru;

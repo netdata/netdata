@@ -14,6 +14,9 @@ type collectorCommonConfig struct {
 	HasBTF         *bool
 	ObjectFlavor   *string
 	AppsLevel      *int
+	// ReturnMode receives `ebpf load mode`.  Only fd passes it: it is the only
+	// module whose charts differ between `entry` and `return`.
+	ReturnMode *bool
 }
 
 // applyCommonCollectorConfig merges the `[global]` keys onto a collector's
@@ -50,5 +53,8 @@ func applyCommonCollectorConfig(fileCfg pluginConfigFile, dst collectorCommonCon
 	}
 	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" && dst.ObjectFlavor != nil {
 		*dst.ObjectFlavor = *fileCfg.ObjectFlavor
+	}
+	if fileCfg.LoadModeReturn != nil && dst.ReturnMode != nil {
+		*dst.ReturnMode = *fileCfg.LoadModeReturn
 	}
 }

@@ -2138,6 +2138,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_fd.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -3257,8 +3258,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.h
             src/collectors/ebpf.plugin/ebpf_disk.c
             src/collectors/ebpf.plugin/ebpf_disk.h
-            src/collectors/ebpf.plugin/ebpf_fd.c
-            src/collectors/ebpf.plugin/ebpf_fd.h
             src/collectors/ebpf.plugin/ebpf_hardirq.c
             src/collectors/ebpf.plugin/ebpf_hardirq.h
             src/collectors/ebpf.plugin/ebpf_mdflush.c

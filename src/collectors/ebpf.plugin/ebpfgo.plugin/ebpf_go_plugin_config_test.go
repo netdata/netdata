@@ -22,7 +22,7 @@ func writeTempConfig(t *testing.T, filename, content string) string {
 func parseTempConfig(t *testing.T, filename, content string) pluginConfigFile {
 	t.Helper()
 	path := writeTempConfig(t, filename, content)
-	cfg, ok, err := parsePluginConfigFile(path, false)
+	cfg, ok, err := parsePluginConfigFile(path)
 	if err != nil {
 		t.Fatalf("parse config: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestParsePluginConfigFileInvalidValuesAreIgnored(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			path := writeTempConfig(t, "ebpf.d.conf", tc.content)
-			cfg, ok, err := parsePluginConfigFile(path, false)
+			cfg, ok, err := parsePluginConfigFile(path)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

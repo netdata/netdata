@@ -17,6 +17,13 @@ static netdata_ebpfgo_shared_pid_memory_t apps_ebpf_shared_memory_ctx = {
  * started, or running with a different subset of modules enabled. */
 static bool apps_ebpf_cachestat_available = false;
 static bool apps_ebpf_dcstat_available = false;
+static bool apps_ebpf_fd_available = false;
+
+/* Whether fd is publishing with `ebpf load mode = return`, i.e. whether its
+ * error charts may be created.  Sticky like the availability flags above: once
+ * the charts exist they must keep receiving values, and pluginsd logs an error
+ * for every SET to a chart that was never declared. */
+static bool apps_ebpf_fd_errors_available = false;
 
 /* Per-cycle flag: set each cycle to the refresh() return value.  Prevents
  * stale data emission when the producer dies after its first successful
@@ -114,6 +121,11 @@ bool apps_ebpf_shared_memory_refresh(void)
             apps_ebpf_cachestat_available = true;
         if (flags & EBPFGO_SHM_FLAG_DCSTAT)
             apps_ebpf_dcstat_available = true;
+        if (flags & EBPFGO_SHM_FLAG_FD) {
+            apps_ebpf_fd_available = true;
+            if (flags & EBPFGO_SHM_FLAG_FD_ERRORS)
+                apps_ebpf_fd_errors_available = true;
+        }
     }
     return ok;
 }
@@ -191,6 +203,58 @@ bool apps_ebpf_dcstat_is_available(void)
     return apps_ebpf_dcstat_available;
 }
 
+/* Sums the per-PID file-descriptor deltas the Go plugin published into each
+ * target.
+ *
+ * The totals are MONOTONIC, not per-interval: the fd charts use the incremental
+ * algorithm, so zeroing them each cycle would make every point a spike.  This
+ * mirrors apps_ebpf_accumulate_cachestat()'s hit/miss handling rather than
+ * apps_ebpf_accumulate_dcstat()'s absolute one. */
+void apps_ebpf_accumulate_fd(void)
+{
+    for (struct pid_stat *p = root_of_pids(); p; p = p->next) {
+        if (unlikely(!p->has_ebpf || !p->updated))
+            continue;
+
+        struct target *w = p->target;
+        if (!w)
+            continue;
+
+        // Reset the ct gate on regression (Go plugin restart, map reset, SHM
+        // inode swap, PID reuse) so deltas are not permanently suppressed.
+        if (p->ebpf.fd.ct < p->ebpf_fd_ct)
+            p->ebpf_fd_ct = 0;
+
+        // Only consume this PID's counters when the Go plugin published fresh
+        // data (ct advanced).  Per-PID deltas keep the target totals monotonic
+        // even when PIDs exit or are reclassified between cycles.
+        if (p->ebpf.fd.ct <= p->ebpf_fd_ct)
+            continue;
+
+        w->fd_totals.open_call += p->ebpf.fd.open_call;
+        w->fd_totals.close_call += p->ebpf.fd.close_call;
+        w->fd_totals.open_err += p->ebpf.fd.open_err;
+        w->fd_totals.close_err += p->ebpf.fd.close_err;
+
+        p->ebpf_fd_ct = p->ebpf.fd.ct;
+    }
+}
+
+bool apps_ebpf_fd_data_ready(void)
+{
+    return apps_ebpf_fd_available && apps_ebpf_last_refresh_ok;
+}
+
+bool apps_ebpf_fd_is_available(void)
+{
+    return apps_ebpf_fd_available;
+}
+
+bool apps_ebpf_fd_errors_are_available(void)
+{
+    return apps_ebpf_fd_errors_available;
+}
+
 bool apps_ebpf_sync_pid_stat(struct pid_stat *p)
 {
     if (!p)
@@ -203,6 +267,7 @@ bool apps_ebpf_sync_pid_stat(struct pid_stat *p)
         memset(&p->ebpf, 0, sizeof(p->ebpf));
         p->ebpf_cachestat_ct = 0;
         p->ebpf_dcstat_ct = 0;
+        p->ebpf_fd_ct = 0;
         return false;
     }
 
