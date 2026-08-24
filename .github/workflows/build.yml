@@ -1317,6 +1317,12 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           brew install bash
+      - name: Install Go
+        id: install-go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
       - name: Install netdata dependencies
         id: install-deps
         if: needs.file-check.outputs.run == 'true'
