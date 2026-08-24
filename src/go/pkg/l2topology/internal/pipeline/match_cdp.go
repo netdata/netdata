@@ -16,6 +16,8 @@ type cdpMatchLink struct {
 	sourceGlobalID string
 
 	localInterfaceName string
+	localIfIndex       int
+	localObservedName  string
 
 	remoteDeviceID     string
 	remoteDevicePort   string
@@ -45,9 +47,11 @@ func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 
 		remotes := sortedCDPRemotes(obs.CDPRemotes)
 		for _, remote := range remotes {
-			localInterfaceName := strings.TrimSpace(remote.LocalIfName)
-			if localInterfaceName == "" && remote.LocalIfIndex > 0 {
-				localInterfaceName = strconv.Itoa(remote.LocalIfIndex)
+			localIfIndex := max(remote.LocalIfIndex, 0)
+			localObservedName := strings.TrimSpace(remote.LocalIfName)
+			localInterfaceName := localObservedName
+			if localInterfaceName == "" && localIfIndex > 0 {
+				localInterfaceName = strconv.Itoa(localIfIndex)
 			}
 
 			remoteDeviceID := strings.TrimSpace(remote.DeviceID)
@@ -68,6 +72,8 @@ func buildCDPMatchLinks(observations []model.L2Observation) []cdpMatchLink {
 				sourceDeviceID:     sourceID,
 				sourceGlobalID:     sourceGlobalID,
 				localInterfaceName: localInterfaceName,
+				localIfIndex:       localIfIndex,
+				localObservedName:  localObservedName,
 				remoteDeviceID:     remoteDeviceID,
 				remoteDevicePort:   strings.TrimSpace(remote.DevicePort),
 				remoteHost:         remoteHost,

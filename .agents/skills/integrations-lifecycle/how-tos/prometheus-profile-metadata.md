@@ -12,9 +12,13 @@ profile contribution must make a deliberate catalog disposition.
   profile envelope is decoded by
   `src/go/plugin/go.d/collector/prometheus/promprofiles/profile.go`.
 - **Integration catalog:** `metadata.yaml` controls public integration entries
-  and generated documentation. Discovery uses the `*/metadata.yaml` pattern and
-  enumerated collector roots (`integrations/_common.py:16-29`, `:96-111`,
-  `:136-162`).
+  and generated documentation. Its top-level `profile_coverage.modules` mapping
+  associates authored module IDs with primary stock profiles. Discovery uses the
+  `*/metadata.yaml` pattern and enumerated collector roots.
+- **Documentation projection:**
+  `integrations/prometheus_profile_docs.py` joins each mapped profile's strict
+  `PROFILE-DESIGN.yaml` with its runtime profile YAML. Generation fails if a
+  stock profile is unmapped or if a semantic view and runtime chart differ.
 - **Generic profile configuration:** the Prometheus collector metadata documents
   the `profiles` job option
   (`src/go/plugin/go.d/collector/prometheus/metadata.yaml:175-203`). That is
@@ -26,8 +30,10 @@ profile contribution must make a deliberate catalog disposition.
   application metadata module does not make those runtime contexts stable.
 
 `integrations/gen_integrations.py` imports collector entries through
-`load_collectors` (`integrations/gen_integrations.py:10-23`) and renders the
-metadata modules (`:740-756`). It never scans the profile directory.
+`load_collectors`, projects profile coverage, and then renders the metadata
+modules. Website consumes the clean native-`details` form; Agent Markdown is
+generated from the rich form and retains the same `data-prometheus-profile-*`
+hooks after `clean_and_write()` conversion.
 
 ## Required catalog disposition
 
@@ -35,7 +41,7 @@ For every stock profile:
 
 1. Search existing integration metadata and generated pages for an equivalent
    application/endpoint.
-2. Choose and record exactly one disposition:
+2. Choose and record exactly one public-page disposition:
    - **Add/update a Prometheus application module** when no equivalent entry
      exists.
    - **Update or cross-link the existing first-class integration** when it
@@ -43,30 +49,40 @@ For every stock profile:
      entry.
    - **Keep generic-only documentation** only when an application-specific
      entry would be misleading, and record the concrete product reason.
-3. Keep collector `metadata.yaml` authoritative. Do not add documentation keys
-   to the strict runtime profile envelope.
-4. Omit job `profiles` from application examples so they exercise default
+3. Map every stock profile exactly once as a primary profile under the owning
+   metadata document's top-level `profile_coverage.modules`. A module key is its
+   authored `meta.id`; its value is the list of primary stock profile IDs.
+   Supporting profiles are derived from `PROFILE-DESIGN.yaml`
+   `composition.supports` and MUST NOT be repeated in integration metadata.
+4. Keep runtime profile YAML limited to collection behavior. Put the
+   operator-facing profile `title` and `summary` in the strict
+   `PROFILE-DESIGN.yaml` `documentation` block, and put the human activation
+   explanation on every support dependency's `activation` field.
+5. Omit job `profiles` from application examples so they exercise default
    automatic selection. Do not copy proof-descriptor candidate/support
    composition into deployment configuration; exact proof composition isolates
    declared evidence dependencies, while an exact job makes every named support
    namespace mandatory.
-5. Omit job `app` when automatic selection provides one unambiguous application
+6. Omit job `app` when automatic selection provides one unambiguous application
    identity. Keep it only for an intentional override, genuine app conflict, or
    an endpoint for which no selected profile supplies one.
-6. Put a short operator-model brief in
+7. Put a short operator-model brief in
    `overview.data_collection.metrics_description`. Summarize the entities,
    capabilities, and processing stages; do not copy the complete chart/family
    ledger.
-7. Run the normal integration generators locally to validate the source. Do
+8. Run the normal integration generators locally to validate the source. Do
    not commit generated Markdown in the source PR; after merge,
    `generate-integrations.yml` opens the separate generated-artifact PR. Never
    hand-edit generated integration pages.
-8. Preserve the Prometheus taxonomy opt-out unless the runtime collector gains
+9. Preserve the Prometheus taxonomy opt-out unless the runtime collector gains
    a real stable-context contract.
 
 ## Validation
 
 - Validate the edited `metadata.yaml` through `integrations/gen_integrations.py`.
+- Run `python3 -m unittest integrations.tests.test_prometheus_profile_docs` to
+  enforce stock-profile reachability, exact view/chart/family parity, support
+  projection, inherited-YAML isolation, and generated markup hooks.
 - Regenerate the application integration page and, when the catalog gains or
   loses an entry, `src/collectors/COLLECTORS.md`.
 - Run `python3 integrations/gen_taxonomy.py --check-only`.

@@ -22,8 +22,8 @@ func newTopologyCache() *topologyCache {
 		l3InterfacesByIP:   make(map[string]topologymodel.L3Interface),
 		bridgePortToIf:     make(map[string]string),
 		fdbEntries:         make(map[string]*fdbEntry),
-		fdbIDToVlanID:      make(map[string]string),
-		vlanIDToName:       make(map[string]string),
+		vlanByFDBID:        make(map[string]fdbVLANMapping),
+		vlanNameByID:       make(map[string]vlanNameMapping),
 		stpPorts:           make(map[string]*stpPortEntry),
 		arpEntries:         make(map[string]*arpEntry),
 		ospfNeighborsByKey: make(map[string]topologymodel.OSPFNeighbor),
@@ -39,6 +39,8 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.lastUpdate = src.lastUpdate
 	c.updateTime = src.updateTime
 	c.staleAfter = src.staleAfter
+	c.preparedSnapshot = src.preparedSnapshot
+	c.hasPreparedSnapshot = src.hasPreparedSnapshot
 	c.agentID = src.agentID
 	c.localDevice = src.localDevice
 	c.lldpLocPorts = src.lldpLocPorts
@@ -52,13 +54,11 @@ func (c *topologyCache) replaceWith(src *topologyCache) {
 	c.trapMatchMethodByIP = src.trapMatchMethodByIP
 	c.bridgePortToIf = src.bridgePortToIf
 	c.fdbEntries = src.fdbEntries
-	c.fdbIDToVlanID = src.fdbIDToVlanID
-	c.vlanIDToName = src.vlanIDToName
+	c.vlanByFDBID = src.vlanByFDBID
+	c.vlanNameByID = src.vlanNameByID
 	c.fdbRowsDroppedNoMAC = src.fdbRowsDroppedNoMAC
 	c.fdbRowsUnmappedPort = src.fdbRowsUnmappedPort
-	c.vtpVersion = src.vtpVersion
-	c.stpBaseBridgeAddress = src.stpBaseBridgeAddress
-	c.stpDesignatedRoot = src.stpDesignatedRoot
+	c.bridgeBaseAddress = src.bridgeBaseAddress
 	c.stpPorts = src.stpPorts
 	c.arpEntries = src.arpEntries
 	c.ospfNeighborsByKey = src.ospfNeighborsByKey
@@ -123,7 +123,9 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 	defer c.mu.Unlock()
 
 	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
+	c.localManagementAddressKeys = nil
 	c.rebuildTrapSourceMatchMethods()
+	c.finalizeFDBVLANs()
 	c.updateFDBDiagnostics()
 	stats := topologyCacheFinalizeStats{
 		agentID:      c.agentID,
@@ -131,6 +133,7 @@ func (c *topologyCache) finalizeTopologyCache() topologyCacheFinalizeStats {
 		unmappedPort: c.fdbRowsUnmappedPort,
 	}
 	c.lastUpdate = c.updateTime
+	c.preparedSnapshot, c.hasPreparedSnapshot = c.buildObservationSnapshotLocked()
 	return stats
 }
 

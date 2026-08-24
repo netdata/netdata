@@ -111,11 +111,13 @@ func ensureTopologyPortEvidence(
 }
 
 func resolveAdjacencySourceIfIndex(adj model.Adjacency, ifIndexByDeviceName map[string]int) int {
-	ifIndex := 0
-	if ifName := strings.TrimSpace(adj.SourcePort); ifName != "" {
-		ifIndex = resolveIfIndexByPortName(adj.SourceID, ifName, ifIndexByDeviceName)
+	if adj.SourcePortEvidence.IfIndex > 0 {
+		return adj.SourcePortEvidence.IfIndex
 	}
-	return ifIndex
+	if ifName := strings.TrimSpace(adj.SourcePortEvidence.IfName); ifName != "" {
+		return resolveIfIndexByInterfaceName(adj.SourceID, ifName, ifIndexByDeviceName)
+	}
+	return 0
 }
 
 func classifyTopologyPortLinkMode(evidence *topologyDevicePortEvidence) (mode string, confidence string, sources []string, vlans []string) {

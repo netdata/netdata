@@ -13,13 +13,15 @@
 #define TASK_COMM_LEN 16
 #endif
 
-/* v4: socket_update_every_s added to ebpf_socket_publish_apps.
+/* v5: dcstat_update_every_s added to ebpf_publish_dcstat.  It is retained for
+ *     shared-memory ABI compatibility; dcstat consumers publish interval totals.
+ * v4: socket_update_every_s added to ebpf_socket_publish_apps.
  * v3: live_count added at offset 16; header is now 24 bytes; entries start
  *     at offset 24 (still 8-byte aligned for the uint64_t fields in ebpf_pid_stat).
  * v2: update_every_s replaced _pad; header grew from 8 to 16 bytes.
  * Version suffix ensures old consumers never map the new layout at the wrong offset. */
-#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v4"
-#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v4"
+#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v5"
+#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v5"
 
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
  * immediately.  sizeof == 24 so entries start on an 8-byte boundary, which
@@ -38,6 +40,7 @@ struct ebpfgo_shm_header {
 
 #define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */
 #define EBPFGO_SHM_FLAG_SOCKET    0x02u /* socket per-PID fields are valid */
+#define EBPFGO_SHM_FLAG_DCSTAT    0x04u /* dcstat (directory cache) per-PID fields are valid */
 
 struct ebpf_cachestat {
     uint32_t add_to_page_cache_lru;
@@ -68,6 +71,7 @@ struct ebpf_publish_dcstat {
     int64_t cache_access;
     struct ebpf_publish_dcstat_pid curr;
     struct ebpf_publish_dcstat_pid prev;
+    uint32_t dcstat_update_every_s; /* retained v5 field; 0 = unknown */
 };
 
 struct ebpf_publish_fd_stat {

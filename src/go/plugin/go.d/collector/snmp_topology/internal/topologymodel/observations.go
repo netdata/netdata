@@ -28,7 +28,6 @@ type ObservationAggregate struct {
 	L3Interfaces    []L3Interface
 	OSPFNeighbors   []OSPFNeighbor
 	BGPPeers        []BGPPeer
-	LocalDeviceID   string
 	AgentID         string
 	ProducerScopeID string
 	CollectedAt     time.Time

@@ -357,6 +357,6 @@ Control which Netdata tools are available:
 
 - [Gemini CLI GitHub Repository](https://github.com/google-gemini/gemini-cli)
 - [Gemini CLI MCP Documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
-- [Gemini CLI Configuration Guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/configuration.md)
+- [Gemini CLI Configuration Guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/configuration.md)
 - [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
 - [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)

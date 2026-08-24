@@ -2,41 +2,16 @@
 
 package projector
 
-import (
-	"strconv"
-	"strings"
-)
-
 func bridgePortObservationKey(port bridgePortRef) string {
-	base := bridgePortObservationBaseKey(port)
-	if base == "" {
-		return ""
-	}
-	return base + keySep + "vlan:"
+	return bridgePortCanonicalIdentity(port)
 }
 
 func bridgePortObservationVLANKey(port bridgePortRef) string {
-	base := bridgePortObservationBaseKey(port)
+	base := bridgePortObservationKey(port)
 	if base == "" {
 		return ""
 	}
-	return base + keySep + "vlan:" + strings.ToLower(strings.TrimSpace(port.vlanID))
-}
-
-func bridgePortObservationBaseKey(port bridgePortRef) string {
-	deviceID := strings.TrimSpace(port.deviceID)
-	if deviceID == "" {
-		return ""
-	}
-	if port.ifIndex > 0 {
-		return deviceID + keySep + "if:" + strconv.Itoa(port.ifIndex)
-	}
-	name := firstNonEmpty(port.ifName, port.bridgePort)
-	name = normalizeInterfaceNameForLookup(name)
-	if name == "" {
-		return ""
-	}
-	return deviceID + keySep + "name:" + name
+	return base + keySep + "scope:" + bridgePortForwardingDomain(port)
 }
 
 func addBridgePortObservationKeys(set map[string]struct{}, port bridgePortRef) {

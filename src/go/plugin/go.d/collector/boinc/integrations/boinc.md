@@ -25,7 +25,7 @@ Module: boinc
 This collector monitors task counts for the Berkeley Open Infrastructure Networking Computing (BOINC) distributed computing client.
 
 
-It communicates with BOING using [GIU RPC Protocol](https://boinc.berkeley.edu/trac/wiki/GuiRpcProtocol).
+It communicates with BOINC using the [GUI RPC Protocol](https://github.com/BOINC/boinc/wiki/GuiRpcProtocol).
 
 
 This collector is supported on all platforms.

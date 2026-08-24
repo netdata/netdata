@@ -2,31 +2,36 @@ package main
 
 import "testing"
 
-func TestCgoScaffoldReady(t *testing.T) {
-	if got := cgoScaffoldReady(); got != 0 {
-		t.Fatalf("unexpected cgo scaffold state: %d", got)
-	}
-}
-
-func TestResolveUpdateEvery(t *testing.T) {
+func TestParsePluginArgs(t *testing.T) {
 	tests := map[string]struct {
-		cliArg, cfgVal, fallback int
-		want                     int
+		args           []string
+		wantInterval   int
+		wantDCStatOnly bool
 	}{
-		// Config is the operator-controlled source of truth.
-		"config beats argv":        {cliArg: 1, cfgVal: 10, fallback: 10, want: 10},
-		"config beats large argv":  {cliArg: 30, cfgVal: 10, fallback: 10, want: 10},
-		"argv used when no config": {cliArg: 5, cfgVal: 0, fallback: 10, want: 5},
-		"argv beats fallback":      {cliArg: 3, cfgVal: 0, fallback: 10, want: 3},
-		"config beats fallback":    {cliArg: 0, cfgVal: 5, fallback: 10, want: 5},
-		// Both absent — hardcoded default wins.
-		"fallback when both absent": {cliArg: 0, cfgVal: 0, fallback: 10, want: 10},
+		"numeric pluginsd interval": {
+			args:         []string{"10"},
+			wantInterval: 10,
+		},
+		"dcstat long flag": {
+			args:           []string{"--dcstat"},
+			wantDCStatOnly: true,
+		},
+		"dcstat short-compatible flag with interval": {
+			args:           []string{"-dcstat", "7"},
+			wantInterval:   7,
+			wantDCStatOnly: true,
+		},
+		"unknown and invalid arguments stay ignored": {
+			args: []string{"--unknown", "0", "invalid"},
+		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := resolveUpdateEvery(tc.cliArg, tc.cfgVal, tc.fallback); got != tc.want {
-				t.Fatalf("resolveUpdateEvery(%d, %d, %d) = %d, want %d",
-					tc.cliArg, tc.cfgVal, tc.fallback, got, tc.want)
+			gotInterval, gotDCStatOnly := parsePluginArgs(tc.args)
+			if gotInterval != tc.wantInterval || gotDCStatOnly != tc.wantDCStatOnly {
+				t.Fatalf("parsePluginArgs(%q) = (%d, %t), want (%d, %t)",
+					tc.args, gotInterval, gotDCStatOnly, tc.wantInterval, tc.wantDCStatOnly)
 			}
 		})
 	}

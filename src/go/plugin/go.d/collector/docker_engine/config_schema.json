@@ -20,7 +20,7 @@
       },
       "url": {
         "title": "URL",
-        "description": "The URL of the Docker Engine [metrics endpoint](https://docs.docker.com/config/daemon/prometheus/#configure-the-daemon).",
+        "description": "The URL of the Docker Engine [metrics endpoint](https://docs.docker.com/engine/daemon/prometheus/#configure-the-daemon).",
         "type": "string",
         "default": "http://127.0.0.1:9323/metrics",
         "format": "uri"

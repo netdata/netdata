@@ -8,22 +8,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring
+// https://docs.nats.io/learn/monitoring/monitoring-endpoints
 
 const (
-	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#general-information
+	// https://docs.nats.io/reference/system/monitor/varz
 	urlPathVarz = "/varz"
-	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#health
+	// https://docs.nats.io/reference/system/monitor/healthz
 	urlPathHealthz = "/healthz"
-	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics
+	// https://docs.nats.io/reference/system/monitor/accstatz
 	urlPathAccstatz = "/accstatz"
-	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information
+	// https://docs.nats.io/reference/system/monitor/routez
 	urlPathRoutez = "/routez"
-	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information
+	// https://docs.nats.io/reference/system/monitor/gatewayz
 	urlPathGatewayz = "/gatewayz"
-	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information
+	// https://docs.nats.io/reference/system/monitor/leafz
 	urlPathLeafz = "/leafz"
-	// https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#jetstream-information
+	// https://docs.nats.io/reference/system/monitor/jsz
 	urlPathJsz = "/jsz"
 )
 

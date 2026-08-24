@@ -53,19 +53,21 @@ func topologyCanonicalMetadataKey(key string) string {
 	return strings.Trim(key, "_")
 }
 
-func topologyMetadataValue(labels map[string]string, aliases []string) string {
-	if len(labels) == 0 || len(aliases) == 0 {
-		return ""
+type topologyMetadataIndex map[string]string
+
+func newTopologyMetadataIndex(labels map[string]string) topologyMetadataIndex {
+	if len(labels) == 0 {
+		return nil
 	}
-	byKey := make(map[string]string, len(labels))
+
+	byKey := make(topologyMetadataIndex, len(labels))
 	keys := make([]string, 0, len(labels))
 	for key := range labels {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		value := labels[key]
-		value = strings.TrimSpace(value)
+		value := strings.TrimSpace(labels[key])
 		if value == "" {
 			continue
 		}
@@ -77,12 +79,19 @@ func topologyMetadataValue(labels map[string]string, aliases []string) string {
 			byKey[canonical] = value
 		}
 	}
+	return byKey
+}
+
+func (idx topologyMetadataIndex) value(aliases []string) string {
+	if len(idx) == 0 || len(aliases) == 0 {
+		return ""
+	}
 	for _, alias := range aliases {
 		alias = topologyCanonicalMetadataKey(alias)
 		if alias == "" {
 			continue
 		}
-		if value := strings.TrimSpace(byKey[alias]); value != "" {
+		if value := strings.TrimSpace(idx[alias]); value != "" {
 			return value
 		}
 	}

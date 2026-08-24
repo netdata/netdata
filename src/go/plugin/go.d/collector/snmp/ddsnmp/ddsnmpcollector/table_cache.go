@@ -14,11 +14,10 @@ import (
 )
 
 // Table Cache Overview:
-// The table cache converts repeated SNMP walks into efficient GET operations.
-// - First collection: Full walk, cache structure and tags
-// - Subsequent collections: GET metrics only, use cached tags
-// - Tables with dependencies expire together to maintain consistency
-// - Supports multiple metric configurations per table
+// The cache retains only instance OIDs and tags for ordinary value tables; it
+// never retains SNMP values. Later collections GET current values for those
+// instances. Topology presence, BGP, and licensing tables always walk fresh.
+// Tables with dependencies expire together to maintain tag consistency.
 
 type tableCache struct {
 	// Table OID -> config ID -> cached entry
@@ -30,9 +29,10 @@ type tableCache struct {
 	// Table OID -> specific TTL for this table (with jitter applied)
 	tableTTLs map[string]time.Duration
 
-	// Table OID -> list of dependent table OIDs (bidirectional)
-	// If table A depends on table B, both A->B and B->A are stored
-	tableDeps map[string]map[string]bool
+	// Cache dependency direction is retained across collections so settlement
+	// can invalidate reverse dependents omitted from the current session.
+	dependenciesByTable map[string]map[string]bool
+	dependentsByTable   map[string]map[string]bool
 
 	baseTTL   time.Duration
 	jitterPct float64
@@ -40,7 +40,17 @@ type tableCache struct {
 	rng       *rand.Rand
 }
 
+type tableCacheEntryKind uint8
+
+const (
+	tableCacheEntryInvalid tableCacheEntryKind = iota
+	tableCacheEntryRows
+	tableCacheEntryMarker
+)
+
 type tableCacheEntry struct {
+	kind tableCacheEntryKind
+
 	// Index -> column OID -> full OID
 	oidMap map[string]map[string]string
 
@@ -50,13 +60,14 @@ type tableCacheEntry struct {
 
 func newTableCache(baseTTL time.Duration, jitterPct float64) *tableCache {
 	return &tableCache{
-		tables:     make(map[string]map[string]tableCacheEntry),
-		timestamps: make(map[string]time.Time),
-		tableTTLs:  make(map[string]time.Duration),
-		tableDeps:  make(map[string]map[string]bool),
-		baseTTL:    baseTTL,
-		jitterPct:  jitterPct,
-		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
+		tables:              make(map[string]map[string]tableCacheEntry),
+		timestamps:          make(map[string]time.Time),
+		tableTTLs:           make(map[string]time.Duration),
+		dependenciesByTable: make(map[string]map[string]bool),
+		dependentsByTable:   make(map[string]map[string]bool),
+		baseTTL:             baseTTL,
+		jitterPct:           jitterPct,
+		rng:                 rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -98,14 +109,18 @@ func (tc *tableCache) getCachedData(cfg ddprofiledefinition.MetricsConfig) (oids
 	}
 
 	entry, ok := configEntries[configID]
-	if !ok {
+	if !ok || entry.kind != tableCacheEntryRows {
 		return nil, nil, false
 	}
 
 	return entry.oidMap, entry.tagValues, true
 }
 
-func (tc *tableCache) cacheData(cfg ddprofiledefinition.MetricsConfig, oidMap map[string]map[string]string, tagValues map[string]map[string]string, dependencies []string) {
+func (tc *tableCache) cacheRows(cfg ddprofiledefinition.MetricsConfig, oidMap map[string]map[string]string, tagValues map[string]map[string]string, dependencies []string) {
+	if len(oidMap) == 0 {
+		return
+	}
+
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
@@ -138,6 +153,7 @@ func (tc *tableCache) cacheData(cfg ddprofiledefinition.MetricsConfig, oidMap ma
 
 	// Store the entry
 	tc.tables[tableOID][configID] = tableCacheEntry{
+		kind:      tableCacheEntryRows,
 		oidMap:    oidsCopy,
 		tagValues: tagsCopy,
 	}
@@ -148,33 +164,113 @@ func (tc *tableCache) cacheData(cfg ddprofiledefinition.MetricsConfig, oidMap ma
 		tc.tableTTLs[tableOID] = tc.calculateTableTTL()
 	}
 
-	// Set up bidirectional dependencies
+	// Retain both directions: expiry uses the full component, while settlement
+	// rollback follows only reverse dependents.
 	if len(dependencies) > 0 {
-		if tc.tableDeps[tableOID] == nil {
-			tc.tableDeps[tableOID] = make(map[string]bool)
+		if tc.dependenciesByTable[tableOID] == nil {
+			tc.dependenciesByTable[tableOID] = make(map[string]bool)
 		}
 
 		for _, depTable := range dependencies {
-			// Add forward dependency
-			tc.tableDeps[tableOID][depTable] = true
-
-			// Add reverse dependency
-			if tc.tableDeps[depTable] == nil {
-				tc.tableDeps[depTable] = make(map[string]bool)
+			tc.dependenciesByTable[tableOID][depTable] = true
+			if tc.dependentsByTable[depTable] == nil {
+				tc.dependentsByTable[depTable] = make(map[string]bool)
 			}
-			tc.tableDeps[depTable][tableOID] = true
+			tc.dependentsByTable[depTable][tableOID] = true
 		}
 	}
+}
+
+// cacheMarker records a successful symbol-free auxiliary walk for route
+// planning. Markers never provide row data to cached collection.
+func (tc *tableCache) cacheMarker(cfg ddprofiledefinition.MetricsConfig) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
+	if tc.baseTTL == 0 {
+		return
+	}
+
+	tableOID := cfg.Table.OID
+	if tc.tables[tableOID] == nil {
+		tc.tables[tableOID] = make(map[string]tableCacheEntry)
+	}
+	tc.tables[tableOID][tc.generateConfigID(cfg)] = tableCacheEntry{kind: tableCacheEntryMarker}
+
+	if _, exists := tc.timestamps[tableOID]; !exists {
+		tc.timestamps[tableOID] = time.Now()
+		tc.tableTTLs[tableOID] = tc.calculateTableTTL()
+	}
+}
+
+func (tc *tableCache) invalidateConfig(cfg ddprofiledefinition.MetricsConfig) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
+	tableOID := cfg.Table.OID
+	configs, ok := tc.tables[tableOID]
+	if !ok {
+		return
+	}
+
+	delete(configs, tc.generateConfigID(cfg))
+	if len(configs) > 0 {
+		return
+	}
+
+	tc.clearTablesLocked(map[string]bool{tableOID: true})
+}
+
+func (tc *tableCache) invalidateTable(tableOID string) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
+	tc.clearTablesLocked(map[string]bool{tableOID: true})
+}
+
+func (tc *tableCache) discardTables(tableOIDs []string) {
+	if len(tableOIDs) == 0 {
+		return
+	}
+
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	if tc.baseTTL == 0 {
+		return
+	}
+
+	tables := make(map[string]bool, len(tableOIDs))
+	var addDependents func(string)
+	addDependents = func(tableOID string) {
+		if tables[tableOID] {
+			return
+		}
+		tables[tableOID] = true
+		for dependent := range tc.dependentsByTable[tableOID] {
+			addDependents(dependent)
+		}
+	}
+	for _, tableOID := range tableOIDs {
+		addDependents(tableOID)
+	}
+
+	for tableOID := range tables {
+		tc.discardTableLocked(tableOID)
+	}
+}
+
+func (tc *tableCache) enabled() bool {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+	return tc.baseTTL != 0
 }
 
 func (tc *tableCache) clearExpired() []string {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
-	var expired []string
 	now := time.Now()
 
-	// First pass: find naturally expired tables
 	expiredTables := make(map[string]bool)
 	for tableOID, timestamp := range tc.timestamps {
 		ttl := tc.tableTTLs[tableOID]
@@ -182,51 +278,58 @@ func (tc *tableCache) clearExpired() []string {
 			expiredTables[tableOID] = true
 		}
 	}
+	return tc.clearTablesLocked(expiredTables)
+}
 
-	// Second pass: cascade expiration to dependent tables
-	visited := make(map[string]bool)
-	var cascadeExpiration func(tableOID string)
-	cascadeExpiration = func(tableOID string) {
-		if visited[tableOID] {
+func (tc *tableCache) clearTablesLocked(tables map[string]bool) []string {
+	collected := make(map[string]bool)
+	var addRelatedTables func(tableOID string)
+	addRelatedTables = func(tableOID string) {
+		if collected[tableOID] {
 			return
 		}
-		visited[tableOID] = true
-		expiredTables[tableOID] = true
+		collected[tableOID] = true
 
-		for dep := range tc.tableDeps[tableOID] {
-			cascadeExpiration(dep)
+		for dependency := range tc.dependenciesByTable[tableOID] {
+			addRelatedTables(dependency)
+		}
+		for dependent := range tc.dependentsByTable[tableOID] {
+			addRelatedTables(dependent)
 		}
 	}
 
-	// Start cascade from naturally expired tables
-	for tableOID := range expiredTables {
-		cascadeExpiration(tableOID)
+	for tableOID := range tables {
+		addRelatedTables(tableOID)
 	}
 
-	// Clear all expired tables
-	for tableOID := range expiredTables {
-		delete(tc.tables, tableOID)
-		delete(tc.timestamps, tableOID)
-		delete(tc.tableTTLs, tableOID)
+	cleared := make([]string, 0, len(collected))
+	for tableOID := range collected {
+		tc.discardTableLocked(tableOID)
+		cleared = append(cleared, tableOID)
+	}
 
-		// Clean up dependencies
-		if deps, ok := tc.tableDeps[tableOID]; ok {
-			// Remove this table from other tables' dependency lists
-			for depTable := range deps {
-				if otherDeps, ok := tc.tableDeps[depTable]; ok {
-					delete(otherDeps, tableOID)
-					if len(otherDeps) == 0 {
-						delete(tc.tableDeps, depTable)
-					}
-				}
-			}
-			delete(tc.tableDeps, tableOID)
+	return cleared
+}
+
+func (tc *tableCache) discardTableLocked(tableOID string) {
+	delete(tc.tables, tableOID)
+	delete(tc.timestamps, tableOID)
+	delete(tc.tableTTLs, tableOID)
+
+	for dependency := range tc.dependenciesByTable[tableOID] {
+		delete(tc.dependentsByTable[dependency], tableOID)
+		if len(tc.dependentsByTable[dependency]) == 0 {
+			delete(tc.dependentsByTable, dependency)
 		}
-
-		expired = append(expired, tableOID)
 	}
-
-	return expired
+	for dependent := range tc.dependentsByTable[tableOID] {
+		delete(tc.dependenciesByTable[dependent], tableOID)
+		if len(tc.dependenciesByTable[dependent]) == 0 {
+			delete(tc.dependenciesByTable, dependent)
+		}
+	}
+	delete(tc.dependenciesByTable, tableOID)
+	delete(tc.dependentsByTable, tableOID)
 }
 
 func (tc *tableCache) setTTL(baseTTL time.Duration, jitterPct float64) {
@@ -241,7 +344,8 @@ func (tc *tableCache) setTTL(baseTTL time.Duration, jitterPct float64) {
 		tc.tables = make(map[string]map[string]tableCacheEntry)
 		tc.timestamps = make(map[string]time.Time)
 		tc.tableTTLs = make(map[string]time.Duration)
-		tc.tableDeps = make(map[string]map[string]bool)
+		tc.dependenciesByTable = make(map[string]map[string]bool)
+		tc.dependentsByTable = make(map[string]map[string]bool)
 	}
 }
 
@@ -298,8 +402,8 @@ func (tc *tableCache) isConfigCached(cfg ddprofiledefinition.MetricsConfig) bool
 		return false
 	}
 
-	_, ok = configEntries[configID]
-	return ok
+	entry, ok := configEntries[configID]
+	return ok && (entry.kind == tableCacheEntryRows || entry.kind == tableCacheEntryMarker)
 }
 
 // generateConfigID creates a unique identifier for a MetricsConfig
@@ -340,7 +444,7 @@ func (tc *tableCache) stats() (tables int, configs int, withDeps int, totalDeps 
 		configs += len(configMap)
 	}
 
-	for _, deps := range tc.tableDeps {
+	for _, deps := range tc.dependenciesByTable {
 		if len(deps) > 0 {
 			withDeps++
 			totalDeps += len(deps)
@@ -354,7 +458,7 @@ func (tc *tableCache) getDependencies(tableOID string) []string {
 	tc.mu.RLock()
 	defer tc.mu.RUnlock()
 
-	deps, ok := tc.tableDeps[tableOID]
+	deps, ok := tc.dependenciesByTable[tableOID]
 	if !ok {
 		return nil
 	}
@@ -362,6 +466,18 @@ func (tc *tableCache) getDependencies(tableOID string) []string {
 	result := make([]string, 0, len(deps))
 	for dep := range deps {
 		result = append(result, dep)
+	}
+	return result
+}
+
+func (tc *tableCache) getDependents(tableOID string) []string {
+	tc.mu.RLock()
+	defer tc.mu.RUnlock()
+
+	dependents := tc.dependentsByTable[tableOID]
+	result := make([]string, 0, len(dependents))
+	for dependent := range dependents {
+		result = append(result, dependent)
 	}
 	return result
 }

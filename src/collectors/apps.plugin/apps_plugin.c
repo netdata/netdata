@@ -103,7 +103,7 @@ NETDATA_DOUBLE
 
 int update_every = 1;
 
-#if defined(OS_LINUX)
+#if (PROCESSES_HAVE_STATE == 1)
 proc_state proc_state_count[PROC_STATUS_END];
 const char *proc_states[] = {
     [PROC_STATUS_RUNNING] = "running",
@@ -904,6 +904,8 @@ int main(int argc, char **argv) {
 #if defined(OS_LINUX)
         if (apps_ebpf_cachestat_is_available())
             apps_ebpf_accumulate_cachestat();
+        if (apps_ebpf_dcstat_is_available())
+            apps_ebpf_accumulate_dcstat();
 #endif
 
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);

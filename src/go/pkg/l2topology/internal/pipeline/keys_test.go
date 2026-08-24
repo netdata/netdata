@@ -53,6 +53,21 @@ func TestAttachmentKey_NormalizesIDsAndMethod(t *testing.T) {
 	require.Equal(t, attachmentKey(normalized), attachmentKey(raw))
 }
 
+func TestAttachmentKey_DistinguishesForwardingDomainsWithoutDisplayVLAN(t *testing.T) {
+	base := model.Attachment{
+		DeviceID:   "sw1",
+		IfIndex:    10,
+		EndpointID: "endpoint-1",
+		Method:     "fdb",
+	}
+	first := base
+	first.Labels = map[string]string{"fdb_domain_id": "fdb:100"}
+	second := base
+	second.Labels = map[string]string{"fdb_domain_id": "fdb:200"}
+
+	require.NotEqual(t, attachmentKey(first), attachmentKey(second))
+}
+
 func TestAdjacencyKey_DistinguishesEmbeddedSeparators(t *testing.T) {
 	first := model.Adjacency{
 		Protocol:   "lldp",

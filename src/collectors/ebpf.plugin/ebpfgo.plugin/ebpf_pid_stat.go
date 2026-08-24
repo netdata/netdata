@@ -34,6 +34,12 @@ type netdataPublishDCStat struct {
 	CacheAccess int64
 	Curr        netdataPublishDCStatPid
 	Prev        netdataPublishDCStatPid
+	// UpdateEverySec is the dcstat collection interval that produced Curr-Prev.
+	// Consumers must divide the deltas by it rather than by their own tick rate:
+	// dcstat may run at a different interval from whichever module owns the
+	// segment, so the header's update_every_s is not a substitute.  Mirrors
+	// ebpf_socket_publish_apps.socket_update_every_s.
+	UpdateEverySec uint32
 }
 
 type netdataPublishFDStat struct {

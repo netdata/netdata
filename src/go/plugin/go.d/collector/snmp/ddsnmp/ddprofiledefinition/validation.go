@@ -40,8 +40,6 @@ var validMetadataResources = map[string]map[string]bool{
 		"lldp_loc_sys_cap_supported":  true,
 		"lldp_loc_sys_cap_enabled":    true,
 		"bridge_base_address":         true,
-		"stp_designated_root":         true,
-		"vtp_version":                 true,
 		"ospf_router_id":              true,
 	},
 	"interface": {
@@ -1361,6 +1359,17 @@ func validateEnrichTopologySymbol(topologyIdx int, symbol *SymbolConfig, symbolC
 	}
 	if symbol.ConstantValueOne {
 		errs = append(errs, fmt.Errorf("topology[%d]: constant_value_one cannot be used in topology rows", topologyIdx))
+	}
+	if symbolContext == TopologyColumnSymbol {
+		if symbol.ExtractValue != "" {
+			errs = append(errs, fmt.Errorf("topology[%d]: extract_value cannot be used on table presence symbols", topologyIdx))
+		}
+		if symbol.MatchPattern != "" {
+			errs = append(errs, fmt.Errorf("topology[%d]: match_pattern cannot be used on table presence symbols", topologyIdx))
+		}
+		if symbol.MatchValue != "" {
+			errs = append(errs, fmt.Errorf("topology[%d]: match_value cannot be used on table presence symbols", topologyIdx))
+		}
 	}
 
 	return errors.Join(errs...)

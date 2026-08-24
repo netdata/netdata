@@ -130,6 +130,43 @@ off-registry and only swaps it into the registered cache after ingestion
 finishes. Function readers keep seeing the previous complete snapshot while a
 new SNMP walk is in progress.
 
+## Topology Profile Composition
+
+Topology profile selection uses the shared SNMP profile catalog. Matching is
+additive: a device receives the combined topology rows from every matching
+selector and each profile's `extends` graph. The topology projection then keeps
+only topology-consumer fields and typed `topology:` rows.
+
+The standard capabilities have separate owners:
+
+- `generic-device.yaml` and `generic-ups.yaml` extend
+  `_std-topology-ip-mib.yaml`. This baseline walks the legacy IPv4
+  `ipAddrTable` and provides address, interface-index, and netmask facts for L3
+  subnet enrichment. The address comes from the indexed row suffix; the `.2`
+  ifIndex and `.3` netmask columns are the required readable PDUs.
+- `_std-topology-interface-mib.yaml` owns interface identity and state.
+- `_std-topology-bridge-base-mib.yaml` owns bridge identity and bridge-port to
+  ifIndex mapping.
+- Classic FDB, Q-BRIDGE, STP, ARP, and Cisco VTP each have independent mixins.
+  Product profiles inherit only the capabilities justified by their role and
+  available MIB rows. Selector-only `topology-role-*.yaml` profiles fill exact
+  or qualified capability gaps without attaching unrelated vendor metrics.
+
+This separation is why an L3-only device can participate in logical subnet
+topology without being polled as a bridge. Conversely, FDB and ARP are not
+attempted on every generic SNMP device: their tables can be high-cardinality and
+their graph semantics are role-specific.
+
+When `sysObjectID` is unavailable, profile resolution uses only the configured
+manual profiles. Such jobs must list `generic-device` explicitly when they need
+the baseline IPv4 topology rows, for example
+`manual_profiles: [vendor-profile, generic-device]`.
+
+For a topology table, the configured symbol is a structural row-presence
+anchor. An existing PDU emits the tagged observation with an internal value of
+zero, including when the PDU is an OctetString. Cache ingestion consumes the
+tags; scalar topology values retain normal value semantics.
+
 ## Per-Device Cache
 
 `topology_cache.go` defines one mutable cache per SNMP device.
@@ -265,6 +302,22 @@ aggregate observations
 For the low-confidence map type, the builder creates a strict map and a
 probable map, marks probable-only link deltas, then applies the same L3/OSPF/BGP
 enrichment and depth/focus filtering to the probable map.
+
+The default `managed_fabric` map keeps every monitored SNMP device, the legacy
+direct LLDP/CDP discovery surface, direct STP adjacencies between monitored
+devices, and bridge/FDB legs for broadcast-domain segments adjacent to at least
+two distinct monitored devices. Multiple legs from one device do not satisfy
+that threshold. Endpoint actors, endpoint-only or sparse segments, direct FDB
+shortcuts, and segment-to-segment paths are excluded. The selectable legacy
+`lldp_cdp_managed`, `high_confidence_inferred`, and
+`all_devices_low_confidence` policies retain their existing semantics.
+
+Map-type shaping applies to the Layer 2 graph. Logical Layer 3 enrichment runs
+after shaping and is preserved for every map type: `/24` through `/29` subnet
+segments, `/30` and `/31` direct subnet links, OSPF adjacencies, and BGP
+adjacencies. Their topology presentation uses distinct dashed logical/control
+links, so Layer 2 acceptance and statistics must be checked by link type rather
+than by treating any non-empty graph as Layer 2 success.
 
 Local actor augmentation indexes the pre-policy actor generation once by its
 local identity subset: chassis id, system name, and selected management IP.

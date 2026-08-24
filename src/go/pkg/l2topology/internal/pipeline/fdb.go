@@ -10,12 +10,13 @@ import (
 )
 
 type fdbCandidate struct {
-	mac        string
-	bridgePort string
-	ifIndex    int
-	statusRaw  string
-	vlanID     string
-	vlanName   string
+	mac         string
+	bridgePort  string
+	ifIndex     int
+	statusRaw   string
+	fdbDomainID string
+	vlanID      string
+	vlanName    string
 }
 
 func buildFDBCandidates(entries []model.FDBObservation, bridgePortToIfIndex map[string]int) []fdbCandidate {
@@ -58,17 +59,20 @@ func buildFDBCandidates(entries []model.FDBObservation, bridgePortToIfIndex map[
 			}
 		}
 
+		vlanID := strings.TrimSpace(entry.VLANID)
+		fdbDomainID := strings.TrimSpace(entry.FDBDomainID)
 		candidate := fdbCandidate{
-			mac:        mac,
-			bridgePort: bridgePort,
-			ifIndex:    ifIndex,
-			statusRaw:  strings.TrimSpace(entry.Status),
-			vlanID:     strings.TrimSpace(entry.VLANID),
-			vlanName:   strings.TrimSpace(entry.VLANName),
+			mac:         mac,
+			bridgePort:  bridgePort,
+			ifIndex:     ifIndex,
+			statusRaw:   strings.TrimSpace(entry.Status),
+			fdbDomainID: fdbDomainID,
+			vlanID:      vlanID,
+			vlanName:    strings.TrimSpace(entry.VLANName),
 		}
 		candidateKey := opaqueCompositeKey(mac)
-		if candidate.vlanID != "" {
-			candidateKey = opaqueCompositeKey(mac, "vlan:"+strings.ToLower(candidate.vlanID))
+		if domain := fdbCandidateForwardingDomain(candidate); domain != "" {
+			candidateKey = opaqueCompositeKey(mac, strings.ToLower(domain))
 		}
 		if _, duplicated := duplicates[candidateKey]; duplicated {
 			continue
@@ -104,6 +108,9 @@ func buildFDBCandidates(entries []model.FDBObservation, bridgePortToIfIndex map[
 		if out[i].mac != out[j].mac {
 			return out[i].mac < out[j].mac
 		}
+		if out[i].fdbDomainID != out[j].fdbDomainID {
+			return out[i].fdbDomainID < out[j].fdbDomainID
+		}
 		if out[i].vlanID != out[j].vlanID {
 			return out[i].vlanID < out[j].vlanID
 		}
@@ -134,11 +141,21 @@ func canonicalFDBStatus(status string) string {
 }
 
 func sameFDBDestination(left, right fdbCandidate) bool {
-	if strings.TrimSpace(left.vlanID) != strings.TrimSpace(right.vlanID) {
+	if fdbCandidateForwardingDomain(left) != fdbCandidateForwardingDomain(right) {
 		return false
 	}
 	if left.ifIndex > 0 && right.ifIndex > 0 {
 		return left.ifIndex == right.ifIndex
 	}
 	return left.bridgePort != "" && left.bridgePort == right.bridgePort
+}
+
+func fdbCandidateForwardingDomain(candidate fdbCandidate) string {
+	if domain := strings.TrimSpace(candidate.fdbDomainID); domain != "" {
+		return strings.ToLower(domain)
+	}
+	if vlanID := strings.TrimSpace(candidate.vlanID); vlanID != "" {
+		return "vlan:" + strings.ToLower(vlanID)
+	}
+	return ""
 }

@@ -54,7 +54,7 @@ func TestTopologyFunctionAdapter_MethodParamsUsesRegistryFocusTargets(t *testing
 	assert.Nil(t, params)
 }
 
-func TestTopologyFunctionAdapter_HandleDefaultStrictL2(t *testing.T) {
+func TestTopologyFunctionAdapter_HandleDefaultManagedFabric(t *testing.T) {
 	registry := newTopologyRegistry()
 	registry.register(newTestTopologyCacheLLDP(
 		"agent-test",

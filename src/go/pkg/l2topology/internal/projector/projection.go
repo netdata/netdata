@@ -26,9 +26,10 @@ type projectedLinks struct {
 }
 
 type bridgePortRef struct {
-	deviceID   string
-	ifIndex    int
-	ifName     string
-	bridgePort string
-	vlanID     string
+	deviceID    string
+	ifIndex     int
+	ifName      string
+	bridgePort  string
+	fdbDomainID string
+	vlanID      string
 }
