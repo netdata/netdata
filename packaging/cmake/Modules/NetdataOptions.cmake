@@ -194,6 +194,13 @@ if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
                 message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg builds the native macOS package and requires arm64 macOS; this is ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
         endif()
 
+        # The bundling modules rely on FetchContent honouring SOURCE_SUBDIR
+        # and EXCLUDE_FROM_ALL in FetchContent_Declare. The CPack productbuild
+        # wiring will raise this further if it needs to.
+        if(CMAKE_VERSION VERSION_LESS 3.28)
+                message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg requires CMake >= 3.28; this is ${CMAKE_VERSION}")
+        endif()
+
         set(ENABLE_BUNDLED_JSONC True)
         set(ENABLE_BUNDLED_YAML True)
 endif()

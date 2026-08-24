@@ -64,9 +64,6 @@ pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
 pkg_check_modules(TLS IMPORTED_TARGET openssl)
 pkg_check_modules(CRYPTO IMPORTED_TARGET libcrypto)
 
-pkg_check_modules(LIBLZ4 liblz4>=1.7.1)
-pkg_check_modules(LIBZSTD libzstd)
-pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
 
 pkg_check_modules(LIBUV libuv)
 pkg_check_modules(UUID uuid)
@@ -146,10 +143,6 @@ endif()
 
 if(NOT ZLIB_FOUND)
   message(FATAL_ERROR "zlib is required for building Netdata, but could not be found.")
-endif()
-
-if(NOT LIBLZ4_FOUND)
-  message(FATAL_ERROR "liblz4 >= 1.7.1 is required for building Netdata, but could not be found.")
 endif()
 
 if(NOT LIBUV_FOUND)
