@@ -1312,6 +1312,11 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         with:
           submodules: recursive
+      - name: Install latest bash
+        id: install-bash
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          brew install bash
       - name: Install netdata dependencies
         id: install-deps
         if: needs.file-check.outputs.run == 'true'

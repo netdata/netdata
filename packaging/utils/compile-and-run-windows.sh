@@ -47,7 +47,6 @@ export PATH="/usr/local/bin:${PATH}"
 
 WT_ROOT="$(pwd)"
 BUILD_TYPE="Debug"
-NULL=""
 
 if [ -z "${MSYSTEM}" ]; then
    build="${WT_ROOT}/build-${OSTYPE}"
@@ -75,8 +74,7 @@ then
       -DENABLE_ML=On \
       -DENABLE_BUNDLED_JSONC=On \
       -DENABLE_BUNDLED_PROTOBUF=Off \
-      -DENABLE_PLUGIN_APPS=On \
-      ${NULL}
+      -DENABLE_PLUGIN_APPS=On
 fi
 
 echo "Compiling Netdata..."
@@ -106,7 +104,7 @@ if [ $RUN_AS_SERVICE -eq 1 ]; then
    grep " => /usr/bin/" |\
     sed -e 's|\s\+| |g' -e 's|^ ||g' |\
      cut -d ' ' -f 3 |\
-      while read x; do
+      while read -r x; do
         cp "$x" /opt/netdata/usr/bin/
       done
 
@@ -126,7 +124,8 @@ else
   echo "Starting netdata..."
 
   # enable JIT debug with gdb
-  export MSYS="error_start:$(cygpath -w /usr/bin/gdb)"
+  MSYS="error_start:$(cygpath -w /usr/bin/gdb)"
+  export MSYS
 
   rm -rf /opt/netdata/var/log/netdata/*.log || echo
   /opt/netdata/usr/bin/netdata -D
