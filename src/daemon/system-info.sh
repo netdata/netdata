@@ -329,14 +329,27 @@ fi
 
 # Label-only OS metadata uses standard os-release keys. Do not infer an edition,
 # codename, or point release when the operating system does not provide one.
+filter_host_os_label_version() {
+  # Linux has no separate marketing-version source here. Avoid emitting the
+  # same value under two labels while retaining the release label.
+  if [ "${KERNEL_NAME}" = "Linux" ] && [ "${HOST_OS_LABEL_VERSION}" = "${HOST_OS_LABEL_RELEASE}" ]; then
+    HOST_OS_LABEL_VERSION=""
+  fi
+}
+
+set_host_os_label_versions() {
+  if [ -n "${HOST_VERSION_ID}" ] && [ "${HOST_VERSION_ID}" != "unknown" ] && [ "${HOST_VERSION_ID}" != "none" ]; then
+    HOST_OS_LABEL_VERSION="${HOST_VERSION_ID}"
+    HOST_OS_LABEL_RELEASE="${HOST_VERSION_ID}"
+  else
+    HOST_OS_LABEL_VERSION="${HOST_VERSION}"
+    HOST_OS_LABEL_RELEASE="${HOST_VERSION}"
+  fi
+  filter_host_os_label_version
+}
+
 HOST_OS_LABEL_NAME="${HOST_NAME}"
-if [ -n "${HOST_VERSION_ID}" ] && [ "${HOST_VERSION_ID}" != "unknown" ] && [ "${HOST_VERSION_ID}" != "none" ]; then
-  HOST_OS_LABEL_VERSION="${HOST_VERSION_ID}"
-  HOST_OS_LABEL_RELEASE="${HOST_VERSION_ID}"
-else
-  HOST_OS_LABEL_VERSION="${HOST_VERSION}"
-  HOST_OS_LABEL_RELEASE="${HOST_VERSION}"
-fi
+set_host_os_label_versions
 HOST_OS_LABEL_CODENAME="${HOST_VERSION_CODENAME}"
 HOST_OS_LABEL_EDITION="${HOST_VARIANT}"
 HOST_OS_LABEL_BUILD="${HOST_BUILD_ID}"

@@ -14,6 +14,8 @@ sed -n \
     -e '/^os_release_unescape()/,/^}/p' \
     -e '/^load_os_release()/,/^}/p' \
     -e '/^load_lsb_release()/,/^}/p' \
+    -e '/^filter_host_os_label_version()/,/^}/p' \
+    -e '/^set_host_os_label_versions()/,/^}/p' \
     "${system_info_script}" > "${functions_script}"
 
 os_release_file="${test_dir}/os-release"
@@ -47,5 +49,38 @@ if [ "$(id -u)" -ne 0 ]; then
     chmod 000 "${lsb_release_file}"
     /bin/sh -c '. "$1"; ! load_lsb_release "$2"' sh "${functions_script}" "${lsb_release_file}"
 fi
+
+label_output=$(/bin/sh -c '
+    . "$1"
+    KERNEL_NAME=Linux HOST_VERSION_ID=24.04 HOST_VERSION=Ubuntu
+    set_host_os_label_versions
+    printf "%s|%s\n" "$HOST_OS_LABEL_VERSION" "$HOST_OS_LABEL_RELEASE"
+' sh "${functions_script}")
+[ "${label_output}" = '|24.04' ] || {
+    printf 'unexpected duplicate Linux label output: %s\n' "${label_output}" >&2
+    exit 1
+}
+
+label_output=$(/bin/sh -c '
+    . "$1"
+    KERNEL_NAME=Linux HOST_OS_LABEL_VERSION=24.04 HOST_OS_LABEL_RELEASE=24.04.3
+    filter_host_os_label_version
+    printf "%s|%s\n" "$HOST_OS_LABEL_VERSION" "$HOST_OS_LABEL_RELEASE"
+' sh "${functions_script}")
+[ "${label_output}" = '24.04|24.04.3' ] || {
+    printf 'unexpected distinct Linux label output: %s\n' "${label_output}" >&2
+    exit 1
+}
+
+label_output=$(/bin/sh -c '
+    . "$1"
+    KERNEL_NAME=Darwin HOST_VERSION_ID=24.04 HOST_VERSION=macOS
+    set_host_os_label_versions
+    printf "%s|%s\n" "$HOST_OS_LABEL_VERSION" "$HOST_OS_LABEL_RELEASE"
+' sh "${functions_script}")
+[ "${label_output}" = '24.04|24.04' ] || {
+    printf 'unexpected non-Linux label output: %s\n' "${label_output}" >&2
+    exit 1
+}
 
 printf '%s\n' 'system-info shell tests: OK'
