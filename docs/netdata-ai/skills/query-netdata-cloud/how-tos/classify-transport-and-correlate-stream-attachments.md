@@ -37,6 +37,11 @@ CONTEXT_PATTERN='vendor.*wan*'
 AUDIT_DIR=".local/audits/query-netdata-cloud/transport-state/$SPACE/$ROOM/$AFTER-$BEFORE"
 mkdir -p "$AUDIT_DIR"
 
+require_query_tier() {
+  jq -e --argjson tier "$QUERY_TIER" \
+    'all(.db.per_tier[]; .tier == $tier or .points == 0)' "$1" > /dev/null
+}
+
 DISCOVERY_PAYLOAD=$(jq -nc --arg context "$CONTEXT_PATTERN" '{
   scope: {contexts: [$context]},
   selectors: {nodes: ["*"], contexts: ["*"]}
@@ -94,8 +99,7 @@ while (( start < BEFORE )); do
     }')
 
   agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/data" "$TRANSPORT_PAYLOAD" > "$response"
-  jq -e --argjson tier "$QUERY_TIER" \
-    'all(.db.per_tier[]; .tier == $tier or .points == 0)' "$response" > /dev/null
+  require_query_tier "$response"
   printf '%s\n' "$response" >> "$TRANSPORT_MANIFEST"
   start=$end
 done
@@ -251,8 +255,7 @@ while (( start < BEFORE )); do
 
   response="$AUDIT_DIR/attachments-$start-$end.json"
   agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/data" "$ATTACHMENT_PAYLOAD" > "$response"
-  jq -e --argjson tier "$QUERY_TIER" \
-    'all(.db.per_tier[]; .tier == $tier or .points == 0)' "$response" > /dev/null
+  require_query_tier "$response"
   printf '%s\n' "$response" >> "$ATTACHMENT_MANIFEST"
   start=$end
 done
