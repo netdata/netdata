@@ -807,7 +807,7 @@ newer_commit_date() {
   fi
 
   if command -v jq > /dev/null 2>&1 ; then
-    commit_date="$(jq -r '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}")"
+    commit_date="$(jq -r '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}" || true)"
   elif command -v python > /dev/null 2>&1 || command -v python3 > /dev/null 2>&1 ; then
     python="$(command -v python3 2>/dev/null)"
     [ -z "${python}" ] && python="$(command -v python 2>/dev/null)"
@@ -821,24 +821,46 @@ newer_commit_date() {
 	else:
 	    print(data[0]['commit']['committer']['date'] if isinstance(data, list) and data else '')
 	EOF
-    commit_date="$("${python}" "${ndtmpdir}/parse_commit_date.py" < "${commit_check_file}")"
+    commit_date="$("${python}" "${ndtmpdir}/parse_commit_date.py" < "${commit_check_file}" 2>/dev/null || true)"
   elif command -v node > /dev/null 2>&1 || command -v deno > /dev/null 2>&1 ; then
     cat > "${ndtmpdir}/parse_commit_date.js" <<-EOF
-	const fs = require('node:fs');
-	const data = fs.readFileSync(0, 'utf-8');
-	try {
-	  const json = JSON.parse(data);
-	  const date = json[0].commit.committer.date;
-	  process.stdout.write(String(date));
-	} catch (err) {
-	  process.stderr.write(err.message + '\\n');
-	  process.exit(1);
-	}
+	(function () {
+	  function writeOut(s) {
+	    if (typeof Deno !== 'undefined' && Deno.stdout && Deno.stdout.writeSync) {
+	      Deno.stdout.writeSync(new TextEncoder().encode(s));
+	      return;
+	    }
+	    if (typeof process !== 'undefined' && process.stdout && process.stdout.write) {
+	      process.stdout.write(s);
+	    }
+	  }
+	  async function readStdin() {
+	    if (typeof Deno !== 'undefined' && Deno.stdin && Deno.stdin.readable) {
+	      return await new Response(Deno.stdin.readable).text();
+	    }
+	    const fs = require('fs');
+	    return fs.readFileSync(0, 'utf8');
+	  }
+	  readStdin().then((data) => {
+	    let date = '';
+	    try {
+	      const json = JSON.parse(data);
+	      if (Array.isArray(json) && json[0] && json[0].commit && json[0].commit.committer && json[0].commit.committer.date) {
+	        date = json[0].commit.committer.date;
+	      }
+	    } catch (_) {
+	      date = '';
+	    }
+	    writeOut(String(date || ''));
+	  }).catch(() => {
+	    writeOut('');
+	  });
+	})();
 	EOF
     if command -v deno > /dev/null 2>&1 ; then
-      commit_date="$(deno run -A "${ndtmpdir}/parse_commit_date.js" < "${commit_check_file}")"
+      commit_date="$(deno run "${ndtmpdir}/parse_commit_date.js" < "${commit_check_file}" 2>/dev/null || true)"
     else
-      commit_date="$(node "${ndtmpdir}/parse_commit_date.js" < "${commit_check_file}")"
+      commit_date="$(node "${ndtmpdir}/parse_commit_date.js" < "${commit_check_file}" 2>/dev/null || true)"
     fi
   fi
 
@@ -854,7 +876,7 @@ newer_commit_date() {
     commit_date="$(/bin/date -j -f "%Y-%m-%dT%H:%M:%SZ" "${commit_date}" +%s 2>/dev/null)"
 
     if [ -z "${commit_date}" ]; then
-        return 0
+      return 0
     fi
   fi
 
