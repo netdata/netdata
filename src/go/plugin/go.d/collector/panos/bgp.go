@@ -54,20 +54,13 @@ type bgpPeer struct {
 	RemoteAS       string
 	PeerGroup      string
 	State          string
-	Uptime         int64
-	MessagesIn     int64
-	MessagesOut    int64
-	UpdatesIn      int64
-	UpdatesOut     int64
-	Flaps          int64
-	Established    int64
-	HasUptime      bool
-	HasMessagesIn  bool
-	HasMessagesOut bool
-	HasUpdatesIn   bool
-	HasUpdatesOut  bool
-	HasFlaps       bool
-	HasEstablished bool
+	Uptime         *int64
+	MessagesIn     *int64
+	MessagesOut    *int64
+	UpdatesIn      *int64
+	UpdatesOut     *int64
+	Flaps          *int64
+	Established    *int64
 	PrefixCounters []bgpPrefixCounter
 
 	// ARE peers require summary-based VR resolution even when routerID is absent.
@@ -79,15 +72,10 @@ type bgpPeer struct {
 type bgpPrefixCounter struct {
 	AFI                string
 	SAFI               string
-	IncomingTotal      int64
-	IncomingAccepted   int64
-	IncomingRejected   int64
-	OutgoingAdvertised int64
-
-	HasIncomingTotal      bool
-	HasIncomingAccepted   bool
-	HasIncomingRejected   bool
-	HasOutgoingAdvertised bool
+	IncomingTotal      *int64
+	IncomingAccepted   *int64
+	IncomingRejected   *int64
+	OutgoingAdvertised *int64
 }
 
 type panosResponseMessage struct {
@@ -453,20 +441,13 @@ func (e panosBGPPeerEntry) toBGPPeer() (bgpPeer, bool, error) {
 		RemoteAS:       e.remoteAS(),
 		PeerGroup:      e.peerGroup(),
 		State:          normalizeBGPState(firstNonEmpty(e.Status, e.State, e.BGPState, e.PeerState, e.SessionState)),
-		Uptime:         uptime,
-		MessagesIn:     messagesIn,
-		MessagesOut:    messagesOut,
-		UpdatesIn:      updatesIn,
-		UpdatesOut:     updatesOut,
-		Flaps:          flaps,
-		Established:    established,
-		HasUptime:      true,
-		HasMessagesIn:  true,
-		HasMessagesOut: true,
-		HasUpdatesIn:   true,
-		HasUpdatesOut:  true,
-		HasFlaps:       true,
-		HasEstablished: true,
+		Uptime:         new(uptime),
+		MessagesIn:     new(messagesIn),
+		MessagesOut:    new(messagesOut),
+		UpdatesIn:      new(updatesIn),
+		UpdatesOut:     new(updatesOut),
+		Flaps:          new(flaps),
+		Established:    new(established),
 		PrefixCounters: prefixCounters,
 	}
 
@@ -583,15 +564,10 @@ func (e panosBGPPrefixEntry) toBGPPrefixCounter(peerAddr string) (bgpPrefixCount
 	return bgpPrefixCounter{
 		AFI:                afi,
 		SAFI:               safi,
-		IncomingTotal:      incomingTotal,
-		IncomingAccepted:   incomingAccepted,
-		IncomingRejected:   incomingRejected,
-		OutgoingAdvertised: outgoingAdvertised,
-
-		HasIncomingTotal:      true,
-		HasIncomingAccepted:   true,
-		HasIncomingRejected:   true,
-		HasOutgoingAdvertised: true,
+		IncomingTotal:      new(incomingTotal),
+		IncomingAccepted:   new(incomingAccepted),
+		IncomingRejected:   new(incomingRejected),
+		OutgoingAdvertised: new(outgoingAdvertised),
 	}, nil
 }
 

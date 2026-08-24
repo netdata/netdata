@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 )
 
@@ -112,50 +113,25 @@ func (f frrBGPPeer) toBGPPeer(name string) (bgpPeer, bool) {
 		RemoteAS:       strings.TrimSpace(f.RemoteAS.String()),
 		PeerGroup:      strings.TrimSpace(f.PeerGroupName),
 		State:          normalizeBGPState(firstNonEmpty(f.State, f.Detail.BGPState)),
+		MessagesIn:     f.Detail.MessageStats.TotalRecv,
+		MessagesOut:    f.Detail.MessageStats.TotalSent,
+		UpdatesIn:      f.Detail.MessageStats.UpdatesRecv,
+		UpdatesOut:     f.Detail.MessageStats.UpdatesSent,
+		Flaps:          f.Detail.ConnectionsDropped,
+		Established:    f.Detail.ConnectionsEstablished,
 	}
 
 	if f.Detail.BGPTimerUpMsec != nil {
-		peer.Uptime = *f.Detail.BGPTimerUpMsec / 1000
-		peer.HasUptime = true
-	}
-	if f.Detail.MessageStats.TotalRecv != nil {
-		peer.MessagesIn = *f.Detail.MessageStats.TotalRecv
-		peer.HasMessagesIn = true
-	}
-	if f.Detail.MessageStats.TotalSent != nil {
-		peer.MessagesOut = *f.Detail.MessageStats.TotalSent
-		peer.HasMessagesOut = true
-	}
-	if f.Detail.MessageStats.UpdatesRecv != nil {
-		peer.UpdatesIn = *f.Detail.MessageStats.UpdatesRecv
-		peer.HasUpdatesIn = true
-	}
-	if f.Detail.MessageStats.UpdatesSent != nil {
-		peer.UpdatesOut = *f.Detail.MessageStats.UpdatesSent
-		peer.HasUpdatesOut = true
-	}
-	if f.Detail.ConnectionsDropped != nil {
-		peer.Flaps = *f.Detail.ConnectionsDropped
-		peer.HasFlaps = true
-	}
-	if f.Detail.ConnectionsEstablished != nil {
-		peer.Established = *f.Detail.ConnectionsEstablished
-		peer.HasEstablished = true
+		peer.Uptime = new(*f.Detail.BGPTimerUpMsec / 1000)
 	}
 
 	for afName, af := range f.Detail.AddressFamilyInfo {
 		afi, safi := splitFRRAddressFamily(afName)
 		counter := bgpPrefixCounter{
-			AFI:  afi,
-			SAFI: safi,
-		}
-		if af.AcceptedPrefixCounter != nil {
-			counter.IncomingAccepted = *af.AcceptedPrefixCounter
-			counter.HasIncomingAccepted = true
-		}
-		if af.SentPrefixCounter != nil {
-			counter.OutgoingAdvertised = *af.SentPrefixCounter
-			counter.HasOutgoingAdvertised = true
+			AFI:                afi,
+			SAFI:               safi,
+			IncomingAccepted:   af.AcceptedPrefixCounter,
+			OutgoingAdvertised: af.SentPrefixCounter,
 		}
 		peer.PrefixCounters = append(peer.PrefixCounters, counter)
 	}
@@ -282,9 +258,7 @@ func mergeBGPRouterNames(
 	summary bgpRouterSummary,
 ) (next map[string]string, missingIDs, ambiguousIDs int) {
 	next = make(map[string]string, len(summary.names)+len(peers))
-	for id, name := range summary.names {
-		next[id] = name
-	}
+	maps.Copy(next, summary.names)
 
 	current := make(map[string]bool)
 	for _, peer := range peers {

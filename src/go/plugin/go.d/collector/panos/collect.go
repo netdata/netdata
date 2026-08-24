@@ -129,45 +129,45 @@ func (c *Collector) collectPeerMetrics(peers []bgpPeer) bool {
 	for _, peer := range peers {
 		labels := peerLabelValues(peer)
 		observeStateSetVec(c.metrics.bgp.peerState, peer.State, labels...)
-		if peer.HasUptime {
-			c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(peer.Uptime))
+		if peer.Uptime != nil {
+			c.metrics.bgp.peerUptime.WithLabelValues(labels...).Observe(float64(*peer.Uptime))
 		}
-		if peer.HasMessagesIn {
-			c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesIn))
+		if peer.MessagesIn != nil {
+			c.metrics.bgp.peerMessagesIn.WithLabelValues(labels...).ObserveTotal(float64(*peer.MessagesIn))
 		}
-		if peer.HasMessagesOut {
-			c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.MessagesOut))
+		if peer.MessagesOut != nil {
+			c.metrics.bgp.peerMessagesOut.WithLabelValues(labels...).ObserveTotal(float64(*peer.MessagesOut))
 		}
-		if peer.HasUpdatesIn {
-			c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesIn))
+		if peer.UpdatesIn != nil {
+			c.metrics.bgp.peerUpdatesIn.WithLabelValues(labels...).ObserveTotal(float64(*peer.UpdatesIn))
 		}
-		if peer.HasUpdatesOut {
-			c.metrics.bgp.peerUpdatesOut.WithLabelValues(labels...).ObserveTotal(float64(peer.UpdatesOut))
+		if peer.UpdatesOut != nil {
+			c.metrics.bgp.peerUpdatesOut.WithLabelValues(labels...).ObserveTotal(float64(*peer.UpdatesOut))
 		}
-		if peer.HasFlaps {
-			c.metrics.bgp.peerFlaps.WithLabelValues(labels...).ObserveTotal(float64(peer.Flaps))
+		if peer.Flaps != nil {
+			c.metrics.bgp.peerFlaps.WithLabelValues(labels...).ObserveTotal(float64(*peer.Flaps))
 		}
-		if peer.HasEstablished {
-			c.metrics.bgp.peerEstablishedTransitions.WithLabelValues(labels...).ObserveTotal(float64(peer.Established))
+		if peer.Established != nil {
+			c.metrics.bgp.peerEstablishedTransitions.WithLabelValues(labels...).ObserveTotal(float64(*peer.Established))
 		}
 
 		for _, counter := range peer.PrefixCounters {
 			prefixLabels := prefixLabelValues(peer, counter)
-			if counter.HasIncomingTotal {
+			if counter.IncomingTotal != nil {
 				c.metrics.bgp.peerPrefixesReceivedTotal.WithLabelValues(prefixLabels...).
-					Observe(float64(counter.IncomingTotal))
+					Observe(float64(*counter.IncomingTotal))
 			}
-			if counter.HasIncomingAccepted {
+			if counter.IncomingAccepted != nil {
 				c.metrics.bgp.peerPrefixesReceivedAccepted.WithLabelValues(prefixLabels...).
-					Observe(float64(counter.IncomingAccepted))
+					Observe(float64(*counter.IncomingAccepted))
 			}
-			if counter.HasIncomingRejected {
+			if counter.IncomingRejected != nil {
 				c.metrics.bgp.peerPrefixesReceivedRejected.WithLabelValues(prefixLabels...).
-					Observe(float64(counter.IncomingRejected))
+					Observe(float64(*counter.IncomingRejected))
 			}
-			if counter.HasOutgoingAdvertised {
+			if counter.OutgoingAdvertised != nil {
 				c.metrics.bgp.peerPrefixesAdvertised.WithLabelValues(prefixLabels...).
-					Observe(float64(counter.OutgoingAdvertised))
+					Observe(float64(*counter.OutgoingAdvertised))
 			}
 		}
 	}

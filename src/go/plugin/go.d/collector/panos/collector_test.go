@@ -2273,7 +2273,7 @@ func TestParseBGPPeers(t *testing.T) {
 				assert.Equal(t, "lr-a", peers[0].VR)
 				assert.Equal(t, "203.0.113.1", peers[0].PeerAddress)
 				assert.Equal(t, "openconfirm", peers[0].State)
-				assert.Equal(t, int64(93784), peers[0].Uptime)
+				assert.Equal(t, new(int64(93784)), peers[0].Uptime)
 			},
 		},
 		"advanced routing engine json": {
@@ -2292,36 +2292,30 @@ func TestParseBGPPeers(t *testing.T) {
 				assert.Equal(t, "established", est.State)
 				assert.Equal(t, "65020", est.RemoteAS)
 				assert.Equal(t, "core", est.PeerGroup)
-				assert.True(t, est.HasUptime)
-				assert.Equal(t, int64(1136150), est.Uptime)
-				assert.Equal(t, int64(189375), est.MessagesIn)
-				assert.True(t, est.HasMessagesIn)
-				assert.True(t, est.HasMessagesOut)
-				assert.True(t, est.HasUpdatesIn)
-				assert.True(t, est.HasUpdatesOut)
-				assert.True(t, est.HasFlaps)
-				assert.True(t, est.HasEstablished)
+				assert.Equal(t, new(int64(1136150)), est.Uptime)
+				assert.Equal(t, new(int64(189375)), est.MessagesIn)
+				assert.NotNil(t, est.MessagesOut)
+				assert.NotNil(t, est.UpdatesIn)
+				assert.NotNil(t, est.UpdatesOut)
+				assert.NotNil(t, est.Flaps)
+				assert.NotNil(t, est.Established)
 				require.Len(t, est.PrefixCounters, 1)
 				assert.Equal(t, "ipv4", est.PrefixCounters[0].AFI)
 				assert.Equal(t, "unicast", est.PrefixCounters[0].SAFI)
-				assert.True(t, est.PrefixCounters[0].HasIncomingAccepted)
-				assert.Equal(t, int64(9), est.PrefixCounters[0].IncomingAccepted)
-				assert.True(t, est.PrefixCounters[0].HasOutgoingAdvertised)
-				assert.Equal(t, int64(5), est.PrefixCounters[0].OutgoingAdvertised)
-				assert.False(t, est.PrefixCounters[0].HasIncomingTotal)
-				assert.False(t, est.PrefixCounters[0].HasIncomingRejected)
+				assert.Equal(t, new(int64(9)), est.PrefixCounters[0].IncomingAccepted)
+				assert.Equal(t, new(int64(5)), est.PrefixCounters[0].OutgoingAdvertised)
+				assert.Nil(t, est.PrefixCounters[0].IncomingTotal)
+				assert.Nil(t, est.PrefixCounters[0].IncomingRejected)
 
 				con := byName["203.0.113.10"]
 				assert.Equal(t, "connect", con.State)
-				assert.False(t, con.HasUptime)
-				assert.Equal(t, int64(0), con.Uptime)
-				assert.True(t, con.HasMessagesIn)
-				assert.True(t, con.HasFlaps)
-				assert.True(t, con.HasEstablished)
+				assert.Nil(t, con.Uptime)
+				assert.NotNil(t, con.MessagesIn)
+				assert.NotNil(t, con.Flaps)
+				assert.NotNil(t, con.Established)
 				require.Len(t, con.PrefixCounters, 1)
-				assert.True(t, con.PrefixCounters[0].HasIncomingAccepted)
-				assert.Equal(t, int64(0), con.PrefixCounters[0].IncomingAccepted)
-				assert.False(t, con.PrefixCounters[0].HasOutgoingAdvertised)
+				assert.Equal(t, new(int64(0)), con.PrefixCounters[0].IncomingAccepted)
+				assert.Nil(t, con.PrefixCounters[0].OutgoingAdvertised)
 			},
 		},
 		"advanced routing engine null peer entry": {
@@ -2361,7 +2355,7 @@ func TestParseBGPPeers(t *testing.T) {
 			wantErr: `BGP peer entry 192.0.2.1: BGP peer 192.0.2.1 msg-total-in: invalid integer "abc"`,
 			validate: func(t *testing.T, peers []bgpPeer) {
 				assert.Equal(t, "192.0.2.2", peers[0].PeerAddress)
-				assert.Equal(t, int64(120), peers[0].Uptime)
+				assert.Equal(t, new(int64(120)), peers[0].Uptime)
 			},
 		},
 		"malformed prefix counter preserves peer": {
@@ -2389,7 +2383,7 @@ func TestParseBGPPeers(t *testing.T) {
 				require.Len(t, peers[0].PrefixCounters, 1)
 				assert.Equal(t, "ipv6", peers[0].PrefixCounters[0].AFI)
 				assert.Equal(t, "unicast", peers[0].PrefixCounters[0].SAFI)
-				assert.Equal(t, int64(7), peers[0].PrefixCounters[0].IncomingTotal)
+				assert.Equal(t, new(int64(7)), peers[0].PrefixCounters[0].IncomingTotal)
 			},
 		},
 		"deduplicates same vr and peer": {
@@ -2401,7 +2395,7 @@ func TestParseBGPPeers(t *testing.T) {
 			validate: func(t *testing.T, peers []bgpPeer) {
 				assert.Equal(t, "192.0.2.1", peers[0].PeerAddress)
 				assert.Equal(t, "established", peers[0].State)
-				assert.Equal(t, int64(10), peers[0].MessagesIn)
+				assert.Equal(t, new(int64(10)), peers[0].MessagesIn)
 			},
 		},
 		"uses peer name when peer address is missing": {
@@ -2448,7 +2442,7 @@ func TestParseBGPPeers(t *testing.T) {
 				require.Len(t, peers[0].PrefixCounters, 1)
 				assert.Equal(t, "unknown", peers[0].PrefixCounters[0].AFI)
 				assert.Equal(t, "unknown", peers[0].PrefixCounters[0].SAFI)
-				assert.Equal(t, int64(7), peers[0].PrefixCounters[0].IncomingTotal)
+				assert.Equal(t, new(int64(7)), peers[0].PrefixCounters[0].IncomingTotal)
 			},
 		},
 		"container entries without peer data are skipped": {
@@ -2481,7 +2475,7 @@ func TestParseBGPPeers(t *testing.T) {
 				</result></response>`),
 			wantLen: 1,
 			validate: func(t *testing.T, peers []bgpPeer) {
-				assert.Equal(t, int64(0), peers[0].Uptime)
+				assert.Equal(t, new(int64(0)), peers[0].Uptime)
 			},
 		},
 	}
