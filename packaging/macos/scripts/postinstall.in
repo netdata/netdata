@@ -98,12 +98,31 @@ done
 #
 # launchd: replace whatever registration exists and start the daemon.
 # preinstall booted out a running job; an upgrade may still have the label
-# registered from the old payload.
+# registered from the old payload, and teardown is asynchronous - a
+# bootstrap racing it fails with EIO - so both the bootout wait and the
+# bootstrap itself retry.
 #
 if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
     /bin/launchctl bootout "system/${LABEL}" 2>/dev/null || true
+    i=0
+    while [ "${i}" -lt 60 ] && /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; do
+        sleep 1
+        i=$((i + 1))
+    done
 fi
+
 log "bootstrapping ${LABEL}"
-/bin/launchctl bootstrap system "${PLIST}"
+i=0
+while :; do
+    if /bin/launchctl bootstrap system "${PLIST}"; then
+        break
+    fi
+    i=$((i + 1))
+    if [ "${i}" -ge 30 ]; then
+        echo "netdata postinstall: launchctl bootstrap kept failing" >&2
+        exit 1
+    fi
+    sleep 2
+done
 
 exit 0
